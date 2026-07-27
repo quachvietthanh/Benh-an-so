@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
-import { loginUser } from '../services/mockDataService'
+import authApi from '../api/authApi'
 
 const AuthContext = createContext(null)
 
@@ -18,23 +18,25 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const data = loginUser(credentials)
+      const response = await authApi.login(credentials)
+      const data = response.data
 
       const normalizedUser = {
-        id: data.id,
+        id: data.userId,
         username: data.username,
-        fullName: data.fullName,
-        email: data.email,
-        roles: data.roles,
+        fullName: data.username,
+        roles: data.role ? [data.role.toLowerCase()] : [],
+        expiredAt: data.expiredAt,
       }
 
-      localStorage.setItem('token', data.token)
+      localStorage.setItem('token', data.accessToken)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       setUser(normalizedUser)
 
       return { success: true }
     } catch (error) {
-      return { success: false, message: error.message || 'Đăng nhập thất bại' }
+      const message = error.response?.data?.message || 'Không thể kết nối đến máy chủ'
+      return { success: false, message }
     }
   }
 

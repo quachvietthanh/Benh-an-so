@@ -110,6 +110,29 @@
   margin-top: 4px;
 }
 
+.bsa2-foot span {
+  display: block;
+  margin-top: 8px;
+}
+
+.bsa2-lookup-link {
+  color: #1769d2;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bsa2-lookup-link:hover {
+  color: #0d4fa6;
+  text-decoration: underline;
+}
+
+.bsa2-lookup-link:focus-visible {
+  border-radius: 4px;
+  outline: 3px solid rgb(23 105 210 / 24%);
+  outline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .bsa2-pulse {
     stroke-dasharray: 400;

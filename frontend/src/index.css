@@ -1,158 +1,103 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 :root {
-  --primary-color: #0ea5e9;
-  --primary-light: #e0f2fe;
-  --primary-dark: #0284c7;
-  --secondary-color: #10b981;
-  --danger-color: #ef4444;
+  --primary-color: #176ee8;
+  --primary-dark: #1254b8;
+  --primary-light: #eaf3ff;
+  --success-color: #16a66a;
   --warning-color: #f59e0b;
-  --bg-color: #f8fafc;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
+  --danger-color: #ef4444;
+  --bg-color: #f4f7fb;
+  --text-primary: #172033;
+  --text-secondary: #718096;
   --border-color: #e2e8f0;
-  --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --card-shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.5);
-  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
-  --border-radius-lg: 16px;
-  --border-radius-md: 12px;
-  --border-radius-sm: 8px;
-  --transition-fast: 0.2s ease-in-out;
-  --transition-normal: 0.3s ease-in-out;
+  --card-shadow: 0 5px 18px rgba(37, 61, 95, 0.06);
+  color: var(--text-primary);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: var(--bg-color);
+  min-height: 100vh;
   color: var(--text-primary);
-  margin: 0;
+  background: var(--bg-color);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== Ant Design Overrides ===== */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 .ant-layout {
   min-height: 100vh;
-  background: var(--bg-color) !important;
-}
-
-.ant-layout-sider {
-  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.05);
-  z-index: 10;
-}
-
-.ant-layout-header {
-  background: var(--glass-bg) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 0 24px !important;
-  box-shadow: var(--glass-shadow);
-  border-bottom: var(--glass-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 9;
+  background: var(--bg-color);
 }
 
 .ant-card {
-  border-radius: var(--border-radius-lg) !important;
-  box-shadow: var(--card-shadow) !important;
-  border: 1px solid var(--border-color) !important;
-  transition: all var(--transition-normal);
-  background: white;
-}
-
-.ant-card:hover {
-  box-shadow: var(--card-shadow-hover) !important;
-  transform: translateY(-2px);
+  border-color: var(--border-color) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--card-shadow);
 }
 
 .ant-table-wrapper {
-  background: white;
-  border-radius: var(--border-radius-lg);
-  padding: 16px;
-  box-shadow: var(--card-shadow);
+  padding: 14px;
+  overflow-x: auto;
+  background: #ffffff;
   border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
 }
 
 .ant-table-thead > tr > th {
-  background-color: var(--primary-light) !important;
-  color: var(--primary-dark) !important;
-  font-weight: 600 !important;
+  color: #40516c !important;
+  font-size: 12px;
+  font-weight: 650 !important;
+  background: #f6f8fb !important;
 }
 
-.ant-btn {
-  border-radius: var(--border-radius-sm) !important;
-  transition: all var(--transition-fast) !important;
+.ant-btn,
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-picker,
+.ant-select-selector {
+  border-radius: 7px !important;
 }
 
 .ant-btn-primary {
-  background-color: var(--primary-color);
-  box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.2);
-}
-
-.ant-btn-primary:hover {
-  background-color: var(--primary-dark) !important;
-  box-shadow: 0 6px 8px -1px rgba(14, 165, 233, 0.3) !important;
-  transform: translateY(-1px);
-}
-
-.ant-input, .ant-picker, .ant-select-selector {
-  border-radius: var(--border-radius-sm) !important;
-}
-
-.logo {
-  height: 48px;
-  margin: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
-  border-radius: var(--border-radius-md);
-  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3);
-  transition: all var(--transition-normal);
-}
-
-.logo:hover {
-  transform: scale(1.02);
-  box-shadow: 0 6px 12px rgba(14, 165, 233, 0.4);
+  background: var(--primary-color);
+  box-shadow: 0 4px 10px rgba(23, 110, 232, 0.18);
 }
 
 .page-header {
-  margin-bottom: 24px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
 }
 
 .page-title {
   margin: 0 !important;
-  color: var(--text-primary);
-  font-weight: 700 !important;
-  letter-spacing: -0.5px;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
@@ -160,10 +105,47 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  background: #b8c4d4;
+  border-radius: 99px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* ==========================================================
+ * Mobile Responsive Optimizations for Doctors (NCL-10-CN-004)
+ * ========================================================== */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ant-card-body {
+    padding: 14px !important;
+  }
+
+  .ant-descriptions {
+    font-size: 13px;
+  }
+
+  .ant-descriptions-item-label,
+  .ant-descriptions-item-content {
+    padding: 8px 10px !important;
+  }
+
+  .ant-modal {
+    max-width: 95vw !important;
+    margin: 10px auto !important;
+  }
+
+  .ant-modal-body {
+    padding: 12px !important;
+  }
+
+  .ant-table {
+    font-size: 13px;
+  }
+
+  .ant-tabs-nav-list {
+    flex-wrap: wrap;
+  }
 }
