@@ -1,0 +1,359 @@
+/* Layout, Header, Sidebar & Navigation Styles */
+
+.clinic-shell {
+  min-height: 100vh;
+}
+
+.clinic-sider.ant-layout-sider {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(165deg, #073866 0%, #05315e 55%, #03284e 100%) !important;
+  box-shadow: 5px 0 22px rgba(14, 65, 145, 0.16);
+}
+
+.clinic-sider .ant-layout-sider-children {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.clinic-brand {
+  display: flex;
+  align-items: center;
+  min-height: 78px;
+  padding: 12px 17px;
+  color: #ffffff;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+
+.clinic-brand-icon {
+  display: grid;
+  flex: 0 0 39px;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  color: #2071d8;
+  font-size: 22px;
+  background: #ffffff;
+  border-radius: 9px;
+  box-shadow: 0 5px 12px rgba(6, 42, 101, 0.18);
+}
+
+.clinic-brand-copy {
+  display: flex;
+  min-width: 0;
+  margin-left: 11px;
+  flex-direction: column;
+}
+
+.clinic-brand-copy strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clinic-brand-copy small {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.clinic-menu.ant-menu-dark {
+  display: flex;
+  min-height: 0;
+  padding: 8px 10px 6px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: transparent;
+  border-inline-end: 0;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-width: thin;
+}
+
+.clinic-menu.ant-menu-dark > .ant-menu-item,
+.clinic-menu.ant-menu-dark > .ant-menu-item-group {
+  flex: 0 0 auto;
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-item-group-title {
+  padding: 4px 10px 3px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-size: 8px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-item-group-list {
+  margin: 0 !important;
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-item {
+  display: flex;
+  height: 36px;
+  min-height: 36px;
+  margin: 1px 0;
+  padding-block: 0;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 36px;
+  white-space: nowrap;
+  border-radius: 6px;
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-item .anticon {
+  min-width: 16px;
+  font-size: 14px;
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-title-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-item:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-item-selected {
+  color: #ffffff;
+  font-weight: 650;
+  background: linear-gradient(90deg, rgba(115, 176, 255, 0.48), rgba(133, 187, 255, 0.3));
+  box-shadow: inset 3px 0 0 #ffffff, 0 5px 14px rgba(5, 45, 107, 0.14);
+}
+
+.clinic-sider.ant-layout-sider-collapsed .clinic-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.clinic-sider.ant-layout-sider-collapsed .clinic-menu {
+  padding-inline: 8px;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.clinic-sider.ant-layout-sider-collapsed .clinic-menu .ant-menu-item-group-title {
+  display: none;
+}
+
+.clinic-sider.ant-layout-sider-collapsed .clinic-menu .ant-menu-item {
+  justify-content: center;
+  padding-inline: 0 !important;
+}
+
+.clinic-sider.ant-layout-sider-collapsed .clinic-menu .ant-menu-item .anticon {
+  margin: 0;
+}
+
+.sidebar-collapse {
+  display: flex;
+  width: calc(100% - 20px);
+  min-height: 50px;
+  margin: 0 10px;
+  padding: 0 12px;
+  align-items: center;
+  flex: 0 0 50px;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 10px;
+  font-weight: 520;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+}
+
+.sidebar-collapse:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sidebar-collapse .anticon {
+  flex: 0 0 16px;
+  font-size: 14px;
+}
+
+.clinic-sider.ant-layout-sider-collapsed .sidebar-collapse {
+  justify-content: center;
+  margin-inline: 10px;
+  padding-inline: 0;
+}
+
+.clinic-main-layout {
+  min-width: 0;
+}
+
+.clinic-header.ant-layout-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 20px !important;
+  line-height: normal;
+  background: rgba(255, 255, 255, 0.97) !important;
+  border-bottom: 1px solid #e4e9f0;
+  box-shadow: 0 2px 10px rgba(42, 61, 87, 0.035);
+  backdrop-filter: blur(10px);
+}
+
+.sidebar-trigger,
+.notification-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  color: #52627a;
+  font-size: 17px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sidebar-trigger:hover,
+.notification-button:hover {
+  color: #176ee8;
+  background: #eef5ff;
+}
+
+.clinic-search.ant-input-affix-wrapper {
+  width: min(460px, 46vw);
+  height: 39px;
+  margin-left: 0;
+  padding-inline: 12px;
+  background: #ffffff;
+  border-color: #dbe3ee;
+  border-radius: 7px !important;
+  box-shadow: 0 2px 8px rgba(37, 61, 95, 0.025);
+}
+
+.clinic-search .ant-input-prefix {
+  margin-right: 10px;
+  color: #708199;
+}
+
+.clinic-search input {
+  font-size: 12px;
+}
+
+.clinic-search input::placeholder {
+  color: #8997aa;
+}
+
+.clinic-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: auto;
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  min-width: 180px;
+  padding: 3px 2px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.header-avatar {
+  color: #ffffff !important;
+  background: linear-gradient(145deg, #345f8e, #173d69) !important;
+}
+
+.header-user-copy {
+  display: flex;
+  min-width: 0;
+  margin-left: 9px;
+  flex: 1;
+  flex-direction: column;
+  text-align: left;
+}
+
+.header-user-copy strong {
+  overflow: hidden;
+  color: #25344d;
+  font-size: 12px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-user-copy small {
+  margin-top: 3px;
+  color: #7c899b;
+  font-size: 9px;
+}
+
+.header-user > .anticon:last-child {
+  color: #64748b;
+  font-size: 9px;
+}
+
+.clinic-content {
+  min-height: calc(100vh - 64px);
+  padding: 14px 18px 24px;
+  background: #f4f7fb;
+}
+
+.page-transition {
+  width: 100%;
+  max-width: 1540px;
+  margin: 0 auto;
+  animation: page-in 220ms ease-out;
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-loading {
+  display: grid;
+  min-height: 360px;
+  place-items: center;
+}
+
+.compact-dashboard {
+  width: 100%;
+}
+
+.dashboard-title {
+  margin: 0 0 12px;
+  color: #172033;
+  font-size: 20px;
+  font-weight: 730;
+  line-height: 1.25;
+}
+
+.compact-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
