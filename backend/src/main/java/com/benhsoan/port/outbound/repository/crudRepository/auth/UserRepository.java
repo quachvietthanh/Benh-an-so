@@ -19,4 +19,6 @@ public interface UserRepository extends BaseRepository<User, UUID> {
     boolean existsByEmail(String email);
 
     List<User> findAllById(List<UUID> ids);
+
+    List<User> findAllActiveByRoleId(UUID roleId);
 }

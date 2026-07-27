@@ -77,4 +77,12 @@ public class UserRepositoryAdapter implements UserRepository {
                 .map(mapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<User> findAllActiveByRoleId(UUID roleId) {
+        return jpaRepository.findAllByRoleIdAndActiveTrue(roleId)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
 }

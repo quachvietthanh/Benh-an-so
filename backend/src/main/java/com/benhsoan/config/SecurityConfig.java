@@ -72,6 +72,8 @@ public class SecurityConfig {
 
                                                 // ===== ADMIN =====
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
+                                                .requestMatchers(HttpMethod.GET, "/users/doctors")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
                                                 .requestMatchers("/users/**").hasRole("ADMIN")
                                                 .requestMatchers("/audit-logs/**").hasRole("ADMIN")
 

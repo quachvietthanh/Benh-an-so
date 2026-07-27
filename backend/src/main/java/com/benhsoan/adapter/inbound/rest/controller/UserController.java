@@ -26,6 +26,7 @@ import com.benhsoan.port.inbound.user.CreateUserUseCase;
 import com.benhsoan.port.inbound.user.DeactivateUserUseCase;
 import com.benhsoan.port.inbound.user.DeleteUserUseCase;
 import com.benhsoan.port.inbound.user.GetAllUsersUseCase;
+import com.benhsoan.port.inbound.user.GetDoctorsUseCase;
 import com.benhsoan.port.inbound.user.GetUserUseCase;
 import com.benhsoan.port.inbound.user.UpdateUserUseCase;
 
@@ -39,6 +40,7 @@ public class UserController {
 
     private final CreateUserUseCase createUserUseCase;
     private final GetAllUsersUseCase getUsersUseCase;
+    private final GetDoctorsUseCase getDoctorsUseCase;
     private final GetUserUseCase getUserUseCase;
     private final UpdateUserUseCase updateUserUseCase;
     private final DeleteUserUseCase deleteUserUseCase;
@@ -66,6 +68,14 @@ public class UserController {
 
         return userRestMapper.toResponse(
                 getUsersUseCase.getAll());
+    }
+
+    @GetMapping("/doctors")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    public List<UserResponse> getDoctors() {
+
+        return userRestMapper.toResponse(
+                getDoctorsUseCase.getAllActiveDoctors());
     }
 
     @GetMapping("/{id}")
