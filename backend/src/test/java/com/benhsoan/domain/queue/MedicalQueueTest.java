@@ -1,10 +1,12 @@
 package com.benhsoan.domain.queue;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -279,8 +281,7 @@ class MedicalQueueTest {
                     1, QueueStatus.IN_PROGRESS, PriorityLevel.EMERGENCY,
                     "Some notes", null, null, null,
                     null, null, null, null,
-                    createdBy, Instant.now(), Instant.now(),
-                    null
+                    createdBy, Instant.now(), Instant.now()
             );
 
             assertEquals(id, restored.getId());

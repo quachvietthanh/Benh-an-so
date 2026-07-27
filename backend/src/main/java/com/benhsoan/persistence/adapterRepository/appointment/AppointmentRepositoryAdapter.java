@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.appointment.Appointment;
@@ -36,11 +37,11 @@ public class AppointmentRepositoryAdapter
     @Override
     public Appointment save(Appointment appointment) {
 
-        AppointmentEntity entity =
-                mapper.toEntity(appointment);
+        AppointmentEntity entity
+                = mapper.toEntity(appointment);
 
-        AppointmentEntity savedEntity =
-                jpaRepository.save(entity);
+        AppointmentEntity savedEntity
+                = jpaRepository.save(entity);
 
         return mapper.toDomain(savedEntity);
     }
@@ -100,15 +101,12 @@ public class AppointmentRepositoryAdapter
     ) {
 
         return jpaRepository.exists(
-
                 AppointmentBusinessSpecification
                         .hasDoctor(doctorId)
-
                         .and(
                                 AppointmentBusinessSpecification
-                                        .notCancelled()
+                                        .active()
                         )
-
                         .and(
                                 AppointmentBusinessSpecification
                                         .overlap(
@@ -116,8 +114,20 @@ public class AppointmentRepositoryAdapter
                                                 endTime
                                         )
                         )
-
         );
+
+    }
+
+    @Override
+    public Page<Appointment> findOverdue(
+            Instant threshold,
+            Pageable pageable
+    ) {
+
+        return jpaRepository.findAll(
+                AppointmentBusinessSpecification.overdue(threshold),
+                pageable
+        ).map(mapper::toDomain);
 
     }
 
