@@ -36,6 +36,7 @@ import {
 import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
 import patientApi from '../api/patientApi'
+import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
 import { getAppointments, getPatients } from '../services/mockDataService'
 import {
@@ -161,7 +162,7 @@ function AppointmentQueue() {
         appointmentApi.getAll(),
         appointmentApi.getQueue(),
         includeDirectories ? loadPatientDirectory() : Promise.resolve(null),
-        includeDirectories ? appointmentApi.getDoctors() : Promise.resolve(null),
+        includeDirectories ? userApi.getDoctors() : Promise.resolve(null),
       ])
 
       let hasSuccess = false
@@ -369,6 +370,9 @@ function AppointmentQueue() {
   }
 
   const createAppointment = async (values) => {
+    const startTime = values.appointmentAt.toISOString()
+    const endTime = values.appointmentAt.add(30, 'minute').toISOString()
+
     setSaving(true)
     const appointmentAt = values.appointmentAt ? values.appointmentAt : dayjs().add(10, 'minute')
     const startTime = appointmentAt.toISOString()
