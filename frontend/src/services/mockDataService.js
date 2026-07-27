@@ -20,6 +20,7 @@ import {
   BarChartOutlined,
   SettingOutlined,
   SafetyCertificateOutlined,
+  BellOutlined,
 } from '@ant-design/icons'
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
@@ -43,7 +44,7 @@ export const getNavigationItems = (roles = []) => {
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: DollarCircleOutlined, roles: ['admin', 'manager', 'receptionist'] },
     { key: '/reports', label: 'Báo cáo vận hành & nhật ký', icon: BarChartOutlined, roles: ['admin', 'manager'] },
     { key: '/system-management', label: 'Quản trị hệ thống & dịch vụ', icon: SettingOutlined, roles: ['admin'] },
-    { key: '/public-lookup', label: 'Chăm sóc sau khám & tra cứu', icon: SafetyCertificateOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist', 'pharmacist'] },
+    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SafetyCertificateOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist', 'pharmacist'] },
   ]
 
   return allItems.filter((item) => item.roles.some((role) => roles.includes(role)))
@@ -61,71 +62,26 @@ export const loginUser = ({ username, password }) => {
   }
 }
 
-export const getDashboardStats = () => ({
-  totalPatients: demoPatients.length,
-  totalRecords: demoMedicalRecords.length,
-  activeQueue: demoAppointments.filter((appointment) => appointment.status === 'CHECKED_IN').length,
-  revenueToday: 2850000,
-})
+export const getDashboardStats = () => {
+  const totalPatients = demoPatients.length
+  const todayAppointments = demoAppointments.filter((item) => item.date === '2026-03-30').length
+  const pendingExaminations = demoAppointments.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED').length
+  const totalRevenue = demoInvoices.reduce((sum, item) => sum + item.totalAmount, 0)
 
-export const getPatients = (keyword = '') => {
-  const q = keyword.toLowerCase()
-  return clone(demoPatients.filter((patient) => !q || patient.fullName.toLowerCase().includes(q) || patient.patientCode.toLowerCase().includes(q) || patient.phoneNumber.includes(q)))
-}
-
-export const getPatientById = (id) => clone(demoPatients.find((patient) => patient.id === id))
-
-export const createPatient = (payload) => {
-  const patient = {
-    id: `p${Date.now()}`,
-    patientCode: `BN-${Date.now().toString().slice(-4)}`,
-    ...payload,
+  return {
+    totalPatients,
+    todayAppointments,
+    pendingExaminations,
+    totalRevenue,
   }
-  demoPatients.unshift(patient)
-  return clone(patient)
 }
 
+export const getPatients = () => clone(demoPatients)
 export const getAppointments = () => clone(demoAppointments)
-
-export const updateAppointmentStatus = (id, status) => {
-  const appointment = demoAppointments.find((item) => item.id === id)
-  if (appointment) {
-    appointment.status = status
-  }
-  return clone(appointment)
-}
-
 export const getMedicalRecords = () => clone(demoMedicalRecords)
-
-export const getMedicalRecordById = (id) => clone(demoMedicalRecords.find((record) => record.id === id))
-
 export const getMedicines = () => clone(demoMedicines)
-
-export const updateMedicineStock = (id, stockChange) => {
-  const medicine = demoMedicines.find((item) => item.id === id)
-  if (medicine) {
-    medicine.stock = Math.max(0, medicine.stock + stockChange)
-  }
-  return clone(medicine)
-}
-
 export const getInvoices = () => clone(demoInvoices)
-
 export const getAuditLogs = () => clone(demoAuditLogs)
-
-export const getUsers = () => clone(demoUsers)
-
 export const getServices = () => clone(demoServices)
-
 export const getPrescriptions = () => clone(demoPrescriptions)
-
-export const checkDrugInteractions = (selectedDrugIds) => {
-  const warnings = []
-  drugInteractions.forEach(interaction => {
-    const hasInteraction = interaction.drugs.every(id => selectedDrugIds.includes(id))
-    if (hasInteraction) {
-      warnings.push(interaction)
-    }
-  })
-  return warnings
-}
+export const getDrugInteractions = () => clone(drugInteractions)

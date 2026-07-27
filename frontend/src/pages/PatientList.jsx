@@ -121,11 +121,20 @@ function PatientList() {
         insuranceNumber: values.insuranceNumber || null,
       }
       const response = await patientApi.create(payload)
-      message.success(`Tạo hồ sơ thành công: ${response.data.patientCode}`)
+      const newPatient = response.data || { id: values.patientCode, fullName: values.fullName }
+      message.success(`Tạo hồ sơ thành công: ${newPatient.patientCode || ''}`)
       setRegisterOpen(false)
       registerForm.resetFields()
       setPage(0)
       await loadPatients()
+
+      Modal.confirm({
+        title: `Đã tạo thành công bệnh nhân: ${newPatient.fullName}`,
+        content: 'Bạn có muốn CHUYỂN SANG BƯỚC TIẾP THEO (Đặt lịch khám & Xếp hàng) cho bệnh nhân này không?',
+        okText: 'Chuyển sang Đặt lịch khám',
+        cancelText: 'Về danh sách bệnh nhân',
+        onOk: () => navigate('/appointments', { state: { patientId: newPatient.id, patientName: newPatient.fullName } }),
+      })
     } catch (error) {
       message.error(error.response?.data?.message || 'Không thể tạo hồ sơ bệnh nhân')
     } finally {
@@ -152,23 +161,87 @@ function PatientList() {
       return
     }
 
-    const headings = ['Mã bệnh nhân', 'Họ và tên', 'Giới tính', 'Ngày sinh', 'Số điện thoại', 'CCCD', 'Địa chỉ', 'Trạng thái']
-    const rows = filteredPatients.map((patient) => [
-      patient.patientCode,
-      patient.fullName,
-      patient.gender === 'FEMALE' ? 'Nữ' : patient.gender === 'MALE' ? 'Nam' : 'Khác',
-      formatDate(patient.dateOfBirth),
-      patient.phone || '',
-      patient.identityNumber || '',
-      patient.address || '',
-      getPatientStatus(patient).label,
-    ])
-    const escapeCell = (value) => `"${String(value).replaceAll('"', '""')}"`
-    const csv = [headings, ...rows].map((row) => row.map(escapeCell).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const headers = [
+      'TÊN PHÒNG KHÁM',
+      'TÊN BỆNH NHÂN',
+      'MÃ BỆNH NHÂN',
+      'GIỚI TÍNH',
+      'SĐT',
+      'EMAIL',
+      'NGÀY NHẬP VIỆN',
+      'THÔNG TIN BỆNH',
+      'THÔNG TIN ĐƠN THUỐC',
+    ]
+
+    const escapeXml = (str) => {
+      if (str === null || str === undefined) return ''
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;')
+    }
+
+    const rowsXml = filteredPatients.map((patient, index) => {
+      const clinicName = patient.clinicName || patient.roomName || patient.department || patient.room || `Phòng khám ${index + 1}`
+      const fullName = patient.fullName || patient.name || ''
+      const patientCode = patient.patientCode || patient.code || ''
+      const gender = patient.gender === 'FEMALE' ? 'Nữ' : patient.gender === 'MALE' ? 'Nam' : (patient.gender || '')
+      const phone = patient.phone || patient.phoneNumber || ''
+      const email = patient.email || ''
+      const admissionDate = patient.admissionDate || patient.hospitalizationDate || patient.visitDate || (patient.createdAt ? formatDate(patient.createdAt) : '')
+      const diseaseInfo = patient.medicalCondition || patient.diagnosis || patient.diseaseInfo || patient.medicalHistory || ''
+      const prescriptionInfo = patient.prescriptionInfo || patient.prescription || patient.medicines || patient.treatment || ''
+
+      const cells = [clinicName, fullName, patientCode, gender, phone, email, admissionDate, diseaseInfo, prescriptionInfo]
+
+      return '   <Row>\n' +
+        cells.map((cell) => `    <Cell><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`).join('\n') +
+        '\n   </Row>'
+    }).join('\n')
+
+    const headerCellsXml = headers.map((h) => `    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join('\n')
+
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Bottom"/>
+   <Borders/>
+   <Font ss:FontName="Segoe UI" x:Family="Swiss" ss:Size="10" ss:Color="#000000"/>
+   <Interior/>
+   <NumberFormat/>
+   <Protection/>
+  </Style>
+  <Style ss:ID="HeaderStyle">
+   <Font ss:FontName="Segoe UI" x:Family="Swiss" ss:Size="10" ss:Bold="1" ss:Color="#000000"/>
+   <Interior ss:Color="#E5E7EB" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Thông tin bệnh nhân">
+  <Table>
+   <Row></Row>
+   <Row></Row>
+   <Row ss:StyleID="HeaderStyle">
+${headerCellsXml}
+   </Row>
+${rowsXml}
+  </Table>
+ </Worksheet>
+</Workbook>`
+
+    const blob = new Blob([xmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `danh-sach-benh-nhan-${dayjs().format('YYYY-MM-DD')}.csv`
+    anchor.download = `danh-sach-benh-nhan-${dayjs().format('YYYY-MM-DD')}.xls`
     anchor.click()
     URL.revokeObjectURL(url)
   }

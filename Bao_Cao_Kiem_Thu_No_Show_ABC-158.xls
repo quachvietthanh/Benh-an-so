@@ -1,0 +1,179 @@
+<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Author>Bệnh Án Số System</Author>
+  <Title>Báo Cáo Kiểm Thử No-Show ABC-158</Title>
+ </DocumentProperties>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#000000"/>
+  </Style>
+  <Style ss:ID="Header">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#1F4E78" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="CellData">
+   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="CellCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="Passed">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#006100"/>
+   <Interior ss:Color="#C6EFCE" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D9D9D9"/>
+   </Borders>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Báo Cáo Kiểm Thử ABC-158">
+  <Table ss:DefaultRowHeight="24">
+   <Column ss:Width="90"/>
+   <Column ss:Width="220"/>
+   <Column ss:Width="160"/>
+   <Column ss:Width="260"/>
+   <Column ss:Width="220"/>
+   <Column ss:Width="240"/>
+   <Column ss:Width="240"/>
+   <Column ss:Width="90"/>
+   <Column ss:Width="130"/>
+
+   <Row ss:Height="30">
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Mã Test Case</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Tên Test Case</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Phân Loại Test</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Hàm Test / Module</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Điều Kiện Đầu Vào</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Kết Quả Mong Đợi</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Kết Quả Thực Tế</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Trạng Thái</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Ghi Chú</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-01</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Kiểm tra ngưỡng 15 phút không đến</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Unit Test (Backend &amp; Frontend)</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">AppointmentServiceTest.appliesNoShowThresholdAtExactBoundary</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Lịch 09:00. Kiểm tra lúc 09:14:59.999 và 09:15:00</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Trước 15p: False (Chưa quá hạn). Từ 15p: True (Quá hạn)</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Xác nhận quá hạn đúng tại mốc 15 phút chính xác</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-155</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-02</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Đánh dấu lịch quá hạn thành NO_SHOW</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Integration / Service Test</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">AppointmentServiceTest.marksOverdueScheduledAppointmentAsNoShow</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Lịch SCHEDULED quá 16 phút. Gọi API /no-show</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Chuyển sang NO_SHOW; cập nhật updatedAt; lưu CSDL</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Chuyển trạng thái NO_SHOW và lưu DB thành công</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-156</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-03</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Từ chối đánh dấu NO_SHOW trước 15 phút</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Service / API Test</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">AppointmentServiceTest.rejectsNoShowBeforeThreshold</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Lịch SCHEDULED mới quá 14 phút. Gọi API /no-show</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Trả về HTTP 409 Conflict; không thay đổi dữ liệu</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Bị từ chối với HTTP 409 Conflict chuẩn xác</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-156</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-04</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Từ chối NO_SHOW cho lịch không ở SCHEDULED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Parameterized Test</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">AppointmentServiceTest.rejectsNoShowForNonScheduledStatuses</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Lịch ở trạng thái CHECKED_IN, COMPLETED, CANCELLED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Trả về HTTP 409 Conflict cho mọi trạng thái khác</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Bảo vệ trạng thái và trả về 409 Conflict chuẩn</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-157</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-05</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Kiểm tra lịch hẹn không tồn tại (404)</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Service / API Test</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">AppointmentServiceTest.rejectsNoShowForUnknownAppointment</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Random UUID không tồn tại trong CSDL</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Trả về HTTP 404 Not Found</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Trả về HTTP 404 Not Found chính xác</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-157</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-06</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Phân quyền thao tác đánh dấu NO_SHOW</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Security Test</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">PermissionEvaluatorTest &amp; SecurityConfig</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Tài khoản Bác sĩ / Bệnh nhân gọi API /no-show</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Trả về HTTP 403 Forbidden. Chỉ Admin/Lễ tân làm được</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Phân quyền chặt chẽ, chặn 403 đúng quy định</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-157</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-07</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Hiển thị nhãn Quá Hạn &amp; Đếm số lượng trên UI</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Frontend Component Test</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">AppointmentQueue.jsx &amp; Dashboard.jsx</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Lịch quá 15 phút hiển thị ở màn hình hàng chờ</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Hiển thị nhãn Quá Hạn (Orange); hỗ trợ bộ lọc riêng</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Giao diện cập nhật nhãn Quá Hạn &amp; bộ lọc chuẩn</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-158</Data></Cell>
+   </Row>
+
+   <Row ss:Height="26">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">TC-NS-08</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Đồng bộ tính toán thời gian Deadline Frontend</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Frontend Unit Test</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">appointmentTiming.test.js</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Hàm getNoShowDeadline &amp; isAppointmentOverdue</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Frontend tính toán thời gian quá hạn khớp 100% Server</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Tính toán thời gian chính xác từng millisecond</Data></Cell>
+    <Cell ss:StyleID="Passed"><Data ss:Type="String">PASSED</Data></Cell>
+    <Cell ss:StyleID="CellData"><Data ss:Type="String">Nghiệm thu ABC-158</Data></Cell>
+   </Row>
+  </Table>
+ </Worksheet>
+</Workbook>

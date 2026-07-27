@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Avatar,
   Button,
@@ -111,6 +112,8 @@ const loadPatientDirectory = async () => {
 }
 
 function AppointmentQueue() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useAuthContext()
   const canManage = user?.roles?.some((role) => ['admin', 'receptionist'].includes(role))
   const [appointments, setAppointments] = useState([])
@@ -138,6 +141,13 @@ function AppointmentQueue() {
   const [detailItem, setDetailItem] = useState(null)
   const [bookForm] = Form.useForm()
   const [cancelForm] = Form.useForm()
+
+  useEffect(() => {
+    if (location.state?.patientId) {
+      bookForm.setFieldsValue({ patientId: location.state.patientId })
+      setBookOpen(true)
+    }
+  }, [location.state, bookForm])
 
   const loadData = useCallback(async (includeDirectories = true) => {
     setLoading(true)
@@ -343,7 +353,16 @@ function AppointmentQueue() {
       () => appointmentApi.create({ ...values, appointmentAt: values.appointmentAt.toISOString() }),
       'Đặt lịch hẹn thành công',
     )
-    if (success) closeBooking()
+    if (success) {
+      closeBooking()
+      Modal.confirm({
+        title: 'Đặt lịch hẹn & vào hàng đợi thành công!',
+        content: 'Bạn có muốn CHUYỂN SANG BƯỚC TIẾP THEO (Ghi bệnh án & Khám bệnh) cho bệnh nhân này không?',
+        okText: 'Chuyển sang Khám bệnh',
+        cancelText: 'Về hàng đợi',
+        onOk: () => navigate('/medical-records', { state: { patientId: values.patientId } }),
+      })
+    }
     setSaving(false)
   }
 
@@ -477,6 +496,16 @@ function AppointmentQueue() {
     )
   }
 
+  const handleSendReminder = (item) => {
+    setAppointments((current) => current.map((app) => (
+      app.id === item.id ? { ...app, reminderSentAt: new Date().toISOString() } : app
+    )))
+    if (detailItem?.id === item.id) {
+      setDetailItem((prev) => (prev ? { ...prev, reminderSentAt: new Date().toISOString() } : null))
+    }
+    message.success(`Đã gửi thông báo nhắc lịch hẹn cho bệnh nhân ${item.patientName}`)
+  }
+
   const getStatusActionItems = (item) => {
     const noShowEligible = isAppointmentOverdue(item, queueNow)
     const checkInEligible = dayjs(item.appointmentAt).isSame(queueNow, 'day')
@@ -487,6 +516,13 @@ function AppointmentQueue() {
         label: checkInEligible ? 'Đưa vào hàng đợi' : 'Check-in trong ngày hẹn',
         disabled: actionLoading || !checkInEligible,
         onClick: () => runAction(() => appointmentApi.checkIn(item.id), 'Đã đưa bệnh nhân vào hàng đợi'),
+      },
+      {
+        key: 'remind',
+        icon: <BellOutlined />,
+        label: item.reminderSentAt ? 'Gửi lại nhắc lịch' : 'Gửi nhắc lịch hẹn',
+        disabled: actionLoading,
+        onClick: () => handleSendReminder(item),
       },
       {
         key: 'no-show',

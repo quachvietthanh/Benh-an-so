@@ -56,7 +56,7 @@ textarea {
 
 .ant-table-wrapper {
   padding: 14px;
-  overflow: hidden;
+  overflow-x: auto;
   background: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -107,4 +107,45 @@ textarea {
 ::-webkit-scrollbar-thumb {
   background: #b8c4d4;
   border-radius: 99px;
+}
+
+/* ==========================================================
+ * Mobile Responsive Optimizations for Doctors (NCL-10-CN-004)
+ * ========================================================== */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ant-card-body {
+    padding: 14px !important;
+  }
+
+  .ant-descriptions {
+    font-size: 13px;
+  }
+
+  .ant-descriptions-item-label,
+  .ant-descriptions-item-content {
+    padding: 8px 10px !important;
+  }
+
+  .ant-modal {
+    max-width: 95vw !important;
+    margin: 10px auto !important;
+  }
+
+  .ant-modal-body {
+    padding: 12px !important;
+  }
+
+  .ant-table {
+    font-size: 13px;
+  }
+
+  .ant-tabs-nav-list {
+    flex-wrap: wrap;
+  }
 }
