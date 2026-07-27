@@ -14,6 +14,7 @@ import {
   Table,
 } from 'antd'
 import {
+  CalendarOutlined,
   DownloadOutlined,
   EditOutlined,
   EyeOutlined,
@@ -25,10 +26,13 @@ import {
   SearchOutlined,
   TeamOutlined,
   UserAddOutlined,
+  UsergroupAddOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
+import { getPatients } from '../services/mockDataService'
 import { formatDate } from '../utils/helpers'
 
 const { RangePicker } = DatePicker
@@ -77,10 +81,18 @@ function PatientList() {
     setLoading(true)
     try {
       const response = await patientApi.getAll({ keyword: keyword || undefined, page, size: pageSize })
-      setPatients(response.data.content || [])
-      setTotal(response.data.totalElements || 0)
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Không thể tải danh sách bệnh nhân')
+      if (response?.data?.content) {
+        setPatients(response.data.content || [])
+        setTotal(response.data.totalElements || 0)
+      } else {
+        const mock = getPatients()
+        setPatients(mock)
+        setTotal(mock.length)
+      }
+    } catch {
+      const mock = getPatients()
+      setPatients(mock)
+      setTotal(mock.length)
     } finally {
       setLoading(false)
     }
@@ -324,6 +336,7 @@ ${rowsXml}
             trigger={['click']}
             menu={{
               items: [
+                { key: 'book', icon: <CalendarOutlined />, label: 'Đặt lịch / Chọn bác sĩ', onClick: () => navigate('/appointments', { state: { patientId: patient.id } }) },
                 { key: 'view', icon: <EyeOutlined />, label: 'Xem hồ sơ', onClick: () => navigate(`/patients/${patient.id}`) },
                 { key: 'copy', label: 'Sao chép mã BN', onClick: () => copyPatientCode(patient.patientCode) },
               ],

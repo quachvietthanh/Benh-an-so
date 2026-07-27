@@ -10,72 +10,80 @@
   z-index: 30;
   height: 100vh;
   overflow: hidden;
-  background: linear-gradient(165deg, #073866 0%, #05315e 55%, #03284e 100%) !important;
-  box-shadow: 5px 0 22px rgba(14, 65, 145, 0.16);
+  background: #123B6D !important;
+  box-shadow: 3px 0 14px rgba(0, 0, 0, 0.08);
 }
 
 .clinic-sider .ant-layout-sider-children {
   display: flex;
   height: 100%;
+  padding: 14px 14px;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .clinic-brand {
   display: flex;
   align-items: center;
-  min-height: 78px;
-  padding: 12px 17px;
+  height: 60px;
+  min-height: 60px;
+  padding: 0;
   color: #ffffff;
   text-align: left;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
+  margin-bottom: 2px;
 }
 
 .clinic-brand-icon {
   display: grid;
-  flex: 0 0 39px;
-  width: 39px;
-  height: 39px;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
   place-items: center;
-  color: #2071d8;
-  font-size: 22px;
+  color: #123B6D;
+  font-size: 18px;
   background: #ffffff;
-  border-radius: 9px;
-  box-shadow: 0 5px 12px rgba(6, 42, 101, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .clinic-brand-copy {
   display: flex;
   min-width: 0;
-  margin-left: 11px;
+  margin-left: 10px;
   flex-direction: column;
 }
 
 .clinic-brand-copy strong {
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 750;
-  letter-spacing: 0.02em;
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #ffffff;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .clinic-brand-copy small {
-  margin-top: 3px;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 8px;
+  margin-top: 2px;
+  color: #CBD5E1;
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .clinic-menu.ant-menu-dark {
   display: flex;
   min-height: 0;
-  padding: 8px 10px 6px;
+  padding: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  justify-content: space-between;
   overflow-x: hidden;
   overflow-y: auto;
   background: transparent;
@@ -90,37 +98,51 @@
 }
 
 .clinic-menu.ant-menu-dark .ant-menu-item-group-title {
-  padding: 4px 10px 3px !important;
-  color: rgba(255, 255, 255, 0.5) !important;
-  font-size: 8px;
-  font-weight: 650;
-  line-height: 1.2;
-  letter-spacing: 0.055em;
+  padding: 0 !important;
+  margin-top: 16px !important;
+  margin-bottom: 4px !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .clinic-menu.ant-menu-dark .ant-menu-item-group-list {
   margin: 0 !important;
+  padding: 0 !important;
 }
 
 .clinic-menu.ant-menu-dark .ant-menu-item {
   display: flex;
-  height: 36px;
-  min-height: 36px;
-  margin: 1px 0;
-  padding-block: 0;
+  height: 38px;
+  min-height: 38px;
+  margin: 2px 0 !important;
+  padding: 8px 12px !important;
   align-items: center;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 10px;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 13.5px;
   font-weight: 500;
-  line-height: 36px;
+  line-height: 20px;
   white-space: nowrap;
-  border-radius: 6px;
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
 }
 
 .clinic-menu.ant-menu-dark .ant-menu-item .anticon {
-  min-width: 16px;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  stroke-width: 1.8;
+  color: currentColor;
 }
 
 .clinic-menu.ant-menu-dark .ant-menu-title-content {
@@ -130,15 +152,19 @@
 }
 
 .clinic-menu.ant-menu-dark .ant-menu-item:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 .clinic-menu.ant-menu-dark .ant-menu-item-selected {
-  color: #ffffff;
-  font-weight: 650;
-  background: linear-gradient(90deg, rgba(115, 176, 255, 0.48), rgba(133, 187, 255, 0.3));
-  box-shadow: inset 3px 0 0 #ffffff, 0 5px 14px rgba(5, 45, 107, 0.14);
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  background: linear-gradient(135deg, #4F7FBE 0%, #3566A8 100%) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
+}
+
+.clinic-menu.ant-menu-dark .ant-menu-item-selected .anticon {
+  color: #ffffff !important;
 }
 
 .clinic-sider.ant-layout-sider-collapsed .clinic-brand {
@@ -147,7 +173,7 @@
 }
 
 .clinic-sider.ant-layout-sider-collapsed .clinic-menu {
-  padding-inline: 8px;
+  padding-inline: 0;
   justify-content: flex-start;
   gap: 4px;
 }
@@ -167,36 +193,42 @@
 
 .sidebar-collapse {
   display: flex;
-  width: calc(100% - 20px);
-  min-height: 50px;
-  margin: 0 10px;
+  width: 100%;
+  height: 38px;
+  min-height: 38px;
+  margin-top: 14px;
   padding: 0 12px;
   align-items: center;
-  flex: 0 0 50px;
   gap: 10px;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 10px;
-  font-weight: 520;
+  color: rgba(255, 255, 255, 0.70);
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
   background: transparent;
   border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .sidebar-collapse:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-collapse .anticon {
-  flex: 0 0 16px;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
 }
 
 .clinic-sider.ant-layout-sider-collapsed .sidebar-collapse {
   justify-content: center;
-  margin-inline: 10px;
   padding-inline: 0;
 }
 
@@ -242,26 +274,26 @@
 
 .clinic-search.ant-input-affix-wrapper {
   width: min(460px, 46vw);
-  height: 39px;
+  height: 40px;
   margin-left: 0;
-  padding-inline: 12px;
+  padding-inline: 14px;
   background: #ffffff;
-  border-color: #dbe3ee;
-  border-radius: 7px !important;
-  box-shadow: 0 2px 8px rgba(37, 61, 95, 0.025);
+  border-color: #cbd5e1;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
 }
 
 .clinic-search .ant-input-prefix {
   margin-right: 10px;
-  color: #708199;
+  color: #64748b;
 }
 
 .clinic-search input {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .clinic-search input::placeholder {
-  color: #8997aa;
+  color: #64748b;
 }
 
 .clinic-header-actions {
@@ -297,28 +329,28 @@
 
 .header-user-copy strong {
   overflow: hidden;
-  color: #25344d;
-  font-size: 12px;
-  font-weight: 680;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .header-user-copy small {
-  margin-top: 3px;
-  color: #7c899b;
-  font-size: 9px;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
 }
 
 .header-user > .anticon:last-child {
   color: #64748b;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .clinic-content {
   min-height: calc(100vh - 64px);
-  padding: 14px 18px 24px;
-  background: #f4f7fb;
+  padding: 16px 20px 24px;
+  background: #f8fafc;
 }
 
 .page-transition {
@@ -344,16 +376,15 @@
 }
 
 .dashboard-title {
-  margin: 0 0 12px;
-  color: #172033;
-  font-size: 20px;
-  font-weight: 730;
-  line-height: 1.25;
+  margin: 0 0 16px;
+  color: #111827;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .compact-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
-

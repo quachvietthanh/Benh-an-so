@@ -1,27 +1,47 @@
 import React from 'react'
 import AppRoutes from './routes/AppRoutes'
 import './App.css'
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, message } from 'antd'
+
+message.config({
+  maxCount: 2,
+  duration: 3,
+})
 
 function App() {
   return (
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#0ea5e9',
-          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-          borderRadius: 8,
-          colorBgContainer: '#ffffff',
-          colorText: '#1e293b',
-          colorTextSecondary: '#64748b',
-          colorBorder: '#e2e8f0',
-          controlHeight: 36,
+          colorPrimary: '#2563EB',
+          fontFamily: "Inter, 'Segoe UI', Roboto, Arial, sans-serif",
+          borderRadius: 12,
+          colorBgContainer: '#FFFFFF',
+          colorBgLayout: '#F8FAFC',
+          colorText: '#111827',
+          colorTextSecondary: '#64748B',
+          colorBorder: '#E2E8F0',
+          colorSuccess: '#16A34A',
+          colorWarning: '#D97706',
+          colorError: '#DC2626',
+          controlHeight: 42,
         },
         components: {
           Card: {
             paddingLG: 20,
-          }
-        }
+            borderRadiusLG: 12,
+          },
+          Button: {
+            controlHeight: 42,
+            fontWeight: 600,
+          },
+          Input: {
+            controlHeight: 42,
+          },
+          Select: {
+            controlHeight: 42,
+          },
+        },
       }}
     >
       <AppRoutes />

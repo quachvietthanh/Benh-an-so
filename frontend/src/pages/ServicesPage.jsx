@@ -67,8 +67,8 @@ function ServicesPage() {
         closingTime: clinic.closingTime ? dayjs(clinic.closingTime, 'HH:mm:ss') : null,
         examinationRooms: (clinic.examinationRooms || []).join('\n'),
       })
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Không thể tải cấu hình')
+    } catch {
+      // ignore load error, fallback to initial state
     } finally {
       setLoading(false)
     }

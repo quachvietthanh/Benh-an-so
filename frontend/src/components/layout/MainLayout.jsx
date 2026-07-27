@@ -98,7 +98,7 @@ function MainLayout() {
         collapsible
         collapsed={collapsed}
         collapsedWidth={78}
-        width={254}
+        width={240}
         theme="dark"
       >
         <button type="button" className="clinic-brand" onClick={() => navigate('/')}>

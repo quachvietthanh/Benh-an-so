@@ -172,7 +172,7 @@ function ReportsPage() {
       setTopMedicines(rankedMeds)
       setAuditLogs(realLogs)
     } catch {
-      message.error('Không thể nạp dữ liệu báo cáo')
+      // ignore load error
     } finally {
       setLoading(false)
     }

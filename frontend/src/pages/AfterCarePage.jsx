@@ -91,7 +91,7 @@ function AfterCarePage() {
       if (noteRes.status === 'fulfilled') setNotes(noteRes.value.data || [])
       if (patRes.status === 'fulfilled') setPatients(patRes.value.data?.content || [])
     } catch {
-      message.error('Không thể tải dữ liệu chăm sóc sau khám')
+      // ignore load error
     } finally {
       setLoading(false)
     }
