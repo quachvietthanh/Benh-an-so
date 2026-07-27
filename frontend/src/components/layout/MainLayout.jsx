@@ -1,18 +1,40 @@
-import React, { useState } from 'react'
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Dropdown, Avatar, Space, Typography, Alert } from 'antd'
+import React, { useMemo, useState } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Avatar, Badge, Dropdown, Input, Layout, Menu, Tooltip } from 'antd'
 import {
+  BellOutlined,
+  CaretDownOutlined,
   LogoutOutlined,
+  MedicineBoxOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  MedicineBoxOutlined,
+  SearchOutlined,
+  SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { useAuthContext } from '../../context/AuthContext'
 import { getNavigationItems } from '../../services/mockDataService'
 
 const { Header, Sider, Content } = Layout
-const { Text } = Typography
+
+const roleNames = {
+  admin: 'Quản trị viên',
+  manager: 'Quản lý',
+  doctor: 'Bác sĩ',
+  receptionist: 'Lễ tân',
+  pharmacist: 'Dược sĩ',
+}
+
+const navigationSections = [
+  { key: 'overview', paths: ['/'] },
+  { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments'] },
+  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/prescriptions'] },
+  { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy'] },
+  { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
+  { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
+  { key: 'system', label: 'Hệ thống', paths: ['/system-management'] },
+  { key: 'lookup', label: 'Tra cứu', paths: ['/public-lookup'] },
+]
 
 function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -20,98 +42,129 @@ function MainLayout() {
   const location = useLocation()
   const { user, logout } = useAuthContext()
 
-  const handleMenuClick = (info) => {
-    navigate(info.key)
+  const navigationItems = useMemo(
+    () => getNavigationItems(user?.roles || []).map((item) => ({
+      key: item.key,
+      icon: React.createElement(item.icon),
+      label: item.label,
+      title: item.label,
+    })),
+    [user?.roles],
+  )
+
+  const sidebarItems = useMemo(() => navigationSections.flatMap((section) => {
+    const items = section.paths
+      .map((path) => navigationItems.find((item) => item.key === path))
+      .filter(Boolean)
+
+    if (!items.length) return []
+    if (!section.label) return items
+
+    return [{
+      type: 'group',
+      key: `group-${section.key}`,
+      label: section.label,
+      children: items,
+    }]
+  }), [navigationItems])
+
+  const selectedPath = useMemo(() => {
+    const match = navigationItems
+      .filter((item) => item.key === '/' ? location.pathname === '/' : location.pathname.startsWith(item.key))
+      .sort((a, b) => b.key.length - a.key.length)[0]
+    return match?.key || location.pathname
+  }, [location.pathname, navigationItems])
+
+  const primaryRole = user?.roles?.[0] || 'doctor'
+  const displayName = user?.fullName || user?.username || 'Nguyễn Văn A'
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
   }
 
-  const sidebarItems = getNavigationItems(user?.roles || []).map((item) => ({
-    key: item.key,
-    icon: React.createElement(item.icon),
-    label: item.label,
-  }))
-
   const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Thông tin cá nhân',
-    },
+    { key: 'profile', icon: <UserOutlined />, label: 'Thông tin cá nhân' },
+    { key: 'settings', icon: <SettingOutlined />, label: 'Cài đặt tài khoản' },
     { type: 'divider' },
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: 'Đăng xuất',
-      danger: true,
-      onClick: () => {
-        logout()
-        navigate('/login')
-      },
-    },
+    { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true, onClick: handleLogout },
   ]
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout className="clinic-shell">
       <Sider
+        className="clinic-sider"
         trigger={null}
         collapsible
         collapsed={collapsed}
-        theme="light"
-        width={260}
-        style={{ borderRight: '1px solid var(--border-color)' }}
+        collapsedWidth={78}
+        width={254}
+        theme="dark"
       >
-        <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <MedicineBoxOutlined style={{ fontSize: 24, marginRight: collapsed ? 0 : 8 }} />
-          {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>Bệnh Án Số</span>}
-        </div>
+        <button type="button" className="clinic-brand" onClick={() => navigate('/')}>
+          <span className="clinic-brand-icon"><MedicineBoxOutlined /></span>
+          {!collapsed && (
+            <span className="clinic-brand-copy">
+              <strong>BỆNH ÁN SỐ</strong>
+              <small>Hệ thống quản lý phòng khám</small>
+            </span>
+          )}
+        </button>
 
         <Menu
-          theme="light"
+          className="clinic-menu"
+          theme="dark"
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[selectedPath]}
           items={sidebarItems}
-          onClick={handleMenuClick}
-          style={{ borderRight: 0, padding: '0 8px' }}
+          inlineIndent={16}
+          onClick={({ key }) => navigate(key)}
         />
+
+        <Tooltip title={collapsed ? 'Mở rộng menu' : ''} placement="right">
+          <button
+            type="button"
+            className="sidebar-collapse"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+          >
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            {!collapsed && <span>Thu gọn menu</span>}
+          </button>
+        </Tooltip>
       </Sider>
 
-      <Layout>
-        <Header>
-          <Space>
-            {React.createElement(collapsed ? MenuUnfoldOutlined : MenuFoldOutlined, {
-              style: {
-                fontSize: '18px',
-                cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--bg-color)'
-              },
-              onClick: () => setCollapsed(!collapsed),
-            })}
-          </Space>
+      <Layout className="clinic-main-layout">
+        <Header className="clinic-header">
+          <Input
+            className="clinic-search"
+            prefix={<SearchOutlined />}
+            placeholder="Tìm kiếm bệnh nhân, lịch hẹn..."
+            allowClear
+          />
 
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
-            <Space style={{ cursor: 'pointer', padding: '4px 12px', borderRadius: '24px', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border-color)' }}>
-              <Avatar icon={<UserOutlined />} style={{ backgroundColor: 'var(--primary-color)' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2' }}>
-                <Text strong style={{ fontSize: '14px' }}>{user?.fullName || user?.username}</Text>
-                <Text type="secondary" style={{ fontSize: '12px', textTransform: 'capitalize' }}>
-                  {user?.roles?.[0] || 'User'}
-                </Text>
-              </div>
-            </Space>
-          </Dropdown>
+          <div className="clinic-header-actions">
+            <Badge count={3} size="small" offset={[-2, 3]}>
+              <button type="button" className="notification-button" aria-label="Thông báo">
+                <BellOutlined />
+              </button>
+            </Badge>
+
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
+              <button type="button" className="header-user">
+                <Avatar className="header-avatar" icon={<UserOutlined />} />
+                <span className="header-user-copy">
+                  <strong>{displayName}</strong>
+                  <small>{roleNames[primaryRole] || primaryRole}</small>
+                </span>
+                <CaretDownOutlined />
+              </button>
+            </Dropdown>
+          </div>
         </Header>
 
-        <Content style={{ margin: '24px', minHeight: 280, display: 'flex', flexDirection: 'column' }}>
-          <Alert
-            message="Chế độ Demo"
-            description="Hệ thống đang sử dụng dữ liệu mô phỏng. Phù hợp cho việc trình diễn nghiệp vụ phòng khám nhỏ."
-            type="info"
-            showIcon
-            closable
-            style={{ marginBottom: 24, borderRadius: '12px', border: 'none', backgroundColor: '#e0f2fe', color: '#0284c7' }}
-          />
-          <div className="animate-fade-in" style={{ flex: 1 }}>
+        <Content className="clinic-content">
+          <div className="page-transition">
             <Outlet />
           </div>
         </Content>

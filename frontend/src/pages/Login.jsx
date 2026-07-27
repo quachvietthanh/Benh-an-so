@@ -1,22 +1,14 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Form, Input, Button, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
-import './Login.css'
+import './login.css'
 
 function Login() {
   const [loading, setLoading] = useState(false)
-  const [time, setTime] = useState('')
   const navigate = useNavigate()
   const { login, isAuthenticated } = useAuthContext()
-
-  useEffect(() => {
-    const update = () => setTime(new Date().toLocaleTimeString('vi-VN', { hour12: false }))
-    update()
-    const interval = setInterval(update, 1000)
-    return () => clearInterval(interval)
-  }, [])
 
   // Redirect if already logged in
   if (isAuthenticated) {
@@ -102,7 +94,12 @@ function Login() {
           </Form.Item>
         </Form>
 
-        <p className="bsa2-foot">Phiên bản nội bộ · Bệnh Án Số</p>
+        <p className="bsa2-foot">
+          <Link className="bsa2-lookup-link" to="/public-lookup">
+            Tra cứu lịch hẹn dành cho bệnh nhân
+          </Link>
+          <span>Phiên bản nội bộ · Bệnh Án Số</span>
+        </p>
       </div>
     </div>
   )
