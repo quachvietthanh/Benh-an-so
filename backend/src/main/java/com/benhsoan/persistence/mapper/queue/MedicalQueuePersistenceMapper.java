@@ -32,8 +32,7 @@ public class MedicalQueuePersistenceMapper {
                 entity.getCancelReason(),
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt(),
-                entity.getVersion()
+                entity.getUpdatedAt()
         );
     }
 
@@ -62,7 +61,6 @@ public class MedicalQueuePersistenceMapper {
                 .createdBy(domain.getCreatedBy())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
-                .version(domain.getVersion())
                 .build();
     }
 }

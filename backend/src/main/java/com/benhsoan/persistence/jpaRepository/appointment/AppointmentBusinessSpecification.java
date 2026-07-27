@@ -16,42 +16,46 @@ public final class AppointmentBusinessSpecification {
     public static Specification<AppointmentEntity> hasDoctor(
             UUID doctorId
     ) {
-        return (root, query, cb) ->
-                cb.equal(root.get("doctorId"), doctorId);
+        return (root, query, cb)
+                -> cb.equal(root.get("doctorId"), doctorId);
     }
 
     public static Specification<AppointmentEntity> hasPatient(
             UUID patientId
     ) {
-        return (root, query, cb) ->
-                cb.equal(root.get("patientId"), patientId);
+        return (root, query, cb)
+                -> cb.equal(root.get("patientId"), patientId);
     }
 
     public static Specification<AppointmentEntity> hasAppointmentCode(
             String appointmentCode
     ) {
-        return (root, query, cb) ->
-                cb.equal(root.get("appointmentCode"), appointmentCode);
+        return (root, query, cb)
+                -> cb.equal(root.get("appointmentCode"), appointmentCode);
     }
 
     public static Specification<AppointmentEntity> hasStatus(
             AppointmentStatus status
     ) {
-        return (root, query, cb) ->
-                cb.equal(root.get("status"), status);
+        return (root, query, cb)
+                -> cb.equal(root.get("status"), status);
     }
 
-    public static Specification<AppointmentEntity> notCancelled() {
-        return (root, query, cb) ->
-                cb.notEqual(root.get("status"), AppointmentStatus.CANCELLED);
+    public static Specification<AppointmentEntity> active() {
+        return (root, query, cb)
+                -> root.get("status").in(
+                        AppointmentStatus.SCHEDULED,
+                        AppointmentStatus.CHECKED_IN,
+                        AppointmentStatus.IN_PROGRESS
+                );
     }
 
     public static Specification<AppointmentEntity> overlap(
             Instant startTime,
             Instant endTime
     ) {
-        return (root, query, cb) ->
-                cb.and(
+        return (root, query, cb)
+                -> cb.and(
                         cb.lessThan(root.get("startTime"), endTime),
                         cb.greaterThan(root.get("endTime"), startTime)
                 );
@@ -60,20 +64,35 @@ public final class AppointmentBusinessSpecification {
     public static Specification<AppointmentEntity> createdBy(
             UUID createdBy
     ) {
-        return (root, query, cb) ->
-                cb.equal(root.get("createdBy"), createdBy);
+        return (root, query, cb)
+                -> cb.equal(root.get("createdBy"), createdBy);
     }
 
     public static Specification<AppointmentEntity> today(
             Instant startOfDay,
             Instant endOfDay
     ) {
-        return (root, query, cb) ->
-                cb.between(
+        return (root, query, cb)
+                -> cb.between(
                         root.get("startTime"),
                         startOfDay,
                         endOfDay
                 );
     }
 
+    public static Specification<AppointmentEntity> overdue(
+            Instant threshold
+    ) {
+        return (root, query, cb)
+                -> cb.and(
+                        cb.equal(
+                                root.get("status"),
+                                AppointmentStatus.SCHEDULED
+                        ),
+                        cb.lessThan(
+                                root.get("startTime"),
+                                threshold
+                        )
+                );
+    }
 }

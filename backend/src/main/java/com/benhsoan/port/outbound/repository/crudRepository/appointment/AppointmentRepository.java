@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
@@ -21,10 +22,8 @@ public interface AppointmentRepository
 
     Page<Appointment> search(SearchAppointmentCommand command);
 
-    boolean existsActiveAppointmentConflict(
-            UUID doctorId,
-            Instant startTime,
-            Instant endTime
-    );
+    boolean existsActiveAppointmentConflict( UUID doctorId, Instant startTime, Instant endTime);
+
+    Page<Appointment> findOverdue( Instant threshold, Pageable pageable );
 
 }

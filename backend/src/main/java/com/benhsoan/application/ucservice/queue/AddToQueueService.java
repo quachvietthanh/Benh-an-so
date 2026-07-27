@@ -103,7 +103,7 @@ public class AddToQueueService implements AddToQueueUseCase {
         Specification<AppointmentEntity> spec = AppointmentBusinessSpecification
                 .hasPatient(command.patientId())
                 .and(AppointmentBusinessSpecification.today(startOfDay, endOfDay))
-                .and(AppointmentBusinessSpecification.notCancelled());
+                .and(AppointmentBusinessSpecification.active());
 
         boolean hasAppointmentToday = specExecutor.findOne(spec).isPresent();
 

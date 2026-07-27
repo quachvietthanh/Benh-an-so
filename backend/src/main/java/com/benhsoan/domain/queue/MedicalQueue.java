@@ -57,7 +57,6 @@ public class MedicalQueue {
 
     private Instant updatedAt;
 
-    private Long version;
 
     private MedicalQueue(
             UUID id,
@@ -266,8 +265,7 @@ public class MedicalQueue {
             String cancelReason,
             UUID createdBy,
             Instant createdAt,
-            Instant updatedAt,
-            Long version
+            Instant updatedAt
     ) {
         MedicalQueue q = new MedicalQueue(
                 id,
@@ -289,7 +287,6 @@ public class MedicalQueue {
                 createdAt,
                 updatedAt
         );
-        q.version = version;
         return q;
     }
 }

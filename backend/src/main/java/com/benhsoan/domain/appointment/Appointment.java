@@ -1,5 +1,6 @@
 package com.benhsoan.domain.appointment;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -8,6 +9,7 @@ import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCancelledException;
 import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCompletedException;
 import com.benhsoan.domain.appointment.exception.AppointmentInvalidStatusException;
+import com.benhsoan.domain.appointment.exception.AppointmentNotOverdueException;
 import com.benhsoan.domain.appointment.exception.AppointmentTimeInPastException;
 import com.benhsoan.domain.shared.Guard.Guard;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -50,6 +52,8 @@ public class Appointment {
 
     private Instant createdAt;
 
+    private static final Duration NO_SHOW_THRESHOLD = Duration.ofMinutes(15);
+    
     private Appointment(
             UUID id,
             String appointmentCode,
@@ -148,8 +152,8 @@ public class Appointment {
             UUID doctorId,
             Instant startTime,
             Instant endTime,
-            String reason
-    ) {
+            String reason ) {
+
          if (!endTime.isAfter(startTime)) 
             throw new ValidationException("End time must be after start time.");
         if (startTime.isBefore(Instant.now()))
@@ -218,19 +222,25 @@ public class Appointment {
         this.status = AppointmentStatus.CANCELLED;
     }
 
-    public void markNoShow() {
+    public void markNoShow(Instant now) {
+
+        Guard.require(now, "Current time");
+
         if (status != AppointmentStatus.SCHEDULED) {
             throw new AppointmentInvalidStatusException(
                     "Only scheduled appointments can be marked as no show."
             );
         }
 
+        if (now.isBefore(getNoShowThresholdTime())) {
+            throw new AppointmentNotOverdueException();
+        }
+
         this.status = AppointmentStatus.NO_SHOW;
     }
 
     public boolean canReschedule() {
-        return status != AppointmentStatus.CANCELLED
-            && status != AppointmentStatus.COMPLETED;
+        return !isFinished();
     }
 
     public boolean canCheckIn() {
@@ -246,12 +256,13 @@ public class Appointment {
     }
 
     public boolean canCancel() {
-        return status != AppointmentStatus.CANCELLED
-            && status != AppointmentStatus.COMPLETED;
+        return !isFinished();
     }
 
-    public boolean canMarkNoShow() {
-        return status == AppointmentStatus.SCHEDULED;
+    public boolean canMarkNoShow(Instant now) {
+        Guard.require(now, "Current time");
+        return status == AppointmentStatus.SCHEDULED
+                && !now.isBefore(getNoShowThresholdTime());
     }
 
     public boolean isScheduled() {
@@ -262,5 +273,9 @@ public class Appointment {
         return status == AppointmentStatus.COMPLETED
             || status == AppointmentStatus.CANCELLED
             || status == AppointmentStatus.NO_SHOW;
+    }
+
+    private Instant getNoShowThresholdTime() {
+        return startTime.plus(NO_SHOW_THRESHOLD);
     }
 }
