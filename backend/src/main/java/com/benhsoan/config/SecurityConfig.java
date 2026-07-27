@@ -39,211 +39,198 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        http
-                .csrf(AbstractHttpConfigurer::disable)
+                http
+                                .csrf(AbstractHttpConfigurer::disable)
 
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .sessionManagement(session -> session.sessionCreationPolicy(
+                                                SessionCreationPolicy.STATELESS))
 
-                .authorizeHttpRequests(auth -> auth
+                                .authorizeHttpRequests(auth -> auth
 
-                        // ===== PUBLIC =====
-                        .requestMatchers("/auth/**").permitAll()
+                                                // ===== PUBLIC =====
+                                                .requestMatchers("/auth/**").permitAll()
 
-                        .requestMatchers(
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/swagger-resources/**",
-                                "/webjars/**"
-                        ).permitAll()
+                                                .requestMatchers(
+                                                                "/v3/api-docs/**",
+                                                                "/swagger-ui/**",
+                                                                "/swagger-ui.html",
+                                                                "/swagger-resources/**",
+                                                                "/webjars/**")
+                                                .permitAll()
 
-                        .requestMatchers(
-                                "/actuator/health",
-                                "/actuator/info"
-                        ).permitAll()
+                                                .requestMatchers(
+                                                                "/actuator/health",
+                                                                "/actuator/info")
+                                                .permitAll()
 
-                        // ===== ADMIN =====
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/users/**").hasRole("ADMIN")
-                        .requestMatchers("/audit-logs/**").hasRole("ADMIN")
+                                                // ===== ADMIN =====
+                                                .requestMatchers("/admin/**").hasRole("ADMIN")
+                                                .requestMatchers("/users/**").hasRole("ADMIN")
+                                                .requestMatchers("/audit-logs/**").hasRole("ADMIN")
 
-                        // ===== DOCTOR =====
-                        .requestMatchers(HttpMethod.POST, "/medical-records/**")
-                        .hasAnyRole("ADMIN", "DOCTOR")
+                                                // ===== DOCTOR =====
+                                                .requestMatchers(HttpMethod.POST, "/medical-records/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
 
-                        .requestMatchers(HttpMethod.PUT, "/medical-records/**")
-                        .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.PUT, "/medical-records/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
 
-                        .requestMatchers(HttpMethod.DELETE, "/medical-records/**")
-                        .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.DELETE, "/medical-records/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
 
-                        .requestMatchers("/prescriptions/**")
-                        .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers("/prescriptions/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
 
-                        .requestMatchers("/diagnoses/**")
-                        .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers("/diagnoses/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
 
-                        // ===== NURSE =====
-                        .requestMatchers(HttpMethod.GET, "/medical-records/**")
-                        .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
+                                                // ===== NURSE =====
+                                                .requestMatchers(HttpMethod.GET, "/medical-records/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
 
-                        .requestMatchers("/vital-signs/**")
-                        .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
+                                                .requestMatchers("/vital-signs/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
 
-                        // ===== RECEPTIONIST =====
-                        .requestMatchers("/appointments/**")
-                        .hasAnyRole("ADMIN", "RECEPTIONIST", "DOCTOR")
+                                                // ===== RECEPTIONIST =====
+                                                .requestMatchers("/appointments/**")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST", "DOCTOR")
 
-                        .requestMatchers(HttpMethod.GET, "/patients")
-                        .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.GET, "/patients")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
 
-                        // ===== PHARMACIST =====
-                        .requestMatchers("/pharmacy/inventory/**")
-                        .hasAnyRole("ADMIN", "PHARMACIST")
+                                                // ===== PHARMACIST =====
+                                                .requestMatchers("/pharmacy/inventory/**")
+                                                .hasAnyRole("ADMIN", "PHARMACIST")
 
-                        .requestMatchers(HttpMethod.GET, "/prescriptions/**")
-                        .hasAnyRole("ADMIN", "DOCTOR", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.GET, "/prescriptions/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "PHARMACIST")
 
-                        .requestMatchers(HttpMethod.PUT, "/prescriptions/*/status")
-                        .hasAnyRole("ADMIN", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.PUT, "/prescriptions/*/status")
+                                                .hasAnyRole("ADMIN", "PHARMACIST")
 
-                        // ===== INVOICE =====
-                        .requestMatchers("/invoices/**")
-                        .hasAnyRole("ADMIN", "RECEPTIONIST")
+                                                // ===== INVOICE =====
+                                                .requestMatchers("/invoices/**")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
 
-                        // ===== USER =====
-                        .requestMatchers(HttpMethod.GET, "/patients/me/**")
-                        .authenticated()
+                                                // ===== USER =====
+                                                .requestMatchers(HttpMethod.GET, "/patients/me/**")
+                                                .authenticated()
 
-                        .requestMatchers(HttpMethod.GET, "/appointments/me/**")
-                        .authenticated()
+                                                .requestMatchers(HttpMethod.GET, "/appointments/me/**")
+                                                .authenticated()
 
-                        // ===== OTHERS =====
-                        .anyRequest().permitAll()
-                )
+                                                // ===== OTHERS =====
+                                                .anyRequest().authenticated())
 
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(authenticationEntryPoint())
-                        .accessDeniedHandler(accessDeniedHandler())
-                )
+                                .exceptionHandling(ex -> ex
+                                                .authenticationEntryPoint(authenticationEntryPoint())
+                                                .accessDeniedHandler(accessDeniedHandler()))
 
-                .addFilterBefore(
-                        jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                                .addFilterBefore(
+                                                jwtAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+                return http.build();
+        }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+        @Bean
+        public CorsConfigurationSource corsConfigurationSource() {
 
-        CorsConfiguration configuration = new CorsConfiguration();
+                CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:4200"
-        ));
+                configuration.setAllowedOrigins(List.of(
+                                "http://localhost:3000",
+                                "http://localhost:5173",
+                                "http://localhost:4200"));
 
-        configuration.setAllowedMethods(List.of(
-                "GET",
-                "POST",
-                "PUT",
-                "PATCH",
-                "DELETE",
-                "OPTIONS"
-        ));
+                configuration.setAllowedMethods(List.of(
+                                "GET",
+                                "POST",
+                                "PUT",
+                                "PATCH",
+                                "DELETE",
+                                "OPTIONS"));
 
-        configuration.setAllowedHeaders(List.of(
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "X-Requested-With",
-                "Origin",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"
-        ));
+                configuration.setAllowedHeaders(List.of(
+                                "Authorization",
+                                "Content-Type",
+                                "Accept",
+                                "X-Requested-With",
+                                "Origin",
+                                "Access-Control-Request-Method",
+                                "Access-Control-Request-Headers"));
 
-        configuration.setExposedHeaders(List.of(
-                "Authorization",
-                "Content-Disposition"
-        ));
+                configuration.setExposedHeaders(List.of(
+                                "Authorization",
+                                "Content-Disposition"));
 
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
+                configuration.setAllowCredentials(true);
+                configuration.setMaxAge(3600L);
 
-        UrlBasedCorsConfigurationSource source =
-                new UrlBasedCorsConfigurationSource();
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration("/**", configuration);
+                source.registerCorsConfiguration("/**", configuration);
 
-        return source;
-    }
+                return source;
+        }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
-    }
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder(12);
+        }
 
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authenticationConfiguration
-    ) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
-    }
+        @Bean
+        public AuthenticationManager authenticationManager(
+                        AuthenticationConfiguration authenticationConfiguration) throws Exception {
+                return authenticationConfiguration.getAuthenticationManager();
+        }
 
-    @Bean
-    public AuthenticationEntryPoint authenticationEntryPoint() {
+        @Bean
+        public AuthenticationEntryPoint authenticationEntryPoint() {
 
-        return (request, response, authException) -> {
+                return (request, response, authException) -> {
 
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.setCharacterEncoding("UTF-8");
+                        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        response.setCharacterEncoding("UTF-8");
 
-            ObjectMapper mapper = new ObjectMapper();
+                        ObjectMapper mapper = new ObjectMapper();
 
-            response.getWriter().write(
-                    mapper.writeValueAsString(Map.of(
-                            "timestamp", Instant.now().toString(),
-                            "status", HttpStatus.UNAUTHORIZED.value(),
-                            "error", "Unauthorized",
-                            "message", "Bạn cần đăng nhập để truy cập tài nguyên này",
-                            "path", request.getRequestURI()
-                    ))
-            );
-        };
-    }
+                        response.getWriter().write(
+                                        mapper.writeValueAsString(Map.of(
+                                                        "timestamp", Instant.now().toString(),
+                                                        "status", HttpStatus.UNAUTHORIZED.value(),
+                                                        "error", "Unauthorized",
+                                                        "message", "Bạn cần đăng nhập để truy cập tài nguyên này",
+                                                        "path", request.getRequestURI())));
+                };
+        }
 
-    @Bean
-    public AccessDeniedHandler accessDeniedHandler() {
+        @Bean
+        public AccessDeniedHandler accessDeniedHandler() {
 
-        return (request, response, accessDeniedException) -> {
+                return (request, response, accessDeniedException) -> {
 
-            response.setStatus(HttpStatus.FORBIDDEN.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.setCharacterEncoding("UTF-8");
+                        response.setStatus(HttpStatus.FORBIDDEN.value());
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        response.setCharacterEncoding("UTF-8");
 
-            ObjectMapper mapper = new ObjectMapper();
+                        ObjectMapper mapper = new ObjectMapper();
 
-            response.getWriter().write(
-                    mapper.writeValueAsString(Map.of(
-                            "timestamp", Instant.now().toString(),
-                            "status", HttpStatus.FORBIDDEN.value(),
-                            "error", "Forbidden",
-                            "message", "Bạn không có quyền truy cập tài nguyên này",
-                            "path", request.getRequestURI()
-                    ))
-            );
-        };
-    }
+                        response.getWriter().write(
+                                        mapper.writeValueAsString(Map.of(
+                                                        "timestamp", Instant.now().toString(),
+                                                        "status", HttpStatus.FORBIDDEN.value(),
+                                                        "error", "Forbidden",
+                                                        "message", "Bạn không có quyền truy cập tài nguyên này",
+                                                        "path", request.getRequestURI())));
+                };
+        }
 }

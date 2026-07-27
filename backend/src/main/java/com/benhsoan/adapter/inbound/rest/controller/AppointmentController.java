@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -47,6 +48,7 @@ public class AppointmentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
     public AppointmentResponse create(@Valid @RequestBody CreateAppointmentRequest request) {
         AppointmentResult result
                 = createAppointmentUseCase.create(
@@ -57,6 +59,7 @@ public class AppointmentController {
     }
 
     @PatchMapping("/cancel/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
     public AppointmentResponse cancel(
             @PathVariable UUID id,
             @Valid
@@ -71,6 +74,7 @@ public class AppointmentController {
     }
 
     @GetMapping("/overdue")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
     public Page<AppointmentResponse> getOverdueAppointments(Pageable pageable) {
         Page<AppointmentResult> result
                 = getOverdueAppointmentsUseCase.execute(
@@ -83,6 +87,7 @@ public class AppointmentController {
     }
 
     @PatchMapping("/no-show/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
     public AppointmentResponse markNoShow(@PathVariable UUID id) {
         AppointmentResult result
                 = markAppointmentNoShowUseCase.execute(
