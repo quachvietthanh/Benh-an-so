@@ -36,6 +36,7 @@ import {
 import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
 import patientApi from '../api/patientApi'
+import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
 import {
   getOverdueMinutes,
@@ -156,7 +157,7 @@ function AppointmentQueue() {
         appointmentApi.getAll(),
         appointmentApi.getQueue(),
         includeDirectories ? loadPatientDirectory() : Promise.resolve(null),
-        includeDirectories ? appointmentApi.getDoctors() : Promise.resolve(null),
+        includeDirectories ? userApi.getDoctors() : Promise.resolve(null),
       ])
 
       if (appointmentResult.status === 'fulfilled') {
@@ -348,9 +349,18 @@ function AppointmentQueue() {
   }
 
   const createAppointment = async (values) => {
+    const startTime = values.appointmentAt.toISOString()
+    const endTime = values.appointmentAt.add(30, 'minute').toISOString()
+
     setSaving(true)
     const success = await runAction(
-      () => appointmentApi.create({ ...values, appointmentAt: values.appointmentAt.toISOString() }),
+      () => appointmentApi.create({
+        patientId: values.patientId,
+        doctorId: values.doctorId,
+        startTime,
+        endTime,
+        reason: values.reason,
+      }),
       'Đặt lịch hẹn thành công',
     )
     if (success) {

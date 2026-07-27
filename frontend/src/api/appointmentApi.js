@@ -2,7 +2,6 @@ import axiosClient from './axiosClient'
 
 const appointmentApi = {
   getAll: () => axiosClient.get('/appointments'),
-  getDoctors: () => axiosClient.get('/appointments/doctors'),
   getQueue: () => axiosClient.get('/appointments/queue'),
   create: (data) => axiosClient.post('/appointments', data),
   cancel: (id, reason) => axiosClient.patch(`/appointments/${id}/cancel`, { reason }),

@@ -22,6 +22,7 @@ import com.benhsoan.infrastructure.authSecurity.CurrentUserPrincipal;
 
 import com.benhsoan.application.ucservice.user.ActivateUserService;
 import com.benhsoan.application.ucservice.user.DeactivateUserService;
+import com.benhsoan.domain.auth.constant.RoleConstants;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
@@ -116,6 +117,37 @@ class UserRepositoryAdapterTest {
     void shouldExistsEmail() {
 
         assertTrue(userRepository.existsByEmail("test_admin@gmail.com"));
+    }
+
+    @Test
+    @DisplayName("Should find only active doctors by role id")
+    void shouldFindOnlyActiveDoctorsByRoleId() {
+
+        User activeDoctor = userRepository.save(User.create(
+                "doctor_active",
+                "123456",
+                "Doctor Active",
+                "doctor_active@gmail.com",
+                "0900000001",
+                RoleConstants.DOCTOR
+        ));
+
+        User inactiveDoctor = User.create(
+                "doctor_inactive",
+                "123456",
+                "Doctor Inactive",
+                "doctor_inactive@gmail.com",
+                "0900000002",
+                RoleConstants.DOCTOR
+        );
+        inactiveDoctor.deactivate();
+        userRepository.save(inactiveDoctor);
+
+        var doctors = userRepository.findAllActiveByRoleId(RoleConstants.DOCTOR);
+
+        assertTrue(doctors.stream().anyMatch(user -> user.getId().equals(activeDoctor.getId())));
+        assertTrue(doctors.stream().noneMatch(user -> user.getUsername().equals("doctor_inactive")));
+        assertTrue(doctors.stream().allMatch(User::isActive));
     }
 
     @Test

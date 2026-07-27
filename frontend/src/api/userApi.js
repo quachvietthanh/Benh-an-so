@@ -8,6 +8,10 @@ const userApi = {
     return axiosClient.get('/users')
   },
 
+  getDoctors: () => {
+    return axiosClient.get('/users/doctors')
+  },
+
   create: (data) => {
     return axiosClient.post('/users', data)
   },
