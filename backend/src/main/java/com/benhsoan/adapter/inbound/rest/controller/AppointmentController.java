@@ -24,17 +24,17 @@ import com.benhsoan.adapter.inbound.rest.mapper.AppointmentRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.appointment.CancelAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.request.appointment.CreateAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentResponse;
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.appointment.GetOverdueAppointmentsCommand;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
-import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
+import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
-import com.benhsoan.domain.appointment.enums.AppointmentStatus;
-import com.benhsoan.domain.shared.exception.ValidationException;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -130,7 +130,7 @@ public class AppointmentController {
         return mapper.toResponse(result);
     }
 
-    @PatchMapping("/no-show/{id}")
+    @PatchMapping("/{id}/no-show")
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
     public AppointmentResponse markNoShow(@PathVariable UUID id) {
         AppointmentResult result
