@@ -217,6 +217,12 @@ public class Appointment {
         if (status == AppointmentStatus.COMPLETED) {
             throw new AppointmentAlreadyCompletedException();
         }
+
+        if (status == AppointmentStatus.NO_SHOW) {
+            throw new AppointmentInvalidStatusException(
+                    "No-show appointments cannot be cancelled."
+            );
+        }
         
         this.cancelReason = Guard.require(cancelReason, "Cancel reason");
         this.status = AppointmentStatus.CANCELLED;

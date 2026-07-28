@@ -123,7 +123,7 @@ public class SecurityConfig {
                                                 // ===== APPOINTMENTS =====
                                                 .requestMatchers(HttpMethod.GET, "/appointments/me/**")
                                                 .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.PATCH, "/appointments/cancel/**")
+                                                .requestMatchers(HttpMethod.PATCH, "/appointments/*/cancel")
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.PATCH, "/appointments/no-show/**")
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
