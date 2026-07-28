@@ -57,7 +57,11 @@ const departmentOptions = [
 const statusMeta = {
   SCHEDULED: { label: 'Đã đặt', tone: 'green' },
   CHECKED_IN: { label: 'Chờ khám', tone: 'blue' },
+  WAITING: { label: 'Chờ khám', tone: 'blue' },
   CALLED: { label: 'Đang khám', tone: 'emerald' },
+  IN_PROGRESS: { label: 'Đang khám', tone: 'emerald' },
+  WAITING_FOR_RESULT: { label: 'Chờ kết quả', tone: 'purple' },
+  SKIPPED: { label: 'Bỏ qua', tone: 'orange' },
   COMPLETED: { label: 'Đã khám', tone: 'gray' },
   CANCELLED: { label: 'Đã hủy', tone: 'red' },
   NO_SHOW: { label: 'Không đến', tone: 'orange' },

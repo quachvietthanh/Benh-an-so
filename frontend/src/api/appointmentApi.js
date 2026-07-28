@@ -1,4 +1,5 @@
 import axiosClient from './axiosClient'
+import queueApi from './queueApi'
 
 const DEFAULT_DOCTORS = [
   { id: 'u3', fullName: 'BS. Phạm Hồng Anh', username: 'doctor', role: 'DOCTOR', department: 'Nội tổng quát' },
@@ -28,13 +29,15 @@ const appointmentApi = {
     }
     return { data: DEFAULT_DOCTORS }
   },
-  getQueue: () => axiosClient.get('/appointments/queue'),
+  getQueue: (params) => queueApi.getQueue(params),
   create: (data) => axiosClient.post('/appointments', data),
   cancel: (id, reason) => axiosClient.patch(`/appointments/${id}/cancel`, { reason }),
   noShow: (id) => axiosClient.patch(`/appointments/${id}/no-show`),
   checkIn: (id) => axiosClient.patch(`/appointments/${id}/check-in`),
-  callNext: () => axiosClient.post('/appointments/queue/call-next'),
+  callNext: (payload) => queueApi.callNext(payload),
   complete: (id) => axiosClient.patch(`/appointments/${id}/complete`),
+  updateQueueStatus: (id, data) => queueApi.updateStatus(id, data),
+  addToQueue: (data) => queueApi.addToQueue(data),
 }
 
 export default appointmentApi
