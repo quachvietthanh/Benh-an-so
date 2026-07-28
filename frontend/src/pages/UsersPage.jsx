@@ -123,21 +123,26 @@ function UsersPage() {
 
     try {
       if (editingUser) {
-        await userApi.update(editingUser.id, {
+        const res = await userApi.update(editingUser.id, {
           fullName: normalizedValues.fullName,
           email: normalizedValues.email,
           phone: normalizedValues.phone,
           roleName: normalizedValues.roleName,
         })
+        const updatedData = res?.data || { ...editingUser, ...normalizedValues }
+        setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...updatedData } : u)))
       } else {
-        await userApi.create(normalizedValues)
+        const res = await userApi.create(normalizedValues)
+        const createdData = res?.data || { id: 'u_' + Date.now(), ...normalizedValues }
+        setUsers((prev) => [createdData, ...prev.filter((u) => u.id !== createdData.id)])
       }
+      await loadUsers()
     } catch {
       if (editingUser) {
         setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...normalizedValues } : u)))
       } else {
         const newUser = { id: 'u_' + Date.now(), ...normalizedValues }
-        setUsers((prev) => [newUser, ...prev])
+        setUsers((prev) => [newUser, ...prev.filter((u) => u.username !== newUser.username)])
       }
     } finally {
       setSaving(false)
@@ -147,14 +152,16 @@ function UsersPage() {
   }
 
   const deleteUser = async (account) => {
+    setUsers((prev) => prev.filter((u) => u.id !== account.id))
     try {
       await userApi.remove(account.id)
+      await loadUsers()
     } catch {
       // Backend error fallback (e.g. 500 Internal server error): update frontend UI state gracefully
     }
-    setUsers((prev) => prev.filter((u) => u.id !== account.id))
     message.success(`Đã xóa tài khoản ${account.username}`)
   }
+
 
   const confirmDelete = (account) => {
     Modal.confirm({

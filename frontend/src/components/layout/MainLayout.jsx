@@ -1,19 +1,24 @@
 import React, { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Avatar, Badge, Dropdown, Input, Layout, Menu, Tooltip } from 'antd'
+import { AutoComplete, Avatar, Badge, Drawer, Dropdown, Input, Layout, Menu, Tooltip } from 'antd'
 import {
   BellOutlined,
+  CalendarOutlined,
   CaretDownOutlined,
+  DashboardOutlined,
+  FileTextOutlined,
   LogoutOutlined,
   MedicineBoxOutlined,
   MenuFoldOutlined,
+  MenuOutlined,
   MenuUnfoldOutlined,
   SearchOutlined,
   SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { useAuthContext } from '../../context/AuthContext'
-import { getNavigationItems } from '../../services/mockDataService'
+import { getAppointments, getNavigationItems, getPatients } from '../../services/mockDataService'
+import { mergeAppointments, mergePatients } from '../../utils/storageHelpers'
 
 const { Header, Sider, Content } = Layout
 
@@ -38,23 +43,112 @@ const navigationSections = [
 
 function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [searchValue, setSearchValue] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthContext()
 
+  const allPatients = useMemo(() => mergePatients(getPatients()), [])
+  const allAppointments = useMemo(() => mergeAppointments(getAppointments()), [])
+
+  const searchOptions = useMemo(() => {
+    const keyword = searchValue.trim().toLowerCase()
+    if (!keyword) return []
+
+    const matchedPatients = allPatients.filter((p) =>
+      [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
+        .some((val) => String(val || '').toLowerCase().includes(keyword)),
+    ).slice(0, 5)
+
+    const matchedAppointments = allAppointments.filter((a) =>
+      [a.patientName, a.patientCode, a.id, a.doctorName]
+        .some((val) => String(val || '').toLowerCase().includes(keyword)),
+    ).slice(0, 5)
+
+    const options = []
+
+    if (matchedPatients.length > 0) {
+      options.push({
+        label: <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12 }}>👤 BỆNH NHÂN ({matchedPatients.length})</span>,
+        options: matchedPatients.map((p) => ({
+          value: `patient:${p.id}`,
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span><strong>{p.fullName}</strong> <small style={{ color: '#64748b' }}>({p.patientCode})</small></span>
+              <small style={{ color: '#2563eb' }}>{p.phone || p.phoneNumber || ''}</small>
+            </div>
+          ),
+          type: 'patient',
+          id: p.id,
+          patient: p,
+        })),
+      })
+    }
+
+    if (matchedAppointments.length > 0) {
+      options.push({
+        label: <span style={{ fontWeight: 600, color: '#16a34a', fontSize: 12 }}>📅 LỊCH HẸN ({matchedAppointments.length})</span>,
+        options: matchedAppointments.map((a) => ({
+          value: `appointment:${a.id}`,
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span><strong>{a.patientName || 'Lịch hẹn'}</strong> <small style={{ color: '#64748b' }}>({a.slot || a.time || 'Hôm nay'})</small></span>
+              <small style={{ color: '#16a34a' }}>{a.status || 'Đã đặt'}</small>
+            </div>
+          ),
+          type: 'appointment',
+          id: a.id,
+        })),
+      })
+    }
+
+    return options
+  }, [allAppointments, allPatients, searchValue])
+
+  const handleSelectSearch = (_, option) => {
+    setSearchValue('')
+    if (option.type === 'patient') {
+      navigate(`/patients/${option.id}`, { state: { patient: option.patient } })
+    } else if (option.type === 'appointment') {
+      navigate('/appointments', { state: { appointmentId: option.id } })
+    }
+  }
+
+  const handleSearchSubmit = () => {
+    if (!searchValue.trim()) return
+    const keyword = searchValue.trim()
+    setSearchValue('')
+    navigate('/patients', { state: { keyword } })
+  }
+
   const navigationItems = useMemo(
     () => getNavigationItems(user?.roles || []).map((item) => ({
       key: item.key,
-      icon: React.createElement(item.icon),
+      icon: item.icon ? React.createElement(item.icon) : null,
       label: item.label,
       title: item.label,
     })),
     [user?.roles],
   )
 
-
-
   const sidebarItems = useMemo(() => navigationSections.flatMap((section) => {
+    const items = section.paths
+      .map((path) => navigationItems.find((item) => item.key === path))
+      .filter(Boolean)
+
+    if (!items.length) return []
+    if (collapsed || !section.label) return items
+
+    return [{
+      type: 'group',
+      key: `group-${section.key}`,
+      label: section.label,
+      children: items,
+    }]
+  }), [navigationItems, collapsed])
+
+  const drawerItems = useMemo(() => navigationSections.flatMap((section) => {
     const items = section.paths
       .map((path) => navigationItems.find((item) => item.key === path))
       .filter(Boolean)
@@ -69,6 +163,7 @@ function MainLayout() {
       children: items,
     }]
   }), [navigationItems])
+
 
   const selectedPath = useMemo(() => {
     const match = navigationItems
@@ -85,6 +180,23 @@ function MainLayout() {
     navigate('/login')
   }
 
+  const handleMenuClick = ({ key }) => {
+    if (key && key.startsWith('group-')) {
+      const sectionKey = key.replace('group-', '')
+      const section = navigationSections.find((s) => s.key === sectionKey)
+      const firstPath = section?.paths[0]
+      if (firstPath) {
+        navigate(firstPath)
+        setMobileDrawerOpen(false)
+      }
+      return
+    }
+    if (key && key.startsWith('/')) {
+      navigate(key)
+      setMobileDrawerOpen(false)
+    }
+  }
+
   const userMenuItems = [
     { key: 'profile', icon: <UserOutlined />, label: 'Thông tin cá nhân' },
     { key: 'settings', icon: <SettingOutlined />, label: 'Cài đặt tài khoản' },
@@ -99,10 +211,15 @@ function MainLayout() {
         trigger={null}
         collapsible
         collapsed={collapsed}
-        collapsedWidth={78}
+        collapsedWidth={0}
+        breakpoint="md"
+        onBreakpoint={(broken) => {
+          if (broken) setCollapsed(true)
+        }}
         width={240}
         theme="dark"
       >
+
         <button type="button" className="clinic-brand" onClick={() => navigate('/')}>
           <span className="clinic-brand-icon"><MedicineBoxOutlined /></span>
           {!collapsed && (
@@ -120,7 +237,7 @@ function MainLayout() {
           selectedKeys={[selectedPath]}
           items={sidebarItems}
           inlineIndent={16}
-          onClick={({ key }) => navigate(key)}
+          onClick={handleMenuClick}
         />
 
         <Tooltip title={collapsed ? 'Mở rộng menu' : ''} placement="right">
@@ -138,12 +255,32 @@ function MainLayout() {
 
       <Layout className="clinic-main-layout">
         <Header className="clinic-header">
-          <Input
-            className="clinic-search"
-            prefix={<SearchOutlined />}
-            placeholder="Tìm kiếm bệnh nhân, lịch hẹn..."
-            allowClear
-          />
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            onClick={() => setMobileDrawerOpen(true)}
+            aria-label="Mở menu điều hướng"
+          >
+            <MenuOutlined />
+          </button>
+
+          <AutoComplete
+            className="clinic-search-autocomplete"
+            style={{ width: 'min(460px, 46vw)' }}
+            options={searchOptions}
+            value={searchValue}
+            onChange={setSearchValue}
+            onSelect={handleSelectSearch}
+            popupMatchSelectWidth={340}
+          >
+            <Input
+              className="clinic-search"
+              prefix={<SearchOutlined />}
+              placeholder="Tìm kiếm bệnh nhân, lịch hẹn..."
+              allowClear
+              onPressEnter={handleSearchSubmit}
+            />
+          </AutoComplete>
 
           <div className="clinic-header-actions">
             <Badge count={3} size="small" offset={[-2, 3]}>
@@ -171,6 +308,35 @@ function MainLayout() {
           </div>
         </Content>
       </Layout>
+
+
+      <Drawer
+        title={(
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="clinic-brand-icon" style={{ background: '#123B6D', color: '#fff' }}><MedicineBoxOutlined /></span>
+            <div>
+              <strong style={{ display: 'block', fontSize: 15, color: '#123B6D' }}>BỆNH ÁN SỐ</strong>
+              <small style={{ color: '#64748b' }}>Hệ thống quản lý phòng khám</small>
+            </div>
+          </div>
+        )}
+        placement="left"
+        onClose={() => setMobileDrawerOpen(false)}
+        open={mobileDrawerOpen}
+        width={280}
+        styles={{ body: { padding: '12px 0', background: '#123B6D' }, header: { borderBottom: '1px solid #e2e8f0', padding: '16px' } }}
+      >
+        <Menu
+          className="clinic-menu"
+          theme="dark"
+          mode="inline"
+          selectedKeys={[selectedPath]}
+          items={drawerItems}
+
+          inlineIndent={16}
+          onClick={handleMenuClick}
+        />
+      </Drawer>
     </Layout>
   )
 }

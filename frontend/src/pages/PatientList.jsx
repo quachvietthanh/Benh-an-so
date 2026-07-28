@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+
 import {
   Avatar,
   Button,
@@ -61,6 +62,7 @@ const getPatientStatus = (patient) => (
 
 function PatientList() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuthContext()
   const canManage = user?.roles?.some((role) => ['admin', 'receptionist'].includes(role))
   const [loading, setLoading] = useState(false)
@@ -68,6 +70,14 @@ function PatientList() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [searchText, setSearchText] = useState('')
+
+  useEffect(() => {
+    if (location.state?.keyword) {
+      setSearchText(location.state.keyword)
+      setKeyword(location.state.keyword)
+    }
+  }, [location.state?.keyword])
+
   const [genderFilter, setGenderFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [dateRange, setDateRange] = useState(null)

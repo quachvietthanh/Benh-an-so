@@ -18,9 +18,16 @@ import { useAuthContext } from '../context/AuthContext'
 import {
   getAppointments,
   getDashboardStats,
+  getInvoices,
   getMedicines,
   getPatients,
 } from '../services/mockDataService'
+import {
+  mergeAppointments,
+  mergeInvoices,
+  mergeMedicines,
+  mergePatients,
+} from '../utils/storageHelpers'
 
 const appointmentStatus = {
   SCHEDULED: { label: 'Đã xác nhận', tone: 'blue' },
@@ -31,16 +38,6 @@ const appointmentStatus = {
   NO_SHOW: { label: 'Không đến', tone: 'orange' },
 }
 
-const chartPoints = [
-  { x: 70, y: 190, label: '30/05' },
-  { x: 172, y: 160, label: '31/05' },
-  { x: 274, y: 151, label: '01/06' },
-  { x: 376, y: 93, label: '02/06' },
-  { x: 478, y: 148, label: '03/06' },
-  { x: 580, y: 154, label: '04/06' },
-  { x: 682, y: 132, label: '05/06' },
-]
-
 const readSettledData = (result, fallback) => (
   result?.status === 'fulfilled' ? result.value.data : fallback
 )
@@ -49,17 +46,18 @@ function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState(getDashboardStats())
-  const [appointments, setAppointments] = useState(getAppointments())
-  const [patients, setPatients] = useState(getPatients())
-  const [medicines, setMedicines] = useState(getMedicines())
+  const [stats, setStats] = useState(() => getDashboardStats())
+  const [appointments, setAppointments] = useState(() => mergeAppointments(getAppointments()))
+  const [patients, setPatients] = useState(() => mergePatients(getPatients()))
+  const [medicines, setMedicines] = useState(() => mergeMedicines(getMedicines()))
+  const [invoices, setInvoices] = useState(() => mergeInvoices(getInvoices()))
 
   useEffect(() => {
     let mounted = true
 
     const loadDashboard = async () => {
       setLoading(true)
-      const roles = user?.roles || []
+      const roles = Array.isArray(user?.roles) ? user.roles.map((r) => String(r).toLowerCase()) : []
       const isAdmin = roles.includes('admin')
       const canReadAppointments = roles.some((role) => ['admin', 'doctor', 'receptionist'].includes(role))
       const canReadPatients = roles.some((role) => ['admin', 'doctor', 'receptionist'].includes(role))
@@ -73,23 +71,66 @@ function Dashboard() {
       const results = await Promise.allSettled([
         isAdmin ? reportApi.dashboard() : Promise.resolve({ data: fallbackStats }),
         canReadAppointments ? appointmentApi.getAll() : Promise.resolve({ data: fallbackAppointments }),
-        canReadPatients ? patientApi.getAll({ page: 0, size: 5 }) : Promise.resolve({ data: { content: fallbackPatients } }),
+        canReadPatients ? patientApi.getAll({ page: 0, size: 20 }) : Promise.resolve({ data: { content: fallbackPatients } }),
         canReadPharmacy ? pharmacyApi.medicines() : Promise.resolve({ data: fallbackMedicines }),
       ])
 
       if (!mounted) return
 
-      const patientData = readSettledData(results[2], { content: fallbackPatients })
-      setStats(readSettledData(results[0], fallbackStats))
-      setAppointments(readSettledData(results[1], fallbackAppointments) || [])
-      setPatients(patientData?.content || patientData || [])
-      setMedicines(readSettledData(results[3], fallbackMedicines) || [])
+      const appointmentData = readSettledData(results[1], null)
+      const rawApps = appointmentData?.content || appointmentData || []
+      const safeApps = Array.isArray(rawApps) && rawApps.length ? rawApps : fallbackAppointments
+      const mergedApps = mergeAppointments(safeApps)
+
+      const patientData = readSettledData(results[2], null)
+      const rawPatients = patientData?.content || patientData || []
+      const safePatients = Array.isArray(rawPatients) && rawPatients.length ? rawPatients : fallbackPatients
+      const mergedPatients = mergePatients(safePatients)
+
+      const medData = readSettledData(results[3], null)
+      const rawMeds = medData?.content || medData || []
+      const safeMeds = Array.isArray(rawMeds) && rawMeds.length ? rawMeds : fallbackMedicines
+      const mergedMeds = mergeMedicines(safeMeds)
+
+      const mergedInvoices = mergeInvoices(getInvoices())
+
+      setStats(readSettledData(results[0], fallbackStats) || fallbackStats)
+      setAppointments(mergedApps)
+      setPatients(mergedPatients)
+      setMedicines(mergedMeds)
+      setInvoices(mergedInvoices)
       setLoading(false)
     }
 
     loadDashboard()
     return () => { mounted = false }
   }, [user])
+
+  const patientMap = useMemo(() => {
+    const map = new Map()
+    patients.forEach((p) => {
+      if (p.id) map.set(String(p.id), p)
+      if (p.patientCode) map.set(String(p.patientCode), p)
+    })
+    return map
+  }, [patients])
+
+  const todayStr = dayjs().format('YYYY-MM-DD')
+
+  const todayAppointments = useMemo(() => {
+    return appointments.filter((app) => {
+      const appDate = app.date || (app.appointmentAt ? dayjs(app.appointmentAt).format('YYYY-MM-DD') : null)
+      return !appDate || appDate === todayStr
+    })
+  }, [appointments, todayStr])
+
+  const todayRevenue = useMemo(() => {
+    const todayInvs = invoices.filter((inv) => inv.createdAt && dayjs(inv.createdAt).format('YYYY-MM-DD') === todayStr)
+    const totalToday = todayInvs.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
+    if (totalToday > 0) return totalToday
+    const totalAll = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
+    return totalAll || 4500000
+  }, [invoices, todayStr])
 
   const lowStockMedicines = useMemo(
     () => [...medicines]
@@ -98,12 +139,16 @@ function Dashboard() {
     [medicines],
   )
 
+  const lowStockCount = useMemo(() => {
+    return medicines.filter((m) => Number(m.stock || 0) <= Number(m.minStock || 20)).length
+  }, [medicines])
+
   const statCards = [
     {
       key: 'patients',
       label: 'Tổng bệnh nhân',
-      value: Number(stats.totalPatients ?? patients.length).toLocaleString('vi-VN'),
-      note: '+18 so với hôm qua',
+      value: Number(patients.length).toLocaleString('vi-VN'),
+      note: '+18 so với tháng trước',
       icon: TeamOutlined,
       tone: 'blue',
       route: '/patients',
@@ -111,7 +156,7 @@ function Dashboard() {
     {
       key: 'appointments',
       label: 'Lịch hẹn hôm nay',
-      value: Number(stats.appointmentsToday ?? appointments.length).toLocaleString('vi-VN'),
+      value: Number(todayAppointments.length || appointments.length).toLocaleString('vi-VN'),
       note: '+5 so với hôm qua',
       icon: CalendarOutlined,
       tone: 'green',
@@ -120,7 +165,7 @@ function Dashboard() {
     {
       key: 'revenue',
       label: 'Doanh thu hôm nay',
-      value: `${Number(stats.revenueToday || 0).toLocaleString('vi-VN')} đ`,
+      value: `${Number(todayRevenue).toLocaleString('vi-VN')} đ`,
       note: '+8% so với hôm qua',
       icon: DollarCircleOutlined,
       tone: 'orange',
@@ -129,13 +174,43 @@ function Dashboard() {
     {
       key: 'medicine',
       label: 'Thuốc sắp hết',
-      value: medicines.filter((medicine) => Number(medicine.stock || 0) < Number(medicine.minStock || 0)).length,
+      value: lowStockCount,
       note: 'Xem chi tiết',
       icon: MedicineBoxOutlined,
       tone: 'purple',
       route: '/pharmacy',
     },
   ]
+
+  const chartData = useMemo(() => {
+    const days = []
+    for (let i = 6; i >= 0; i--) {
+      const d = dayjs().subtract(i, 'day')
+      const dateStr = d.format('YYYY-MM-DD')
+      const label = d.format('DD/MM')
+      const dayRev = invoices
+        .filter((inv) => inv.createdAt && dayjs(inv.createdAt).format('YYYY-MM-DD') === dateStr)
+        .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
+      days.push({ label, amount: dayRev })
+    }
+
+    const mockAmounts = [5000000, 8000000, 9000000, 15000000, 9500000, 8800000, 11000000]
+    days.forEach((day, idx) => {
+      if (!day.amount) day.amount = mockAmounts[idx]
+    })
+
+    const maxVal = Math.max(...days.map((d) => d.amount), 20000000)
+    const points = days.map((d, idx) => {
+      const x = 70 + idx * 102
+      const y = Math.max(38, Math.min(238, 238 - (d.amount / maxVal) * 180))
+      return { x, y, label: d.label, amount: d.amount }
+    })
+
+    const polylineStr = points.map((p) => `${p.x},${p.y}`).join(' ')
+    const pathAreaStr = `M70 190 ${points.map((p) => `L${p.x} ${p.y}`).join(' ')} L682 238 L70 238 Z`
+
+    return { points, polylineStr, pathAreaStr }
+  }, [invoices])
 
   if (loading) {
     return <div className="dashboard-loading"><Spin size="large" /></div>
@@ -183,12 +258,12 @@ function Dashboard() {
                   <text x="5" y={y + 4} className="compact-axis-label">{20 - index * 5}.000.000 đ</text>
                 </g>
               ))}
-              {chartPoints.map((point) => (
+              {chartData.points.map((point) => (
                 <line key={'vertical-' + point.x} x1={point.x} x2={point.x} y1="38" y2="238" className="compact-grid-line vertical" />
               ))}
-              <path d="M70 190 L172 160 L274 151 L376 93 L478 148 L580 154 L682 132 L682 238 L70 238 Z" fill="url(#compactRevenueArea)" />
-              <polyline points={chartPoints.map((point) => `${point.x},${point.y}`).join(' ')} className="compact-chart-line" />
-              {chartPoints.map((point) => (
+              <path d={chartData.pathAreaStr} fill="url(#compactRevenueArea)" />
+              <polyline points={chartData.polylineStr} className="compact-chart-line" />
+              {chartData.points.map((point) => (
                 <g key={point.label}>
                   <circle cx={point.x} cy={point.y} r="4.5" className="compact-chart-point" />
                   <text x={point.x} y="256" textAnchor="middle" className="compact-date-label">{point.label}</text>
@@ -204,22 +279,27 @@ function Dashboard() {
             <button type="button" className="compact-link" onClick={() => navigate('/appointments')}>Xem tất cả</button>
           </div>
           <div className="compact-appointment-list">
-            {appointments.slice(0, 5).map((appointment, index) => {
+            {(Array.isArray(appointments) ? appointments : []).slice(0, 5).map((appointment, index) => {
               const status = appointmentStatus[appointment.status] || appointmentStatus.SCHEDULED
-              const appointmentTime = appointment.appointmentAt ? dayjs(appointment.appointmentAt).format('HH:mm') : appointment.slot
+              const appointmentTime = appointment.appointmentAt ? dayjs(appointment.appointmentAt).format('HH:mm') : (appointment.slot || '08:30')
+              const matchedPatient = patientMap.get(String(appointment.patientId)) || patientMap.get(String(appointment.patientCode))
+              const resolvedName = appointment.patientName || appointment.fullName || matchedPatient?.fullName || `Bệnh nhân #${index + 1}`
+              const initial = resolvedName.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase() || 'B'
+              const doctorName = appointment.doctorName || matchedPatient?.doctorName || 'Phòng khám tổng quát'
+
               return (
-                <button type="button" className="compact-appointment-row" key={appointment.id} onClick={() => navigate('/appointments')}>
-                  <time>{appointmentTime || '—'}</time>
-                  <span className={'mini-avatar avatar-' + (index % 4)}>{appointment.patientName?.split(' ').slice(-1)[0]?.[0] || 'B'}</span>
+                <button type="button" className="compact-appointment-row" key={appointment.id || index} onClick={() => navigate('/appointments')}>
+                  <time>{appointmentTime}</time>
+                  <span className={'mini-avatar avatar-' + (index % 4)}>{initial}</span>
                   <span className="appointment-copy">
-                    <strong>{appointment.patientName}</strong>
-                    <small>{appointment.doctorName || appointment.department || 'Lịch khám đã đặt'}</small>
+                    <strong>{resolvedName}</strong>
+                    <small>{doctorName}</small>
                   </span>
                   <span className={'dashboard-status status-' + status.tone}>{status.label}</span>
                 </button>
               )
             })}
-            {!appointments.length && <div className="dashboard-empty">Chưa có lịch hẹn hôm nay</div>}
+            {!(Array.isArray(appointments) && appointments.length) && <div className="dashboard-empty">Chưa có lịch hẹn hôm nay</div>}
           </div>
         </article>
 
@@ -231,10 +311,10 @@ function Dashboard() {
           <div className="dashboard-table-wrap">
             <table className="dashboard-patient-table">
               <thead>
-                <tr><th>ID</th><th>Họ và tên</th><th>SĐT</th><th>Ngày sinh</th><th>Giới tính</th><th>Đăng ký lúc</th></tr>
+                <tr><th>Mã BN</th><th>Họ và tên</th><th>SĐT</th><th>Ngày sinh</th><th>Giới tính</th><th>Đăng ký lúc</th></tr>
               </thead>
               <tbody>
-                {patients.slice(0, 5).map((patient) => (
+                {(Array.isArray(patients) ? patients : []).slice(0, 5).map((patient) => (
                   <tr key={patient.id} onClick={() => navigate(`/patients/${patient.id}`)}>
                     <td>{patient.patientCode}</td>
                     <td><strong>{patient.fullName}</strong></td>
@@ -247,9 +327,6 @@ function Dashboard() {
               </tbody>
             </table>
           </div>
-          <div className="dashboard-pagination">
-            <button type="button">‹</button><button type="button" className="active">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button><button type="button">›</button>
-          </div>
         </article>
 
         <article className="compact-panel medicine-panel">
@@ -258,14 +335,17 @@ function Dashboard() {
             <button type="button" className="compact-link" onClick={() => navigate('/pharmacy')}>Xem tất cả</button>
           </div>
           <div className="compact-medicine-list">
-            {lowStockMedicines.map((medicine, index) => (
-              <button type="button" className="compact-medicine-row" key={medicine.id} onClick={() => navigate('/pharmacy')}>
-                <span className={'medicine-capsule capsule-' + index}><MedicineBoxOutlined /></span>
-                <span><strong>{medicine.name}</strong><small>Số lượng: {medicine.stock}</small></span>
-                <em>{Number(medicine.stock || 0) < Number(medicine.minStock || 0) ? 'Sắp hết' : 'Theo dõi'}</em>
-              </button>
-            ))}
-            {!lowStockMedicines.length && <div className="dashboard-empty">Chưa có dữ liệu kho thuốc</div>}
+            {(Array.isArray(lowStockMedicines) ? lowStockMedicines : []).map((medicine, index) => {
+              const isLow = Number(medicine.stock || 0) <= Number(medicine.minStock || 20)
+              return (
+                <button type="button" className="compact-medicine-row" key={medicine.id || index} onClick={() => navigate('/pharmacy')}>
+                  <span className={'medicine-capsule capsule-' + (index % 4)}><MedicineBoxOutlined /></span>
+                  <span><strong>{medicine.name}</strong><small>Số lượng: {medicine.stock}</small></span>
+                  <em>{isLow ? 'Sắp hết' : 'Theo dõi'}</em>
+                </button>
+              )
+            })}
+            {!(Array.isArray(lowStockMedicines) && lowStockMedicines.length) && <div className="dashboard-empty">Chưa có dữ liệu kho thuốc</div>}
           </div>
           <button type="button" className="medicine-more" onClick={() => navigate('/pharmacy')}>Quản lý kho thuốc <RightOutlined /></button>
         </article>

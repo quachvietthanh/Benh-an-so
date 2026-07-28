@@ -12,10 +12,29 @@ export const AuthProvider = ({ children }) => {
     const storedUser = localStorage.getItem('user')
     const storedToken = localStorage.getItem('token')
     if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser))
+      try {
+        const parsed = JSON.parse(storedUser)
+        if (parsed && typeof parsed === 'object') {
+          if (!Array.isArray(parsed.roles)) {
+            parsed.roles = parsed.role ? [String(parsed.role).toLowerCase()] : ['doctor']
+          } else {
+            parsed.roles = parsed.roles.map((r) => String(r).toLowerCase())
+          }
+          setUser(parsed)
+        } else {
+          localStorage.removeItem('user')
+          localStorage.removeItem('token')
+        }
+      } catch (e) {
+        console.warn('Invalid user data in localStorage, resetting...', e)
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+        setUser(null)
+      }
     }
     setLoading(false)
   }, [])
+
 
 
 

@@ -106,6 +106,8 @@ const getPercentage = (value, total) => (total ? `${((value / total) * 100).toFi
 
 const isSameDate = (value, date) => !date || (value && dayjs(value).isSame(date, 'day'))
 
+
+
 const loadPatientDirectory = async () => {
   try {
     const pageSize = 200
@@ -246,6 +248,8 @@ function AppointmentQueue() {
     () => appointments.filter((item) => isSameDate(item.appointmentAt, selectedDate)),
     [appointments, selectedDate],
   )
+
+
 
   const dailyStats = useMemo(() => {
     const count = (...statuses) => dailyAppointments.filter((item) => statuses.includes(item.status)).length
