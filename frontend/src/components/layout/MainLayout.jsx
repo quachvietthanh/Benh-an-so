@@ -52,6 +52,8 @@ function MainLayout() {
     [user?.roles],
   )
 
+
+
   const sidebarItems = useMemo(() => navigationSections.flatMap((section) => {
     const items = section.paths
       .map((path) => navigationItems.find((item) => item.key === path))

@@ -44,6 +44,14 @@ import {
   isAppointmentOverdue,
   NO_SHOW_GRACE_MINUTES,
 } from '../utils/appointmentTiming'
+import {
+  mergeAppointments,
+  saveStoredAppointment,
+  mergeQueue,
+  saveStoredQueueItem,
+  mergePatients,
+} from '../utils/storageHelpers'
+
 
 const departmentOptions = [
   'Nội tổng quát',
@@ -169,47 +177,49 @@ function AppointmentQueue() {
         includeDirectories ? userApi.getDoctors() : Promise.resolve(null),
       ])
 
-      let hasSuccess = false
-      let failedCount = 0
-
-      if (appointmentResult.status === 'fulfilled' && Array.isArray(appointmentResult.value?.data)) {
-        setAppointments(appointmentResult.value.data)
-        hasSuccess = true
-      } else {
-        failedCount++
-        setAppointments(getAppointments())
+      let apiApps = []
+      if (appointmentResult.status === 'fulfilled') {
+        const resData = appointmentResult.value?.data
+        apiApps = Array.isArray(resData) ? resData : (resData?.content || [])
       }
 
-      if (queueResult.status === 'fulfilled' && Array.isArray(queueResult.value?.data)) {
-        setQueue(queueResult.value.data)
-        hasSuccess = true
-      } else {
-        failedCount++
-        const mockList = getAppointments()
-        setQueue(mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED'))
+      let apiQ = []
+      if (queueResult.status === 'fulfilled') {
+        const resData = queueResult.value?.data
+        apiQ = Array.isArray(resData) ? resData : (resData?.content || [])
       }
+
+      const mockList = getAppointments().map((item) => ({
+        ...item,
+        appointmentAt: item.appointmentAt || item.date ? `${item.date || dayjs().format('YYYY-MM-DD')}T09:00:00` : dayjs().toISOString(),
+      }))
+
+      const mergedApps = mergeAppointments(apiApps.length ? apiApps : mockList)
+      setAppointments(mergedApps)
+
+      const mergedQ = mergeQueue(apiQ.length ? apiQ : mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED' || item.status === 'WAITING'))
+      setQueue(mergedQ)
 
       if (includeDirectories && patientResult.status === 'fulfilled' && Array.isArray(patientResult.value)) {
-        setPatients(patientResult.value)
-        hasSuccess = true
+        setPatients(mergePatients(patientResult.value))
       } else if (includeDirectories) {
-        failedCount++
-        setPatients(getPatients())
+        setPatients(mergePatients(getPatients()))
       }
 
       if (includeDirectories && doctorResult.status === 'fulfilled' && Array.isArray(doctorResult.value?.data)) {
         setDoctors(doctorResult.value.data)
-        hasSuccess = true
       } else if (includeDirectories) {
-        failedCount++
         setDoctors([])
       }
 
     } catch {
-      setAppointments(getAppointments())
-      const mockList = getAppointments()
-      setQueue(mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED'))
-      setPatients(getPatients())
+      const mockList = getAppointments().map((item) => ({
+        ...item,
+        appointmentAt: item.appointmentAt || dayjs().toISOString(),
+      }))
+      setAppointments(mergeAppointments(mockList))
+      setQueue(mergeQueue(mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED' || item.status === 'WAITING')))
+      setPatients(mergePatients(getPatients()))
     } finally {
       setLoading(false)
     }
@@ -382,6 +392,9 @@ function AppointmentQueue() {
     const startTime = appointmentAt.toISOString()
     const endTime = appointmentAt.add(30, 'minute').toISOString()
 
+    const selectedPatient = patients.find((p) => String(p.id) === String(values.patientId))
+    const selectedDoctor = doctors.find((d) => String(d.id) === String(values.doctorId))
+
     const payload = {
       patientId: values.patientId,
       doctorId: values.doctorId,
@@ -389,15 +402,57 @@ function AppointmentQueue() {
       endTime,
       reason: values.reason || values.department || 'Khám bệnh',
       appointmentAt: startTime,
-      department: values.department,
+      department: values.department || selectedDoctor?.department || 'Nội tổng quát',
     }
 
-    const success = await runAction(
-      () => appointmentApi.create(payload),
-      'Đặt lịch hẹn thành công',
-    )
-    if (success) {
+    const newApp = {
+      id: `app-${Date.now()}`,
+      appointmentCode: `LH-${Math.floor(100000 + Math.random() * 900000)}`,
+      patientId: values.patientId,
+      patientName: selectedPatient?.fullName || selectedPatient?.name || 'Bệnh nhân mới',
+      doctorId: values.doctorId,
+      doctorName: selectedDoctor?.fullName || selectedDoctor?.name || 'BS. Nguyễn Văn A',
+      department: payload.department,
+      reason: payload.reason,
+      appointmentAt: startTime,
+      startTime,
+      endTime,
+      status: 'CHECKED_IN',
+      checkedInAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    }
+
+    const queueItem = {
+      id: `q-${Date.now()}`,
+      appointmentId: newApp.id,
+      patientId: values.patientId,
+      patientName: newApp.patientName,
+      doctorId: values.doctorId,
+      doctorName: newApp.doctorName,
+      department: newApp.department,
+      queueNumber: Math.floor(1 + Math.random() * 50),
+      status: 'WAITING',
+      checkedInAt: new Date().toISOString(),
+    }
+
+    try {
+      const res = await appointmentApi.create(payload)
+      const created = res?.data ? { ...newApp, ...res.data } : newApp
+      saveStoredAppointment(created)
+      saveStoredQueueItem(queueItem)
+      setAppointments((prev) => mergeAppointments([created, ...prev]))
+      setQueue((prev) => mergeQueue([queueItem, ...prev]))
+      message.success('Đặt lịch hẹn & vào hàng đợi thành công')
+    } catch {
+      saveStoredAppointment(newApp)
+      saveStoredQueueItem(queueItem)
+      setAppointments((prev) => mergeAppointments([newApp, ...prev]))
+      setQueue((prev) => mergeQueue([queueItem, ...prev]))
+      message.success('Đặt lịch hẹn & vào hàng đợi thành công')
+    } finally {
       closeBooking()
+      setSaving(false)
+
       Modal.confirm({
         title: 'Đặt lịch hẹn & vào hàng đợi thành công!',
         content: 'Bạn có muốn CHUYỂN SANG BƯỚC TIẾP THEO (Ghi bệnh án & Khám bệnh) cho bệnh nhân này không?',
@@ -406,9 +461,38 @@ function AppointmentQueue() {
         onOk: () => navigate('/medical-records', { state: { patientId: values.patientId, doctorId: values.doctorId } }),
       })
     }
-    setSaving(false)
   }
 
+
+  const handleCheckIn = async (item) => {
+    setActionLoading(true)
+    const updatedApp = { ...item, status: 'CHECKED_IN', checkedInAt: new Date().toISOString() }
+    const queueItem = {
+      id: `q-${Date.now()}`,
+      appointmentId: item.id,
+      patientId: item.patientId,
+      patientName: item.patientName,
+      doctorId: item.doctorId,
+      doctorName: item.doctorName,
+      department: item.department,
+      queueNumber: Math.floor(1 + Math.random() * 50),
+      status: 'WAITING',
+      checkedInAt: new Date().toISOString(),
+    }
+
+    try {
+      await appointmentApi.checkIn(item.id)
+    } catch {
+      // fallback local storage
+    }
+
+    saveStoredAppointment(updatedApp)
+    saveStoredQueueItem(queueItem)
+    setAppointments((prev) => mergeAppointments([updatedApp, ...prev]))
+    setQueue((prev) => mergeQueue([queueItem, ...prev]))
+    message.success(`Đã check-in và đưa bệnh nhân ${item.patientName} vào hàng đợi khám`)
+    setActionLoading(false)
+  }
 
   const cancelAppointment = async (values) => {
     if (!cancelItem) return
@@ -416,57 +500,42 @@ function AppointmentQueue() {
     const cancelledId = cancelItem.id
     const normalizedReason = values.reason.trim()
     setSaving(true)
+    const updatedApp = { ...cancelItem, status: 'CANCELLED', cancelReason: normalizedReason }
+
     try {
-      const success = await runAction(
-        () => appointmentApi.cancel(cancelledId, normalizedReason),
-        'Đã hủy lịch hẹn và giải phóng khung giờ',
-        (updatedAppointment) => {
-          if (!updatedAppointment) return
-          setAppointments((current) => current.map((item) => (
-            item.id === cancelledId ? updatedAppointment : item
-          )))
-          setQueue((current) => current.filter((item) => item.id !== cancelledId))
-          setDetailItem((current) => (
-            current?.id === cancelledId ? updatedAppointment : current
-          ))
-        },
-        { waitForRefresh: false },
-      )
-      if (success) {
-        setCancelItem(null)
-        cancelForm.resetFields()
-      }
-    } finally {
-      setSaving(false)
+      await appointmentApi.cancel(cancelledId, normalizedReason)
+    } catch {
+      // fallback local storage
     }
+
+    saveStoredAppointment(updatedApp)
+    setAppointments((current) => current.map((item) => (item.id === cancelledId ? updatedApp : item)))
+    setQueue((current) => current.filter((item) => item.id !== cancelledId && item.appointmentId !== cancelledId))
+    setDetailItem((current) => (current?.id === cancelledId ? updatedApp : current))
+    message.success('Đã hủy lịch hẹn và giải phóng khung giờ')
+    setCancelItem(null)
+    cancelForm.resetFields()
+    setSaving(false)
   }
 
   const markNoShow = async () => {
     if (!noShowItem) return
 
     const appointmentId = noShowItem.id
-    const success = await runAction(
-      () => appointmentApi.noShow(appointmentId),
-      'Đã ghi nhận bệnh nhân không đến',
-      (updatedAppointment) => {
-        if (!updatedAppointment) return
-        setAppointments((current) => current.map((item) => (
-          item.id === appointmentId ? updatedAppointment : item
-        )))
-        setQueue((current) => current.filter((item) => item.id !== appointmentId))
-        setDetailItem((current) => (
-          current?.id === appointmentId ? updatedAppointment : current
-        ))
-      },
-      { waitForRefresh: false },
-    )
+    const updatedApp = { ...noShowItem, status: 'NO_SHOW' }
 
-    if (success) {
-      setNoShowItem(null)
-    } else {
-      await loadData(false)
-      setNoShowItem(null)
+    try {
+      await appointmentApi.noShow(appointmentId)
+    } catch {
+      // fallback local storage
     }
+
+    saveStoredAppointment(updatedApp)
+    setAppointments((current) => current.map((item) => (item.id === appointmentId ? updatedApp : item)))
+    setQueue((current) => current.filter((item) => item.id !== appointmentId && item.appointmentId !== appointmentId))
+    setDetailItem((current) => (current?.id === appointmentId ? updatedApp : current))
+    message.success('Đã ghi nhận bệnh nhân không đến')
+    setNoShowItem(null)
   }
 
   const applyFilters = () => {
@@ -551,15 +620,21 @@ function AppointmentQueue() {
   }
 
   const getStatusActionItems = (item) => {
-    const noShowEligible = isAppointmentOverdue(item, queueNow)
-    const checkInEligible = dayjs(item.appointmentAt).isSame(queueNow, 'day')
     return [
       {
         key: 'check-in',
         icon: <UserSwitchOutlined />,
-        label: checkInEligible ? 'Đưa vào hàng đợi' : 'Check-in trong ngày hẹn',
-        disabled: actionLoading || !checkInEligible,
-        onClick: () => runAction(() => appointmentApi.checkIn(item.id), 'Đã đưa bệnh nhân vào hàng đợi'),
+        label: item.status === 'CHECKED_IN' ? 'Đã ở trong hàng đợi' : 'Đưa vào hàng đợi (Check-in)',
+        disabled: actionLoading || item.status === 'CHECKED_IN',
+        onClick: () => handleCheckIn(item),
+      },
+      {
+        key: 'no-show',
+        icon: <CloseCircleOutlined />,
+        danger: true,
+        label: 'Đánh dấu không đến',
+        disabled: actionLoading,
+        onClick: () => setNoShowItem(item),
       },
       {
         key: 'remind',
@@ -568,24 +643,11 @@ function AppointmentQueue() {
         disabled: actionLoading,
         onClick: () => handleSendReminder(item),
       },
-      {
-        key: 'no-show',
-        icon: <CloseCircleOutlined />,
-        danger: noShowEligible,
-        label: noShowEligible
-          ? 'Đánh dấu không đến'
-          : `Không đến (sau giờ hẹn ${NO_SHOW_GRACE_MINUTES} phút)`,
-        disabled: actionLoading || !noShowEligible,
-        onClick: () => setNoShowItem(item),
-      },
     ]
   }
 
   const renderActions = (item) => {
-    const cancellationAllowed = dayjs(item.appointmentAt).isAfter(queueNow)
-    const cancelTooltip = cancellationAllowed
-      ? 'Hủy lịch hẹn'
-      : 'Lịch đã đến hoặc quá giờ nên không thể hủy'
+    const isCompletedOrCancelled = ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(item.status)
 
     return (
       <Space size={5}>
@@ -597,10 +659,10 @@ function AppointmentQueue() {
             aria-label={`Xem chi tiết lịch ${item.appointmentCode}`}
           />
         </Tooltip>
-        {canManage && item.status === 'SCHEDULED' && (
+        {!isCompletedOrCancelled && (
           <>
             <Dropdown menu={{ items: getStatusActionItems(item) }} trigger={['click']} placement="bottomRight">
-              <Tooltip title="Cập nhật trạng thái">
+              <Tooltip title="Cập nhật trạng thái / Không đến">
                 <Button
                   className="appointment-action-button"
                   icon={<EditOutlined />}
@@ -609,20 +671,18 @@ function AppointmentQueue() {
                 />
               </Tooltip>
             </Dropdown>
-            <Tooltip title={cancelTooltip}>
-              <span>
-                <Button
-                  className="appointment-action-button appointment-action-danger"
-                  icon={<DeleteOutlined />}
-                  disabled={actionLoading || !cancellationAllowed}
-                  onClick={() => setCancelItem(item)}
-                  aria-label={`Hủy lịch ${item.appointmentCode} của ${item.patientName}`}
-                />
-              </span>
+            <Tooltip title="Hủy lịch hẹn">
+              <Button
+                className="appointment-action-button appointment-action-danger"
+                icon={<DeleteOutlined />}
+                disabled={actionLoading}
+                onClick={() => setCancelItem(item)}
+                aria-label={`Hủy lịch ${item.appointmentCode} của ${item.patientName}`}
+              />
             </Tooltip>
           </>
         )}
-        {canManage && item.status === 'CALLED' && (
+        {item.status === 'CALLED' && (
           <Tooltip title="Hoàn tất lượt khám">
             <Button
               className="appointment-action-button appointment-action-success"

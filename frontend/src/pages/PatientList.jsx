@@ -33,6 +33,7 @@ import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
 import { getPatients } from '../services/mockDataService'
+import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate } from '../utils/helpers'
 
 const { RangePicker } = DatePicker
@@ -81,18 +82,14 @@ function PatientList() {
     setLoading(true)
     try {
       const response = await patientApi.getAll({ keyword: keyword || undefined, page, size: pageSize })
-      if (response?.data?.content) {
-        setPatients(response.data.content || [])
-        setTotal(response.data.totalElements || 0)
-      } else {
-        const mock = getPatients()
-        setPatients(mock)
-        setTotal(mock.length)
-      }
+      const apiList = response?.data?.content || []
+      const merged = mergePatients(apiList.length ? apiList : getPatients())
+      setPatients(merged)
+      setTotal(response?.data?.totalElements || merged.length)
     } catch {
-      const mock = getPatients()
-      setPatients(mock)
-      setTotal(mock.length)
+      const merged = mergePatients(getPatients())
+      setPatients(merged)
+      setTotal(merged.length)
     } finally {
       setLoading(false)
     }
@@ -134,7 +131,8 @@ function PatientList() {
         insuranceNumber: values.insuranceNumber || null,
       }
       const response = await patientApi.create(payload)
-      newPatient = response.data || { id: 'p_' + Date.now(), patientCode: 'BN-' + Math.floor(100000 + Math.random() * 900000), fullName: values.fullName }
+      newPatient = response.data || { id: 'p_' + Date.now(), patientCode: 'BN-' + Math.floor(100000 + Math.random() * 900000), fullName: values.fullName, dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD'), gender: values.gender.toUpperCase() }
+      saveStoredPatient(newPatient)
     } catch {
       // Fallback mock patient when backend is offline
       newPatient = {
@@ -153,7 +151,8 @@ function PatientList() {
         active: true,
         createdAt: new Date().toISOString(),
       }
-      setPatients((prev) => [newPatient, ...prev])
+      saveStoredPatient(newPatient)
+      setPatients((prev) => mergePatients([newPatient, ...prev]))
       setTotal((t) => t + 1)
     } finally {
       setSaving(false)
@@ -351,14 +350,14 @@ ${rowsXml}
       fixed: 'right',
       render: (_, patient) => (
         <Space size={5} onClick={(event) => event.stopPropagation()}>
-          <Button className="patient-action-button" icon={<EyeOutlined />} onClick={() => navigate(`/patients/${patient.id}`)} aria-label="Xem hồ sơ" />
-          {canManage && <Button className="patient-action-button" icon={<EditOutlined />} onClick={() => navigate(`/patients/${patient.id}`)} aria-label="Sửa hồ sơ" />}
+          <Button className="patient-action-button" icon={<EyeOutlined />} onClick={() => navigate(`/patients/${patient.id}`, { state: { patient } })} aria-label="Xem hồ sơ" />
+          {canManage && <Button className="patient-action-button" icon={<EditOutlined />} onClick={() => navigate(`/patients/${patient.id}`, { state: { patient } })} aria-label="Sửa hồ sơ" />}
           <Dropdown
             trigger={['click']}
             menu={{
               items: [
                 { key: 'book', icon: <CalendarOutlined />, label: 'Đặt lịch / Chọn bác sĩ', onClick: () => navigate('/appointments', { state: { patientId: patient.id } }) },
-                { key: 'view', icon: <EyeOutlined />, label: 'Xem hồ sơ', onClick: () => navigate(`/patients/${patient.id}`) },
+                { key: 'view', icon: <EyeOutlined />, label: 'Xem hồ sơ', onClick: () => navigate(`/patients/${patient.id}`, { state: { patient } }) },
                 { key: 'copy', label: 'Sao chép mã BN', onClick: () => copyPatientCode(patient.patientCode) },
               ],
             }}
@@ -441,7 +440,7 @@ ${rowsXml}
             columnWidth: 42,
             onCell: () => ({ onClick: (event) => event.stopPropagation() }),
           }}
-          onRow={(patient) => ({ onClick: () => navigate(`/patients/${patient.id}`) })}
+          onRow={(patient) => ({ onClick: () => navigate(`/patients/${patient.id}`, { state: { patient } }) })}
           scroll={{ x: 1095 }}
           pagination={{
             current: page + 1,
