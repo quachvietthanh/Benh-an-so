@@ -29,11 +29,14 @@ public class UserSessionEntity {
     @Column(name = "user_id", nullable = false, columnDefinition = "BINARY(16)")
     private UUID userId;
 
-    @Column(name = "token_hash", nullable = false, length = 255)
-    private String tokenHash;
+    @Column(name = "refresh_token_hash", nullable = false, length = 255)
+    private String refreshTokenHash;
 
-    @Column(name = "expires_at", nullable = false)
-    private Instant expiresAt;
+    @Column(name = "previous_refresh_token_hash", length = 255)
+    private String previousRefreshTokenHash;
+
+    @Column(name = "refresh_expires_at", nullable = false)
+    private Instant refreshExpiresAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

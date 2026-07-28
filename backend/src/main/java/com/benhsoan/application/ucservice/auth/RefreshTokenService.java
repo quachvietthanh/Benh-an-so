@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.auth;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
 import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.inbound.auth.RefreshTokenUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
+import com.benhsoan.port.outbound.authSecurity.RefreshTokenGeneratorPort;
 import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
@@ -27,11 +29,10 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(noRollbackFor = TokenInvalidException.class)
 public class RefreshTokenService implements RefreshTokenUseCase {
 
-    private static final Duration SESSION_TIMEOUT =
-            Duration.ofMinutes(30);
+    private static final Duration SESSION_TIMEOUT = Duration.ofDays(7);
 
     private final UserRepository userRepository;
 
@@ -43,6 +44,8 @@ public class RefreshTokenService implements RefreshTokenUseCase {
 
     private final TokenHashPort tokenHashPort;
 
+    private final RefreshTokenGeneratorPort refreshTokenGeneratorPort;
+
     private final ClockPort clockPort;
 
     @Override
@@ -50,20 +53,20 @@ public class RefreshTokenService implements RefreshTokenUseCase {
             RefreshTokenCommand command
     ) {
 
-        String oldToken = command.accessToken();
+        String tokenHash = tokenHashPort.hash(command.refreshToken());
 
-        if (!jwtTokenPort.validate(oldToken)) {
+        Instant now = clockPort.now();
+        Optional<UserSession> currentSession = userSessionRepository.findByRefreshTokenHash(tokenHash);
+
+        if (currentSession.isEmpty()) {
+            UserSession reusedTokenSession = userSessionRepository.findByPreviousRefreshTokenHash(tokenHash)
+                    .orElseThrow(TokenInvalidException::new);
+            reusedTokenSession.revoke(now);
+            userSessionRepository.save(reusedTokenSession);
             throw new TokenInvalidException();
         }
 
-        String tokenHash =
-                tokenHashPort.hash(oldToken);
-
-        UserSession session =
-                userSessionRepository.findByTokenHash(tokenHash)
-                        .orElseThrow(TokenInvalidException::new);
-
-        Instant now = clockPort.now();
+        UserSession session = currentSession.get();
 
         if (!session.isActive(now, SESSION_TIMEOUT)) {
             throw new SessionExpiredException();
@@ -81,33 +84,16 @@ public class RefreshTokenService implements RefreshTokenUseCase {
                 roleRepository.findById(user.getRoleId())
                         .orElseThrow(IllegalStateException::new);
 
-        String newToken =
-                jwtTokenPort.generateToken(
-                        user.getId(),
-                        user.getUsername(),
-                        role.getName()
-                );
-
-        String newTokenHash =
-                tokenHashPort.hash(newToken);
-
-        session.refresh(SESSION_TIMEOUT);
-
-        userSessionRepository.deleteById(session.getId());
-
-        UserSession newSession =
-                UserSession.create(
-                        user.getId(),
-                        newTokenHash,
-                        jwtTokenPort.getExpiredAt(newToken)
-                );
-
-        userSessionRepository.save(newSession);
+        String refreshToken = refreshTokenGeneratorPort.generate();
+        session.rotateRefreshToken(tokenHashPort.hash(refreshToken), now.plus(SESSION_TIMEOUT), now);
+        userSessionRepository.save(session);
+        String newToken = jwtTokenPort.generateToken(user.getId(), session.getId(), user.getUsername(), role.getName());
 
         return new LoginResult(
                 user.getId(),
                 user.getUsername(),
                 newToken,
+                refreshToken,
                 role.getName(),
                 jwtTokenPort.getExpiredAt(newToken)
         );

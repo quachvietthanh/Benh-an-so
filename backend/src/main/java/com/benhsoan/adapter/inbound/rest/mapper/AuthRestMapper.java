@@ -3,11 +3,9 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.auth.LoginRequest;
-import com.benhsoan.adapter.inbound.rest.request.auth.LogoutRequest;
 import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
-import com.benhsoan.port.dto.command.auth.LogoutCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
 import com.benhsoan.port.dto.result.LoginResult;
 
@@ -23,17 +21,10 @@ public class AuthRestMapper {
         );
     }
 
-    public LogoutCommand toCommand(LogoutRequest request) {
-
-        return new LogoutCommand(
-                request.accessToken()
-        );
-    }
-
     public RefreshTokenCommand toCommand(RefreshTokenRequest request) {
 
         return new RefreshTokenCommand(
-                request.accessToken()
+                request.refreshToken()
         );
     }
 
@@ -43,6 +34,7 @@ public class AuthRestMapper {
                 result.userId(),
                 result.username(),
                 result.accessToken(),
+                result.refreshToken(),
                 result.role(),
                 result.expiredAt()
         );

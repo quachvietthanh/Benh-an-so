@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 @Getter
-@ToString(exclude = "tokenHash")
+@ToString(exclude = {"refreshTokenHash", "previousRefreshTokenHash"})
 @EqualsAndHashCode(of = "id")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserSession {
@@ -22,9 +22,11 @@ public class UserSession {
 
     private UUID userId;
 
-    private String tokenHash;
+    private String refreshTokenHash;
 
-    private Instant expiresAt;
+    private String previousRefreshTokenHash;
+
+    private Instant refreshExpiresAt;
 
     private Instant createdAt;
 
@@ -35,16 +37,18 @@ public class UserSession {
     private UserSession(
             UUID id,
             UUID userId,
-            String tokenHash,
-            Instant expiresAt,
+            String refreshTokenHash,
+            String previousRefreshTokenHash,
+            Instant refreshExpiresAt,
             Instant createdAt,
             Instant lastUsedAt,
             Instant revokedAt
     ) {
         this.id = Guard.require(id, "Session id");
         this.userId = Guard.require(userId, "User id");
-        this.tokenHash = Guard.require(tokenHash, "Token hash");
-        this.expiresAt = Guard.require(expiresAt, "Expires at");
+        this.refreshTokenHash = Guard.require(refreshTokenHash, "Refresh token hash");
+        this.previousRefreshTokenHash = previousRefreshTokenHash;
+        this.refreshExpiresAt = Guard.require(refreshExpiresAt, "Refresh expires at");
         this.createdAt = Guard.require(createdAt, "Created at");
 
         this.lastUsedAt = lastUsedAt;
@@ -53,16 +57,17 @@ public class UserSession {
 
     public static UserSession create(
             UUID userId,
-            String tokenHash,
-            Instant expiresAt
+            String refreshTokenHash,
+            Instant refreshExpiresAt
     ) {
         Instant now = Instant.now();
 
         return new UserSession(
                 UUID.randomUUID(),
                 userId,
-                tokenHash,
-                expiresAt,
+                refreshTokenHash,
+                null,
+                refreshExpiresAt,
                 now,
                 now,
                 null
@@ -77,8 +82,8 @@ public class UserSession {
         this.revokedAt = now;
     }
 
-    public boolean isExpired(Instant now) {
-        return now.isAfter(expiresAt);
+    public boolean isRefreshExpired(Instant now) {
+        return now.isAfter(refreshExpiresAt);
     }
 
     public boolean isIdleTimeout(
@@ -92,7 +97,7 @@ public class UserSession {
             Instant now,
             Duration timeout
     ) {
-        return !isExpired(now)
+        return !isRefreshExpired(now)
                 && !isRevoked()
                 && !isIdleTimeout(now, timeout);
     }
@@ -104,14 +109,31 @@ public class UserSession {
     public void refresh(Duration timeout) {
         Instant now = Instant.now();
         this.lastUsedAt = now;
-        this.expiresAt = now.plus(timeout);
+        this.refreshExpiresAt = now.plus(timeout);
+    }
+
+    public boolean matchesPreviousRefreshTokenHash(String refreshTokenHash) {
+        return previousRefreshTokenHash != null
+                && previousRefreshTokenHash.equals(refreshTokenHash);
+    }
+
+    public void rotateRefreshToken(
+            String refreshTokenHash,
+            Instant refreshExpiresAt,
+            Instant lastUsedAt
+    ) {
+        this.previousRefreshTokenHash = this.refreshTokenHash;
+        this.refreshTokenHash = Guard.require(refreshTokenHash, "Refresh token hash");
+        this.refreshExpiresAt = Guard.require(refreshExpiresAt, "Refresh expiration");
+        this.lastUsedAt = Guard.require(lastUsedAt, "Last used at");
     }
 
     public static UserSession restore(
             UUID id,
             UUID userId,
-            String tokenHash,
-            Instant expiresAt,
+            String refreshTokenHash,
+            String previousRefreshTokenHash,
+            Instant refreshExpiresAt,
             Instant createdAt,
             Instant lastUsedAt,
             Instant revokedAt
@@ -119,8 +141,9 @@ public class UserSession {
         return new UserSession(
                 id,
                 userId,
-                tokenHash,
-                expiresAt,
+                refreshTokenHash,
+                previousRefreshTokenHash,
+                refreshExpiresAt,
                 createdAt,
                 lastUsedAt,
                 revokedAt

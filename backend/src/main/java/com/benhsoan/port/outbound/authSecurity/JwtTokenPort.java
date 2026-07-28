@@ -7,6 +7,7 @@ public interface JwtTokenPort {
 
     String generateToken(
             UUID userId,
+            UUID sessionId,
             String username,
             String role
     );
@@ -16,6 +17,8 @@ public interface JwtTokenPort {
     String getUsername(String token);
 
     String getRole(String token);
+
+    UUID getSessionId(String token);
 
     Instant getExpiredAt(String token);
 

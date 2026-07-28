@@ -12,7 +12,6 @@ import com.benhsoan.domain.auth.exception.TokenInvalidException;
 import com.benhsoan.port.dto.command.auth.LogoutCommand;
 import com.benhsoan.port.inbound.auth.LogoutUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
-import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
@@ -25,8 +24,6 @@ import lombok.RequiredArgsConstructor;
 public class LogoutService implements LogoutUseCase {
 
     private final JwtTokenPort jwtTokenPort;
-
-    private final TokenHashPort tokenHashPort;
 
     private final UserSessionRepository userSessionRepository;
 
@@ -45,18 +42,15 @@ public class LogoutService implements LogoutUseCase {
             throw new TokenInvalidException();
         }
 
-        String tokenHash =
-                tokenHashPort.hash(accessToken);
-
         UserSession session =
-                userSessionRepository.findByTokenHash(tokenHash)
-                        .orElseThrow(TokenInvalidException::new);
+                userSessionRepository.findById(jwtTokenPort.getSessionId(accessToken))
+                .orElseThrow(TokenInvalidException::new);
 
         if (session.isRevoked()) {
             throw new SessionExpiredException();
         }
 
-        if (session.isExpired(clockPort.now())) {
+        if (session.isRefreshExpired(clockPort.now())) {
             throw new SessionExpiredException();
         }
 

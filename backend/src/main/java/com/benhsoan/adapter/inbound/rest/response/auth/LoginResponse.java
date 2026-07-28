@@ -11,6 +11,8 @@ public record LoginResponse(
 
         String accessToken,
 
+        String refreshToken,
+
         String role,
 
         Instant expiredAt

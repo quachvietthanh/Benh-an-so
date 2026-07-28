@@ -29,8 +29,14 @@ public class UserSessionRepositoryAdapter implements UserSessionRepository {
     }
 
     @Override
-    public Optional<UserSession> findByTokenHash(String tokenHash) {
-        return jpaRepository.findByTokenHash(tokenHash)
+    public Optional<UserSession> findByRefreshTokenHash(String refreshTokenHash) {
+        return jpaRepository.findByRefreshTokenHash(refreshTokenHash)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<UserSession> findByPreviousRefreshTokenHash(String previousRefreshTokenHash) {
+        return jpaRepository.findByPreviousRefreshTokenHash(previousRefreshTokenHash)
                 .map(mapper::toDomain);
     }
 
@@ -57,17 +63,17 @@ public class UserSessionRepositoryAdapter implements UserSessionRepository {
     }
 
     @Override
-    public boolean existsByTokenHash(String tokenHash) {
-        return jpaRepository.existsByTokenHash(tokenHash);
+    public boolean existsByRefreshTokenHash(String refreshTokenHash) {
+        return jpaRepository.existsByRefreshTokenHash(refreshTokenHash);
     }
 
     @Override
-    public void deleteByUserId(UUID userId) {
-        jpaRepository.deleteByUserId(userId);
+    public void revokeByUserId(UUID userId, Instant revokedAt) {
+        jpaRepository.revokeByUserId(userId, revokedAt);
     }
 
     @Override
     public void deleteExpiredSessions() {
-        jpaRepository.deleteByExpiresAtBefore(Instant.now());
+        jpaRepository.deleteByRefreshExpiresAtBefore(Instant.now());
     }
 }

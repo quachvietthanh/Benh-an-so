@@ -21,7 +21,7 @@ class UserSessionTest {
                 Instant.now().plusSeconds(3600)
         );
 
-        assertFalse(session.isExpired(Instant.now()));
+        assertFalse(session.isRefreshExpired(Instant.now()));
         assertTrue(session.isActive(Instant.now(), Duration.ofMinutes(30)));
     }
 
@@ -34,7 +34,7 @@ class UserSessionTest {
                 Instant.now().minusSeconds(60)
         );
 
-        assertTrue(session.isExpired(Instant.now()));
+        assertTrue(session.isRefreshExpired(Instant.now()));
     }
 
     @Test
@@ -64,8 +64,24 @@ class UserSessionTest {
         Duration timeout = Duration.ofHours(1);
         session.refresh(timeout);
 
-        assertFalse(session.isExpired(Instant.now()));
+        assertFalse(session.isRefreshExpired(Instant.now()));
         assertTrue(session.isActive(Instant.now(), Duration.ofMinutes(30)));
+    }
+
+    @Test
+    @DisplayName("Refresh-token rotation retains the previous hash for reuse detection")
+    void rotateRefreshToken() {
+        UserSession session = UserSession.create(
+                UUID.randomUUID(), "old-hash", Instant.now().plusSeconds(60)
+        );
+        Instant expiresAt = Instant.now().plusSeconds(3600);
+
+        session.rotateRefreshToken("new-hash", expiresAt, Instant.now());
+
+        assertEquals("new-hash", session.getRefreshTokenHash());
+        assertEquals("old-hash", session.getPreviousRefreshTokenHash());
+        assertTrue(session.matchesPreviousRefreshTokenHash("old-hash"));
+        assertEquals(expiresAt, session.getRefreshExpiresAt());
     }
 
     @Test
@@ -92,20 +108,22 @@ class UserSessionTest {
     void sessionRestore() {
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        String tokenHash = "restored-hash";
-        Instant expiresAt = Instant.now().plusSeconds(3600);
+        String refreshTokenHash = "restored-hash";
+        String previousRefreshTokenHash = "previous-restored-hash";
+        Instant refreshExpiresAt = Instant.now().plusSeconds(3600);
         Instant createdAt = Instant.now().minusSeconds(86400);
         Instant lastUsedAt = Instant.now().minusSeconds(3600);
         Instant revokedAt = null;
 
         UserSession session = UserSession.restore(
-                id, userId, tokenHash, expiresAt, createdAt, lastUsedAt, revokedAt
+                id, userId, refreshTokenHash, previousRefreshTokenHash, refreshExpiresAt, createdAt, lastUsedAt, revokedAt
         );
 
         assertEquals(id, session.getId());
         assertEquals(userId, session.getUserId());
-        assertEquals(tokenHash, session.getTokenHash());
-        assertEquals(expiresAt, session.getExpiresAt());
+        assertEquals(refreshTokenHash, session.getRefreshTokenHash());
+        assertEquals(previousRefreshTokenHash, session.getPreviousRefreshTokenHash());
+        assertEquals(refreshExpiresAt, session.getRefreshExpiresAt());
         assertEquals(createdAt, session.getCreatedAt());
         assertEquals(lastUsedAt, session.getLastUsedAt());
         assertFalse(session.isRevoked());

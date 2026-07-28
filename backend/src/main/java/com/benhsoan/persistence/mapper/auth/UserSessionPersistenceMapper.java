@@ -17,8 +17,9 @@ public class UserSessionPersistenceMapper {
         return UserSession.restore(
                 entity.getId(),
                 entity.getUserId(),
-                entity.getTokenHash(),
-                entity.getExpiresAt(),
+                entity.getRefreshTokenHash(),
+                entity.getPreviousRefreshTokenHash(),
+                entity.getRefreshExpiresAt(),
                 entity.getCreatedAt(),
                 entity.getLastUsedAt(),
                 entity.getRevokedAt()
@@ -34,8 +35,9 @@ public class UserSessionPersistenceMapper {
         return UserSessionEntity.builder()
                 .id(domain.getId())
                 .userId(domain.getUserId())
-                .tokenHash(domain.getTokenHash())
-                .expiresAt(domain.getExpiresAt())
+                .refreshTokenHash(domain.getRefreshTokenHash())
+                .previousRefreshTokenHash(domain.getPreviousRefreshTokenHash())
+                .refreshExpiresAt(domain.getRefreshExpiresAt())
                 .createdAt(domain.getCreatedAt())
                 .lastUsedAt(domain.getLastUsedAt())
                 .revokedAt(domain.getRevokedAt())

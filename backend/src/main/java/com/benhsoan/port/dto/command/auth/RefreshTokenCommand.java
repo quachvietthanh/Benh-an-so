@@ -5,6 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 public record RefreshTokenCommand(
 
         @NotBlank
-        String accessToken
+        String refreshToken
 
 ){}

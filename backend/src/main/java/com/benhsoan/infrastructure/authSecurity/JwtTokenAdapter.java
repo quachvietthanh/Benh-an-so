@@ -36,6 +36,7 @@ public class JwtTokenAdapter implements JwtTokenPort {
     @Override
     public String generateToken(
             UUID userId,
+            UUID sessionId,
             String username,
             String role
     ) {
@@ -48,6 +49,8 @@ public class JwtTokenAdapter implements JwtTokenPort {
 
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim("sessionId", sessionId.toString())
+                .claim("userId", userId.toString())
                 .claim("username", username)
                 .claim("role", role)
                 .issuedAt(now)
@@ -73,6 +76,11 @@ public class JwtTokenAdapter implements JwtTokenPort {
     public String getRole(String token) {
         return getClaims(token)
                 .get("role", String.class);
+    }
+
+    @Override
+    public UUID getSessionId(String token) {
+        return UUID.fromString(getClaims(token).get("sessionId", String.class));
     }
 
     @Override
