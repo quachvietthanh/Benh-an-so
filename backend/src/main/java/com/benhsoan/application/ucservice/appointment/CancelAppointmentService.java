@@ -80,7 +80,8 @@ public class CancelAppointmentService
 
     private void validatePermission() {
 
-        if (!currentUserPort.hasRole("RECEPTIONIST")) {
+        if (!currentUserPort.hasRole("ADMIN")
+                && !currentUserPort.hasRole("RECEPTIONIST")) {
             throw new UnauthorizedAppointmentOperationException();
         }
 

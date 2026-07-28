@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.auth;
 
 import java.time.Instant;
+import java.time.Duration;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ import com.benhsoan.port.inbound.auth.LoginUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
 import com.benhsoan.port.outbound.authSecurity.PasswordEncoderPort;
+import com.benhsoan.port.outbound.authSecurity.RefreshTokenGeneratorPort;
 import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
@@ -35,6 +37,8 @@ import lombok.RequiredArgsConstructor;
 @Transactional
 public class LoginService implements LoginUseCase {
 
+    private static final Duration REFRESH_TOKEN_TIMEOUT = Duration.ofDays(7);
+
     private final UserRepository userRepository;
 
     private final RoleRepository roleRepository;
@@ -46,6 +50,8 @@ public class LoginService implements LoginUseCase {
     private final JwtTokenPort jwtTokenPort;
 
     private final TokenHashPort tokenHashPort;
+
+    private final RefreshTokenGeneratorPort refreshTokenGeneratorPort;
 
     private final LoginAttemptPort loginAttemptPort;
 
@@ -89,31 +95,24 @@ public class LoginService implements LoginUseCase {
         Role role = roleRepository.findById(user.getRoleId())
                 .orElseThrow(IllegalStateException::new);
 
-        String accessToken =
-                jwtTokenPort.generateToken(
-                        user.getId(),
-                        user.getUsername(),
-                        role.getName()
-                );
-
-        String tokenHash =
-                tokenHashPort.hash(accessToken);
-
         Instant now = clockPort.now();
 
-        Instant expiredAt =
-                jwtTokenPort.getExpiredAt(accessToken);
+        userSessionRepository.revokeByUserId(user.getId(), now);
 
-        userSessionRepository.deleteByUserId(user.getId());
+        String refreshToken = refreshTokenGeneratorPort.generate();
 
         UserSession session =
                 UserSession.create(
                         user.getId(),
-                        tokenHash,
-                        expiredAt
+                        tokenHashPort.hash(refreshToken),
+                        now.plus(REFRESH_TOKEN_TIMEOUT)
                 );
 
         userSessionRepository.save(session);
+
+        String accessToken = jwtTokenPort.generateToken(
+                user.getId(), session.getId(), user.getUsername(), role.getName());
+        Instant expiredAt = jwtTokenPort.getExpiredAt(accessToken);
 
         user.updateLastLogin(now);
 
@@ -139,6 +138,7 @@ public class LoginService implements LoginUseCase {
                 user.getId(),
                 user.getUsername(),
                 accessToken,
+                refreshToken,
                 role.getName(),
                 expiredAt
         );

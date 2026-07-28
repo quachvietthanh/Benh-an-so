@@ -75,7 +75,8 @@ public class MarkAppointmentNoShowService
 
     private void validate() {
 
-        if (!currentUserPort.hasRole("RECEPTIONIST")) {
+        if (!currentUserPort.hasRole("ADMIN")
+                && !currentUserPort.hasRole("RECEPTIONIST")) {
             throw new UnauthorizedAppointmentOperationException();
         }
 

@@ -69,8 +69,9 @@ CREATE TABLE users (
 CREATE TABLE user_sessions (
     id BINARY(16) NOT NULL,
     user_id BINARY(16) NOT NULL,
-    token_hash VARCHAR(255) NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
+    refresh_token_hash VARCHAR(255) NOT NULL,
+    previous_refresh_token_hash VARCHAR(255) NULL,
+    refresh_expires_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP NOT NULL,
     last_used_at TIMESTAMP NULL,
     revoked_at TIMESTAMP NULL,
@@ -119,20 +120,17 @@ CREATE TABLE audit_logs (
 CREATE INDEX idx_users_role
     ON users(role_id);
 
-CREATE INDEX idx_role_permissions_role
-    ON role_permissions(role_id);
-
 CREATE INDEX idx_role_permissions_permission
     ON role_permissions(permission);
 
-CREATE INDEX idx_user_sessions_user
-    ON user_sessions(user_id);
+CREATE UNIQUE INDEX uk_user_sessions_refresh_token_hash
+    ON user_sessions(refresh_token_hash);
 
-CREATE INDEX idx_user_sessions_token
-    ON user_sessions(token_hash);
+CREATE INDEX idx_user_sessions_user_expires
+    ON user_sessions(user_id, refresh_expires_at);
 
-CREATE INDEX idx_audit_logs_user
-    ON audit_logs(user_id);
+CREATE INDEX idx_user_sessions_previous_refresh_token_hash
+    ON user_sessions(previous_refresh_token_hash);
 
 CREATE INDEX idx_audit_logs_created_at
     ON audit_logs(created_at);

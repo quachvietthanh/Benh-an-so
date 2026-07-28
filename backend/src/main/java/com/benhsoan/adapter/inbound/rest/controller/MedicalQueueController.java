@@ -33,7 +33,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/v1/queue")
+@RequestMapping("/queue")
 @RequiredArgsConstructor
 public class MedicalQueueController {
 
@@ -102,7 +102,7 @@ public class MedicalQueueController {
      * Lấy danh sách hàng đợi theo phòng khám, có phân trang và lọc theo trạng thái.
      */
     @GetMapping("/room/{roomNumber}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'PHARMACIST')")
     public ResponseEntity<PageResponse<MedicalQueueResponse>> getQueueByRoom(
             @PathVariable String roomNumber,
             @RequestParam(required = false) QueueStatus status,
@@ -142,7 +142,7 @@ public class MedicalQueueController {
      * Đếm số lượng queue items theo phòng, bác sĩ hoặc trạng thái.
      */
     @GetMapping("/count")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'PHARMACIST')")
     public ResponseEntity<Long> count(
             @RequestParam(required = false) String roomNumber,
             @RequestParam(required = false) UUID doctorId,

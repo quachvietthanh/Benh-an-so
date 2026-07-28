@@ -48,7 +48,7 @@ public class AppointmentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
     public AppointmentResponse create(@Valid @RequestBody CreateAppointmentRequest request) {
         AppointmentResult result
                 = createAppointmentUseCase.create(
@@ -59,7 +59,7 @@ public class AppointmentController {
     }
 
     @PatchMapping("/cancel/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
     public AppointmentResponse cancel(
             @PathVariable UUID id,
             @Valid
@@ -87,7 +87,7 @@ public class AppointmentController {
     }
 
     @PatchMapping("/no-show/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
     public AppointmentResponse markNoShow(@PathVariable UUID id) {
         AppointmentResult result
                 = markAppointmentNoShowUseCase.execute(

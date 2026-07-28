@@ -123,7 +123,8 @@ public class CreateAppointmentService
             );
         }
 
-        if (!currentUserPort.hasRole("RECEPTIONIST")) {
+        if (!currentUserPort.hasRole("ADMIN")
+                && !currentUserPort.hasRole("RECEPTIONIST")) {
             throw new UnauthorizedAppointmentOperationException();
         }
 

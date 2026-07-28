@@ -14,6 +14,7 @@ public enum Permission {
     ROLE_READ,
     ROLE_UPDATE,
     ROLE_DELETE,
+    PERMISSION_READ,
 
     // Patient
     PATIENT_CREATE,
@@ -64,5 +65,12 @@ public enum Permission {
     INVOICE_DELETE,
 
     // Audit
-    AUDIT_READ
+    AUDIT_READ,
+
+    // Medical Queue
+    QUEUE_CREATE,
+    QUEUE_CALL_NEXT,
+    QUEUE_UPDATE_STATUS,
+    QUEUE_VIEW,
+    QUEUE_COUNT
 }

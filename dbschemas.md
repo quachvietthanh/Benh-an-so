@@ -144,43 +144,12 @@ Tài liệu này mô tả schema đang thực sự tồn tại trong repo hiện
 | start_time | TIMESTAMP | NOT NULL |
 | end_time | TIMESTAMP | NOT NULL |
 | status | VARCHAR(30) | AppointmentStatus |
-| reason | VARCHAR(500) | |
+| reason | VARCHAR(500) | NOT NULL |
 | cancel_reason | VARCHAR(500) | NULL |
 | checked_in_at | TIMESTAMP | NULL |
 | completed_at | TIMESTAMP | NULL |
 | created_by | BINARY(16) | FK -> users.id |
 | created_at | TIMESTAMP | NOT NULL |
-
----
-
-#### appointment_queue
-
-| Column | Type | Notes |
-|---|---|---|
-| id | BINARY(16) | PK |
-| appointment_id | BINARY(16) | UNIQUE, FK -> appointments.id |
-| queue_number | INT | Queue number of the day |
-| status | VARCHAR(30) | AppointmentQueueStatus |
-| checked_in_at | TIMESTAMP | NULL |
-| called_at | TIMESTAMP | NULL |
-| started_at | TIMESTAMP | NULL |
-| completed_at | TIMESTAMP | NULL |
-| created_at | TIMESTAMP | NOT NULL |
-
----
-
-#### appointment_reminders
-
-| Column | Type | Notes |
-|---|---|---|
-| id | BINARY(16) | PK |
-| appointment_id | BINARY(16) | FK -> appointments.id |
-| channel | VARCHAR(30) | ReminderChannel |
-| remind_at | TIMESTAMP | Scheduled reminder time |
-| status | VARCHAR(30) | ReminderStatus |
-| sent_at | TIMESTAMP | NULL |
-| created_at | TIMESTAMP | NOT NULL |
-
 
 ## STOCK_RECEIPT
 

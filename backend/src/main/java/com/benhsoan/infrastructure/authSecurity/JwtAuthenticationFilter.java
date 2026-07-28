@@ -1,6 +1,8 @@
 package com.benhsoan.infrastructure.authSecurity;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,20 +16,26 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
+import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Duration REFRESH_SESSION_TIMEOUT = Duration.ofDays(7);
+
     private final JwtTokenPort jwtTokenPort;
+    private final UserSessionRepository userSessionRepository;
+    private final UserRepository userRepository;
+    private final ClockPort clockPort;
 
     @Override
     protected void doFilterInternal(
@@ -41,51 +49,43 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = extractToken(request);
 
             if (token != null && jwtTokenPort.validate(token)) {
-
                 UUID userId = jwtTokenPort.getUserId(token);
+                Instant now = clockPort.now();
 
-                String username = jwtTokenPort.getUsername(token);
+                boolean sessionIsActive = userSessionRepository.findById(jwtTokenPort.getSessionId(token))
+                        .filter(session -> session.getUserId().equals(userId))
+                        .filter(session -> session.isActive(now, REFRESH_SESSION_TIMEOUT))
+                        .isPresent();
 
-                String role = jwtTokenPort.getRole(token);
+                boolean userIsActive = userRepository.findById(userId)
+                        .map(user -> user.isActive())
+                        .orElse(false);
 
+                if (sessionIsActive && userIsActive) {
+                    String username = jwtTokenPort.getUsername(token);
+                    String role = jwtTokenPort.getRole(token);
+                    CurrentUserPrincipal principal = new CurrentUserPrincipal(userId, username);
 
-                CurrentUserPrincipal principal =
-                        new CurrentUserPrincipal(
-                                userId,
-                                username
-                        );
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    principal,
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                            );
 
-                log.debug("JWT userId={}, username={}, role={}",
-                        userId, username, role);
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                principal,
-                                null,
-                                List.of(
-                                        new SimpleGrantedAuthority(
-                                                "ROLE_" + role
-                                        )
-                                )
-                        );
-
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
-
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    SecurityContextHolder.clearContext();
+                }
+            } else if (token != null) {
+                SecurityContextHolder.clearContext();
             }
 
         } catch (Exception ex) {
-
-            log.error(
-                    "JWT authentication failed: {}",
-                    ex.getMessage()
-            );
-
             SecurityContextHolder.clearContext();
         }
 

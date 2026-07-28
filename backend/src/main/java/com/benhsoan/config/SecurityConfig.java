@@ -70,63 +70,92 @@ public class SecurityConfig {
                                                                 "/actuator/info")
                                                 .permitAll()
 
-                                                // ===== ADMIN =====
+                                                // ===== ADMIN / USER MANAGEMENT =====
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .requestMatchers(HttpMethod.GET, "/users/doctors")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
                                                 .requestMatchers("/users/**").hasRole("ADMIN")
                                                 .requestMatchers("/audit-logs/**").hasRole("ADMIN")
+                                                .requestMatchers("/roles/**").hasRole("ADMIN")
+                                                .requestMatchers("/permissions/**").hasRole("ADMIN")
 
-                                                // ===== DOCTOR =====
-                                                .requestMatchers(HttpMethod.POST, "/medical-records/**")
+                                                // ===== MEDICAL HISTORY =====
+                                                .requestMatchers(HttpMethod.GET, "/patients/*/medical-history")
                                                 .hasAnyRole("ADMIN", "DOCTOR")
 
-                                                .requestMatchers(HttpMethod.PUT, "/medical-records/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                // ===== PATIENTS =====
+                                                .requestMatchers(HttpMethod.GET, "/patients/me/**")
+                                                .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.GET, "/patients/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.POST, "/patients/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.PUT, "/patients/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.DELETE, "/patients/**").hasRole("ADMIN")
 
-                                                .requestMatchers(HttpMethod.DELETE, "/medical-records/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
-
-                                                .requestMatchers("/prescriptions/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
-
-                                                .requestMatchers("/diagnoses/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
-
-                                                // ===== NURSE =====
+                                                // ===== MEDICAL RECORDS =====
+                                                .requestMatchers(HttpMethod.PATCH, "/medical-records/*/status")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.GET, "/medical-records/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
+                                                .requestMatchers(HttpMethod.POST, "/medical-records/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.PUT, "/medical-records/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.DELETE, "/medical-records/**").hasRole("ADMIN")
 
+                                                // ===== PRESCRIPTIONS / CLINICAL =====
+                                                .requestMatchers(HttpMethod.PUT, "/prescriptions/*/status")
+                                                .hasAnyRole("ADMIN", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.GET, "/prescriptions/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.POST, "/prescriptions/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.PUT, "/prescriptions/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.DELETE, "/prescriptions/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers("/diagnoses/**").hasAnyRole("ADMIN", "DOCTOR")
                                                 .requestMatchers("/vital-signs/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
 
-                                                // ===== RECEPTIONIST =====
-                                                .requestMatchers("/appointments/**")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST", "DOCTOR")
+                                                // ===== APPOINTMENTS =====
+                                                .requestMatchers(HttpMethod.GET, "/appointments/me/**")
+                                                .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.PATCH, "/appointments/cancel/**")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.PATCH, "/appointments/no-show/**")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.GET, "/appointments/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.POST, "/appointments/**")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.PUT, "/appointments/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.DELETE, "/appointments/**")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
 
-                                                .requestMatchers(HttpMethod.GET, "/patients")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
-
-                                                // ===== PHARMACIST =====
+                                                // ===== PHARMACY / INVOICES =====
+                                                .requestMatchers(HttpMethod.DELETE, "/pharmacy/inventory/**").hasRole("ADMIN")
                                                 .requestMatchers("/pharmacy/inventory/**")
                                                 .hasAnyRole("ADMIN", "PHARMACIST")
-
-                                                .requestMatchers(HttpMethod.GET, "/prescriptions/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "PHARMACIST")
-
-                                                .requestMatchers(HttpMethod.PUT, "/prescriptions/*/status")
-                                                .hasAnyRole("ADMIN", "PHARMACIST")
-
-                                                // ===== INVOICE =====
                                                 .requestMatchers("/invoices/**")
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
 
-                                                // ===== USER =====
-                                                .requestMatchers(HttpMethod.GET, "/patients/me/**")
-                                                .authenticated()
-
-                                                .requestMatchers(HttpMethod.GET, "/appointments/me/**")
-                                                .authenticated()
+                                                // ===== MEDICAL QUEUE =====
+                                                .requestMatchers(HttpMethod.POST, "/queue/call-next")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.PUT, "/queue/*/status")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
+                                                .requestMatchers(HttpMethod.GET, "/queue/doctor/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.GET, "/queue/room/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.GET, "/queue/count")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.POST, "/queue/**")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
 
                                                 // ===== OTHERS =====
                                                 .anyRequest().authenticated())
