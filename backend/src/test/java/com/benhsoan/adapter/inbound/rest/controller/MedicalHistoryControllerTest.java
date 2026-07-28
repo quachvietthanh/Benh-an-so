@@ -29,6 +29,8 @@ import com.benhsoan.domain.patient.enums.VisitType;
 import com.benhsoan.domain.patient.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = MedicalHistoryController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -47,6 +49,12 @@ class MedicalHistoryControllerTest {
 
     @MockitoBean
     private JwtTokenPort jwtTokenPort;
+
+    @MockitoBean
+    private UserSessionRepository userSessionRepository;
+
+    @MockitoBean
+    private ClockPort clockPort;
 
     private final UUID patientId = UUID.randomUUID();
 
