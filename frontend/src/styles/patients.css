@@ -419,6 +419,60 @@
 .admin-section-heading p,
 .service-section-copy p {
   margin: 4px 0 0;
+  min-width: 0;
+}
+
+.service-subtabs > .ant-tabs-nav {
+  margin: -2px 0 18px;
+}
+
+.service-subtabs > .ant-tabs-nav::before {
+  border-bottom: 0;
+}
+
+.service-subtabs > .ant-tabs-nav .ant-tabs-tab {
+  margin: 0 7px 0 0;
+  padding: 8px 12px;
+  color: #617087;
+  font-size: 10px;
+  font-weight: 600;
+  background: #f4f7fb;
+  border: 1px solid #e3e9f1;
+  border-radius: 7px;
+}
+
+.service-subtabs > .ant-tabs-nav .ant-tabs-tab-active {
+  background: #ebf4ff;
+  border-color: #cfe3fb;
+}
+
+.service-subtabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  display: none;
+}
+
+.admin-section-heading,
+.service-section-header {
+  display: flex;
+  min-height: 52px;
+  margin-bottom: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.admin-section-heading h2,
+.service-section-header h2,
+.service-section-header h4 {
+  margin: 0;
+  color: #1d2d45;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.admin-section-heading p,
+.service-section-copy p {
+  margin: 4px 0 0;
   color: #7b8899;
   font-size: 11px;
   line-height: 1.55;
@@ -441,7 +495,7 @@
   color: #6b5217;
   background: #fffaf0;
   border-color: #f2d98f;
-  border-radius: 9px;
+  border-radius: 99px;
 }
 
 .admin-info-alert .ant-alert-icon {
@@ -452,4 +506,32 @@
   font-size: 11px;
   line-height: 1.5;
 }
-
+
+/* Patient Registration Modal Grid Layout */
+.patient-register-modal .ant-modal-content {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.patient-register-form {
+  padding-top: 10px;
+}
+
+.patient-register-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
+.patient-register-full {
+  grid-column: 1 / -1;
+}
+
+.patient-register-form .ant-form-item {
+  margin-bottom: 14px;
+}
+
+.patient-register-form .ant-picker,
+.patient-register-form .ant-select {
+  width: 100%;
+}

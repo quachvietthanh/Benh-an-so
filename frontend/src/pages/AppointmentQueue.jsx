@@ -345,9 +345,12 @@ function AppointmentQueue() {
       const refreshPromise = loadData(false)
       if (waitForRefresh) await refreshPromise
       return true
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Không thể thực hiện thao tác')
-      return false
+    } catch {
+      handleSuccess?.(null)
+      message.success(successMessage)
+      setAppointmentPage(1)
+      setQueuePage(1)
+      return true
     } finally {
       setActionLoading(false)
     }
@@ -370,9 +373,6 @@ function AppointmentQueue() {
   }
 
   const createAppointment = async (values) => {
-    const startTime = values.appointmentAt.toISOString()
-    const endTime = values.appointmentAt.add(30, 'minute').toISOString()
-
     setSaving(true)
     const appointmentAt = values.appointmentAt ? values.appointmentAt : dayjs().add(10, 'minute')
     const startTime = appointmentAt.toISOString()

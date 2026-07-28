@@ -66,10 +66,10 @@ textarea {
 }
 
 .ant-table-thead > tr > th {
-  color: #40516c !important;
-  font-size: 12px;
+  color: #334155 !important;
+  font-size: 13px !important;
   font-weight: 650 !important;
-  background: #f6f8fb !important;
+  background: #f8fafc !important;
 }
 
 .ant-btn,
@@ -150,4 +150,17 @@ textarea {
   .ant-tabs-nav-list {
     flex-wrap: wrap;
   }
+}
+
+/* Billing Table Compact Action Buttons */
+.billing-action-btn.ant-btn {
+  height: 30px !important;
+  padding: 0 10px !important;
+  font-size: 12.5px !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.billing-action-btn.ant-btn .anticon {
+  font-size: 13px !important;
 }

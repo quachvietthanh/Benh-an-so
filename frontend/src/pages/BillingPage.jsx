@@ -197,15 +197,17 @@ function BillingPage() {
       title: 'Thao tác chứng từ & QR',
       key: 'actions',
       render: (_, record) => (
-        <Space wrap>
-          <Button icon={<FileTextOutlined />} onClick={() => setViewingReceipt(record)}>
+        <Space size={6} wrap>
+          <Button size="small" className="billing-action-btn" icon={<FileTextOutlined />} onClick={() => setViewingReceipt(record)}>
             Biên lai thu tiền
           </Button>
-          <Button type="primary" ghost icon={<QrcodeOutlined />} onClick={() => setViewingEInvoice(record)}>
+          <Button size="small" className="billing-action-btn" type="primary" ghost icon={<QrcodeOutlined />} onClick={() => setViewingEInvoice(record)}>
             Quét QR HĐĐT
           </Button>
           {isAdmin && record.invoiceType === 'ORIGINAL' && (
             <Button
+              size="small"
+              className="billing-action-btn"
               type="dashed"
               icon={<AuditOutlined />}
               onClick={() => {

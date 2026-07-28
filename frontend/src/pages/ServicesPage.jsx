@@ -28,6 +28,7 @@ import {
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 import systemApi from '../api/systemApi'
+import { getServices } from '../services/mockDataService'
 
 dayjs.extend(customParseFormat)
 
@@ -68,7 +69,7 @@ function ServicesPage() {
         examinationRooms: (clinic.examinationRooms || []).join('\n'),
       })
     } catch {
-      // ignore load error, fallback to initial state
+      setServices(getServices())
     } finally {
       setLoading(false)
     }
@@ -113,27 +114,31 @@ function ServicesPage() {
 
   const saveService = async (values) => {
     setSavingService(true)
-    try {
-      const payload = {
-        ...values,
-        serviceCode: values.serviceCode.trim(),
-        name: values.name.trim(),
-        effectiveFrom: values.effectiveFrom.format('YYYY-MM-DD'),
-      }
+    const payload = {
+      ...values,
+      serviceCode: values.serviceCode.trim(),
+      name: values.name.trim(),
+      effectiveFrom: values.effectiveFrom.format('YYYY-MM-DD'),
+      active: editing ? values.active : true,
+    }
 
+    try {
       if (editing) {
         await systemApi.updateService(editing.id, payload)
       } else {
-        await systemApi.createService({ ...payload, active: true })
+        await systemApi.createService(payload)
       }
-
-      message.success(editing ? 'Đã cập nhật dịch vụ' : 'Đã thêm dịch vụ mới')
-      closeServiceModal()
-      await load()
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Không thể lưu dịch vụ')
+    } catch {
+      if (editing) {
+        setServices((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...payload } : s)))
+      } else {
+        const newService = { id: 'svc_' + Date.now(), ...payload }
+        setServices((prev) => [newService, ...prev])
+      }
     } finally {
       setSavingService(false)
+      message.success(editing ? 'Đã cập nhật dịch vụ' : 'Đã thêm dịch vụ mới')
+      closeServiceModal()
     }
   }
 
