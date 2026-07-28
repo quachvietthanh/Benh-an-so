@@ -119,9 +119,6 @@ CREATE TABLE audit_logs (
 CREATE INDEX idx_users_role
     ON users(role_id);
 
-CREATE INDEX idx_role_permissions_role
-    ON role_permissions(role_id);
-
 CREATE INDEX idx_role_permissions_permission
     ON role_permissions(permission);
 
@@ -130,9 +127,6 @@ CREATE INDEX idx_user_sessions_user
 
 CREATE INDEX idx_user_sessions_token
     ON user_sessions(token_hash);
-
-CREATE INDEX idx_audit_logs_user
-    ON audit_logs(user_id);
 
 CREATE INDEX idx_audit_logs_created_at
     ON audit_logs(created_at);
