@@ -34,7 +34,9 @@ import com.benhsoan.port.inbound.queue.GetQueueListUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueStatusUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = MedicalQueueController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -64,7 +66,13 @@ class MedicalQueueControllerTest {
     private UserRepository userRepository;
 
     @MockitoBean
+    private UserSessionRepository userSessionRepository;
+
+    @MockitoBean
     private JwtTokenPort jwtTokenPort;
+
+    @MockitoBean
+    private ClockPort clockPort;
 
     private final UUID queueId = UUID.randomUUID();
     private final UUID patientId = UUID.randomUUID();
@@ -81,7 +89,7 @@ class MedicalQueueControllerTest {
     }
 
     @Nested
-    @DisplayName("POST /api/v1/queue")
+    @DisplayName("POST /queue")
     class AddToQueue {
 
         @Test
@@ -98,7 +106,7 @@ class MedicalQueueControllerTest {
                     }
                     """.formatted(patientId.toString());
 
-            mockMvc.perform(post("/api/v1/queue")
+            mockMvc.perform(post("/queue")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isCreated())
@@ -117,7 +125,7 @@ class MedicalQueueControllerTest {
                     }
                     """;
 
-            mockMvc.perform(post("/api/v1/queue")
+            mockMvc.perform(post("/queue")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isBadRequest());
@@ -133,7 +141,7 @@ class MedicalQueueControllerTest {
                     }
                     """.formatted(patientId.toString());
 
-            mockMvc.perform(post("/api/v1/queue")
+            mockMvc.perform(post("/queue")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isBadRequest());
@@ -141,7 +149,7 @@ class MedicalQueueControllerTest {
     }
 
     @Nested
-    @DisplayName("POST /api/v1/queue/call-next")
+    @DisplayName("POST /queue/call-next")
     class CallNext {
 
         @Test
@@ -164,7 +172,7 @@ class MedicalQueueControllerTest {
                     }
                     """.formatted(doctorId.toString());
 
-            mockMvc.perform(post("/api/v1/queue/call-next")
+            mockMvc.perform(post("/queue/call-next")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -181,7 +189,7 @@ class MedicalQueueControllerTest {
                     }
                     """;
 
-            mockMvc.perform(post("/api/v1/queue/call-next")
+            mockMvc.perform(post("/queue/call-next")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isBadRequest());
@@ -196,7 +204,7 @@ class MedicalQueueControllerTest {
                     }
                     """.formatted(doctorId.toString());
 
-            mockMvc.perform(post("/api/v1/queue/call-next")
+            mockMvc.perform(post("/queue/call-next")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isBadRequest());
@@ -204,7 +212,7 @@ class MedicalQueueControllerTest {
     }
 
     @Nested
-    @DisplayName("PUT /api/v1/queue/{id}/status")
+    @DisplayName("PUT /queue/{id}/status")
     class UpdateStatus {
 
         @Test
@@ -226,7 +234,7 @@ class MedicalQueueControllerTest {
                     }
                     """;
 
-            mockMvc.perform(put("/api/v1/queue/{id}/status", queueId)
+            mockMvc.perform(put("/queue/{id}/status", queueId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -238,7 +246,7 @@ class MedicalQueueControllerTest {
         void updateStatusMissingStatus() throws Exception {
             String body = "{}";
 
-            mockMvc.perform(put("/api/v1/queue/{id}/status", queueId)
+            mockMvc.perform(put("/queue/{id}/status", queueId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isBadRequest());
@@ -246,7 +254,7 @@ class MedicalQueueControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /api/v1/queue/room/{roomNumber}")
+    @DisplayName("GET /queue/room/{roomNumber}")
     class GetQueueByRoom {
 
         @Test
@@ -255,7 +263,7 @@ class MedicalQueueControllerTest {
             when(getQueueListUseCase.getQueueList(any()))
                     .thenReturn(PageResponse.of(List.of(sampleResult()), 0, 20, 1));
 
-            mockMvc.perform(get("/api/v1/queue/room/{roomNumber}", "Room 101"))
+            mockMvc.perform(get("/queue/room/{roomNumber}", "Room 101"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].queueNumber").value(1))
                     .andExpect(jsonPath("$.content[0].roomNumber").value("Room 101"));
@@ -263,7 +271,7 @@ class MedicalQueueControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /api/v1/queue/doctor/{doctorId}")
+    @DisplayName("GET /queue/doctor/{doctorId}")
     class GetQueueByDoctor {
 
         @Test
@@ -272,14 +280,14 @@ class MedicalQueueControllerTest {
             when(getQueueListUseCase.getQueueList(any()))
                     .thenReturn(PageResponse.of(List.of(sampleResult()), 0, 20, 1));
 
-            mockMvc.perform(get("/api/v1/queue/doctor/{doctorId}", doctorId))
+            mockMvc.perform(get("/queue/doctor/{doctorId}", doctorId))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].queueNumber").value(1));
         }
     }
 
     @Nested
-    @DisplayName("GET /api/v1/queue/count")
+    @DisplayName("GET /queue/count")
     class Count {
 
         @Test
@@ -287,7 +295,7 @@ class MedicalQueueControllerTest {
         void countReturns200() throws Exception {
             when(getQueueListUseCase.count(any())).thenReturn(3L);
 
-            mockMvc.perform(get("/api/v1/queue/count")
+            mockMvc.perform(get("/queue/count")
                             .param("roomNumber", "Room 101")
                             .param("status", "WAITING"))
                     .andExpect(status().isOk())
