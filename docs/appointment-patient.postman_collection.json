@@ -1,0 +1,187 @@
+{
+  "info": {
+    "_postman_id": "8d69f901-35ca-4d73-94d9-70d95bfc693e",
+    "name": "Benh So An - Appointment and Patient Tests",
+    "description": "Run requests in order. Use a receptionist account and safe test patient/doctor records.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080/api/v1" },
+    { "key": "token", "value": "" },
+    { "key": "username", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "patient_id", "value": "" },
+    { "key": "doctor_id", "value": "" },
+    { "key": "appointment_id_for_cancel", "value": "" },
+    { "key": "no_show_appointment_id", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authenticate as receptionist",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": "{{base_url}}/auth/login"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+            "pm.collectionVariables.set('token', body.accessToken);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Update test patient",
+      "event": [{
+        "listen": "prerequest",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.collectionVariables.set('test_identity_number', `PM-${Date.now()}`);"
+          ]
+        }
+      }, {
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Patient update returns 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body.id).to.eql(pm.collectionVariables.get('patient_id'));",
+            "pm.expect(body.fullName).to.eql('Postman Test Patient');",
+            "pm.expect(body.active).to.eql(true);"
+          ]
+        }
+      }],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Postman Test Patient\",\n  \"dateOfBirth\": \"1995-05-15\",\n  \"gender\": \"OTHER\",\n  \"phone\": \"0900000000\",\n  \"email\": \"postman.test@example.com\",\n  \"address\": \"Postman test address\",\n  \"identityNumber\": \"{{test_identity_number}}\",\n  \"insuranceNumber\": \"PM-INS-001\",\n  \"bloodType\": \"O_POSITIVE\",\n  \"emergencyContact\": \"Postman Contact\",\n  \"emergencyPhone\": \"0900000001\",\n  \"active\": true\n}"
+        },
+        "url": "{{base_url}}/patients/{{patient_id}}"
+      }
+    },
+    {
+      "name": "Create appointment for cancellation",
+      "event": [{
+        "listen": "prerequest",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "const start = new Date(Date.now() + 60 * 60 * 1000);",
+            "const end = new Date(start.getTime() + 30 * 60 * 1000);",
+            "pm.collectionVariables.set('appointment_start_time', start.toISOString());",
+            "pm.collectionVariables.set('appointment_end_time', end.toISOString());"
+          ]
+        }
+      }, {
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Appointment creation returns 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.expect(body.id).to.be.a('string').and.not.empty;",
+            "pm.expect(body.status).to.eql('SCHEDULED');",
+            "pm.expect(body.startTime).to.eql(pm.collectionVariables.get('appointment_start_time'));",
+            "pm.expect(body.endTime).to.eql(pm.collectionVariables.get('appointment_end_time'));",
+            "pm.collectionVariables.set('appointment_id_for_cancel', body.id);"
+          ]
+        }
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"patientId\": \"{{patient_id}}\",\n  \"doctorId\": \"{{doctor_id}}\",\n  \"startTime\": \"{{appointment_start_time}}\",\n  \"endTime\": \"{{appointment_end_time}}\",\n  \"reason\": \"Postman cancellation test\"\n}"
+        },
+        "url": "{{base_url}}/appointments"
+      }
+    },
+    {
+      "name": "Cancel created appointment",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cancelReason\": \"Cancelled by Postman test\"\n}"
+        },
+        "url": "{{base_url}}/appointments/cancel/{{appointment_id_for_cancel}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Appointment cancellation returns 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body.id).to.eql(pm.collectionVariables.get('appointment_id_for_cancel'));",
+            "pm.expect(body.status).to.eql('CANCELLED');",
+            "pm.expect(body.cancelReason).to.eql('Cancelled by Postman test');"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Find appointment eligible for no-show",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/appointments/overdue?page=0&size=1"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('Overdue appointment search returns 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body.content).to.be.an('array').and.not.empty;",
+            "if (body.content?.length) pm.collectionVariables.set('no_show_appointment_id', body.content[0].id);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Mark overdue appointment as no-show",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": "{{base_url}}/appointments/no-show/{{no_show_appointment_id}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('No-show operation returns 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body.id).to.eql(pm.collectionVariables.get('no_show_appointment_id'));",
+            "pm.expect(body.status).to.eql('NO_SHOW');"
+          ]
+        }
+      }]
+    }
+  ]
+}
