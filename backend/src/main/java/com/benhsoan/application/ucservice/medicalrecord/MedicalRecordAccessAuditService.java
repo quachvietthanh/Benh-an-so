@@ -1,0 +1,33 @@
+package com.benhsoan.application.ucservice.medicalrecord;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
+import com.benhsoan.port.outbound.repository.logRepository.MedicalRecordAccessLogRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class MedicalRecordAccessAuditService {
+
+    private static final String HISTORY_VIEW_DETAIL = "Patient medical history viewed";
+
+    private final MedicalRecordAccessLogRepository medicalRecordAccessLogRepository;
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordHistoryView(UUID patientId, UUID accessedBy, Instant accessedAt) {
+        medicalRecordAccessLogRepository.save(MedicalRecordAccessLog.createHistoryView(
+                patientId,
+                accessedBy,
+                HISTORY_VIEW_DETAIL,
+                null,
+                accessedAt
+        ));
+    }
+}

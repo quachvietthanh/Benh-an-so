@@ -3,47 +3,28 @@ package com.benhsoan.port.dto.command.patient;
 import java.time.Instant;
 import java.util.UUID;
 
-import jakarta.validation.constraints.NotNull;
+import com.benhsoan.domain.shared.exception.ValidationException;
 
 public record GetPatientMedicalHistoryQuery(
-
-        @NotNull
         UUID patientId,
-
-        Instant fromDate,
-
-        Instant toDate,
-
+        Instant from,
+        Instant to,
         int page,
-
         int size
-
 ) {
 
     public GetPatientMedicalHistoryQuery {
-        if (page < 0) page = 0;
-        if (size <= 0) size = 10;
-        if (size > 100) size = 100;
-        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
-            throw new IllegalArgumentException(
-                    "fromDate must not be after toDate"
-            );
+        if (patientId == null) {
+            throw new ValidationException("Patient id is required.");
         }
-    }
-
-    public static GetPatientMedicalHistoryQuery of(
-            UUID patientId,
-            Instant fromDate,
-            Instant toDate,
-            Integer page,
-            Integer size
-    ) {
-        return new GetPatientMedicalHistoryQuery(
-                patientId,
-                fromDate,
-                toDate,
-                page != null ? page : 0,
-                size != null ? size : 10
-        );
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ValidationException("From time must not be after to time.");
+        }
+        if (page < 0) {
+            throw new ValidationException("Page must not be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new ValidationException("Size must be between 1 and 100.");
+        }
     }
 }

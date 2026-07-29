@@ -79,10 +79,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/roles/**").hasRole("ADMIN")
                                                 .requestMatchers("/permissions/**").hasRole("ADMIN")
 
-                                                // ===== MEDICAL HISTORY =====
-                                                .requestMatchers(HttpMethod.GET, "/patients/*/medical-history")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
-
                                                 // ===== PATIENTS =====
                                                 .requestMatchers(HttpMethod.GET, "/patients/me/**")
                                                 .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
@@ -95,6 +91,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.DELETE, "/patients/**").hasRole("ADMIN")
 
                                                 // ===== MEDICAL RECORDS =====
+                                                .requestMatchers(HttpMethod.GET, "/medical-history/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.PATCH, "/medical-records/*/status")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.GET, "/medical-records/**")
