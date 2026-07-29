@@ -1,66 +1,49 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.time.Instant;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.patient.MedicalHistoryItemResponse;
-import com.benhsoan.domain.auth.User;
-import com.benhsoan.domain.patient.Visit;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-
-import lombok.RequiredArgsConstructor;
+import com.benhsoan.port.dto.command.patient.GetPatientMedicalHistoryQuery;
+import com.benhsoan.port.dto.result.MedicalHistoryItemResult;
 
 @Component
-@RequiredArgsConstructor
 public class MedicalHistoryRestMapper {
 
-    private final UserRepository userRepository;
-
-    public Page<MedicalHistoryItemResponse> toResponse(Page<Visit> visits) {
-
-        List<UUID> doctorIds = visits.getContent().stream()
-                .map(Visit::getDoctorId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-
-        Map<UUID, String> doctorNames;
-
-        if (doctorIds.isEmpty()) {
-            doctorNames = Collections.emptyMap();
-        } else {
-            doctorNames = userRepository.findAllById(doctorIds).stream()
-                    .collect(Collectors.toMap(
-                            User::getId,
-                            User::getFullName
-                    ));
-        }
-
-        return visits.map(visit -> toResponse(visit, doctorNames));
+    public GetPatientMedicalHistoryQuery toQuery(
+            UUID patientId,
+            Instant from,
+            Instant to,
+            int page,
+            int size
+    ) {
+        return new GetPatientMedicalHistoryQuery(patientId, from, to, page, size);
     }
 
-    private MedicalHistoryItemResponse toResponse(
-            Visit visit,
-            Map<UUID, String> doctorNames
-    ) {
+    public Page<MedicalHistoryItemResponse> toResponse(Page<MedicalHistoryItemResult> resultPage) {
+        return resultPage.map(this::toResponse);
+    }
+
+    private MedicalHistoryItemResponse toResponse(MedicalHistoryItemResult result) {
         return new MedicalHistoryItemResponse(
-                visit.getId(),
-                visit.getVisitCode(),
-                visit.getVisitType(),
-                visit.getVisitStatus(),
-                visit.getVisitAt(),
-                visit.getReason(),
-                visit.getNote(),
-                visit.getDoctorId(),
-                doctorNames.get(visit.getDoctorId()),
-                visit.getDepartmentId()
+                result.visitId(),
+                result.visitCode(),
+                result.visitType(),
+                result.visitStatus(),
+                result.visitAt(),
+                result.startedAt(),
+                result.completedAt(),
+                result.reason(),
+                result.note(),
+                result.doctorId(),
+                result.doctorName(),
+                result.medicalRecordId(),
+                result.medicalRecordStatus(),
+                result.chiefComplaint(),
+                result.conclusion()
         );
     }
 }

@@ -1,0 +1,188 @@
+{
+  "info": {
+    "name": "Benh So An - Medical History",
+    "_postman_id": "d02a6e43-8995-4b39-bd89-5ed2a0cc0012",
+    "description": "Manual tests for the seeded patient medical-history API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "seededPatientId",
+      "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001"
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin"
+    },
+    {
+      "key": "seededPassword",
+      "value": "password"
+    },
+    {
+      "key": "receptionistUsername",
+      "value": "receptionist1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Login as Admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Login succeeds', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Get Seeded Medical History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/medical-history/patients/{{seededPatientId}}?page=0&size=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('History request succeeds', function () { pm.response.to.have.status(200); });",
+              "pm.test('Returns the two seeded visits', function () { pm.expect(pm.response.json().content).to.have.length(2); });",
+              "pm.test('Newest visit is returned first', function () { pm.expect(pm.response.json().content[0].visitCode).to.eql('VIS000002'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Filter Seeded Medical History By Date",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/medical-history/patients/{{seededPatientId}}?from=2026-08-01T00:00:00Z&to=2026-08-31T23:59:59Z&page=0&size=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Date filter succeeds', function () { pm.response.to.have.status(200); });",
+              "pm.test('Returns only the August visit', function () { pm.expect(pm.response.json().content).to.have.length(1); pm.expect(pm.response.json().content[0].visitCode).to.eql('VIS000001'); });",
+              "pm.test('Returns seeded medical record summary', function () { pm.expect(pm.response.json().content[0].medicalRecordStatus).to.eql('LOCKED'); pm.expect(pm.response.json().content[0].doctorName).to.eql('Dr. Nguyen Minh Anh'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Reject Invalid Date Range",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/medical-history/patients/{{seededPatientId}}?from=2026-09-01T00:00:00Z&to=2026-08-01T00:00:00Z"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Invalid range returns 400', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Login as Receptionist",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{receptionistUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Receptionist login succeeds', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Receptionist Cannot Read Medical History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/medical-history/patients/{{seededPatientId}}?page=0&size=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Receptionist is denied', function () { pm.response.to.have.status(403); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

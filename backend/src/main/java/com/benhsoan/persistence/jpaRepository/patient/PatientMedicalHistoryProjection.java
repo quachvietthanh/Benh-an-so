@@ -1,4 +1,4 @@
-package com.benhsoan.adapter.inbound.rest.response.patient;
+package com.benhsoan.persistence.jpaRepository.patient;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -7,7 +7,7 @@ import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 
-public record MedicalHistoryItemResponse(
+public record PatientMedicalHistoryProjection(
         UUID visitId,
         String visitCode,
         VisitType visitType,
