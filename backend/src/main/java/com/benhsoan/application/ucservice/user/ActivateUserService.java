@@ -58,6 +58,7 @@ public class ActivateUserService implements ActivateUserUseCase {
                         saved.getId(),
                         """
                         {
+                        "action":"ACTIVATE",
                         "username":"%s",
                         "fullName":"%s",
                         "email":"%s",
