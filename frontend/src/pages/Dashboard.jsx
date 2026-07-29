@@ -49,7 +49,7 @@ function Dashboard() {
   const [stats, setStats] = useState(() => getDashboardStats())
   const [appointments, setAppointments] = useState(() => mergeAppointments(getAppointments()))
   const [patients, setPatients] = useState(() => mergePatients(getPatients()))
-  const [medicines, setMedicines] = useState(() => mergeMedicines(getMedicines()))
+  const [medicines, setMedicines] = useState(() => mergeMedicines([]))
   const [invoices, setInvoices] = useState(() => mergeInvoices(getInvoices()))
 
   useEffect(() => {
@@ -66,13 +66,12 @@ function Dashboard() {
       const fallbackStats = getDashboardStats()
       const fallbackAppointments = getAppointments()
       const fallbackPatients = getPatients()
-      const fallbackMedicines = getMedicines()
 
       const results = await Promise.allSettled([
         isAdmin ? reportApi.dashboard() : Promise.resolve({ data: fallbackStats }),
         canReadAppointments ? appointmentApi.getAll() : Promise.resolve({ data: fallbackAppointments }),
         canReadPatients ? patientApi.getAll({ page: 0, size: 20 }) : Promise.resolve({ data: { content: fallbackPatients } }),
-        canReadPharmacy ? pharmacyApi.medicines() : Promise.resolve({ data: fallbackMedicines }),
+        canReadPharmacy ? pharmacyApi.medicines() : Promise.resolve({ data: [] }),
       ])
 
       if (!mounted) return
@@ -89,7 +88,7 @@ function Dashboard() {
 
       const medData = readSettledData(results[3], null)
       const rawMeds = medData?.content || medData || []
-      const safeMeds = Array.isArray(rawMeds) && rawMeds.length ? rawMeds : fallbackMedicines
+      const safeMeds = Array.isArray(rawMeds) ? rawMeds : []
       const mergedMeds = mergeMedicines(safeMeds)
 
       const mergedInvoices = mergeInvoices(getInvoices())
@@ -133,15 +132,13 @@ function Dashboard() {
   }, [invoices, todayStr])
 
   const lowStockMedicines = useMemo(
-    () => [...medicines]
-      .sort((first, second) => Number(first.stock || 0) - Number(second.stock || 0))
-      .slice(0, 4),
+    () => medicines.filter((m) => Number(m.stock || 0) <= Number(m.minStock || 10)),
     [medicines],
   )
 
   const lowStockCount = useMemo(() => {
-    return medicines.filter((m) => Number(m.stock || 0) <= Number(m.minStock || 20)).length
-  }, [medicines])
+    return lowStockMedicines.length
+  }, [lowStockMedicines])
 
   const statCards = [
     {
@@ -336,7 +333,7 @@ function Dashboard() {
           </div>
           <div className="compact-medicine-list">
             {(Array.isArray(lowStockMedicines) ? lowStockMedicines : []).map((medicine, index) => {
-              const isLow = Number(medicine.stock || 0) <= Number(medicine.minStock || 20)
+              const isLow = Number(medicine.stock || 0) <= Number(medicine.minStock || 10)
               return (
                 <button type="button" className="compact-medicine-row" key={medicine.id || index} onClick={() => navigate('/pharmacy')}>
                   <span className={'medicine-capsule capsule-' + (index % 4)}><MedicineBoxOutlined /></span>
@@ -345,7 +342,7 @@ function Dashboard() {
                 </button>
               )
             })}
-            {!(Array.isArray(lowStockMedicines) && lowStockMedicines.length) && <div className="dashboard-empty">Chưa có dữ liệu kho thuốc</div>}
+            {!(Array.isArray(lowStockMedicines) && lowStockMedicines.length) && <div className="dashboard-empty">Kho thuốc ổn định (Không có thuốc tồn thấp)</div>}
           </div>
           <button type="button" className="medicine-more" onClick={() => navigate('/pharmacy')}>Quản lý kho thuốc <RightOutlined /></button>
         </article>
