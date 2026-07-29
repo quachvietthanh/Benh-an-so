@@ -44,13 +44,19 @@ function PatientDetail() {
 
     if (!foundPatient) {
       const allMerged = mergePatients(getPatients())
-      foundPatient = allMerged.find((p) => String(p.id) === String(id) || String(p.patientCode) === String(id)) || null
+      foundPatient = allMerged.find((p) =>
+        String(p.id).toLowerCase() === String(id).toLowerCase() ||
+        String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
+      ) || null
 
       if (!foundPatient) {
         try {
           const allRes = await patientApi.getAll({ page: 0, size: 200 })
           const list = allRes.data?.content || []
-          foundPatient = list.find((p) => String(p.id) === String(id) || String(p.patientCode) === String(id)) || null
+          foundPatient = list.find((p) =>
+            String(p.id).toLowerCase() === String(id).toLowerCase() ||
+            String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
+          ) || null
         } catch {
           // ignore
         }
