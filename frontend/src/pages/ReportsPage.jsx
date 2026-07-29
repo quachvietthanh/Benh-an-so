@@ -240,10 +240,10 @@ function ReportsPage() {
   const maxVisitsChart = Math.max(...timeline.map((t) => Number(t.visitCount || 0)), 10)
 
   return (
-    <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '16px 24px' }}>
+    <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '16px 14px' }}>
       {/* Header Section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
+      <div className="reports-page-header">
+        <div className="reports-page-title-group">
           <Title level={3} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
             Báo cáo vận hành và nhật ký truy cập
           </Title>
@@ -251,7 +251,7 @@ function ReportsPage() {
             Theo dõi số liệu khám bệnh, doanh thu, thuốc và lịch sử truy cập hệ thống (Dữ liệu ghi nhận thực tế)
           </Text>
         </div>
-        <Space size="middle">
+        <Space size="middle" className="reports-page-actions">
           <RangePicker
             value={range}
             format="DD/MM/YYYY"
@@ -277,164 +277,73 @@ function ReportsPage() {
         </Space>
       </div>
 
-      {/* Top 4 Summary Cards (COMPUTED STRICTLY FROM REAL RECORDED DATA) */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      {/* Top 4 Summary Cards */}
+      <Row gutter={[10, 10]} style={{ marginBottom: 16 }}>
         {/* Card 1: Tổng lượt khám */}
-        <Col xs={24} sm={12} md={6}>
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 14,
-              padding: '18px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-              border: '1px solid #f1f5f9',
-            }}
-          >
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 14,
-                background: '#1677ff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 16,
-                color: '#fff',
-                fontSize: 24,
-              }}
-            >
+        <Col xs={12} sm={12} md={6}>
+          <div className="reports-stat-card">
+            <div className="reports-stat-icon blue">
               <CalendarOutlined />
             </div>
             <div>
-              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Tổng lượt khám</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#1677ff', lineHeight: 1.2 }}>
+              <div className="reports-stat-label">Tổng lượt khám</div>
+              <div className="reports-stat-value blue">
                 {summary.visitCount} lượt
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Ghi nhận thực tế từ bệnh án</div>
+              <div className="reports-stat-sub">Ghi nhận từ bệnh án</div>
             </div>
           </div>
         </Col>
 
         {/* Card 2: Doanh thu phòng khám */}
-        <Col xs={24} sm={12} md={6}>
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 14,
-              padding: '18px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-              border: '1px solid #f1f5f9',
-            }}
-          >
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 14,
-                background: '#22c55e',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 16,
-                color: '#fff',
-                fontSize: 24,
-              }}
-            >
+        <Col xs={12} sm={12} md={6}>
+          <div className="reports-stat-card">
+            <div className="reports-stat-icon green">
               <DollarCircleOutlined />
             </div>
             <div>
-              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Doanh thu phòng khám</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a', lineHeight: 1.2 }}>
+              <div className="reports-stat-label">Doanh thu phòng khám</div>
+              <div className="reports-stat-value green">
                 {money(summary.revenue)}
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Ghi nhận thực tế từ hóa đơn</div>
+              <div className="reports-stat-sub">Ghi nhận từ hóa đơn</div>
             </div>
           </div>
         </Col>
 
         {/* Card 3: Đơn thuốc đã cấp */}
-        <Col xs={24} sm={12} md={6}>
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 14,
-              padding: '18px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-              border: '1px solid #f1f5f9',
-            }}
-          >
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 14,
-                background: '#ff7a00',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 16,
-                color: '#fff',
-                fontSize: 24,
-              }}
-            >
+        <Col xs={12} sm={12} md={6}>
+          <div className="reports-stat-card">
+            <div className="reports-stat-icon orange">
               <MedicineBoxOutlined />
             </div>
             <div>
-              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Đơn thuốc đã cấp</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#ea580c', lineHeight: 1.2 }}>
+              <div className="reports-stat-label">Đơn thuốc đã cấp</div>
+              <div className="reports-stat-value orange">
                 {summary.dispensedCount} đơn
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Ghi nhận thực tế từ kho thuốc</div>
+              <div className="reports-stat-sub">Ghi nhận từ kho thuốc</div>
             </div>
           </div>
         </Col>
 
         {/* Card 4: Nhật ký truy cập */}
-        <Col xs={24} sm={12} md={6}>
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 14,
-              padding: '18px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-              border: '1px solid #f1f5f9',
-            }}
-          >
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 14,
-                background: '#7c3aed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 16,
-                color: '#fff',
-                fontSize: 24,
-              }}
-            >
+        <Col xs={12} sm={12} md={6}>
+          <div className="reports-stat-card">
+            <div className="reports-stat-icon purple">
               <FileSearchOutlined />
             </div>
             <div>
-              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Nhật ký truy cập</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#7c3aed', lineHeight: 1.2 }}>
-                {summary.auditCount} lượt xem
+              <div className="reports-stat-label">Nhật ký truy cập</div>
+              <div className="reports-stat-value purple">
+                {summary.auditCount} lượt
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Ghi nhận thực tế truy cập y tế</div>
+              <div className="reports-stat-sub">Ghi nhận truy cập y tế</div>
             </div>
           </div>
         </Col>
       </Row>
+
 
       {/* Tabs Header Navigation */}
       <Card

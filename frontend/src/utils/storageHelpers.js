@@ -1,3 +1,6 @@
+const PATIENTS_KEY = 'app_patients'
+const APPOINTMENTS_KEY = 'app_appointments'
+const QUEUE_KEY = 'app_queue'
 const MEDICAL_RECORDS_KEY = 'app_medical_records'
 const PRESCRIPTIONS_KEY = 'app_prescriptions'
 const MEDICINES_KEY = 'app_medicines'
@@ -8,6 +11,113 @@ const AUDIT_LOGS_KEY = 'app_audit_logs'
 export const demoBatches = []
 export const demoInvoices = []
 export const demoAuditLogs = []
+
+export const getStoredAppointments = () => {
+  try {
+    const raw = localStorage.getItem(APPOINTMENTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export const saveStoredAppointment = (appointment) => {
+  try {
+    const current = getStoredAppointments()
+    const updated = [appointment, ...current.filter((a) => String(a.id) !== String(appointment.id))]
+    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const mergeAppointments = (apiAppointments = []) => {
+  const localApps = getStoredAppointments()
+  const map = new Map()
+
+  if (Array.isArray(apiAppointments) && apiAppointments.length) {
+    apiAppointments.forEach((item) => map.set(String(item.id), item))
+  }
+  localApps.forEach((item) => {
+    const existing = map.get(String(item.id))
+    map.set(String(item.id), existing ? { ...existing, ...item } : item)
+  })
+
+  return Array.from(map.values())
+}
+
+export const getStoredQueue = () => {
+  try {
+    const raw = localStorage.getItem(QUEUE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export const saveStoredQueueItem = (item) => {
+  try {
+    const current = getStoredQueue()
+    const updated = [item, ...current.filter((q) => String(q.id) !== String(item.id))]
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const mergeQueue = (apiQueue = []) => {
+  const localQueue = getStoredQueue()
+  const map = new Map()
+
+  if (Array.isArray(apiQueue) && apiQueue.length) {
+    apiQueue.forEach((item) => map.set(String(item.id), item))
+  }
+  localQueue.forEach((item) => {
+    const existing = map.get(String(item.id))
+    map.set(String(item.id), existing ? { ...existing, ...item } : item)
+  })
+
+  return Array.from(map.values())
+}
+
+
+export const getStoredPatients = () => {
+  try {
+    const raw = localStorage.getItem(PATIENTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export const saveStoredPatient = (patient) => {
+  try {
+    const current = getStoredPatients()
+    const updated = [patient, ...current.filter((p) => String(p.id) !== String(patient.id) && String(p.patientCode) !== String(patient.patientCode))]
+    localStorage.setItem(PATIENTS_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const mergePatients = (apiPatients = []) => {
+  const localPatients = getStoredPatients()
+  const map = new Map()
+
+  if (Array.isArray(apiPatients) && apiPatients.length) {
+    apiPatients.forEach((item) => map.set(String(item.id), item))
+  }
+  localPatients.forEach((item) => {
+    const existing = map.get(String(item.id))
+    map.set(String(item.id), existing ? { ...existing, ...item } : item)
+  })
+
+  return Array.from(map.values())
+}
+
 
 export const getStoredMedicalRecords = () => {
   try {

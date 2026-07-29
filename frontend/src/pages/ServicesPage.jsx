@@ -124,10 +124,15 @@ function ServicesPage() {
 
     try {
       if (editing) {
-        await systemApi.updateService(editing.id, payload)
+        const res = await systemApi.updateService(editing.id, payload)
+        const updatedData = res?.data || { ...editing, ...payload }
+        setServices((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...updatedData } : s)))
       } else {
-        await systemApi.createService(payload)
+        const res = await systemApi.createService(payload)
+        const createdData = res?.data || { id: 'svc_' + Date.now(), ...payload }
+        setServices((prev) => [createdData, ...prev.filter((s) => s.id !== createdData.id)])
       }
+      await load()
     } catch {
       if (editing) {
         setServices((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...payload } : s)))
@@ -141,6 +146,7 @@ function ServicesPage() {
       closeServiceModal()
     }
   }
+
 
   const saveClinic = async (values) => {
     setSavingClinic(true)

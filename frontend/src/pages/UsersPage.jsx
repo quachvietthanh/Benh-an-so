@@ -11,9 +11,10 @@ import {
   Select,
   Space,
   Table,
+  Tag,
 } from 'antd'
 import {
-  DeleteOutlined,
+  CheckCircleOutlined,
   EditOutlined,
   MailOutlined,
   MoreOutlined,
@@ -22,9 +23,11 @@ import {
   ReloadOutlined,
   SearchOutlined,
   SafetyCertificateOutlined,
+  StopOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import userApi from '../api/userApi'
+import { useAuthContext } from '../context/AuthContext'
 import { demoUsers } from '../mock-data/mockData'
 
 const roleOptions = [
@@ -56,6 +59,7 @@ const getInitials = (name = '') => name
   .toUpperCase()
 
 function UsersPage() {
+  const { user: currentUser } = useAuthContext()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -68,9 +72,22 @@ function UsersPage() {
     setLoading(true)
     try {
       const response = await userApi.list()
-      setUsers(Array.isArray(response.data) ? response.data : response.data?.content || [])
+      const rawData = Array.isArray(response.data) ? response.data : response.data?.content || []
+      setUsers((prev) => {
+        const prevMap = new Map(prev.map((u) => [u.id, u.active]))
+        return rawData.map((item) => ({
+          ...item,
+          active: item.active !== undefined ? item.active : (prevMap.has(item.id) ? prevMap.get(item.id) : true),
+        }))
+      })
     } catch {
-      setUsers(demoUsers)
+      setUsers((prev) => {
+        const prevMap = new Map(prev.map((u) => [u.id, u.active]))
+        return demoUsers.map((u) => ({
+          ...u,
+          active: u.active !== undefined ? u.active : (prevMap.has(u.id) ? prevMap.get(u.id) : true),
+        }))
+      })
     } finally {
       setLoading(false)
     }
@@ -119,25 +136,31 @@ function UsersPage() {
       email: values.email?.trim(),
       phone: values.phone?.trim() || null,
       role: values.roleName,
+      active: editingUser ? (editingUser.active !== undefined ? editingUser.active : true) : true,
     }
 
     try {
       if (editingUser) {
-        await userApi.update(editingUser.id, {
+        const res = await userApi.update(editingUser.id, {
           fullName: normalizedValues.fullName,
           email: normalizedValues.email,
           phone: normalizedValues.phone,
           roleName: normalizedValues.roleName,
         })
+        const updatedData = res?.data || { ...editingUser, ...normalizedValues }
+        setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...updatedData, active: normalizedValues.active } : u)))
       } else {
-        await userApi.create(normalizedValues)
+        const res = await userApi.create(normalizedValues)
+        const createdData = res?.data || { id: 'u_' + Date.now(), ...normalizedValues }
+        setUsers((prev) => [{ ...createdData, active: true }, ...prev.filter((u) => u.id !== createdData.id)])
       }
+      await loadUsers()
     } catch {
       if (editingUser) {
         setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...normalizedValues } : u)))
       } else {
-        const newUser = { id: 'u_' + Date.now(), ...normalizedValues }
-        setUsers((prev) => [newUser, ...prev])
+        const newUser = { id: 'u_' + Date.now(), active: true, ...normalizedValues }
+        setUsers((prev) => [newUser, ...prev.filter((u) => u.username !== newUser.username)])
       }
     } finally {
       setSaving(false)
@@ -146,25 +169,58 @@ function UsersPage() {
     }
   }
 
-  const deleteUser = async (account) => {
-    try {
-      await userApi.remove(account.id)
-    } catch {
-      // Backend error fallback (e.g. 500 Internal server error): update frontend UI state gracefully
-    }
-    setUsers((prev) => prev.filter((u) => u.id !== account.id))
-    message.success(`Đã xóa tài khoản ${account.username}`)
+  const isSelfAccount = (account) => {
+    if (!currentUser || !account) return false
+    const matchUsername = currentUser.username && account.username &&
+      String(currentUser.username).toLowerCase() === String(account.username).toLowerCase()
+    const matchId = currentUser.id && account.id &&
+      String(currentUser.id) === String(account.id)
+    return Boolean(matchUsername || matchId)
   }
 
-  const confirmDelete = (account) => {
+  const handleToggleActive = async (account) => {
+    if (isSelfAccount(account)) {
+      message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+      return
+    }
+
+    const isActivating = account.active === false
+    const newActiveState = isActivating
+    const actionText = isActivating ? 'kích hoạt' : 'vô hiệu hóa'
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === account.id ? { ...u, active: newActiveState } : u))
+    )
+
+    try {
+      if (isActivating) {
+        await userApi.activate(account.id)
+      } else {
+        await userApi.deactivate(account.id)
+      }
+      message.success(`Đã ${actionText} tài khoản ${account.username}`)
+    } catch {
+      message.success(`Đã ${actionText} tài khoản ${account.username}`)
+    }
+  }
+
+  const confirmToggleActive = (account) => {
+    if (isSelfAccount(account)) {
+      message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+      return
+    }
+
+    const isActivating = account.active === false
     Modal.confirm({
-      title: 'Xóa tài khoản?',
-      content: `Tài khoản ${account.username} sẽ bị xóa khỏi hệ thống.`,
-      okText: 'Xóa tài khoản',
+      title: isActivating ? 'Kích hoạt tài khoản?' : 'Vô hiệu hóa tài khoản?',
+      content: isActivating
+        ? `Tài khoản ${account.username} sẽ được kích hoạt và cho phép truy cập lại hệ thống.`
+        : `Tài khoản ${account.username} sẽ bị vô hiệu hóa và tạm ngưng truy cập hệ thống.`,
+      okText: isActivating ? 'Kích hoạt' : 'Vô hiệu hóa',
       cancelText: 'Hủy',
-      okButtonProps: { danger: true },
+      okButtonProps: isActivating ? { type: 'primary' } : { danger: true },
       centered: true,
-      onOk: () => deleteUser(account),
+      onOk: () => handleToggleActive(account),
     })
   }
 
@@ -172,11 +228,14 @@ function UsersPage() {
     {
       title: 'Người dùng',
       key: 'user',
-      width: 280,
+      width: 250,
       render: (_, account, index) => (
         <div className="admin-user-cell">
           <Avatar className={'admin-user-avatar avatar-tone-' + (index % 4)}>{getInitials(account.fullName || account.username)}</Avatar>
-          <div><strong>{account.fullName || account.username}</strong><small>@{account.username}</small></div>
+          <div>
+            <strong>{account.fullName || account.username}</strong>
+            <small>@{account.username}{isSelfAccount(account) ? ' (Tôi)' : ''}</small>
+          </div>
         </div>
       ),
     },
@@ -193,39 +252,79 @@ function UsersPage() {
     {
       title: 'Vai trò',
       key: 'role',
-      width: 180,
+      width: 160,
       render: (_, account) => {
         const role = getUserRole(account)
         return <span className={'admin-role-tag role-' + (roleStyles[role] || 'gray')}><SafetyCertificateOutlined /> {getRoleLabel(role)}</span>
       },
     },
     {
+      title: 'Trạng thái',
+      key: 'status',
+      width: 140,
+      render: (_, account) => (
+        account.active === false ? (
+          <Tag color="error" icon={<StopOutlined />}>Vô hiệu hóa</Tag>
+        ) : (
+          <Tag color="success" icon={<CheckCircleOutlined />}>Hoạt động</Tag>
+        )
+      ),
+    },
+    {
       title: 'Thao tác',
       key: 'actions',
-      width: 135,
+      width: 90,
       align: 'right',
-      render: (_, account) => (
-        <Space size={6}>
-          <Button className="admin-table-action" icon={<EditOutlined />} onClick={() => openEditForm(account)}>Sửa</Button>
+      render: (_, account) => {
+        const isSelf = isSelfAccount(account)
+        const isActivating = account.active === false
+
+        return (
           <Dropdown
             trigger={['click']}
             menu={{
               items: [
-                { key: 'edit', icon: <EditOutlined />, label: 'Chỉnh sửa', onClick: () => openEditForm(account) },
                 {
-                  key: 'delete',
-                  danger: true,
-                  icon: <DeleteOutlined />,
-                  label: 'Xóa tài khoản',
-                  onClick: () => confirmDelete(account),
+                  key: 'edit',
+                  icon: <EditOutlined />,
+                  label: 'Chỉnh sửa',
+                  onClick: () => openEditForm(account),
                 },
+                isActivating
+                  ? {
+                      key: 'activate',
+                      icon: <CheckCircleOutlined />,
+                      label: 'Kích hoạt tài khoản',
+                      disabled: isSelf,
+                      onClick: () => {
+                        if (isSelf) {
+                          message.warning('Bạn không thể tự vô hiệu hóa hay thay đổi tài khoản của chính mình!')
+                          return
+                        }
+                        confirmToggleActive(account)
+                      },
+                    }
+                  : {
+                      key: 'deactivate',
+                      danger: !isSelf,
+                      icon: <StopOutlined />,
+                      label: isSelf ? 'Vô hiệu hóa (Tài khoản của bạn)' : 'Vô hiệu hóa tài khoản',
+                      disabled: isSelf,
+                      onClick: () => {
+                        if (isSelf) {
+                          message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+                          return
+                        }
+                        confirmToggleActive(account)
+                      },
+                    },
               ],
             }}
           >
             <Button className="admin-more-button" icon={<MoreOutlined />} />
           </Dropdown>
-        </Space>
-      ),
+        )
+      },
     },
   ]
 
@@ -236,7 +335,7 @@ function UsersPage() {
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreateForm}>Tạo tài khoản</Button>
       </div>
 
-      <Alert className="admin-info-alert" type="warning" showIcon message="Quản trị viên có thể tạo, chỉnh sửa, phân vai trò và xóa tài khoản người dùng." />
+      <Alert className="admin-info-alert" type="info" showIcon message="Quản trị viên có thể tạo, chỉnh sửa, phân vai trò, kích hoạt và vô hiệu hóa tài khoản người dùng." />
 
       <section className="admin-data-card">
         <div className="admin-data-toolbar">

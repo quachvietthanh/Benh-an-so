@@ -39,6 +39,8 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
   }
 
   return children
+
+
 }
 
 function AppRoutes() {

@@ -972,9 +972,43 @@
   }
 }
 
+@media (max-width: 768px) {
+  .appointment-stat-grid,
+  .appointment-stat-grid.appointment-queue-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .appointment-stat-card {
+    min-height: 72px !important;
+    padding: 8px 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .appointment-stat-icon {
+    flex: 0 0 34px !important;
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 16px !important;
+  }
+
+  .appointment-stat-card strong {
+    font-size: 17px !important;
+  }
+
+  .appointment-stat-card small {
+    font-size: 11px !important;
+  }
+
+  .appointment-stat-card em {
+    display: none !important;
+  }
+}
+
 @media (max-width: 480px) {
   .appointment-stat-grid,
   .appointment-stat-grid.appointment-queue-stat-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+

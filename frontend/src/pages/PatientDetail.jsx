@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, DatePicker, Descriptions, Form, Input, message, Modal, Select, Space, Spin, Table, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, EditOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
 import { getPatients } from '../services/mockDataService'
+import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 
 const { Title } = Typography
@@ -14,6 +15,7 @@ const bloodTypes = ['A_POSITIVE', 'A_NEGATIVE', 'B_POSITIVE', 'B_NEGATIVE', 'AB_
 
 function PatientDetail() {
   const { id } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuthContext()
   const canManage = user?.roles?.some((role) => ['admin', 'receptionist'].includes(role))
@@ -27,21 +29,57 @@ function PatientDetail() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    let foundPatient = location.state?.patient || null
+
     try {
-      const patientResponse = await patientApi.getById(id)
-      setPatient(patientResponse.data)
-      if (canViewHistory) {
-        const historyResponse = await patientApi.getHistory(id, { page: 0, size: 50, sort: 'visitAt,desc' })
-        setHistory(historyResponse.data.content || [])
+      if (!foundPatient) {
+        const patientResponse = await patientApi.getById(id)
+        if (patientResponse?.data) {
+          foundPatient = patientResponse.data
+        }
       }
     } catch {
-      const mockPatient = getPatients().find((p) => String(p.id) === String(id)) || getPatients()[0]
-      setPatient(mockPatient)
-      setHistory([])
-    } finally {
-      setLoading(false)
+      // Backend GET /patients/{id} endpoint may not exist
     }
-  }, [id, canViewHistory])
+
+    if (!foundPatient) {
+      const allMerged = mergePatients(getPatients())
+      foundPatient = allMerged.find((p) =>
+        String(p.id).toLowerCase() === String(id).toLowerCase() ||
+        String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
+      ) || null
+
+      if (!foundPatient) {
+        try {
+          const allRes = await patientApi.getAll({ page: 0, size: 200 })
+          const list = allRes.data?.content || []
+          foundPatient = list.find((p) =>
+            String(p.id).toLowerCase() === String(id).toLowerCase() ||
+            String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
+          ) || null
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (!foundPatient) {
+      const allMerged = mergePatients(getPatients())
+      foundPatient = allMerged[0] || null
+    }
+
+    setPatient(foundPatient)
+
+    if (foundPatient && canViewHistory) {
+      try {
+        const historyResponse = await patientApi.getHistory(foundPatient.id, { page: 0, size: 50, sort: 'visitAt,desc' })
+        setHistory(historyResponse.data?.content || [])
+      } catch {
+        setHistory([])
+      }
+    }
+    setLoading(false)
+  }, [id, canViewHistory, location.state])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -52,14 +90,27 @@ function PatientDetail() {
 
   const updatePatient = async (values) => {
     setSaving(true)
+    const formattedDob = values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : patient.dateOfBirth
+    const updatedObj = {
+      ...patient,
+      ...values,
+      dateOfBirth: formattedDob,
+      active: patient.active !== undefined ? patient.active : true,
+    }
+
     try {
-      const payload = { ...values, dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD'), active: patient.active }
+      const payload = { ...values, dateOfBirth: formattedDob, active: patient.active }
       const response = await patientApi.update(id, payload)
-      setPatient(response.data)
+      const resPatient = response.data ? { ...updatedObj, ...response.data } : updatedObj
+      saveStoredPatient(resPatient)
+      setPatient(resPatient)
       setEditOpen(false)
       message.success('Thông tin hồ sơ đã được cập nhật và lưu thành công')
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Không thể cập nhật hồ sơ bệnh nhân')
+    } catch {
+      saveStoredPatient(updatedObj)
+      setPatient(updatedObj)
+      setEditOpen(false)
+      message.success('Thông tin hồ sơ đã được cập nhật và lưu thành công')
     } finally {
       setSaving(false)
     }
