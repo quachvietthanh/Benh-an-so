@@ -78,6 +78,7 @@ function PatientList() {
     }
   }, [location.state?.keyword])
 
+  const [allPatients, setAllPatients] = useState([])
   const [genderFilter, setGenderFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [dateRange, setDateRange] = useState(null)
@@ -91,44 +92,57 @@ function PatientList() {
   const loadPatients = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await patientApi.getAll({ keyword: keyword || undefined, page, size: pageSize })
-      const apiList = response?.data?.content || []
+      const response = await patientApi.getAll({ page: 0, size: 500 })
+      const apiList = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
       const merged = mergePatients(apiList.length ? apiList : getPatients())
-      setPatients(merged)
-      setTotal(response?.data?.totalElements || merged.length)
+      setAllPatients(merged)
     } catch {
       const merged = mergePatients(getPatients())
-      setPatients(merged)
-      setTotal(merged.length)
+      setAllPatients(merged)
     } finally {
       setLoading(false)
     }
-  }, [keyword, page, pageSize])
+  }, [])
 
   useEffect(() => { loadPatients() }, [loadPatients])
 
   const filteredPatients = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
-    return patients.filter((patient) => {
-      const matchesKeyword = !kw || [patient.fullName, patient.patientCode, patient.phone, patient.identityNumber]
-        .some((val) => String(val || '').toLowerCase().includes(kw))
+    return allPatients.filter((patient) => {
+      const matchesKeyword = !kw || [
+        patient.fullName,
+        patient.patientCode,
+        patient.phone,
+        patient.phoneNumber,
+        patient.identityNumber,
+        patient.insuranceNumber,
+        patient.address,
+      ].some((val) => String(val || '').toLowerCase().includes(kw))
+
       const matchesGender = genderFilter === 'ALL' || patient.gender === genderFilter
       const matchesStatus = statusFilter === 'ALL'
         || (statusFilter === 'ACTIVE' ? patient.active !== false : patient.active === false)
+
       const createdAt = patient.createdAt ? dayjs(patient.createdAt) : null
       const matchesDate = !dateRange?.length || (createdAt
         && !createdAt.isBefore(dateRange[0].startOf('day'))
         && !createdAt.isAfter(dateRange[1].endOf('day')))
+
       return matchesKeyword && matchesGender && matchesStatus && matchesDate
     })
-  }, [dateRange, genderFilter, keyword, patients, statusFilter])
+  }, [allPatients, dateRange, genderFilter, keyword, statusFilter])
 
-  const activeCount = patients.filter((patient) => patient.active !== false).length
-  const archivedCount = patients.filter((patient) => patient.active === false).length
-  const newCount = patients.filter((patient) => patient.createdAt && dayjs().diff(dayjs(patient.createdAt), 'day') <= 30).length
+  const paginatedPatients = useMemo(() => {
+    const start = page * pageSize
+    return filteredPatients.slice(start, start + pageSize)
+  }, [filteredPatients, page, pageSize])
+
+  const activeCount = useMemo(() => allPatients.filter((patient) => patient.active !== false).length, [allPatients])
+  const archivedCount = useMemo(() => allPatients.filter((patient) => patient.active === false).length, [allPatients])
+  const newCount = useMemo(() => allPatients.filter((patient) => patient.createdAt && dayjs().diff(dayjs(patient.createdAt), 'day') <= 30).length, [allPatients])
 
   const patientStats = [
-    { key: 'total', label: 'Tổng bệnh nhân', value: total, note: '12,5% so với tháng trước', trend: 'up', icon: TeamOutlined, tone: 'blue' },
+    { key: 'total', label: 'Tổng bệnh nhân', value: allPatients.length, note: '12,5% so với tháng trước', trend: 'up', icon: TeamOutlined, tone: 'blue' },
     { key: 'new', label: 'Bệnh nhân mới', value: newCount, note: '8,3% so với tháng trước', trend: 'up', icon: UserAddOutlined, tone: 'green' },
     { key: 'active', label: 'Đang điều trị', value: activeCount, note: 'Không đổi so với tháng trước', trend: 'flat', icon: HeartOutlined, tone: 'orange' },
     { key: 'archived', label: 'Hồ sơ đã lưu trữ', value: archivedCount, note: '4,1% so với tháng trước', trend: 'up', icon: InboxOutlined, tone: 'purple' },
@@ -148,8 +162,8 @@ function PatientList() {
       const response = await patientApi.create(payload)
       newPatient = response.data || { id: 'p_' + Date.now(), patientCode: 'BN-' + Math.floor(100000 + Math.random() * 900000), fullName: values.fullName, dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD'), gender: values.gender.toUpperCase() }
       saveStoredPatient(newPatient)
+      setAllPatients((prev) => mergePatients([newPatient, ...prev]))
     } catch {
-      // Fallback mock patient when backend is offline
       newPatient = {
         id: 'p_' + Date.now(),
         patientCode: 'BN-' + Math.floor(100000 + Math.random() * 900000),
@@ -167,8 +181,7 @@ function PatientList() {
         createdAt: new Date().toISOString(),
       }
       saveStoredPatient(newPatient)
-      setPatients((prev) => mergePatients([newPatient, ...prev]))
-      setTotal((t) => t + 1)
+      setAllPatients((prev) => mergePatients([newPatient, ...prev]))
     } finally {
       setSaving(false)
     }
@@ -417,7 +430,12 @@ ${rowsXml}
             prefix={<SearchOutlined />}
             placeholder="Tìm kiếm theo tên, SĐT, CCCD..."
             allowClear
-            onChange={(event) => setSearchText(event.target.value)}
+            onChange={(event) => {
+              const val = event.target.value
+              setSearchText(val)
+              setKeyword(val)
+              setPage(0)
+            }}
             onPressEnter={submitSearch}
           />
           <Select
@@ -446,7 +464,7 @@ ${rowsXml}
         <Table
           className="patient-record-table"
           columns={columns}
-          dataSource={filteredPatients}
+          dataSource={paginatedPatients}
           rowKey="id"
           loading={loading}
           rowSelection={{
@@ -460,7 +478,7 @@ ${rowsXml}
           pagination={{
             current: page + 1,
             pageSize,
-            total,
+            total: filteredPatients.length,
             showSizeChanger: true,
             pageSizeOptions: [5, 10, 20],
             showTotal: (value, range) => `Hiển thị ${range[0]} - ${range[1]} của ${value.toLocaleString('vi-VN')} bệnh nhân`,
