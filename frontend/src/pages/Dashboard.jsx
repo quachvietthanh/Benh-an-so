@@ -81,7 +81,13 @@ function Dashboard() {
 
       const patientData = readSettledData(results[2], { content: fallbackPatients })
       setStats(readSettledData(results[0], fallbackStats))
-      setAppointments(readSettledData(results[1], fallbackAppointments) || [])
+      const appointmentData = readSettledData(results[1], fallbackAppointments);
+
+      setAppointments(
+        Array.isArray(appointmentData)
+        ? appointmentData
+        : appointmentData?.content ?? []
+);
       setPatients(patientData?.content || patientData || [])
       setMedicines(readSettledData(results[3], fallbackMedicines) || [])
       setLoading(false)

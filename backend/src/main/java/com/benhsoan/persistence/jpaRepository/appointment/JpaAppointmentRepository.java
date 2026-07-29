@@ -3,7 +3,16 @@ package com.benhsoan.persistence.jpaRepository.appointment;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
+import java.util.Collection;
 
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
+
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -22,4 +31,18 @@ public interface JpaAppointmentRepository
     List<AppointmentEntity> findByPatientId(UUID patientId);
 
     Optional<AppointmentEntity> findTopByOrderByAppointmentCodeDesc();
+
+    @Query("select appointment.id from AppointmentEntity appointment "
+            + "where appointment.startTime > :now "
+            + "and appointment.startTime <= :reminderDeadline "
+            + "and appointment.status in :statuses")
+    List<UUID> findDueReminderIds(
+            @Param("now") Instant now,
+            @Param("reminderDeadline") Instant reminderDeadline,
+            @Param("statuses") Collection<AppointmentStatus> statuses
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select appointment from AppointmentEntity appointment where appointment.id = :id")
+    Optional<AppointmentEntity> findByIdForUpdate(@Param("id") UUID id);
 }
