@@ -29,12 +29,14 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.appointment.GetOverdueAppointmentsCommand;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
+import com.benhsoan.port.dto.result.AppointmentReminderResult;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
 import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
+import com.benhsoan.port.inbound.appointment.SendAppointmentReminderManuallyUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +58,8 @@ public class AppointmentController {
     private final SearchAppointmentsUseCase searchAppointmentsUseCase;
 
     private final GetAppointmentByIdUseCase getAppointmentByIdUseCase;
+
+    private final SendAppointmentReminderManuallyUseCase sendAppointmentReminderManuallyUseCase;
 
     private final AppointmentRestMapper mapper;
 
@@ -100,6 +104,12 @@ public class AppointmentController {
                 );
         return mapper.toResponse(result);
 
+    }
+
+    @PostMapping("/{id}/reminder")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    public AppointmentReminderResult sendReminderManually(@PathVariable UUID id) {
+        return sendAppointmentReminderManuallyUseCase.sendManually(id);
     }
 
     @PatchMapping("/{id}/cancel")

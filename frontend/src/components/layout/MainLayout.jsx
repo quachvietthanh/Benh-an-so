@@ -16,6 +16,7 @@ import {
   SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons'
+import patientApi from '../../api/patientApi'
 import { useAuthContext } from '../../context/AuthContext'
 import { getAppointments, getNavigationItems, getPatients } from '../../services/mockDataService'
 import { mergeAppointments, mergePatients } from '../../utils/storageHelpers'
@@ -45,9 +46,26 @@ function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
+  const [remotePatients, setRemotePatients] = useState([])
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthContext()
+
+  const syncPatients = React.useCallback(async () => {
+    try {
+      const res = await patientApi.getAll({ page: 0, size: 200 })
+      const list = res.data?.content || res.data || []
+      if (Array.isArray(list) && list.length) {
+        setRemotePatients(list)
+      }
+    } catch {
+      // fallback
+    }
+  }, [])
+
+  React.useEffect(() => {
+    syncPatients()
+  }, [syncPatients, location.pathname])
 
   const allPatients = useMemo(() => mergePatients(getPatients()), [])
   const allAppointments = useMemo(() => mergeAppointments(getAppointments()), [])
@@ -56,7 +74,7 @@ function MainLayout() {
     const keyword = searchValue.trim().toLowerCase()
     if (!keyword) return []
 
-    const currentPatients = mergePatients(getPatients())
+    const currentPatients = mergePatients([...remotePatients, ...getPatients()])
     const currentAppointments = mergeAppointments(getAppointments())
 
     // Combine patients from patient list and appointment records so every patient is searchable
@@ -154,7 +172,7 @@ function MainLayout() {
     }
 
     return options
-  }, [searchValue, navigate])
+  }, [searchValue, remotePatients, navigate])
 
   const handleSelectSearch = (value, option) => {
     setSearchValue('')
@@ -162,7 +180,7 @@ function MainLayout() {
 
     if (valStr.startsWith('patient:')) {
       const patientId = valStr.replace('patient:', '')
-      const currentPatients = mergePatients(getPatients())
+      const currentPatients = mergePatients([...remotePatients, ...getPatients()])
       const foundPatient = option?.patient || currentPatients.find((p) => String(p.id) === String(patientId))
       navigate(`/patients/${patientId}`, { state: { patient: foundPatient } })
     } else if (valStr.startsWith('appointment:')) {
@@ -181,7 +199,7 @@ function MainLayout() {
     const keyword = searchValue.trim()
     setSearchValue('')
 
-    const currentPatients = mergePatients(getPatients())
+    const currentPatients = mergePatients([...remotePatients, ...getPatients()])
     const matched = currentPatients.find((p) =>
       [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
         .some((val) => String(val || '').toLowerCase() === keyword.toLowerCase())
@@ -315,7 +333,7 @@ function MainLayout() {
           onClick={handleMenuClick}
         />
 
-        <Tooltip title={collapsed ? 'Mở rộng menu' : ''} placement="right">
+        <Tooltip title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} placement="right">
           <button
             type="button"
             className="sidebar-collapse"
@@ -332,11 +350,12 @@ function MainLayout() {
         <Header className="clinic-header">
           <button
             type="button"
-            className="mobile-nav-toggle"
-            onClick={() => setMobileDrawerOpen(true)}
-            aria-label="Mở menu điều hướng"
+            className="sidebar-toggle-btn"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-label="Thu gọn / Mở rộng menu"
+            title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           >
-            <MenuOutlined />
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </button>
 
           <AutoComplete
@@ -353,6 +372,7 @@ function MainLayout() {
               prefix={<SearchOutlined />}
               placeholder="Tìm kiếm bệnh nhân, lịch hẹn..."
               allowClear
+              onFocus={syncPatients}
               onPressEnter={handleSearchSubmit}
             />
           </AutoComplete>

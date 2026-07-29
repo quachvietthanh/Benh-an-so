@@ -95,8 +95,7 @@ public class GetPatientMedicalHistoryQueryHandler {
         // 5. Audit log — record that this user accessed the medical history
         auditService.logViewHistory(
                 query.patientId(),
-                currentUserId,
-                null  // IP address if available
+                currentUserId
         );
 
         log.debug(

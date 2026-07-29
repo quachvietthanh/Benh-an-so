@@ -26,6 +26,7 @@ import com.benhsoan.domain.auth.constant.RoleConstants;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.UserResult;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
@@ -70,10 +71,15 @@ class UserRepositoryAdapterTest {
         user = userRepository.save(user);
         userId = user.getId();
 
-        // Authenticate as the created admin user so that
-        // DeactivateUserService / ActivateUserService
-        // can read the current user via CurrentUserPort.
-        var principal = new CurrentUserPrincipal(userId, user.getUsername());
+        User operator = userRepository.save(User.create(
+                "operator_" + UUID.randomUUID(),
+                "123456",
+                "Operator",
+                "operator_" + UUID.randomUUID() + "@gmail.com",
+                "0123456788",
+                adminRole.getId()
+        ));
+        var principal = new CurrentUserPrincipal(operator.getId(), operator.getUsername());
         var auth = new UsernamePasswordAuthenticationToken(
                 principal, null, Collections.emptyList()
         );
@@ -150,17 +156,6 @@ class UserRepositoryAdapterTest {
         assertTrue(doctors.stream().allMatch(User::isActive));
     }
 
-    @Test
-    @DisplayName("Should delete user")
-    void shouldDeleteUser() {
-
-        userRepository.deleteById(user.getId());
-
-        assertFalse(
-                userRepository.findById(user.getId()).isPresent()
-        );
-    }
-
     // ============================
     // Account Lock/Unlock Tests
     // ============================
@@ -176,6 +171,19 @@ class UserRepositoryAdapterTest {
         // Verify in DB
         User deactivated = userRepository.findById(userId).orElseThrow();
         assertFalse(deactivated.isActive());
+    }
+
+    @Test
+    @DisplayName("DeactivateUserService should reject self deactivation")
+    void deactivateOwnAccountIsRejected() {
+        var principal = new CurrentUserPrincipal(userId, user.getUsername());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList()));
+
+        assertThrows(ValidationException.class,
+                () -> deactivateUserService.deactivate(userId));
+
+        assertTrue(userRepository.findById(userId).orElseThrow().isActive());
     }
 
     @Test

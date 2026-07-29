@@ -2,6 +2,8 @@ package com.benhsoan.persistence.adapterRepository.appointment;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -9,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.appointment.Appointment;
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.persistence.entity.appointment.AppointmentEntity;
 import com.benhsoan.persistence.jpaRepository.appointment.AppointmentBusinessSpecification;
 import com.benhsoan.persistence.jpaRepository.appointment.AppointmentSearchSpecification;
@@ -129,6 +132,20 @@ public class AppointmentRepositoryAdapter
                 pageable
         ).map(mapper::toDomain);
 
+    }
+
+    @Override
+    public List<UUID> findDueReminderIds(
+            Instant now,
+            Instant reminderDeadline,
+            Collection<AppointmentStatus> statuses
+    ) {
+        return jpaRepository.findDueReminderIds(now, reminderDeadline, statuses);
+    }
+
+    @Override
+    public Optional<Appointment> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
     }
 
 }

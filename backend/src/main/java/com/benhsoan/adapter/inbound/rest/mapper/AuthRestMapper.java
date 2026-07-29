@@ -16,8 +16,7 @@ public class AuthRestMapper {
 
         return new LoginCommand(
                 request.username(),
-                request.password(),
-                request.ipAddress()
+                request.password()
         );
     }
 

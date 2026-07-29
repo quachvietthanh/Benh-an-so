@@ -28,8 +28,7 @@ public class MedicalRecordAuditService {
     @Transactional
     public void logViewHistory(
             UUID patientId,
-            UUID performedByUserId,
-            String ipAddress
+            UUID performedByUserId
     ) {
 
         try {
@@ -37,7 +36,7 @@ public class MedicalRecordAuditService {
                     .createViewHistoryLog(
                             patientId,
                             performedByUserId,
-                            ipAddress
+                            null
                     );
 
             accessLogRepository.save(auditLog);

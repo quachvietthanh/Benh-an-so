@@ -3,9 +3,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,7 +11,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.UserRestMapper;
@@ -24,7 +21,6 @@ import com.benhsoan.port.dto.result.UserResult;
 import com.benhsoan.port.inbound.user.ActivateUserUseCase;
 import com.benhsoan.port.inbound.user.CreateUserUseCase;
 import com.benhsoan.port.inbound.user.DeactivateUserUseCase;
-import com.benhsoan.port.inbound.user.DeleteUserUseCase;
 import com.benhsoan.port.inbound.user.GetAllUsersUseCase;
 import com.benhsoan.port.inbound.user.GetDoctorsUseCase;
 import com.benhsoan.port.inbound.user.GetUserUseCase;
@@ -43,7 +39,6 @@ public class UserController {
     private final GetDoctorsUseCase getDoctorsUseCase;
     private final GetUserUseCase getUserUseCase;
     private final UpdateUserUseCase updateUserUseCase;
-    private final DeleteUserUseCase deleteUserUseCase;
     private final ActivateUserUseCase activateUserUseCase;
     private final DeactivateUserUseCase deactivateUserUseCase;
 
@@ -101,16 +96,6 @@ public class UserController {
                         userRestMapper.toCommand(request));
 
         return userRestMapper.toResponse(result);
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-            @PathVariable UUID id
-    ) {
-
-        deleteUserUseCase.delete(id);
     }
 
     @PatchMapping("/{id}/activate")

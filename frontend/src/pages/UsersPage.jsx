@@ -27,6 +27,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import userApi from '../api/userApi'
+import { useAuthContext } from '../context/AuthContext'
 import { demoUsers } from '../mock-data/mockData'
 
 const roleOptions = [
@@ -58,6 +59,7 @@ const getInitials = (name = '') => name
   .toUpperCase()
 
 function UsersPage() {
+  const { user: currentUser } = useAuthContext()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -167,7 +169,21 @@ function UsersPage() {
     }
   }
 
+  const isSelfAccount = (account) => {
+    if (!currentUser || !account) return false
+    const matchUsername = currentUser.username && account.username &&
+      String(currentUser.username).toLowerCase() === String(account.username).toLowerCase()
+    const matchId = currentUser.id && account.id &&
+      String(currentUser.id) === String(account.id)
+    return Boolean(matchUsername || matchId)
+  }
+
   const handleToggleActive = async (account) => {
+    if (isSelfAccount(account)) {
+      message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+      return
+    }
+
     const isActivating = account.active === false
     const newActiveState = isActivating
     const actionText = isActivating ? 'kích hoạt' : 'vô hiệu hóa'
@@ -189,6 +205,11 @@ function UsersPage() {
   }
 
   const confirmToggleActive = (account) => {
+    if (isSelfAccount(account)) {
+      message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+      return
+    }
+
     const isActivating = account.active === false
     Modal.confirm({
       title: isActivating ? 'Kích hoạt tài khoản?' : 'Vô hiệu hóa tài khoản?',
@@ -211,7 +232,10 @@ function UsersPage() {
       render: (_, account, index) => (
         <div className="admin-user-cell">
           <Avatar className={'admin-user-avatar avatar-tone-' + (index % 4)}>{getInitials(account.fullName || account.username)}</Avatar>
-          <div><strong>{account.fullName || account.username}</strong><small>@{account.username}</small></div>
+          <div>
+            <strong>{account.fullName || account.username}</strong>
+            <small>@{account.username}{isSelfAccount(account) ? ' (Tôi)' : ''}</small>
+          </div>
         </div>
       ),
     },
@@ -251,37 +275,56 @@ function UsersPage() {
       key: 'actions',
       width: 90,
       align: 'right',
-      render: (_, account) => (
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items: [
-              {
-                key: 'edit',
-                icon: <EditOutlined />,
-                label: 'Chỉnh sửa',
-                onClick: () => openEditForm(account),
-              },
-              account.active === false
-                ? {
-                    key: 'activate',
-                    icon: <CheckCircleOutlined />,
-                    label: 'Kích hoạt tài khoản',
-                    onClick: () => confirmToggleActive(account),
-                  }
-                : {
-                    key: 'deactivate',
-                    danger: true,
-                    icon: <StopOutlined />,
-                    label: 'Vô hiệu hóa tài khoản',
-                    onClick: () => confirmToggleActive(account),
-                  },
-            ],
-          }}
-        >
-          <Button className="admin-more-button" icon={<MoreOutlined />} />
-        </Dropdown>
-      ),
+      render: (_, account) => {
+        const isSelf = isSelfAccount(account)
+        const isActivating = account.active === false
+
+        return (
+          <Dropdown
+            trigger={['click']}
+            menu={{
+              items: [
+                {
+                  key: 'edit',
+                  icon: <EditOutlined />,
+                  label: 'Chỉnh sửa',
+                  onClick: () => openEditForm(account),
+                },
+                isActivating
+                  ? {
+                      key: 'activate',
+                      icon: <CheckCircleOutlined />,
+                      label: 'Kích hoạt tài khoản',
+                      disabled: isSelf,
+                      onClick: () => {
+                        if (isSelf) {
+                          message.warning('Bạn không thể tự vô hiệu hóa hay thay đổi tài khoản của chính mình!')
+                          return
+                        }
+                        confirmToggleActive(account)
+                      },
+                    }
+                  : {
+                      key: 'deactivate',
+                      danger: !isSelf,
+                      icon: <StopOutlined />,
+                      label: isSelf ? 'Vô hiệu hóa (Tài khoản của bạn)' : 'Vô hiệu hóa tài khoản',
+                      disabled: isSelf,
+                      onClick: () => {
+                        if (isSelf) {
+                          message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+                          return
+                        }
+                        confirmToggleActive(account)
+                      },
+                    },
+              ],
+            }}
+          >
+            <Button className="admin-more-button" icon={<MoreOutlined />} />
+          </Dropdown>
+        )
+      },
     },
   ]
 
