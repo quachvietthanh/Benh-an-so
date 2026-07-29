@@ -79,10 +79,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/roles/**").hasRole("ADMIN")
                                                 .requestMatchers("/permissions/**").hasRole("ADMIN")
 
-                                                // ===== MEDICAL HISTORY =====
-                                                .requestMatchers(HttpMethod.GET, "/patients/*/medical-history")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
-
                                                 // ===== PATIENTS =====
                                                 .requestMatchers(HttpMethod.GET, "/patients/me/**")
                                                 .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
