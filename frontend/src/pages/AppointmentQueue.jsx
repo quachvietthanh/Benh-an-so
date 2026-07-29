@@ -648,6 +648,9 @@ function AppointmentQueue() {
 
   const getStatusActionItems = (item) => {
     const isOverdue = isAppointmentOverdue(item, queueNow)
+    const activeStatus = ['SCHEDULED', 'CHECKED_IN', 'WAITING'].includes(item.status)
+    const canMarkNoShow = activeStatus && isOverdue
+
     return [
       {
         key: 'check-in',
@@ -661,7 +664,7 @@ function AppointmentQueue() {
         icon: <CloseCircleOutlined />,
         danger: true,
         label: isOverdue ? 'Đánh dấu không đến' : 'Đánh dấu không đến (Cần trễ quá 15p)',
-        disabled: actionLoading || !isOverdue,
+        disabled: actionLoading || !canMarkNoShow,
         onClick: () => {
           if (!isOverdue) {
             message.warning('Chỉ được đánh dấu bệnh nhân không đến khi đã trễ quá 15 phút so với giờ hẹn.')
@@ -1048,15 +1051,6 @@ function AppointmentQueue() {
         <h1>Lịch hẹn &amp; hàng đợi khám</h1>
         <p>Quản lý lịch khám, tiếp nhận và theo dõi thứ tự bệnh nhân trong ngày.</p>
       </header>
-
-      <Alert
-        className="appointment-info-alert"
-        type="warning"
-        showIcon
-        style={{ marginBottom: 16, borderRadius: 8 }}
-        message="Quy định lịch hẹn quá hạn"
-        description="Hiển thị lịch hẹn quá hạn 15 phút so với giờ khám đăng ký => Hệ thống hiển thị trực tiếp nút [Không đến] để đánh dấu bệnh nhân không đến."
-      />
 
       <Tabs className="appointment-tabs" activeKey={activeTab} items={tabItems} onChange={setActiveTab} />
 
