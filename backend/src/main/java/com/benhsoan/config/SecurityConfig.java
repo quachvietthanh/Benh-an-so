@@ -91,6 +91,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.DELETE, "/patients/**").hasRole("ADMIN")
 
                                                 // ===== MEDICAL RECORDS =====
+                                                .requestMatchers(HttpMethod.GET, "/medical-history/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.PATCH, "/medical-records/*/status")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.GET, "/medical-records/**")
