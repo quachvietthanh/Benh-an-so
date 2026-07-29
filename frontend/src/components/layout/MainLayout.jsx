@@ -333,7 +333,7 @@ function MainLayout() {
           onClick={handleMenuClick}
         />
 
-        <Tooltip title={collapsed ? 'Mở rộng menu' : ''} placement="right">
+        <Tooltip title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} placement="right">
           <button
             type="button"
             className="sidebar-collapse"
@@ -350,11 +350,12 @@ function MainLayout() {
         <Header className="clinic-header">
           <button
             type="button"
-            className="mobile-nav-toggle"
-            onClick={() => setMobileDrawerOpen(true)}
-            aria-label="Mở menu điều hướng"
+            className="sidebar-toggle-btn"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-label="Thu gọn / Mở rộng menu"
+            title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
           >
-            <MenuOutlined />
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </button>
 
           <AutoComplete

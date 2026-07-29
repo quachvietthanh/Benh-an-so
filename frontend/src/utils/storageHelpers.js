@@ -219,9 +219,15 @@ export const mergeMedicines = (apiMedicines = []) => {
   const map = new Map()
 
   if (Array.isArray(apiMedicines) && apiMedicines.length) {
-    apiMedicines.forEach((item) => map.set(item.id, item))
+    apiMedicines.forEach((item) => map.set(String(item.id), item))
+    localMeds.forEach((item) => {
+      if (String(item.id).startsWith('med-') && !map.has(String(item.id))) {
+        map.set(String(item.id), item)
+      }
+    })
+  } else {
+    localMeds.forEach((item) => map.set(String(item.id), item))
   }
-  localMeds.forEach((item) => map.set(item.id, item))
 
   return Array.from(map.values())
 }
