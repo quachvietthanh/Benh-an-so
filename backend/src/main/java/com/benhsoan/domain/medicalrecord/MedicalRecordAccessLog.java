@@ -44,8 +44,8 @@ public class MedicalRecordAccessLog {
         }return new MedicalRecordAccessLog(UUID.randomUUID(), patientId, visitId, recordId, by, action, detail, ip, Instant.now());
     }
 
-    public static MedicalRecordAccessLog createHistoryView(UUID patientId, UUID by, String detail, String ip) {
-        return new MedicalRecordAccessLog(UUID.randomUUID(), patientId, null, null, by, MedicalRecordAccessAction.VIEW_HISTORY, detail, ip, Instant.now());
+    public static MedicalRecordAccessLog createHistoryView(UUID patientId, UUID by, String detail, String ip, Instant accessedAt) {
+        return new MedicalRecordAccessLog(UUID.randomUUID(), patientId, null, null, by, MedicalRecordAccessAction.VIEW_HISTORY, detail, ip, accessedAt);
     }
 
     public static MedicalRecordAccessLog restore(UUID id, UUID patientId, UUID visitId, UUID recordId, UUID by, MedicalRecordAccessAction action, String detail, String ip, Instant at) {
