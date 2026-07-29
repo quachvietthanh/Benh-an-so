@@ -22,7 +22,7 @@ public class MedicalRecordAccessLogPersistenceMapper {
                 entity.getVisitId(),
                 entity.getAccessedBy(),
                 entity.getAction(),
-                entity.getIpAddress(),
+                null,
                 entity.getAccessedAt()
         );
     }
@@ -41,7 +41,7 @@ public class MedicalRecordAccessLogPersistenceMapper {
                 .visitId(domain.getVisitId())
                 .accessedBy(domain.getAccessedBy())
                 .action(domain.getAction())
-                .ipAddress(domain.getIpAddress())
+                .ipAddress(null)
                 .accessedAt(domain.getAccessedAt())
                 .build();
     }

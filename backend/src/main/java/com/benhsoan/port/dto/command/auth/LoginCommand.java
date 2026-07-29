@@ -8,8 +8,6 @@ public record LoginCommand(
         String username,
 
         @NotBlank
-        String password,
-
-        String ipAddress
+        String password
 
 ){}

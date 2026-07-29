@@ -12,6 +12,7 @@ import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.UserResult;
 import com.benhsoan.port.inbound.user.DeactivateUserUseCase;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
@@ -35,6 +36,10 @@ public class DeactivateUserService implements DeactivateUserUseCase {
     @Override
     public UserResult deactivate(UUID id) {
 
+        if (id.equals(currentUserPort.getCurrentUserId())) {
+            throw new ValidationException("You cannot deactivate your own account.");
+        }
+
         User user = userRepository.findById(id)
                 .orElseThrow(UserNotFoundException::new);
 
@@ -48,11 +53,12 @@ public class DeactivateUserService implements DeactivateUserUseCase {
         auditLogRepository.save(
                 AuditLog.create(
                         currentUserPort.getCurrentUserId(),
-                        ActionType.CREATE,
+                        ActionType.DEACTIVATE,
                         ResourceType.USER,
                         saved.getId(),
                         """
                         {
+                        "action":"DEACTIVATE",
                         "username":"%s",
                         "fullName":"%s",
                         "email":"%s",

@@ -21,7 +21,7 @@ public class AuditLogPersistenceMapper {
                 entity.getResourceType(),
                 entity.getResourceId(),
                 entity.getDetail(),
-                entity.getIpAddress(),
+                null,
                 entity.getCreatedAt()
         );
     }
@@ -39,7 +39,7 @@ public class AuditLogPersistenceMapper {
                 .resourceType(domain.getResourceType())
                 .resourceId(domain.getResourceId())
                 .detail(domain.getDetail())
-                .ipAddress(domain.getIpAddress())
+                .ipAddress(null)
                 .createdAt(domain.getCreatedAt())
                 .build();
     }

@@ -5,9 +5,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.benhsoan.domain.auth.User;
-import com.benhsoan.port.outbound.repository.BaseRepository;
 
-public interface UserRepository extends BaseRepository<User, UUID> {
+public interface UserRepository {
+    Optional<User> findById(UUID id);
+
+    User save(User user);
+
     List<User> findAll();
 
     Optional<User> findByUsername(String username);

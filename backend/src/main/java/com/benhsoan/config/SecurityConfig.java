@@ -127,6 +127,8 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.PATCH, "/appointments/no-show/**")
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
+                                                .requestMatchers(HttpMethod.POST, "/appointments/*/reminder")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.GET, "/appointments/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.POST, "/appointments/**")

@@ -4,6 +4,8 @@ public enum AppointmentStatus {
 
     SCHEDULED,
 
+    CONFIRMED,
+
     CHECKED_IN,
 
     IN_PROGRESS,

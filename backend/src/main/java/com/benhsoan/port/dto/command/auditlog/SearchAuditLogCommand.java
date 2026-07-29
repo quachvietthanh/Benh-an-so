@@ -22,8 +22,6 @@ public record SearchAuditLogCommand(
 
         UUID resourceId,
 
-        String ipAddress,
-
         Instant fromCreatedAt,
 
         Instant toCreatedAt,

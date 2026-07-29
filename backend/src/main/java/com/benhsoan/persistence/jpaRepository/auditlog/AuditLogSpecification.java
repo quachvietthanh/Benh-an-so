@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.util.StringUtils;
 
 import com.benhsoan.persistence.entity.auditlog.AuditLogEntity;
 import com.benhsoan.port.dto.command.auditlog.SearchAuditLogCommand;
@@ -56,15 +55,6 @@ public final class AuditLogSpecification {
                         cb.equal(
                                 root.get("resourceId"),
                                 command.resourceId()
-                        )
-                );
-            }
-
-            if (StringUtils.hasText(command.ipAddress())) {
-                predicates.add(
-                        cb.equal(
-                                root.get("ipAddress"),
-                                command.ipAddress()
                         )
                 );
             }

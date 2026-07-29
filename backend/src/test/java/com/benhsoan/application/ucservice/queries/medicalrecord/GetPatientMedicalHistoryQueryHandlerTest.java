@@ -90,14 +90,12 @@ class GetPatientMedicalHistoryQueryHandlerTest {
         when(visitRepository.findByPatientIdWithDateFilter(
                 eq(patientId), isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(emptyPage());
-        doNothing().when(auditService).logViewHistory(
-                any(), any(), any());
+        doNothing().when(auditService).logViewHistory(any(), any());
 
         Page<Visit> result = handler.handle(defaultQuery());
 
         assertNotNull(result);
-        verify(auditService).logViewHistory(
-                patientId, currentUserId, null);
+        verify(auditService).logViewHistory(patientId, currentUserId);
     }
 
     // ==================== PATIENT ====================
@@ -115,13 +113,12 @@ class GetPatientMedicalHistoryQueryHandlerTest {
         when(visitRepository.findByPatientIdWithDateFilter(
                 eq(patientId), isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(emptyPage());
-        doNothing().when(auditService).logViewHistory(any(), any(), any());
+        doNothing().when(auditService).logViewHistory(any(), any());
 
         Page<Visit> result = handler.handle(defaultQuery());
 
         assertNotNull(result);
-        verify(auditService).logViewHistory(
-                patientId, currentUserId, null);
+        verify(auditService).logViewHistory(patientId, currentUserId);
     }
 
     @Test
@@ -178,13 +175,12 @@ class GetPatientMedicalHistoryQueryHandlerTest {
         when(visitRepository.findByPatientIdWithDateFilter(
                 eq(patientId), isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(emptyPage());
-        doNothing().when(auditService).logViewHistory(any(), any(), any());
+        doNothing().when(auditService).logViewHistory(any(), any());
 
         Page<Visit> result = handler.handle(defaultQuery());
 
         assertNotNull(result);
-        verify(auditService).logViewHistory(
-                patientId, currentUserId, null);
+        verify(auditService).logViewHistory(patientId, currentUserId);
     }
 
     @Test
