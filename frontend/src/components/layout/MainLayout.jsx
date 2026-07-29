@@ -297,6 +297,14 @@ function MainLayout() {
     { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true, onClick: handleLogout },
   ]
 
+  const handleToggleSidebar = () => {
+    if (window.innerWidth <= 768 || document.documentElement.clientWidth <= 768) {
+      setMobileDrawerOpen((prev) => !prev)
+    } else {
+      setCollapsed((prev) => !prev)
+    }
+  }
+
   return (
     <Layout className="clinic-shell">
       <Sider
@@ -351,11 +359,11 @@ function MainLayout() {
           <button
             type="button"
             className="sidebar-toggle-btn"
-            onClick={() => setCollapsed((value) => !value)}
+            onClick={handleToggleSidebar}
             aria-label="Thu gọn / Mở rộng menu"
-            title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+            title="Thu gọn / Mở rộng menu"
           >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            {collapsed || mobileDrawerOpen ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </button>
 
           <AutoComplete
