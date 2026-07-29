@@ -127,9 +127,6 @@ function PatientList() {
       const matchesDate = !dateRange?.length || (createdAt
         && !createdAt.isBefore(dateRange[0].startOf('day'))
         && !createdAt.isAfter(dateRange[1].endOf('day')))
-      return matchesKeyword && matchesGender && matchesStatus && matchesDate
-    })
-  }, [dateRange, genderFilter, keyword, allPatients, statusFilter])
 
       return matchesKeyword && matchesGender && matchesStatus && matchesDate
     })

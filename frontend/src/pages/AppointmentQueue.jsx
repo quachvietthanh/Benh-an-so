@@ -705,7 +705,6 @@ function AppointmentQueue() {
     const isOverdue = isAppointmentOverdue(item, queueNow)
     const activeStatus = ['SCHEDULED', 'CHECKED_IN', 'WAITING'].includes(item.status)
     const canMarkNoShow = activeStatus && isOverdue
-
     return [
       {
         key: 'check-in',
