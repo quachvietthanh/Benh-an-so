@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, DatePicker, Descriptions, Form, Input, message, Modal, Select, Space, Spin, Table, Tag, Typography } from 'antd'
-import { ArrowLeftOutlined, EditOutlined } from '@ant-design/icons'
+import { Button, Card, DatePicker, Descriptions, Form, Input, message, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
+import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
 import { getPatients } from '../services/mockDataService'
 import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
+import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
 
 const { Title } = Typography
 const phoneRule = { pattern: /^0\d{9}$/, message: 'Số điện thoại phải gồm 10 số và bắt đầu bằng 0' }
@@ -44,13 +45,19 @@ function PatientDetail() {
 
     if (!foundPatient) {
       const allMerged = mergePatients(getPatients())
-      foundPatient = allMerged.find((p) => String(p.id) === String(id) || String(p.patientCode) === String(id)) || null
+      foundPatient = allMerged.find((p) =>
+        String(p.id).toLowerCase() === String(id).toLowerCase() ||
+        String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
+      ) || null
 
       if (!foundPatient) {
         try {
           const allRes = await patientApi.getAll({ page: 0, size: 200 })
           const list = allRes.data?.content || []
-          foundPatient = list.find((p) => String(p.id) === String(id) || String(p.patientCode) === String(id)) || null
+          foundPatient = list.find((p) =>
+            String(p.id).toLowerCase() === String(id).toLowerCase() ||
+            String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
+          ) || null
         } catch {
           // ignore
         }
@@ -143,7 +150,47 @@ function PatientDetail() {
         </Descriptions>
       </Card>
 
-      {canViewHistory && <Card title="Lịch sử khám chữa bệnh"><Table columns={historyColumns} dataSource={history} rowKey="id" pagination={false} locale={{ emptyText: 'Bệnh nhân chưa có lượt khám' }} /></Card>}
+      {canViewHistory && (
+        <Card bodyStyle={{ padding: 16 }}>
+          <Tabs
+            defaultActiveKey="history"
+            items={[
+              {
+                key: 'history',
+                label: (
+                  <span>
+                    <FileTextOutlined /> Lịch sử khám chữa bệnh ({history.length})
+                  </span>
+                ),
+                children: (
+                  <Table
+                    columns={historyColumns}
+                    dataSource={history}
+                    rowKey="id"
+                    pagination={false}
+                    locale={{ emptyText: 'Bệnh nhân chưa có lượt khám' }}
+                  />
+                ),
+              },
+              {
+                key: 'attachments',
+                label: (
+                  <span>
+                    <PaperClipOutlined /> Kết quả Cận lâm sàng & Tệp đính kèm
+                  </span>
+                ),
+                children: (
+                  <AttachmentResultManager
+                    patientIdFilter={patient.id}
+                    patientNameFilter={patient.fullName}
+                    compact
+                  />
+                ),
+              },
+            ]}
+          />
+        </Card>
+      )}
 
       <Modal title="Cập nhật thông tin bệnh nhân" open={editOpen} confirmLoading={saving} width={680}
         onCancel={() => setEditOpen(false)} onOk={() => form.submit()} okText="Lưu thay đổi" cancelText="Hủy">

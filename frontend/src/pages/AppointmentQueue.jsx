@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
+  Alert,
   Avatar,
   Button,
   DatePicker,
@@ -191,10 +192,18 @@ function AppointmentQueue() {
         apiQ = Array.isArray(resData) ? resData : (resData?.content || [])
       }
 
-      const mockList = getAppointments().map((item) => ({
-        ...item,
-        appointmentAt: item.appointmentAt || item.date ? `${item.date || dayjs().format('YYYY-MM-DD')}T09:00:00` : dayjs().toISOString(),
-      }))
+      const mockList = getAppointments().map((item) => {
+        let appAt = item.appointmentAt
+        if (!appAt) {
+          const dateStr = item.date || dayjs().format('YYYY-MM-DD')
+          const timeStr = item.slot || '09:00'
+          appAt = `${dateStr}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}`
+        }
+        return {
+          ...item,
+          appointmentAt: appAt,
+        }
+      })
 
       const mergedApps = mergeAppointments(apiApps.length ? apiApps : mockList)
       setAppointments(mergedApps)
@@ -215,10 +224,18 @@ function AppointmentQueue() {
       }
 
     } catch {
-      const mockList = getAppointments().map((item) => ({
-        ...item,
-        appointmentAt: item.appointmentAt || dayjs().toISOString(),
-      }))
+      const mockList = getAppointments().map((item) => {
+        let appAt = item.appointmentAt
+        if (!appAt) {
+          const dateStr = item.date || dayjs().format('YYYY-MM-DD')
+          const timeStr = item.slot || '09:00'
+          appAt = `${dateStr}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}`
+        }
+        return {
+          ...item,
+          appointmentAt: appAt,
+        }
+      })
       setAppointments(mergeAppointments(mockList))
       setQueue(mergeQueue(mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED' || item.status === 'WAITING')))
       setPatients(mergePatients(getPatients()))
@@ -525,6 +542,12 @@ function AppointmentQueue() {
   const markNoShow = async () => {
     if (!noShowItem) return
 
+    if (!isAppointmentOverdue(noShowItem, queueNow)) {
+      message.warning('Chỉ được đánh dấu bệnh nhân không đến khi đã trễ quá 15 phút so với giờ hẹn.')
+      setNoShowItem(null)
+      return
+    }
+
     const appointmentId = noShowItem.id
     const updatedApp = { ...noShowItem, status: 'NO_SHOW' }
 
@@ -624,6 +647,7 @@ function AppointmentQueue() {
   }
 
   const getStatusActionItems = (item) => {
+    const isOverdue = isAppointmentOverdue(item, queueNow)
     return [
       {
         key: 'check-in',
@@ -636,9 +660,15 @@ function AppointmentQueue() {
         key: 'no-show',
         icon: <CloseCircleOutlined />,
         danger: true,
-        label: 'Đánh dấu không đến',
-        disabled: actionLoading,
-        onClick: () => setNoShowItem(item),
+        label: isOverdue ? 'Đánh dấu không đến' : 'Đánh dấu không đến (Cần trễ quá 15p)',
+        disabled: actionLoading || !isOverdue,
+        onClick: () => {
+          if (!isOverdue) {
+            message.warning('Chỉ được đánh dấu bệnh nhân không đến khi đã trễ quá 15 phút so với giờ hẹn.')
+            return
+          }
+          setNoShowItem(item)
+        },
       },
       {
         key: 'remind',
@@ -652,6 +682,7 @@ function AppointmentQueue() {
 
   const renderActions = (item) => {
     const isCompletedOrCancelled = ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(item.status)
+    const isOverdue = isAppointmentOverdue(item, queueNow)
 
     return (
       <Space size={5}>
@@ -663,6 +694,29 @@ function AppointmentQueue() {
             aria-label={`Xem chi tiết lịch ${item.appointmentCode}`}
           />
         </Tooltip>
+        {!isCompletedOrCancelled && isOverdue && (
+          <Tooltip title="Lịch hẹn đã quá hạn 15 phút - Đánh dấu bệnh nhân không đến">
+            <Button
+              type="primary"
+              danger
+              size="small"
+              icon={<CloseCircleOutlined />}
+              disabled={actionLoading}
+              onClick={() => setNoShowItem(item)}
+              style={{
+                borderRadius: 6,
+                fontWeight: 600,
+                fontSize: '12px',
+                height: '32px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              Không đến
+            </Button>
+          </Tooltip>
+        )}
         {!isCompletedOrCancelled && (
           <>
             <Dropdown menu={{ items: getStatusActionItems(item) }} trigger={['click']} placement="bottomRight">
@@ -764,7 +818,7 @@ function AppointmentQueue() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: canManage ? 140 : 64,
+      width: canManage ? 220 : 64,
       fixed: 'right',
       render: (_, item) => renderActions(item),
     },
@@ -994,6 +1048,15 @@ function AppointmentQueue() {
         <h1>Lịch hẹn &amp; hàng đợi khám</h1>
         <p>Quản lý lịch khám, tiếp nhận và theo dõi thứ tự bệnh nhân trong ngày.</p>
       </header>
+
+      <Alert
+        className="appointment-info-alert"
+        type="warning"
+        showIcon
+        style={{ marginBottom: 16, borderRadius: 8 }}
+        message="Quy định lịch hẹn quá hạn"
+        description="Hiển thị lịch hẹn quá hạn 15 phút so với giờ khám đăng ký => Hệ thống hiển thị trực tiếp nút [Không đến] để đánh dấu bệnh nhân không đến."
+      />
 
       <Tabs className="appointment-tabs" activeKey={activeTab} items={tabItems} onChange={setActiveTab} />
 

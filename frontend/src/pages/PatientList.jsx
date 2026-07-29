@@ -107,16 +107,21 @@ function PatientList() {
 
   useEffect(() => { loadPatients() }, [loadPatients])
 
-  const filteredPatients = useMemo(() => patients.filter((patient) => {
-    const matchesGender = genderFilter === 'ALL' || patient.gender === genderFilter
-    const matchesStatus = statusFilter === 'ALL'
-      || (statusFilter === 'ACTIVE' ? patient.active !== false : patient.active === false)
-    const createdAt = patient.createdAt ? dayjs(patient.createdAt) : null
-    const matchesDate = !dateRange?.length || (createdAt
-      && !createdAt.isBefore(dateRange[0].startOf('day'))
-      && !createdAt.isAfter(dateRange[1].endOf('day')))
-    return matchesGender && matchesStatus && matchesDate
-  }), [dateRange, genderFilter, patients, statusFilter])
+  const filteredPatients = useMemo(() => {
+    const kw = keyword.trim().toLowerCase()
+    return patients.filter((patient) => {
+      const matchesKeyword = !kw || [patient.fullName, patient.patientCode, patient.phone, patient.identityNumber]
+        .some((val) => String(val || '').toLowerCase().includes(kw))
+      const matchesGender = genderFilter === 'ALL' || patient.gender === genderFilter
+      const matchesStatus = statusFilter === 'ALL'
+        || (statusFilter === 'ACTIVE' ? patient.active !== false : patient.active === false)
+      const createdAt = patient.createdAt ? dayjs(patient.createdAt) : null
+      const matchesDate = !dateRange?.length || (createdAt
+        && !createdAt.isBefore(dateRange[0].startOf('day'))
+        && !createdAt.isAfter(dateRange[1].endOf('day')))
+      return matchesKeyword && matchesGender && matchesStatus && matchesDate
+    })
+  }, [dateRange, genderFilter, keyword, patients, statusFilter])
 
   const activeCount = patients.filter((patient) => patient.active !== false).length
   const archivedCount = patients.filter((patient) => patient.active === false).length

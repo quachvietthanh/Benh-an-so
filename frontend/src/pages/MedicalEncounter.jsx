@@ -7,6 +7,7 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
 import { logMedicalAccess, mergeMedicalRecords, saveStoredMedicalRecord } from '../utils/storageHelpers'
+import { saveStoredAttachment } from '../utils/attachmentHelpers'
 
 const testOptions = ['Công thức máu', 'Đường huyết', 'Sinh hóa máu', 'Nước tiểu', 'X-quang', 'Siêu âm', 'CT Scanner', 'MRI']
 
@@ -119,6 +120,25 @@ function MedicalEncounter() {
         createdAt: dayjs().toISOString(),
         attachments: files.map((file) => ({ id: file.uid || String(Date.now()), fileName: file.name })),
       }
+      files.forEach((file) => {
+        saveStoredAttachment({
+          id: file.uid || `att-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          attachmentCode: `KQ-${dayjs().format('YYYYMMDDHHmm')}`,
+          patientId: values.patientId,
+          patientName: selectedPatient ? selectedPatient.fullName : 'Bệnh nhân',
+          patientCode: selectedPatient ? selectedPatient.patientCode : '',
+          category: orders[0] || 'Khác',
+          testDate: dayjs().format('YYYY-MM-DD HH:mm'),
+          doctorName: user?.fullName || user?.username || 'Bác sĩ',
+          status: 'NORMAL',
+          resultSummary: values.diagnosis || 'Kết quả cận lâm sàng đính kèm bệnh án',
+          fileName: file.name,
+          fileType: file.type || 'application/pdf',
+          fileSize: file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : '1.0 MB',
+          fileUrl: URL.createObjectURL && file instanceof Blob ? URL.createObjectURL(file) : '',
+          createdAt: dayjs().toISOString(),
+        })
+      })
       saveStoredMedicalRecord(fallbackRecord)
       logMedicalAccess({
         userName: user?.fullName || user?.username || 'Bác sĩ',

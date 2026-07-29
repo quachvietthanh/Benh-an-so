@@ -33,7 +33,7 @@ const roleNames = {
 const navigationSections = [
   { key: 'overview', paths: ['/'] },
   { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments'] },
-  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/prescriptions'] },
+  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/attachments', '/prescriptions'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
@@ -56,12 +56,37 @@ function MainLayout() {
     const keyword = searchValue.trim().toLowerCase()
     if (!keyword) return []
 
-    const matchedPatients = allPatients.filter((p) =>
+    const currentPatients = mergePatients(getPatients())
+    const currentAppointments = mergeAppointments(getAppointments())
+
+    // Combine patients from patient list and appointment records so every patient is searchable
+    const appointmentPatientsMap = new Map()
+    currentAppointments.forEach((a) => {
+      if (a.patientName) {
+        const pId = a.patientId || `p_${a.id}`
+        if (!currentPatients.some((p) => String(p.id) === String(a.patientId) || p.fullName === a.patientName) && !appointmentPatientsMap.has(pId)) {
+          appointmentPatientsMap.set(pId, {
+            id: pId,
+            fullName: a.patientName,
+            patientCode: a.patientCode || `BN-${pId}`,
+            phone: a.phone || a.phoneNumber || '',
+            active: true,
+          })
+        }
+      }
+    })
+
+    const allCombinedPatients = [
+      ...currentPatients,
+      ...Array.from(appointmentPatientsMap.values()),
+    ]
+
+    const matchedPatients = allCombinedPatients.filter((p) =>
       [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
         .some((val) => String(val || '').toLowerCase().includes(keyword)),
     ).slice(0, 5)
 
-    const matchedAppointments = allAppointments.filter((a) =>
+    const matchedAppointments = currentAppointments.filter((a) =>
       [a.patientName, a.patientCode, a.id, a.doctorName]
         .some((val) => String(val || '').toLowerCase().includes(keyword)),
     ).slice(0, 5)
@@ -74,7 +99,16 @@ function MainLayout() {
         options: matchedPatients.map((p) => ({
           value: `patient:${p.id}`,
           label: (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div
+              className="search-patient-item"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setSearchValue('')
+                navigate(`/patients/${p.id}`, { state: { patient: p } })
+              }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', cursor: 'pointer' }}
+            >
               <span><strong>{p.fullName}</strong> <small style={{ color: '#64748b' }}>({p.patientCode})</small></span>
               <small style={{ color: '#2563eb' }}>{p.phone || p.phoneNumber || ''}</small>
             </div>
@@ -89,29 +123,56 @@ function MainLayout() {
     if (matchedAppointments.length > 0) {
       options.push({
         label: <span style={{ fontWeight: 600, color: '#16a34a', fontSize: 12 }}>📅 LỊCH HẸN ({matchedAppointments.length})</span>,
-        options: matchedAppointments.map((a) => ({
-          value: `appointment:${a.id}`,
-          label: (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <span><strong>{a.patientName || 'Lịch hẹn'}</strong> <small style={{ color: '#64748b' }}>({a.slot || a.time || 'Hôm nay'})</small></span>
-              <small style={{ color: '#16a34a' }}>{a.status || 'Đã đặt'}</small>
-            </div>
-          ),
-          type: 'appointment',
-          id: a.id,
-        })),
+        options: matchedAppointments.map((a) => {
+          const targetPatientId = a.patientId || allCombinedPatients.find((p) => p.fullName === a.patientName)?.id || a.id
+          const targetPatientObj = allCombinedPatients.find((p) => String(p.id) === String(targetPatientId) || p.fullName === a.patientName) || { id: targetPatientId, fullName: a.patientName || 'Bệnh nhân' }
+
+          return {
+            value: `appointment:${a.id}`,
+            label: (
+              <div
+                className="search-appointment-item"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setSearchValue('')
+                  navigate(`/patients/${targetPatientId}`, { state: { patient: targetPatientObj } })
+                }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', cursor: 'pointer' }}
+              >
+                <span><strong>{a.patientName || 'Lịch hẹn'}</strong> <small style={{ color: '#64748b' }}>({a.slot || a.time || 'Hôm nay'})</small></span>
+                <small style={{ color: '#16a34a' }}>{a.status || 'Đã đặt'}</small>
+              </div>
+            ),
+            type: 'appointment',
+            id: a.id,
+            patientId: targetPatientId,
+            patient: targetPatientObj,
+          }
+        }),
       })
     }
 
     return options
-  }, [allAppointments, allPatients, searchValue])
+  }, [searchValue, navigate])
 
-  const handleSelectSearch = (_, option) => {
+  const handleSelectSearch = (value, option) => {
     setSearchValue('')
-    if (option.type === 'patient') {
-      navigate(`/patients/${option.id}`, { state: { patient: option.patient } })
-    } else if (option.type === 'appointment') {
-      navigate('/appointments', { state: { appointmentId: option.id } })
+    const valStr = String(value || '')
+
+    if (valStr.startsWith('patient:')) {
+      const patientId = valStr.replace('patient:', '')
+      const currentPatients = mergePatients(getPatients())
+      const foundPatient = option?.patient || currentPatients.find((p) => String(p.id) === String(patientId))
+      navigate(`/patients/${patientId}`, { state: { patient: foundPatient } })
+    } else if (valStr.startsWith('appointment:')) {
+      const targetPatientId = option?.patientId || option?.patient?.id
+      if (targetPatientId) {
+        navigate(`/patients/${targetPatientId}`, { state: { patient: option?.patient } })
+      } else {
+        const appointmentId = valStr.replace('appointment:', '')
+        navigate('/appointments', { state: { appointmentId } })
+      }
     }
   }
 
@@ -119,7 +180,21 @@ function MainLayout() {
     if (!searchValue.trim()) return
     const keyword = searchValue.trim()
     setSearchValue('')
-    navigate('/patients', { state: { keyword } })
+
+    const currentPatients = mergePatients(getPatients())
+    const matched = currentPatients.find((p) =>
+      [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
+        .some((val) => String(val || '').toLowerCase() === keyword.toLowerCase())
+    ) || currentPatients.find((p) =>
+      [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
+        .some((val) => String(val || '').toLowerCase().includes(keyword.toLowerCase()))
+    )
+
+    if (matched) {
+      navigate(`/patients/${matched.id}`, { state: { patient: matched } })
+    } else {
+      navigate('/patients', { state: { keyword } })
+    }
   }
 
   const navigationItems = useMemo(
