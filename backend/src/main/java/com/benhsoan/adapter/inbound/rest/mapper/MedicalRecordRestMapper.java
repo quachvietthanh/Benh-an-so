@@ -1,0 +1,63 @@
+package com.benhsoan.adapter.inbound.rest.mapper;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Component;
+
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
+import com.benhsoan.port.dto.command.medicalrecord.AmendMedicalRecordCommand;
+import com.benhsoan.port.dto.command.medicalrecord.CreateMedicalRecordCommand;
+import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
+import com.benhsoan.port.dto.command.medicalrecord.UpdateMedicalRecordCommand;
+import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
+import com.benhsoan.port.dto.result.MedicalRecordAmendmentResult;
+import com.benhsoan.port.dto.result.MedicalRecordResult;
+
+@Component
+public class MedicalRecordRestMapper {
+
+    public CreateMedicalRecordCommand toCommand(CreateMedicalRecordRequest request) {
+        return new CreateMedicalRecordCommand(request.visitId(), request.chiefComplaint(), request.symptoms(),
+                request.medicalHistory(), request.physicalExamination(), request.clinicalProgress(),
+                request.treatmentPlan(), request.doctorInstructions(), request.conclusion());
+    }
+
+    public UpdateMedicalRecordCommand toCommand(UpdateMedicalRecordRequest request) {
+        return new UpdateMedicalRecordCommand(request.chiefComplaint(), request.symptoms(), request.medicalHistory(),
+                request.physicalExamination(), request.clinicalProgress(), request.treatmentPlan(),
+                request.doctorInstructions(), request.conclusion());
+    }
+
+    public AmendMedicalRecordCommand toCommand(AmendMedicalRecordRequest request) {
+        return new AmendMedicalRecordCommand(request.content(), request.reason());
+    }
+
+    public GetMedicalRecordAccessLogsQuery toQuery(UUID medicalRecordId, UUID patientId, Instant from, Instant to, int page, int size) {
+        return new GetMedicalRecordAccessLogsQuery(medicalRecordId, patientId, from, to, page, size);
+    }
+
+    public MedicalRecordResponse toResponse(MedicalRecordResult result) {
+        return new MedicalRecordResponse(result.id(), result.visitId(), result.chiefComplaint(), result.symptoms(),
+                result.medicalHistory(), result.physicalExamination(), result.clinicalProgress(), result.treatmentPlan(),
+                result.doctorInstructions(), result.conclusion(), result.status(), result.lockedAt(), result.lockedBy(),
+                result.createdBy(), result.createdAt(), result.updatedBy(), result.updatedAt());
+    }
+
+    public MedicalRecordAmendmentResponse toResponse(MedicalRecordAmendmentResult result) {
+        return new MedicalRecordAmendmentResponse(result.id(), result.medicalRecordId(), result.content(),
+                result.reason(), result.amendedBy(), result.amendedAt());
+    }
+
+    public Page<MedicalRecordAccessLogResponse> toAccessLogResponse(Page<MedicalRecordAccessLogResult> resultPage) {
+        return resultPage.map(result -> new MedicalRecordAccessLogResponse(result.id(), result.patientId(),
+                result.visitId(), result.medicalRecordId(), result.accessedBy(), result.action(),
+                result.detail(), result.accessedAt()));
+    }
+}

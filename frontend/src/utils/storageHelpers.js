@@ -481,3 +481,55 @@ export const mergeAuditLogs = (apiLogs = []) => {
 
   return Array.from(map.values())
 }
+
+const CLINICAL_ORDERS_KEY = 'app_clinical_orders'
+
+export const getStoredClinicalOrders = () => {
+  try {
+    const raw = localStorage.getItem(CLINICAL_ORDERS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export const saveStoredClinicalOrder = (order) => {
+  try {
+    const current = getStoredClinicalOrders()
+    const updated = [order, ...current.filter((o) => o.id !== order.id && o.orderCode !== order.orderCode)]
+    localStorage.setItem(CLINICAL_ORDERS_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const deleteStoredClinicalOrder = (id) => {
+  try {
+    const current = getStoredClinicalOrders()
+    const updated = current.filter((o) => o.id !== id && o.orderCode !== id)
+    localStorage.setItem(CLINICAL_ORDERS_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const mergeClinicalOrders = (defaultOrders = []) => {
+  const localOrders = getStoredClinicalOrders()
+  const map = new Map()
+
+  if (Array.isArray(localOrders) && localOrders.length) {
+    localOrders.forEach((item) => map.set(item.id, item))
+  }
+  if (Array.isArray(defaultOrders) && defaultOrders.length) {
+    defaultOrders.forEach((item) => {
+      if (!map.has(item.id)) {
+        map.set(item.id, item)
+      }
+    })
+  }
+
+  return Array.from(map.values())
+}
+

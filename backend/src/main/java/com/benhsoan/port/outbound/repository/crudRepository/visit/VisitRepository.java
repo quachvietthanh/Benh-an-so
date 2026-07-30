@@ -9,4 +9,7 @@ import com.benhsoan.port.outbound.repository.BaseRepository;
 public interface VisitRepository extends BaseRepository<Visit, UUID> {
 
     Optional<Visit> findByVisitCode(String visitCode);
+
+    Optional<Visit> findById(UUID visitId);
+
 }
