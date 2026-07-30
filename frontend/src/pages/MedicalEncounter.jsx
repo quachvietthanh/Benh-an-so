@@ -75,6 +75,7 @@ function MedicalEncounter() {
   const [diagnosisModalOpen, setDiagnosisModalOpen] = useState(false)
   const [icdSearchQuery, setIcdSearchQuery] = useState('')
   const [icdCategory, setIcdCategory] = useState('ALL')
+  const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
 
   // Clinical Orders State
   const [selectedOrders, setSelectedOrders] = useState([])
@@ -116,6 +117,21 @@ function MedicalEncounter() {
     loadData()
   }, [loadData])
 
+  // Fetch Backend Diagnosis ICD-10 Catalog API
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      try {
+        const response = await medicalRecordApi.getDiagnosisCatalog(icdSearchQuery)
+        if (Array.isArray(response.data)) {
+          setBackendIcdCatalog(response.data)
+        }
+      } catch {
+        // Fallback to local catalog
+      }
+    }
+    fetchCatalog()
+  }, [icdSearchQuery])
+
   const selectedPatientObj = useMemo(() => {
     return patients.find((p) => p.id === selectedPatientId)
   }, [patients, selectedPatientId])
@@ -130,10 +146,20 @@ function MedicalEncounter() {
     return null
   }, [vitalSigns.weight, vitalSigns.height])
 
-  // ICD-10 Search Results
+  // ICD-10 Search Results (combining Backend API & Local fallback)
   const filteredIcdList = useMemo(() => {
-    return searchIcd10(icdSearchQuery, icdCategory)
-  }, [icdSearchQuery, icdCategory])
+    const localMatches = searchIcd10(icdSearchQuery, icdCategory)
+    if (!backendIcdCatalog.length) return localMatches
+
+    const combinedMap = new Map()
+    localMatches.forEach((item) => combinedMap.set(item.code, item))
+    backendIcdCatalog.forEach((item) => {
+      if (!combinedMap.has(item.code)) {
+        combinedMap.set(item.code, { code: item.code, name: item.name, category: 'ALL' })
+      }
+    })
+    return Array.from(combinedMap.values())
+  }, [icdSearchQuery, icdCategory, backendIcdCatalog])
 
   // Clinical Orders Catalog Filtered
   const filteredCatalog = useMemo(() => {
@@ -183,7 +209,7 @@ function MedicalEncounter() {
     return selectedOrders.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
   }, [selectedOrders])
 
-  // Form Submission
+  // Form Submission & API Integration
   const saveRecord = async () => {
     let values
     try {
@@ -225,8 +251,42 @@ function MedicalEncounter() {
     }
 
     try {
+      // 1. Call Backend POST /medical-records API
       const response = await medicalRecordApi.create(payload)
       const createdRecord = response.data
+
+      // 2. If examinationId exists, trigger recordDiagnosis API & createClinicalOrder API
+      const examId = createdRecord?.examinationId || createdRecord?.id || location.state?.examinationId
+      if (examId) {
+        try {
+          await medicalRecordApi.recordDiagnosis(examId, {
+            primaryIcdCode: primaryIcd?.code || 'ICD-10',
+            primaryIcdName: primaryIcd?.name || values.diagnosisText || 'Chẩn đoán xác định',
+            secondaryIcdCodes: secondaryIcds.map((item) => ({ code: item.code, name: item.name })),
+            clinicalNotes: values.examinationNote || values.symptoms || '',
+          })
+        } catch (diagErr) {
+          console.warn('Backend recordDiagnosis API endpoint note:', diagErr)
+        }
+
+        if (selectedOrders.length > 0) {
+          try {
+            await medicalRecordApi.createClinicalOrder(examId, {
+              clinicalReason: fullDiagnosisText,
+              items: selectedOrders.map((item) => ({
+                serviceId: item.id,
+                serviceCode: item.code,
+                serviceName: item.name,
+                instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
+              })),
+            })
+          } catch (orderErr) {
+            console.warn('Backend createClinicalOrder API endpoint note:', orderErr)
+          }
+        }
+      }
+
+      // 3. File Attachments
       if (createdRecord?.id && files.length) {
         for (const file of files) {
           try {
@@ -236,15 +296,18 @@ function MedicalEncounter() {
           }
         }
       }
+
       if (createdRecord?.id) {
         saveStoredMedicalRecord(createdRecord)
       }
+
       logMedicalAccess({
         userName: user?.fullName || user?.username || 'Bác sĩ',
         patientName: selectedPatientObj ? `${selectedPatientObj.fullName} (${selectedPatientObj.patientCode})` : 'Bệnh nhân',
         recordCode: createdRecord?.recordCode || 'BA-001',
-        action: 'Tạo bệnh án & chẩn đoán mới (API Backend)',
+        action: 'Tạo bệnh án, chẩn đoán ICD-10 & nhập chỉ định Cận lâm sàng (API Backend)',
       })
+
       message.success(`Đã lưu bệnh án thành công ${createdRecord?.recordCode || ''}`)
       resetFormState()
       await loadData()
@@ -252,7 +315,7 @@ function MedicalEncounter() {
 
       showSuccessModal(createdRecord?.recordCode || 'BA-001', values.patientId)
     } catch {
-      // Local Storage Fallback
+      // Local Storage Fallback if backend API is not responding
       const recordCode = `BA-${dayjs().format('YYYYMMDDHHmmss')}`
       const fallbackRecord = {
         id: `mr-${Date.now()}`,

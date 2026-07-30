@@ -34,7 +34,7 @@ const roleNames = {
 const navigationSections = [
   { key: 'overview', paths: ['/'] },
   { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments'] },
-  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/attachments', '/clinical-orders', '/prescriptions'] },
+  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/clinical-orders', '/prescriptions'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
