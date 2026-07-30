@@ -8,7 +8,7 @@ import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordAccessLogEntit
 public class MedicalRecordAccessLogPersistenceMapper {
 
     public MedicalRecordAccessLog toDomain(MedicalRecordAccessLogEntity e) {
-        return e == null ? null : MedicalRecordAccessLog.restore(e.getId(), e.getPatientId(), e.getVisitId(), e.getMedicalRecordId(), e.getAccessedBy(), e.getAction(), e.getDetail(), null, e.getAccessedAt());
+        return e == null ? null : MedicalRecordAccessLog.restore(e.getId(), e.getPatientId(), e.getVisitId(), e.getMedicalRecordId(), e.getAccessedBy(), e.getAction(), e.getDetail(), e.getAccessedAt());
     }
 
     public MedicalRecordAccessLogEntity toEntity(MedicalRecordAccessLog d) {
