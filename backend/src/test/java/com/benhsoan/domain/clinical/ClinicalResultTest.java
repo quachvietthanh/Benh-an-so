@@ -2,6 +2,7 @@ package com.benhsoan.domain.clinical;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,6 +44,13 @@ class ClinicalResultTest {
     void rejectsCorrectionBeforeFinalization() {
         assertThrows(ClinicalResultInvalidStatusException.class,
                 () -> createDraft().markCorrected(UUID.randomUUID(), now));
+    }
+
+    @Test
+    void mapsFileDataTypeToFileResultType() {
+        assertEquals(ClinicalResultType.FILE,
+                ClinicalResultType.from(com.benhsoan.domain.clinical.enums.ClinicalResultDataType.FILE));
+        assertTrue(ClinicalResultType.FILE.requiresAttachment());
     }
 
     private ClinicalResult createDraft() {
