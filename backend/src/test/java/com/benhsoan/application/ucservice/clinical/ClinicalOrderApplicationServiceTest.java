@@ -26,6 +26,10 @@ import com.benhsoan.domain.clinical.ClinicalServiceCatalog;
 import com.benhsoan.domain.clinical.enums.ClinicalResultDataType;
 import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderLockedMedicalRecordException;
+import com.benhsoan.domain.clinical.exception.ClinicalOrderInvalidVisitException;
+import com.benhsoan.domain.clinical.exception.ClinicalServiceUnavailableException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
+import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
@@ -106,6 +110,72 @@ class ClinicalOrderApplicationServiceTest {
     }
 
     @Test
+    void rejectsOrderWhenVisitDoesNotExist() {
+        UUID visitId = UUID.randomUUID();
+        when(authorizationService.requireWriteAccess()).thenReturn(UUID.randomUUID());
+        when(visitRepository.findById(visitId)).thenReturn(Optional.empty());
+
+        assertThrows(VisitNotFoundException.class, () -> createClinicalOrderService.createOrder(visitId, command()));
+    }
+
+    @Test
+    void rejectsOrderForInactiveVisit() {
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Visit cancelledVisit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null,
+                VisitType.WALK_IN, VisitStatus.CANCELLED, NOW, null, NOW, "Consultation", null, actorId, NOW, null);
+        when(authorizationService.requireWriteAccess()).thenReturn(actorId);
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(cancelledVisit));
+
+        assertThrows(ClinicalOrderInvalidVisitException.class,
+                () -> createClinicalOrderService.createOrder(visitId, command()));
+    }
+
+    @Test
+    void rejectsOrderWhenVisitHasNoMedicalRecord() {
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        when(authorizationService.requireWriteAccess()).thenReturn(actorId);
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(activeVisit(visitId, UUID.randomUUID(), actorId)));
+        when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+
+        assertThrows(MedicalRecordNotFoundException.class,
+                () -> createClinicalOrderService.createOrder(visitId, command()));
+    }
+
+    @Test
+    void rejectsInactiveOrUnknownClinicalService() {
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        when(authorizationService.requireWriteAccess()).thenReturn(actorId);
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(activeVisit(visitId, UUID.randomUUID(), actorId)));
+        when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.of(editableMedicalRecord(visitId, actorId)));
+        when(clinicalServiceCatalogRepository.findActiveByIdIn(List.of(serviceId))).thenReturn(List.of());
+
+        assertThrows(ClinicalServiceUnavailableException.class, () -> createClinicalOrderService.createOrder(visitId,
+                new CreateClinicalOrderCommand("Reason", List.of(
+                        new CreateClinicalOrderCommand.OrderItemCommand(serviceId, null)
+                ))));
+    }
+
+    @Test
+    void rejectsDuplicateClinicalServiceInOneOrder() {
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        when(authorizationService.requireWriteAccess()).thenReturn(actorId);
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(activeVisit(visitId, UUID.randomUUID(), actorId)));
+        when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.of(editableMedicalRecord(visitId, actorId)));
+
+        assertThrows(ClinicalServiceUnavailableException.class, () -> createClinicalOrderService.createOrder(visitId,
+                new CreateClinicalOrderCommand("Reason", List.of(
+                        new CreateClinicalOrderCommand.OrderItemCommand(serviceId, null),
+                        new CreateClinicalOrderCommand.OrderItemCommand(serviceId, "Duplicate")
+                ))));
+    }
+
+    @Test
     void searchesOnlyActiveCatalogServices() {
         UUID actorId = UUID.randomUUID();
         ClinicalServiceCatalog catalog = ClinicalServiceCatalog.restore(UUID.randomUUID(), "LAB-GLU", "Blood glucose",
@@ -147,5 +217,11 @@ class ClinicalOrderApplicationServiceTest {
 
     private MedicalRecord editableMedicalRecord(UUID visitId, UUID actorId) {
         return MedicalRecord.create(visitId, "Headache", null, null, null, null, null, null, "Stable", actorId, NOW);
+    }
+
+    private CreateClinicalOrderCommand command() {
+        return new CreateClinicalOrderCommand("Reason", List.of(
+                new CreateClinicalOrderCommand.OrderItemCommand(UUID.randomUUID(), null)
+        ));
     }
 }

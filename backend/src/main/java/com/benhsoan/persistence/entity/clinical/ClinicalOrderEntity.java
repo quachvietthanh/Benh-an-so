@@ -29,7 +29,7 @@ public class ClinicalOrderEntity {
     @Id
     @Column(columnDefinition = "BINARY(16)")
     UUID id;
-    @Column(name = "order_code", nullable = false, length = 30)
+    @Column(name = "order_code", nullable = false, unique = true, length = 30)
     String orderCode;
     @Column(name = "visit_id", nullable = false, columnDefinition = "BINARY(16)")
     UUID visitId;

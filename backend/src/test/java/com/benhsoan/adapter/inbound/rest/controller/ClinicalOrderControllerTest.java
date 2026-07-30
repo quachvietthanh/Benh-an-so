@@ -3,6 +3,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.benhsoan.adapter.inbound.rest.mapper.ClinicalOrderRestMapper;
 import com.benhsoan.port.dto.result.ClinicalOrderResult;
 import com.benhsoan.port.inbound.clinical.CreateClinicalOrderUseCase;
+import com.benhsoan.port.inbound.clinical.GetClinicalOrdersByVisitUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
@@ -43,6 +45,9 @@ class ClinicalOrderControllerTest {
     private CreateClinicalOrderUseCase createClinicalOrderUseCase;
 
     @MockitoBean
+    private GetClinicalOrdersByVisitUseCase getClinicalOrdersByVisitUseCase;
+
+    @MockitoBean
     private CurrentUserPort currentUserPort;
 
     @MockitoBean
@@ -58,8 +63,8 @@ class ClinicalOrderControllerTest {
     private ClockPort clockPort;
 
     @Test
-    @DisplayName("POST /clinical-orders/visits/{id} - 200 OK")
-    void createClinicalOrderReturns200() throws Exception {
+    @DisplayName("POST /clinical-orders/visits/{id} - 201 Created")
+    void createClinicalOrderReturns201() throws Exception {
         UUID visitId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
         when(createClinicalOrderUseCase.createOrder(eq(visitId), any()))
@@ -82,7 +87,7 @@ class ClinicalOrderControllerTest {
         mockMvc.perform(post("/clinical-orders/visits/{visitId}", visitId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.orderCode").value("ORD-123"))
                 .andExpect(jsonPath("$.status").value("ORDERED"));
     }
@@ -102,5 +107,20 @@ class ClinicalOrderControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /clinical-orders/visits/{id} - 200 OK")
+    void getsClinicalOrdersByVisit() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        when(getClinicalOrdersByVisitUseCase.getOrdersByVisit(any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(new ClinicalOrderResult(
+                        UUID.randomUUID(), "ORD-123", visitId, UUID.randomUUID(), UUID.randomUUID(),
+                        "Clinical reason", "ORDERED", Instant.parse("2026-08-20T01:00:00Z"), null, List.of()
+                ))));
+
+        mockMvc.perform(get("/clinical-orders/visits/{visitId}", visitId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].orderCode").value("ORD-123"));
     }
 }
