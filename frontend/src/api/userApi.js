@@ -36,26 +36,28 @@ const userApi = {
    * Lấy danh sách tất cả người dùng (phân trang)
    */
   getAll: (params) => {
-    return axiosClient.get('/users', { params })
+    return axiosClient.get('/admin/users', { params })
   },
 
   /**
    * Lấy thông tin chi tiết người dùng
    */
   getById: (id) => {
-    return axiosClient.get(`/users/${id}`)
+    return axiosClient.get(`/admin/users/${id}`)
   },
 
   /**
    * Cập nhật trạng thái khóa / mở khóa tài khoản người dùng
    *
+   * PUT /api/v1/admin/users/{id}/status?locked=true|false
+   *
    * @param {string} id - UUID của người dùng
    * @param {boolean} locked - true: khóa, false: mở khóa
    */
   updateStatus: (id, locked) => {
-    return locked
-      ? axiosClient.patch(`/users/${id}/deactivate`)
-      : axiosClient.patch(`/users/${id}/activate`)
+    return axiosClient.put(`/admin/users/${id}/status`, null, {
+      params: { locked },
+    })
   },
 }
 

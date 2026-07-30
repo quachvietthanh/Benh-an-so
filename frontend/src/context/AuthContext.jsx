@@ -43,13 +43,11 @@ export const AuthProvider = ({ children }) => {
       const response = await authApi.login(credentials)
       const data = response.data
 
-      const rawRole = data.role ? String(data.role).toLowerCase().replace(/^role_/, '') : 'doctor'
-
       const normalizedUser = {
         id: data.userId,
         username: data.username,
         fullName: data.username,
-        roles: [rawRole],
+        roles: data.role ? [data.role.toLowerCase()] : [],
         expiredAt: data.expiredAt,
       }
 
