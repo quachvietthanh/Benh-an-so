@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.ActiveProfiles;
 
 import com.benhsoan.infrastructure.authSecurity.CurrentUserPrincipal;
 
@@ -33,8 +34,18 @@ import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
 
 import jakarta.transaction.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+    "spring.flyway.enabled=false",
+    "spring.datasource.driver-class-name=org.h2.Driver",
+    "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MYSQL",
+    "spring.datasource.username=sa",
+    "spring.datasource.password=",
+    "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+    "spring.jpa.hibernate.ddl-auto=create-drop",
+    "spring.jpa.defer-datasource-initialization=true"
+})
 @Transactional
+@ActiveProfiles("test")
 @DisplayName("User Repository & Service Integration Tests")
 class UserRepositoryAdapterTest {
 

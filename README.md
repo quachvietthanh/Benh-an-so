@@ -2,7 +2,7 @@
 
 > **Hệ thống chuyển đổi số cơ sở khám chữa bệnh** - Quản lý hồ sơ bệnh án điện tử toàn diện
 
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.x-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.x-brightgreen)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
 [![React](https://img.shields.io/badge/React-18-61DAFB)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF)](https://vitejs.dev/)
@@ -77,7 +77,7 @@
 | Công nghệ | Mô tả |
 |-----------|-------|
 | **Java 21** | OpenJDK Temurin |
-| **Spring Boot 3.3.x** | Framework chính |
+| **Spring Boot 3.5.x** | Framework chính |
 | **Spring Security** | Xác thực & phân quyền |
 | **Spring Data JPA** | ORM - Truy vấn dữ liệu |
 | **Spring Validation** | Validation dữ liệu đầu vào |
@@ -118,7 +118,9 @@
 │                      Backend (Spring Boot)                        │
 │  Port: 8080 | Context-path: /api/v1                               │
 │  Java 21 + Maven 3.9+                                             │
-│  Modules: Config, Controller, Service, Repository, Security       │
+│  Modules: adapter (inbound/rest), application (ucservice),         │
+│           port (inbound/outbound), domain, persistence,             │
+│           infrastructure (security, mail, storage)                  │
 └──────────────────────────┬───────────────────────────────────────┘
                            │ JPA / Hibernate
 ┌──────────────────────────┴───────────────────────────────────────┐
@@ -343,7 +345,8 @@ Bệnh án số/
 | **Maven** | 3.9+ |
 | **Node.js** | 18+ |
 | **npm** | 9+ |
-| **PostgreSQL** | 16 (cho production) |
+| **MySQL** | 8 (cho production) |
+REPLACE
 
 ### Backend
 
@@ -351,16 +354,24 @@ Bệnh án số/
 # 1. Di chuyển vào thư mục backend
 cd backend
 
-# 2. Build project (bỏ qua test)
+# 2. Compile project
+mvn clean compile
+
+# 3. Chạy kiểm thử
+mvn test
+
+# 4. Build (bỏ qua test)
 mvn clean install -DskipTests
 
-# 3. Chạy ứng dụng (mặc định profile dev)
+# 5. Chạy ứng dụng (mặc định profile local → H2)
 mvn spring-boot:run
 ```
 
-> **Lưu ý:** Mặc định chạy với profile `dev` (H2 in-memory). Để chạy với PostgreSQL, set biến môi trường:
+> **Lưu ý:** Mặc định chạy với profile `local` (H2 in-memory + Flyway). Để chạy với MySQL production:
 > ```bash
-> set SPRING_PROFILES_ACTIVE=prod
+> set SPRING_PROFILES_ACTIVE=local
+> set DB_URL=jdbc:mysql://localhost:3306/digital_medical_record
+> set DB_USERNAME=root
 > set DB_PASSWORD=your_password
 > mvn spring-boot:run
 > ```
@@ -369,8 +380,8 @@ mvn spring-boot:run
 
 Sau khi chạy backend, truy cập:
 
-- **Swagger UI:** http://localhost:8080/api/v1/swagger-ui/index.html
-- **OpenAPI JSON:** http://localhost:8080/api/v1/v3/api-docs
+- **Swagger UI:** http://localhost:8080/api/v1/swagger-ui.html
+- **OpenAPI JSON:** http://localhost:8080/api/v1/api-docs
 - **H2 Console:** http://localhost:8080/api/v1/h2-console (JDBC URL: `jdbc:h2:mem:benhsoandb`)
 
 ### Frontend
@@ -458,7 +469,50 @@ npm run dev
 | `PUT` | `/medical-records/{id}` | Cập nhật hồ sơ | ✅ |
 | `DELETE` | `/medical-records/{id}` | Xóa hồ sơ | ✅ |
 
+### 🩺 Diagnosis Catalog & Clinical Orders (Epic NCL-04)
+
+| Method | Endpoint | Mô tả | Xác thực | Vai trò |
+|--------|----------|-------|----------|---------|
+| `GET` | `/diagnosis-catalog?search={query}` | Tra cứu danh mục ICD-10 | ✅ | ADMIN, DOCTOR |
+| `POST` | `/examinations/{examinationId}/diagnosis` | Ghi/nhập chẩn đoán chính & phụ | ✅ | ADMIN, DOCTOR |
+| `GET` | `/examinations/{examinationId}/diagnosis` | Xem chẩn đoán & chỉ định | ✅ | ADMIN, DOCTOR, NURSE |
+| `POST` | `/examinations/{examinationId}/clinical-orders` | Tạo chỉ định cận lâm sàng | ✅ | ADMIN, DOCTOR |
+
+**Business Rules (QTN):**
+- **QTN-07:** Khóa chẩn đoán/chỉ định khi lượt khám kết thúc (COMPLETED/CANCELLED)
+- **QTN-11:** Chỉ DOCTOR được phép ghi chẩn đoán và chỉ định
+- **QTN-13:** Mỗi chỉ định cận lâm sàng gắn liền với một lượt khám
+
+**Sample Payloads (chi tiết xem tại [`docs/api/diagnosis-and-orders-delivery.md`](docs/api/diagnosis-and-orders-delivery.md)):**
+
+**POST /examinations/{id}/diagnosis**
+```json
+{
+  "primaryIcdCode": "J00",
+  "primaryIcdName": "Common cold",
+  "secondaryIcdCodes": [
+    { "code": "R50.9", "name": "Fever" }
+  ],
+  "clinicalNotes": "Patient has runny nose"
+}
+```
+
+**POST /examinations/{id}/clinical-orders**
+```json
+{
+  "clinicalReason": "Check glucose",
+  "items": [
+    {
+      "serviceCode": "LAB-GLU",
+      "serviceName": "Blood glucose",
+      "instruction": "Fasting"
+    }
+  ]
+}
+```
+
 ---
+REPLACE
 
 ## 🌍 Môi trường
 
