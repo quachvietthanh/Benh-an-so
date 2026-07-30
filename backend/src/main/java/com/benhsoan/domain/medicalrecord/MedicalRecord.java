@@ -5,6 +5,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidStatusException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
 import lombok.AccessLevel;
@@ -42,8 +44,8 @@ public class MedicalRecord {
         this.updatedAt = updatedAt;
     }
 
-    public static MedicalRecord create(UUID visitId, String a, String b, String c, String d, String e, String f, String g, String h, UUID createdBy) {
-        return new MedicalRecord(UUID.randomUUID(), visitId, a, b, c, d, e, f, g, h, MedicalRecordStatus.DRAFT, null, null, createdBy, Instant.now(), null, null);
+    public static MedicalRecord create(UUID visitId, String a, String b, String c, String d, String e, String f, String g, String h, UUID createdBy, Instant createdAt) {
+        return new MedicalRecord(UUID.randomUUID(), visitId, a, b, c, d, e, f, g, h, MedicalRecordStatus.DRAFT, null, null, createdBy, Objects.requireNonNull(createdAt), null, null);
     }
 
     public static MedicalRecord restore(UUID id, UUID visitId, String a, String b, String c, String d, String e, String f, String g, String h, MedicalRecordStatus s, Instant l, UUID lb, UUID cb, Instant ca, UUID ub, Instant ua) {
@@ -52,7 +54,7 @@ public class MedicalRecord {
 
     public void open(UUID by, Instant at) {
         if (status != MedicalRecordStatus.DRAFT) {
-            throw new ValidationException("Only draft records can be opened.");
+            conflict("Only draft records can be opened.");
         
         }status = MedicalRecordStatus.OPEN;
         updatedBy = Objects.requireNonNull(by);
@@ -75,6 +77,7 @@ public class MedicalRecord {
 
     public void lock(UUID by, Instant at) {
         ensureEditable();
+        ensureLockableContent();
         status = MedicalRecordStatus.LOCKED;
         lockedBy = updatedBy = Objects.requireNonNull(by);
         lockedAt = updatedAt = Objects.requireNonNull(at);
@@ -86,7 +89,23 @@ public class MedicalRecord {
 
     public void ensureEditable() {
         if (isLocked()) {
-            throw new ValidationException("Locked medical records cannot be updated.");
+            throw new MedicalRecordAlreadyLockedException();
     
         }}
+
+    private void ensureLockableContent() {
+        if (chiefComplaint == null || chiefComplaint.isBlank()) {
+            throw new ValidationException("Chief complaint is required before locking medical record.");
+        }
+        if (conclusion == null || conclusion.isBlank()) {
+            throw new ValidationException("Conclusion is required before locking medical record.");
+        }
+    }
+
+    private void conflict(String message) {
+        if (isLocked()) {
+            throw new MedicalRecordAlreadyLockedException();
+        }
+        throw new MedicalRecordInvalidStatusException(message);
+    }
 }

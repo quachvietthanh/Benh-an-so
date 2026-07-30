@@ -34,14 +34,14 @@ public class MedicalRecordAccessLog {
         accessedAt = Objects.requireNonNull(at);
     }
 
-    public static MedicalRecordAccessLog createRecordAccess(UUID patientId, UUID visitId, UUID recordId, UUID by, MedicalRecordAccessAction action, String detail, String ip) {
+    public static MedicalRecordAccessLog createRecordAccess(UUID patientId, UUID visitId, UUID recordId, UUID by, MedicalRecordAccessAction action, String detail, String ip, Instant accessedAt) {
         if (action == MedicalRecordAccessAction.VIEW_HISTORY) {
             throw new ValidationException("Record access cannot use VIEW_HISTORY.");
         
         }if (visitId == null || recordId == null) {
             throw new ValidationException("Record access requires visit and medical record.");
         
-        }return new MedicalRecordAccessLog(UUID.randomUUID(), patientId, visitId, recordId, by, action, detail, ip, Instant.now());
+        }return new MedicalRecordAccessLog(UUID.randomUUID(), patientId, visitId, recordId, by, action, detail, ip, Objects.requireNonNull(accessedAt));
     }
 
     public static MedicalRecordAccessLog createHistoryView(UUID patientId, UUID by, String detail, String ip, Instant accessedAt) {
