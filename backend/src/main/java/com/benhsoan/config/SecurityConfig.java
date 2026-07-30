@@ -93,8 +93,8 @@ public class SecurityConfig {
                                                 // ===== MEDICAL RECORDS =====
                                                 .requestMatchers(HttpMethod.GET, "/medical-history/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
-                                                .requestMatchers(HttpMethod.PATCH, "/medical-records/*/status")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
+                                                .requestMatchers(HttpMethod.POST, "/medical-records/*/lock")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
                                                 .requestMatchers(HttpMethod.GET, "/medical-records/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.POST, "/medical-records/**")
