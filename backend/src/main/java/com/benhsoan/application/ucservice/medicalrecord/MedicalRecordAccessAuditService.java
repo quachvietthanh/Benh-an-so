@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.port.outbound.repository.logRepository.MedicalRecordAccessLogRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -26,8 +27,18 @@ public class MedicalRecordAccessAuditService {
                 patientId,
                 accessedBy,
                 HISTORY_VIEW_DETAIL,
-                null,
                 accessedAt
+        ));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordRecordView(UUID patientId, UUID visitId, UUID medicalRecordId, UUID accessedBy, Instant accessedAt) {
+        recordRecordAccess(patientId, visitId, medicalRecordId, accessedBy, MedicalRecordAccessAction.VIEW, "Medical record viewed", accessedAt);
+    }
+
+    public void recordRecordAccess(UUID patientId, UUID visitId, UUID medicalRecordId, UUID accessedBy, MedicalRecordAccessAction action, String detail, Instant accessedAt) {
+        medicalRecordAccessLogRepository.save(MedicalRecordAccessLog.createRecordAccess(
+                patientId, visitId, medicalRecordId, accessedBy, action, detail, accessedAt
         ));
     }
 }

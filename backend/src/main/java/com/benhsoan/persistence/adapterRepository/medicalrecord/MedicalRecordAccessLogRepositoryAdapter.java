@@ -1,5 +1,10 @@
 package com.benhsoan.persistence.adapterRepository.medicalrecord;
 
+import java.time.Instant;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
@@ -21,5 +26,27 @@ public class MedicalRecordAccessLogRepositoryAdapter implements MedicalRecordAcc
     public MedicalRecordAccessLog save(MedicalRecordAccessLog accessLog) {
         MedicalRecordAccessLogEntity savedEntity = jpaRepository.save(mapper.toEntity(accessLog));
         return mapper.toDomain(savedEntity);
+    }
+
+    @Override
+    public Page<MedicalRecordAccessLog> findByMedicalRecordId(
+            UUID medicalRecordId,
+            Instant from,
+            Instant to,
+            Pageable pageable
+    ) {
+        return jpaRepository.findByMedicalRecordId(medicalRecordId, from, to, pageable)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Page<MedicalRecordAccessLog> findByPatientId(
+            UUID patientId,
+            Instant from,
+            Instant to,
+            Pageable pageable
+    ) {
+        return jpaRepository.findByPatientId(patientId, from, to, pageable)
+                .map(mapper::toDomain);
     }
 }
