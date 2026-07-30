@@ -23,9 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ExaminationDiagnosisRestMapper;
-import com.benhsoan.port.dto.result.ClinicalOrderResult;
 import com.benhsoan.port.dto.result.ExaminationDiagnosisResult;
-import com.benhsoan.port.inbound.clinical.CreateClinicalOrderUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetExaminationDiagnosisUseCase;
 import com.benhsoan.port.inbound.medicalrecord.RecordDiagnosisUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -48,9 +46,6 @@ class ExaminationDiagnosisControllerTest {
 
     @MockitoBean
     private GetExaminationDiagnosisUseCase getExaminationDiagnosisUseCase;
-
-    @MockitoBean
-    private CreateClinicalOrderUseCase createClinicalOrderUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -125,48 +120,4 @@ class ExaminationDiagnosisControllerTest {
                 .andExpect(jsonPath("$.primaryIcdCode").value("J00"));
     }
 
-    @Test
-    @DisplayName("POST /examinations/{id}/clinical-orders - 200 OK")
-    void createClinicalOrderReturns200() throws Exception {
-        when(createClinicalOrderUseCase.createOrder(eq(examinationId), any()))
-                .thenReturn(new ClinicalOrderResult(
-                        UUID.randomUUID(), "ORD-123", examinationId,
-                        UUID.randomUUID(), doctorId, "Clinical reason",
-                        "ORDERED", Instant.now(), null, List.of()));
-
-        String body = """
-                {
-                    "clinicalReason": "Check up",
-                    "items": [
-                        {
-                            "serviceCode": "LAB-GLU",
-                            "serviceName": "Blood glucose"
-                        }
-                    ]
-                }
-                """;
-
-        mockMvc.perform(post("/examinations/{examinationId}/clinical-orders", examinationId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orderCode").value("ORD-123"))
-                .andExpect(jsonPath("$.status").value("ORDERED"));
-    }
-
-    @Test
-    @DisplayName("POST /examinations/{id}/clinical-orders - 400 when items empty")
-    void createClinicalOrderMissingItems() throws Exception {
-        String body = """
-                {
-                    "clinicalReason": "Check up",
-                    "items": []
-                }
-                """;
-
-        mockMvc.perform(post("/examinations/{examinationId}/clinical-orders", examinationId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest());
-    }
 }

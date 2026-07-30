@@ -4,13 +4,9 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 
 import org.springframework.stereotype.Component;
 
-import com.benhsoan.adapter.inbound.rest.request.clinical.CreateClinicalOrderRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.RecordDiagnosisRequest;
-import com.benhsoan.adapter.inbound.rest.response.clinical.ClinicalOrderResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.ExaminationDiagnosisResponse;
-import com.benhsoan.port.dto.command.clinical.CreateClinicalOrderCommand;
 import com.benhsoan.port.dto.command.medicalrecord.RecordDiagnosisCommand;
-import com.benhsoan.port.dto.result.ClinicalOrderResult;
 import com.benhsoan.port.dto.result.ExaminationDiagnosisResult;
 
 @Component
@@ -31,14 +27,6 @@ public class ExaminationDiagnosisRestMapper {
         );
     }
 
-    public CreateClinicalOrderCommand toCommand(CreateClinicalOrderRequest request) {
-        var items = request.items().stream()
-                .map(i -> new CreateClinicalOrderCommand.OrderItemCommand(
-                        i.serviceId(), i.serviceCode(), i.serviceName(), i.instruction()))
-                .toList();
-        return new CreateClinicalOrderCommand(request.clinicalReason(), items);
-    }
-
     public ExaminationDiagnosisResponse toResponse(ExaminationDiagnosisResult result) {
         var secondary = result.secondaryDiagnoses().stream()
                 .map(s -> new ExaminationDiagnosisResponse.SecondaryDiagnosisResponse(s.id(), s.code(), s.name()))
@@ -54,15 +42,4 @@ public class ExaminationDiagnosisRestMapper {
         );
     }
 
-    public ClinicalOrderResponse toResponse(ClinicalOrderResult result) {
-        var items = result.items().stream()
-                .map(i -> new ClinicalOrderResponse.OrderItemResponse(
-                        i.id(), i.serviceCode(), i.serviceName(), i.instruction(), i.status()))
-                .toList();
-        return new ClinicalOrderResponse(
-                result.id(), result.orderCode(), result.visitId(), result.patientId(),
-                result.orderedBy(), result.clinicalReason(), result.status(),
-                result.orderedAt(), result.completedAt(), items
-        );
-    }
 }

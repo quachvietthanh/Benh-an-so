@@ -39,8 +39,10 @@ public class ClinicalServiceCatalog {
         updatedAt = updated;
     }
 
-    public static ClinicalServiceCatalog create(String code, String name, ClinicalServiceType type, ClinicalResultDataType dataType, String unit, String range, String description) {
-        return new ClinicalServiceCatalog(UUID.randomUUID(), code, name, type, dataType, unit, range, description, true, Instant.now(), null);
+    public static ClinicalServiceCatalog create(String code, String name, ClinicalServiceType type,
+            ClinicalResultDataType dataType, String unit, String range, String description, Instant createdAt) {
+        return new ClinicalServiceCatalog(UUID.randomUUID(), code, name, type, dataType, unit, range,
+                description, true, Objects.requireNonNull(createdAt), null);
     }
 
     public static ClinicalServiceCatalog restore(UUID id, String code, String name, ClinicalServiceType type, ClinicalResultDataType dataType, String unit, String range, String description, boolean active, Instant created, Instant updated) {
