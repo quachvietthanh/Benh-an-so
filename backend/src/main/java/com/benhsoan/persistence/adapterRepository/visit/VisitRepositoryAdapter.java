@@ -20,7 +20,22 @@ public class VisitRepositoryAdapter implements VisitRepository {
     private final VisitPersistenceMapper mapper;
 
     @Override
-    public Optional<Visit> findById(UUID visitId) {
-        return jpaRepository.findById(visitId).map(mapper::toDomain);
+    public Optional<Visit> findById(UUID id) {
+        return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public Visit save(Visit visit) {
+        return mapper.toDomain(jpaRepository.save(mapper.toEntity(visit)));
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        jpaRepository.deleteById(id);
+    }
+
+    @Override
+    public Optional<Visit> findByVisitCode(String visitCode) {
+        return jpaRepository.findByVisitCode(visitCode).map(mapper::toDomain);
     }
 }

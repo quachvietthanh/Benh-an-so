@@ -22,15 +22,16 @@ import {
   SafetyCertificateOutlined,
   BellOutlined,
   PaperClipOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
 
 export const roleRoutes = {
-  admin: ['/', '/patients', '/appointments', '/medical-records', '/attachments', '/prescriptions', '/pharmacy', '/billing', '/reports', '/system-management', '/users', '/services', '/public-lookup'],
-  manager: ['/', '/patients', '/medical-records', '/attachments', '/prescriptions', '/pharmacy', '/billing', '/reports', '/services'],
-  doctor: ['/', '/patients', '/appointments', '/medical-records', '/attachments', '/prescriptions'],
-  receptionist: ['/', '/patients', '/appointments', '/attachments', '/billing'],
+  admin: ['/', '/patients', '/appointments', '/medical-records', '/attachments', '/clinical-orders', '/prescriptions', '/pharmacy', '/billing', '/reports', '/system-management', '/users', '/services', '/public-lookup'],
+  manager: ['/', '/patients', '/medical-records', '/attachments', '/clinical-orders', '/prescriptions', '/pharmacy', '/billing', '/reports', '/services'],
+  doctor: ['/', '/patients', '/appointments', '/medical-records', '/attachments', '/clinical-orders', '/prescriptions'],
+  receptionist: ['/', '/patients', '/appointments', '/attachments', '/clinical-orders', '/billing'],
   pharmacist: ['/', '/pharmacy', '/prescriptions'],
 }
 
@@ -42,6 +43,7 @@ export const getNavigationItems = (roles = []) => {
     { key: '/medical-records', label: 'Khám bệnh & bệnh án điện tử', icon: FileTextOutlined, roles: ['admin', 'manager', 'doctor'] },
     { key: '/attachments', label: 'Kết quả Cân lâm sàng & Đính kèm', icon: PaperClipOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
     { key: '/prescriptions', label: 'Kê đơn thuốc & cảnh báo TT', icon: MedicineBoxOutlined, roles: ['admin', 'manager', 'doctor', 'pharmacist'] },
+    { key: '/clinical-orders', label: 'Chỉ định cận lâm sàng', icon: ExperimentOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
     { key: '/pharmacy', label: 'Quản lý kho thuốc & cấp phát', icon: MedicineBoxOutlined, roles: ['admin', 'manager', 'pharmacist'] },
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: DollarCircleOutlined, roles: ['admin', 'manager', 'receptionist'] },
     { key: '/reports', label: 'Báo cáo vận hành & nhật ký', icon: BarChartOutlined, roles: ['admin', 'manager'] },
