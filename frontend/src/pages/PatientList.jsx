@@ -94,8 +94,12 @@ function PatientList() {
     try {
       const response = await patientApi.getAll({ page: 0, size: 500 })
       const apiList = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
-      const merged = mergePatients(apiList.length ? apiList : getPatients())
-      setAllPatients(merged)
+      if (apiList && apiList.length > 0) {
+        setAllPatients(apiList)
+      } else {
+        const merged = mergePatients(getPatients())
+        setAllPatients(merged)
+      }
     } catch {
       const merged = mergePatients(getPatients())
       setAllPatients(merged)
