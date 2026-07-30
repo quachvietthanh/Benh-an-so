@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Table, Button, Tag, Typography, Space } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { Table, Button, Tag, Typography } from 'antd'
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
 import medicalRecordApi from '../api/medicalRecordApi'
 import { formatDateTime, formatRecordStatus } from '../utils/helpers'
@@ -12,6 +13,8 @@ function MedicalRecordList() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+
+  const navigate = useNavigate()
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)

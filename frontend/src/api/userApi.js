@@ -1,63 +1,56 @@
 import axiosClient from './axiosClient'
 
 /**
- * API quản lý người dùng (dành cho Admin)
+ * RESTful API Client for User & Doctor Management
+ * Backend Controller: UserController.java (@RequestMapping("/users"))
  */
 const userApi = {
-  list: () => {
-    return axiosClient.get('/users')
+  // GET /api/v1/users (Admin only)
+  getAll: (params) => {
+    return axiosClient.get('/users', { params })
   },
 
+  // GET /api/v1/users/doctors (Admin, Doctor, Receptionist)
   getDoctors: () => {
     return axiosClient.get('/users/doctors')
   },
 
+  // GET /api/v1/users/{id}
+  getById: (id) => {
+    return axiosClient.get(`/users/${id}`)
+  },
+
+  // POST /api/v1/users (Admin only)
   create: (data) => {
     return axiosClient.post('/users', data)
   },
 
+  // PUT /api/v1/users/{id} (Admin only)
   update: (id, data) => {
     return axiosClient.put(`/users/${id}`, data)
   },
 
-  remove: (id) => {
-    return axiosClient.delete(`/users/${id}`)
-  },
-
+  // PATCH /api/v1/users/{id}/activate (Admin only)
   activate: (id) => {
     return axiosClient.patch(`/users/${id}/activate`)
   },
 
+  // PATCH /api/v1/users/{id}/deactivate (Admin only)
   deactivate: (id) => {
     return axiosClient.patch(`/users/${id}/deactivate`)
   },
 
-  /**
-   * Lấy danh sách tất cả người dùng (phân trang)
-   */
-  getAll: (params) => {
-    return axiosClient.get('/admin/users', { params })
+  // Aliases for backward compatibility
+  list: () => {
+    return axiosClient.get('/users')
   },
 
-  /**
-   * Lấy thông tin chi tiết người dùng
-   */
-  getById: (id) => {
-    return axiosClient.get(`/admin/users/${id}`)
+  remove: (id) => {
+    return axiosClient.patch(`/users/${id}/deactivate`)
   },
 
-  /**
-   * Cập nhật trạng thái khóa / mở khóa tài khoản người dùng
-   *
-   * PUT /api/v1/admin/users/{id}/status?locked=true|false
-   *
-   * @param {string} id - UUID của người dùng
-   * @param {boolean} locked - true: khóa, false: mở khóa
-   */
   updateStatus: (id, locked) => {
-    return axiosClient.put(`/admin/users/${id}/status`, null, {
-      params: { locked },
-    })
+    return locked ? axiosClient.patch(`/users/${id}/deactivate`) : axiosClient.patch(`/users/${id}/activate`)
   },
 }
 

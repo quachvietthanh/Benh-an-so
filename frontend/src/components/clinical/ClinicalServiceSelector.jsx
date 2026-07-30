@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Card,
   Input,
@@ -24,12 +24,57 @@ import {
   HeartOutlined,
 } from '@ant-design/icons'
 import { demoClinicalCatalog } from '../../mock-data/mockData'
+import clinicalOrderApi from '../../api/clinicalOrderApi'
 
 const { Text, Title } = Typography
 
 export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => {
   const [activeTab, setActiveTab] = useState('ALL')
   const [searchText, setSearchText] = useState('')
+  const [catalog, setCatalog] = useState(demoClinicalCatalog)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    const fetchServices = async () => {
+      setLoading(true)
+      try {
+        const response = await clinicalOrderApi.searchServices({ size: 100 })
+        const content = response.data?.content || response.data
+        if (Array.isArray(content) && content.length > 0 && isMounted) {
+          const mapped = content.map((item) => {
+            const rawType = item.serviceType || 'LAB_TEST'
+            let category = 'LABORATORY'
+            let categoryName = 'Xét nghiệm'
+            if (rawType === 'IMAGING') {
+              category = 'IMAGING'
+              categoryName = 'Chẩn đoán hình ảnh'
+            } else if (rawType === 'OTHER') {
+              category = 'FUNCTIONAL'
+              categoryName = 'Thăm dò chức năng'
+            }
+            return {
+              id: item.id || `cls-${item.serviceCode}`,
+              code: item.serviceCode || 'DV-01',
+              name: item.serviceName || item.name,
+              category,
+              categoryName,
+              price: item.price || 120000,
+              room: item.room || (category === 'LABORATORY' ? 'Phòng Xét nghiệm' : category === 'IMAGING' ? 'Phòng CĐHA' : 'Phòng TDCN'),
+              description: item.description || '',
+            }
+          })
+          setCatalog(mapped)
+        }
+      } catch {
+        // Fallback to demoClinicalCatalog
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+    fetchServices()
+    return () => { isMounted = false }
+  }, [])
 
   const categories = useMemo(() => [
     { key: 'ALL', label: 'Tất cả dịch vụ', icon: <ExperimentOutlined /> },
@@ -40,13 +85,13 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
 
   const filteredCatalog = useMemo(() => {
     const kw = searchText.trim().toLowerCase()
-    return demoClinicalCatalog.filter((item) => {
+    return catalog.filter((item) => {
       const matchesCategory = activeTab === 'ALL' || item.category === activeTab
       const matchesKw = !kw || [item.code, item.name, item.categoryName, item.room]
         .some((val) => String(val || '').toLowerCase().includes(kw))
       return matchesCategory && matchesKw
     })
-  }, [activeTab, searchText])
+  }, [catalog, activeTab, searchText])
 
   const selectedMap = useMemo(() => {
     const map = new Map()

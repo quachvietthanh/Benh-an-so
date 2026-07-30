@@ -1,44 +1,68 @@
 import axiosClient from './axiosClient'
+import userApi from './userApi'
 import queueApi from './queueApi'
 
-const DEFAULT_DOCTORS = [
-  { id: 'u3', fullName: 'BS. Phạm Hồng Anh', username: 'doctor', role: 'DOCTOR', department: 'Nội tổng quát' },
-  { id: 'd1', fullName: 'BS. Nguyễn Văn Minh', username: 'minh.doctor', role: 'DOCTOR', department: 'Tim mạch' },
-  { id: 'd2', fullName: 'BS. Trần Thị Hoa', username: 'hoa.doctor', role: 'DOCTOR', department: 'Nhi khoa' },
-  { id: 'd3', fullName: 'BS. Lê Hoài Nam', username: 'nam.doctor', role: 'DOCTOR', department: 'Tai Mũi Họng' },
-  { id: 'd4', fullName: 'BS. Vũ Đức Cường', username: 'cuong.doctor', role: 'DOCTOR', department: 'Chấn thương chỉnh hình' },
-]
-
+/**
+ * RESTful API Client for Appointments
+ * Backend Controller: AppointmentController.java (@RequestMapping("/appointments"))
+ */
 const appointmentApi = {
-  getAll: () => axiosClient.get('/appointments'),
-  getDoctors: async () => {
-    try {
-      const res = await axiosClient.get('/users')
-      if (res && Array.isArray(res.data) && res.data.length > 0) {
-        const doctors = res.data.filter((u) => {
-          const role = String(u.role || u.roleName || '').toUpperCase()
-          return role.includes('DOCTOR') || role.includes('BÁC SĨ') || role === 'DOCTOR'
-        })
-        if (doctors.length > 0) {
-          return { data: doctors }
-        }
-        return { data: res.data }
-      }
-    } catch (err) {
-      console.warn('Backend /users endpoint unavailable, falling back to default doctors list:', err?.message)
+  // GET /api/v1/appointments
+  getAll: (params = {}) => {
+    const searchParams = {
+      patientId: params.patientId || null,
+      doctorId: params.doctorId || null,
+      status: params.status || null,
+      startDate: params.startDate || null,
+      endDate: params.endDate || null,
+      page: params.page !== undefined ? params.page : 0,
+      size: params.size || 20,
     }
-    return { data: DEFAULT_DOCTORS }
+    return axiosClient.get('/appointments', { params: searchParams })
   },
+
+  // GET /api/v1/appointments/{id}
+  getById: (id) => {
+    return axiosClient.get(`/appointments/${id}`)
+  },
+
+  // POST /api/v1/appointments
+  create: (data) => {
+    return axiosClient.post('/appointments', data)
+  },
+
+  // POST /api/v1/appointments/{id}/reminder
+  sendReminder: (id) => {
+    return axiosClient.post(`/appointments/${id}/reminder`)
+  },
+
+  // PATCH /api/v1/appointments/{id}/cancel
+  cancel: (id, reason) => {
+    return axiosClient.patch(`/appointments/${id}/cancel`, { reason })
+  },
+
+  // GET /api/v1/appointments/overdue
+  getOverdue: (params = {}) => {
+    return axiosClient.get('/appointments/overdue', { params })
+  },
+
+  // PATCH /api/v1/appointments/{id}/no-show
+  noShow: (id) => {
+    return axiosClient.patch(`/appointments/${id}/no-show`)
+  },
+
+  // GET active doctors list from GET /api/v1/users/doctors
+  getDoctors: () => {
+    return userApi.getDoctors()
+  },
+
+  // Queue integration aliases for backwards compatibility
   getQueue: (params) => queueApi.getQueue(params),
-  create: (data) => axiosClient.post('/appointments', data),
-  cancel: (id, reason) => axiosClient.patch(`/appointments/${id}/cancel`, { reason }),
-  noShow: (id) => axiosClient.patch(`/appointments/${id}/no-show`),
-  checkIn: (id) => axiosClient.patch(`/appointments/${id}/check-in`),
+  checkIn: (id) => queueApi.updateStatus(id, 'IN_PROGRESS'),
   callNext: (payload) => queueApi.callNext(payload),
-  complete: (id) => axiosClient.patch(`/appointments/${id}/complete`),
+  complete: (id) => queueApi.updateStatus(id, 'COMPLETED'),
   updateQueueStatus: (id, data) => queueApi.updateStatus(id, data),
   addToQueue: (data) => queueApi.addToQueue(data),
 }
 
 export default appointmentApi
-
