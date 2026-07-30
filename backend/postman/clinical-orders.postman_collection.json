@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "Benh So An - Clinical Orders",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "username", "value": "admin" },
+    { "key": "nurseUsername", "value": "nurse1" },
+    { "key": "receptionistUsername", "value": "receptionist1" },
+    { "key": "password", "value": "password" },
+    { "key": "visitId", "value": "d0000000-0000-0000-0000-000000000002" },
+    { "key": "serviceId", "value": "f0000000-0000-0000-0000-000000000001" },
+    { "key": "accessToken", "value": "" },
+    { "key": "orderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Login Admin",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/login", "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });", "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"] } }]
+    },
+    {
+      "name": "2. Create Medical Record For Active Visit",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/medical-records", "body": { "mode": "raw", "raw": "{\n  \"visitId\": \"{{visitId}}\",\n  \"chiefComplaint\": \"Follow-up consultation\",\n  \"conclusion\": \"Stable\"\n}" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('201', function () { pm.response.to.have.status(201); });"] } }]
+    },
+    {
+      "name": "3. Search Active Clinical Services",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/clinical-services?keyword=glucose&page=0&size=20" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('catalog returned', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().content.length).to.be.above(0); });"] } }]
+    },
+    {
+      "name": "4. Create Clinical Order",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/clinical-orders/visits/{{visitId}}", "body": { "mode": "raw", "raw": "{\n  \"clinicalReason\": \"Evaluate fasting blood glucose\",\n  \"items\": [{ \"serviceId\": \"{{serviceId}}\", \"instruction\": \"Fast for 8 hours\" }]\n}" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('201', function () { pm.response.to.have.status(201); });", "pm.collectionVariables.set('orderId', pm.response.json().id);"] } }]
+    },
+    {
+      "name": "5. Get Orders By Visit",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/clinical-orders/visits/{{visitId}}?page=0&size=20" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('created order is listed', function () { pm.response.to.have.status(200); var ids = pm.response.json().content.map(function (order) { return order.id; }); pm.expect(ids).to.include(pm.collectionVariables.get('orderId')); });"] } }]
+    },
+    {
+      "name": "6. Reject Duplicate Service",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/clinical-orders/visits/{{visitId}}", "body": { "mode": "raw", "raw": "{\n  \"items\": [{ \"serviceId\": \"{{serviceId}}\" }, { \"serviceId\": \"{{serviceId}}\" }]\n}" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('409', function () { pm.response.to.have.status(409); });"] } }]
+    },
+    {
+      "name": "7. Login Nurse And Read Orders",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/login", "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{nurseUsername}}\",\n  \"password\": \"{{password}}\"\n}" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('nurse login', function () { pm.response.to.have.status(200); });", "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"] } }]
+    },
+    {
+      "name": "8. Nurse Can Read Orders",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/clinical-orders/visits/{{visitId}}?page=0&size=20" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', function () { pm.response.to.have.status(200); });"] } }]
+    },
+    {
+      "name": "9. Receptionist Cannot Create Order",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/login", "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{receptionistUsername}}\",\n  \"password\": \"{{password}}\"\n}" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('receptionist login', function () { pm.response.to.have.status(200); });", "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"] } }]
+    },
+    {
+      "name": "10. Receptionist Is Denied",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/clinical-orders/visits/{{visitId}}", "body": { "mode": "raw", "raw": "{\n  \"items\": [{ \"serviceId\": \"{{serviceId}}\" }]\n}" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('403', function () { pm.response.to.have.status(403); });"] } }]
+    }
+  ]
+}

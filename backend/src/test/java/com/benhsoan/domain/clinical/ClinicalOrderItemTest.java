@@ -33,7 +33,8 @@ class ClinicalOrderItemTest {
 
     private ClinicalOrderItem createItem() {
         return ClinicalOrderItem.create(
-                UUID.randomUUID(), UUID.randomUUID(), "LAB-001", "Blood test", null
+                UUID.randomUUID(), UUID.randomUUID(), "LAB-001", "Blood test", null,
+                Instant.parse("2026-08-20T01:00:00Z")
         );
     }
 }

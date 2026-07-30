@@ -16,7 +16,8 @@ class ClinicalServiceCatalogTest {
     void updatesAndReactivatesService() {
         ClinicalServiceCatalog service = ClinicalServiceCatalog.create(
                 "LAB-001", "Blood glucose", ClinicalServiceType.LAB_TEST,
-                ClinicalResultDataType.NUMBER, "mmol/L", "3.9-5.5", null
+                ClinicalResultDataType.NUMBER, "mmol/L", "3.9-5.5", null,
+                Instant.parse("2026-08-20T01:00:00Z")
         );
         Instant updatedAt = Instant.parse("2026-08-20T02:00:00Z");
 

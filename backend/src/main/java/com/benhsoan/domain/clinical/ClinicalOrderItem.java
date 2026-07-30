@@ -35,8 +35,10 @@ public class ClinicalOrderItem {
         updatedAt = updated;
     }
 
-    public static ClinicalOrderItem create(UUID orderId, UUID serviceId, String code, String name, String instruction) {
-        return new ClinicalOrderItem(UUID.randomUUID(), orderId, serviceId, code, name, instruction, ClinicalOrderItemStatus.PENDING, Instant.now(), null);
+    public static ClinicalOrderItem create(UUID orderId, UUID serviceId, String code, String name,
+            String instruction, Instant createdAt) {
+        return new ClinicalOrderItem(UUID.randomUUID(), orderId, serviceId, code, name, instruction,
+                ClinicalOrderItemStatus.PENDING, Objects.requireNonNull(createdAt), null);
     }
 
     public static ClinicalOrderItem restore(UUID id, UUID orderId, UUID serviceId, String code, String name, String instruction, ClinicalOrderItemStatus status, Instant created, Instant updated) {

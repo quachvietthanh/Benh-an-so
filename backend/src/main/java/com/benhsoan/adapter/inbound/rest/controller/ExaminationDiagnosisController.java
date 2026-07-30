@@ -12,11 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ExaminationDiagnosisRestMapper;
-import com.benhsoan.adapter.inbound.rest.request.clinical.CreateClinicalOrderRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.RecordDiagnosisRequest;
-import com.benhsoan.adapter.inbound.rest.response.clinical.ClinicalOrderResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.ExaminationDiagnosisResponse;
-import com.benhsoan.port.inbound.clinical.CreateClinicalOrderUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetExaminationDiagnosisUseCase;
 import com.benhsoan.port.inbound.medicalrecord.RecordDiagnosisUseCase;
 
@@ -31,7 +28,6 @@ public class ExaminationDiagnosisController {
 
     private final RecordDiagnosisUseCase recordDiagnosisUseCase;
     private final GetExaminationDiagnosisUseCase getExaminationDiagnosisUseCase;
-    private final CreateClinicalOrderUseCase createClinicalOrderUseCase;
     private final ExaminationDiagnosisRestMapper mapper;
 
     @PostMapping("/diagnosis")
@@ -49,16 +45,6 @@ public class ExaminationDiagnosisController {
     public ExaminationDiagnosisResponse getDiagnosis(
             @PathVariable UUID examinationId) {
         var result = getExaminationDiagnosisUseCase.getDiagnosis(examinationId);
-        return mapper.toResponse(result);
-    }
-
-    @PostMapping("/clinical-orders")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
-    public ClinicalOrderResponse createClinicalOrder(
-            @PathVariable UUID examinationId,
-            @Valid @RequestBody CreateClinicalOrderRequest request) {
-        var result = createClinicalOrderUseCase.createOrder(
-                examinationId, mapper.toCommand(request));
         return mapper.toResponse(result);
     }
 }
