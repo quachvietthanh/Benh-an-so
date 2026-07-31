@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidVisitException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.medicalrecord.UpdateMedicalRecordCommand;
@@ -38,6 +39,9 @@ public class UpdateMedicalRecordService implements UpdateMedicalRecordUseCase {
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
         var visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
+        if (!visit.isActive()) {
+            throw new MedicalRecordInvalidVisitException(visit.getId());
+        }
         Instant now = clockPort.now();
         record.updateContent(command.chiefComplaint(), command.symptoms(), command.medicalHistory(),
                 command.physicalExamination(), command.clinicalProgress(), command.treatmentPlan(),

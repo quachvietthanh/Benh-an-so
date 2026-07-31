@@ -11,6 +11,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecordAmendment;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotLockedException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAmendmentRequiresCompletedVisitException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.medicalrecord.AmendMedicalRecordCommand;
 import com.benhsoan.port.dto.result.MedicalRecordAmendmentResult;
@@ -48,6 +49,9 @@ public class AmendMedicalRecordService implements AmendMedicalRecordUseCase {
 
         var visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
+        if (!visit.isCompleted()) {
+            throw new MedicalRecordAmendmentRequiresCompletedVisitException();
+        }
 
         Instant now = clockPort.now();
 

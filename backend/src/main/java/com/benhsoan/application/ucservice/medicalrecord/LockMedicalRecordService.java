@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidVisitException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.result.MedicalRecordResult;
@@ -37,6 +38,9 @@ public class LockMedicalRecordService implements LockMedicalRecordUseCase {
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
         var visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
+        if (!visit.isActive()) {
+            throw new MedicalRecordInvalidVisitException(visit.getId());
+        }
         Instant now = clockPort.now();
         record.lock(userId, now);
         MedicalRecord saved = medicalRecordRepository.save(record);
