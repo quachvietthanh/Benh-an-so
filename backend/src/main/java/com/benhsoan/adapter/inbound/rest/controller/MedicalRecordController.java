@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,6 +38,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
+@RequestMapping("/api/v1/medical-records")
 @RequiredArgsConstructor
 @Validated
 public class MedicalRecordController {
@@ -50,51 +52,51 @@ public class MedicalRecordController {
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
 
-    @PostMapping("/medical-records")
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordResponse create(@Valid @RequestBody CreateMedicalRecordRequest request) {
         return mapper.toResponse(createMedicalRecordUseCase.create(mapper.toCommand(request)));
     }
 
-    @GetMapping("/medical-records/{medicalRecordId}")
+    @GetMapping("/{medicalRecordId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public MedicalRecordResponse getById(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(getMedicalRecordUseCase.getById(medicalRecordId));
     }
 
-    @GetMapping("/medical-records/visits/{visitId}")
+    @GetMapping("/visits/{visitId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public MedicalRecordDetailResponse getByVisitId(@PathVariable UUID visitId) {
         return detailMapper.toResponse(getMedicalRecordUseCase.getDetailByVisitId(visitId));
     }
 
-    @GetMapping("/patients/{patientId}/medical-records")
+    @GetMapping("/patient/{patientId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public List<MedicalRecordDetailResponse> getPatientMedicalRecords(@PathVariable UUID patientId) {
         return detailMapper.toResponses(getMedicalRecordUseCase.getHistoryByPatientId(patientId));
     }
 
-    @PutMapping("/medical-records/{medicalRecordId}")
+    @PutMapping("/{medicalRecordId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordResponse update(@PathVariable UUID medicalRecordId, @RequestBody UpdateMedicalRecordRequest request) {
         return mapper.toResponse(updateMedicalRecordUseCase.update(medicalRecordId, mapper.toCommand(request)));
     }
 
-    @PostMapping("/medical-records/{medicalRecordId}/lock")
+    @PostMapping("/{medicalRecordId}/lock")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordResponse lock(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(lockMedicalRecordUseCase.lock(medicalRecordId));
     }
 
-    @PostMapping("/medical-records/{medicalRecordId}/amendments")
+    @PostMapping("/{medicalRecordId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordAmendmentResponse amend(@PathVariable UUID medicalRecordId, @Valid @RequestBody AmendMedicalRecordRequest request) {
         return mapper.toResponse(amendMedicalRecordUseCase.amend(medicalRecordId, mapper.toCommand(request)));
     }
 
-    @GetMapping("/medical-records/{medicalRecordId}/access-logs")
+    @GetMapping("/{medicalRecordId}/access-logs")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByRecord(
             @PathVariable UUID medicalRecordId,
@@ -108,7 +110,7 @@ public class MedicalRecordController {
         ));
     }
 
-    @GetMapping("/medical-records/access-logs")
+    @GetMapping("/access-logs")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByPatient(
             @RequestParam UUID patientId,

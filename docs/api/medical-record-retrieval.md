@@ -27,7 +27,7 @@ Cung cấp API để hiển thị nội dung hồ sơ bệnh án điện tử ch
 | Method | Endpoint | Mô tả | Vai trò |
 |--------|----------|-------|---------|
 | `GET` | `/medical-records/visits/{visitId}` | Chi tiết hồ sơ bệnh án theo lượt khám (kèm chẩn đoán ICD-10) | ADMIN, DOCTOR, NURSE |
-| `GET` | `/patients/{patientId}/medical-records` | Lịch sử hồ sơ bệnh án của bệnh nhân | ADMIN, DOCTOR, NURSE |
+| `GET` | `/medical-records/patient/{patientId}` | Lịch sử hồ sơ bệnh án của bệnh nhân | ADMIN, DOCTOR, NURSE |
 | `GET` | `/medical-records/{medicalRecordId}` | Chi tiết hồ sơ (nội dung) | ADMIN, DOCTOR, NURSE |
 | `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR, NURSE |
 | `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR, NURSE |
@@ -120,7 +120,7 @@ GET {{baseUrl}}/medical-records/visits/f8c2e5d0-1a3b-4c6d-8e9f-2a4b6c8d0e1f
 Authorization: Bearer {{token}}
 ```
 
-## 2. GET /patients/{patientId}/medical-records
+## 2. GET /medical-records/patient/{patientId}
 
 Trả về **danh sách lịch sử hồ sơ bệnh án** của một bệnh nhân (chỉ những lượt khám **đã có** hồ sơ), sắp xếp theo thời gian khám giảm dần. Mỗi phần tử có cấu trúc giống Response của endpoint 1.
 
@@ -145,7 +145,7 @@ Trả về **danh sách lịch sử hồ sơ bệnh án** của một bệnh nh�
 ### Postman
 
 ```
-GET {{baseUrl}}/patients/e7b1f0e4-2b8e-4c5a-9f6d-3d3e8a2b1c0a/medical-records
+GET {{baseUrl}}/medical-records/patient/e7b1f0e4-2b8e-4c5a-9f6d-3d3e8a2b1c0a
 Authorization: Bearer {{token}}
 ```
 
@@ -172,8 +172,8 @@ SELECT * FROM medical_record_access_logs ORDER BY accessed_at DESC LIMIT 10;
 
 ```
 adapter/inbound/rest/controller
-└── MedicalRecordController        (GET /medical-records/visits/{visitId},
-                                    GET /patients/{patientId}/medical-records)
+└── MedicalRecordController        (@RequestMapping("/api/v1/medical-records")
+                                    GET /visits/{visitId}, GET /patient/{patientId})
           │
           ▼
 port/inbound/medicalrecord
