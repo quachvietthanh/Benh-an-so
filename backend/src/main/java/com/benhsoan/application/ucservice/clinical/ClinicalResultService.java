@@ -1,7 +1,6 @@
 package com.benhsoan.application.ucservice.clinical;
 
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,14 +18,11 @@ import com.benhsoan.domain.clinical.MedicalAttachment;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderItemStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalResultType;
-import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
-import com.benhsoan.domain.clinical.enums.MedicalAttachmentType;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderInvalidVisitException;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderLockedMedicalRecordException;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
-import com.benhsoan.port.dto.command.clinical.AttachmentMetadataCommand;
 import com.benhsoan.port.dto.command.clinical.EnterClinicalResultCommand;
 import com.benhsoan.port.dto.command.clinical.GetClinicalResultsByVisitQuery;
 import com.benhsoan.port.dto.command.clinical.UpdateClinicalResultCommand;
@@ -94,16 +90,12 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
                 .orElseThrow(() -> new ValidationException("Clinical service not found."));
 
         ClinicalResultType resultType = ClinicalResultType.from(clinicalService.getResultDataType());
-        if (resultType.requiresAttachment() && command.attachments().isEmpty()) {
-            throw new ValidationException("File result requires an attachment.");
-        }
 
         Instant now = clock.now();
         ClinicalResult result = clinicalResultRepository.save(ClinicalResult.create(
                 clinicalOrderItemId, visit.getId(), resultType, command.numericValue(), command.textValue(),
                 clinicalService.getUnit(), clinicalService.getReferenceRange(), command.abnormalFlag(),
                 command.conclusion(), actorId, now));
-        saveAttachments(command.attachments(), result, visit.getId(), clinicalService.getServiceType(), actorId, now);
         auditService.recordWrite(result.getId(), visit.getPatientId(), visit.getId(), medicalRecord.getId(), actorId,
                 MedicalRecordAccessAction.CREATE, now);
         return mapDetail(result);
@@ -120,14 +112,6 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         result.updateResult(command.numericValue(), command.textValue(), result.getUnit(), result.getReferenceRange(),
                 command.abnormalFlag(), command.conclusion(), actorId, now);
         ClinicalResult savedResult = clinicalResultRepository.save(result);
-        if (!command.attachments().isEmpty()) {
-            var item = clinicalOrderItemRepository.findById(savedResult.getClinicalOrderItemId())
-                    .orElseThrow(() -> new ValidationException("Clinical order item not found."));
-            var clinicalService = clinicalServiceCatalogRepository.findById(item.getClinicalServiceId())
-                    .orElseThrow(() -> new ValidationException("Clinical service not found."));
-            saveAttachments(command.attachments(), savedResult, savedResult.getVisitId(),
-                    clinicalService.getServiceType(), actorId, now);
-        }
         clinicalResultHistoryRepository.save(ClinicalResultHistory.create(
                 previousResult, savedResult, command.changeReason(), actorId, now));
         auditWrite(savedResult, actorId, MedicalRecordAccessAction.UPDATE, now);
@@ -139,6 +123,10 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         UUID actorId = authorizationService.requireWriteAccess();
         ClinicalResult result = findResult(clinicalResultId);
         ensureWritableVisitAndRecord(result.getVisitId());
+        if (result.getResultType().requiresAttachment()
+                && !medicalAttachmentRepository.existsByClinicalResultId(result.getId())) {
+            throw new ValidationException("File result requires an uploaded attachment before finalization.");
+        }
         ClinicalResult previousResult = snapshot(result);
         Instant now = clock.now();
 
@@ -255,20 +243,6 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
             auditService.recordView(result.getId(), visit.getPatientId(), visit.getId(), medicalRecord.getId(), actorId,
                     MedicalRecordAccessAction.VIEW, now);
         }
-    }
-
-    private void saveAttachments(Collection<AttachmentMetadataCommand> commands, ClinicalResult result, UUID visitId,
-            ClinicalServiceType serviceType, UUID actorId, Instant now) {
-        MedicalAttachmentType attachmentType = switch (serviceType) {
-            case IMAGING -> MedicalAttachmentType.IMAGING_RESULT;
-            case LAB_TEST -> MedicalAttachmentType.LAB_RESULT;
-            default -> MedicalAttachmentType.OTHER;
-        };
-        medicalAttachmentRepository.saveAll(commands.stream()
-                .map(command -> MedicalAttachment.create(visitId, null, result.getId(), command.originalFileName(),
-                        command.originalFileName(), "mock/clinical-results/" + result.getId() + "/" + UUID.randomUUID(),
-                        command.contentType(), command.fileSize(), null, attachmentType, actorId, now))
-                .toList());
     }
 
     private ClinicalResult findResult(UUID clinicalResultId) {

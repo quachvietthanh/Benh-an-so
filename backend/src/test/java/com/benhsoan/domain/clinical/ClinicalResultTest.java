@@ -53,6 +53,18 @@ class ClinicalResultTest {
         assertTrue(ClinicalResultType.FILE.requiresAttachment());
     }
 
+    @Test
+    void supportsNumberTextFileAndMixedResultTypes() {
+        assertEquals(ClinicalResultType.NUMBER, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.NUMBER));
+        assertEquals(ClinicalResultType.TEXT, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.TEXT));
+        assertEquals(ClinicalResultType.FILE, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.FILE));
+        assertEquals(ClinicalResultType.MIXED, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.MIXED));
+    }
+
     private ClinicalResult createDraft() {
         return ClinicalResult.create(
                 UUID.randomUUID(), UUID.randomUUID(), ClinicalResultType.NUMBER,

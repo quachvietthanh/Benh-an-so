@@ -8,6 +8,7 @@ import com.benhsoan.domain.clinical.MedicalAttachment;
 import com.benhsoan.port.outbound.repository.BaseRepository;
 
 public interface MedicalAttachmentRepository extends BaseRepository<MedicalAttachment, UUID> {
+    boolean existsByClinicalResultId(UUID clinicalResultId);
     List<MedicalAttachment> findByClinicalResultId(UUID clinicalResultId);
     List<MedicalAttachment> findByClinicalResultIdIn(Collection<UUID> clinicalResultIds);
     List<MedicalAttachment> saveAll(Collection<MedicalAttachment> attachments);

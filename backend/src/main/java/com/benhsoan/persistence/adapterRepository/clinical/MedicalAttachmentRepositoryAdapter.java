@@ -22,6 +22,7 @@ public class MedicalAttachmentRepositoryAdapter implements MedicalAttachmentRepo
     public Optional<MedicalAttachment> findById(UUID id) { return jpaRepository.findById(id).map(mapper::toDomain); }
     public MedicalAttachment save(MedicalAttachment attachment) { return mapper.toDomain(jpaRepository.save(mapper.toEntity(attachment))); }
     public void deleteById(UUID id) { if (id != null) jpaRepository.deleteById(id); }
+    public boolean existsByClinicalResultId(UUID resultId) { return resultId != null && jpaRepository.existsByClinicalResultId(resultId); }
     public List<MedicalAttachment> findByClinicalResultId(UUID resultId) { return jpaRepository.findByClinicalResultIdOrderByUploadedAtDesc(resultId).stream().map(mapper::toDomain).toList(); }
     public List<MedicalAttachment> findByClinicalResultIdIn(Collection<UUID> resultIds) {
         return resultIds == null || resultIds.isEmpty() ? List.of() : jpaRepository.findByClinicalResultIdIn(resultIds).stream().map(mapper::toDomain).toList();
