@@ -17,12 +17,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
@@ -47,6 +49,7 @@ public class MedicalRecordController {
     private final AmendMedicalRecordUseCase amendMedicalRecordUseCase;
     private final GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
     private final MedicalRecordRestMapper mapper;
+    private final MedicalRecordDetailRestMapper detailMapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -63,8 +66,8 @@ public class MedicalRecordController {
 
     @GetMapping("/visits/{visitId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
-    public MedicalRecordResponse getByVisitId(@PathVariable UUID visitId) {
-        return mapper.toResponse(getMedicalRecordUseCase.getByVisitId(visitId));
+    public MedicalRecordDetailResponse getByVisitId(@PathVariable UUID visitId) {
+        return detailMapper.toResponse(getMedicalRecordUseCase.getDetailByVisitId(visitId));
     }
 
     @PutMapping("/{medicalRecordId}")

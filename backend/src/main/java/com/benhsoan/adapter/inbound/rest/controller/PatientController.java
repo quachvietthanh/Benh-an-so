@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -14,12 +15,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.PatientRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
 import com.benhsoan.port.dto.result.PatientResult;
+import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
 import com.benhsoan.port.inbound.patient.SearchPatientUseCase;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
@@ -38,6 +42,10 @@ public class PatientController {
     private final SearchPatientUseCase searchPatientUseCase;
 
     private final UpdatePatientUseCase updatePatientUseCase;
+
+    private final GetMedicalRecordUseCase getMedicalRecordUseCase;
+
+    private final MedicalRecordDetailRestMapper medicalRecordDetailRestMapper;
 
     private final PatientRestMapper patientRestMapper;
 
@@ -88,6 +96,16 @@ public class PatientController {
                         patientRestMapper.toCommand(request));
 
         return patientRestMapper.toResponse(result);
+    }
+
+    @GetMapping("/{patientId}/medical-records")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    public List<MedicalRecordDetailResponse> getPatientMedicalRecords(
+            @PathVariable UUID patientId
+    ) {
+        return medicalRecordDetailRestMapper.toResponses(
+                getMedicalRecordUseCase.getHistoryByPatientId(patientId)
+        );
     }
 
 }

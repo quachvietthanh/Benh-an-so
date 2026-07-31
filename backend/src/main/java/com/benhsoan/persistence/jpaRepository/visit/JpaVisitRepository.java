@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.visit;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -10,4 +11,6 @@ import com.benhsoan.persistence.entity.visit.VisitEntity;
 public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {
 
     Optional<VisitEntity> findByVisitCode(String visitCode);
+
+    List<VisitEntity> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 }
