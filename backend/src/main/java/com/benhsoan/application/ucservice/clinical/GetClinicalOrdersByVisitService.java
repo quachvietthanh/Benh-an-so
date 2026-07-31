@@ -3,7 +3,6 @@ package com.benhsoan.application.ucservice.clinical;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;

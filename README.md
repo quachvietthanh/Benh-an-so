@@ -512,7 +512,19 @@ npm run dev
 ```
 
 ---
-REPLACE
+
+### 📋 Tra cứu Hồ sơ Bệnh án (NCL-04-CN-004)
+
+| Method | Endpoint | Mô tả | Vai trò |
+|--------|----------|-------|---------|
+| `GET` | `/medical-records/visits/{visitId}` | Chi tiết hồ sơ theo lượt khám (bệnh nhân + lượt khám + chẩn đoán ICD-10) | ADMIN, DOCTOR, NURSE |
+| `GET` | `/medical-records/patient/{patientId}` | Lịch sử hồ sơ của bệnh nhân (mới nhất trước) | ADMIN, DOCTOR, NURSE |
+| `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR, NURSE |
+| `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR, NURSE |
+
+> ✅ Mọi lượt **đọc** hồ sơ đều tự động ghi **audit log** vào `medical_record_access_logs` (QTN-02). Chi tiết payload & Postman: [`docs/api/medical-record-retrieval.md`](docs/api/medical-record-retrieval.md)
+
+---
 
 ## 🌍 Môi trường
 

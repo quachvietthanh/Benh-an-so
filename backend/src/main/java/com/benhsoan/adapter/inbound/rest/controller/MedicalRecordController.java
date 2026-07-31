@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -17,12 +18,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
@@ -35,7 +38,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/medical-records")
+@RequestMapping("/api/v1/medical-records")
 @RequiredArgsConstructor
 @Validated
 public class MedicalRecordController {
@@ -47,6 +50,7 @@ public class MedicalRecordController {
     private final AmendMedicalRecordUseCase amendMedicalRecordUseCase;
     private final GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
     private final MedicalRecordRestMapper mapper;
+    private final MedicalRecordDetailRestMapper detailMapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -63,8 +67,14 @@ public class MedicalRecordController {
 
     @GetMapping("/visits/{visitId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
-    public MedicalRecordResponse getByVisitId(@PathVariable UUID visitId) {
-        return mapper.toResponse(getMedicalRecordUseCase.getByVisitId(visitId));
+    public MedicalRecordDetailResponse getByVisitId(@PathVariable UUID visitId) {
+        return detailMapper.toResponse(getMedicalRecordUseCase.getDetailByVisitId(visitId));
+    }
+
+    @GetMapping("/patient/{patientId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    public List<MedicalRecordDetailResponse> getPatientMedicalRecords(@PathVariable UUID patientId) {
+        return detailMapper.toResponses(getMedicalRecordUseCase.getHistoryByPatientId(patientId));
     }
 
     @PutMapping("/{medicalRecordId}")
