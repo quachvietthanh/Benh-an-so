@@ -10,6 +10,7 @@ function AttachmentFilterBar({
   setSelectedCategory,
   selectedStatus,
   setSelectedStatus,
+  categoryOptions = CATEGORY_OPTIONS,
   onReload,
 }) {
   return (
@@ -30,7 +31,7 @@ function AttachmentFilterBar({
           onChange={setSelectedCategory}
           options={[
             { value: 'ALL', label: 'Tất cả loại kết quả' },
-            ...CATEGORY_OPTIONS.map((c) => ({ value: c.value, label: c.value })),
+            ...categoryOptions.map((c) => ({ value: c.value, label: c.label || c.value })),
           ]}
         />
       </Col>

@@ -7,16 +7,35 @@ import {
   FileTextOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import axiosClient from '../../api/axiosClient'
+
+// Live Database Category Options Loader from Backend CSDL
+export const fetchDatabaseCategoryOptions = async () => {
+  try {
+    const res = await axiosClient.get('/clinical-services', { params: { size: 200 } })
+    const items = res.data?.content || res.data || []
+    if (Array.isArray(items) && items.length > 0) {
+      const categoriesSet = new Set(items.map((item) => item.category || item.department || item.name))
+      return Array.from(categoriesSet).map((cat) => ({
+        value: cat,
+        label: cat,
+      }))
+    }
+  } catch (err) {
+    console.warn('Backend CSDL unavailable, falling back to default categories:', err)
+  }
+  return CATEGORY_OPTIONS
+}
 
 export const CATEGORY_OPTIONS = [
-  { value: 'Công thức máu', label: '🩸 Công thức máu 18-24 chỉ số', color: 'red' },
-  { value: 'Sinh hóa máu', label: '🧪 Sinh hóa máu (Glucose, Ure, Liver/Kidney)', color: 'gold' },
-  { value: 'X-quang', label: '🩻 X-quang (Ngực, Xương, Khớp)', color: 'blue' },
-  { value: 'Siêu âm', label: '🖥️ Siêu âm (Bụng, Tim, Giáp, Mạch)', color: 'cyan' },
-  { value: 'Nước tiểu', label: '🧪 Xét nghiệm Nước tiểu', color: 'purple' },
-  { value: 'CT Scanner', label: '🧠 Cắt lớp vi tính CT Scanner', color: 'magenta' },
-  { value: 'MRI', label: '🧲 Cộng hưởng từ MRI', color: 'geekblue' },
-  { value: 'Khác', label: '📋 Khác / Hồ sơ kết quả ngoài', color: 'default' },
+  { value: 'Công thức máu', label: 'Công thức máu (22 thông số)', color: 'red' },
+  { value: 'Sinh hóa máu', label: 'Sinh hóa máu (Glucose, Ure, Liver/Kidney)', color: 'gold' },
+  { value: 'X-quang', label: 'Chẩn đoán hình ảnh X-quang', color: 'blue' },
+  { value: 'Siêu âm', label: 'Siêu âm bụng / tim / giáp', color: 'cyan' },
+  { value: 'Nước tiểu', label: 'Xét nghiệm Nước tiểu (10 thông số)', color: 'purple' },
+  { value: 'CT Scanner', label: 'Chụp cắt lớp vi tính CT Scanner', color: 'magenta' },
+  { value: 'MRI', label: 'Chụp cộng hưởng từ MRI', color: 'geekblue' },
+  { value: 'Khác', label: 'Khác / Kết quả ngoại viện', color: 'default' },
 ]
 
 export const STATUS_MAP = {
