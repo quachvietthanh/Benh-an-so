@@ -35,7 +35,7 @@ import lombok.RequiredArgsConstructor;
  * @see MedicalQueueController
  */
 @RestController
-@RequestMapping("/api/v1/appointments/queue")
+@RequestMapping("/appointments/queue")
 @RequiredArgsConstructor
 public class LegacyAppointmentQueueController {
 
@@ -48,9 +48,10 @@ public class LegacyAppointmentQueueController {
     private final CurrentUserPort currentUserPort;
 
     /**
-     * GET /api/v1/appointments/queue
+     * GET /appointments/queue
      *
-     * Legacy endpoint: returns all active queue items as a flat JSON array.
+     * Legacy endpoint (runtime URL: /api/v1/appointments/queue via servlet context-path):
+     * returns all active queue items as a flat JSON array.
      * Frontend expects response.data to be an array of queue items
      * with fields: id, patientName, doctorName, status, checkedInAt, etc.
      *
@@ -80,9 +81,10 @@ public class LegacyAppointmentQueueController {
     }
 
     /**
-     * POST /api/v1/appointments/queue/call-next
+     * POST /appointments/queue/call-next
      *
-     * Legacy endpoint: calls the next WAITING patient.
+     * Legacy endpoint (runtime URL: /api/v1/appointments/queue/call-next via servlet context-path):
+     * calls the next WAITING patient.
      * The doctor ID is extracted from the currently authenticated user.
      * Uses "DEFAULT" as the room number since the legacy frontend
      * does not send a room.

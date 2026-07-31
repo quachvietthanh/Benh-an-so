@@ -89,11 +89,11 @@ class MedicalRecordControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/medical-records/visits/{visitId} - 200 OK with detail content")
+    @DisplayName("GET /medical-records/visits/{visitId} - 200 OK with detail content")
     void getByVisitIdReturnsDetail() throws Exception {
         when(getMedicalRecordUseCase.getDetailByVisitId(visitId)).thenReturn(detailResult());
 
-        mockMvc.perform(get("/api/v1/medical-records/visits/{visitId}", visitId))
+        mockMvc.perform(get("/medical-records/visits/{visitId}", visitId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.medicalRecordId").value(recordId.toString()))
                 .andExpect(jsonPath("$.patient.fullName").value("Nguyen Van A"))
@@ -108,12 +108,12 @@ class MedicalRecordControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/medical-records/patient/{patientId} - 200 OK with history list")
+    @DisplayName("GET /medical-records/patient/{patientId} - 200 OK with history list")
     void getPatientMedicalRecordsReturnsHistory() throws Exception {
         when(getMedicalRecordUseCase.getHistoryByPatientId(patientId))
                 .thenReturn(List.of(detailResult()));
 
-        mockMvc.perform(get("/api/v1/medical-records/patient/{patientId}", patientId))
+        mockMvc.perform(get("/medical-records/patient/{patientId}", patientId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].medicalRecordId").value(recordId.toString()))
                 .andExpect(jsonPath("$[0].patient.fullName").value("Nguyen Van A"))
@@ -123,12 +123,12 @@ class MedicalRecordControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/medical-records/patient/{patientId} - empty list when no records")
+    @DisplayName("GET /medical-records/patient/{patientId} - empty list when no records")
     void getPatientMedicalRecordsReturnsEmptyList() throws Exception {
         when(getMedicalRecordUseCase.getHistoryByPatientId(patientId))
                 .thenReturn(List.of());
 
-        mockMvc.perform(get("/api/v1/medical-records/patient/{patientId}", patientId))
+        mockMvc.perform(get("/medical-records/patient/{patientId}", patientId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
