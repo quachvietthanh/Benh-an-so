@@ -2,6 +2,7 @@ package com.benhsoan.domain.clinical;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,6 +44,25 @@ class ClinicalResultTest {
     void rejectsCorrectionBeforeFinalization() {
         assertThrows(ClinicalResultInvalidStatusException.class,
                 () -> createDraft().markCorrected(UUID.randomUUID(), now));
+    }
+
+    @Test
+    void mapsFileDataTypeToFileResultType() {
+        assertEquals(ClinicalResultType.FILE,
+                ClinicalResultType.from(com.benhsoan.domain.clinical.enums.ClinicalResultDataType.FILE));
+        assertTrue(ClinicalResultType.FILE.requiresAttachment());
+    }
+
+    @Test
+    void supportsNumberTextFileAndMixedResultTypes() {
+        assertEquals(ClinicalResultType.NUMBER, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.NUMBER));
+        assertEquals(ClinicalResultType.TEXT, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.TEXT));
+        assertEquals(ClinicalResultType.FILE, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.FILE));
+        assertEquals(ClinicalResultType.MIXED, ClinicalResultType.from(
+                com.benhsoan.domain.clinical.enums.ClinicalResultDataType.MIXED));
     }
 
     private ClinicalResult createDraft() {

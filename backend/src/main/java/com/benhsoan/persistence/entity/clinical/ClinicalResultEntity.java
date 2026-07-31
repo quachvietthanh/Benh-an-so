@@ -32,7 +32,7 @@ public class ClinicalResultEntity {
     @Id
     @Column(columnDefinition = "BINARY(16)")
     UUID id;
-    @Column(name = "clinical_order_item_id", nullable = false, columnDefinition = "BINARY(16)")
+    @Column(name = "clinical_order_item_id", nullable = false, unique = true, columnDefinition = "BINARY(16)")
     UUID clinicalOrderItemId;
     @Column(name = "visit_id", nullable = false, columnDefinition = "BINARY(16)")
     UUID visitId;

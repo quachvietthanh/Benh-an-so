@@ -11,5 +11,5 @@ public record MedicalRecordResponse(
         String doctorInstructions, String conclusion, MedicalRecordStatus status,
         Instant lockedAt, UUID lockedBy, UUID createdBy, Instant createdAt,
         UUID updatedBy, Instant updatedAt
-) {
+        ) {
 }
