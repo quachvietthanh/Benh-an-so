@@ -63,6 +63,13 @@ export const isAppointmentPast15Mins = (appointment, now = dayjs()) => {
   const activeStatuses = ['SCHEDULED', 'CHECKED_IN', 'WAITING']
   if (!activeStatuses.includes(appointment.status)) return false
 
+  if (appointment.appointmentAt && !appointment.slot && !appointment.startTime) {
+    const deadline = getNoShowDeadline(appointment.appointmentAt)
+    if (deadline && deadline.isValid()) {
+      return dayjs(now).isAfter(deadline) || dayjs(now).isSame(deadline)
+    }
+  }
+
   const { overdueThreshold } = getAppointmentSlotTimes(appointment)
   if (!overdueThreshold || !overdueThreshold.isValid()) return false
 
@@ -74,6 +81,16 @@ export const isAppointmentOverdue = (appointment, now = dayjs()) => {
 }
 
 export const getOverdueMinutes = (appointment, now = dayjs()) => {
+  if (!appointment) return 0
+
+  if (appointment.appointmentAt && !appointment.slot && !appointment.startTime) {
+    const appAt = dayjs(appointment.appointmentAt)
+    if (appAt.isValid()) {
+      const diff = dayjs(now).diff(appAt, 'minute')
+      return Math.max(0, diff)
+    }
+  }
+
   const { overdueThreshold, endTime } = getAppointmentSlotTimes(appointment)
   if (!overdueThreshold || !overdueThreshold.isValid()) return 0
 

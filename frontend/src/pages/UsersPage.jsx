@@ -209,7 +209,6 @@ function UsersPage() {
       message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
       return
     }
-
     const isActivating = account.active === false
     Modal.confirm({
       title: isActivating ? 'Kích hoạt tài khoản?' : 'Vô hiệu hóa tài khoản?',
