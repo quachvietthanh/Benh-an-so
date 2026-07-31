@@ -12,4 +12,6 @@ public interface MedicalQueueRepository extends BaseRepository<MedicalQueue, UUI
     Optional<MedicalQueue> findByDoctorIdAndQueueDate(UUID doctorId, LocalDate queueDate);
 
     Optional<MedicalQueue> findByDoctorIdAndQueueDateForUpdate(UUID doctorId, LocalDate queueDate);
+
+    Optional<MedicalQueue> findByIdForUpdate(UUID medicalQueueId);
 }

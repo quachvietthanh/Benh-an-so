@@ -18,4 +18,5 @@ public class DoctorRoomAssignmentRepositoryAdapter implements DoctorRoomAssignme
     private final JpaDoctorRoomAssignmentRepository jpaRepository;
     private final QueueStructurePersistenceMapper mapper;
     public Optional<DoctorRoomAssignment> findByDoctorId(UUID doctorId) { return jpaRepository.findByDoctorId(doctorId).map(mapper::toDomain); }
+    public Optional<DoctorRoomAssignment> findByDoctorIdForUpdate(UUID doctorId) { return jpaRepository.findByDoctorIdForUpdate(doctorId).map(mapper::toDomain); }
 }

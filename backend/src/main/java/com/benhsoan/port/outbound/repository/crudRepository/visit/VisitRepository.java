@@ -17,6 +17,8 @@ public interface VisitRepository extends BaseRepository<Visit, UUID> {
 
     Optional<Visit> findById(UUID visitId);
 
+    Optional<Visit> findByIdForUpdate(UUID visitId);
+
     List<Visit> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 
     boolean existsByPatientIdAndStatusIn(UUID patientId, Collection<VisitStatus> statuses);

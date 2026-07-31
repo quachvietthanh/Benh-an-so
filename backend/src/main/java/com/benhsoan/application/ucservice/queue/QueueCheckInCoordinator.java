@@ -61,7 +61,7 @@ class QueueCheckInCoordinator {
         LocalDate queueDate = checkedInAt.atZone(CLINIC_ZONE_ID).toLocalDate();
         ensurePatientHasNoActiveCareFlow(patientId, queueDate);
 
-        DoctorRoomAssignment assignment = doctorRoomAssignmentRepository.findByDoctorId(doctorId)
+        DoctorRoomAssignment assignment = doctorRoomAssignmentRepository.findByDoctorIdForUpdate(doctorId)
                 .orElseThrow(() -> new DoctorRoomAssignmentNotFoundException(doctorId));
         roomRepository.findActiveById(assignment.getRoomId())
                 .orElseThrow(() -> new DoctorRoomAssignmentNotFoundException(doctorId));
@@ -69,7 +69,7 @@ class QueueCheckInCoordinator {
         MedicalQueue medicalQueue = getOrCreateOpenQueue(doctorId, assignment.getRoomId(), queueDate, checkedInAt);
         Visit visit = Visit.create(visitCodeGenerator.generate(), patientId, doctorId, appointmentId, null,
                 sourceType == QueueItemSourceType.APPOINTMENT ? VisitType.APPOINTMENT : VisitType.WALK_IN,
-                checkedInAt, reason, note, actorId);
+                checkedInAt, reason, note, actorId, checkedInAt);
         Visit savedVisit = visitRepository.save(visit);
 
         int queueNumber = queueItemRepository.findMaxQueueNumber(medicalQueue.getId()) + 1;

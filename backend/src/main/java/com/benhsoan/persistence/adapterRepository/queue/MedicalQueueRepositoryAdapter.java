@@ -46,4 +46,9 @@ public class MedicalQueueRepositoryAdapter implements MedicalQueueRepository {
     public Optional<MedicalQueue> findByDoctorIdAndQueueDateForUpdate(UUID doctorId, LocalDate queueDate) {
         return jpaRepository.findByDoctorIdAndQueueDateForUpdate(doctorId, queueDate).map(mapper::toDomain);
     }
+
+    @Override
+    public Optional<MedicalQueue> findByIdForUpdate(UUID medicalQueueId) {
+        return jpaRepository.findByIdForUpdate(medicalQueueId).map(mapper::toDomain);
+    }
 }

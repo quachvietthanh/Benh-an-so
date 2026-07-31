@@ -2,6 +2,7 @@ package com.benhsoan.persistence.jpaRepository.queue;
 
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.Lock;
@@ -26,4 +27,15 @@ public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, U
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select item from QueueItemEntity item where item.id = :id")
     Optional<QueueItemEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    @Query("select item from QueueItemEntity item join MedicalQueueEntity queue on queue.id = item.medicalQueueId "
+            + "where queue.queueDate = :queueDate and (:doctorId is null or queue.doctorId = :doctorId) "
+            + "and (:roomId is null or queue.roomId = :roomId) order by queue.doctorId, item.queueNumber")
+    List<QueueItemEntity> findQueueBoard(@Param("queueDate") LocalDate queueDate, @Param("doctorId") UUID doctorId,
+            @Param("roomId") UUID roomId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select item from QueueItemEntity item where item.medicalQueueId = :medicalQueueId "
+            + "and item.status = 'WAITING' order by item.queueNumber")
+    List<QueueItemEntity> findWaitingForUpdate(@Param("medicalQueueId") UUID medicalQueueId);
 }

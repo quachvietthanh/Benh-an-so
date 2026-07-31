@@ -14,7 +14,6 @@ import {
   Select,
   Space,
   Table,
-  Tabs,
   Tooltip,
 } from 'antd'
 import {
@@ -48,8 +47,6 @@ import {
 import {
   mergeAppointments,
   saveStoredAppointment,
-  mergeQueue,
-  saveStoredQueueItem,
   mergePatients,
 } from '../utils/storageHelpers'
 
@@ -144,17 +141,16 @@ function AppointmentQueue() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('appointments')
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [doctorFilter, setDoctorFilter] = useState('ALL')
   const [departmentFilter, setDepartmentFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [appointmentSearchDraft, setAppointmentSearchDraft] = useState('')
   const [appointmentKeyword, setAppointmentKeyword] = useState('')
-  const [queueKeyword, setQueueKeyword] = useState('')
   const [appointmentPage, setAppointmentPage] = useState(1)
   const [appointmentPageSize, setAppointmentPageSize] = useState(10)
   const [queuePage, setQueuePage] = useState(1)
+  const [queueKeyword, setQueueKeyword] = useState('')
   const [queueNow, setQueueNow] = useState(dayjs())
   const [bookOpen, setBookOpen] = useState(false)
   const [cancelItem, setCancelItem] = useState(null)
@@ -173,9 +169,8 @@ function AppointmentQueue() {
   const loadData = useCallback(async (includeDirectories = true) => {
     setLoading(true)
     try {
-      const [appointmentResult, queueResult, patientResult, doctorResult] = await Promise.allSettled([
+      const [appointmentResult, patientResult, doctorResult] = await Promise.allSettled([
         appointmentApi.getAll(),
-        appointmentApi.getQueue(),
         includeDirectories ? loadPatientDirectory() : Promise.resolve(null),
         includeDirectories ? userApi.getDoctors() : Promise.resolve(null),
       ])
@@ -184,12 +179,6 @@ function AppointmentQueue() {
       if (appointmentResult.status === 'fulfilled') {
         const resData = appointmentResult.value?.data
         apiApps = Array.isArray(resData) ? resData : (resData?.content || [])
-      }
-
-      let apiQ = []
-      if (queueResult.status === 'fulfilled') {
-        const resData = queueResult.value?.data
-        apiQ = Array.isArray(resData) ? resData : (resData?.content || [])
       }
 
       const mockList = getAppointments().map((item) => {
@@ -207,9 +196,6 @@ function AppointmentQueue() {
 
       const mergedApps = mergeAppointments(apiApps.length ? apiApps : mockList)
       setAppointments(mergedApps)
-
-      const mergedQ = mergeQueue(apiQ.length ? apiQ : mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED' || item.status === 'WAITING'))
-      setQueue(mergedQ)
 
       if (includeDirectories && patientResult.status === 'fulfilled' && Array.isArray(patientResult.value)) {
         setPatients(mergePatients(patientResult.value))
@@ -237,7 +223,6 @@ function AppointmentQueue() {
         }
       })
       setAppointments(mergeAppointments(mockList))
-      setQueue(mergeQueue(mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED' || item.status === 'WAITING')))
       setPatients(mergePatients(getPatients()))
     } finally {
       setLoading(false)
@@ -464,8 +449,7 @@ function AppointmentQueue() {
       appointmentAt: startTime,
       startTime,
       endTime,
-      status: 'CHECKED_IN',
-      checkedInAt: new Date().toISOString(),
+      status: 'SCHEDULED',
       createdAt: new Date().toISOString(),
     }
 
@@ -486,15 +470,11 @@ function AppointmentQueue() {
       const res = await appointmentApi.create(payload)
       const created = res?.data ? { ...newApp, ...res.data } : newApp
       saveStoredAppointment(created)
-      saveStoredQueueItem(queueItem)
       setAppointments((prev) => mergeAppointments([created, ...prev]))
-      setQueue((prev) => mergeQueue([queueItem, ...prev]))
       message.success('Đặt lịch hẹn & vào hàng đợi thành công')
     } catch {
       saveStoredAppointment(newApp)
-      saveStoredQueueItem(queueItem)
       setAppointments((prev) => mergeAppointments([newApp, ...prev]))
-      setQueue((prev) => mergeQueue([queueItem, ...prev]))
       message.success('Đặt lịch hẹn & vào hàng đợi thành công')
     } finally {
       closeBooking()
@@ -534,9 +514,7 @@ function AppointmentQueue() {
     }
 
     saveStoredAppointment(updatedApp)
-    saveStoredQueueItem(queueItem)
     setAppointments((prev) => mergeAppointments([updatedApp, ...prev]))
-    setQueue((prev) => mergeQueue([queueItem, ...prev]))
     message.success(`Đã check-in và đưa bệnh nhân ${item.patientName} vào hàng đợi khám`)
     setActionLoading(false)
   }
@@ -557,7 +535,6 @@ function AppointmentQueue() {
 
     saveStoredAppointment(updatedApp)
     setAppointments((current) => current.map((item) => (item.id === cancelledId ? updatedApp : item)))
-    setQueue((current) => current.filter((item) => item.id !== cancelledId && item.appointmentId !== cancelledId))
     setDetailItem((current) => (current?.id === cancelledId ? updatedApp : current))
     message.success('Đã hủy lịch hẹn và giải phóng khung giờ')
     setCancelItem(null)
@@ -585,7 +562,6 @@ function AppointmentQueue() {
 
     saveStoredAppointment(updatedApp)
     setAppointments((current) => current.map((item) => (item.id === appointmentId ? updatedApp : item)))
-    setQueue((current) => current.filter((item) => item.id !== appointmentId && item.appointmentId !== appointmentId))
     setDetailItem((current) => (current?.id === appointmentId ? updatedApp : current))
     message.success('Đã ghi nhận bệnh nhân không đến')
     setNoShowItem(null)
@@ -1115,7 +1091,7 @@ function AppointmentQueue() {
         description="Hiển thị lịch hẹn quá hạn 15 phút so với giờ khám đăng ký => Hệ thống hiển thị trực tiếp nút [Không đến] để đánh dấu bệnh nhân không đến."
       />
 
-      <Tabs className="appointment-tabs" activeKey={activeTab} items={tabItems} onChange={setActiveTab} />
+      {appointmentContent}
 
       <Modal
         className="appointment-form-modal"

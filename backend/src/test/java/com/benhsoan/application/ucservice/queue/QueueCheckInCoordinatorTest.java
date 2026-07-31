@@ -66,7 +66,7 @@ class QueueCheckInCoordinatorTest {
         when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(mock(Patient.class)));
         when(visitRepository.existsByPatientIdAndStatusIn(any(), any())).thenReturn(false);
         when(queueItemRepository.existsByPatientIdAndQueueDateAndStatusIn(any(), any(), any())).thenReturn(false);
-        when(assignmentRepository.findByDoctorId(doctorId)).thenReturn(Optional.of(
+        when(assignmentRepository.findByDoctorIdForUpdate(doctorId)).thenReturn(Optional.of(
                 DoctorRoomAssignment.restore(UUID.randomUUID(), doctorId, roomId, actorId, now)));
         when(roomRepository.findActiveById(roomId)).thenReturn(Optional.of(
                 Room.restore(roomId, "P101", "Phong 101", true, now, now)));

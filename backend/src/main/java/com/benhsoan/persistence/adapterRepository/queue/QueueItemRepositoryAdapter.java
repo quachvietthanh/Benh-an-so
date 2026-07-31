@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 import org.springframework.stereotype.Repository;
 
@@ -56,5 +57,15 @@ public class QueueItemRepositoryAdapter implements QueueItemRepository {
     @Override
     public int findMaxQueueNumber(UUID medicalQueueId) {
         return jpaRepository.findMaxQueueNumber(medicalQueueId);
+    }
+
+    @Override
+    public List<QueueItem> findQueueBoard(LocalDate queueDate, UUID doctorId, UUID roomId) {
+        return jpaRepository.findQueueBoard(queueDate, doctorId, roomId).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public Optional<QueueItem> findNextWaitingForUpdate(UUID medicalQueueId) {
+        return jpaRepository.findWaitingForUpdate(medicalQueueId).stream().findFirst().map(mapper::toDomain);
     }
 }

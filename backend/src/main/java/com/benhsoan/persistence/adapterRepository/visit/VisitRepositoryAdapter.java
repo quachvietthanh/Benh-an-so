@@ -28,6 +28,11 @@ public class VisitRepositoryAdapter implements VisitRepository {
     }
 
     @Override
+    public Optional<Visit> findByIdForUpdate(UUID visitId) {
+        return jpaRepository.findByIdForUpdate(visitId).map(mapper::toDomain);
+    }
+
+    @Override
     public Visit save(Visit visit) {
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(visit)));
     }

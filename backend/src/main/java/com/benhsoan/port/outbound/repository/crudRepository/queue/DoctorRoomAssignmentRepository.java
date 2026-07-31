@@ -5,4 +5,8 @@ import java.util.UUID;
 
 import com.benhsoan.domain.queue.DoctorRoomAssignment;
 
-public interface DoctorRoomAssignmentRepository { Optional<DoctorRoomAssignment> findByDoctorId(UUID doctorId); }
+public interface DoctorRoomAssignmentRepository {
+    Optional<DoctorRoomAssignment> findByDoctorId(UUID doctorId);
+
+    Optional<DoctorRoomAssignment> findByDoctorIdForUpdate(UUID doctorId);
+}

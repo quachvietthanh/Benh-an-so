@@ -64,6 +64,13 @@ public class Visit {
         return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, type, VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy, Instant.now(), null);
     }
 
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            VisitType type, Instant visitAt, String reason, String note, UUID createdBy, Instant createdAt) {
+        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, type,
+                VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy,
+                Objects.requireNonNull(createdAt), null);
+    }
+
     public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt, String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
         return new Visit(id, code, patientId, doctorId, appointmentId, queueItemId, type, status, visitAt, startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
     }
