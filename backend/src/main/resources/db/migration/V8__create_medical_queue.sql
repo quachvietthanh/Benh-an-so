@@ -59,7 +59,6 @@ CREATE TABLE queue_items (
     CONSTRAINT pk_queue_items PRIMARY KEY (id),
     CONSTRAINT uk_queue_items_appointment UNIQUE (appointment_id),
     CONSTRAINT uk_queue_items_visit UNIQUE (visit_id),
-    CONSTRAINT uk_queue_items_patient_date UNIQUE (patient_id, queue_date),
     CONSTRAINT uk_queue_items_queue_number UNIQUE (medical_queue_id, queue_number),
     CONSTRAINT fk_queue_items_queue FOREIGN KEY (medical_queue_id) REFERENCES medical_queues(id),
     CONSTRAINT fk_queue_items_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
@@ -72,7 +71,7 @@ CREATE TABLE queue_items (
 CREATE INDEX idx_rooms_active ON rooms(active);
 CREATE INDEX idx_medical_queues_room_date ON medical_queues(room_id, queue_date);
 CREATE INDEX idx_queue_items_queue_status_number ON queue_items(medical_queue_id, status, queue_number);
-CREATE INDEX idx_queue_items_patient ON queue_items(patient_id);
+CREATE INDEX idx_queue_items_patient_date_status ON queue_items(patient_id, queue_date, status);
 CREATE INDEX idx_queue_items_visit ON queue_items(visit_id);
 
 INSERT INTO rooms (id, room_code, room_name, active, created_at, updated_at) VALUES

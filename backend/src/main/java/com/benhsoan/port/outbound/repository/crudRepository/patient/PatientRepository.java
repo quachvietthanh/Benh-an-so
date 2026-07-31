@@ -25,6 +25,8 @@ public interface PatientRepository extends BaseRepository<Patient, UUID> {
     boolean existsByIdentityNumberAndIdNot( String identityNumber, UUID id);
 
     Optional<Patient> findByUserId(UUID userId);
+
+    Optional<Patient> findByIdForUpdate(UUID patientId);
     
     Page<Patient> search( SearchPatientCommand command);
 }

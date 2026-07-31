@@ -122,6 +122,15 @@ public class Visit {
         this.updatedAt = Objects.requireNonNull(at);
     }
 
+    public void assignQueueItem(UUID queueItemId, Instant assignedAt) {
+        require(VisitStatus.WAITING);
+        if (this.queueItemId != null) {
+            throw new VisitInvalidStatusException("Visit is already linked to a queue item.");
+        }
+        this.queueItemId = Guard.require(queueItemId, "Queue item id");
+        this.updatedAt = Guard.require(assignedAt, "Assigned at");
+    }
+
     public void updateNote(String note, Instant at) {
         if (status == VisitStatus.COMPLETED || status == VisitStatus.CANCELLED) {
             throw new VisitInvalidStatusException("Finished visits cannot be updated.");

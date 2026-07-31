@@ -14,26 +14,8 @@ public class MedicalQueuePersistenceMapper {
             return null;
         }
 
-        return MedicalQueue.restore(
-                entity.getId(),
-                entity.getPatientId(),
-                entity.getDoctorId(),
-                entity.getRoomNumber(),
-                entity.getQueueNumber(),
-                entity.getStatus(),
-                entity.getPriorityLevel(),
-                entity.getNotes(),
-                entity.getCheckedInAt(),
-                entity.getCalledAt(),
-                entity.getStartedAt(),
-                entity.getWaitingForResultAt(),
-                entity.getCompletedAt(),
-                entity.getCancelledAt(),
-                entity.getCancelReason(),
-                entity.getCreatedBy(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
-        );
+        return MedicalQueue.restore(entity.getId(), entity.getDoctorId(), entity.getRoomId(), entity.getQueueDate(),
+                entity.getStatus(), entity.getCreatedAt(), entity.getUpdatedAt());
     }
 
     public MedicalQueueEntity toEntity(MedicalQueue domain) {
@@ -44,21 +26,10 @@ public class MedicalQueuePersistenceMapper {
 
         return MedicalQueueEntity.builder()
                 .id(domain.getId())
-                .patientId(domain.getPatientId())
                 .doctorId(domain.getDoctorId())
-                .roomNumber(domain.getRoomNumber())
-                .queueNumber(domain.getQueueNumber())
+                .roomId(domain.getRoomId())
+                .queueDate(domain.getQueueDate())
                 .status(domain.getStatus())
-                .priorityLevel(domain.getPriorityLevel())
-                .notes(domain.getNotes())
-                .checkedInAt(domain.getCheckedInAt())
-                .calledAt(domain.getCalledAt())
-                .startedAt(domain.getStartedAt())
-                .waitingForResultAt(domain.getWaitingForResultAt())
-                .completedAt(domain.getCompletedAt())
-                .cancelledAt(domain.getCancelledAt())
-                .cancelReason(domain.getCancelReason())
-                .createdBy(domain.getCreatedBy())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

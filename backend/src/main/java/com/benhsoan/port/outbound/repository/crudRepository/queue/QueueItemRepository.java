@@ -1,9 +1,22 @@
 package com.benhsoan.port.outbound.repository.crudRepository.queue;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.benhsoan.domain.queue.QueueItem;
+import com.benhsoan.domain.queue.enums.QueueItemStatus;
+import com.benhsoan.port.outbound.repository.BaseRepository;
 
-public interface QueueItemRepository { Optional<QueueItem> findByAppointmentId(UUID appointmentId); boolean existsByPatientIdAndQueueDate(UUID patientId, LocalDate queueDate); }
+public interface QueueItemRepository extends BaseRepository<QueueItem, UUID> {
+
+    Optional<QueueItem> findByAppointmentId(UUID appointmentId);
+
+    Optional<QueueItem> findByIdForUpdate(UUID id);
+
+    boolean existsByPatientIdAndQueueDateAndStatusIn(UUID patientId, LocalDate queueDate,
+            Collection<QueueItemStatus> statuses);
+
+    int findMaxQueueNumber(UUID medicalQueueId);
+}
