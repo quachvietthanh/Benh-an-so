@@ -21,6 +21,7 @@ import {
   SettingOutlined,
   SafetyCertificateOutlined,
   BellOutlined,
+  PaperClipOutlined,
   ExperimentOutlined,
   FileDoneOutlined,
 } from '@ant-design/icons'

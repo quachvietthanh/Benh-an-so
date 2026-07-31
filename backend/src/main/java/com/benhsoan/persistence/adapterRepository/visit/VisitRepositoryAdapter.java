@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.visit;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,5 +38,12 @@ public class VisitRepositoryAdapter implements VisitRepository {
     @Override
     public Optional<Visit> findByVisitCode(String visitCode) {
         return jpaRepository.findByVisitCode(visitCode).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Visit> findByPatientIdOrderByVisitAtDesc(UUID patientId) {
+        return jpaRepository.findByPatientIdOrderByVisitAtDesc(patientId).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 }
