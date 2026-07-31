@@ -67,16 +67,30 @@ export const ClinicalOrderTable = ({
       title: 'Dịch vụ chỉ định',
       dataIndex: 'items',
       key: 'items',
-      width: 240,
+      width: 250,
       render: (items = []) => (
-        <Space direction="vertical" size={2} style={{ width: '100%' }}>
+        <Space direction="vertical" size={3} style={{ width: '100%' }}>
           {items.slice(0, 2).map((item, idx) => (
-            <Tag key={idx} color="blue" style={{ borderRadius: 4, margin: 0, fontSize: 11 }}>
-              [{item.serviceCode || 'CLS'}] {item.serviceName}
-            </Tag>
+            <Tooltip key={idx} title={`[${item.serviceCode || 'CLS'}] ${item.serviceName}`}>
+              <Tag
+                color="blue"
+                style={{
+                  borderRadius: 4,
+                  margin: 0,
+                  fontSize: 11,
+                  maxWidth: 235,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  display: 'block',
+                }}
+              >
+                [{item.serviceCode || 'CLS'}] {item.serviceName}
+              </Tag>
+            </Tooltip>
           ))}
           {items.length > 2 && (
-            <Tag color="purple" style={{ borderRadius: 4, fontSize: 11 }}>
+            <Tag color="purple" style={{ borderRadius: 4, fontSize: 11, margin: 0 }}>
               +{items.length - 2} dịch vụ khác...
             </Tag>
           )}
