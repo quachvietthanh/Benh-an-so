@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF)](https://vitejs.dev/)
 [![Ant Design](https://img.shields.io/badge/Ant_Design-5-1677FF)](https://ant.design/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8-4479A1)](https://www.mysql.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
@@ -125,8 +125,9 @@
                            │ JPA / Hibernate
 ┌──────────────────────────┴───────────────────────────────────────┐
 │                         Database                                  │
-│  Dev:  H2 (In-memory)    - jdbc:h2:mem:benhsoandb                │
-│  Prod: MySQL 16     - jdbc:myysql://localhost:2060/...   │
+│  Local: MySQL 8  - jdbc:mysql://localhost:3306/digital_medical_record  │
+│  Dev:   TiDB Cloud (MySQL-compatible) - gateway01.ap-southeast-1...   │
+│  Prod:  MySQL 8  - jdbc:mysql://... (từ env DB_URL/DB_USERNAME/DB_PASSWORD) │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -140,188 +141,68 @@
 Bệnh án số/
 │
 ├── backend/
-│   │
-│   ├── src/
-│   │   │
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── com/
-│   │   │   │       └── benhsoan/
-│   │   │   │
-│   │   │   │           ├── BenhSoAnApplication.java
-│   │   │   │
-│   │   │   │           ├── config/
-│   │   │   │           │   ├── SecurityConfig.java
-│   │   │   │           │   ├── SwaggerConfig.java
-│   │   │   │           │   └── ....
-│   │   │   │
-│   │   │   │
-│   │   │   │           ├── adapter/
-│   │   │   │           │
-│   │   │   │           │   ├── inbound/
-│   │   │   │           │   │
-│   │   │   │           │   │   ├── rest/ 
-│   │   │   │           │   │             └── controller/
-│   │   │   │           │   │             └── request/
-│   │   │   │           │   │             └── response/
-│   │   │   │           │   │             └── mapper/
-│   │   │   │           │   │
-│   │   │   │           │   │   ├── websocket/
-│   │   │   │           │   │   ├── scheduler/
-│   │   │   │           │   │   └── listener/
-│   │   │   │           │
-│   │   │   │
-│   │   │   │           ├── application/
-│   │   │   │           │
-│   │   │   │           │   ├── ucservice/
-│   │   │   │           │   │
-│   │   │   │           │   │   ├── auth
-│   │   │   │           │   │   ├── patient
-│   │   │   │           │   │   ├── user
-│   │   │   │           │   │   └── ...
-
-│   │   │   │           │   ├── mapper/
-│   │   │   │           │   ├── assembler/
-│   │   │   │           │   └── event/
-│   │   │   │           │       ├── publisher/
-│   │   │   │           │       └── listener/
-│   │   │   │
-│   │   │   │
-│   │   │   │           ├── port/
-│   │   │   │           │
-│   │   │   │           │   ├── inbound/
-│   │   │   │           │   │   ├── auth/
-│   │   │   │           │   │   ├── patient/
-│   │   │   │           │   │   ├── ....
-│   │   │   │           │
-│   │   │   │           │   ├── outbound/
-│   │   │   │           │   │   ├── repository/
-│   │   │   │           │   │   │              └── crudRepository/
-│   │   │   │           │   │   │              │                   └── auth/
-│   │   │   │           │   │   │              │                   └── patient/
-│   │   │   │           │   │   │              │                   └── user/
-│   │   │   │           │   │   │              │                   └── ...
-│   │   │   │           │   │   │              └── logRepository/
-│   │   │   │           │   │   │                                  └── ....
-│   │   │   │           │   │   │                                  └── ....
-
-│   │   │   │           │   │   ├── storage/
-│   │   │   │           │   │   ├── notification/
-│   │   │   │           │   │   ├── email/
-│   │   │   │           │   │   ├── jwt/
-│   │   │   │           │   │   ├── cache/
-│   │   │   │           │   │   └── external/
-│   │   │   │           │
-│   │   │   │           │   └── dto/
-│   │   │   │           │       ├── command/
-│   │   │   │           │       ├── query/
-│   │   │   │           │       └── result/
-│   │   │   │
-│   │   │   │
-│   │   │   │           ├── domain/
-│   │   │   │           │   ├── auth/
-│   │   │   │           │   ├── patient/
-│   │   │   │           │   ├── medicalrecord/
-│   │   │   │           │   ├── ...
-│   │   │   │           │   └── shared/
-│   │   │   │           │       ├── entity/
-│   │   │   │           │       ├── valueobject/
-│   │   │   │           │       ├── enums/
-│   │   │   │           │       ├── event/
-│   │   │   │           │       ├── exception/
-│   │   │   │           │                        ├── DomainException.java
-│   │   │   │           │                        └── ValidationException.java
-│   │   │   │           │       ├── validator/
-│   │   │   │           │       ├── guard/
-│   │   │   │           │       └── specification/
-│   │   │   │
-│   │   │   │
-│   │   │   │           ├── persistence/
-│   │   │   │           │   ├── jpaRepo/
-│   │   │   │           │   ├── entity/
-│   │   │   │           │   ├── adapterRepo/
-│   │   │   │           │   └── mapper/
-│   │   │   │
-│   │   │   │
-│   │   │   │           ├── infrastructure/
-│   │   │   │           │   ├── authSecurity
-│   │   │   │           │   ├── redis/
-│   │   │   │           │   ├── kafka/
-│   │   │   │           │   ├── mail/
-│   │   │   │           │   ├── storage/
-│   │   │   │           │   │   ├── cloudinary/
-│   │   │   │           │   │   ├── minio/
-│   │   │   │           │   │   └── local/
-│   │   │   │           │   ├── cache/
-│   │   │   │           │   ├── scheduler/
-│   │   │   │           │   └── external/
-│   │   │   │
-│   │   │   │
-│   │   │   │           ├── common/
-│   │   │   │           │   ├── annotation/
-│   │   │   │           │   ├── constant/
-│   │   │   │           │   ├── exception/
-│   │   │   │           │   ├── response/
-│   │   │   │           │   ├── util/
-│   │   │   │           │   └── validator/
-│   │   │   │
-│   │   │   │
-│   │   │   │           └── exception/
-│   │   │   │               ├── GlobalExceptionHandler.java
-│   │   │   │               └── ApiResponse.java
-│   │   │
-│   │   └── resources/
-│   │       ├── application.properties
-│   │       ├── application-dev.properties
-│   │       ├── application-prod.properties
-│   │       └── db/
-│   │           └── migration/
-│   │
-│   ├── test/
-│   └── pom.xml
+│   ├── pom.xml
+│   └── src/
+│       ├── main/java/com/benhsoan/
+│       │   ├── BenhSoAnApplication.java
+│       │   ├── config/                      (SecurityConfig, AppointmentReminderProperties)
+│       │   ├── adapter/
+│       │   │   └── inbound/rest/
+│       │   │       ├── controller/          (Auth, Patient, User, MedicalRecord, MedicalHistory,
+│       │   │       │                         Appointment, MedicalQueue, LegacyAppointmentQueue,
+│       │   │       │                         DiagnosisCatalog, ExaminationDiagnosis,
+│       │   │       │                         ClinicalOrder, ClinicalServiceCatalog, Home)
+│       │   │       ├── request/             (request DTO theo từng domain)
+│       │   │       ├── response/            (response DTO theo từng domain)
+│       │   │       └── mapper/              (rest mapper: request/command, result/response)
+│       │   ├── application/ucservice/       (auth, patient, user, medicalrecord, clinical,
+│       │   │   │                             appointment, queue, queries)
+│       │   │   └── ...                      (Service triển khai Inbound Port)
+│       │   ├── port/
+│       │   │   ├── inbound/                 (UseCase Ports theo domain)
+│       │   │   ├── outbound/                (repository/, authSecurity/, security/, time/, ...)
+│       │   │   └── dto/                     (command/, query/, result/, PageResponse)
+│       │   ├── domain/                      (auth, patient, visit, medicalrecord, clinical,
+│       │   │   │                             queue, appointment, auditlog, shared/)
+│       │   ├── persistence/
+│       │   │   ├── entity/                  (JPA entities)
+│       │   │   ├── jpaRepository/           (Spring Data repositories)
+│       │   │   ├── adapterRepository/       (triển khai Outbound Port)
+│       │   │   └── mapper/                  (entity ↔ domain)
+│       │   ├── infrastructure/              (authSecurity/, security/, time/, notification/,
+│       │   │   │                             scheduler/, persistence/)
+│       │   ├── dto/  exception/             (GlobalExceptionHandler, ApiErrorResponse)
+│       │   └── common/
+│       └── main/resources/
+│           ├── application.properties       (mặc định: profile local — MySQL 8 + Flyway)
+│           ├── application-local.properties
+│           ├── application-dev.properties
+│           ├── application-prod.properties
+│           └── db/migration/                (Flyway V1 → V14)
+│       └── src/test/java/                   (domain, service, MockMvc, adapter, JPA tests)
 │
 ├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   ├── assets/
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   ├── layout/
-│   │   │   └── ui/
-│   │   ├── context/
-│   │   ├── hooks/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── pages/
-│   │   │   ├── auth/
-│   │   │   ├── dashboard/
-│   │   │   ├── patient/
-│   │   │   ├── medicalrecord/
-│   │   │   ├── appointment/
-│   │   │   ├── pharmacy/
-│   │   │   ├── invoice/
-│   │   │   ├── auditlog/
-│   │   │   └── admin/
-│   │   ├── styles/
-│   │   ├── utils/
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│
+│   ├── package.json                         (React 18 + Vite 5 + Ant Design 5)
+│   └── src/
+│       ├── api/                             (axiosClient + module API)
+│       ├── components/                      (layout/, clinical/, results/, attachments/, common/)
+│       ├── context/  hooks/  routes/        (AuthContext, useAuth, AppRoutes)
+│       ├── pages/                           (Login, Dashboard, PatientList/Detail, MedicalEncounter,
+│       │                                     AppointmentQueue, ClinicalOrders, Result, Pharmacy,
+│       │                                     Billing, Reports, Users, PublicLookup, ...)
+│       ├── utils/  styles/  mock-data/
+│       ├── App.jsx
+│       └── main.jsx
 │
 ├── docs/
-│   ├── Architecture.md
-│   ├── API.md
-│   ├── ERD.drawio
-│   ├── Sequence/
-│   ├── UseCase/
-│   └── Database/
+│   ├── api/                                 (diagnosis-and-orders-delivery, medical-queue-delivery,
+│   │                                         medical-record-retrieval)
+│   ├── project-overview.md
+│   ├── permission-matrix.md
+│   ├── frontend-status-report.md
+│   └── ...
 │
-├── docker/
-│   ├── mysql/
-│   ├── redis/
-│   └── nginx/
-│
-├── docker-compose.yml
+├── database/                                (init.sql, dbschemas.md)
 ├── README.md
 └── .gitignore
 ```
@@ -363,11 +244,11 @@ mvn test
 # 4. Build (bỏ qua test)
 mvn clean install -DskipTests
 
-# 5. Chạy ứng dụng (mặc định profile local → H2)
+# 5. Chạy ứng dụng (mặc định profile local → MySQL 8 localhost)
 mvn spring-boot:run
 ```
 
-> **Lưu ý:** Mặc định chạy với profile `local` (H2 in-memory + Flyway). Để chạy với MySQL production:
+> **Lưu ý:** Mặc định chạy với profile `local` (**MySQL 8 localhost:3306** + Flyway V1–V14). Test tự động (`mvn test`) dùng H2 in-memory. Để chạy với MySQL production:
 > ```bash
 > set SPRING_PROFILES_ACTIVE=local
 > set DB_URL=jdbc:mysql://localhost:3306/digital_medical_record
@@ -530,10 +411,11 @@ npm run dev
 
 ### Backend Profiles
 
-| Profile | Database | Flyway | H2 Console | Log Level |
-|---------|----------|--------|------------|-----------|
-| **dev** (mặc định) | H2 in-memory | ❌ | ✅ | DEBUG |
-| **prod** | PostgreSQL | ✅ | ❌ | WARN |
+| Profile | Database | Flyway | Ghi chú | Log Level |
+|---------|----------|--------|---------|-----------|
+| **local** (mặc định) | MySQL 8 localhost:3306 (`digital_medical_record`) | ✅ | `show-sql=true` | INFO |
+| **dev** | TiDB Cloud — MySQL-compatible (`gateway01.ap-southeast-1.prod.aws.tidbcloud.com`) | ✅ | Dùng cho tích hợp | INFO / DEBUG |
+| **prod** | MySQL 8 (từ env `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`) | ✅ | `ddl-auto=validate` | WARN |
 
 ### Cấu hình JWT
 

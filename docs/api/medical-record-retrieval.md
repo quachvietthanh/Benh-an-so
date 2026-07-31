@@ -23,6 +23,10 @@ Cung cấp API để hiển thị nội dung hồ sơ bệnh án điện tử ch
 ## Endpoints
 
 > Base URL: `http://localhost:8080/api/v1` — Header: `Authorization: Bearer <token>`
+>
+> **Lưu ý về URL:** `server.servlet.context-path=/api/v1` nên runtime URL là `http://localhost:8080/api/v1/medical-records/...`.
+> Controller khai báo mapping **tương đối** `@RequestMapping("/medical-records")` (KHÔNG bao gồm `/api/v1`).
+> Trong MockMvc test (không qua servlet context-path), request path phải khớp mapping controller: `/medical-records/...`.
 
 | Method | Endpoint | Mô tả | Vai trò |
 |--------|----------|-------|---------|
@@ -172,8 +176,10 @@ SELECT * FROM medical_record_access_logs ORDER BY accessed_at DESC LIMIT 10;
 
 ```
 adapter/inbound/rest/controller
-└── MedicalRecordController        (@RequestMapping("/api/v1/medical-records")
-                                    GET /visits/{visitId}, GET /patient/{patientId})
+└── MedicalRecordController        (@RequestMapping("/medical-records") — tương đối,
+                                    context-path /api/v1 tự prefix ở runtime:
+                                    GET /api/v1/medical-records/visits/{visitId},
+                                    GET /api/v1/medical-records/patient/{patientId})
           │
           ▼
 port/inbound/medicalrecord
