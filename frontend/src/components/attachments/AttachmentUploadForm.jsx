@@ -10,6 +10,7 @@ function AttachmentUploadForm({
   fileList,
   setFileList,
   uploading,
+  categoryOptions = CATEGORY_OPTIONS,
   onSubmit,
   onCancel,
 }) {
@@ -29,7 +30,7 @@ function AttachmentUploadForm({
         onFinish={onSubmit}
         initialValues={{
           patientId: patientIdFilter || undefined,
-          category: 'Công thức máu',
+          category: categoryOptions[0]?.value || 'Công thức máu',
           status: 'NORMAL',
         }}
       >
@@ -59,7 +60,7 @@ function AttachmentUploadForm({
               label="Loại kết quả cận lâm sàng"
               rules={[{ required: true, message: 'Vui lòng chọn loại kết quả' }]}
             >
-              <Select options={CATEGORY_OPTIONS} />
+              <Select options={categoryOptions} />
             </Form.Item>
           </Col>
         </Row>

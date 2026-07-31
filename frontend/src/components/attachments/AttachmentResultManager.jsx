@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { useAuthContext } from '../../context/AuthContext'
 import medicalRecordApi from '../../api/medicalRecordApi'
 import patientApi from '../../api/patientApi'
+import clinicalResultApi from '../../api/clinicalResultApi'
 import { getPatients } from '../../services/mockDataService'
 import {
   deleteStoredAttachment,
@@ -14,7 +15,7 @@ import {
 } from '../../utils/attachmentHelpers'
 import { mergePatients } from '../../utils/storageHelpers'
 
-import { CATEGORY_OPTIONS, STATUS_MAP } from './attachmentConstants.jsx'
+import { CATEGORY_OPTIONS, STATUS_MAP, fetchDatabaseCategoryOptions } from './attachmentConstants.jsx'
 import AttachmentFilterBar from './AttachmentFilterBar'
 import AttachmentPreviewModal from './AttachmentPreviewModal'
 import AttachmentStatsCards from './AttachmentStatsCards'
@@ -42,22 +43,57 @@ function AttachmentResultManager({ patientIdFilter = null, patientNameFilter = n
   const [selectedCategory, setSelectedCategory] = useState('ALL')
   const [selectedStatus, setSelectedStatus] = useState('ALL')
 
+  const [dbCategoryOptions, setDbCategoryOptions] = useState(CATEGORY_OPTIONS)
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [patientRes] = await Promise.allSettled([patientApi.getAll({ page: 0, size: 200 })])
+      // 1. Fetch dynamic categories from CSDL database
+      const dynamicCats = await fetchDatabaseCategoryOptions()
+      if (Array.isArray(dynamicCats) && dynamicCats.length) {
+        setDbCategoryOptions(dynamicCats)
+      }
+
+      // 2. Fetch patient records and clinical results/attachments from CSDL
+      const [patientRes, resultRes, recordRes] = await Promise.allSettled([
+        patientApi.getAll({ page: 0, size: 200 }),
+        clinicalResultApi.getAll(),
+        medicalRecordApi.getAll(),
+      ])
+
       let loadedPatients = []
       if (patientRes.status === 'fulfilled') {
-        loadedPatients = patientRes.value.data?.content || []
+        loadedPatients = patientRes.value.data?.content || patientRes.value.data || []
       }
       const combinedPatients = mergePatients(loadedPatients.length ? loadedPatients : getPatients())
       setPatients(combinedPatients)
 
       let apiAttachments = []
-      try {
-        const recordRes = await medicalRecordApi.getAll()
-        const records = recordRes.data || []
-        records.forEach((rec) => {
+
+      // Add entries from clinical results API (CSDL)
+      if (resultRes.status === 'fulfilled' && Array.isArray(resultRes.value.data)) {
+        resultRes.value.data.forEach((resItem) => {
+          apiAttachments.push({
+            id: resItem.id || `res-${Date.now()}`,
+            attachmentCode: resItem.resultCode || `KQ-${resItem.id}`,
+            patientId: resItem.patientId,
+            patientName: resItem.patientName || 'Bệnh nhân',
+            category: resItem.category || resItem.serviceName || 'Xét nghiệm',
+            testDate: resItem.testDate || dayjs(resItem.createdAt).format('YYYY-MM-DD HH:mm'),
+            doctorName: resItem.doctorName || user?.fullName || 'Bác sĩ',
+            status: resItem.status || 'NORMAL',
+            resultSummary: resItem.resultSummary || resItem.note || 'Kết quả xét nghiệm CSDL',
+            fileName: resItem.fileName || 'ket_qua_xet_nghiem.pdf',
+            fileType: resItem.fileType || 'application/pdf',
+            fileSize: resItem.fileSize || '1.2 MB',
+            fileUrl: resItem.fileUrl || '',
+          })
+        })
+      }
+
+      // Add entries from medical record attachments (CSDL)
+      if (recordRes.status === 'fulfilled' && Array.isArray(recordRes.value.data)) {
+        recordRes.value.data.forEach((rec) => {
           if (Array.isArray(rec.attachments)) {
             rec.attachments.forEach((att) => {
               apiAttachments.push({
@@ -78,13 +114,11 @@ function AttachmentResultManager({ patientIdFilter = null, patientNameFilter = n
             })
           }
         })
-      } catch {
-        // Fallback to local stored items
       }
 
       setAttachments(mergeAttachments(apiAttachments))
     } catch (error) {
-      console.error('Error loading attachments:', error)
+      console.error('Error loading attachments from database:', error)
       setAttachments(getStoredAttachments())
     } finally {
       setLoading(false)
@@ -258,6 +292,7 @@ function AttachmentResultManager({ patientIdFilter = null, patientNameFilter = n
                     setSelectedCategory={setSelectedCategory}
                     selectedStatus={selectedStatus}
                     setSelectedStatus={setSelectedStatus}
+                    categoryOptions={dbCategoryOptions}
                     onReload={loadData}
                   />
 
@@ -289,6 +324,7 @@ function AttachmentResultManager({ patientIdFilter = null, patientNameFilter = n
                   fileList={fileList}
                   setFileList={setFileList}
                   uploading={uploading}
+                  categoryOptions={dbCategoryOptions}
                   onSubmit={handleUploadSubmit}
                   onCancel={() => setActiveTab('list')}
                 />
