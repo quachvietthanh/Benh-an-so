@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,7 +37,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/medical-records")
 @RequiredArgsConstructor
 @Validated
 public class MedicalRecordController {
@@ -51,45 +50,51 @@ public class MedicalRecordController {
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
 
-    @PostMapping
+    @PostMapping("/medical-records")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordResponse create(@Valid @RequestBody CreateMedicalRecordRequest request) {
         return mapper.toResponse(createMedicalRecordUseCase.create(mapper.toCommand(request)));
     }
 
-    @GetMapping("/{medicalRecordId}")
+    @GetMapping("/medical-records/{medicalRecordId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public MedicalRecordResponse getById(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(getMedicalRecordUseCase.getById(medicalRecordId));
     }
 
-    @GetMapping("/visits/{visitId}")
+    @GetMapping("/medical-records/visits/{visitId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public MedicalRecordDetailResponse getByVisitId(@PathVariable UUID visitId) {
         return detailMapper.toResponse(getMedicalRecordUseCase.getDetailByVisitId(visitId));
     }
 
-    @PutMapping("/{medicalRecordId}")
+    @GetMapping("/patients/{patientId}/medical-records")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    public List<MedicalRecordDetailResponse> getPatientMedicalRecords(@PathVariable UUID patientId) {
+        return detailMapper.toResponses(getMedicalRecordUseCase.getHistoryByPatientId(patientId));
+    }
+
+    @PutMapping("/medical-records/{medicalRecordId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordResponse update(@PathVariable UUID medicalRecordId, @RequestBody UpdateMedicalRecordRequest request) {
         return mapper.toResponse(updateMedicalRecordUseCase.update(medicalRecordId, mapper.toCommand(request)));
     }
 
-    @PostMapping("/{medicalRecordId}/lock")
+    @PostMapping("/medical-records/{medicalRecordId}/lock")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordResponse lock(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(lockMedicalRecordUseCase.lock(medicalRecordId));
     }
 
-    @PostMapping("/{medicalRecordId}/amendments")
+    @PostMapping("/medical-records/{medicalRecordId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordAmendmentResponse amend(@PathVariable UUID medicalRecordId, @Valid @RequestBody AmendMedicalRecordRequest request) {
         return mapper.toResponse(amendMedicalRecordUseCase.amend(medicalRecordId, mapper.toCommand(request)));
     }
 
-    @GetMapping("/{medicalRecordId}/access-logs")
+    @GetMapping("/medical-records/{medicalRecordId}/access-logs")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByRecord(
             @PathVariable UUID medicalRecordId,
@@ -103,7 +108,7 @@ public class MedicalRecordController {
         ));
     }
 
-    @GetMapping("/access-logs")
+    @GetMapping("/medical-records/access-logs")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByPatient(
             @RequestParam UUID patientId,

@@ -10,9 +10,6 @@ import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 
-/**
- * REST display model for reviewing medical record content (NCL-04-CN-004).
- */
 public record MedicalRecordDetailResponse(
         PatientInfo patient,
         VisitInfo visit,

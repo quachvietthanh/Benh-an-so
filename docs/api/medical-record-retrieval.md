@@ -172,8 +172,8 @@ SELECT * FROM medical_record_access_logs ORDER BY accessed_at DESC LIMIT 10;
 
 ```
 adapter/inbound/rest/controller
-├── MedicalRecordController        (GET /medical-records/visits/{visitId})
-└── PatientController              (GET /patients/{patientId}/medical-records)
+└── MedicalRecordController        (GET /medical-records/visits/{visitId},
+                                    GET /patients/{patientId}/medical-records)
           │
           ▼
 port/inbound/medicalrecord
@@ -202,6 +202,6 @@ port/outbound/repository/crudRepository
 | Outbound Port | `MedicalRecordDiagnosisRepository` (mới) |
 | Application | `GetMedicalRecordService` (mở rộng), `MedicalRecordResultMapper` (mở rộng) |
 | Persistence | `JpaMedicalRecordDiagnosisRepository`, `MedicalRecordDiagnosisRepositoryAdapter` (mới) |
-| REST Adapter | `MedicalRecordDetailRestMapper`, `MedicalRecordDetailResponse`, `MedicalRecordDiagnosisResponse` (mới) |
+| REST Adapter | `MedicalRecordController.getPatientMedicalRecords` (mới — endpoint chuyển từ `PatientController`), `MedicalRecordDetailRestMapper`, `MedicalRecordDetailResponse`, `MedicalRecordDiagnosisResponse` (mới) |
 
 > **Flyway:** Không cần migration mới — bảng `medical_record_access_logs` đã có từ `V10__create_medical_record_access_logs.sql`; dữ liệu chẩn đoán ICD-10 được lưu ở bảng `medical_record_diagnoses` (V12) và tra cứu qua `diagnosis_catalog` (V13).

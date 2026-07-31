@@ -10,11 +10,6 @@ import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 
-/**
- * Comprehensive read model for reviewing a medical record (NCL-04-CN-004).
- * Combines patient basic info, encounter/visit details, ICD-10 diagnoses,
- * doctor notes and record status.
- */
 public record MedicalRecordDetailResult(
         PatientInfo patient,
         VisitInfo visit,

@@ -5,9 +5,6 @@ import java.util.UUID;
 
 import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
 
-/**
- * Read model for a single diagnosis attached to a medical record.
- */
 public record MedicalRecordDiagnosisResult(
         UUID id,
         UUID medicalRecordId,

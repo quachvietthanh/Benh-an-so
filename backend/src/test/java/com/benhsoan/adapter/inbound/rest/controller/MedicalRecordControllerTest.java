@@ -106,4 +106,31 @@ class MedicalRecordControllerTest {
                 .andExpect(jsonPath("$.primaryIcdName").value("Migraine"))
                 .andExpect(jsonPath("$.secondaryIcdCodes[0]").value("J00"));
     }
+
+    @Test
+    @DisplayName("GET /patients/{patientId}/medical-records - 200 OK with history list")
+    void getPatientMedicalRecordsReturnsHistory() throws Exception {
+        when(getMedicalRecordUseCase.getHistoryByPatientId(patientId))
+                .thenReturn(List.of(detailResult()));
+
+        mockMvc.perform(get("/patients/{patientId}/medical-records", patientId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].medicalRecordId").value(recordId.toString()))
+                .andExpect(jsonPath("$[0].patient.fullName").value("Nguyen Van A"))
+                .andExpect(jsonPath("$[0].visit.visitCode").value("VS-0001"))
+                .andExpect(jsonPath("$[0].primaryIcdCode").value("G43"))
+                .andExpect(jsonPath("$[0].primaryIcdName").value("Migraine"));
+    }
+
+    @Test
+    @DisplayName("GET /patients/{patientId}/medical-records - empty list when no records")
+    void getPatientMedicalRecordsReturnsEmptyList() throws Exception {
+        when(getMedicalRecordUseCase.getHistoryByPatientId(patientId))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/patients/{patientId}/medical-records", patientId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
 }
