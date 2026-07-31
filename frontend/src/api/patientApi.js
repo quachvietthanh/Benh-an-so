@@ -10,8 +10,8 @@ const patientApi = {
   getByCode: (code) => {
     return axiosClient.get(`/patients/code/${code}`)
   },
-  getHistory: (id, params) => {
-    return axiosClient.get(`/patients/${id}/history`, { params })
+  getHistory: (patientId, params) => {
+    return axiosClient.get(`/medical-history/patients/${patientId}`, { params })
   },
   create: (data) => {
     return axiosClient.post('/patients', data)

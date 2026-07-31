@@ -7,8 +7,11 @@ const medicalRecordApi = {
   getById: (id) => {
     return axiosClient.get(`/medical-records/${id}`)
   },
+  getByVisit: (visitId, params) => {
+    return axiosClient.get(`/medical-records/visits/${visitId}`, { params })
+  },
   getByPatient: (patientId, params) => {
-    return axiosClient.get('/medical-records', { params: { ...params, patientId } })
+    return axiosClient.get(`/medical-records/patient/${patientId}`, { params })
   },
   getByDoctor: (doctorId, params) => {
     return axiosClient.get(`/medical-records/by-doctor/${doctorId}`, { params })
