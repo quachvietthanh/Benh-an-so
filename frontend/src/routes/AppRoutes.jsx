@@ -9,7 +9,6 @@ import PatientList from '../pages/PatientList'
 import PatientDetail from '../pages/PatientDetail'
 import AppointmentQueue from '../pages/AppointmentQueue'
 import MedicalEncounter from '../pages/MedicalEncounter'
-import AttachmentResultPage from '../pages/AttachmentResultPage'
 import PrescriptionPage from '../pages/PrescriptionPage'
 import PharmacyPage from '../pages/PharmacyPage'
 import BillingPage from '../pages/BillingPage'
@@ -33,17 +32,21 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/login" replace />
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.some((role) => user?.roles?.includes(role))) {
-    return (
-      <div style={{ padding: 24 }}>
-        <Alert type="error" showIcon message="Bạn không có quyền truy cập chức năng này." />
-      </div>
+  if (allowedRoles.length > 0) {
+    const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    const isAllowed = allowedRoles.some((role) =>
+      userRoles.includes(String(role).toLowerCase().replace(/^role_/, ''))
     )
+    if (!isAllowed) {
+      return (
+        <div style={{ padding: 24 }}>
+          <Alert type="error" showIcon message="Bạn không có quyền truy cập chức năng này." />
+        </div>
+      )
+    }
   }
 
   return children
-
-
 }
 
 function AppRoutes() {

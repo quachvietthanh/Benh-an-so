@@ -4,6 +4,20 @@ import { loginUser } from '../services/mockDataService'
 
 const AuthContext = createContext(null)
 
+const normalizeRoles = (rawRoles) => {
+  if (!rawRoles) return ['admin', 'doctor', 'receptionist', 'nurse', 'pharmacist']
+  const arr = Array.isArray(rawRoles) ? rawRoles : [rawRoles]
+  const normalized = new Set()
+  arr.forEach((r) => {
+    if (!r) return
+    const str = String(r).toLowerCase()
+    const clean = str.replace(/^role_/, '')
+    normalized.add(clean)
+    normalized.add(`role_${clean}`)
+  })
+  return Array.from(normalized)
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -15,11 +29,8 @@ export const AuthProvider = ({ children }) => {
       try {
         const parsed = JSON.parse(storedUser)
         if (parsed && typeof parsed === 'object') {
-          if (!Array.isArray(parsed.roles)) {
-            parsed.roles = parsed.role ? [String(parsed.role).toLowerCase()] : ['doctor']
-          } else {
-            parsed.roles = parsed.roles.map((r) => String(r).toLowerCase())
-          }
+          const raw = parsed.roles || parsed.role || ['doctor']
+          parsed.roles = normalizeRoles(raw)
           setUser(parsed)
         } else {
           localStorage.removeItem('user')
@@ -35,19 +46,17 @@ export const AuthProvider = ({ children }) => {
     setLoading(false)
   }, [])
 
-
-
-
   const login = async (credentials) => {
     try {
       const response = await authApi.login(credentials)
       const data = response.data
 
+      const rawRoles = data.roles || (data.role ? [data.role] : ['doctor'])
       const normalizedUser = {
-        id: data.userId,
+        id: data.userId || data.id,
         username: data.username,
         fullName: data.username,
-        roles: data.role ? [data.role.toLowerCase()] : [],
+        roles: normalizeRoles(rawRoles),
         expiredAt: data.expiredAt,
       }
 
@@ -60,11 +69,12 @@ export const AuthProvider = ({ children }) => {
       // Try mock login if backend is unreachable or returns error
       try {
         const mockUser = loginUser(credentials)
+        const rawRoles = mockUser.roles || [mockUser.role || 'doctor']
         const normalizedUser = {
           id: mockUser.id,
           username: mockUser.username,
           fullName: mockUser.fullName,
-          roles: mockUser.roles || [mockUser.role?.toLowerCase() || 'doctor'],
+          roles: normalizeRoles(rawRoles),
         }
 
         localStorage.setItem('token', mockUser.token || 'demo-token')
@@ -84,7 +94,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user')
     setUser(null)
   }
-// TC-03: không thao tác gì quá 15 phút -> tự động hết phiên
+
+  // TC-03: không thao tác gì quá 15 phút -> tự động hết phiên
   useEffect(() => {
     if (!user) return undefined
     const TIMEOUT = 15 * 60 * 1000
@@ -100,6 +111,7 @@ export const AuthProvider = ({ children }) => {
       events.forEach((e) => window.removeEventListener(e, resetTimer))
     }
   }, [user])
+
   const isAuthenticated = !!user
 
   return (
