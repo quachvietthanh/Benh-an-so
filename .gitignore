@@ -40,3 +40,6 @@ backend/src/main/resources/application-*.local.properties
 
 # Bot Cline
 .clinerules
+
+# graphify-out
+graphify-out/
