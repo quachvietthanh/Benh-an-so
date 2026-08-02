@@ -51,12 +51,14 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
   const handlePatientSelect = (patientId) => {
     const found = patients.find((p) => String(p.id) === String(patientId))
     if (found) {
+      const visitCode = `LK-${new Date().toISOString().replace(/\D/g, '').slice(0, 8)}-${found.patientCode || '01'}`
       form.setFieldsValue({
         patientCode: found.patientCode,
         patientName: found.fullName,
         gender: found.gender || 'Nam',
         age: found.age || 30,
         phone: found.phone || found.phoneNumber || '',
+        visitId: visitCode,
       })
     }
   }
@@ -78,6 +80,7 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
       const newOrder = {
         id: `ord-${Date.now()}`,
         orderCode,
+        visitId: values.visitId,
         patientId: values.patientId,
         patientCode: values.patientCode,
         patientName: values.patientName,
@@ -87,7 +90,8 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
         doctorId: 'u3',
         doctorName: values.doctorName || 'BS. Trực',
         department: values.department,
-        diagnosis: values.diagnosis,
+        diagnosis: values.diagnosis?.trim(),
+        notes: values.notes?.trim() || '',
         priority: values.priority,
         status: 'PENDING',
         items: selectedServices,
@@ -151,6 +155,21 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
             </Form.Item>
           </Col>
 
+          {/* Encounter / Visit Selection */}
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              name="visitId"
+              label="Chọn Lượt khám"
+              rules={[{ required: true, whitespace: true, message: 'Vui lòng chọn lượt khám của bệnh nhân' }]}
+            >
+              <Select placeholder="Chọn lượt khám...">
+                <Option value="LK-HOM-NAY">Lượt khám hôm nay (Nội tổng quát)</Option>
+                <Option value="LK-TAI-KHAM">Lượt tái khám theo lịch</Option>
+                <Option value="LK-CAP-CUU">Lượt khám Cấp cứu</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+
           <Form.Item name="patientCode" hidden><Input /></Form.Item>
           <Form.Item name="patientName" hidden><Input /></Form.Item>
           <Form.Item name="gender" hidden><Input /></Form.Item>
@@ -158,11 +177,11 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
           <Form.Item name="phone" hidden><Input /></Form.Item>
 
           {/* Department */}
-          <Col xs={12} sm={6} md={8}>
+          <Col xs={24} sm={12} md={8}>
             <Form.Item
               name="department"
               label="Khoa / Phòng chỉ định"
-              rules={[{ required: true, message: 'Vui lòng nhập khoa chỉ định' }]}
+              rules={[{ required: true, message: 'Vui lòng chọn khoa chỉ định' }]}
             >
               <Select>
                 <Option value="Khoa Nội tổng quát">Khoa Nội tổng quát</Option>
@@ -174,9 +193,11 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
               </Select>
             </Form.Item>
           </Col>
+        </Row>
 
+        <Row gutter={16}>
           {/* Doctor */}
-          <Col xs={12} sm={6} md={8}>
+          <Col xs={24} sm={12} md={8}>
             <Form.Item
               name="doctorName"
               label="Bác sĩ chỉ định"
@@ -190,22 +211,20 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
               </Select>
             </Form.Item>
           </Col>
-        </Row>
 
-        <Row gutter={16}>
           {/* Clinical Diagnosis */}
-          <Col xs={24} sm={16}>
+          <Col xs={24} sm={12} md={10}>
             <Form.Item
               name="diagnosis"
               label="Chẩn đoán lâm sàng / Lý do chỉ định"
-              rules={[{ required: true, message: 'Vui lòng nhập chẩn đoán lâm sàng' }]}
+              rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập chẩn đoán lâm sàng' }]}
             >
-              <Input placeholder="Ví dụ: Tăng huyết áp vô căn, đau ngực trái chu kỳ, sốt chưa rõ nguyên nhân..." />
+              <Input placeholder="Ví dụ: Tăng huyết áp vô căn, đau ngực trái chu kỳ..." />
             </Form.Item>
           </Col>
 
           {/* Priority */}
-          <Col xs={24} sm={8}>
+          <Col xs={24} sm={12} md={6}>
             <Form.Item name="priority" label="Độ ưu tiên thực hiện">
               <Radio.Group buttonStyle="solid" style={{ width: '100%' }}>
                 <Radio.Button value="NORMAL" style={{ width: '50%', textAlign: 'center' }}>
@@ -215,6 +234,14 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
                   <ThunderboltOutlined /> Khẩn cấp
                 </Radio.Button>
               </Radio.Group>
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col span={24}>
+            <Form.Item name="notes" label="Ghi chú thêm cho phiếu chỉ định">
+              <Input.TextArea rows={2} placeholder="Ghi chú dặn dò hoặc yêu cầu đặc biệt khi lấy mẫu / chụp chiếu..." />
             </Form.Item>
           </Col>
         </Row>

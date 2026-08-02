@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
   Modal,
   Form,
@@ -23,6 +23,7 @@ import {
 } from '@ant-design/icons'
 import ResultForm from './ResultForm'
 import ResultStatusBadge from './ResultStatusBadge'
+import { useAuthContext } from '../../context/AuthContext'
 
 const { Text } = Typography
 
@@ -32,13 +33,22 @@ export const ResultModal = ({
   onClose,
   onSaveSuccess,
 }) => {
+  const { user } = useAuthContext()
+  const userRoles = Array.isArray(user?.roles) ? user.roles : []
+  const isAdmin = userRoles.includes('admin')
+  const isDoctor = isAdmin || userRoles.includes('doctor')
+  const isTechnician = isAdmin || userRoles.includes('technician') || userRoles.includes('ktv')
+  const isReadOnlyRole = !isAdmin && !isTechnician && !isDoctor // Receptionist, Nurse, etc.
+
   const [form] = Form.useForm()
   const [fileList, setFileList] = useState([])
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
 
   const isConfirmed = order?.status === 'CONFIRMED'
   const isCancelled = order?.status === 'CANCELLED'
+  const isFormDisabled = isConfirmed || isCancelled || isReadOnlyRole
 
   useEffect(() => {
     if (visible && order) {
@@ -48,8 +58,10 @@ export const ResultModal = ({
         notes: order.notes || '',
       })
 
-      setFileList(order.attachments || [])
+      setFileList(Array.isArray(order.attachments) ? order.attachments : [])
       setErrors({})
+      savingRef.current = false
+      setSaving(false)
     }
   }, [visible, order, form])
 
@@ -70,26 +82,30 @@ export const ResultModal = ({
   }
 
   const handleSaveResult = async (targetStatus) => {
+    // Double click guard
+    if (savingRef.current || saving) return
+
     if (targetStatus !== 'CANCELLED' && !validate()) {
       message.error('Vui lòng hoàn thiện các trường dữ liệu bắt buộc!')
       return
     }
 
     try {
+      savingRef.current = true
       setSaving(true)
       const values = form.getFieldsValue()
 
       const updatedRecord = {
         ...order,
-        resultValues: values.resultValues,
-        conclusion: values.conclusion,
-        notes: values.notes,
-        resultSummary: values.conclusion,
-        attachments: fileList,
+        resultValues: values.resultValues?.trim() || '',
+        conclusion: values.conclusion?.trim() || '',
+        notes: values.notes?.trim() || '',
+        resultSummary: values.conclusion?.trim() || '',
+        attachments: Array.isArray(fileList) ? fileList : [],
         status: targetStatus,
         updatedAt: new Date().toISOString(),
-        enteredBy: order?.enteredBy || 'KTV. Nguyễn Văn Hùng',
-        confirmedBy: targetStatus === 'CONFIRMED' ? 'BS. Phạm Hồng Anh' : order?.confirmedBy,
+        enteredBy: order?.enteredBy || user?.fullName || 'KTV. Nguyễn Văn Hùng',
+        confirmedBy: targetStatus === 'CONFIRMED' ? (user?.fullName || 'BS. Phạm Hồng Anh') : order?.confirmedBy,
       }
 
       await onSaveSuccess(updatedRecord)
@@ -105,11 +121,66 @@ export const ResultModal = ({
       console.error(err)
       message.error('Có lỗi xảy ra khi lưu kết quả cận lâm sàng')
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
 
   if (!order) return null
+
+  // Build footer actions based on role and order status
+  const getFooterButtons = () => {
+    if (isFormDisabled) {
+      return [
+        <Button key="close" type="primary" size="large" onClick={onClose} style={{ borderRadius: 8 }}>
+          Đóng
+        </Button>,
+      ]
+    }
+
+    const buttons = [
+      <Button key="cancel" size="large" onClick={onClose} style={{ borderRadius: 8 }} disabled={saving}>
+        Hủy bỏ
+      </Button>,
+    ]
+
+    // Technician / Admin can Save Result (RESULTED)
+    if (isTechnician) {
+      buttons.push(
+        <Button
+          key="saveResult"
+          size="large"
+          icon={<SaveOutlined />}
+          loading={saving}
+          disabled={saving}
+          onClick={() => handleSaveResult('RESULTED')}
+          style={{ borderRadius: 8, borderColor: '#2563eb', color: '#2563eb' }}
+        >
+          Lưu kết quả
+        </Button>
+      )
+    }
+
+    // Doctor / Admin can Confirm & Lock (CONFIRMED)
+    if (isDoctor) {
+      buttons.push(
+        <Button
+          key="saveConfirm"
+          type="primary"
+          size="large"
+          icon={<SafetyCertificateOutlined />}
+          loading={saving}
+          disabled={saving}
+          onClick={() => handleSaveResult('CONFIRMED')}
+          style={{ borderRadius: 8, background: '#16a34a', borderColor: '#16a34a' }}
+        >
+          Bác sĩ xác nhận & Khóa
+        </Button>
+      )
+    }
+
+    return buttons
+  }
 
   return (
     <Modal
@@ -134,40 +205,9 @@ export const ResultModal = ({
       open={visible}
       onCancel={onClose}
       width={920}
-      style={{ top: 20 }}
+      style={{ top: 20, maxWidth: '95vw' }}
       destroyOnClose
-      footer={
-        isConfirmed || isCancelled ? [
-          <Button key="close" type="primary" size="large" onClick={onClose} style={{ borderRadius: 8 }}>
-            Đóng
-          </Button>,
-        ] : [
-          <Button key="cancel" size="large" onClick={onClose} style={{ borderRadius: 8 }}>
-            Hủy bỏ
-          </Button>,
-          <Button
-            key="saveResult"
-            size="large"
-            icon={<SaveOutlined />}
-            loading={saving}
-            onClick={() => handleSaveResult('RESULTED')}
-            style={{ borderRadius: 8, borderColor: '#2563eb', color: '#2563eb' }}
-          >
-            Lưu kết quả
-          </Button>,
-          <Button
-            key="saveConfirm"
-            type="primary"
-            size="large"
-            icon={<SafetyCertificateOutlined />}
-            loading={saving}
-            onClick={() => handleSaveResult('CONFIRMED')}
-            style={{ borderRadius: 8, background: '#16a34a', borderColor: '#16a34a' }}
-          >
-            Bác sĩ xác nhận & Khóa
-          </Button>,
-        ]
-      }
+      footer={getFooterButtons()}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
         {/* Patient Demographics & Order Metadata Header */}
@@ -221,7 +261,9 @@ export const ResultModal = ({
             <Col span={24}>
               <Text style={{ fontSize: 13, color: '#475569' }}>
                 <b>Dịch vụ thực hiện:</b>{' '}
-                {order.items?.map((it) => `${it.serviceName} [${it.serviceCode}]`).join(', ') || 'Chỉ định cận lâm sàng'}
+                {Array.isArray(order.items) && order.items.length > 0
+                  ? order.items.map((it) => `${it?.serviceName || 'Dịch vụ'} [${it?.serviceCode || 'CLS'}]`).join(', ')
+                  : 'Chỉ định cận lâm sàng'}
               </Text>
             </Col>
             <Col span={24}>
@@ -247,7 +289,7 @@ export const ResultModal = ({
           fileList={fileList}
           onFileListChange={setFileList}
           errors={errors}
-          disabled={isConfirmed || isCancelled}
+          disabled={isFormDisabled}
         />
       </div>
     </Modal>

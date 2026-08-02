@@ -136,7 +136,10 @@ function AppointmentQueue() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const canManage = user?.roles?.some((role) => ['admin', 'receptionist'].includes(role))
+  const userRoles = Array.isArray(user?.roles) ? user.roles : []
+  const canManage = userRoles.some((role) => ['admin', 'receptionist'].includes(role))
+  const canUpdateQueue = userRoles.some((role) => ['admin', 'receptionist', 'nurse', 'doctor'].includes(role))
+
   const [appointments, setAppointments] = useState([])
   const [queue, setQueue] = useState([])
   const [patients, setPatients] = useState([])
@@ -182,14 +185,14 @@ function AppointmentQueue() {
 
       let apiApps = []
       if (appointmentResult.status === 'fulfilled') {
-        const resData = appointmentResult.value?.data
-        apiApps = Array.isArray(resData) ? resData : (resData?.content || [])
+        const rawApps = appointmentResult.value?.data?.content ?? appointmentResult.value?.data?.data ?? appointmentResult.value?.data ?? []
+        apiApps = Array.isArray(rawApps) ? rawApps : []
       }
 
       let apiQ = []
       if (queueResult.status === 'fulfilled') {
-        const resData = queueResult.value?.data
-        apiQ = Array.isArray(resData) ? resData : (resData?.content || [])
+        const rawQ = queueResult.value?.data?.content ?? queueResult.value?.data?.data ?? queueResult.value?.data ?? []
+        apiQ = Array.isArray(rawQ) ? rawQ : []
       }
 
       const mockList = getAppointments().map((item) => {
@@ -206,10 +209,10 @@ function AppointmentQueue() {
       })
 
       const mergedApps = mergeAppointments(apiApps.length ? apiApps : mockList)
-      setAppointments(mergedApps)
+      setAppointments(Array.isArray(mergedApps) ? mergedApps : [])
 
       const mergedQ = mergeQueue(apiQ.length ? apiQ : mockList.filter((item) => item.status === 'CHECKED_IN' || item.status === 'CALLED' || item.status === 'WAITING'))
-      setQueue(mergedQ)
+      setQueue(Array.isArray(mergedQ) ? mergedQ : [])
 
       if (includeDirectories && patientResult.status === 'fulfilled' && Array.isArray(patientResult.value)) {
         setPatients(mergePatients(patientResult.value))
@@ -217,8 +220,9 @@ function AppointmentQueue() {
         setPatients(mergePatients(getPatients()))
       }
 
-      if (includeDirectories && doctorResult.status === 'fulfilled' && Array.isArray(doctorResult.value?.data)) {
-        setDoctors(doctorResult.value.data)
+      if (includeDirectories && doctorResult.status === 'fulfilled') {
+        const doctorData = doctorResult.value?.data?.content ?? doctorResult.value?.data?.data ?? doctorResult.value?.data ?? []
+        setDoctors(Array.isArray(doctorData) ? doctorData : [])
       } else if (includeDirectories) {
         setDoctors([])
       }
@@ -436,6 +440,32 @@ function AppointmentQueue() {
   const createAppointment = async (values) => {
     setSaving(true)
     const appointmentAt = values.appointmentAt ? values.appointmentAt : dayjs().add(10, 'minute')
+
+    // Validation: Check duplicate time slot conflict for Doctor & Patient
+    const hasDoctorConflict = appointments.some((app) => {
+      if (app.status === 'CANCELLED' || app.status === 'NO_SHOW') return false
+      if (String(app.doctorId) !== String(values.doctorId)) return false
+      return Math.abs(dayjs(app.appointmentAt).diff(appointmentAt, 'minute')) < 15
+    })
+
+    const hasPatientConflict = appointments.some((app) => {
+      if (app.status === 'CANCELLED' || app.status === 'NO_SHOW') return false
+      if (String(app.patientId) !== String(values.patientId)) return false
+      return Math.abs(dayjs(app.appointmentAt).diff(appointmentAt, 'minute')) < 15
+    })
+
+    if (hasDoctorConflict) {
+      message.error('Bác sĩ đã có lịch hẹn trùng khung giờ này! Vui lòng chọn khung giờ khác.')
+      setSaving(false)
+      return
+    }
+
+    if (hasPatientConflict) {
+      message.error('Bệnh nhân này đã có lịch hẹn trùng khung giờ này!')
+      setSaving(false)
+      return
+    }
+
     const startTime = appointmentAt.toISOString()
     const endTime = appointmentAt.add(30, 'minute').toISOString()
 
@@ -775,7 +805,7 @@ function AppointmentQueue() {
             </Button>
           </Tooltip>
         )}
-        {!isCompletedOrCancelled && (
+        {!isCompletedOrCancelled && canUpdateQueue && (
           <>
             <Dropdown menu={{ items: getStatusActionItems(item) }} trigger={['click']} placement="bottomRight">
               <Tooltip title="Cập nhật trạng thái / Không đến">
@@ -787,15 +817,17 @@ function AppointmentQueue() {
                 />
               </Tooltip>
             </Dropdown>
-            <Tooltip title="Hủy lịch hẹn">
-              <Button
-                className="appointment-action-button appointment-action-danger"
-                icon={<DeleteOutlined />}
-                disabled={actionLoading}
-                onClick={() => setCancelItem(item)}
-                aria-label={`Hủy lịch ${item.appointmentCode} của ${item.patientName}`}
-              />
-            </Tooltip>
+            {canManage && (
+              <Tooltip title="Hủy lịch hẹn">
+                <Button
+                  className="appointment-action-button appointment-action-danger"
+                  icon={<DeleteOutlined />}
+                  disabled={actionLoading}
+                  onClick={() => setCancelItem(item)}
+                  aria-label={`Hủy lịch ${item.appointmentCode} của ${item.patientName}`}
+                />
+              </Tooltip>
+            )}
           </>
         )}
         {item.status === 'CALLED' && (
@@ -1047,7 +1079,7 @@ function AppointmentQueue() {
               aria-label="Tìm kiếm bệnh nhân trong hàng đợi"
               onChange={(event) => { setQueueKeyword(event.target.value); setQueuePage(1) }}
             />
-            {canManage && (
+            {canUpdateQueue && (
               <Button
                 type="primary"
                 icon={<UserSwitchOutlined />}

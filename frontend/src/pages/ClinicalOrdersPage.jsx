@@ -48,7 +48,7 @@ const { Title, Text } = Typography
 
 export function ClinicalOrdersPage() {
   const { user } = useAuthContext()
-  const canManage = user?.roles?.some((role) => ['admin', 'doctor', 'receptionist'].includes(role))
+  const canManage = user?.roles?.some((role) => ['admin', 'doctor'].includes(role))
 
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])
@@ -85,7 +85,15 @@ export function ClinicalOrdersPage() {
   const handleConfirmCancelOrder = () => {
     if (!orderToCancel) return
 
-    const finalReason = cancelReasonSelect === 'OTHER' ? (cancelReasonCustom.trim() || 'Lý do khác') : cancelReasonSelect
+    let finalReason = cancelReasonSelect
+    if (cancelReasonSelect === 'OTHER') {
+      const trimmedCustom = cancelReasonCustom.trim()
+      if (!trimmedCustom) {
+        message.warning('Vui lòng nhập lý do hủy chi tiết!')
+        return
+      }
+      finalReason = trimmedCustom
+    }
 
     const cancelledOrder = {
       ...orderToCancel,
@@ -106,7 +114,7 @@ export function ClinicalOrdersPage() {
       action: `Hủy chỉ định CLS - Lý do: ${finalReason}`,
     })
 
-    setOrders((prev) => prev.map((o) => (o.id === orderToCancel.id ? cancelledOrder : o)))
+    setOrders((prev) => (Array.isArray(prev) ? prev.map((o) => (o.id === orderToCancel.id ? cancelledOrder : o)) : []))
     message.success(`Đã hủy phiếu chỉ định ${orderToCancel.orderCode} và lưu vào lịch sử thành công!`)
     setCancelModalVisible(false)
     setOrderToCancel(null)
@@ -116,7 +124,7 @@ export function ClinicalOrdersPage() {
     setLoading(true)
     try {
       const merged = mergeClinicalOrders(demoClinicalOrders)
-      setOrders(merged)
+      setOrders(Array.isArray(merged) ? merged : [])
     } catch (err) {
       console.error(err)
       message.error('Không thể tải danh sách chỉ định cận lâm sàng')
@@ -133,8 +141,10 @@ export function ClinicalOrdersPage() {
 
   // Filter logic
   const filteredOrders = useMemo(() => {
+    const safeOrders = Array.isArray(orders) ? orders : []
     const kw = searchText.trim().toLowerCase()
-    return orders.filter((order) => {
+    return safeOrders.filter((order) => {
+      if (!order) return false
       // Tab filter logic: ACTIVE tab excludes CANCELLED, CANCELLED tab shows ONLY CANCELLED
       if (activeTab === 'ACTIVE' && order.status === 'CANCELLED') return false
       if (activeTab === 'CANCELLED' && order.status !== 'CANCELLED') return false
@@ -151,7 +161,9 @@ export function ClinicalOrdersPage() {
       const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter
       const matchesPriority = priorityFilter === 'ALL' || order.priority === priorityFilter
 
-      const matchesCategory = categoryFilter === 'ALL' || order.items?.some((item) => {
+      const items = Array.isArray(order.items) ? order.items : []
+      const matchesCategory = categoryFilter === 'ALL' || items.some((item) => {
+        if (!item) return false
         const cat = item.category || item.categoryName || ''
         if (categoryFilter === 'LABORATORY') return cat.includes('LAB') || cat.includes('Xét nghiệm')
         if (categoryFilter === 'IMAGING') return cat.includes('IMG') || cat.includes('hình ảnh')

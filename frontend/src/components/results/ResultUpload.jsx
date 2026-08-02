@@ -131,7 +131,7 @@ export const ResultUpload = ({ fileList = [], onChange, error, disabled = false 
       )}
 
       {/* File List & Preview Area */}
-      {fileList.length > 0 && (
+      {Array.isArray(fileList) && fileList.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <Text style={{ fontWeight: 600, color: '#475569', fontSize: 13 }}>
             Tệp đã đính kèm ({fileList.length}):
@@ -158,7 +158,7 @@ export const ResultUpload = ({ fileList = [], onChange, error, disabled = false 
                       alt={item.name}
                       style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, border: '1px solid #cbd5e1' }}
                     />
-                  ) : item.name.endsWith('.pdf') || item.type?.includes('pdf') ? (
+                  ) : item.name?.endsWith('.pdf') || item.type?.includes('pdf') ? (
                     <FilePdfOutlined style={{ fontSize: 28, color: '#ff4d4f' }} />
                   ) : (
                     <FileImageOutlined style={{ fontSize: 28, color: '#1890ff' }} />

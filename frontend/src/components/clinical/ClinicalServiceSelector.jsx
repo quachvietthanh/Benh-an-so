@@ -95,14 +95,18 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
 
   const selectedMap = useMemo(() => {
     const map = new Map()
-    selectedServices.forEach((item) => map.set(item.serviceId || item.id, item))
+    const safeSelected = Array.isArray(selectedServices) ? selectedServices : []
+    safeSelected.forEach((item) => {
+      if (item) map.set(item.serviceId || item.id, item)
+    })
     return map
   }, [selectedServices])
 
   const handleToggleService = (service) => {
+    const safeSelected = Array.isArray(selectedServices) ? selectedServices : []
     const serviceKey = service.id
     if (selectedMap.has(serviceKey)) {
-      const updated = selectedServices.filter((s) => (s.serviceId || s.id) !== serviceKey)
+      const updated = safeSelected.filter((s) => (s?.serviceId || s?.id) !== serviceKey)
       onChange(updated)
     } else {
       const newItem = {
@@ -115,13 +119,14 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
         note: '',
         status: 'PENDING',
       }
-      onChange([...selectedServices, newItem])
+      onChange([...safeSelected, newItem])
     }
   }
 
   const handleUpdateItemNote = (serviceKey, note) => {
-    const updated = selectedServices.map((item) => {
-      if ((item.serviceId || item.id) === serviceKey) {
+    const safeSelected = Array.isArray(selectedServices) ? selectedServices : []
+    const updated = safeSelected.map((item) => {
+      if ((item?.serviceId || item?.id) === serviceKey) {
         return { ...item, note }
       }
       return item
@@ -130,12 +135,14 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
   }
 
   const handleRemoveService = (serviceKey) => {
-    const updated = selectedServices.filter((s) => (s.serviceId || s.id) !== serviceKey)
+    const safeSelected = Array.isArray(selectedServices) ? selectedServices : []
+    const updated = safeSelected.filter((s) => (s?.serviceId || s?.id) !== serviceKey)
     onChange(updated)
   }
 
   const totalAmount = useMemo(() => {
-    return selectedServices.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0)
+    const safeSelected = Array.isArray(selectedServices) ? selectedServices : []
+    return safeSelected.reduce((sum, item) => sum + (Number(item?.price || 0) * Number(item?.quantity || 1)), 0)
   }, [selectedServices])
 
   return (

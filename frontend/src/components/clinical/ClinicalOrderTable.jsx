@@ -68,34 +68,37 @@ export const ClinicalOrderTable = ({
       dataIndex: 'items',
       key: 'items',
       width: 250,
-      render: (items = []) => (
-        <Space direction="vertical" size={3} style={{ width: '100%' }}>
-          {items.slice(0, 2).map((item, idx) => (
-            <Tooltip key={idx} title={`[${item.serviceCode || 'CLS'}] ${item.serviceName}`}>
-              <Tag
-                color="blue"
-                style={{
-                  borderRadius: 4,
-                  margin: 0,
-                  fontSize: 11,
-                  maxWidth: 235,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  display: 'block',
-                }}
-              >
-                [{item.serviceCode || 'CLS'}] {item.serviceName}
+      render: (items) => {
+        const safeItems = Array.isArray(items) ? items : []
+        return (
+          <Space direction="vertical" size={3} style={{ width: '100%' }}>
+            {safeItems.slice(0, 2).map((item, idx) => (
+              <Tooltip key={idx} title={`[${item?.serviceCode || 'CLS'}] ${item?.serviceName || ''}`}>
+                <Tag
+                  color="blue"
+                  style={{
+                    borderRadius: 4,
+                    margin: 0,
+                    fontSize: 11,
+                    maxWidth: 235,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'block',
+                  }}
+                >
+                  [{item?.serviceCode || 'CLS'}] {item?.serviceName}
+                </Tag>
+              </Tooltip>
+            ))}
+            {safeItems.length > 2 && (
+              <Tag color="purple" style={{ borderRadius: 4, fontSize: 11, margin: 0 }}>
+                +{safeItems.length - 2} dịch vụ khác...
               </Tag>
-            </Tooltip>
-          ))}
-          {items.length > 2 && (
-            <Tag color="purple" style={{ borderRadius: 4, fontSize: 11, margin: 0 }}>
-              +{items.length - 2} dịch vụ khác...
-            </Tag>
-          )}
-        </Space>
-      ),
+            )}
+          </Space>
+        )
+      },
     },
     {
       title: 'Độ ưu tiên',
@@ -146,12 +149,38 @@ export const ClinicalOrderTable = ({
       align: 'center',
       fixed: 'right',
       render: (_, record) => {
-        const statusMenu = [
-          { key: 'PENDING', label: 'Chuyển: Chờ tiếp nhận', icon: <SyncOutlined /> },
-          { key: 'IN_PROGRESS', label: 'Chuyển: Đang thực hiện', icon: <SyncOutlined spin /> },
-          { key: 'RESULTED', label: 'Chuyển: Đã có kết quả', icon: <FileDoneOutlined /> },
-          { key: 'COMPLETED', label: 'Chuyển: Hoàn tất', icon: <CheckOutlined /> },
+        const ALLOWED_NEXT_STATUS = {
+          PENDING: [{ key: 'IN_PROGRESS', label: 'Chuyển: Đang thực hiện', icon: <SyncOutlined spin /> }],
+          IN_PROGRESS: [{ key: 'RESULTED', label: 'Chuyển: Đã có kết quả', icon: <FileDoneOutlined /> }],
+          RESULTED: [{ key: 'COMPLETED', label: 'Chuyển: Hoàn tất', icon: <CheckOutlined /> }],
+          COMPLETED: [],
+          CANCELLED: [],
+        }
+
+        const nextOptions = ALLOWED_NEXT_STATUS[record.status] || []
+        const canCancel = record.status === 'PENDING' || record.status === 'IN_PROGRESS'
+
+        const menuItems = [
+          ...nextOptions.map((m) => ({
+            key: m.key,
+            label: m.label,
+            icon: m.icon,
+            onClick: () => onUpdateStatus(record.id, m.key),
+          })),
         ]
+
+        if (canCancel) {
+          if (menuItems.length > 0) {
+            menuItems.push({ type: 'divider' })
+          }
+          menuItems.push({
+            key: 'CANCELLED',
+            label: 'Hủy phiếu chỉ định',
+            danger: true,
+            icon: <DeleteOutlined />,
+            onClick: () => onDeleteOrder(record.id),
+          })
+        }
 
         return (
           <Space size="small">
@@ -173,8 +202,8 @@ export const ClinicalOrderTable = ({
               />
             </Tooltip>
 
-            {canManage && record.status !== 'COMPLETED' && record.status !== 'CANCELLED' && (
-              <Tooltip title="Chỉnh sửa chỉ định">
+            {canManage && record.status === 'PENDING' && (
+              <Tooltip title="Chỉnh sửa chỉ định (chỉ dành cho phiếu Chờ tiếp nhận)">
                 <Button
                   type="text"
                   size="small"
@@ -184,29 +213,14 @@ export const ClinicalOrderTable = ({
               </Tooltip>
             )}
 
-            <Dropdown
-              menu={{
-                items: [
-                  ...statusMenu.map((m) => ({
-                    key: m.key,
-                    label: m.label,
-                    icon: m.icon,
-                    onClick: () => onUpdateStatus(record.id, m.key),
-                  })),
-                  { type: 'divider' },
-                  {
-                    key: 'CANCELLED',
-                    label: 'Hủy phiếu chỉ định',
-                    danger: true,
-                    icon: <DeleteOutlined />,
-                    onClick: () => onDeleteOrder(record.id),
-                  },
-                ],
-              }}
-              trigger={['click']}
-            >
-              <Button type="text" size="small" icon={<MoreOutlined />} />
-            </Dropdown>
+            {menuItems.length > 0 && (
+              <Dropdown
+                menu={{ items: menuItems }}
+                trigger={['click']}
+              >
+                <Button type="text" size="small" icon={<MoreOutlined />} />
+              </Dropdown>
+            )}
           </Space>
         )
       },

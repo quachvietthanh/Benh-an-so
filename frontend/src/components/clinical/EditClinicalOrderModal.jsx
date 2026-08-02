@@ -125,7 +125,11 @@ export const EditClinicalOrderModal = ({ visible, order, onClose, onUpdateSucces
 
         <Row gutter={16}>
           <Col xs={24} sm={16}>
-            <Form.Item name="diagnosis" label="Chẩn đoán lâm sàng / Lý do chỉ định" rules={[{ required: true }]}>
+            <Form.Item
+              name="diagnosis"
+              label="Chẩn đoán lâm sàng / Lý do chỉ định"
+              rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập chẩn đoán lâm sàng' }]}
+            >
               <Input />
             </Form.Item>
           </Col>

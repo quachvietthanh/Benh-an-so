@@ -53,8 +53,10 @@ export function ResultPage() {
           status: statusFilter,
           category: categoryFilter,
         })
-        if (response.data && Array.isArray(response.data)) {
-          setOrders(response.data)
+        const rawList = response?.data?.content ?? response?.data?.data ?? response?.data ?? []
+        const safeList = Array.isArray(rawList) ? rawList : []
+        if (safeList.length > 0 || (response && response.status === 200)) {
+          setOrders(safeList)
           setLoading(false)
           return
         }
@@ -64,7 +66,7 @@ export function ResultPage() {
 
       // 2. Local storage & Mock data fallback
       const merged = mergeClinicalOrders(demoClinicalOrders)
-      setOrders(merged)
+      setOrders(Array.isArray(merged) ? merged : [])
     } catch (err) {
       console.error('Error loading clinical results:', err)
       message.error('Không thể tải danh sách chỉ định cận lâm sàng')
@@ -79,8 +81,10 @@ export function ResultPage() {
 
   // Filtered orders calculation
   const filteredOrders = useMemo(() => {
+    const safeOrders = Array.isArray(orders) ? orders : []
     const kw = searchText.trim().toLowerCase()
-    return orders.filter((order) => {
+    return safeOrders.filter((order) => {
+      if (!order) return false
       // Ignore cancelled orders from result entry table
       if (order.status === 'CANCELLED') return false
 
@@ -96,9 +100,11 @@ export function ResultPage() {
 
       const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter
 
+      const items = Array.isArray(order.items) ? order.items : []
       const matchesCategory =
         categoryFilter === 'ALL' ||
-        order.items?.some((item) => {
+        items.some((item) => {
+          if (!item) return false
           const cat = item.category || item.categoryName || ''
           if (categoryFilter === 'LABORATORY') return cat.includes('LAB') || cat.includes('Xét nghiệm')
           if (categoryFilter === 'IMAGING') return cat.includes('IMG') || cat.includes('hình ảnh')
@@ -112,11 +118,12 @@ export function ResultPage() {
 
   // Stats calculation
   const stats = useMemo(() => {
-    const total = orders.filter((o) => o.status !== 'CANCELLED').length
-    const pending = orders.filter((o) => o.status === 'PENDING').length
-    const inProgress = orders.filter((o) => o.status === 'IN_PROGRESS').length
-    const resulted = orders.filter((o) => o.status === 'RESULTED').length
-    const confirmed = orders.filter((o) => o.status === 'CONFIRMED').length
+    const safeOrders = Array.isArray(orders) ? orders : []
+    const total = safeOrders.filter((o) => o?.status !== 'CANCELLED').length
+    const pending = safeOrders.filter((o) => o?.status === 'PENDING').length
+    const inProgress = safeOrders.filter((o) => o?.status === 'IN_PROGRESS').length
+    const resulted = safeOrders.filter((o) => o?.status === 'RESULTED').length
+    const confirmed = safeOrders.filter((o) => o?.status === 'CONFIRMED').length
     return { total, pending, inProgress, resulted, confirmed }
   }, [orders])
 
@@ -180,7 +187,7 @@ export function ResultPage() {
 
       {/* Summary Statistics Cards */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={8} md={4} lg={4.8}>
+        <Col xs={24} sm={12} md={8} style={{ flex: '1 1 200px' }}>
           <Card
             size="small"
             style={{
@@ -198,7 +205,7 @@ export function ResultPage() {
           </Card>
         </Col>
 
-        <Col xs={12} sm={8} md={4} lg={4.8}>
+        <Col xs={24} sm={12} md={8} style={{ flex: '1 1 200px' }}>
           <Card
             size="small"
             style={{
@@ -216,7 +223,7 @@ export function ResultPage() {
           </Card>
         </Col>
 
-        <Col xs={12} sm={8} md={4} lg={4.8}>
+        <Col xs={24} sm={12} md={8} style={{ flex: '1 1 200px' }}>
           <Card
             size="small"
             style={{
@@ -234,7 +241,7 @@ export function ResultPage() {
           </Card>
         </Col>
 
-        <Col xs={12} sm={8} md={6} lg={4.8}>
+        <Col xs={24} sm={12} md={8} style={{ flex: '1 1 200px' }}>
           <Card
             size="small"
             style={{
@@ -252,7 +259,7 @@ export function ResultPage() {
           </Card>
         </Col>
 
-        <Col xs={12} sm={8} md={6} lg={4.8}>
+        <Col xs={24} sm={12} md={8} style={{ flex: '1 1 200px' }}>
           <Card
             size="small"
             style={{

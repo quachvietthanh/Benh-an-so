@@ -7,6 +7,7 @@ import {
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import ResultStatusBadge from './ResultStatusBadge'
+import { useAuthContext } from '../../context/AuthContext'
 
 const { Text } = Typography
 
@@ -15,6 +16,15 @@ export const ResultTable = ({
   loading = false,
   onOpenModal,
 }) => {
+  const { user } = useAuthContext()
+  const userRoles = Array.isArray(user?.roles) ? user.roles : []
+  const isAdmin = userRoles.includes('admin')
+  const isDoctor = isAdmin || userRoles.includes('doctor')
+  const isTechnician = isAdmin || userRoles.includes('technician') || userRoles.includes('ktv')
+  const isReadOnlyRole = !isAdmin && !isTechnician && !isDoctor // Receptionist, Nurse, etc.
+
+  const safeDataSource = Array.isArray(dataSource) ? dataSource : []
+
   const columns = [
     {
       title: 'Mã chỉ định',
@@ -72,34 +82,37 @@ export const ResultTable = ({
       dataIndex: 'items',
       key: 'items',
       width: 240,
-      render: (items = []) => (
-        <Space direction="vertical" size={3} style={{ width: '100%' }}>
-          {items.slice(0, 2).map((item, idx) => (
-            <Tooltip key={idx} title={`[${item.serviceCode || 'CLS'}] ${item.serviceName}`}>
-              <Tag
-                color="purple"
-                style={{
-                  borderRadius: 4,
-                  margin: 0,
-                  fontSize: 11,
-                  maxWidth: 225,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  display: 'block',
-                }}
-              >
-                [{item.serviceCode || 'CLS'}] {item.serviceName}
+      render: (items = []) => {
+        const safeItems = Array.isArray(items) ? items : []
+        return (
+          <Space direction="vertical" size={3} style={{ width: '100%' }}>
+            {safeItems.slice(0, 2).map((item, idx) => (
+              <Tooltip key={idx} title={`[${item?.serviceCode || 'CLS'}] ${item?.serviceName}`}>
+                <Tag
+                  color="purple"
+                  style={{
+                    borderRadius: 4,
+                    margin: 0,
+                    fontSize: 11,
+                    maxWidth: 225,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'block',
+                  }}
+                >
+                  [{item?.serviceCode || 'CLS'}] {item?.serviceName}
+                </Tag>
+              </Tooltip>
+            ))}
+            {safeItems.length > 2 && (
+              <Tag color="cyan" style={{ borderRadius: 4, fontSize: 11, margin: 0 }}>
+                +{safeItems.length - 2} dịch vụ khác...
               </Tag>
-            </Tooltip>
-          ))}
-          {items.length > 2 && (
-            <Tag color="cyan" style={{ borderRadius: 4, fontSize: 11, margin: 0 }}>
-              +{items.length - 2} dịch vụ khác...
-            </Tag>
-          )}
-        </Space>
-      ),
+            )}
+          </Space>
+        )
+      },
     },
     {
       title: 'Bác sĩ chỉ định',
@@ -123,13 +136,14 @@ export const ResultTable = ({
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 150,
+      width: 160,
       align: 'center',
       fixed: 'right',
       render: (_, record) => {
         const isConfirmed = record.status === 'CONFIRMED'
         const isResulted = record.status === 'RESULTED'
 
+        // 1. Confirmed / Locked -> Read-only for all roles
         if (isConfirmed) {
           return (
             <Button
@@ -151,41 +165,102 @@ export const ResultTable = ({
           )
         }
 
-        if (isResulted) {
+        // 2. Read-only role (Receptionist, Nurse) -> Cannot edit or confirm
+        if (isReadOnlyRole) {
           return (
             <Button
-              type="primary"
+              type="default"
               size="small"
-              icon={<SafetyCertificateOutlined />}
+              icon={<EyeOutlined />}
               onClick={() => onOpenModal(record)}
               style={{
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: 600,
-                background: '#d97706',
-                borderColor: '#d97706',
+                borderColor: '#cbd5e1',
+                color: '#475569',
               }}
             >
-              BS Xác nhận
+              Xem chi tiết
             </Button>
           )
         }
 
+        // 3. Resulted state -> Doctor confirms, Technician can also view
+        if (isResulted) {
+          if (isDoctor) {
+            return (
+              <Button
+                type="primary"
+                size="small"
+                icon={<SafetyCertificateOutlined />}
+                onClick={() => onOpenModal(record)}
+                style={{
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  background: '#d97706',
+                  borderColor: '#d97706',
+                }}
+              >
+                BS Xác nhận
+              </Button>
+            )
+          }
+          return (
+            <Button
+              type="default"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => onOpenModal(record)}
+              style={{
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                borderColor: '#93c5fd',
+                color: '#2563eb',
+              }}
+            >
+              Xem kết quả
+            </Button>
+          )
+        }
+
+        // 4. Pending / In-progress state -> Technician or Admin can enter result
+        if (isTechnician) {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => onOpenModal(record)}
+              style={{
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                background: '#2563eb',
+                borderColor: '#2563eb',
+              }}
+            >
+              Nhập kết quả
+            </Button>
+          )
+        }
+
+        // Default view button
         return (
           <Button
-            type="primary"
+            type="default"
             size="small"
-            icon={<EditOutlined />}
+            icon={<EyeOutlined />}
             onClick={() => onOpenModal(record)}
             style={{
               borderRadius: '8px',
               fontSize: '12px',
               fontWeight: 600,
-              background: '#2563eb',
-              borderColor: '#2563eb',
             }}
           >
-            Nhập kết quả
+            Xem chi tiết
           </Button>
         )
       },
@@ -195,7 +270,7 @@ export const ResultTable = ({
   return (
     <Table
       columns={columns}
-      dataSource={dataSource}
+      dataSource={safeDataSource}
       rowKey="id"
       loading={loading}
       pagination={{

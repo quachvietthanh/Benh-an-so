@@ -76,13 +76,13 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
             </tr>
           </thead>
           <tbody>
-            {order.items?.map((item, idx) => (
+            {(Array.isArray(order.items) ? order.items : []).map((item, idx) => (
               <tr key={idx}>
                 <td style={{ border: '1px solid #000', padding: 8, textAlign: 'center' }}>{idx + 1}</td>
-                <td style={{ border: '1px solid #000', padding: 8, textAlign: 'center' }}>{item.serviceCode}</td>
-                <td style={{ border: '1px solid #000', padding: 8 }}>{item.serviceName}</td>
-                <td style={{ border: '1px solid #000', padding: 8, fontSize: 12 }}>{item.note || '-'}</td>
-                <td style={{ border: '1px solid #000', padding: 8, textAlign: 'right' }}>{Number(item.price || 0).toLocaleString('vi-VN')} đ</td>
+                <td style={{ border: '1px solid #000', padding: 8, textAlign: 'center' }}>{item?.serviceCode || 'CLS'}</td>
+                <td style={{ border: '1px solid #000', padding: 8 }}>{item?.serviceName}</td>
+                <td style={{ border: '1px solid #000', padding: 8, fontSize: 12 }}>{item?.note || '-'}</td>
+                <td style={{ border: '1px solid #000', padding: 8, textAlign: 'right' }}>{Number(item?.price || 0).toLocaleString('vi-VN')} đ</td>
               </tr>
             ))}
           </tbody>

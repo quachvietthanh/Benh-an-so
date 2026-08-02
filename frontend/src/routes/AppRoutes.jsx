@@ -63,11 +63,11 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="patients" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientList /></PrivateRoute>} />
         <Route path="patients/:id" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientDetail /></PrivateRoute>} />
-        <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><AppointmentQueue /></PrivateRoute>} />
+        <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist', 'nurse']}><AppointmentQueue /></PrivateRoute>} />
         <Route path="medical-records" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
         <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'pharmacist']}><PrescriptionPage /></PrivateRoute>} />
-        <Route path="clinical-orders" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'receptionist']}><ClinicalOrdersPage /></PrivateRoute>} />
-        <Route path="clinical-results" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'receptionist']}><ResultPage /></PrivateRoute>} />
+        <Route path="clinical-orders" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'nurse', 'receptionist']}><ClinicalOrdersPage /></PrivateRoute>} />
+        <Route path="clinical-results" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'technician', 'ktv', 'nurse', 'receptionist']}><ResultPage /></PrivateRoute>} />
         <Route path="results" element={<Navigate to="/clinical-results" replace />} />
         <Route path="pharmacy" element={<PrivateRoute allowedRoles={['admin', 'manager', 'pharmacist']}><PharmacyPage /></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedRoles={['admin', 'manager', 'receptionist']}><BillingPage /></PrivateRoute>} />

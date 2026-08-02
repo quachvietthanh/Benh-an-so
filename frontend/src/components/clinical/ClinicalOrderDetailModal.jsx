@@ -152,11 +152,13 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
 
         {/* Services Table */}
         <div>
-          <Title level={5} style={{ marginBottom: 12 }}>Danh sách dịch vụ chỉ định ({order.items?.length || 0})</Title>
+          <Title level={5} style={{ marginBottom: 12 }}>
+            Danh sách dịch vụ chỉ định ({Array.isArray(order.items) ? order.items.length : 0})
+          </Title>
           <Table
             columns={serviceColumns}
-            dataSource={order.items || []}
-            rowKey={(r, idx) => r.serviceId || idx}
+            dataSource={Array.isArray(order.items) ? order.items : []}
+            rowKey={(r, idx) => r?.serviceId || idx}
             pagination={false}
             size="small"
             bordered
