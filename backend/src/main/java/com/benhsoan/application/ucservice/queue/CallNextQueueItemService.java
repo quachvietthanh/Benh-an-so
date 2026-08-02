@@ -7,6 +7,7 @@ import com.benhsoan.domain.queue.MedicalQueue;
 import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.enums.MedicalQueueStatus;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
+import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
 import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.queue.CallNextQueueItemCommand;
@@ -16,6 +17,7 @@ import com.benhsoan.port.outbound.repository.crudRepository.appointment.Appointm
 import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
@@ -30,7 +32,7 @@ public class CallNextQueueItemService implements CallNextQueueItemUseCase {
     private final VisitRepository visitRepository;
     private final AppointmentRepository appointmentRepository;
     private final QueueOperationAuthorization authorization;
-    private final QueueItemResultMapper resultMapper;
+    private final QueueItemQueryRepository queueItemQueryRepository;
     private final ClockPort clockPort;
     private final QueueAuditService queueAuditService;
 
@@ -58,6 +60,7 @@ public class CallNextQueueItemService implements CallNextQueueItemUseCase {
         queueItemRepository.save(item);
         visitRepository.save(visit);
         queueAuditService.record(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, item);
-        return resultMapper.toResult(item);
+        return queueItemQueryRepository.findDetailById(item.getId())
+                .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }
 }

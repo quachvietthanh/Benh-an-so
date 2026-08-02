@@ -10,7 +10,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.queue.GetQueuesQuery;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.inbound.queue.GetQueuesUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;
@@ -20,8 +20,7 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class GetQueuesService implements GetQueuesUseCase {
 
-    private final QueueItemRepository queueItemRepository;
-    private final QueueItemResultMapper resultMapper;
+    private final QueueItemQueryRepository queueItemQueryRepository;
     private final CurrentUserPort currentUserPort;
 
     @Override
@@ -32,9 +31,7 @@ public class GetQueuesService implements GetQueuesUseCase {
         if (!canViewBoard()) {
             throw new UnauthorizedQueueOperationException();
         }
-        return queueItemRepository.findQueueBoard(query.queueDate(), query.doctorId(), query.roomId()).stream()
-                .map(resultMapper::toResult)
-                .toList();
+        return queueItemQueryRepository.findQueueBoard(query.queueDate(), query.doctorId(), query.roomId());
     }
 
     private boolean canViewBoard() {

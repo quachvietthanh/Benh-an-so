@@ -174,6 +174,8 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.POST, "/queue-items/*/complete")
                                                 .hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.POST, "/queue-items/*/skip")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.PATCH, "/queue-items/*/status")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.GET, "/queue-items/*")

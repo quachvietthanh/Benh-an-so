@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.QueueRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.queue.CheckInWalkInRequest;
+import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueItemResponse;
@@ -32,6 +33,7 @@ import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetQueuesUseCase;
+import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 
 import jakarta.validation.Valid;
@@ -49,6 +51,7 @@ public class QueueController {
     private final UpdateQueueItemStatusUseCase updateQueueItemStatusUseCase;
     private final CompleteQueueItemUseCase completeQueueItemUseCase;
     private final GetQueueItemUseCase getQueueItemUseCase;
+    private final SkipQueueItemUseCase skipQueueItemUseCase;
     private final QueueRestMapper mapper;
 
     @GetMapping("/queues")
@@ -95,6 +98,12 @@ public class QueueController {
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public QueueItemResponse complete(@PathVariable UUID itemId) {
         return mapper.toResponse(completeQueueItemUseCase.complete(new CompleteQueueItemCommand(itemId)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/skip")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    public QueueItemResponse skip(@PathVariable UUID itemId, @Valid @RequestBody SkipQueueItemRequest request) {
+        return mapper.toResponse(skipQueueItemUseCase.skip(mapper.toCommand(itemId, request)));
     }
 
     @GetMapping("/queue-items/{itemId}")

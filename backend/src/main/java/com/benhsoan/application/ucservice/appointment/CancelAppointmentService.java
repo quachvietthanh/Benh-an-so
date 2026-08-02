@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.appointment;
 
 import java.util.UUID;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,8 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
+import com.benhsoan.domain.queue.QueueItem;
+import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
@@ -53,29 +56,29 @@ public class CancelAppointmentService
 
         validatePermission();
 
-        Appointment appointment =
-                appointmentRepository.findByIdForUpdate(appointmentId)
-                        .orElseThrow(() ->
-                                new AppointmentNotFoundException(
-                                        appointmentId
-                                )
-                        );
+        Optional<QueueItem> linkedQueueItem = queueItemRepository.findByAppointmentId(appointmentId);
+        QueueItem lockedQueueItem = null;
+        Visit lockedVisit = null;
+        if (linkedQueueItem.isPresent()) {
+            lockedQueueItem = queueItemRepository.findByIdForUpdate(linkedQueueItem.orElseThrow().getId())
+                    .orElseThrow(() -> new CheckInConflictException(
+                            "Queue item disappeared during appointment cancellation."));
+            UUID visitId = lockedQueueItem.getVisitId();
+            lockedVisit = visitRepository.findByIdForUpdate(visitId)
+                    .orElseThrow(() -> new VisitNotFoundException(visitId));
+        }
 
-        appointment.cancel(
-                command.cancelReason()
-        );
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId)
+                .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
+        appointment.cancel(command.cancelReason());
 
-        queueItemRepository.findByAppointmentId(appointmentId).ifPresent(queueItem -> {
-            var lockedQueueItem = queueItemRepository.findByIdForUpdate(queueItem.getId())
-                    .orElseThrow(() -> new CheckInConflictException("Queue item disappeared during appointment cancellation."));
-            var visit = visitRepository.findByIdForUpdate(lockedQueueItem.getVisitId())
-                    .orElseThrow(() -> new VisitNotFoundException(lockedQueueItem.getVisitId()));
+        if (lockedQueueItem != null) {
             var cancelledAt = clockPort.now();
             lockedQueueItem.cancel(command.cancelReason(), cancelledAt);
-            visit.cancel(cancelledAt);
+            lockedVisit.cancel(cancelledAt);
             queueItemRepository.save(lockedQueueItem);
-            visitRepository.save(visit);
-        });
+            visitRepository.save(lockedVisit);
+        }
 
         Appointment saved = appointmentRepository.save(appointment);
 

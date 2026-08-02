@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.queue.QueueItem;
+import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
 import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -14,6 +15,8 @@ import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
@@ -26,8 +29,9 @@ public class UpdateQueueItemStatusService implements UpdateQueueItemStatusUseCas
     private final QueueItemRepository queueItemRepository;
     private final MedicalQueueRepository medicalQueueRepository;
     private final VisitRepository visitRepository;
+    private final AppointmentRepository appointmentRepository;
     private final QueueOperationAuthorization authorization;
-    private final QueueItemResultMapper resultMapper;
+    private final QueueItemQueryRepository queueItemQueryRepository;
     private final ClockPort clockPort;
     private final QueueAuditService queueAuditService;
 
@@ -51,6 +55,12 @@ public class UpdateQueueItemStatusService implements UpdateQueueItemStatusUseCas
         } else if (command.targetStatus() == QueueItemStatus.CANCELLED) {
             item.cancel(command.cancelReason(), now);
             visit.cancel(now);
+            if (item.getAppointmentId() != null) {
+                var appointment = appointmentRepository.findByIdForUpdate(item.getAppointmentId())
+                        .orElseThrow(() -> new AppointmentNotFoundException(item.getAppointmentId()));
+                appointment.cancel(command.cancelReason());
+                appointmentRepository.save(appointment);
+            }
         } else {
             throw new ValidationException("Only WAITING_FOR_RESULT, IN_PROGRESS, or CANCELLED are supported updates.");
         }
@@ -60,6 +70,7 @@ public class UpdateQueueItemStatusService implements UpdateQueueItemStatusUseCas
         queueAuditService.record(item.getStatus() == QueueItemStatus.CANCELLED
                 ? com.benhsoan.domain.auditlog.enums.ActionType.CANCEL
                 : com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, item);
-        return resultMapper.toResult(item);
+        return queueItemQueryRepository.findDetailById(item.getId())
+                .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }
 }

@@ -8,8 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
+import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -18,18 +17,14 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class GetQueueItemService implements GetQueueItemUseCase {
 
-    private final QueueItemRepository queueItemRepository;
-    private final MedicalQueueRepository medicalQueueRepository;
-    private final QueueItemResultMapper resultMapper;
+    private final QueueItemQueryRepository queueItemQueryRepository;
     private final QueueOperationAuthorization authorization;
 
     @Override
     public QueueItemResult getById(UUID queueItemId) {
-        var item = queueItemRepository.findById(queueItemId)
+        QueueItemResult item = queueItemQueryRepository.findDetailById(queueItemId)
                 .orElseThrow(() -> new QueueItemNotFoundException(queueItemId));
-        var queue = medicalQueueRepository.findById(item.getMedicalQueueId())
-                .orElseThrow(() -> new QueueItemNotFoundException(item.getMedicalQueueId()));
-        authorization.requireReadPermission(queue);
-        return resultMapper.toResult(item);
+        authorization.requireReadPermission(item.doctorId());
+        return item;
     }
 }

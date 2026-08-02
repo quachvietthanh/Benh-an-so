@@ -2,7 +2,6 @@ package com.benhsoan.port.outbound.repository.crudRepository.queue;
 
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,8 +19,6 @@ public interface QueueItemRepository extends BaseRepository<QueueItem, UUID> {
             Collection<QueueItemStatus> statuses);
 
     int findMaxQueueNumber(UUID medicalQueueId);
-
-    List<QueueItem> findQueueBoard(LocalDate queueDate, UUID doctorId, UUID roomId);
 
     Optional<QueueItem> findNextWaitingForUpdate(UUID medicalQueueId);
 }

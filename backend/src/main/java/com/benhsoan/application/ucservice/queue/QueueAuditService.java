@@ -25,4 +25,12 @@ class QueueAuditService {
         auditLogRepository.save(AuditLog.create(actorId, actionType, ResourceType.VISIT, item.getVisitId(),
                 "{\"queueItemId\":\"%s\",\"status\":\"%s\"}".formatted(item.getId(), item.getStatus()), null));
     }
+
+    void recordSkipped(QueueItem item, String reasonCode) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        auditLogRepository.save(AuditLog.create(actorId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),
+                "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"reason\":\"%s\"}"
+                        .formatted(item.getId(), item.getStatus(), reasonCode),
+                null));
+    }
 }

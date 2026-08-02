@@ -34,6 +34,7 @@ public class CheckInAppointmentService implements CheckInAppointmentUseCase {
         Appointment appointment = appointmentRepository.findByIdForUpdate(command.appointmentId())
                 .orElseThrow(() -> new AppointmentNotFoundException(command.appointmentId()));
         Instant checkedInAt = clockPort.now();
+        queueCheckInCoordinator.requireAppointmentOnQueueDate(appointment.getStartTime(), checkedInAt);
         appointment.checkIn(checkedInAt);
 
         QueueCheckInResult result = queueCheckInCoordinator.checkIn(appointment.getPatientId(), appointment.getDoctorId(),

@@ -26,6 +26,7 @@ import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.outbound.generator.VisitCodeGenerator;
 import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.DoctorRoomAssignmentRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
@@ -46,6 +47,7 @@ class QueueCheckInCoordinator {
             QueueItemStatus.WAITING, QueueItemStatus.IN_PROGRESS, QueueItemStatus.WAITING_FOR_RESULT);
 
     private final PatientRepository patientRepository;
+    private final UserRepository userRepository;
     private final DoctorRoomAssignmentRepository doctorRoomAssignmentRepository;
     private final RoomRepository roomRepository;
     private final MedicalQueueRepository medicalQueueRepository;
@@ -56,10 +58,20 @@ class QueueCheckInCoordinator {
 
     QueueCheckInResult checkIn(UUID patientId, UUID doctorId, UUID appointmentId, QueueItemSourceType sourceType,
             String reason, String note, UUID actorId, Instant checkedInAt) {
-        patientRepository.findByIdForUpdate(patientId).orElseThrow(() -> new PatientNotFoundException(patientId));
+        var patient = patientRepository.findByIdForUpdate(patientId)
+                .orElseThrow(() -> new PatientNotFoundException(patientId));
+        if (!patient.isActive()) {
+            throw new CheckInConflictException("Inactive patients cannot be checked in.");
+        }
 
         LocalDate queueDate = checkedInAt.atZone(CLINIC_ZONE_ID).toLocalDate();
         ensurePatientHasNoActiveCareFlow(patientId, queueDate);
+
+        var doctor = userRepository.findById(doctorId)
+                .orElseThrow(() -> new CheckInConflictException("Assigned doctor does not exist."));
+        if (!doctor.isActive()) {
+            throw new CheckInConflictException("Inactive doctors cannot receive queue items.");
+        }
 
         DoctorRoomAssignment assignment = doctorRoomAssignmentRepository.findByDoctorIdForUpdate(doctorId)
                 .orElseThrow(() -> new DoctorRoomAssignmentNotFoundException(doctorId));
@@ -87,6 +99,14 @@ class QueueCheckInCoordinator {
         return new QueueCheckInResult(savedQueueItem.getId(), medicalQueue.getId(), linkedVisit.getId(),
                 linkedVisit.getVisitCode(), appointmentId, patientId, doctorId, assignment.getRoomId(), queueNumber,
                 queueDate, sourceType, savedQueueItem.getStatus(), linkedVisit.getStatus(), checkedInAt);
+    }
+
+    void requireAppointmentOnQueueDate(Instant appointmentStartTime, Instant checkedInAt) {
+        LocalDate appointmentDate = appointmentStartTime.atZone(CLINIC_ZONE_ID).toLocalDate();
+        LocalDate queueDate = checkedInAt.atZone(CLINIC_ZONE_ID).toLocalDate();
+        if (!appointmentDate.equals(queueDate)) {
+            throw new CheckInConflictException("Appointment can only be checked in on its scheduled date.");
+        }
     }
 
     private void ensurePatientHasNoActiveCareFlow(UUID patientId, LocalDate queueDate) {

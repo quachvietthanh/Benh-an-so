@@ -8,8 +8,13 @@ import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
 
 public record QueueItemResponse(
-        UUID id, UUID medicalQueueId, UUID patientId, UUID appointmentId, UUID visitId,
+        UUID id, UUID medicalQueueId,
+        UUID patientId, String patientName,
+        UUID doctorId, String doctorName,
+        UUID roomId, String roomNumber,
+        UUID appointmentId, UUID visitId, String visitCode,
         QueueItemSourceType sourceType, QueueItemStatus status, int queueNumber, LocalDate queueDate,
-        Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason
+        Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
+        Instant skippedAt, String skipReason
 ) {
 }

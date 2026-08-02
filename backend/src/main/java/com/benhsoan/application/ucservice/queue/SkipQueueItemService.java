@@ -3,16 +3,16 @@ package com.benhsoan.application.ucservice.queue;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.queue.QueueItem;
+import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
-import com.benhsoan.domain.queue.exception.CheckInConflictException;
+import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
+import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
-import com.benhsoan.port.dto.command.queue.CompleteQueueItemCommand;
+import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
 import com.benhsoan.port.dto.result.QueueItemResult;
-import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
+import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
@@ -24,46 +24,53 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class CompleteQueueItemService implements CompleteQueueItemUseCase {
+public class SkipQueueItemService implements SkipQueueItemUseCase {
+
+    static final String APPOINTMENT_CANCEL_REASON = "PATIENT_ABSENT_AFTER_CHECK_IN";
 
     private final QueueItemRepository queueItemRepository;
     private final MedicalQueueRepository medicalQueueRepository;
     private final VisitRepository visitRepository;
     private final AppointmentRepository appointmentRepository;
-    private final MedicalRecordRepository medicalRecordRepository;
     private final QueueOperationAuthorization authorization;
     private final QueueItemQueryRepository queueItemQueryRepository;
     private final ClockPort clockPort;
     private final QueueAuditService queueAuditService;
 
     @Override
-    public QueueItemResult complete(CompleteQueueItemCommand command) {
+    public QueueItemResult skip(SkipQueueItemCommand command) {
         QueueItem item = queueItemRepository.findByIdForUpdate(command.queueItemId())
                 .orElseThrow(() -> new QueueItemNotFoundException(command.queueItemId()));
         var queue = medicalQueueRepository.findById(item.getMedicalQueueId())
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getMedicalQueueId()));
-        authorization.requireCompletePermission(queue);
-        var visit = visitRepository.findByIdForUpdate(item.getVisitId())
+        authorization.requireSkipPermission(queue);
+
+        Visit visit = visitRepository.findByIdForUpdate(item.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(item.getVisitId()));
-        var medicalRecord = medicalRecordRepository.findByVisitId(visit.getId())
-                .orElseThrow(() -> new CheckInConflictException("Visit must have a locked medical record before completion."));
-        if (!medicalRecord.isLocked()) {
-            throw new CheckInConflictException("Medical record must be locked before visit completion.");
+        Appointment appointment = loadAppointment(item);
+        var skippedAt = clockPort.now();
+
+        item.skip(command.reason(), skippedAt);
+        visit.cancel(skippedAt);
+        if (appointment != null) {
+            appointment.cancel(APPOINTMENT_CANCEL_REASON);
         }
 
-        var now = clockPort.now();
-        item.complete(now);
-        visit.complete(now);
-        if (item.getAppointmentId() != null) {
-            var appointment = appointmentRepository.findByIdForUpdate(item.getAppointmentId())
-                    .orElseThrow(() -> new AppointmentNotFoundException(item.getAppointmentId()));
-            appointment.complete(now);
-            appointmentRepository.save(appointment);
-        }
         queueItemRepository.save(item);
         visitRepository.save(visit);
-        queueAuditService.record(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, item);
+        if (appointment != null) {
+            appointmentRepository.save(appointment);
+        }
+        queueAuditService.recordSkipped(item, APPOINTMENT_CANCEL_REASON);
         return queueItemQueryRepository.findDetailById(item.getId())
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
+    }
+
+    private Appointment loadAppointment(QueueItem item) {
+        if (item.getAppointmentId() == null) {
+            return null;
+        }
+        return appointmentRepository.findByIdForUpdate(item.getAppointmentId())
+                .orElseThrow(() -> new AppointmentNotFoundException(item.getAppointmentId()));
     }
 }

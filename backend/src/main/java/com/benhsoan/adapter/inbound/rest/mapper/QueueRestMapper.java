@@ -5,10 +5,12 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.queue.CheckInWalkInRequest;
+import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueItemResponse;
 import com.benhsoan.port.dto.command.queue.CheckInWalkInCommand;
+import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
 import com.benhsoan.port.dto.command.queue.UpdateQueueItemStatusCommand;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.dto.result.QueueItemResult;
@@ -24,10 +26,16 @@ public class QueueRestMapper {
         return new UpdateQueueItemStatusCommand(queueItemId, request.targetStatus(), request.cancelReason());
     }
 
+    public SkipQueueItemCommand toCommand(UUID queueItemId, SkipQueueItemRequest request) {
+        return new SkipQueueItemCommand(queueItemId, request.reason());
+    }
+
     public QueueItemResponse toResponse(QueueItemResult result) {
-        return new QueueItemResponse(result.id(), result.medicalQueueId(), result.patientId(), result.appointmentId(),
-                result.visitId(), result.sourceType(), result.status(), result.queueNumber(), result.queueDate(),
-                result.checkedInAt(), result.calledAt(), result.completedAt(), result.cancelledAt(), result.cancelReason());
+        return new QueueItemResponse(result.id(), result.medicalQueueId(), result.patientId(), result.patientName(),
+                result.doctorId(), result.doctorName(), result.roomId(), result.roomNumber(), result.appointmentId(),
+                result.visitId(), result.visitCode(), result.sourceType(), result.status(), result.queueNumber(), result.queueDate(),
+                result.checkedInAt(), result.calledAt(), result.completedAt(), result.cancelledAt(), result.cancelReason(),
+                result.skippedAt(), result.skipReason());
     }
 
     public QueueCheckInResponse toResponse(QueueCheckInResult result) {
