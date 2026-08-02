@@ -80,3 +80,25 @@ export const getOverdueMinutes = (appointment, now = dayjs()) => {
   const diff = dayjs(now).diff(endTime || overdueThreshold, 'minute')
   return Math.max(0, diff)
 }
+
+export const formatWaitingTime = (checkedInAt, now = dayjs(), status = '') => {
+  const activeWaitingStatuses = ['CHECKED_IN', 'WAITING', 'CALLING']
+  if (!checkedInAt || !activeWaitingStatuses.includes(status)) {
+    return 'Chưa check-in'
+  }
+  const checkInTime = dayjs(checkedInAt)
+  if (!checkInTime.isValid()) return 'Chưa check-in'
+
+  const totalMinutes = Math.max(0, dayjs(now).diff(checkInTime, 'minute'))
+  if (isNaN(totalMinutes)) return 'Chưa check-in'
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes} phút`
+  }
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (minutes === 0) {
+    return `${hours} giờ`
+  }
+  return `${hours} giờ ${minutes} phút`
+}
