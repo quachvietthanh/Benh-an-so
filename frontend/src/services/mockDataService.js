@@ -37,6 +37,10 @@ export const roleRoutes = {
 }
 
 export const getNavigationItems = (roles = []) => {
+  const normalizedUserRoles = (Array.isArray(roles) ? roles : [roles])
+    .map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    .filter(Boolean)
+
   const allItems = [
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist', 'pharmacist'] },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
@@ -52,7 +56,9 @@ export const getNavigationItems = (roles = []) => {
     { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SafetyCertificateOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist', 'pharmacist'] },
   ]
 
-  return allItems.filter((item) => item.roles.some((role) => roles.includes(role)))
+  if (!normalizedUserRoles.length) return allItems
+
+  return allItems.filter((item) => item.roles.some((role) => normalizedUserRoles.includes(role)))
 }
 
 export const loginUser = ({ username, password }) => {

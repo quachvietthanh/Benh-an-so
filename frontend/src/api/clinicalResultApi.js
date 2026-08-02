@@ -1,35 +1,37 @@
 import axiosClient from './axiosClient'
 
 /**
- * RESTful API Client for Clinical Results Management
- * Endpoints:
- * GET    /api/results             - Fetch all result entries (with search/filter params)
- * GET    /api/results/{id}        - Fetch single result entry by ID
- * POST   /api/results             - Create new clinical result record
- * PUT    /api/results/{id}        - Update existing clinical result entry
- * POST   /api/results/upload      - Upload result attachments (PDF, JPG, PNG)
+ * RESTful API Client for Clinical Results & Attachments Management
+ * Chuẩn hóa Namespace: /clinical-results/*
  */
 const clinicalResultApi = {
   getAll: (params) => {
-    return axiosClient.get('/results', { params })
+    return axiosClient.get('/clinical-results', { params })
   },
   getById: (id) => {
-    return axiosClient.get(`/results/${id}`)
+    return axiosClient.get(`/clinical-results/${id}`)
+  },
+  getByVisit: (visitId, params) => {
+    return axiosClient.get(`/clinical-results/visits/${visitId}`, { params })
   },
   create: (data) => {
-    return axiosClient.post('/results', data)
+    return axiosClient.post('/clinical-results', data)
   },
   update: (id, data) => {
-    return axiosClient.put(`/results/${id}`, data)
+    return axiosClient.put(`/clinical-results/${id}`, data)
   },
-  uploadAttachment: (file) => {
+  uploadAttachment: (resultId, file) => {
     const formData = new FormData()
     formData.append('file', file)
-    return axiosClient.post('/results/upload', formData, {
+    const endpoint = resultId ? `/clinical-results/${resultId}/attachments` : '/clinical-results/upload'
+    return axiosClient.post(endpoint, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })
+  },
+  getDownloadUrl: (attachmentId) => {
+    return axiosClient.get(`/clinical-result-attachments/${attachmentId}/download`)
   },
 }
 
