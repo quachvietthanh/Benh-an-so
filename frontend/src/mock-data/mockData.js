@@ -146,10 +146,7 @@ export const demoPrescriptions = [
   { id: 'pre1', recordId: 'm2', medicines: [{ id: 'med1', quantity: 30, dosage: 'Sáng 1 viên' }, { id: 'med2', quantity: 60, dosage: 'Sáng 1 viên, Tối 1 viên' }] },
 ]
 
-export const demoInvoices = [
-  { id: 'inv1', invoiceCode: 'HD-0001', patientName: 'Nguyễn Văn An', amount: 250000, status: 'PAID', createdAt: '2026-06-30T09:00:00', adjustmentOf: null },
-  { id: 'inv2', invoiceCode: 'HD-0002', patientName: 'Trần Thị Bình', amount: 450000, status: 'PENDING', createdAt: '2026-07-10T10:30:00', adjustmentOf: null },
-]
+export const demoInvoices = []
 
 export const demoAuditLogs = [
   { id: 'log1', user: 'BS. Phạm Hồng Anh', patient: 'Nguyễn Văn An', action: 'Xem hồ sơ bệnh án', time: '2026-07-12 08:10' },

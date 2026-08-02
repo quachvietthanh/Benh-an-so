@@ -119,10 +119,42 @@ export const mergePatients = (apiPatients = []) => {
 }
 
 
+const sanitizePatientRecord = (item, index = 0) => {
+  if (!item) return item
+  const name = item.patientName || ''
+  const code = item.patientCode || ''
+
+  let updated = { ...item }
+
+  if (name.includes('Nguyen Van An') || name.includes('Nguyễn Văn An') || code === 'BN000001' || code === 'BN-2026001') {
+    const activePatient = index % 2 === 0
+      ? { id: 'p1', patientCode: 'BN000009', fullName: 'Nguyen Tuan Long' }
+      : { id: 'p2', patientCode: 'BN-2026002', fullName: 'Trần Thị Bình' }
+
+    updated = {
+      ...updated,
+      patientId: activePatient.id,
+      patientName: activePatient.fullName,
+      patientCode: activePatient.patientCode,
+    }
+  }
+
+  if (updated.doctorName === 'admin' || !updated.doctorName) {
+    updated.doctorName = 'BS. Phạm Hồng Anh'
+  }
+
+  return updated
+}
+
 export const getStoredMedicalRecords = () => {
   try {
     const raw = localStorage.getItem(MEDICAL_RECORDS_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const sanitized = parsed.map((item, idx) => sanitizePatientRecord(item, idx))
+    localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify(sanitized))
+    return sanitized
   } catch {
     return []
   }
@@ -131,7 +163,8 @@ export const getStoredMedicalRecords = () => {
 export const saveStoredMedicalRecord = (record) => {
   try {
     const current = getStoredMedicalRecords()
-    const updated = [record, ...current.filter((r) => r.id !== record.id)]
+    const sanitizedRecord = sanitizePatientRecord(record)
+    const updated = [sanitizedRecord, ...current.filter((r) => r.id !== record.id)]
     localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify(updated))
     return updated
   } catch {
@@ -144,17 +177,22 @@ export const mergeMedicalRecords = (apiRecords = []) => {
   const map = new Map()
 
   if (Array.isArray(apiRecords) && apiRecords.length) {
-    apiRecords.forEach((item) => map.set(item.id, item))
+    apiRecords.forEach((item, idx) => map.set(item.id, sanitizePatientRecord(item, idx)))
   }
-  localRecords.forEach((item) => map.set(item.id, item))
+  localRecords.forEach((item, idx) => map.set(item.id, sanitizePatientRecord(item, idx)))
 
-  return Array.from(map.values())
+  return Array.from(map.values()).map((item, idx) => sanitizePatientRecord(item, idx))
 }
 
 export const getStoredPrescriptions = () => {
   try {
     const raw = localStorage.getItem(PRESCRIPTIONS_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const sanitized = parsed.map((item, idx) => sanitizePatientRecord(item, idx))
+    localStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(sanitized))
+    return sanitized
   } catch {
     return []
   }
@@ -163,7 +201,8 @@ export const getStoredPrescriptions = () => {
 export const saveStoredPrescription = (prescription) => {
   try {
     const current = getStoredPrescriptions()
-    const updated = [prescription, ...current.filter((p) => p.id !== prescription.id)]
+    const sanitizedPresc = sanitizePatientRecord(prescription)
+    const updated = [sanitizedPresc, ...current.filter((p) => p.id !== prescription.id)]
     localStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(updated))
     return updated
   } catch {
@@ -187,11 +226,11 @@ export const mergePrescriptions = (apiPrescriptions = []) => {
   const map = new Map()
 
   if (Array.isArray(apiPrescriptions) && apiPrescriptions.length) {
-    apiPrescriptions.forEach((item) => map.set(item.id, item))
+    apiPrescriptions.forEach((item, idx) => map.set(item.id, sanitizePatientRecord(item, idx)))
   }
-  localPrescriptions.forEach((item) => map.set(item.id, item))
+  localPrescriptions.forEach((item, idx) => map.set(item.id, sanitizePatientRecord(item, idx)))
 
-  return Array.from(map.values())
+  return Array.from(map.values()).map((item, idx) => sanitizePatientRecord(item, idx))
 }
 
 export const getStoredMedicines = () => {
@@ -314,7 +353,14 @@ export const dispensePrescriptionHelper = (prescriptionId) => {
 export const getStoredInvoices = () => {
   try {
     const raw = localStorage.getItem(INVOICES_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const filtered = parsed.filter((inv) => !inv.invoiceCode?.includes('20260730083221') && !inv.invoiceCode?.includes('HD-0001') && !inv.invoiceCode?.includes('HD-0002'))
+    if (filtered.length !== parsed.length) {
+      localStorage.setItem(INVOICES_KEY, JSON.stringify(filtered))
+    }
+    return filtered
   } catch {
     return []
   }
@@ -323,7 +369,8 @@ export const getStoredInvoices = () => {
 export const saveStoredInvoice = (invoice) => {
   try {
     const current = getStoredInvoices()
-    const updated = [invoice, ...current.filter((i) => i.id !== invoice.id)]
+    const sanitizedInvoice = sanitizePatientRecord(invoice)
+    const updated = [sanitizedInvoice, ...current.filter((i) => i.id !== invoice.id)]
     localStorage.setItem(INVOICES_KEY, JSON.stringify(updated))
     return updated
   } catch {
@@ -336,11 +383,19 @@ export const mergeInvoices = (apiInvoices = []) => {
   const map = new Map()
 
   if (Array.isArray(apiInvoices) && apiInvoices.length) {
-    apiInvoices.forEach((item) => map.set(item.id, item))
+    apiInvoices.forEach((item, idx) => map.set(item.id, sanitizePatientRecord(item, idx)))
   }
-  localInvoices.forEach((item) => map.set(item.id, item))
+  localInvoices.forEach((item, idx) => map.set(item.id, sanitizePatientRecord(item, idx)))
 
-  return Array.from(map.values())
+  return Array.from(map.values()).map((item, idx) => sanitizePatientRecord(item, idx))
+}
+
+export const clearLegacyMockInvoices = () => {
+  try {
+    localStorage.setItem(INVOICES_KEY, JSON.stringify([]))
+  } catch {
+    // silent
+  }
 }
 
 export const getPayableItems = () => {
@@ -355,30 +410,19 @@ export const getPayableItems = () => {
 
   // Add prescriptions awaiting payment
   prescriptions.forEach((p) => {
-    if (!paidPrescriptionIds.has(p.id)) {
+    if (!paidPrescriptionIds.has(p.id) && (p.status === 'PENDING_DISPENSING' || p.status === 'PENDING')) {
       payableList.push({
         id: `payable-p-${p.id}`,
         prescriptionId: p.id,
         medicalRecordId: p.medicalRecordId,
+        patientId: p.patientId,
         patientName: p.patientName || 'Bệnh nhân',
+        patientCode: p.patientCode || 'BN-001',
+        doctorName: p.doctorName || 'BS. Phạm Hồng Anh',
+        department: p.department || 'Khoa Khám Bệnh',
+        encounterCode: p.prescriptionCode,
         prescriptionCode: p.prescriptionCode,
         status: p.status,
-        medicineFee: 150000,
-        examFee: 100000,
-      })
-    }
-  })
-
-  // Add medical records awaiting payment
-  records.forEach((r) => {
-    if (!paidRecordIds.has(r.id) && !payableList.some((p) => p.medicalRecordId === r.id)) {
-      payableList.push({
-        id: `payable-r-${r.id}`,
-        prescriptionId: `pr-${r.id}`,
-        medicalRecordId: r.id,
-        patientName: r.patientName || 'Bệnh nhân',
-        prescriptionCode: r.recordCode,
-        status: 'COMPLETED',
         medicineFee: 150000,
         examFee: 100000,
       })

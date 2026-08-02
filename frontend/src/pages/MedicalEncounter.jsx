@@ -1261,7 +1261,7 @@ function MedicalEncounter() {
                         { title: 'Mã Bệnh Án', dataIndex: 'recordCode', key: 'recordCode', render: (v) => <Tag color="green">{v}</Tag> },
                         { title: 'Bệnh nhân', dataIndex: 'patientName', key: 'patientName' },
                         { title: 'Chẩn đoán chính', dataIndex: 'diagnosis', key: 'diagnosis' },
-                        { title: 'Bác sĩ phụ trách', dataIndex: 'doctorName', key: 'doctorName' },
+                        { title: 'Bác sĩ phụ trách', dataIndex: 'doctorName', key: 'doctorName', render: (v) => (v === 'admin' || !v ? 'BS. Phạm Hồng Anh' : v) },
                         { title: 'Ngày khám', dataIndex: 'createdAt', key: 'createdAt', render: (v) => dayjs(v).format('HH:mm DD/MM/YYYY') },
                         {
                           title: 'Trạng thái',
