@@ -4,7 +4,7 @@
 
 -- Patient BN000001 has two visits for medical-history API testing.
 INSERT INTO visits (
-    id, visit_code, patient_id, doctor_id, appointment_id, queue_id,
+    id, visit_code, patient_id, doctor_id, appointment_id, queue_item_id,
     visit_type, status, visit_at, started_at, completed_at,
     reason, note, created_by, created_at, updated_at
 ) VALUES

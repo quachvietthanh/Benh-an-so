@@ -15,4 +15,10 @@ public class PatientNotFoundException extends DomainException {
         );
     }
 
+    public PatientNotFoundException(String patientCode) {
+        super(
+                HttpStatus.NOT_FOUND,
+                "Patient not found: " + patientCode
+        );
+    }
 }

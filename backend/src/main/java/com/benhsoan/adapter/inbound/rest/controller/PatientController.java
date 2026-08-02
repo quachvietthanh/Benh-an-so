@@ -20,6 +20,8 @@ import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
 import com.benhsoan.port.dto.result.PatientResult;
+import com.benhsoan.port.inbound.patient.GetPatientByCodeUseCase;
+import com.benhsoan.port.inbound.patient.GetPatientByIdUseCase;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
 import com.benhsoan.port.inbound.patient.SearchPatientUseCase;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
@@ -38,6 +40,10 @@ public class PatientController {
     private final SearchPatientUseCase searchPatientUseCase;
 
     private final UpdatePatientUseCase updatePatientUseCase;
+
+    private final GetPatientByIdUseCase getPatientByIdUseCase;
+
+    private final GetPatientByCodeUseCase getPatientByCodeUseCase;
 
     private final PatientRestMapper patientRestMapper;
 
@@ -68,6 +74,18 @@ public class PatientController {
                         )
                 );
         }
+
+    @GetMapping("/code/{code}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
+    public PatientResponse getByCode(@PathVariable String code) {
+        return patientRestMapper.toResponse(getPatientByCodeUseCase.getByCode(code));
+    }
+
+    @GetMapping("/{patientId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
+    public PatientResponse getById(@PathVariable UUID patientId) {
+        return patientRestMapper.toResponse(getPatientByIdUseCase.getById(patientId));
+    }
 
     @PutMapping("/{patientId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
