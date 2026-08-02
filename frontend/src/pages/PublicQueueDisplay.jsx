@@ -12,7 +12,7 @@ function PublicQueueDisplay() {
 
   const fetchQueue = async () => {
     try {
-      const res = await queueApi.getQueue()
+      const res = await queueApi.getQueues({ date: dayjs().format('YYYY-MM-DD') })
       if (res?.data && Array.isArray(res.data)) {
         setQueueItems(res.data)
       }

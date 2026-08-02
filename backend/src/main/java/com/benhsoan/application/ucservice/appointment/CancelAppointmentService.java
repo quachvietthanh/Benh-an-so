@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.appointment;
 
 import java.util.UUID;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,12 +12,19 @@ import com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperatio
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.queue.exception.CheckInConflictException;
+import com.benhsoan.domain.queue.QueueItem;
+import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
 import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
 import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -34,6 +42,12 @@ public class CancelAppointmentService
 
     private final AuditLogRepository auditLogRepository;
 
+    private final QueueItemRepository queueItemRepository;
+
+    private final VisitRepository visitRepository;
+
+    private final ClockPort clockPort;
+
     @Override
     public AppointmentResult cancel(
             UUID appointmentId,
@@ -42,17 +56,29 @@ public class CancelAppointmentService
 
         validatePermission();
 
-        Appointment appointment =
-                appointmentRepository.findById(appointmentId)
-                        .orElseThrow(() ->
-                                new AppointmentNotFoundException(
-                                        appointmentId
-                                )
-                        );
+        Optional<QueueItem> linkedQueueItem = queueItemRepository.findByAppointmentId(appointmentId);
+        QueueItem lockedQueueItem = null;
+        Visit lockedVisit = null;
+        if (linkedQueueItem.isPresent()) {
+            lockedQueueItem = queueItemRepository.findByIdForUpdate(linkedQueueItem.orElseThrow().getId())
+                    .orElseThrow(() -> new CheckInConflictException(
+                            "Queue item disappeared during appointment cancellation."));
+            UUID visitId = lockedQueueItem.getVisitId();
+            lockedVisit = visitRepository.findByIdForUpdate(visitId)
+                    .orElseThrow(() -> new VisitNotFoundException(visitId));
+        }
 
-        appointment.cancel(
-                command.cancelReason()
-        );
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId)
+                .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
+        appointment.cancel(command.cancelReason());
+
+        if (lockedQueueItem != null) {
+            var cancelledAt = clockPort.now();
+            lockedQueueItem.cancel(command.cancelReason(), cancelledAt);
+            lockedVisit.cancel(cancelledAt);
+            queueItemRepository.save(lockedQueueItem);
+            visitRepository.save(lockedVisit);
+        }
 
         Appointment saved = appointmentRepository.save(appointment);
 

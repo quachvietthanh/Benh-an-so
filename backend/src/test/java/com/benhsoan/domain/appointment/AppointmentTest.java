@@ -38,4 +38,16 @@ class AppointmentTest {
         assertEquals(AppointmentStatus.NO_SHOW, appointment.getStatus());
         assertNull(appointment.getCancelReason());
     }
+
+    @Test
+    void doesNotAllowCheckedInAppointmentToBeMarkedNoShow() {
+        Instant now = Instant.parse("2026-08-02T03:00:00Z");
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT-002", UUID.randomUUID(), UUID.randomUUID(),
+                now.minusSeconds(3600), now.minusSeconds(1800), AppointmentStatus.CHECKED_IN,
+                "Consultation", null, now.minusSeconds(3500), null, UUID.randomUUID(), now.minusSeconds(7200));
+
+        assertThrows(AppointmentInvalidStatusException.class, () -> appointment.markNoShow(now));
+        assertEquals(AppointmentStatus.CHECKED_IN, appointment.getStatus());
+    }
 }

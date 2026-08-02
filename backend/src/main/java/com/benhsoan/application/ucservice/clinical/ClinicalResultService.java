@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -29,8 +28,8 @@ import com.benhsoan.port.dto.command.clinical.UpdateClinicalResultCommand;
 import com.benhsoan.port.dto.result.ClinicalResultResult;
 import com.benhsoan.port.inbound.clinical.EnterClinicalResultUseCase;
 import com.benhsoan.port.inbound.clinical.FinalizeClinicalResultUseCase;
-import com.benhsoan.port.inbound.clinical.GetClinicalResultUseCase;
 import com.benhsoan.port.inbound.clinical.GetClinicalResultHistoryUseCase;
+import com.benhsoan.port.inbound.clinical.GetClinicalResultUseCase;
 import com.benhsoan.port.inbound.clinical.GetClinicalResultsByVisitUseCase;
 import com.benhsoan.port.inbound.clinical.UpdateClinicalResultUseCase;
 import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderItemRepository;

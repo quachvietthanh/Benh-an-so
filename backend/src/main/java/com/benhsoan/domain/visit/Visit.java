@@ -27,7 +27,7 @@ public class Visit {
     private UUID patientId;
     private UUID doctorId;
     private UUID appointmentId;
-    private UUID queueId;
+    private UUID queueItemId;
     private VisitType visitType;
     private VisitStatus status;
     private Instant visitAt;
@@ -39,7 +39,7 @@ public class Visit {
     private Instant createdAt;
     private Instant updatedAt;
 
-    private Visit(UUID id, String visitCode, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueId,
+    private Visit(UUID id, String visitCode, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
             VisitType visitType, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
             String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id);
@@ -47,7 +47,7 @@ public class Visit {
         this.patientId = Objects.requireNonNull(patientId);
         this.doctorId = Objects.requireNonNull(doctorId);
         this.appointmentId = appointmentId;
-        this.queueId = queueId;
+        this.queueItemId = queueItemId;
         this.visitType = Objects.requireNonNull(visitType);
         this.status = Objects.requireNonNull(status);
         this.visitAt = Objects.requireNonNull(visitAt);
@@ -60,12 +60,19 @@ public class Visit {
         this.updatedAt = updatedAt;
     }
 
-    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy) {
-        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueId, type, VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy, Instant.now(), null);
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy) {
+        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, type, VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy, Instant.now(), null);
     }
 
-    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt, String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
-        return new Visit(id, code, patientId, doctorId, appointmentId, queueId, type, status, visitAt, startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            VisitType type, Instant visitAt, String reason, String note, UUID createdBy, Instant createdAt) {
+        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, type,
+                VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy,
+                Objects.requireNonNull(createdAt), null);
+    }
+
+    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt, String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return new Visit(id, code, patientId, doctorId, appointmentId, queueItemId, type, status, visitAt, startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
     }
 
     public void start(Instant at) {
@@ -110,16 +117,25 @@ public class Visit {
         updatedAt = Objects.requireNonNull(at);
     }
 
-    public void updateRegistrationInformation(UUID doctorId, UUID appointmentId, UUID queueId, VisitType type, Instant visitAt, String reason, String note, Instant at) {
+    public void updateRegistrationInformation(UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, Instant visitAt, String reason, String note, Instant at) {
         require(VisitStatus.WAITING);
         this.doctorId = Objects.requireNonNull(doctorId);
         this.appointmentId = appointmentId;
-        this.queueId = queueId;
+        this.queueItemId = queueItemId;
         this.visitType = Objects.requireNonNull(type);
         this.visitAt = Objects.requireNonNull(visitAt);
         this.reason = Guard.require(reason, "Reason");
         this.note = note;
         this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void assignQueueItem(UUID queueItemId, Instant assignedAt) {
+        require(VisitStatus.WAITING);
+        if (this.queueItemId != null) {
+            throw new VisitInvalidStatusException("Visit is already linked to a queue item.");
+        }
+        this.queueItemId = Guard.require(queueItemId, "Queue item id");
+        this.updatedAt = Guard.require(assignedAt, "Assigned at");
     }
 
     public void updateNote(String note, Instant at) {

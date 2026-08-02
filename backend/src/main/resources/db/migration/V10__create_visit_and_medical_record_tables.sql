@@ -13,7 +13,7 @@ CREATE TABLE visits (
     patient_id BINARY(16) NOT NULL,
     doctor_id BINARY(16) NOT NULL,
     appointment_id BINARY(16) NULL,
-    queue_id BINARY(16) NULL,
+    queue_item_id BINARY(16) NULL,
 
     visit_type VARCHAR(30) NOT NULL,
     status VARCHAR(30) NOT NULL,
@@ -47,9 +47,9 @@ CREATE TABLE visits (
         FOREIGN KEY (appointment_id)
         REFERENCES appointments(id),
 
-    CONSTRAINT fk_visits_queue
-        FOREIGN KEY (queue_id)
-        REFERENCES medical_queue(id),
+    CONSTRAINT fk_visits_queue_item
+        FOREIGN KEY (queue_item_id)
+        REFERENCES queue_items(id),
 
     CONSTRAINT fk_visits_created_by
         FOREIGN KEY (created_by)
@@ -74,8 +74,13 @@ CREATE INDEX idx_visits_started_at
 CREATE INDEX idx_visits_appointment
     ON visits(appointment_id);
 
-CREATE INDEX idx_visits_queue
-    ON visits(queue_id);
+CREATE UNIQUE INDEX uk_visits_queue_item
+    ON visits(queue_item_id);
+
+ALTER TABLE queue_items
+    ADD CONSTRAINT fk_queue_items_visit
+    FOREIGN KEY (visit_id)
+    REFERENCES visits(id);
 
 
 -- ===========================

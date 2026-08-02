@@ -9,10 +9,12 @@ import com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperatio
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.queue.exception.CheckInConflictException;
 import com.benhsoan.port.dto.command.appointment.MarkAppointmentNoShowCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
 import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
@@ -32,6 +34,8 @@ public class MarkAppointmentNoShowService
 
     private final AppointmentResultMapper appointmentResultMapper;
 
+    private final QueueItemRepository queueItemRepository;
+
     @Override
     public AppointmentResult execute(
             MarkAppointmentNoShowCommand command
@@ -40,11 +44,15 @@ public class MarkAppointmentNoShowService
         validate();
 
         Appointment appointment
-                = appointmentRepository.findById(command.appointmentId())
+                = appointmentRepository.findByIdForUpdate(command.appointmentId())
                         .orElseThrow(()
                                 -> new AppointmentNotFoundException(
                                 command.appointmentId()
                         ));
+
+        if (queueItemRepository.findByAppointmentId(appointment.getId()).isPresent()) {
+            throw new CheckInConflictException("Checked-in appointments cannot be marked as no show.");
+        }
 
         appointment.markNoShow(command.markedAt());
 
