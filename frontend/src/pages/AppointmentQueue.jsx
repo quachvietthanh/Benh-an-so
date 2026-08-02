@@ -3,18 +3,25 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Alert,
   Avatar,
+  Badge,
   Button,
+  Card,
+  Col,
   DatePicker,
-  Dropdown,
-  Empty,
   Form,
   Input,
-  message,
   Modal,
+  Popconfirm,
+  Radio,
+  Row,
   Select,
   Space,
+  Spin,
   Table,
+  Tabs,
+  Tag,
   Tooltip,
+  Typography,
 } from 'antd'
 import {
   BellOutlined,
@@ -23,34 +30,45 @@ import {
   CheckOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
-  DeleteOutlined,
-  EditOutlined,
+  ExclamationCircleOutlined,
   EyeOutlined,
   FilterOutlined,
+  MedicineBoxOutlined,
   PlusOutlined,
+  ReloadOutlined,
+  RightCircleOutlined,
   SearchOutlined,
+  StepForwardOutlined,
   TeamOutlined,
+  UserAddOutlined,
+  UserOutlined,
   UserSwitchOutlined,
-  WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
 import patientApi from '../api/patientApi'
+import queueApi from '../api/queueApi'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
-import { getAppointments, getPatients } from '../services/mockDataService'
 import {
-  getOverdueMinutes,
-  isAppointmentOverdue,
-  NO_SHOW_GRACE_MINUTES,
-} from '../utils/appointmentTiming'
+  APPOINTMENT_STATUS_META,
+  QUEUE_STATUS_META,
+  checkQueuePermissions,
+  handleQueueApiError,
+} from '../utils/queueHelpers'
+import {
+  getAppointments,
+  getPatients,
+} from '../services/mockDataService'
 import {
   mergeAppointments,
-  saveStoredAppointment,
   mergePatients,
+  saveStoredAppointment,
 } from '../utils/storageHelpers'
 
+const { Text, Title, Paragraph } = Typography
 
+// Preset departments
 const departmentOptions = [
   'Nội tổng quát',
   'Ngoại khoa',
@@ -58,22 +76,9 @@ const departmentOptions = [
   'Sản phụ khoa',
   'Tim mạch',
   'Tai Mũi Họng',
+  'Răng Hàm Mặt',
+  'Mắt',
 ]
-
-const statusMeta = {
-  SCHEDULED: { label: 'Đã đặt', tone: 'green' },
-  CHECKED_IN: { label: 'Chờ khám', tone: 'blue' },
-  WAITING: { label: 'Chờ khám', tone: 'blue' },
-  CALLED: { label: 'Đang khám', tone: 'emerald' },
-  IN_PROGRESS: { label: 'Đang khám', tone: 'emerald' },
-  WAITING_FOR_RESULT: { label: 'Chờ kết quả', tone: 'purple' },
-  SKIPPED: { label: 'Bỏ qua', tone: 'orange' },
-  COMPLETED: { label: 'Đã khám', tone: 'gray' },
-  CANCELLED: { label: 'Đã hủy', tone: 'red' },
-  NO_SHOW: { label: 'Không đến', tone: 'orange' },
-}
-
-const overdueMeta = { label: 'Quá hạn', tone: 'overdue' }
 
 const avatarPalette = [
   ['#e7f0ff', '#1c68ce'],
@@ -82,1197 +87,1018 @@ const avatarPalette = [
   ['#f1eaff', '#7541b7'],
 ]
 
-const weekDays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
-
-const getInitials = (name = '') => name
-  .trim()
-  .split(/\s+/)
-  .slice(-2)
-  .map((part) => part[0])
-  .join('')
-  .toUpperCase()
+const getInitials = (name = '') =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(-2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
 
 const getAvatarStyle = (seed = '') => {
-  const paletteIndex = [...String(seed)].reduce((sum, character) => sum + character.charCodeAt(0), 0) % avatarPalette.length
+  const paletteIndex =
+    [...String(seed)].reduce((sum, character) => sum + character.charCodeAt(0), 0) % avatarPalette.length
   const [background, color] = avatarPalette[paletteIndex]
   return { background, color }
-}
-
-const getStatus = (status) => statusMeta[status] || { label: status || 'Chưa xác định', tone: 'gray' }
-
-const getPercentage = (value, total) => (total ? `${((value / total) * 100).toFixed(1)}%` : '0%')
-
-const isSameDate = (value, date) => !date || (value && dayjs(value).isSame(date, 'day'))
-
-
-
-const loadPatientDirectory = async () => {
-  try {
-    const pageSize = 200
-    const firstResponse = await patientApi.getAll({ page: 0, size: pageSize })
-    const firstPage = firstResponse.data?.content || []
-    const totalPages = Number(firstResponse.data?.totalPages || 1)
-
-    if (totalPages <= 1) return firstPage
-
-    const remainingResponses = await Promise.all(
-      Array.from({ length: totalPages - 1 }, (_, index) => (
-        patientApi.getAll({ page: index + 1, size: pageSize })
-      )),
-    )
-    return [
-      ...firstPage,
-      ...remainingResponses.flatMap((response) => response.data?.content || []),
-    ]
-  } catch {
-    return getPatients()
-  }
 }
 
 function AppointmentQueue() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const canManage = user?.roles?.some((role) => ['admin', 'receptionist'].includes(role))
+
+  // Phân quyền theo vai trò (Bác sĩ, Lễ tân, Điều dưỡng, Admin)
+  const permissions = useMemo(() => checkQueuePermissions(user?.roles || []), [user?.roles])
+
+  // State quản lý danh sách & bộ lọc
+  const [activeMainTab, setActiveMainTab] = useState('appointments') // 'appointments' | 'reception_queue' | 'doctor_queue'
+  const [selectedDate, setSelectedDate] = useState(dayjs())
+  const [loading, setLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  // Sub-data states
   const [appointments, setAppointments] = useState([])
-  const [queue, setQueue] = useState([])
+  const [queues, setQueues] = useState([])
+  const [myQueueData, setMyQueueData] = useState(null)
   const [patients, setPatients] = useState([])
   const [doctors, setDoctors] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(dayjs())
-  const [doctorFilter, setDoctorFilter] = useState('ALL')
-  const [departmentFilter, setDepartmentFilter] = useState('ALL')
-  const [statusFilter, setStatusFilter] = useState('ALL')
-  const [appointmentSearchDraft, setAppointmentSearchDraft] = useState('')
-  const [appointmentKeyword, setAppointmentKeyword] = useState('')
-  const [appointmentPage, setAppointmentPage] = useState(1)
-  const [appointmentPageSize, setAppointmentPageSize] = useState(10)
-  const [queuePage, setQueuePage] = useState(1)
+
+  // Filters for Appointments
+  const [appStatusFilter, setAppStatusFilter] = useState('ALL')
+  const [appDoctorFilter, setAppDoctorFilter] = useState('ALL')
+  const [appKeyword, setAppKeyword] = useState('')
+
+  // Filters for Queue Board (Lễ tân)
+  const [queueDoctorFilter, setQueueDoctorFilter] = useState('ALL')
+  const [queueRoomFilter, setQueueRoomFilter] = useState('ALL')
+  const [queueStatusFilter, setQueueStatusFilter] = useState('ALL')
+  const [queueSourceFilter, setQueueSourceFilter] = useState('ALL')
   const [queueKeyword, setQueueKeyword] = useState('')
-  const [queueNow, setQueueNow] = useState(dayjs())
-  const [bookOpen, setBookOpen] = useState(false)
-  const [cancelItem, setCancelItem] = useState(null)
-  const [noShowItem, setNoShowItem] = useState(null)
+
+  // Modals
+  const [bookModalOpen, setBookModalOpen] = useState(false)
+  const [walkInModalOpen, setWalkInModalOpen] = useState(false)
+  const [skipModalItem, setSkipModalItem] = useState(null)
   const [detailItem, setDetailItem] = useState(null)
+
+  // Forms
   const [bookForm] = Form.useForm()
-  const [cancelForm] = Form.useForm()
+  const [walkInForm] = Form.useForm()
+  const [skipForm] = Form.useForm()
 
-  useEffect(() => {
-    if (location.state?.patientId) {
-      bookForm.setFieldsValue({ patientId: location.state.patientId })
-      setBookOpen(true)
-    }
-  }, [location.state, bookForm])
-
-  const loadData = useCallback(async (includeDirectories = true) => {
-    setLoading(true)
+  // Tải danh sách Bệnh nhân & Bác sĩ
+  const loadDirectories = useCallback(async () => {
     try {
-      const [appointmentResult, patientResult, doctorResult] = await Promise.allSettled([
-        appointmentApi.getAll(),
-        includeDirectories ? loadPatientDirectory() : Promise.resolve(null),
-        includeDirectories ? userApi.getDoctors() : Promise.resolve(null),
+      const [patientRes, doctorRes] = await Promise.allSettled([
+        patientApi.getAll({ page: 0, size: 300 }),
+        userApi.getDoctors(),
       ])
 
-      let apiApps = []
-      if (appointmentResult.status === 'fulfilled') {
-        const resData = appointmentResult.value?.data
-        apiApps = Array.isArray(resData) ? resData : (resData?.content || [])
-      }
-
-      const mockList = getAppointments().map((item) => {
-        let appAt = item.appointmentAt
-        if (!appAt) {
-          const dateStr = item.date || dayjs().format('YYYY-MM-DD')
-          const timeStr = item.slot || '09:00'
-          appAt = `${dateStr}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}`
-        }
-        return {
-          ...item,
-          appointmentAt: appAt,
-        }
-      })
-
-      const mergedApps = mergeAppointments(apiApps.length ? apiApps : mockList)
-      setAppointments(mergedApps)
-
-      if (includeDirectories && patientResult.status === 'fulfilled' && Array.isArray(patientResult.value)) {
-        setPatients(mergePatients(patientResult.value))
-      } else if (includeDirectories) {
+      if (patientRes.status === 'fulfilled' && Array.isArray(patientRes.value?.data?.content || patientRes.value?.data)) {
+        const list = patientRes.value?.data?.content || patientRes.value?.data
+        setPatients(mergePatients(list))
+      } else {
         setPatients(mergePatients(getPatients()))
       }
 
-      if (includeDirectories && doctorResult.status === 'fulfilled' && Array.isArray(doctorResult.value?.data)) {
-        setDoctors(doctorResult.value.data)
-      } else if (includeDirectories) {
-        setDoctors([])
+      if (doctorRes.status === 'fulfilled' && Array.isArray(doctorRes.value?.data)) {
+        setDoctors(doctorRes.value.data)
+      } else {
+        setDoctors([
+          { id: 'u2', username: 'doctor1', fullName: 'BS. Nguyễn Minh Anh', department: 'Ngoại khoa' },
+          { id: 'u3', username: 'doctor2', fullName: 'BS. Trần Quang Huy', department: 'Nội tổng quát' },
+          { id: 'u4', username: 'nurse1', fullName: 'BS. Lê Thu Hà', department: 'Nhi khoa' },
+        ])
       }
-
     } catch {
-      const mockList = getAppointments().map((item) => {
-        let appAt = item.appointmentAt
-        if (!appAt) {
-          const dateStr = item.date || dayjs().format('YYYY-MM-DD')
-          const timeStr = item.slot || '09:00'
-          appAt = `${dateStr}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}`
-        }
-        return {
-          ...item,
-          appointmentAt: appAt,
-        }
-      })
-      setAppointments(mergeAppointments(mockList))
       setPatients(mergePatients(getPatients()))
-    } finally {
-      setLoading(false)
     }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
-
-  useEffect(() => {
-    const timer = setInterval(() => setQueueNow(dayjs()), 60000)
-    return () => clearInterval(timer)
+  // Tải dữ liệu Lịch hẹn (Appointments)
+  const loadAppointments = useCallback(async () => {
+    try {
+      const res = await appointmentApi.getAll()
+      const list = Array.isArray(res.data) ? res.data : (res.data?.content || [])
+      setAppointments(mergeAppointments(list.length ? list : getAppointments()))
+    } catch {
+      setAppointments(mergeAppointments(getAppointments()))
+    }
   }, [])
 
-  const patientMap = useMemo(() => {
+  // Tải dữ liệu Queue Board (GET /queues)
+  const loadQueues = useCallback(async () => {
+    try {
+      const params = {
+        date: selectedDate.format('YYYY-MM-DD'),
+        doctorId: queueDoctorFilter !== 'ALL' ? queueDoctorFilter : undefined,
+        roomId: queueRoomFilter !== 'ALL' ? queueRoomFilter : undefined,
+        status: queueStatusFilter !== 'ALL' ? queueStatusFilter : undefined,
+        sourceType: queueSourceFilter !== 'ALL' ? queueSourceFilter : undefined,
+      }
+      const res = await queueApi.getQueues(params)
+      const list = Array.isArray(res.data) ? res.data : (res.data?.content || [])
+      setQueues(list)
+    } catch (err) {
+      // Fallback local Queue items if BE is offline
+      setQueues([])
+    }
+  }, [selectedDate, queueDoctorFilter, queueRoomFilter, queueStatusFilter, queueSourceFilter])
+
+  // Tải dữ liệu Queue Bác sĩ (GET /queues/me)
+  const loadMyQueue = useCallback(async () => {
+    try {
+      const res = await queueApi.getMyQueue({ date: selectedDate.format('YYYY-MM-DD') })
+      setMyQueueData(res.data)
+    } catch {
+      setMyQueueData(null)
+    }
+  }, [selectedDate])
+
+  // Reload tất cả dữ liệu
+  const refreshAllData = useCallback(async () => {
+    setLoading(true)
+    await Promise.all([loadAppointments(), loadQueues(), loadMyQueue()])
+    setLoading(false)
+  }, [loadAppointments, loadQueues, loadMyQueue])
+
+  useEffect(() => {
+    loadDirectories()
+    refreshAllData()
+  }, [loadDirectories, refreshAllData])
+
+  // Polling tự động mỗi 20 giây cho Queue Board
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadQueues()
+      if (permissions.canComplete) loadMyQueue()
+    }, 20000)
+    return () => clearInterval(timer)
+  }, [loadQueues, loadMyQueue, permissions.canComplete])
+
+  // Trích xuất danh sách Phòng khám từ các lượt khám trong Queue
+  const extractedRooms = useMemo(() => {
     const map = new Map()
-    const allMerged = mergePatients(patients.length ? patients : getPatients())
-    allMerged.forEach((patient) => {
-      if (patient.id) map.set(String(patient.id), patient)
-      if (patient.patientCode) map.set(String(patient.patientCode), patient)
-      if (patient.phone) map.set(String(patient.phone), patient)
-      if (patient.phoneNumber) map.set(String(patient.phoneNumber), patient)
-      if (patient.fullName) map.set(String(patient.fullName), patient)
+    queues.forEach((q) => {
+      const rId = q.roomId || q.roomCode || q.id
+      if (rId && !map.has(String(rId))) {
+        map.set(String(rId), {
+          id: rId,
+          code: q.roomCode || `P${rId}`,
+          name: q.roomName || `Phòng khám ${q.roomCode || rId}`,
+        })
+      }
     })
-    return map
-  }, [patients])
+    // Seed phòng khám mặc định nếu chưa có
+    if (!map.size) {
+      map.set('90000000-0000-0000-0000-000000000001', { id: '90000000-0000-0000-0000-000000000001', code: 'P101', name: 'Phòng khám 101' })
+      map.set('90000000-0000-0000-0000-000000000002', { id: '90000000-0000-0000-0000-000000000002', code: 'P102', name: 'Phòng khám 102' })
+    }
+    return Array.from(map.values())
+  }, [queues])
 
-  const doctorMap = useMemo(() => {
-    const map = new Map()
-    const fallbackDoctors = [
-      { id: 'u2', username: 'doctor1', fullName: 'Dr. Nguyen Minh Anh', department: 'Ngoại khoa' },
-      { id: 'u3', username: 'doctor2', fullName: 'Dr. Tran Quang Huy', department: 'Nội tổng quát' },
-      { id: 'u4', username: 'nurse1', fullName: 'Dr. Le Thu Ha', department: 'Nhi khoa' },
-      { id: 'u5', username: 'receptionist1', fullName: 'Dr. Pham Mai Lan', department: 'Sản phụ khoa' },
-      { id: 'u6', username: 'pharmacist1', fullName: 'Dr. Vo Thanh Nam', department: 'Tai Mũi Họng' },
-    ]
-    const allDocs = [...fallbackDoctors, ...(Array.isArray(doctors) ? doctors : [])]
-    allDocs.forEach((doc) => {
-      if (doc.id) map.set(String(doc.id), doc)
-      if (doc.username) map.set(String(doc.username), doc)
-      if (doc.fullName) map.set(String(doc.fullName), doc)
-    })
-    return map
-  }, [doctors])
-
-  const availableDepartments = useMemo(() => Array.from(new Set([
-    ...departmentOptions,
-    ...appointments.map((item) => item.department).filter(Boolean),
-  ])), [appointments])
-
-  const dailyAppointments = useMemo(
-    () => appointments.filter((item) => isSameDate(item.appointmentAt, selectedDate)),
-    [appointments, selectedDate],
-  )
-
-
-
-  const dailyStats = useMemo(() => {
-    const count = (...statuses) => dailyAppointments.filter((item) => statuses.includes(item.status)).length
-    const total = dailyAppointments.length
-    const overdue = dailyAppointments.filter((item) => isAppointmentOverdue(item, queueNow)).length
-    const scheduled = count('SCHEDULED') - overdue
-    const waiting = count('CHECKED_IN')
-    const consulting = count('CALLED')
-    const completed = count('COMPLETED')
-    const cancelled = count('CANCELLED')
-
-    return [
-      {
-        key: 'total',
-        label: 'Tổng lịch hẹn',
-        value: total,
-        note: selectedDate ? `${selectedDate.isSame(dayjs(), 'day') ? 'Hôm nay' : 'Ngày'} ${selectedDate.format('DD/MM/YYYY')}` : 'Tất cả thời gian',
-        icon: CalendarOutlined,
-        tone: 'blue',
-      },
-      { key: 'scheduled', label: 'Đã đặt', value: scheduled, note: getPercentage(scheduled, total), icon: CheckCircleOutlined, tone: 'green' },
-      { key: 'overdue', label: 'Quá hạn', value: overdue, note: `Từ ${NO_SHOW_GRACE_MINUTES} phút`, icon: WarningOutlined, tone: 'orange' },
-      { key: 'waiting', label: 'Chờ khám', value: waiting, note: 'Hiện tại', icon: ClockCircleOutlined, tone: 'purple' },
-      { key: 'consulting', label: 'Đang khám', value: consulting, note: 'Hiện tại', icon: TeamOutlined, tone: 'cyan' },
-      { key: 'completed', label: 'Đã khám', value: completed, note: getPercentage(completed, total), icon: CheckCircleOutlined, tone: 'blue' },
-      { key: 'cancelled', label: 'Đã hủy', value: cancelled, note: getPercentage(cancelled, total), icon: CloseCircleOutlined, tone: 'red' },
-    ]
-  }, [dailyAppointments, queueNow, selectedDate])
-
-  const queueStats = useMemo(() => {
-    const count = (status) => appointments.filter((item) => item.status === status).length
-    return [
-      { key: 'queue', label: 'Đang chờ khám', value: queue.length, note: 'Theo thứ tự check-in', icon: ClockCircleOutlined, tone: 'purple' },
-      { key: 'called', label: 'Đang khám', value: count('CALLED'), note: 'Hiện tại', icon: UserSwitchOutlined, tone: 'cyan' },
-      { key: 'completed', label: 'Tổng đã khám', value: count('COMPLETED'), note: 'Tất cả lịch', icon: CheckCircleOutlined, tone: 'green' },
-      { key: 'no-show', label: 'Tổng không đến', value: count('NO_SHOW'), note: 'Tất cả lịch', icon: CloseCircleOutlined, tone: 'orange' },
-    ]
-  }, [appointments, queue.length])
-
+  // Bệnh nhân được lọc cho Tab Lịch hẹn
   const filteredAppointments = useMemo(() => {
-    const normalizedKeyword = appointmentKeyword.trim().toLocaleLowerCase('vi')
+    const kw = appKeyword.trim().toLowerCase()
+    return appointments.filter((app) => {
+      const isDateMatch = !app.appointmentAt || dayjs(app.appointmentAt).isSame(selectedDate, 'day')
+      const isDocMatch = appDoctorFilter === 'ALL' || String(app.doctorId) === String(appDoctorFilter)
+      const isStatusMatch = appStatusFilter === 'ALL' || app.status === appStatusFilter
+      const textMatch = !kw || [app.appointmentCode, app.patientName, app.doctorName, app.reason]
+        .some((t) => String(t || '').toLowerCase().includes(kw))
 
-    return appointments
-      .filter((item) => {
-        const patient = patientMap.get(item.patientId)
-        const matchesDate = isSameDate(item.appointmentAt, selectedDate)
-        const matchesDoctor = doctorFilter === 'ALL' || item.doctorId === doctorFilter
-        const matchesDepartment = departmentFilter === 'ALL' || item.department === departmentFilter
-        const matchesStatus = statusFilter === 'ALL'
-          || (statusFilter === 'OVERDUE'
-            ? isAppointmentOverdue(item, queueNow)
-            : statusFilter === 'SCHEDULED'
-              ? item.status === 'SCHEDULED' && !isAppointmentOverdue(item, queueNow)
-              : item.status === statusFilter)
-        const searchableText = [
-          item.appointmentCode,
-          item.patientName,
-          patient?.patientCode,
-          patient?.phone,
-          item.doctorName,
-          item.department,
-          item.reason,
-        ].filter(Boolean).join(' ').toLocaleLowerCase('vi')
-        return matchesDate && matchesDoctor && matchesDepartment && matchesStatus
-          && (!normalizedKeyword || searchableText.includes(normalizedKeyword))
-      })
-      .sort((left, right) => {
-        const overdueDifference = Number(isAppointmentOverdue(right, queueNow))
-          - Number(isAppointmentOverdue(left, queueNow))
-        if (overdueDifference) return overdueDifference
-        return dayjs(left.appointmentAt).valueOf() - dayjs(right.appointmentAt).valueOf()
-      })
-  }, [appointmentKeyword, appointments, departmentFilter, doctorFilter, patientMap, queueNow, selectedDate, statusFilter])
+      return isDateMatch && isDocMatch && isStatusMatch && textMatch
+    })
+  }, [appointments, selectedDate, appDoctorFilter, appStatusFilter, appKeyword])
 
-  const filteredQueue = useMemo(() => {
-    const normalizedKeyword = queueKeyword.trim().toLocaleLowerCase('vi')
-    return queue
-      .filter((item) => {
-        const patient = patientMap.get(item.patientId)
-        const searchableText = [item.patientName, patient?.patientCode, patient?.phone, item.doctorName, item.department]
-          .filter(Boolean).join(' ').toLocaleLowerCase('vi')
-        return !normalizedKeyword || searchableText.includes(normalizedKeyword)
-      })
-      .sort((left, right) => dayjs(left.checkedInAt).valueOf() - dayjs(right.checkedInAt).valueOf())
-  }, [patientMap, queue, queueKeyword])
+  // Bệnh nhân được lọc cho Tab Queue Board Lễ tân
+  const filteredQueues = useMemo(() => {
+    const kw = queueKeyword.trim().toLowerCase()
+    return queues.filter((q) => {
+      const textMatch = !kw || [q.patientName, q.patientCode, q.visitCode, q.doctorName, q.roomName, q.id]
+        .some((t) => String(t || '').toLowerCase().includes(kw))
+      return textMatch
+    })
+  }, [queues, queueKeyword])
 
-  useEffect(() => {
-    const maximumPage = Math.max(1, Math.ceil(filteredAppointments.length / appointmentPageSize))
-    if (appointmentPage > maximumPage) setAppointmentPage(maximumPage)
-  }, [appointmentPage, appointmentPageSize, filteredAppointments.length])
+  // Nhóm bệnh nhân cho Queue Bác sĩ (/queues/me)
+  const doctorQueueGroups = useMemo(() => {
+    const items = myQueueData?.items || queues.filter((q) => !permissions.canComplete || String(q.doctorId) === String(user?.id))
+    return {
+      inProgress: items.filter((q) => q.status === 'IN_PROGRESS'),
+      waiting: items.filter((q) => q.status === 'WAITING'),
+      waitingForResult: items.filter((q) => q.status === 'WAITING_FOR_RESULT'),
+      finished: items.filter((q) => ['COMPLETED', 'SKIPPED', 'CANCELLED'].includes(q.status)),
+    }
+  }, [myQueueData, queues, permissions.canComplete, user?.id])
 
-  useEffect(() => {
-    const maximumPage = Math.max(1, Math.ceil(filteredQueue.length / 10))
-    if (queuePage > maximumPage) setQueuePage(maximumPage)
-  }, [filteredQueue.length, queuePage])
-
-  const runAction = async (
-    action,
-    successMessage,
-    handleSuccess,
-    { waitForRefresh = true } = {},
-  ) => {
-    if (actionLoading) return false
+  // Thao tác 1: Check-in Lịch hẹn (SCHEDULED -> CHECKED_IN)
+  const handleCheckInAppointment = async (appId) => {
     setActionLoading(true)
     try {
-      const response = await action()
-      handleSuccess?.(response?.data)
-      message.success(successMessage)
-      setAppointmentPage(1)
-      setQueuePage(1)
-      const refreshPromise = loadData(false)
-      if (waitForRefresh) await refreshPromise
-      return true
-    } catch {
-      handleSuccess?.(null)
-      message.success(successMessage)
-      setAppointmentPage(1)
-      setQueuePage(1)
-      return true
+      await queueApi.checkInAppointment(appId)
+      handleQueueApiError(null)
+      refreshAllData()
+    } catch (err) {
+      // Fallback local update if BE returns 404 mock
+      setAppointments((prev) =>
+        prev.map((item) => (String(item.id) === String(appId) ? { ...item, status: 'CHECKED_IN' } : item))
+      )
+      handleQueueApiError(err, 'Check-in lịch hẹn thành công (Đã cập nhật trạng thái)')
+      refreshAllData()
     } finally {
       setActionLoading(false)
     }
   }
 
-  const closeBooking = () => {
-    setBookOpen(false)
-    bookForm.resetFields()
-  }
-
-  const closeCancellation = () => {
-    if (saving || actionLoading) return
-    setCancelItem(null)
-    cancelForm.resetFields()
-  }
-
-  const closeNoShowConfirmation = () => {
-    if (actionLoading) return
-    setNoShowItem(null)
-  }
-
-  const createAppointment = async (values) => {
-    setSaving(true)
-    const appointmentAt = values.appointmentAt ? values.appointmentAt : dayjs().add(10, 'minute')
-    const startTime = appointmentAt.toISOString()
-    const endTime = appointmentAt.add(30, 'minute').toISOString()
-
-    const selectedPatient = patients.find((p) => String(p.id) === String(values.patientId))
-    const selectedDoctor = doctors.find((d) => String(d.id) === String(values.doctorId))
-
-    const payload = {
-      patientId: values.patientId,
-      doctorId: values.doctorId,
-      startTime,
-      endTime,
-      reason: values.reason || values.department || 'Khám bệnh',
-      appointmentAt: startTime,
-      department: values.department || selectedDoctor?.department || 'Nội tổng quát',
-    }
-
-    const newApp = {
-      id: `app-${Date.now()}`,
-      appointmentCode: `LH-${Math.floor(100000 + Math.random() * 900000)}`,
-      patientId: values.patientId,
-      patientName: selectedPatient?.fullName || selectedPatient?.name || 'Bệnh nhân mới',
-      doctorId: values.doctorId,
-      doctorName: selectedDoctor?.fullName || selectedDoctor?.name || 'BS. Nguyễn Văn A',
-      department: payload.department,
-      reason: payload.reason,
-      appointmentAt: startTime,
-      startTime,
-      endTime,
-      status: 'SCHEDULED',
-      createdAt: new Date().toISOString(),
-    }
-
-    const queueItem = {
-      id: `q-${Date.now()}`,
-      appointmentId: newApp.id,
-      patientId: values.patientId,
-      patientName: newApp.patientName,
-      doctorId: values.doctorId,
-      doctorName: newApp.doctorName,
-      department: newApp.department,
-      queueNumber: Math.floor(1 + Math.random() * 50),
-      status: 'WAITING',
-      checkedInAt: new Date().toISOString(),
-    }
-
-    try {
-      const res = await appointmentApi.create(payload)
-      const created = res?.data ? { ...newApp, ...res.data } : newApp
-      saveStoredAppointment(created)
-      setAppointments((prev) => mergeAppointments([created, ...prev]))
-      message.success('Đặt lịch hẹn & vào hàng đợi thành công')
-    } catch {
-      saveStoredAppointment(newApp)
-      setAppointments((prev) => mergeAppointments([newApp, ...prev]))
-      message.success('Đặt lịch hẹn & vào hàng đợi thành công')
-    } finally {
-      closeBooking()
-      setSaving(false)
-
-      Modal.confirm({
-        title: 'Đặt lịch hẹn & vào hàng đợi thành công!',
-        content: 'Bạn có muốn CHUYỂN SANG BƯỚC TIẾP THEO (Ghi bệnh án & Khám bệnh) cho bệnh nhân này không?',
-        okText: 'Chuyển sang Khám bệnh',
-        cancelText: 'Về hàng đợi',
-        onOk: () => navigate('/medical-records', { state: { patientId: values.patientId, doctorId: values.doctorId } }),
-      })
-    }
-  }
-
-
-  const handleCheckIn = async (item) => {
+  // Thao tác 2: Check-in Bệnh nhân Walk-in
+  const handleCheckInWalkInSubmit = async (values) => {
     setActionLoading(true)
-    const updatedApp = { ...item, status: 'CHECKED_IN', checkedInAt: new Date().toISOString() }
-    const queueItem = {
-      id: `q-${Date.now()}`,
-      appointmentId: item.id,
-      patientId: item.patientId,
-      patientName: item.patientName,
-      doctorId: item.doctorId,
-      doctorName: item.doctorName,
-      department: item.department,
-      queueNumber: Math.floor(1 + Math.random() * 50),
-      status: 'WAITING',
-      checkedInAt: new Date().toISOString(),
-    }
-
     try {
-      await appointmentApi.checkIn(item.id)
-    } catch {
-      // fallback local storage
+      const payload = {
+        patientId: values.patientId,
+        doctorId: values.doctorId,
+        reason: values.reason,
+        notes: values.notes || '',
+      }
+      await queueApi.checkInWalkIn(payload)
+      setWalkInModalOpen(false)
+      walkInForm.resetFields()
+      refreshAllData()
+    } catch (err) {
+      handleQueueApiError(err, 'Không thể tiếp nhận lượt khám Walk-in')
+    } finally {
+      setActionLoading(false)
     }
-
-    saveStoredAppointment(updatedApp)
-    setAppointments((prev) => mergeAppointments([updatedApp, ...prev]))
-    message.success(`Đã check-in và đưa bệnh nhân ${item.patientName} vào hàng đợi khám`)
-    setActionLoading(false)
   }
 
-  const cancelAppointment = async (values) => {
-    if (!cancelItem) return
-
-    const cancelledId = cancelItem.id
-    const normalizedReason = values.reason.trim()
-    setSaving(true)
-    const updatedApp = { ...cancelItem, status: 'CANCELLED', cancelReason: normalizedReason }
-
+  // Thao tác 3: Gọi người tiếp theo (Call Next)
+  const handleCallNext = async (queueId) => {
+    setActionLoading(true)
     try {
-      await appointmentApi.cancel(cancelledId, normalizedReason)
-    } catch {
-      // fallback local storage
+      const qId = queueId || myQueueData?.id || queues[0]?.medicalQueueId || queues[0]?.queueId
+      if (!qId) {
+        handleQueueApiError({ response: { status: 404, data: { message: 'Không tìm thấy hàng đợi khám phù hợp để gọi tiếp.' } } })
+        return
+      }
+      await queueApi.callNext(qId)
+      refreshAllData()
+    } catch (err) {
+      handleQueueApiError(err, 'Không thể gọi lượt khám tiếp theo')
+    } finally {
+      setActionLoading(false)
     }
-
-    saveStoredAppointment(updatedApp)
-    setAppointments((current) => current.map((item) => (item.id === cancelledId ? updatedApp : item)))
-    setDetailItem((current) => (current?.id === cancelledId ? updatedApp : current))
-    message.success('Đã hủy lịch hẹn và giải phóng khung giờ')
-    setCancelItem(null)
-    cancelForm.resetFields()
-    setSaving(false)
   }
 
-  const markNoShow = async () => {
-    if (!noShowItem) return
-
-    if (!isAppointmentOverdue(noShowItem, queueNow)) {
-      message.warning('Chỉ được đánh dấu bệnh nhân không đến khi đã trễ quá 15 phút so với giờ hẹn.')
-      setNoShowItem(null)
-      return
-    }
-
-    const appointmentId = noShowItem.id
-    const updatedApp = { ...noShowItem, status: 'NO_SHOW' }
-
+  // Thao tác 4: Bỏ qua / Vắng mặt khi gọi (Skip)
+  const handleSkipSubmit = async (values) => {
+    if (!skipModalItem) return
+    setActionLoading(true)
     try {
-      await appointmentApi.noShow(appointmentId)
-    } catch {
-      // fallback local storage
+      await queueApi.skip(skipModalItem.id, values.reason || 'Vắng mặt khi gọi')
+      setSkipModalItem(null)
+      skipForm.resetFields()
+      refreshAllData()
+    } catch (err) {
+      handleQueueApiError(err, 'Không thể thực hiện bỏ qua lượt khám')
+    } finally {
+      setActionLoading(false)
     }
-
-    saveStoredAppointment(updatedApp)
-    setAppointments((current) => current.map((item) => (item.id === appointmentId ? updatedApp : item)))
-    setDetailItem((current) => (current?.id === appointmentId ? updatedApp : current))
-    message.success('Đã ghi nhận bệnh nhân không đến')
-    setNoShowItem(null)
   }
 
-  const applyFilters = () => {
-    setAppointmentKeyword(appointmentSearchDraft.trim())
-    setAppointmentPage(1)
-  }
-
-  const resetFilters = () => {
-    setSelectedDate(dayjs())
-    setDoctorFilter('ALL')
-    setDepartmentFilter('ALL')
-    setStatusFilter('ALL')
-    setAppointmentSearchDraft('')
-    setAppointmentKeyword('')
-    setAppointmentPage(1)
-  }
-
-  const getPatient = (item) => {
-    if (!item) return {}
-    const found = patientMap.get(String(item.patientId)) ||
-      patientMap.get(String(item.patientCode)) ||
-      patientMap.get(String(item.patientPhone)) ||
-      patientMap.get(String(item.phone)) ||
-      patientMap.get(String(item.id)) ||
-      patientMap.get(String(item.patientName))
-    return found || {}
-  }
-
-  const getDoctor = (item) => {
-    if (!item) return {}
-    const found = doctorMap.get(String(item.doctorId)) ||
-      doctorMap.get(String(item.doctorName)) ||
-      doctorMap.get(String(item.department))
-    return found || {}
-  }
-
-  const renderPatient = (item) => {
-    const patient = getPatient(item)
-    const gender = patient.gender || item.gender
-    const genderLabel = gender === 'FEMALE' ? 'Nữ' : gender === 'MALE' ? 'Nam' : 'Khác'
-    const name = item.patientName || patient.fullName || item.fullName || (item.patientCode ? `Bệnh nhân ${item.patientCode}` : 'Bệnh nhân')
-
-    return (
-      <div className="appointment-patient-cell">
-        <Avatar style={getAvatarStyle(item.patientId || patient.id || name)}>{getInitials(name)}</Avatar>
-        <div className="appointment-person-copy">
-          <strong>
-            <span className="appointment-person-name">{name}</span>
-            {gender && (
-              <span
-                className={`appointment-gender gender-${String(gender).toLowerCase()}`}
-                aria-label={`Giới tính: ${genderLabel}`}
-                title={genderLabel}
-              >
-                {gender === 'FEMALE' ? '♀' : gender === 'MALE' ? '♂' : '•'}
-              </span>
-            )}
-          </strong>
-          <small>{patient.patientCode || item.patientCode || 'Chưa có mã'}{(patient.dateOfBirth || item.dateOfBirth) ? ` · ${dayjs().diff(dayjs(patient.dateOfBirth || item.dateOfBirth), 'year')} tuổi` : ''}</small>
-          {(patient.phone || item.phone || item.phoneNumber) && <small>{patient.phone || item.phone || item.phoneNumber}</small>}
-        </div>
-      </div>
-    )
-  }
-
-  const renderDoctor = (item) => {
-    const docObj = getDoctor(item)
-    const fallbackNames = ['Dr. Nguyen Minh Anh', 'Dr. Tran Quang Huy', 'Dr. Le Thu Ha', 'Dr. Pham Mai Lan', 'Dr. Vo Thanh Nam']
-    const seedIndex = [...String(item.id || item.patientCode || '1')].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % fallbackNames.length
-    const defaultDocName = fallbackNames[seedIndex]
-
-    const doctorName = item.doctorName || docObj.fullName || defaultDocName
-    const department = item.department || docObj.department || (seedIndex % 2 === 0 ? 'Ngoại khoa' : 'Nội tổng quát')
-
-    return (
-      <div className="appointment-doctor-cell">
-        <Avatar style={getAvatarStyle(item.doctorId || doctorName)}>{getInitials(doctorName)}</Avatar>
-        <div className="appointment-person-copy">
-          <strong><span className="appointment-person-name">{doctorName}</span></strong>
-          <small>{department}</small>
-        </div>
-      </div>
-    )
-  }
-
-  const renderStatus = (item) => {
-    const overdue = isAppointmentOverdue(item, queueNow)
-    const meta = overdue ? overdueMeta : getStatus(item.status)
-    return (
-      <div className="appointment-status-cell">
-        <span className={`appointment-status appointment-status-${meta.tone}`}>{meta.label}</span>
-        {overdue
-          ? (
-            <small className="appointment-overdue-duration">
-              <WarningOutlined /> Quá giờ hẹn {getOverdueMinutes(item, queueNow)} phút
-            </small>
-          )
-          : item.reminderSentAt && <small><BellOutlined /> Đã nhắc lịch</small>}
-      </div>
-    )
-  }
-
-  const handleSendReminder = (item) => {
-    setAppointments((current) => current.map((app) => (
-      app.id === item.id ? { ...app, reminderSentAt: new Date().toISOString() } : app
-    )))
-    if (detailItem?.id === item.id) {
-      setDetailItem((prev) => (prev ? { ...prev, reminderSentAt: new Date().toISOString() } : null))
+  // Thao tác 5: Chuyển trạng thái lượt khám (VD: Chờ CĐLS hoặc Tiếp tục khám)
+  const handleUpdateItemStatus = async (itemId, newStatus) => {
+    setActionLoading(true)
+    try {
+      await queueApi.updateStatus(itemId, { status: newStatus })
+      refreshAllData()
+    } catch (err) {
+      handleQueueApiError(err, `Không thể chuyển trạng thái lượt khám sang ${newStatus}`)
+    } finally {
+      setActionLoading(false)
     }
-    message.success(`Đã gửi thông báo nhắc lịch hẹn cho bệnh nhân ${item.patientName}`)
   }
 
-  const getStatusActionItems = (item) => {
-    const isOverdue = isAppointmentOverdue(item, queueNow)
-    const activeStatus = ['SCHEDULED', 'CHECKED_IN', 'WAITING'].includes(item.status)
-    const canMarkNoShow = activeStatus && isOverdue
-    return [
-      {
-        key: 'check-in',
-        icon: <UserSwitchOutlined />,
-        label: item.status === 'CHECKED_IN' ? 'Đã ở trong hàng đợi' : 'Đưa vào hàng đợi (Check-in)',
-        disabled: actionLoading || item.status === 'CHECKED_IN',
-        onClick: () => handleCheckIn(item),
-      },
-      {
-        key: 'no-show',
-        icon: <CloseCircleOutlined />,
-        danger: true,
-        label: isOverdue ? 'Đánh dấu không đến' : 'Đánh dấu không đến (Cần trễ quá 15p)',
-        disabled: actionLoading || !canMarkNoShow,
-        onClick: () => {
-          if (!isOverdue) {
-            message.warning('Chỉ được đánh dấu bệnh nhân không đến khi đã trễ quá 15 phút so với giờ hẹn.')
-            return
-          }
-          setNoShowItem(item)
-        },
-      },
-      {
-        key: 'remind',
-        icon: <BellOutlined />,
-        label: item.reminderSentAt ? 'Gửi lại nhắc lịch' : 'Gửi nhắc lịch hẹn',
-        disabled: actionLoading,
-        onClick: () => handleSendReminder(item),
-      },
-    ]
+  // Thao tác 6: Hoàn tất lượt khám (Complete)
+  const handleCompleteItem = async (itemId) => {
+    setActionLoading(true)
+    try {
+      await queueApi.complete(itemId)
+      refreshAllData()
+    } catch (err) {
+      handleQueueApiError(err, 'Bệnh án chưa được khóa hoặc sai chu trình khám.')
+    } finally {
+      setActionLoading(false)
+    }
   }
 
-  const renderActions = (item) => {
-    const isCompletedOrCancelled = ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(item.status)
-    const isOverdue = isAppointmentOverdue(item, queueNow)
-
-    return (
-      <Space size={5}>
-        <Tooltip title="Xem chi tiết">
-          <Button
-            className="appointment-action-button"
-            icon={<EyeOutlined />}
-            onClick={() => setDetailItem(item)}
-            aria-label={`Xem chi tiết lịch ${item.appointmentCode}`}
-          />
-        </Tooltip>
-        {!isCompletedOrCancelled && isOverdue && (
-          <Tooltip title="Lịch hẹn đã quá hạn 15 phút - Đánh dấu bệnh nhân không đến">
-            <Button
-              type="primary"
-              danger
-              size="small"
-              icon={<CloseCircleOutlined />}
-              disabled={actionLoading}
-              onClick={() => setNoShowItem(item)}
-              style={{
-                borderRadius: 6,
-                fontWeight: 600,
-                fontSize: '12px',
-                height: '32px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              Không đến
-            </Button>
-          </Tooltip>
-        )}
-        {!isCompletedOrCancelled && (
-          <>
-            <Dropdown menu={{ items: getStatusActionItems(item) }} trigger={['click']} placement="bottomRight">
-              <Tooltip title="Cập nhật trạng thái / Không đến">
-                <Button
-                  className="appointment-action-button"
-                  icon={<EditOutlined />}
-                  disabled={actionLoading}
-                  aria-label={`Cập nhật trạng thái lịch ${item.appointmentCode}`}
-                />
-              </Tooltip>
-            </Dropdown>
-            <Tooltip title="Hủy lịch hẹn">
-              <Button
-                className="appointment-action-button appointment-action-danger"
-                icon={<DeleteOutlined />}
-                disabled={actionLoading}
-                onClick={() => setCancelItem(item)}
-                aria-label={`Hủy lịch ${item.appointmentCode} của ${item.patientName}`}
-              />
-            </Tooltip>
-          </>
-        )}
-        {item.status === 'CALLED' && (
-          <Tooltip title="Hoàn tất lượt khám">
-            <Button
-              className="appointment-action-button appointment-action-success"
-              icon={<CheckOutlined />}
-              disabled={actionLoading}
-              onClick={() => runAction(() => appointmentApi.complete(item.id), 'Đã hoàn tất lượt khám')}
-              aria-label={`Hoàn tất lịch ${item.appointmentCode}`}
-            />
-          </Tooltip>
-        )}
-      </Space>
-    )
-  }
-
+  // Render Cột cho Bảng Lịch hẹn (Appointments Table)
   const appointmentColumns = [
-    {
-      title: 'STT',
-      key: 'index',
-      width: 52,
-      align: 'center',
-      render: (_, __, index) => (appointmentPage - 1) * appointmentPageSize + index + 1,
-    },
     {
       title: 'Mã lịch hẹn',
       dataIndex: 'appointmentCode',
       key: 'appointmentCode',
-      width: 118,
-      render: (value) => <span className="appointment-code">{value}</span>,
+      render: (code) => <Text strong style={{ color: '#2563eb' }}>{code || 'LH-N/A'}</Text>,
     },
     {
       title: 'Bệnh nhân',
-      key: 'patient',
-      width: 190,
-      render: (_, item) => renderPatient(item),
+      dataIndex: 'patientName',
+      key: 'patientName',
+      render: (name, record) => (
+        <Space>
+          <Avatar style={getAvatarStyle(name)}>{getInitials(name)}</Avatar>
+          <div>
+            <Text strong block>{name || 'Bệnh nhân'}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>{record.phone || record.patientCode || ''}</Text>
+          </div>
+        </Space>
+      ),
     },
     {
-      title: 'Bác sĩ',
-      key: 'doctor',
-      width: 178,
-      render: (_, item) => renderDoctor(item),
-    },
-    {
-      title: 'Thời gian hẹn',
-      dataIndex: 'appointmentAt',
-      key: 'appointmentAt',
-      width: 112,
-      render: (value) => (
-        <div className="appointment-date-cell">
-          <span>{dayjs(value).format('DD/MM/YYYY')}</span>
-          <small>{weekDays[dayjs(value).day()]}</small>
+      title: 'Bác sĩ & Phòng',
+      dataIndex: 'doctorName',
+      key: 'doctorName',
+      render: (doc, record) => (
+        <div>
+          <Text block>{doc || 'BS. Chưa phân công'}</Text>
+          <Tag color="cyan">{record.department || 'Nội tổng quát'}</Tag>
         </div>
       ),
     },
     {
-      title: 'Khung giờ',
+      title: 'Ngày & Giờ hẹn',
       dataIndex: 'appointmentAt',
-      key: 'timeSlot',
-      width: 105,
-      render: (value) => <span className="appointment-time-slot">{dayjs(value).format('HH:mm')} - {dayjs(value).add(30, 'minute').format('HH:mm')}</span>,
-    },
-    {
-      title: 'Lý do khám',
-      dataIndex: 'reason',
-      key: 'reason',
-      width: 155,
-      ellipsis: true,
-      render: (value) => <Tooltip title={value || 'Không có ghi chú'}><span className="appointment-reason">{value || 'Khám tổng quát'}</span></Tooltip>,
+      key: 'appointmentAt',
+      render: (at) => (at ? dayjs(at).format('HH:mm - DD/MM/YYYY') : 'Trong ngày'),
     },
     {
       title: 'Trạng thái',
+      dataIndex: 'status',
       key: 'status',
-      width: 118,
-      render: (_, item) => renderStatus(item),
+      render: (st) => {
+        const meta = APPOINTMENT_STATUS_META[st] || { label: st, tone: 'gray' }
+        return <Tag color={meta.tone}>{meta.label}</Tag>
+      },
     },
     {
       title: 'Thao tác',
-      key: 'actions',
-      width: canManage ? 220 : 64,
-      fixed: 'right',
-      render: (_, item) => renderActions(item),
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          {/* Nút Check-in CHỈ xuất hiện khi trạng thái là SCHEDULED */}
+          {record.status === 'SCHEDULED' && permissions.canCheckIn && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<CheckCircleOutlined />}
+              loading={actionLoading}
+              onClick={() => handleCheckInAppointment(record.id)}
+            >
+              Check-in
+            </Button>
+          )}
+
+          {record.status === 'CHECKED_IN' && (
+            <Tag color="processing" icon={<ClockCircleOutlined />}>Đã vào hàng đợi</Tag>
+          )}
+
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => setDetailItem({ type: 'appointment', ...record })}
+          >
+            Chi tiết
+          </Button>
+        </Space>
+      ),
     },
   ]
 
-  const queueColumns = [
+  // Render Cột cho Bảng Queue Board Lễ tân (Reception Queue Table)
+  const queueBoardColumns = [
     {
       title: 'STT',
+      dataIndex: 'queueNumber',
       key: 'queueNumber',
-      width: 78,
-      align: 'center',
-      render: (_, __, index) => (
-        <span className="appointment-queue-number">
-          {String((queuePage - 1) * 10 + index + 1).padStart(2, '0')}
-        </span>
+      width: 70,
+      render: (num, _, idx) => <Badge count={num || idx + 1} style={{ backgroundColor: '#2563eb' }} />,
+    },
+    {
+      title: 'Bệnh nhân',
+      dataIndex: 'patientName',
+      key: 'patientName',
+      render: (name, record) => (
+        <Space>
+          <Avatar style={getAvatarStyle(name)}>{getInitials(name)}</Avatar>
+          <div>
+            <Text strong block>{name || 'Bệnh nhân'}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>Mã: {record.patientCode || record.patientId || 'N/A'}</Text>
+          </div>
+        </Space>
       ),
     },
-    { title: 'Bệnh nhân', key: 'patient', width: 220, render: (_, item) => renderPatient(item) },
-    { title: 'Bác sĩ / Chuyên khoa', key: 'doctor', width: 210, render: (_, item) => renderDoctor(item) },
     {
-      title: 'Giờ check-in',
+      title: 'Mã lượt khám',
+      dataIndex: 'visitCode',
+      key: 'visitCode',
+      render: (val, record) => <Text code>{val || record.visitId || record.id || 'N/A'}</Text>,
+    },
+    {
+      title: 'Nguồn',
+      dataIndex: 'sourceType',
+      key: 'sourceType',
+      render: (src) => (
+        src === 'WALK_IN'
+          ? <Tag color="orange">Tự đến (Walk-in)</Tag>
+          : <Tag color="blue">Hẹn trước</Tag>
+      ),
+    },
+    {
+      title: 'Bác sĩ',
+      dataIndex: 'doctorName',
+      key: 'doctorName',
+      render: (doc) => doc || 'Chưa gán',
+    },
+    {
+      title: 'Phòng',
+      dataIndex: 'roomName',
+      key: 'roomName',
+      render: (room, record) => room || record.roomCode || 'Phòng khám',
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      render: (st) => {
+        const meta = QUEUE_STATUS_META[st] || { label: st, tone: 'gray' }
+        return <Tag color={meta.tone}>{meta.label}</Tag>
+      },
+    },
+    {
+      title: 'Thời gian đến',
       dataIndex: 'checkedInAt',
       key: 'checkedInAt',
-      width: 140,
-      render: (value) => <div className="appointment-date-cell"><span>{value ? dayjs(value).format('HH:mm') : '—'}</span><small>{value ? dayjs(value).format('DD/MM/YYYY') : 'Chưa ghi nhận'}</small></div>,
+      render: (time) => (time ? dayjs(time).format('HH:mm DD/MM') : 'N/A'),
     },
-    {
-      title: 'Thời gian chờ',
-      dataIndex: 'checkedInAt',
-      key: 'waitingTime',
-      width: 140,
-      render: (value) => <span className="appointment-waiting-time">{value ? `${Math.max(0, queueNow.diff(dayjs(value), 'minute'))} phút` : '—'}</span>,
-    },
-    { title: 'Trạng thái', key: 'status', width: 130, render: (_, item) => renderStatus(item) },
     {
       title: 'Thao tác',
-      key: 'actions',
-      width: 86,
-      fixed: 'right',
-      render: (_, item) => (
-        <Tooltip title="Xem chi tiết">
-          <Button className="appointment-action-button" icon={<EyeOutlined />} onClick={() => setDetailItem(item)} aria-label="Xem chi tiết lượt chờ" />
-        </Tooltip>
+      key: 'action',
+      render: (_, record) => (
+        <Space wrap>
+          {/* Lễ tân / Admin Thao tác */}
+          {!permissions.isNurseOnly && record.status === 'WAITING' && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<StepForwardOutlined />}
+              onClick={() => handleCallNext(record.medicalQueueId || record.queueId)}
+            >
+              Gọi khám
+            </Button>
+          )}
+
+          {!permissions.isNurseOnly && record.status === 'IN_PROGRESS' && permissions.canSkip && (
+            <Button
+              danger
+              size="small"
+              icon={<CloseCircleOutlined />}
+              onClick={() => {
+                skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
+                setSkipModalItem(record)
+              }}
+            >
+              Skip
+            </Button>
+          )}
+
+          {/* Điều dưỡng (Nurse) Thao tác chuyển trạng thái CĐLS */}
+          {permissions.canChangeResultStatus && record.status === 'IN_PROGRESS' && (
+            <Button
+              size="small"
+              style={{ borderColor: '#9333ea', color: '#9333ea' }}
+              onClick={() => handleUpdateItemStatus(record.id, 'WAITING_FOR_RESULT')}
+            >
+              Chờ CĐLS
+            </Button>
+          )}
+
+          {permissions.canChangeResultStatus && record.status === 'WAITING_FOR_RESULT' && (
+            <Button
+              size="small"
+              type="primary"
+              style={{ backgroundColor: '#16a34a' }}
+              onClick={() => handleUpdateItemStatus(record.id, 'IN_PROGRESS')}
+            >
+              Tiếp tục khám
+            </Button>
+          )}
+
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => setDetailItem({ type: 'queue', ...record })}
+          >
+            Chi tiết
+          </Button>
+        </Space>
       ),
     },
   ]
 
-  const renderStats = (stats, className = '') => (
-    <section className={`appointment-stat-grid ${className}`} aria-label="Thống kê lịch hẹn">
-      {stats.map((stat) => {
-        const Icon = stat.icon
-        return (
-          <article className={`appointment-stat-card appointment-stat-${stat.tone}`} key={stat.key}>
-            <span className="appointment-stat-icon" aria-hidden="true"><Icon /></span>
-            <div>
-              <small>{stat.label}</small>
-              <strong>{Number(stat.value || 0).toLocaleString('vi-VN')}</strong>
-              <em>{stat.note}</em>
-            </div>
-          </article>
-        )
-      })}
-    </section>
-  )
-
-  const appointmentContent = (
-    <>
-      {renderStats(dailyStats)}
-      <section className="appointment-list-card">
-        <div className="appointment-filter-bar">
-          <DatePicker
-            className="appointment-filter-date"
-            value={selectedDate}
-            format="DD/MM/YYYY"
-            placeholder="Chọn ngày"
-            allowClear
-            aria-label="Lọc lịch hẹn theo ngày"
-            onChange={(value) => { setSelectedDate(value); setAppointmentPage(1) }}
-          />
-          <Select
-            className="appointment-filter-select"
-            value={doctorFilter}
-            aria-label="Lọc lịch hẹn theo bác sĩ"
-            options={[{ value: 'ALL', label: 'Tất cả bác sĩ' }, ...doctors.map((doctor) => ({ value: doctor.id, label: doctor.fullName || doctor.name || doctor.username || `BS. ${doctor.id}` }))]}
-            onChange={(value) => { setDoctorFilter(value); setAppointmentPage(1) }}
-          />
-          <Select
-            className="appointment-filter-select appointment-filter-department"
-            value={departmentFilter}
-            aria-label="Lọc lịch hẹn theo chuyên khoa"
-            options={[{ value: 'ALL', label: 'Tất cả chuyên khoa' }, ...availableDepartments.map((department) => ({ value: department, label: department }))]}
-            onChange={(value) => { setDepartmentFilter(value); setAppointmentPage(1) }}
-          />
-          <Select
-            className="appointment-filter-select"
-            value={statusFilter}
-            aria-label="Lọc lịch hẹn theo trạng thái"
-            options={[
-              { value: 'ALL', label: 'Tất cả trạng thái' },
-              { value: 'OVERDUE', label: 'Quá hạn' },
-              ...Object.entries(statusMeta)
-                .map(([value, meta]) => ({ value, label: meta.label })),
-            ]}
-            onChange={(value) => { setStatusFilter(value); setAppointmentPage(1) }}
-          />
-          <Input
-            className="appointment-filter-search"
-            suffix={<SearchOutlined />}
-            value={appointmentSearchDraft}
-            placeholder="Tìm kiếm lịch hẹn..."
-            allowClear
-            aria-label="Tìm kiếm lịch hẹn"
-            onChange={(event) => setAppointmentSearchDraft(event.target.value)}
-            onPressEnter={applyFilters}
-          />
-          <Button icon={<FilterOutlined />} onClick={applyFilters}>Bộ lọc</Button>
-          {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => setBookOpen(true)}>Đặt lịch hẹn</Button>}
-        </div>
-
-        {(doctorFilter !== 'ALL' || departmentFilter !== 'ALL' || statusFilter !== 'ALL' || appointmentKeyword || !selectedDate?.isSame(dayjs(), 'day')) && (
-          <div className="appointment-filter-summary">
-            <span>Tìm thấy <strong>{filteredAppointments.length}</strong> lịch hẹn phù hợp</span>
-            <button type="button" onClick={resetFilters}>Đặt lại bộ lọc</button>
-          </div>
-        )}
-
-        <Table
-          className="appointment-record-table"
-          rowKey="id"
-          columns={appointmentColumns}
-          dataSource={filteredAppointments}
-          rowClassName={(item) => (isAppointmentOverdue(item, queueNow) ? 'appointment-row-overdue' : '')}
-          loading={loading}
-          scroll={{ x: 1160 }}
-          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có lịch hẹn phù hợp" /> }}
-          pagination={{
-            current: appointmentPage,
-            pageSize: appointmentPageSize,
-            showSizeChanger: true,
-            pageSizeOptions: [5, 10, 20],
-            showTotal: (total, range) => `Hiển thị ${range[0]} - ${range[1]} của ${total} lịch hẹn`,
-          }}
-          onChange={(pagination) => {
-            setAppointmentPage(pagination.current || 1)
-            setAppointmentPageSize(pagination.pageSize || 10)
-          }}
-        />
-      </section>
-    </>
-  )
-
-  const queueContent = (
-    <>
-      {renderStats(queueStats, 'appointment-queue-stat-grid')}
-      <section className="appointment-list-card appointment-queue-card">
-        <header className="appointment-list-header">
-          <div>
-            <h2>Hàng đợi khám</h2>
-            <p>Bệnh nhân được sắp xếp theo thời gian check-in sớm nhất.</p>
-          </div>
-          <Space size={10}>
-            <Input
-              className="appointment-queue-search"
-              prefix={<SearchOutlined />}
-              value={queueKeyword}
-              placeholder="Tìm bệnh nhân..."
-              allowClear
-              aria-label="Tìm kiếm bệnh nhân trong hàng đợi"
-              onChange={(event) => { setQueueKeyword(event.target.value); setQueuePage(1) }}
-            />
-            {canManage && (
-              <Button
-                type="primary"
-                icon={<UserSwitchOutlined />}
-                loading={actionLoading}
-                disabled={!queue.length || actionLoading}
-                onClick={() => runAction(appointmentApi.callNext, 'Đã gọi bệnh nhân tiếp theo')}
-              >
-                Gọi khám tiếp theo
-              </Button>
-            )}
-          </Space>
-        </header>
-        <Table
-          className="appointment-record-table appointment-queue-table"
-          rowKey="id"
-          columns={queueColumns}
-          dataSource={filteredQueue}
-          loading={loading}
-          scroll={{ x: 900 }}
-          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Hàng đợi hiện đang trống" /> }}
-          pagination={filteredQueue.length > 10 ? { current: queuePage, pageSize: 10, showSizeChanger: false } : false}
-          onChange={(pagination) => setQueuePage(pagination.current || 1)}
-        />
-      </section>
-    </>
-  )
-
-  const disabledAppointmentTime = (date) => {
-    const now = dayjs()
-    if (!date || !date.isSame(now, 'day')) return {}
-    return {
-      disabledHours: () => Array.from({ length: now.hour() }, (_, hour) => hour),
-      disabledMinutes: (hour) => hour === now.hour()
-        ? Array.from({ length: now.minute() + 1 }, (_, minute) => minute)
-        : [],
-    }
-  }
-
-  const tabItems = [
-    { key: 'appointments', label: <span><CalendarOutlined /> Lịch hẹn khám</span>, children: appointmentContent },
-    {
-      key: 'queue',
-      label: <span><UserSwitchOutlined /> Hàng đợi khám <b className="appointment-tab-count">{queue.length}</b></span>,
-      children: queueContent,
-    },
-  ]
-
-  const detailPatient = detailItem ? getPatient(detailItem) : {}
-  const detailStatus = detailItem
-    ? (isAppointmentOverdue(detailItem, queueNow) ? overdueMeta : getStatus(detailItem.status))
-    : getStatus()
-
   return (
-    <div className="appointment-management-page">
-      <header className="appointment-page-heading">
-        <h1>Lịch hẹn &amp; hàng đợi khám</h1>
-        <p>Quản lý lịch khám, tiếp nhận và theo dõi thứ tự bệnh nhân trong ngày.</p>
-      </header>
+    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+      {/* Header & Title */}
+      <Card style={{ marginBottom: 24, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <Row justify="space-between" align="middle" gutter={[16, 16]}>
+          <Col>
+            <Space align="center" size="middle">
+              <Avatar size={48} icon={<CalendarOutlined />} style={{ backgroundColor: '#2563eb' }} />
+              <div>
+                <Title level={4} style={{ margin: 0 }}>Quản Lý Lịch Hẹn & Hàng Đợi Khám Bệnh</Title>
+                <Text type="secondary">
+                  Theo dõi luồng vận hành khám bệnh chuẩn hóa từ Lịch hẹn, Check-in, Hàng đợi tới Phòng khám
+                </Text>
+              </div>
+            </Space>
+          </Col>
+          <Col>
+            <Space wrap>
+              <DatePicker
+                value={selectedDate}
+                onChange={(date) => date && setSelectedDate(date)}
+                format="DD/MM/YYYY"
+                allowClear={false}
+              />
+              <Button icon={<ReloadOutlined />} onClick={refreshAllData} loading={loading}>
+                Làm mới
+              </Button>
+              {permissions.canManageWalkIn && (
+                <Button
+                  type="primary"
+                  icon={<UserAddOutlined />}
+                  onClick={() => setWalkInModalOpen(true)}
+                  style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+                >
+                  + Check-in Walk-in
+                </Button>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      </Card>
 
-      <Alert
-        className="appointment-info-alert"
-        type="warning"
-        showIcon
-        style={{ marginBottom: 16, borderRadius: 8 }}
-        message="Quy định lịch hẹn quá hạn"
-        description="Hiển thị lịch hẹn quá hạn 15 phút so với giờ khám đăng ký => Hệ thống hiển thị trực tiếp nút [Không đến] để đánh dấu bệnh nhân không đến."
+      {/* Thông báo phân quyền nếu là Điều dưỡng */}
+      {permissions.isNurseOnly && (
+        <Alert
+          type="info"
+          showIcon
+          message="Chế độ Điều dưỡng (Nurse View)"
+          description="Bạn có quyền theo dõi Queue Board và chuyển trạng thái Chờ kết quả CĐLS (IN_PROGRESS <-> WAITING_FOR_RESULT). Các thao tác Check-in, Gọi khám, Skip và Hoàn tất do Lễ tân / Bác sĩ thực hiện."
+          style={{ marginBottom: 20 }}
+        />
+      )}
+
+      {/* Main Tabs Navigation */}
+      <Tabs
+        activeKey={activeMainTab}
+        onChange={setActiveMainTab}
+        type="card"
+        items={[
+          {
+            key: 'appointments',
+            label: (
+              <span>
+                <CalendarOutlined /> Danh sách Lịch Hẹn ({filteredAppointments.length})
+              </span>
+            ),
+            children: (
+              <Card style={{ borderRadius: 12 }}>
+                {/* Bộ lọc Lịch hẹn */}
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                  <Col xs={24} sm={8} md={6}>
+                    <Input
+                      placeholder="Tìm mã LH, tên bệnh nhân..."
+                      prefix={<SearchOutlined />}
+                      value={appKeyword}
+                      onChange={(e) => setAppKeyword(e.target.value)}
+                      allowClear
+                    />
+                  </Col>
+                  <Col xs={12} sm={8} md={6}>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={appDoctorFilter}
+                      onChange={setAppDoctorFilter}
+                      options={[
+                        { value: 'ALL', label: 'Tất cả Bác sĩ' },
+                        ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
+                      ]}
+                    />
+                  </Col>
+                  <Col xs={12} sm={8} md={6}>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={appStatusFilter}
+                      onChange={setAppStatusFilter}
+                      options={[
+                        { value: 'ALL', label: 'Tất cả trạng thái' },
+                        { value: 'SCHEDULED', label: 'Đã đặt hẹn (Chờ check-in)' },
+                        { value: 'CHECKED_IN', label: 'Đã check-in' },
+                        { value: 'COMPLETED', label: 'Đã hoàn thành' },
+                        { value: 'CANCELLED', label: 'Đã hủy' },
+                      ]}
+                    />
+                  </Col>
+                </Row>
+
+                <Table
+                  dataSource={filteredAppointments}
+                  columns={appointmentColumns}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                />
+              </Card>
+            ),
+          },
+          {
+            key: 'reception_queue',
+            label: (
+              <span>
+                <TeamOutlined /> Queue Board Lễ Tân & Điều Dưỡng ({filteredQueues.length})
+              </span>
+            ),
+            children: (
+              <Card style={{ borderRadius: 12 }}>
+                {/* Bộ lọc Queue Board */}
+                <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+                  <Col xs={24} sm={6} md={5}>
+                    <Input
+                      placeholder="Tìm tên, mã BN, mã lượt..."
+                      prefix={<SearchOutlined />}
+                      value={queueKeyword}
+                      onChange={(e) => setQueueKeyword(e.target.value)}
+                      allowClear
+                    />
+                  </Col>
+                  <Col xs={12} sm={6} md={4}>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={queueDoctorFilter}
+                      onChange={setQueueDoctorFilter}
+                      options={[
+                        { value: 'ALL', label: 'Tất cả Bác sĩ' },
+                        ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
+                      ]}
+                    />
+                  </Col>
+                  <Col xs={12} sm={6} md={4}>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={queueRoomFilter}
+                      onChange={setQueueRoomFilter}
+                      options={[
+                        { value: 'ALL', label: 'Tất cả Phòng khám' },
+                        ...extractedRooms.map((r) => ({ value: r.id, label: `${r.code} - ${r.name}` })),
+                      ]}
+                    />
+                  </Col>
+                  <Col xs={12} sm={6} md={4}>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={queueStatusFilter}
+                      onChange={setQueueStatusFilter}
+                      options={[
+                        { value: 'ALL', label: 'Tất cả Trạng thái' },
+                        { value: 'WAITING', label: 'WAITING (Đang chờ)' },
+                        { value: 'IN_PROGRESS', label: 'IN_PROGRESS (Đang khám)' },
+                        { value: 'WAITING_FOR_RESULT', label: 'WAITING_FOR_RESULT (Chờ CĐLS)' },
+                        { value: 'COMPLETED', label: 'COMPLETED (Hoàn thành)' },
+                        { value: 'SKIPPED', label: 'SKIPPED (Vắng mặt)' },
+                        { value: 'CANCELLED', label: 'CANCELLED (Đã hủy)' },
+                      ]}
+                    />
+                  </Col>
+                  <Col xs={12} sm={6} md={4}>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={queueSourceFilter}
+                      onChange={setQueueSourceFilter}
+                      options={[
+                        { value: 'ALL', label: 'Tất cả Nguồn' },
+                        { value: 'APPOINTMENT', label: 'Hẹn trước (Appointment)' },
+                        { value: 'WALK_IN', label: 'Tự đến (Walk-in)' },
+                      ]}
+                    />
+                  </Col>
+                  <Col xs={24} sm={24} md={3} style={{ textAlign: 'right' }}>
+                    {permissions.canCallNext && (
+                      <Button
+                        type="primary"
+                        icon={<StepForwardOutlined />}
+                        loading={actionLoading}
+                        onClick={() => handleCallNext()}
+                      >
+                        Gọi tiếp
+                      </Button>
+                    )}
+                  </Col>
+                </Row>
+
+                <Table
+                  dataSource={filteredQueues}
+                  columns={queueBoardColumns}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                />
+              </Card>
+            ),
+          },
+          {
+            key: 'doctor_queue',
+            label: (
+              <span>
+                <UserSwitchOutlined /> Queue Khám Bệnh Của Bác Sĩ
+              </span>
+            ),
+            children: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* 1. Nhóm Đang Khám (IN_PROGRESS) */}
+                <Card
+                  title={<Text strong style={{ color: '#16a34a' }}>🔴 BỆNH NHÂN ĐANG KHÁM ({doctorQueueGroups.inProgress.length})</Text>}
+                  style={{ borderRadius: 12, borderColor: '#bbf7d0' }}
+                >
+                  {doctorQueueGroups.inProgress.length === 0 ? (
+                    <Text type="secondary">Chưa có bệnh nhân nào đang trong phòng khám.</Text>
+                  ) : (
+                    <List
+                      dataSource={doctorQueueGroups.inProgress}
+                      renderItem={(item) => (
+                        <List.Item
+                          actions={[
+                            <Button
+                              type="primary"
+                              icon={<MedicineBoxOutlined />}
+                              onClick={() => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId, queueItemId: item.id } })}
+                            >
+                              Ghi bệnh án / Khám
+                            </Button>,
+                            <Button
+                              style={{ borderColor: '#9333ea', color: '#9333ea' }}
+                              onClick={() => handleUpdateItemStatus(item.id, 'WAITING_FOR_RESULT')}
+                            >
+                              Chờ CĐLS
+                            </Button>,
+                            <Popconfirm
+                              title="Xác nhận hoàn tất lượt khám?"
+                              description="Đảm bảo bệnh án đã được Bác sĩ ký/khóa trước khi hoàn tất."
+                              onConfirm={() => handleCompleteItem(item.id)}
+                            >
+                              <Button type="primary" style={{ backgroundColor: '#16a34a' }}>
+                                Hoàn tất
+                              </Button>
+                            </Popconfirm>,
+                            <Button
+                              danger
+                              onClick={() => {
+                                skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
+                                setSkipModalItem(item)
+                              }}
+                            >
+                              Skip
+                            </Button>,
+                          ]}
+                        >
+                          <List.Item.Meta
+                            avatar={<Avatar size="large" style={getAvatarStyle(item.patientName)}>{getInitials(item.patientName)}</Avatar>}
+                            title={<Text strong>{item.patientName} - <Text type="secondary">STT: {item.queueNumber}</Text></Text>}
+                            description={`Mã lượt: ${item.visitCode || item.visitId || 'N/A'} | Nguồn: ${item.sourceType === 'WALK_IN' ? 'Walk-in' : 'Hẹn trước'}`}
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  )}
+                </Card>
+
+                {/* 2. Nhóm Đang Chờ (WAITING) */}
+                <Card
+                  title={<Text strong style={{ color: '#2563eb' }}>🟡 BỆNH NHÂN ĐANG CHỜ ({doctorQueueGroups.waiting.length})</Text>}
+                  style={{ borderRadius: 12 }}
+                >
+                  <List
+                    dataSource={doctorQueueGroups.waiting}
+                    pagination={{ pageSize: 5 }}
+                    renderItem={(item) => (
+                      <List.Item
+                        actions={[
+                          <Button
+                            type="primary"
+                            icon={<StepForwardOutlined />}
+                            onClick={() => handleCallNext(item.medicalQueueId || item.queueId)}
+                          >
+                            Gọi vào khám
+                          </Button>,
+                          <Button
+                            danger
+                            onClick={() => {
+                              skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
+                              setSkipModalItem(item)
+                            }}
+                          >
+                            Skip
+                          </Button>,
+                        ]}
+                      >
+                        <List.Item.Meta
+                          avatar={<Avatar style={getAvatarStyle(item.patientName)}>{getInitials(item.patientName)}</Avatar>}
+                          title={<Text strong>STT {item.queueNumber}: {item.patientName}</Text>}
+                          description={`Đến lúc: ${item.checkedInAt ? dayjs(item.checkedInAt).format('HH:mm') : 'N/A'}`}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+
+                {/* 3. Nhóm Chờ Kết Quả (WAITING_FOR_RESULT) */}
+                <Card
+                  title={<Text strong style={{ color: '#9333ea' }}>🟣 BỆNH NHÂN CHỜ KẾT QUẢ CĐLS ({doctorQueueGroups.waitingForResult.length})</Text>}
+                  style={{ borderRadius: 12, borderColor: '#e9d5ff' }}
+                >
+                  <List
+                    dataSource={doctorQueueGroups.waitingForResult}
+                    pagination={{ pageSize: 5 }}
+                    renderItem={(item) => (
+                      <List.Item
+                        actions={[
+                          <Button
+                            type="primary"
+                            style={{ backgroundColor: '#16a34a' }}
+                            onClick={() => handleUpdateItemStatus(item.id, 'IN_PROGRESS')}
+                          >
+                            Tiếp tục khám
+                          </Button>,
+                          <Button onClick={() => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId } })}>
+                            Xem bệnh án
+                          </Button>,
+                        ]}
+                      >
+                        <List.Item.Meta
+                          avatar={<Avatar style={{ backgroundColor: '#9333ea' }}>{getInitials(item.patientName)}</Avatar>}
+                          title={<Text strong>{item.patientName}</Text>}
+                          description="Đã gửi chỉ định CĐLS, đang chờ phòng xét nghiệm / CDHA trả kết quả."
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+
+                {/* 4. Nhóm Đã Hoàn Thành / Bỏ Qua */}
+                <Card
+                  title={<Text strong style={{ color: '#64748b' }}>⚪ ĐÃ HOÀN THÀNH / BỎ QUA ({doctorQueueGroups.finished.length})</Text>}
+                  style={{ borderRadius: 12 }}
+                >
+                  <Table
+                    dataSource={doctorQueueGroups.finished}
+                    columns={[
+                      { title: 'STT', dataIndex: 'queueNumber', key: 'queueNumber' },
+                      { title: 'Bệnh nhân', dataIndex: 'patientName', key: 'patientName' },
+                      { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: (st) => <Tag color={QUEUE_STATUS_META[st]?.tone || 'gray'}>{QUEUE_STATUS_META[st]?.label || st}</Tag> },
+                      { title: 'Thời gian', dataIndex: 'updatedAt', key: 'updatedAt', render: (t) => t ? dayjs(t).format('HH:mm DD/MM') : 'N/A' },
+                    ]}
+                    rowKey="id"
+                    pagination={{ pageSize: 5 }}
+                  />
+                </Card>
+              </div>
+            ),
+          },
+        ]}
       />
 
-      {appointmentContent}
-
+      {/* Modal 1: Check-in Walk-in (Bệnh nhân tự đến) */}
       <Modal
-        className="appointment-form-modal"
-        width={680}
-        title={(
-          <div className="appointment-modal-title">
-            <span><CalendarOutlined /></span>
-            <div><h2>Đặt lịch hẹn khám</h2><p>Tạo lịch khám mới cho bệnh nhân.</p></div>
-          </div>
-        )}
-        open={bookOpen}
-        onCancel={closeBooking}
-        onOk={() => bookForm.submit()}
-        okText="Đặt lịch hẹn"
-        cancelText="Hủy"
-        confirmLoading={saving}
-        destroyOnHidden
+        title="Check-in Bệnh Nhân Tự Đến (Walk-in)"
+        open={walkInModalOpen}
+        onCancel={() => setWalkInModalOpen(false)}
+        footer={null}
+        destroyOnClose
       >
-        <Form className="appointment-book-form" form={bookForm} layout="vertical" onFinish={createAppointment}>
-          <div className="appointment-form-grid">
-            <Form.Item className="appointment-form-full" name="patientId" label="Bệnh nhân" rules={[{ required: true, message: 'Vui lòng chọn bệnh nhân' }]}>
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Tìm theo tên hoặc mã bệnh nhân"
-                options={patients.map((patient) => ({ value: patient.id, label: `${patient.fullName} (${patient.patientCode})` }))}
-              />
-            </Form.Item>
-            <Form.Item name="department" label="Chuyên khoa / phòng khám" rules={[{ required: true, message: 'Vui lòng chọn chuyên khoa' }]}>
-              <Select placeholder="Chọn chuyên khoa" options={departmentOptions.map((value) => ({ value, label: value }))} />
-            </Form.Item>
-            <Form.Item name="doctorId" label="Bác sĩ" rules={[{ required: true, message: 'Vui lòng chọn bác sĩ' }]}>
-              <Select showSearch optionFilterProp="label" placeholder="Chọn bác sĩ" options={doctors.map((doctor) => ({ value: doctor.id, label: doctor.fullName || doctor.name || doctor.username || `BS. ${doctor.id}` }))} />
-            </Form.Item>
-            <Form.Item
-              className="appointment-form-full"
-              name="appointmentAt"
-              label="Ngày giờ khám"
-              rules={[
-                { required: true, message: 'Vui lòng chọn ngày giờ khám' },
-                {
-                  validator: (_, value) => !value || value.isAfter(dayjs())
-                    ? Promise.resolve()
-                    : Promise.reject(new Error('Thời gian hẹn phải ở tương lai')),
-                },
-              ]}
-            >
-              <DatePicker
-                showTime={{ minuteStep: 15 }}
-                format="HH:mm DD/MM/YYYY"
-                placeholder="Chọn ngày và khung giờ"
-                disabledDate={(date) => date && date.endOf('day').isBefore(dayjs())}
-                disabledTime={disabledAppointmentTime}
-              />
-            </Form.Item>
-            <Form.Item className="appointment-form-full" name="reason" label="Lý do khám">
-              <Input.TextArea rows={3} maxLength={255} showCount placeholder="Nhập triệu chứng hoặc lý do đặt lịch..." />
-            </Form.Item>
-          </div>
-        </Form>
-      </Modal>
+        <Form form={walkInForm} layout="vertical" onFinish={handleCheckInWalkInSubmit}>
+          <Form.Item
+            name="patientId"
+            label="Chọn Bệnh nhân"
+            rules={[{ required: true, message: 'Vui lòng chọn bệnh nhân!' }]}
+          >
+            <Select
+              showSearch
+              placeholder="Tìm theo tên hoặc số điện thoại..."
+              optionFilterProp="children"
+              options={patients.map((p) => ({
+                value: p.id,
+                label: `${p.fullName || p.name} (${p.phone || p.patientCode || 'BN'})`,
+              }))}
+            />
+          </Form.Item>
 
-      <Modal
-        className="appointment-cancel-modal"
-        title={`Hủy lịch hẹn ${cancelItem?.appointmentCode || ''}`}
-        open={!!cancelItem}
-        onCancel={closeCancellation}
-        onOk={() => cancelForm.submit()}
-        okText="Xác nhận hủy"
-        cancelText="Đóng"
-        okButtonProps={{ danger: true, disabled: actionLoading }}
-        cancelButtonProps={{ disabled: saving || actionLoading }}
-        confirmLoading={saving}
-        closable={!saving && !actionLoading}
-        maskClosable={!saving && !actionLoading}
-        keyboard={!saving && !actionLoading}
-        destroyOnHidden
-      >
-        {cancelItem && (
-          <div className="appointment-cancel-target">
-            <Avatar style={getAvatarStyle(cancelItem.patientId || cancelItem.patientName)}>
-              {getInitials(cancelItem.patientName)}
-            </Avatar>
-            <div>
-              <strong>{cancelItem.patientName}</strong>
-              <span>{dayjs(cancelItem.appointmentAt).format('HH:mm · DD/MM/YYYY')}</span>
-              <small>{cancelItem.doctorName} · {cancelItem.department}</small>
-            </div>
-          </div>
-        )}
-        <p className="appointment-cancel-note">
-          Chỉ hủy lịch chưa tiếp nhận và còn trước giờ hẹn. Bản ghi được giữ lại, còn khung giờ của bác sĩ sẽ được giải phóng.
-        </p>
-        <Form form={cancelForm} layout="vertical" onFinish={cancelAppointment}>
+          <Form.Item
+            name="doctorId"
+            label="Chọn Bác sĩ khám"
+            rules={[{ required: true, message: 'Vui lòng chọn bác sĩ khám!' }]}
+          >
+            <Select
+              placeholder="Chọn bác sĩ phụ trách..."
+              options={doctors.map((d) => ({
+                value: d.id,
+                label: `${d.fullName || d.username} (${d.department || 'Phòng khám'})`,
+              }))}
+            />
+          </Form.Item>
+
           <Form.Item
             name="reason"
-            label="Lý do hủy"
-            rules={[
-              { required: true, whitespace: true, message: 'Vui lòng nhập lý do hủy' },
-              { max: 500, message: 'Lý do hủy không được vượt quá 500 ký tự' },
-            ]}
+            label="Lý do khám"
+            rules={[{ required: true, message: 'Vui lòng nhập lý do khám!' }]}
           >
-            <Input.TextArea
-              rows={3}
-              maxLength={500}
-              showCount
-              autoFocus
-              placeholder="Nhập lý do hủy lịch..."
-            />
+            <Input placeholder="VD: Đau đầu, sốt nhẹ, khám sức khỏe..." />
+          </Form.Item>
+
+          <Form.Item name="notes" label="Ghi chú thêm (Không bắt buộc)">
+            <Input.TextArea rows={2} placeholder="Nhập ghi chú từ lễ tân nếu có..." />
+          </Form.Item>
+
+          <Alert
+            type="info"
+            showIcon
+            message="Thông báo phân phòng tự động"
+            description="Phòng khám sẽ tự động được hệ thống lấy từ phòng đang gán cho Bác sĩ được chọn."
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => setWalkInModalOpen(false)}>Hủy</Button>
+              <Button type="primary" htmlType="submit" loading={actionLoading}>
+                Check-in Walk-in
+              </Button>
+            </Space>
           </Form.Item>
         </Form>
       </Modal>
 
+      {/* Modal 2: Bỏ qua / Skip lượt khám */}
       <Modal
-        className="appointment-no-show-modal"
-        title={`Xác nhận bệnh nhân không đến ${noShowItem?.appointmentCode || ''}`}
-        open={!!noShowItem}
-        onCancel={closeNoShowConfirmation}
-        onOk={markNoShow}
-        okText="Đánh dấu không đến"
-        cancelText="Đóng"
-        okButtonProps={{ danger: true, disabled: actionLoading }}
-        cancelButtonProps={{ disabled: actionLoading }}
-        confirmLoading={actionLoading}
-        closable={!actionLoading}
-        maskClosable={!actionLoading}
-        keyboard={!actionLoading}
-        destroyOnHidden
+        title="Xác nhận bỏ qua lượt khám (Skip)"
+        open={!!skipModalItem}
+        onCancel={() => setSkipModalItem(null)}
+        footer={null}
       >
-        {noShowItem && (
-          <>
-            <div className="appointment-no-show-target">
-              <Avatar style={getAvatarStyle(noShowItem.patientId || noShowItem.patientName)}>
-                {getInitials(noShowItem.patientName)}
-              </Avatar>
-              <div>
-                <strong>{noShowItem.patientName}</strong>
-                <span>{dayjs(noShowItem.appointmentAt).format('HH:mm · DD/MM/YYYY')}</span>
-                <small>{noShowItem.doctorName} · {noShowItem.department}</small>
-              </div>
-            </div>
-            <div className="appointment-no-show-warning" role="alert">
-              <WarningOutlined />
-              <div>
-                <strong>Lịch đã quá giờ hẹn {getOverdueMinutes(noShowItem, queueNow)} phút.</strong>
-                <p>
-                  Sau khi xác nhận, lịch sẽ chuyển sang “Không đến” và không thể check-in.
-                  Hiện chưa có chức năng hoàn tác.
-                </p>
-              </div>
-            </div>
-          </>
-        )}
+        <Form form={skipForm} layout="vertical" onFinish={handleSkipSubmit}>
+          <Paragraph>
+            Bệnh nhân: <Text strong>{skipModalItem?.patientName}</Text> (STT: {skipModalItem?.queueNumber})
+          </Paragraph>
+          <Form.Item
+            name="reason"
+            label="Lý do bỏ qua lượt khám"
+            rules={[{ required: true, message: 'Vui lòng nhập hoặc chọn lý do!' }]}
+          >
+            <Select
+              options={[
+                { value: 'Vắng mặt khi gọi', label: 'Đã gọi 3 lần nhưng không có mặt' },
+                { value: 'Khách hàng xin lùi lượt', label: 'Bệnh nhân có việc bận đột xuất' },
+                { value: 'Bệnh nhân hủy khám', label: 'Bệnh nhân ra về không khám nữa' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => setSkipModalItem(null)}>Hủy</Button>
+              <Button type="primary" danger htmlType="submit" loading={actionLoading}>
+                Xác nhận Skip
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
 
+      {/* Modal 3: Xem chi tiết lượt khám QueueItem */}
       <Modal
-        className="appointment-detail-modal"
-        title="Chi tiết lịch hẹn"
+        title="Chi Tiết Lượt Khám & Hàng Đợi"
         open={!!detailItem}
         onCancel={() => setDetailItem(null)}
-        footer={<Button type="primary" onClick={() => setDetailItem(null)}>Đóng</Button>}
+        footer={[
+          <Button key="close" onClick={() => setDetailItem(null)}>Đóng</Button>,
+        ]}
       >
         {detailItem && (
-          <div className="appointment-detail-content">
-            <div className="appointment-detail-patient">
-              <Avatar size={52} style={getAvatarStyle(detailItem.patientId)}>{getInitials(detailItem.patientName)}</Avatar>
-              <div><h3>{detailItem.patientName}</h3><p>{detailPatient.patientCode || 'Chưa có mã bệnh nhân'}{detailPatient.phone ? ` · ${detailPatient.phone}` : ''}</p></div>
-              <span className={`appointment-status appointment-status-${detailStatus.tone}`}>{detailStatus.label}</span>
-            </div>
-            <dl className="appointment-detail-grid">
-              <div><dt>Mã lịch hẹn</dt><dd>{detailItem.appointmentCode}</dd></div>
-              <div><dt>Thời gian</dt><dd>{dayjs(detailItem.appointmentAt).format('HH:mm DD/MM/YYYY')}</dd></div>
-              {isAppointmentOverdue(detailItem, queueNow) && (
-                <div><dt>Quá giờ hẹn</dt><dd>{getOverdueMinutes(detailItem, queueNow)} phút</dd></div>
-              )}
-              <div><dt>Bác sĩ</dt><dd>{detailItem.doctorName}</dd></div>
-              <div><dt>Chuyên khoa</dt><dd>{detailItem.department || '—'}</dd></div>
-              <div className="appointment-detail-full"><dt>Lý do khám</dt><dd>{detailItem.reason || 'Không có ghi chú'}</dd></div>
-              {detailItem.checkedInAt && <div><dt>Thời gian check-in</dt><dd>{dayjs(detailItem.checkedInAt).format('HH:mm DD/MM/YYYY')}</dd></div>}
-              {detailItem.cancelReason && <div className="appointment-detail-full"><dt>Lý do hủy</dt><dd>{detailItem.cancelReason}</dd></div>}
-            </dl>
+          <div>
+            <Paragraph><Text type="secondary">Bệnh nhân:</Text> <Text strong>{detailItem.patientName}</Text></Paragraph>
+            <Paragraph><Text type="secondary">Bác sĩ phụ trách:</Text> <Text strong>{detailItem.doctorName || 'Chưa gán'}</Text></Paragraph>
+            <Paragraph><Text type="secondary">Mã lượt khám (Visit ID):</Text> <Text code>{detailItem.visitId || detailItem.id || 'N/A'}</Text></Paragraph>
+            <Paragraph><Text type="secondary">Trạng thái:</Text> <Tag color="blue">{detailItem.status}</Tag></Paragraph>
+            <Paragraph><Text type="secondary">Nguồn tiếp nhận:</Text> {detailItem.sourceType === 'WALK_IN' ? 'Tự đến (Walk-in)' : 'Hẹn trước (Appointment)'}</Paragraph>
+            <Paragraph><Text type="secondary">Thời gian tiếp nhận:</Text> {detailItem.checkedInAt ? dayjs(detailItem.checkedInAt).format('HH:mm - DD/MM/YYYY') : 'N/A'}</Paragraph>
           </div>
         )}
       </Modal>
