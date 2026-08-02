@@ -21,11 +21,45 @@ export const APPOINTMENT_STATUS_META = {
 }
 
 /**
+ * Dịch câu thông báo tiếng Anh từ Backend API sang tiếng Việt chuẩn hóa
+ */
+export const translateBackendMessage = (msg) => {
+  if (!msg) return ''
+  const str = String(msg).toLowerCase()
+  if (str.includes('already has an active visit') || str.includes('active visit or queue item')) {
+    return 'Bệnh nhân này hiện đã có một lượt khám hoặc đang ở trong hàng đợi khám, hệ thống không thêm trùng.'
+  }
+  if (str.includes('no waiting queue item') || str.includes('no waiting item')) {
+    return 'Hiện tại không có bệnh nhân nào đang ở trạng thái chờ khám trong hàng đợi.'
+  }
+  if (str.includes('already in queue') || str.includes('already checked in')) {
+    return 'Bệnh nhân đã xuất hiện trong hàng đợi khám, hệ thống không thêm trùng.'
+  }
+  if (str.includes('overlapping') || str.includes('busy slot')) {
+    return 'Bác sĩ đã có lịch hẹn trùng trong cùng khung giờ.'
+  }
+  if (str.includes('past')) {
+    return 'Khung giờ hẹn đã ở quá khứ, không thể thao tác.'
+  }
+  if (str.includes('completed') || str.includes('cancelled')) {
+    return 'Lịch hẹn hoặc lượt khám đã hoàn tất hoặc đã bị hủy.'
+  }
+  if (str.includes('doctor is not assigned')) {
+    return 'Bác sĩ chưa được gán phòng khám phù hợp.'
+  }
+  if (str.includes('medical record is not locked')) {
+    return 'Bệnh án chưa được ký hoặc khóa trước khi hoàn tất.'
+  }
+  return msg
+}
+
+/**
  * Xử lý thông báo lỗi HTTP Status tiêu chuẩn cho FE (400, 401, 403, 404, 409)
  */
 export const handleQueueApiError = (error, defaultMessage = 'Thao tác không thành công') => {
   const status = error?.response?.status
-  const backendMsg = error?.response?.data?.message || error?.response?.data?.error
+  const rawMsg = error?.response?.data?.message || error?.response?.data?.error
+  const backendMsg = translateBackendMessage(rawMsg)
 
   let title = 'Thông báo hệ thống'
   let detail = backendMsg || defaultMessage
@@ -48,8 +82,8 @@ export const handleQueueApiError = (error, defaultMessage = 'Thao tác không th
       detail = backendMsg || 'Dữ liệu Lịch hẹn, Hàng đợi hoặc Lượt khám không tồn tại.'
       break
     case 409:
-      title = '409 - Xung đột luồng vận hành'
-      detail = backendMsg || 'Sai chu trình khám, trùng lượt khám, bác sĩ chưa được gán phòng hoặc bệnh án chưa được khóa.'
+      title = '409 - Hàng đợi / Chu trình vận hành'
+      detail = backendMsg || 'Hiện tại bệnh nhân đã ở trong hàng đợi hoặc chưa đúng chu trình khám.'
       break
     default:
       if (status >= 500) {
@@ -59,7 +93,7 @@ export const handleQueueApiError = (error, defaultMessage = 'Thao tác không th
       break
   }
 
-  notification.error({
+  notification.warning({
     message: title,
     description: detail,
     placement: 'topRight',
