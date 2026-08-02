@@ -181,6 +181,11 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/queue-items/*")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
 
+                                                // ===== ROOMS =====
+                                                .requestMatchers(HttpMethod.GET, "/rooms", "/rooms/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .requestMatchers("/rooms", "/rooms/**").hasRole("ADMIN")
+
                                                 // ===== OTHERS =====
                                                 .anyRequest().authenticated())
 

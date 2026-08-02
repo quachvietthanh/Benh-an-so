@@ -12,6 +12,13 @@ import com.benhsoan.persistence.entity.queue.RoomEntity;
 @Component
 public class QueueStructurePersistenceMapper {
     public Room toDomain(RoomEntity entity) { return entity == null ? null : Room.restore(entity.getId(), entity.getCode(), entity.getName(), entity.isActive(), entity.getCreatedAt(), entity.getUpdatedAt()); }
+    public RoomEntity toEntity(Room domain) {
+        if (domain == null) return null;
+        RoomEntity entity = new RoomEntity();
+        entity.setId(domain.getId()); entity.setCode(domain.getCode()); entity.setName(domain.getName());
+        entity.setActive(domain.isActive()); entity.setCreatedAt(domain.getCreatedAt()); entity.setUpdatedAt(domain.getUpdatedAt());
+        return entity;
+    }
     public DoctorRoomAssignment toDomain(DoctorRoomAssignmentEntity entity) { return entity == null ? null : DoctorRoomAssignment.restore(entity.getId(), entity.getDoctorId(), entity.getRoomId(), entity.getAssignedBy(), entity.getAssignedAt()); }
     public QueueItem toDomain(QueueItemEntity entity) { return entity == null ? null : QueueItem.restore(entity.getId(), entity.getMedicalQueueId(), entity.getPatientId(), entity.getAppointmentId(), entity.getVisitId(), entity.getSourceType(), entity.getStatus(), entity.getQueueNumber(), entity.getQueueDate(), entity.getCheckedInAt(), entity.getCalledAt(), entity.getCompletedAt(), entity.getCancelledAt(), entity.getCancelReason(), entity.getSkippedAt(), entity.getSkipReason(), entity.getCreatedBy(), entity.getCreatedAt(), entity.getUpdatedAt()); }
     public QueueItemEntity toEntity(QueueItem domain) {

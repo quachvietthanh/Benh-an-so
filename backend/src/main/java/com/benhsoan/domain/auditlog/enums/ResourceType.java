@@ -16,6 +16,8 @@ public enum ResourceType {
 
     VISIT,
 
+    ROOM,
+
     MEDICAL_RECORD,
 
     PRESCRIPTION,

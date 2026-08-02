@@ -6,7 +6,9 @@ CREATE TABLE rooms (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NULL,
     CONSTRAINT pk_rooms PRIMARY KEY (id),
-    CONSTRAINT uk_rooms_code UNIQUE (room_code)
+    CONSTRAINT uk_rooms_code UNIQUE (room_code),
+    CONSTRAINT ck_rooms_code_not_blank CHECK (CHAR_LENGTH(TRIM(room_code)) BETWEEN 1 AND 30),
+    CONSTRAINT ck_rooms_name_not_blank CHECK (CHAR_LENGTH(TRIM(room_name)) BETWEEN 1 AND 100)
 );
 
 CREATE TABLE doctor_room_assignments (
