@@ -2,6 +2,16 @@ import React, { createContext, useState, useContext, useEffect } from 'react'
 import authApi from '../api/authApi'
 import { loginUser } from '../services/mockDataService'
 
+import { demoUsers } from '../mock-data/mockData'
+
+const getDoctorDisplayName = (username, fullName) => {
+  if (fullName && fullName !== username && fullName !== 'admin') return fullName
+  const matched = demoUsers.find((u) => u.username === username)
+  if (matched?.fullName) return matched.fullName
+  if (username === 'admin') return 'BS. Phạm Hồng Anh'
+  return username ? `BS. ${username}` : 'BS. Phạm Hồng Anh'
+}
+
 const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
@@ -15,12 +25,14 @@ export const AuthProvider = ({ children }) => {
       try {
         const parsed = JSON.parse(storedUser)
         if (parsed && typeof parsed === 'object') {
+          parsed.fullName = getDoctorDisplayName(parsed.username, parsed.fullName)
           if (!Array.isArray(parsed.roles)) {
             parsed.roles = parsed.role ? [String(parsed.role).toLowerCase()] : ['doctor']
           } else {
             parsed.roles = parsed.roles.map((r) => String(r).toLowerCase())
           }
           setUser(parsed)
+          localStorage.setItem('user', JSON.stringify(parsed))
         } else {
           localStorage.removeItem('user')
           localStorage.removeItem('token')
@@ -46,7 +58,7 @@ export const AuthProvider = ({ children }) => {
       const normalizedUser = {
         id: data.userId,
         username: data.username,
-        fullName: data.username,
+        fullName: getDoctorDisplayName(data.username, data.fullName),
         roles: data.role ? [data.role.toLowerCase()] : [],
         expiredAt: data.expiredAt,
       }

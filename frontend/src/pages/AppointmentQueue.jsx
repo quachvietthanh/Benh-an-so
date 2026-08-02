@@ -43,6 +43,7 @@ import { getAppointments, getPatients } from '../services/mockDataService'
 import {
   getOverdueMinutes,
   isAppointmentOverdue,
+  formatOverdueDuration,
   formatWaitingTime,
   NO_SHOW_GRACE_MINUTES,
 } from '../utils/appointmentTiming'
@@ -221,6 +222,7 @@ function AppointmentQueue() {
         return {
           ...item,
           appointmentAt: appAt,
+          checkedInAt: item.checkedInAt || (['CHECKED_IN', 'WAITING', 'CALLED'].includes(item.status) ? appAt : null),
         }
       })
 
@@ -254,6 +256,7 @@ function AppointmentQueue() {
         return {
           ...item,
           appointmentAt: appAt,
+          checkedInAt: item.checkedInAt || (['CHECKED_IN', 'WAITING', 'CALLED'].includes(item.status) ? appAt : null),
         }
       })
       setAppointments(mergeAppointments(mockList))
@@ -342,16 +345,6 @@ function AppointmentQueue() {
     ]
   }, [dailyAppointments, queueNow, selectedDate])
 
-  const queueStats = useMemo(() => {
-    const count = (status) => appointments.filter((item) => item.status === status).length
-    return [
-      { key: 'queue', label: 'Đang chờ khám', value: queue.length, note: 'Theo thứ tự check-in', icon: ClockCircleOutlined, tone: 'purple' },
-      { key: 'called', label: 'Đang khám', value: count('CALLED'), note: 'Hiện tại', icon: UserSwitchOutlined, tone: 'cyan' },
-      { key: 'completed', label: 'Tổng đã khám', value: count('COMPLETED'), note: 'Tất cả lịch', icon: CheckCircleOutlined, tone: 'green' },
-      { key: 'no-show', label: 'Tổng không đến', value: count('NO_SHOW'), note: 'Tất cả lịch', icon: CloseCircleOutlined, tone: 'orange' },
-    ]
-  }, [appointments, queue.length])
-
   const filteredAppointments = useMemo(() => {
     const normalizedKeyword = appointmentKeyword.trim().toLocaleLowerCase('vi')
 
@@ -397,7 +390,7 @@ function AppointmentQueue() {
         if (!item) return false
         // Yêu cầu NCL-03-CN-004: Bệnh nhân CHƯA check-in KHÔNG được xuất hiện trong hàng đợi
         if (!item.checkedInAt) return false
-        if (['CANCELLED', 'NO_SHOW'].includes(item.status)) return false
+        if (['CALLED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(item.status)) return false
 
         const patient = patientMap.get(item.patientId)
         const searchableText = [item.patientName, patient?.patientCode, patient?.phone, item.doctorName, item.department, item.queueNumber]
@@ -411,6 +404,16 @@ function AppointmentQueue() {
         return dayjs(left.checkedInAt).valueOf() - dayjs(right.checkedInAt).valueOf()
       })
   }, [patientMap, queue, queueKeyword])
+
+  const queueStats = useMemo(() => {
+    const count = (status) => appointments.filter((item) => item.status === status).length
+    return [
+      { key: 'queue', label: 'Đang chờ khám', value: filteredQueue.length, note: 'Theo thứ tự check-in', icon: ClockCircleOutlined, tone: 'purple' },
+      { key: 'called', label: 'Đang khám', value: count('CALLED'), note: 'Hiện tại', icon: UserSwitchOutlined, tone: 'cyan' },
+      { key: 'completed', label: 'Tổng đã khám', value: count('COMPLETED'), note: 'Tất cả lịch', icon: CheckCircleOutlined, tone: 'green' },
+      { key: 'no-show', label: 'Tổng không đến', value: count('NO_SHOW'), note: 'Tất cả lịch', icon: CloseCircleOutlined, tone: 'orange' },
+    ]
+  }, [appointments, filteredQueue.length])
 
   useEffect(() => {
     const maximumPage = Math.max(1, Math.ceil(filteredAppointments.length / appointmentPageSize))
@@ -564,7 +567,15 @@ function AppointmentQueue() {
         content: 'Bạn có muốn CHUYỂN SANG BƯỚC TIẾP THEO (Ghi bệnh án & Khám bệnh) cho bệnh nhân này không?',
         okText: 'Chuyển sang Khám bệnh',
         cancelText: 'Về hàng đợi',
-        onOk: () => navigate('/medical-records', { state: { patientId: values.patientId, doctorId: values.doctorId } }),
+        onOk: () => navigate('/medical-records', {
+          state: {
+            patientId: values.patientId,
+            doctorId: values.doctorId,
+            doctorName: newApp.doctorName,
+            department: newApp.department,
+            appointment: newApp,
+          },
+        }),
       })
     }
   }
@@ -824,7 +835,7 @@ function AppointmentQueue() {
         {overdue
           ? (
             <small className="appointment-overdue-duration">
-              <WarningOutlined /> Quá giờ hẹn {getOverdueMinutes(item, queueNow)} phút
+              <WarningOutlined /> Quá giờ hẹn {formatOverdueDuration(getOverdueMinutes(item, queueNow))}
             </small>
           )
           : item.reminderSentAt && <small><BellOutlined /> Đã nhắc lịch</small>}
@@ -1486,7 +1497,7 @@ function AppointmentQueue() {
             <div className="appointment-no-show-warning" role="alert">
               <WarningOutlined />
               <div>
-                <strong>Lịch đã quá giờ hẹn {getOverdueMinutes(noShowItem, queueNow)} phút.</strong>
+                <strong>Lịch đã quá giờ hẹn {formatOverdueDuration(getOverdueMinutes(noShowItem, queueNow))}.</strong>
                 <p>
                   Sau khi xác nhận, lịch sẽ chuyển sang “Không đến” và không thể check-in.
                   Hiện chưa có chức năng hoàn tác.
@@ -1515,7 +1526,7 @@ function AppointmentQueue() {
               <div><dt>Mã lịch hẹn</dt><dd>{detailItem.appointmentCode}</dd></div>
               <div><dt>Thời gian</dt><dd>{dayjs(detailItem.appointmentAt).format('HH:mm DD/MM/YYYY')}</dd></div>
               {isAppointmentOverdue(detailItem, queueNow) && (
-                <div><dt>Quá giờ hẹn</dt><dd>{getOverdueMinutes(detailItem, queueNow)} phút</dd></div>
+                <div><dt>Quá giờ hẹn</dt><dd>{formatOverdueDuration(getOverdueMinutes(detailItem, queueNow))}</dd></div>
               )}
               <div><dt>Bác sĩ</dt><dd>{detailItem.doctorName}</dd></div>
               <div><dt>Chuyên khoa</dt><dd>{detailItem.department || '—'}</dd></div>

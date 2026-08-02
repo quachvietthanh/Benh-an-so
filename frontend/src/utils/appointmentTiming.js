@@ -60,7 +60,7 @@ export const getNoShowDeadline = (appointmentAt) => {
 
 export const isAppointmentPast15Mins = (appointment, now = dayjs()) => {
   if (!appointment) return false
-  const activeStatuses = ['SCHEDULED', 'CHECKED_IN', 'WAITING']
+  const activeStatuses = ['SCHEDULED']
   if (!activeStatuses.includes(appointment.status)) return false
 
   const { overdueThreshold } = getAppointmentSlotTimes(appointment)
@@ -79,6 +79,16 @@ export const getOverdueMinutes = (appointment, now = dayjs()) => {
 
   const diff = dayjs(now).diff(endTime || overdueThreshold, 'minute')
   return Math.max(0, diff)
+}
+
+export const formatOverdueDuration = (minutes) => {
+  const mins = Number(minutes) || 0
+  if (mins <= 0) return '0 phút'
+  if (mins < 60) return `${mins} phút`
+  const hours = Math.floor(mins / 60)
+  const remMinutes = mins % 60
+  if (remMinutes === 0) return `${hours} giờ`
+  return `${hours} giờ ${remMinutes} phút`
 }
 
 export const formatWaitingTime = (checkedInAt, now = dayjs(), status = '') => {

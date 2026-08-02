@@ -36,7 +36,7 @@ import dayjs from 'dayjs'
 import medicalRecordApi from '../api/medicalRecordApi'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
-import { mergeMedicalRecords, getStoredMedicalRecordLogs } from '../utils/storageHelpers'
+import { mergeMedicalRecords } from '../utils/storageHelpers'
 
 const { Title, Text } = Typography
 
@@ -51,9 +51,41 @@ export function MedicalRecordDetail() {
   const [logs, setLogs] = useState([])
   const [locking, setLocking] = useState(false)
 
+  // States cho Bổ sung bệnh án (Addendum - Mục VIII)
+  const [addendumModalOpen, setAddendumModalOpen] = useState(false)
+  const [addendumReason, setAddendumReason] = useState('')
+  const [addendumContent, setAddendumContent] = useState('')
+
   const isDoctor = user?.roles?.some((role) =>
     ['admin', 'doctor', 'role_admin', 'role_doctor'].includes(String(role).toLowerCase())
   )
+
+  const handleSaveAddendum = () => {
+    if (!addendumReason.trim()) {
+      message.error('Vui lòng nhập lý do bổ sung hồ sơ bệnh án')
+      return
+    }
+    if (!addendumContent.trim()) {
+      message.error('Vui lòng nhập nội dung bổ sung')
+      return
+    }
+
+    const newAddendum = {
+      id: `add-${Date.now()}`,
+      reason: addendumReason.trim(),
+      content: addendumContent.trim(),
+      createdBy: user?.fullName || user?.username || 'Bác sĩ',
+      createdAt: new Date().toISOString(),
+    }
+
+    setRecord((prev) => ({
+      ...prev,
+      addendums: [...(prev?.addendums || []), newAddendum],
+    }))
+
+    message.success('Đã ghi nhận nội dung bổ sung vào hồ sơ bệnh án!')
+    setAddendumModalOpen(false)
+  }
 
   const loadRecordDetail = useCallback(async () => {
     setLoading(true)
@@ -198,6 +230,20 @@ export function MedicalRecordDetail() {
               style={{ borderRadius: 8 }}
             >
               Khóa bệnh án
+            </Button>
+          )}
+          {isDoctor && isLocked && (
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => {
+                setAddendumReason('')
+                setAddendumContent('')
+                setAddendumModalOpen(true)
+              }}
+              style={{ borderRadius: 8 }}
+            >
+              Bổ sung bệnh án
             </Button>
           )}
         </Space>
@@ -490,6 +536,46 @@ export function MedicalRecordDetail() {
         ]}
       />
 
+      {/* Modal Bổ sung Bệnh án (Addendum - Mục VIII) */}
+      <Modal
+        title="Bổ sung thông tin Bệnh án đã khóa"
+        open={addendumModalOpen}
+        onCancel={() => setAddendumModalOpen(false)}
+        onOk={handleSaveAddendum}
+        okText="Lưu bổ sung"
+        cancelText="Hủy bỏ"
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Alert
+            type="warning"
+            showIcon
+            message="Yêu cầu nhập lý do bổ sung"
+            description="Mọi thao tác bổ sung trên hồ sơ đã khóa sẽ được lưu kèm lý do và thời gian thực hiện để đảm bảo tính pháp lý."
+          />
+          <div>
+            <Text strong style={{ display: 'block', marginBottom: 4 }}>
+              Lý do bổ sung (*):
+            </Text>
+            <Input
+              value={addendumReason}
+              onChange={(e) => setAddendumReason(e.target.value)}
+              placeholder="Ví dụ: Bổ sung kết quả xét nghiệm bổ trợ, cập nhật diễn biến..."
+            />
+          </div>
+
+          <div>
+            <Text strong style={{ display: 'block', marginBottom: 4 }}>
+              Nội dung bổ sung (*):
+            </Text>
+            <Input.TextArea
+              rows={4}
+              value={addendumContent}
+              onChange={(e) => setAddendumContent(e.target.value)}
+              placeholder="Nhập ghi chú / nội dung bổ sung..."
+            />
+          </div>
+        </Space>
+      </Modal>
     </div>
   )
 }

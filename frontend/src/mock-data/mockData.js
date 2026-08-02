@@ -44,12 +44,12 @@ export const demoUsers = [
 export const demoPatients = [
   {
     id: 'p1',
-    patientCode: 'BN-2026001',
-    fullName: 'Nguyễn Văn An',
-    dateOfBirth: '1988-05-12',
+    patientCode: 'BN000009',
+    fullName: 'Nguyen Tuan Long',
+    dateOfBirth: '1983-05-12',
     gender: 'MALE',
-    phoneNumber: '0908123456',
-    email: 'an.nguyen@email.com',
+    phoneNumber: '0910000009',
+    email: 'long.nguyen@email.com',
     address: '123 Lê Lợi, Quận 1, TP.HCM',
     identityNumber: '012345678910',
     healthInsuranceCode: 'BH123456789',
@@ -76,26 +76,26 @@ export const demoPatients = [
   },
   {
     id: 'p3',
-    patientCode: 'BN-2026003',
-    fullName: 'Lê Minh Huy',
-    dateOfBirth: '1975-01-08',
+    patientCode: 'BN-774016',
+    fullName: 'nguyễn công bằng',
+    dateOfBirth: '2005-01-08',
     gender: 'MALE',
-    phoneNumber: '0934567890',
-    email: 'huy.le@email.com',
+    phoneNumber: '0398318097',
+    email: 'bang.nguyen@email.com',
     address: '88 Nguyễn Huệ, Quận 5, TP.HCM',
     identityNumber: '011223344556',
     healthInsuranceCode: 'BH111222333',
     bloodType: 'B+',
     emergencyContact: 'Lê Thu Hà - 0931234567',
-    medicalHistory: 'Viêm khớp',
-    allergies: 'Sulfonamide',
+    medicalHistory: 'Viêm phế quản',
+    allergies: 'Không có',
   },
 ]
 
 export const demoAppointments = [
-  { id: 'a1', patientId: 'p1', patientName: 'Nguyễn Văn An', doctorId: 'd1', doctorName: 'BS. Phạm Hồng Anh', slot: '08:00', date: '2026-07-15', status: 'SCHEDULED' },
+  { id: 'a1', patientId: 'p1', patientName: 'Nguyen Tuan Long', doctorId: 'd1', doctorName: 'BS. Phạm Hồng Anh', slot: '08:00', date: '2026-07-15', status: 'SCHEDULED' },
   { id: 'a2', patientId: 'p2', patientName: 'Trần Thị Bình', doctorId: 'd1', doctorName: 'BS. Phạm Hồng Anh', slot: '09:30', date: '2026-07-15', status: 'CHECKED_IN' },
-  { id: 'a3', patientId: 'p3', patientName: 'Lê Minh Huy', doctorId: 'd2', doctorName: 'BS. Nguyễn Minh', slot: '10:00', date: '2026-07-15', status: 'NO_SHOW' },
+  { id: 'a3', patientId: 'p3', patientName: 'nguyễn công bằng', doctorId: 'd2', doctorName: 'BS. Nguyễn Minh', slot: '10:00', date: '2026-07-15', status: 'NO_SHOW' },
 ]
 
 export const demoMedicalRecords = [
@@ -103,7 +103,7 @@ export const demoMedicalRecords = [
     id: 'm1',
     recordCode: 'BA-0001',
     patientId: 'p1',
-    patientName: 'Nguyễn Văn An',
+    patientName: 'Nguyen Tuan Long',
     doctorName: 'BS. Phạm Hồng Anh',
     diagnosis: 'Tăng huyết áp mức độ vừa',
     status: 'COMPLETED',

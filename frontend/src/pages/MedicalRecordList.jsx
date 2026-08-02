@@ -91,7 +91,7 @@ function MedicalRecordList() {
         <Button
           type="link"
           icon={<EyeOutlined />}
-          onClick={() => console.log('View record:', record.id)}
+          onClick={() => navigate(`/medical-records/${record.id}`)}
         >
           Xem
         </Button>
