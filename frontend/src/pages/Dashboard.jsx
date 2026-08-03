@@ -47,10 +47,10 @@ function Dashboard() {
   const { user } = useAuthContext()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState(() => getDashboardStats())
-  const [appointments, setAppointments] = useState(() => mergeAppointments(getAppointments()))
-  const [patients, setPatients] = useState(() => mergePatients(getPatients()))
+  const [appointments, setAppointments] = useState(() => mergeAppointments([]))
+  const [patients, setPatients] = useState(() => mergePatients([]))
   const [medicines, setMedicines] = useState(() => mergeMedicines([]))
-  const [invoices, setInvoices] = useState(() => mergeInvoices(getInvoices()))
+  const [invoices, setInvoices] = useState(() => mergeInvoices([]))
 
   useEffect(() => {
     let mounted = true
@@ -78,12 +78,12 @@ function Dashboard() {
 
       const appointmentData = readSettledData(results[1], null)
       const rawApps = appointmentData?.content || appointmentData || []
-      const safeApps = Array.isArray(rawApps) && rawApps.length ? rawApps : fallbackAppointments
+      const safeApps = Array.isArray(rawApps) ? rawApps : []
       const mergedApps = mergeAppointments(safeApps)
 
       const patientData = readSettledData(results[2], null)
       const rawPatients = patientData?.content || patientData || []
-      const safePatients = Array.isArray(rawPatients) && rawPatients.length ? rawPatients : fallbackPatients
+      const safePatients = Array.isArray(rawPatients) ? rawPatients : []
       const mergedPatients = mergePatients(safePatients)
 
       const medData = readSettledData(results[3], null)
@@ -91,7 +91,7 @@ function Dashboard() {
       const safeMeds = Array.isArray(rawMeds) ? rawMeds : []
       const mergedMeds = mergeMedicines(safeMeds)
 
-      const mergedInvoices = mergeInvoices(getInvoices())
+      const mergedInvoices = mergeInvoices([])
 
       setStats(readSettledData(results[0], fallbackStats) || fallbackStats)
       setAppointments(mergedApps)

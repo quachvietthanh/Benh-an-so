@@ -34,7 +34,6 @@ import ClinicalOrderDetailModal from '../components/clinical/ClinicalOrderDetail
 import PrintClinicalOrderModal from '../components/clinical/PrintClinicalOrderModal'
 
 import { useAuthContext } from '../context/AuthContext'
-import { demoClinicalOrders } from '../mock-data/mockData'
 import {
   mergeClinicalOrders,
   saveStoredClinicalOrder,
@@ -115,7 +114,7 @@ export function ClinicalOrdersPage() {
   const loadData = useCallback(() => {
     setLoading(true)
     try {
-      const merged = mergeClinicalOrders(demoClinicalOrders)
+      const merged = mergeClinicalOrders([])
       setOrders(merged)
     } catch (err) {
       console.error(err)

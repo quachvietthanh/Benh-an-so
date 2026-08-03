@@ -18,7 +18,7 @@ import {
 } from '@ant-design/icons'
 import patientApi from '../../api/patientApi'
 import { useAuthContext } from '../../context/AuthContext'
-import { getAppointments, getNavigationItems, getPatients } from '../../services/mockDataService'
+import { getNavigationItems } from '../../services/mockDataService'
 import { mergeAppointments, mergePatients } from '../../utils/storageHelpers'
 
 const { Header, Sider, Content } = Layout
@@ -67,15 +67,15 @@ function MainLayout() {
     syncPatients()
   }, [syncPatients, location.pathname])
 
-  const allPatients = useMemo(() => mergePatients(getPatients()), [])
-  const allAppointments = useMemo(() => mergeAppointments(getAppointments()), [])
+  const allPatients = useMemo(() => mergePatients([]), [])
+  const allAppointments = useMemo(() => mergeAppointments([]), [])
 
   const searchOptions = useMemo(() => {
     const keyword = searchValue.trim().toLowerCase()
     if (!keyword) return []
 
-    const currentPatients = mergePatients([...remotePatients, ...getPatients()])
-    const currentAppointments = mergeAppointments(getAppointments())
+    const currentPatients = mergePatients(remotePatients)
+    const currentAppointments = mergeAppointments([])
 
     // Combine patients from patient list and appointment records so every patient is searchable
     const appointmentPatientsMap = new Map()

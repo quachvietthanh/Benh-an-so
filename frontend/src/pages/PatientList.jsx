@@ -33,7 +33,6 @@ import {
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
-import { getPatients } from '../services/mockDataService'
 import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate } from '../utils/helpers'
 
@@ -94,10 +93,10 @@ function PatientList() {
     try {
       const response = await patientApi.getAll({ page: 0, size: 500 })
       const apiList = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
-      const merged = mergePatients(apiList.length ? apiList : getPatients())
+      const merged = mergePatients(apiList)
       setAllPatients(merged)
     } catch {
-      const merged = mergePatients(getPatients())
+      const merged = mergePatients([])
       setAllPatients(merged)
     } finally {
       setLoading(false)

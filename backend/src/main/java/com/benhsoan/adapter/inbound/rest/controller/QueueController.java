@@ -55,7 +55,7 @@ public class QueueController {
     private final QueueRestMapper mapper;
 
     @GetMapping("/queues")
-    @PreAuthorize("hasAnyRole('ADMIN', 'NURSE', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
     public List<QueueItemResponse> getQueues(@RequestParam LocalDate date, @RequestParam(required = false) UUID doctorId,
             @RequestParam(required = false) UUID roomId) {
         return getQueuesUseCase.getQueues(new GetQueuesQuery(date, doctorId, roomId)).stream().map(mapper::toResponse).toList();

@@ -25,8 +25,8 @@ import ResultTable from '../components/results/ResultTable'
 import ResultModal from '../components/results/ResultModal'
 
 import clinicalResultApi from '../api/clinicalResultApi'
-import { demoClinicalOrders } from '../mock-data/mockData'
-import { mergeClinicalOrders, saveStoredClinicalOrder } from '../utils/storageHelpers'
+import queueApi from '../api/queueApi'
+import { mergeClinicalOrders, saveStoredClinicalOrder, getStoredQueueItems, saveStoredQueueItem, getStoredMedicalRecords, saveStoredMedicalRecord } from '../utils/storageHelpers'
 
 const { Title, Text } = Typography
 
@@ -62,8 +62,8 @@ export function ResultPage() {
         // Fallback to local storage & mock data if backend not connected yet
       }
 
-      // 2. Local storage & Mock data fallback
-      const merged = mergeClinicalOrders(demoClinicalOrders)
+      // 2. Local storage fallback (real database/user created clinical orders)
+      const merged = mergeClinicalOrders([])
       setOrders(merged)
     } catch (err) {
       console.error('Error loading clinical results:', err)
@@ -136,7 +136,47 @@ export function ResultPage() {
     saveStoredClinicalOrder(updatedOrder)
     setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)))
 
-    // 2. Call RESTful API PUT /api/results/{id} if backend available
+    // 2. Đồng bộ chu trình: Khi Bác sĩ Xác nhận & Khóa (CONFIRMED/COMPLETED), chuyển lượt khám trong Hàng Đợi sang COMPLETED & bổ sung kết quả vào Hồ Sơ
+    if (['CONFIRMED', 'COMPLETED'].includes(updatedOrder.status)) {
+      try {
+        const allQueues = getStoredQueueItems()
+        allQueues.forEach((q) => {
+          if (
+            (updatedOrder.patientId && String(q.patientId) === String(updatedOrder.patientId)) ||
+            (updatedOrder.patientName && q.patientName === updatedOrder.patientName)
+          ) {
+            if (['IN_PROGRESS', 'WAITING_FOR_RESULT', 'WAITING'].includes(q.status)) {
+              const completedItem = { ...q, status: 'COMPLETED', completedAt: new Date().toISOString() }
+              saveStoredQueueItem(completedItem)
+              if (q.id && !String(q.id).startsWith('local') && !String(q.id).startsWith('qi-')) {
+                queueApi.complete(q.id).catch(() => {})
+              }
+            }
+          }
+        })
+        const allRecords = getStoredMedicalRecords()
+        allRecords.forEach((r) => {
+          if (
+            (updatedOrder.patientId && String(r.patientId) === String(updatedOrder.patientId)) ||
+            (updatedOrder.patientName && r.patientName === updatedOrder.patientName)
+          ) {
+            const updatedRec = {
+              ...r,
+              status: 'COMPLETED',
+              clinicalResults: {
+                ...(r.clinicalResults || {}),
+                [updatedOrder.orderCode]: updatedOrder.conclusion || updatedOrder.resultSummary || 'Đã có kết quả CĐLS',
+              },
+            }
+            saveStoredMedicalRecord(updatedRec)
+          }
+        })
+      } catch (err) {
+        console.warn('Sync order completion error:', err)
+      }
+    }
+
+    // 3. Call RESTful API PUT /api/results/{id} if backend available
     try {
       await clinicalResultApi.update(updatedOrder.id, updatedOrder)
     } catch {

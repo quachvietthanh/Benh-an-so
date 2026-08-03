@@ -116,12 +116,20 @@ export const checkQueuePermissions = (roles = []) => {
   const isNurse = normalized.includes('nurse')
 
   return {
-    canCheckIn: isAdmin || isReceptionist,
-    canCallNext: isAdmin || isReceptionist || isDoctor,
-    canSkip: isAdmin || isReceptionist || isDoctor,
-    canComplete: isAdmin || isDoctor,
-    canChangeResultStatus: isAdmin || isDoctor || isNurse,
-    canManageWalkIn: isAdmin || isReceptionist,
+    canViewBoard: isAdmin || isDoctor || isNurse || isReceptionist, // GET /queues
+    canViewMyQueue: isDoctor, // GET /queues/me (Chỉ Bác sĩ)
+    canCheckIn: isAdmin || isReceptionist, // POST /appointments/{id}/check-in
+    canCallNext: isAdmin || isReceptionist || isDoctor, // POST /queues/{id}/call-next
+    canSkip: isAdmin || isReceptionist || isDoctor, // POST /queue-items/{id}/skip
+    canComplete: isAdmin || isDoctor, // POST /queue-items/{id}/complete
+    canUpdateStatus: isAdmin || isDoctor || isNurse, // PATCH /queue-items/{id}/status
+    canChangeResultStatus: isAdmin || isDoctor || isNurse, // Alias cho updateStatus
+    canManageWalkIn: isAdmin || isReceptionist, // POST /queue-items/walk-in
     isNurseOnly: isNurse && !isAdmin && !isDoctor && !isReceptionist,
+    isDoctorOnly: isDoctor && !isAdmin && !isReceptionist,
+    isAdmin,
+    isReceptionist,
+    isDoctor,
+    isNurse,
   }
 }

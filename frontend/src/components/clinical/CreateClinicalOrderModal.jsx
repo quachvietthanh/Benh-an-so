@@ -21,8 +21,8 @@ import {
   ExperimentOutlined,
 } from '@ant-design/icons'
 import ClinicalServiceSelector from './ClinicalServiceSelector'
-import { getPatients } from '../../services/mockDataService'
 import { mergePatients } from '../../utils/storageHelpers'
+import patientApi from '../../api/patientApi'
 
 const { Option } = Select
 const { TextArea } = Input
@@ -36,8 +36,11 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
 
   useEffect(() => {
     if (visible) {
-      const allPatients = mergePatients(getPatients())
-      setPatients(allPatients)
+      setPatients(mergePatients([]))
+      patientApi.getAll({ page: 0, size: 500 }).then((res) => {
+        const list = res.data?.content || (Array.isArray(res.data) ? res.data : [])
+        setPatients(mergePatients(list))
+      }).catch(() => {})
       setSelectedServices([])
       form.resetFields()
       form.setFieldsValue({

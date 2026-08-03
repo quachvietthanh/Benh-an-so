@@ -29,8 +29,9 @@ import {
 import dayjs from 'dayjs'
 import medicalRecordApi from '../api/medicalRecordApi'
 import patientApi from '../api/patientApi'
+import queueApi from '../api/queueApi'
 import { useAuthContext } from '../context/AuthContext'
-import { logMedicalAccess, mergeMedicalRecords, saveStoredMedicalRecord } from '../utils/storageHelpers'
+import { logMedicalAccess, mergeMedicalRecords, saveStoredMedicalRecord, getStoredQueueItems, saveStoredQueueItem, saveStoredClinicalOrder } from '../utils/storageHelpers'
 import { saveStoredAttachment } from '../utils/attachmentHelpers'
 import { commonIcd10List, icd10Categories, searchIcd10 } from '../utils/icd10Data'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
@@ -209,6 +210,79 @@ function MedicalEncounter() {
     return selectedOrders.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
   }, [selectedOrders])
 
+  // Đồng bộ trạng thái hàng đợi & tự động tạo phiếu Chỉ định Lâm sàng sang các màn hình CĐLS và Nhập kết quả
+  const syncQueueCompletion = async (patientId) => {
+    try {
+      const hasOrders = selectedOrders && selectedOrders.length > 0
+      const targetStatus = hasOrders ? 'WAITING_FOR_RESULT' : 'COMPLETED'
+      const targetQueueId = location.state?.queueItemId
+
+      // 1. Nếu có chỉ định CĐLS, lưu phiếu vào hệ thống để xuất hiện ngay trong màn Chỉ định và Nhập kết quả CĐLS
+      if (hasOrders) {
+        const orderCode = `CD-${dayjs().format('YYYYMMDD')}-${Math.floor(100 + Math.random() * 900)}`
+        const clinicalOrderObj = {
+          id: `ord-${Date.now()}`,
+          orderCode,
+          patientId: patientId,
+          patientCode: selectedPatientObj?.patientCode || `BN${String(patientId).slice(-6).toUpperCase()}`,
+          patientName: selectedPatientObj?.fullName || 'Bệnh nhân',
+          gender: selectedPatientObj?.gender || 'Nam',
+          age: selectedPatientObj?.age || 30,
+          department: user?.department || 'Khoa Nội tổng quát',
+          doctorName: user?.fullName || user?.username || 'BS. Phạm Hồng Anh',
+          orderDate: dayjs().format('YYYY-MM-DD HH:mm'),
+          priority: selectedOrders.some((o) => o.isUrgent) ? 'URGENT' : 'NORMAL',
+          status: 'PENDING',
+          totalAmount: totalOrderFee,
+          items: selectedOrders.map((item, idx) => ({
+            serviceId: item.id || `srv-${idx}-${Date.now()}`,
+            serviceCode: item.code || `CDHA-${idx + 1}`,
+            serviceName: item.name,
+            category: item.category || 'Chẩn đoán hình ảnh',
+            price: Number(item.price) || 0,
+            quantity: 1,
+            instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
+            status: 'PENDING',
+          })),
+          resultSummary: '',
+          createdAt: dayjs().toISOString(),
+          updatedAt: dayjs().toISOString(),
+        }
+        saveStoredClinicalOrder(clinicalOrderObj)
+      }
+
+      // 2. Đồng bộ trạng thái về trang Quản lý Lịch hẹn & Hàng Đợi (Chờ CĐLS hoặc Hoàn tất)
+      if (targetQueueId) {
+        try {
+          if (targetStatus === 'COMPLETED') await queueApi.complete(targetQueueId)
+          else await queueApi.updateStatus(targetQueueId, { status: targetStatus })
+        } catch (err) {
+          console.warn('Backend sync queue note:', err)
+        }
+      }
+      const allQueues = getStoredQueueItems()
+      allQueues.forEach((q) => {
+        if (
+          (targetQueueId && String(q.id) === String(targetQueueId)) ||
+          (!targetQueueId && String(q.patientId) === String(patientId) && ['IN_PROGRESS', 'WAITING', 'WAITING_FOR_RESULT'].includes(q.status))
+        ) {
+          const updatedItem = {
+            ...q,
+            status: targetStatus,
+            ...(targetStatus === 'COMPLETED' ? { completedAt: dayjs().toISOString() } : {}),
+          }
+          saveStoredQueueItem(updatedItem)
+          if (!targetQueueId && q.id && !String(q.id).startsWith('local') && !String(q.id).startsWith('qi-')) {
+            if (targetStatus === 'COMPLETED') queueApi.complete(q.id).catch(() => {})
+            else queueApi.updateStatus(q.id, { status: targetStatus }).catch(() => {})
+          }
+        }
+      })
+    } catch (e) {
+      console.warn('Sync queue error:', e)
+    }
+  }
+
   // Form Submission & API Integration
   const saveRecord = async () => {
     let values
@@ -250,28 +324,65 @@ function MedicalEncounter() {
       clinicalResults: Object.fromEntries(Object.entries(results).filter(([, value]) => value?.trim())),
     }
 
-    try {
-      // 1. Call Backend POST /medical-records API
-      const response = await medicalRecordApi.create(payload)
-      const createdRecord = response.data
+    const recordCode = `BA-${dayjs().format('YYYYMMDDHHmmss')}`
+    const completeRecord = {
+      id: `mr-${Date.now()}`,
+      recordCode,
+      patientId: values.patientId,
+      patientName: selectedPatientObj ? `${selectedPatientObj.fullName} (${selectedPatientObj.patientCode})` : 'Bệnh nhân',
+      doctorName: user?.fullName || user?.username || 'BS. Phạm Hồng Anh',
+      symptoms: values.symptoms,
+      examinationNote: values.examinationNote || '',
+      diagnosis: fullDiagnosisText,
+      diagnosisType,
+      primaryIcd: primaryIcd || { code: 'ICD-10', name: values.diagnosisText || 'Chẩn đoán xác định' },
+      secondaryIcds,
+      vitalSigns,
+      treatmentPlan: values.treatmentPlan || '',
+      clinicalOrders: orderNamesList,
+      clinicalOrderItems: selectedOrders,
+      clinicalResults: Object.fromEntries(Object.entries(results).filter(([, value]) => value?.trim())),
+      totalFee: totalOrderFee,
+      status: 'COMPLETED',
+      createdAt: dayjs().toISOString(),
+      attachments: files.map((file) => ({ id: file.uid || String(Date.now()), fileName: file.name })),
+    }
 
-      // 2. If examinationId exists, trigger recordDiagnosis API & createClinicalOrder API
-      const examId = createdRecord?.examinationId || createdRecord?.id || location.state?.examinationId
-      if (examId) {
+    try {
+      // 1. Call Backend POST /medical-records API if available
+      let beRecordId = null
+      let beExamId = location.state?.examinationId || null
+      try {
+        const response = await medicalRecordApi.create(payload)
+        const createdRecord = response?.data
+        if (createdRecord?.id) {
+          beRecordId = createdRecord.id
+          beExamId = createdRecord.examinationId || createdRecord.id || beExamId
+        }
+      } catch (beErr) {
+        console.warn('Backend create API unavailable or error, using local ID:', beErr)
+      }
+
+      if (beRecordId) {
+        completeRecord.id = beRecordId
+      }
+
+      // 2. If examinationId exists, trigger diagnosis and order endpoints safely
+      if (beExamId) {
         try {
-          await medicalRecordApi.recordDiagnosis(examId, {
+          await medicalRecordApi.recordDiagnosis(beExamId, {
             primaryIcdCode: primaryIcd?.code || 'ICD-10',
             primaryIcdName: primaryIcd?.name || values.diagnosisText || 'Chẩn đoán xác định',
             secondaryIcdCodes: secondaryIcds.map((item) => ({ code: item.code, name: item.name })),
             clinicalNotes: values.examinationNote || values.symptoms || '',
           })
         } catch (diagErr) {
-          console.warn('Backend recordDiagnosis API endpoint note:', diagErr)
+          console.warn('Backend recordDiagnosis API note:', diagErr)
         }
 
         if (selectedOrders.length > 0) {
           try {
-            await medicalRecordApi.createClinicalOrder(examId, {
+            await medicalRecordApi.createClinicalOrder(beExamId, {
               clinicalReason: fullDiagnosisText,
               items: selectedOrders.map((item) => ({
                 serviceId: item.id,
@@ -281,66 +392,16 @@ function MedicalEncounter() {
               })),
             })
           } catch (orderErr) {
-            console.warn('Backend createClinicalOrder API endpoint note:', orderErr)
+            console.warn('Backend createClinicalOrder API note:', orderErr)
           }
         }
       }
 
       // 3. File Attachments
-      if (createdRecord?.id && files.length) {
-        for (const file of files) {
-          try {
-            await medicalRecordApi.attach(createdRecord.id, file)
-          } catch (attachErr) {
-            console.warn('Could not attach file to backend:', attachErr)
-          }
-        }
-      }
-
-      if (createdRecord?.id) {
-        saveStoredMedicalRecord(createdRecord)
-      }
-
-      logMedicalAccess({
-        userName: user?.fullName || user?.username || 'Bác sĩ',
-        patientName: selectedPatientObj ? `${selectedPatientObj.fullName} (${selectedPatientObj.patientCode})` : 'Bệnh nhân',
-        recordCode: createdRecord?.recordCode || 'BA-001',
-        action: 'Tạo bệnh án, chẩn đoán ICD-10 & nhập chỉ định Cận lâm sàng (API Backend)',
-      })
-
-      message.success(`Đã lưu bệnh án thành công ${createdRecord?.recordCode || ''}`)
-      resetFormState()
-      await loadData()
-      setActiveTab('history')
-
-      showSuccessModal(createdRecord?.recordCode || 'BA-001', values.patientId)
-    } catch {
-      // Local Storage Fallback if backend API is not responding
-      const recordCode = `BA-${dayjs().format('YYYYMMDDHHmmss')}`
-      const fallbackRecord = {
-        id: `mr-${Date.now()}`,
-        recordCode,
-        patientId: values.patientId,
-        patientName: selectedPatientObj ? `${selectedPatientObj.fullName} (${selectedPatientObj.patientCode})` : 'Bệnh nhân',
-        doctorName: user?.fullName || user?.username || 'BS. Phạm Hồng Anh',
-        symptoms: values.symptoms,
-        examinationNote: values.examinationNote || '',
-        diagnosis: fullDiagnosisText,
-        diagnosisType,
-        primaryIcd: primaryIcd || { code: 'ICD-10', name: values.diagnosisText || 'Chẩn đoán xác định' },
-        secondaryIcds,
-        vitalSigns,
-        treatmentPlan: values.treatmentPlan || '',
-        clinicalOrders: orderNamesList,
-        clinicalOrderItems: selectedOrders,
-        clinicalResults: Object.fromEntries(Object.entries(results).filter(([, value]) => value?.trim())),
-        totalFee: totalOrderFee,
-        status: 'COMPLETED',
-        createdAt: dayjs().toISOString(),
-        attachments: files.map((file) => ({ id: file.uid || String(Date.now()), fileName: file.name })),
-      }
-
       files.forEach((file) => {
+        if (beRecordId) {
+          medicalRecordApi.attach(beRecordId, file).catch(() => {})
+        }
         saveStoredAttachment({
           id: file.uid || `att-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           attachmentCode: `KQ-${dayjs().format('YYYYMMDDHHmm')}`,
@@ -360,19 +421,23 @@ function MedicalEncounter() {
         })
       })
 
-      saveStoredMedicalRecord(fallbackRecord)
+      saveStoredMedicalRecord(completeRecord)
       logMedicalAccess({
         userName: user?.fullName || user?.username || 'Bác sĩ',
-        patientName: fallbackRecord.patientName,
-        recordCode: fallbackRecord.recordCode,
-        action: 'Tạo bệnh án & chẩn đoán mới (Frontend Local)',
+        patientName: completeRecord.patientName,
+        recordCode: completeRecord.recordCode,
+        action: 'Tạo bệnh án & chẩn đoán ICD-10 mới',
       })
 
-      setRecords(mergeMedicalRecords([]))
       message.success(`Đã lưu thành công bệnh án ${recordCode}`)
       resetFormState()
+      await loadData()
+      await syncQueueCompletion(values.patientId)
       setActiveTab('history')
       showSuccessModal(recordCode, values.patientId)
+    } catch (err) {
+      console.error('Lỗi khi lưu bệnh án:', err)
+      message.error('Có lỗi xảy ra, vui lòng thử lại!')
     } finally {
       setSaving(false)
     }
@@ -442,7 +507,8 @@ function MedicalEncounter() {
       action: 'Xem thông tin hồ sơ bệnh án điện tử',
     })
     try {
-      setViewing((await medicalRecordApi.getById(record.id)).data)
+      const res = await medicalRecordApi.getById(record.id)
+      setViewing({ ...record, ...(res.data || {}) })
     } catch {
       setViewing(record)
     }

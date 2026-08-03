@@ -5,7 +5,6 @@ import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined } 
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
-import { getPatients } from '../services/mockDataService'
 import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
@@ -44,7 +43,7 @@ function PatientDetail() {
     }
 
     if (!foundPatient) {
-      const allMerged = mergePatients(getPatients())
+      const allMerged = mergePatients([])
       foundPatient = allMerged.find((p) =>
         String(p.id).toLowerCase() === String(id).toLowerCase() ||
         String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
@@ -62,11 +61,6 @@ function PatientDetail() {
           // ignore
         }
       }
-    }
-
-    if (!foundPatient) {
-      const allMerged = mergePatients(getPatients())
-      foundPatient = allMerged[0] || null
     }
 
     setPatient(foundPatient)
