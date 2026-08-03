@@ -21,6 +21,14 @@ public class DoctorRoomAssignment {
         this.assignedAt = assignedAt;
     }
 
+    public static DoctorRoomAssignment create(UUID doctorId, UUID roomId, UUID assignedBy, Instant assignedAt) {
+        return new DoctorRoomAssignment(UUID.randomUUID(), doctorId, roomId, assignedBy, assignedAt);
+    }
+
+    public DoctorRoomAssignment reassign(UUID roomId, UUID assignedBy, Instant assignedAt) {
+        return new DoctorRoomAssignment(id, doctorId, roomId, assignedBy, assignedAt);
+    }
+
     public static DoctorRoomAssignment restore(UUID id, UUID doctorId, UUID roomId, UUID assignedBy, Instant assignedAt) {
         return new DoctorRoomAssignment(id, doctorId, roomId, assignedBy, assignedAt);
     }

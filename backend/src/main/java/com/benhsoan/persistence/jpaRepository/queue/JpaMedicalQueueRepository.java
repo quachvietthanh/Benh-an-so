@@ -22,4 +22,7 @@ public interface JpaMedicalQueueRepository extends JpaRepository<MedicalQueueEnt
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select queue from MedicalQueueEntity queue where queue.id = :medicalQueueId")
     Optional<MedicalQueueEntity> findByIdForUpdate(@Param("medicalQueueId") UUID medicalQueueId);
+
+    boolean existsByDoctorIdAndQueueDateAndStatus(UUID doctorId, LocalDate queueDate,
+            com.benhsoan.domain.queue.enums.MedicalQueueStatus status);
 }

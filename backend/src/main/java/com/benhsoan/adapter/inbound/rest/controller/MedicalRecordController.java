@@ -19,20 +19,25 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
+import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ReplaceMedicalRecordDiagnosesRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDiagnosisResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -49,8 +54,11 @@ public class MedicalRecordController {
     private final LockMedicalRecordUseCase lockMedicalRecordUseCase;
     private final AmendMedicalRecordUseCase amendMedicalRecordUseCase;
     private final GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
+    private final GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
+    private final ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
+    private final MedicalRecordDiagnosisRestMapper diagnosisMapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -63,6 +71,12 @@ public class MedicalRecordController {
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
     public MedicalRecordResponse getById(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(getMedicalRecordUseCase.getById(medicalRecordId));
+    }
+
+    @GetMapping("/{medicalRecordId}/diagnoses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    public List<MedicalRecordDiagnosisResponse> getDiagnoses(@PathVariable UUID medicalRecordId) {
+        return diagnosisMapper.toResponses(getMedicalRecordDiagnosesUseCase.getByMedicalRecordId(medicalRecordId));
     }
 
     @GetMapping("/visits/{visitId}")
@@ -81,6 +95,17 @@ public class MedicalRecordController {
     @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public MedicalRecordResponse update(@PathVariable UUID medicalRecordId, @RequestBody UpdateMedicalRecordRequest request) {
         return mapper.toResponse(updateMedicalRecordUseCase.update(medicalRecordId, mapper.toCommand(request)));
+    }
+
+    @PutMapping("/{medicalRecordId}/diagnoses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    public List<MedicalRecordDiagnosisResponse> replaceDiagnoses(
+            @PathVariable UUID medicalRecordId,
+            @Valid @RequestBody ReplaceMedicalRecordDiagnosesRequest request
+    ) {
+        return diagnosisMapper.toResponses(replaceMedicalRecordDiagnosesUseCase.replace(
+                medicalRecordId, diagnosisMapper.toCommand(request)
+        ));
     }
 
     @PostMapping("/{medicalRecordId}/lock")

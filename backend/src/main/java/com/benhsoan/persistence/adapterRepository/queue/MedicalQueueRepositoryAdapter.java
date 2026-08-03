@@ -51,4 +51,10 @@ public class MedicalQueueRepositoryAdapter implements MedicalQueueRepository {
     public Optional<MedicalQueue> findByIdForUpdate(UUID medicalQueueId) {
         return jpaRepository.findByIdForUpdate(medicalQueueId).map(mapper::toDomain);
     }
+
+    @Override
+    public boolean existsByDoctorIdAndQueueDateAndStatus(UUID doctorId, LocalDate queueDate,
+            com.benhsoan.domain.queue.enums.MedicalQueueStatus status) {
+        return jpaRepository.existsByDoctorIdAndQueueDateAndStatus(doctorId, queueDate, status);
+    }
 }

@@ -14,4 +14,7 @@ public interface MedicalQueueRepository extends BaseRepository<MedicalQueue, UUI
     Optional<MedicalQueue> findByDoctorIdAndQueueDateForUpdate(UUID doctorId, LocalDate queueDate);
 
     Optional<MedicalQueue> findByIdForUpdate(UUID medicalQueueId);
+
+    boolean existsByDoctorIdAndQueueDateAndStatus(UUID doctorId, LocalDate queueDate,
+            com.benhsoan.domain.queue.enums.MedicalQueueStatus status);
 }

@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,18 +21,22 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
+import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
+import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
@@ -40,7 +45,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = MedicalRecordController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({ MedicalRecordRestMapper.class, MedicalRecordDetailRestMapper.class })
+@Import({ MedicalRecordRestMapper.class, MedicalRecordDetailRestMapper.class, MedicalRecordDiagnosisRestMapper.class })
 @DisplayName("MedicalRecordController - MockMvc Tests")
 class MedicalRecordControllerTest {
 
@@ -59,6 +64,10 @@ class MedicalRecordControllerTest {
     private AmendMedicalRecordUseCase amendMedicalRecordUseCase;
     @MockitoBean
     private GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
+    @MockitoBean
+    private GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
+    @MockitoBean
+    private ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -132,5 +141,24 @@ class MedicalRecordControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/diagnoses - replaces persisted diagnosis list")
+    void replaceDiagnosesReturnsPersistedResponses() throws Exception {
+        UUID catalogId = UUID.randomUUID();
+        when(replaceMedicalRecordDiagnosesUseCase.replace(org.mockito.ArgumentMatchers.eq(recordId), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(new MedicalRecordDiagnosisResult(UUID.randomUUID(), recordId, "J06.9",
+                        "Acute upper respiratory infection", com.benhsoan.domain.medicalrecord.enums.DiagnosisType.PRIMARY,
+                        "Monitor symptoms", doctorId, now)));
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/diagnoses", recordId)
+                        .contentType("application/json")
+                        .content("""
+                                {"primaryDiagnosis":{"diagnosisCatalogId":"%s","code":"J06.9","name":"Acute upper respiratory infection","note":"Monitor symptoms"},"secondaryDiagnoses":[]}
+                                """.formatted(catalogId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].medicalRecordId").value(recordId.toString()))
+                .andExpect(jsonPath("$[0].diagnosisType").value("PRIMARY"));
     }
 }

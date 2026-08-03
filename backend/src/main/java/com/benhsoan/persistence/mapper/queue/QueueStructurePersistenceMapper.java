@@ -20,6 +20,13 @@ public class QueueStructurePersistenceMapper {
         return entity;
     }
     public DoctorRoomAssignment toDomain(DoctorRoomAssignmentEntity entity) { return entity == null ? null : DoctorRoomAssignment.restore(entity.getId(), entity.getDoctorId(), entity.getRoomId(), entity.getAssignedBy(), entity.getAssignedAt()); }
+    public DoctorRoomAssignmentEntity toEntity(DoctorRoomAssignment domain) {
+        if (domain == null) return null;
+        DoctorRoomAssignmentEntity entity = new DoctorRoomAssignmentEntity();
+        entity.setId(domain.getId()); entity.setDoctorId(domain.getDoctorId()); entity.setRoomId(domain.getRoomId());
+        entity.setAssignedBy(domain.getAssignedBy()); entity.setAssignedAt(domain.getAssignedAt());
+        return entity;
+    }
     public QueueItem toDomain(QueueItemEntity entity) { return entity == null ? null : QueueItem.restore(entity.getId(), entity.getMedicalQueueId(), entity.getPatientId(), entity.getAppointmentId(), entity.getVisitId(), entity.getSourceType(), entity.getStatus(), entity.getQueueNumber(), entity.getQueueDate(), entity.getCheckedInAt(), entity.getCalledAt(), entity.getCompletedAt(), entity.getCancelledAt(), entity.getCancelReason(), entity.getSkippedAt(), entity.getSkipReason(), entity.getCreatedBy(), entity.getCreatedAt(), entity.getUpdatedAt()); }
     public QueueItemEntity toEntity(QueueItem domain) {
         if (domain == null) return null;
