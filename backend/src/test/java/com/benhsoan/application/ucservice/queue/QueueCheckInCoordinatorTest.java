@@ -25,6 +25,7 @@ import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.Room;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
+import com.benhsoan.domain.queue.exception.DoctorRoomAssignmentNotFoundException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.outbound.generator.VisitCodeGenerator;
@@ -145,5 +146,31 @@ class QueueCheckInCoordinatorTest {
         assertThrows(CheckInConflictException.class,
                 () -> coordinator.checkIn(patientId, doctorId, null, QueueItemSourceType.WALK_IN,
                         "Kham tong quat", null, UUID.randomUUID(), Instant.parse("2026-07-31T02:00:00Z")));
+    }
+
+    @Test
+    void rejectsCheckInWhenAssignedRoomIsInactive() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID roomId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-07-31T02:00:00Z");
+        Patient patient = mock(Patient.class);
+        User doctor = mock(User.class);
+        when(patient.isActive()).thenReturn(true);
+        when(doctor.isActive()).thenReturn(true);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(patient));
+        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+        when(assignmentRepository.findByDoctorIdForUpdate(doctorId)).thenReturn(Optional.of(
+                DoctorRoomAssignment.restore(UUID.randomUUID(), doctorId, roomId, actorId, now)));
+        when(roomRepository.findActiveById(roomId)).thenReturn(Optional.empty());
+
+        assertThrows(DoctorRoomAssignmentNotFoundException.class,
+                () -> coordinator.checkIn(patientId, doctorId, null, QueueItemSourceType.WALK_IN,
+                        "Kham tong quat", null, actorId, now));
+
+        verify(medicalQueueRepository, times(0)).save(any(MedicalQueue.class));
+        verify(visitRepository, times(0)).save(any(Visit.class));
+        verify(queueItemRepository, times(0)).save(any(QueueItem.class));
     }
 }

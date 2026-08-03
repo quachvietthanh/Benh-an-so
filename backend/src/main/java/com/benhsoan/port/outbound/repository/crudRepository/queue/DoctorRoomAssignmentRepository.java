@@ -9,4 +9,10 @@ public interface DoctorRoomAssignmentRepository {
     Optional<DoctorRoomAssignment> findByDoctorId(UUID doctorId);
 
     Optional<DoctorRoomAssignment> findByDoctorIdForUpdate(UUID doctorId);
+
+    Optional<DoctorRoomAssignment> findByRoomId(UUID roomId);
+
+    DoctorRoomAssignment save(DoctorRoomAssignment assignment);
+
+    void deleteByDoctorId(UUID doctorId);
 }

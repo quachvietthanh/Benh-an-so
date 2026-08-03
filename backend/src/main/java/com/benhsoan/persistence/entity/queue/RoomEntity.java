@@ -15,10 +15,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class RoomEntity {
-    @Id @Column(columnDefinition = "BINARY(16)") private UUID id;
-    @Column(name = "room_code") private String code;
-    @Column(name = "room_name") private String name;
-    private boolean active;
-    @Column(name = "created_at") private Instant createdAt;
+    @Id @Column(nullable = false, columnDefinition = "BINARY(16)") private UUID id;
+    @Column(name = "room_code", nullable = false, unique = true, length = 30) private String code;
+    @Column(name = "room_name", nullable = false, length = 100) private String name;
+    @Column(nullable = false) private boolean active;
+    @Column(name = "created_at", nullable = false) private Instant createdAt;
     @Column(name = "updated_at") private Instant updatedAt;
 }

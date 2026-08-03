@@ -16,8 +16,16 @@ import lombok.Setter;
 @Setter
 public class DoctorRoomAssignmentEntity {
     @Id @Column(columnDefinition = "BINARY(16)") private UUID id;
-    @Column(name = "doctor_id") private UUID doctorId;
-    @Column(name = "room_id") private UUID roomId;
-    @Column(name = "assigned_by") private UUID assignedBy;
-    @Column(name = "assigned_at") private Instant assignedAt;
+    @Column(name = "doctor_id") 
+    private UUID doctorId;
+
+    @Column(name = "room_id") 
+    private UUID roomId;
+
+    @Column(name = "assigned_by") 
+    private UUID assignedBy;
+    
+    @Column(name = "assigned_at") 
+    private Instant assignedAt;
 }
+

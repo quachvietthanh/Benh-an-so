@@ -93,6 +93,8 @@ public class SecurityConfig {
                                                 // ===== MEDICAL RECORDS =====
                                                 .requestMatchers(HttpMethod.GET, "/medical-history/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
+                                                .requestMatchers(HttpMethod.GET, "/visits/*/encounter")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.POST, "/medical-records/*/lock")
                                                 .hasAnyRole("ADMIN", "DOCTOR")
                                                 .requestMatchers(HttpMethod.GET, "/medical-records/**")
@@ -132,7 +134,8 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.GET, "/clinical-result-attachments/*/download")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
-                                                .requestMatchers("/diagnoses/**").hasAnyRole("ADMIN", "DOCTOR")
+                                                .requestMatchers(HttpMethod.GET, "/diagnosis-catalog/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR")
                                                 .requestMatchers("/vital-signs/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
 
@@ -180,6 +183,13 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.GET, "/queue-items/*")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
+
+                                                // ===== ROOMS =====
+                                                .requestMatchers(HttpMethod.GET, "/rooms", "/rooms/**")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .requestMatchers("/rooms", "/rooms/**").hasRole("ADMIN")
+                                                .requestMatchers("/doctor-room-assignments/**").hasRole("ADMIN")
+                                                .requestMatchers("/doctors/*/room-assignment").hasRole("ADMIN")
 
                                                 // ===== OTHERS =====
                                                 .anyRequest().authenticated())
