@@ -28,7 +28,6 @@ import {
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 import systemApi from '../api/systemApi'
-import { getServices } from '../services/mockDataService'
 
 dayjs.extend(customParseFormat)
 
@@ -69,7 +68,7 @@ function ServicesPage() {
         examinationRooms: (clinic.examinationRooms || []).join('\n'),
       })
     } catch {
-      setServices(getServices())
+      setServices([])
     } finally {
       setLoading(false)
     }

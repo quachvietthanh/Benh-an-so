@@ -106,7 +106,7 @@ public class QueueItem {
 
     public void skip(String reason, Instant skippedAt) {
         if (status != QueueItemStatus.IN_PROGRESS) {
-            throw new QueueItemInvalidStatusException(status, QueueItemStatus.SKIPPED);
+            throw new QueueItemInvalidStatusException(status, QueueItemStatus.IN_PROGRESS);
         }
         this.status = QueueItemStatus.SKIPPED;
         this.skipReason = Guard.require(reason, "Skip reason");

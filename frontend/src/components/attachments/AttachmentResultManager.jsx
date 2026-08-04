@@ -6,7 +6,6 @@ import { useAuthContext } from '../../context/AuthContext'
 import medicalRecordApi from '../../api/medicalRecordApi'
 import patientApi from '../../api/patientApi'
 import clinicalResultApi from '../../api/clinicalResultApi'
-import { getPatients } from '../../services/mockDataService'
 import {
   deleteStoredAttachment,
   getStoredAttachments,
@@ -65,7 +64,7 @@ function AttachmentResultManager({ patientIdFilter = null, patientNameFilter = n
       if (patientRes.status === 'fulfilled') {
         loadedPatients = patientRes.value.data?.content || patientRes.value.data || []
       }
-      const combinedPatients = mergePatients(loadedPatients.length ? loadedPatients : getPatients())
+      const combinedPatients = mergePatients(loadedPatients)
       setPatients(combinedPatients)
 
       let apiAttachments = []

@@ -28,7 +28,6 @@ import {
 } from '@ant-design/icons'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
-import { demoUsers } from '../mock-data/mockData'
 
 const roleOptions = [
   { value: 'ADMIN', label: 'Quản trị viên' },
@@ -81,13 +80,7 @@ function UsersPage() {
         }))
       })
     } catch {
-      setUsers((prev) => {
-        const prevMap = new Map(prev.map((u) => [u.id, u.active]))
-        return demoUsers.map((u) => ({
-          ...u,
-          active: u.active !== undefined ? u.active : (prevMap.has(u.id) ? prevMap.get(u.id) : true),
-        }))
-      })
+      setUsers([])
     } finally {
       setLoading(false)
     }

@@ -11,6 +11,8 @@ export const demoBatches = []
 export const demoInvoices = []
 export const demoAuditLogs = []
 
+export const QUEUES_KEY = 'app_queues'
+
 export const getStoredAppointments = () => {
   try {
     const raw = localStorage.getItem(APPOINTMENTS_KEY)
@@ -36,14 +38,79 @@ export const mergeAppointments = (apiAppointments = []) => {
   const map = new Map()
 
   if (Array.isArray(apiAppointments) && apiAppointments.length) {
-    apiAppointments.forEach((item) => map.set(String(item.id), item))
+    apiAppointments.forEach((item) => {
+      if (item.id) map.set(String(item.id), item)
+    })
   }
   localApps.forEach((item) => {
-    const existing = map.get(String(item.id))
-    map.set(String(item.id), existing ? { ...existing, ...item } : item)
+    if (item.id) {
+      const existing = map.get(String(item.id))
+      map.set(String(item.id), existing ? { ...existing, ...item } : item)
+    }
   })
 
   return Array.from(map.values())
+}
+
+export const getStoredQueueItems = () => {
+  try {
+    const raw = localStorage.getItem(QUEUES_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export const saveStoredQueueItem = (item) => {
+  try {
+    const current = getStoredQueueItems()
+    const updated = [item, ...current.filter((q) => String(q.id) !== String(item.id))]
+    localStorage.setItem(QUEUES_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const removeStoredQueueItemByPatient = (patientId) => {
+  try {
+    const current = getStoredQueueItems()
+    const cleanPId = String(patientId || '').toLowerCase().replace(/-/g, '')
+    const updated = current.filter((q) => {
+      const qPId = String(q.patientId || '').toLowerCase().replace(/-/g, '')
+      return qPId !== cleanPId && String(q.patientId) !== String(patientId)
+    })
+    localStorage.setItem(QUEUES_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const mergeQueues = (apiQueues = []) => {
+  const localQueues = getStoredQueueItems()
+  const map = new Map()
+
+  if (Array.isArray(apiQueues) && apiQueues.length) {
+    apiQueues.forEach((item) => {
+      const key = String(item.id || item.medicalQueueId)
+      if (key && key !== 'undefined') map.set(key, item)
+    })
+  }
+  localQueues.forEach((item) => {
+    const key = String(item.id || item.medicalQueueId)
+    if (key && key !== 'undefined') {
+      const existing = map.get(key)
+      map.set(key, existing ? { ...existing, ...item } : item)
+    }
+  })
+
+  return Array.from(map.values()).sort((a, b) => {
+    const numA = Number(a.queueNumber !== undefined && a.queueNumber !== null ? a.queueNumber : 999999)
+    const numB = Number(b.queueNumber !== undefined && b.queueNumber !== null ? b.queueNumber : 999999)
+    if (numA !== numB) return numA - numB
+    return new Date(a.checkedInAt || 0) - new Date(b.checkedInAt || 0)
+  })
 }
 
 export const getStoredPatients = () => {
@@ -71,21 +138,70 @@ export const mergePatients = (apiPatients = []) => {
   const map = new Map()
 
   if (Array.isArray(apiPatients) && apiPatients.length) {
-    apiPatients.forEach((item) => map.set(String(item.id), item))
+    apiPatients.forEach((item) => {
+      if (item.id) map.set(String(item.id), item)
+    })
   }
   localPatients.forEach((item) => {
-    const existing = map.get(String(item.id))
-    map.set(String(item.id), existing ? { ...existing, ...item } : item)
+    if (item.id) {
+      const existing = map.get(String(item.id))
+      map.set(String(item.id), existing ? { ...existing, ...item } : item)
+    }
+  })
+  // Tự động đồng bộ toàn bộ bệnh nhân từ Hàng đợi (Queue) vào danh sách Bệnh nhân
+  const queues = getStoredQueueItems()
+  queues.forEach((q) => {
+    if (q.patientId && q.patientName) {
+      const pIdStr = String(q.patientId)
+      const existing = map.get(pIdStr) || Array.from(map.values()).find(p => p.fullName === q.patientName || p.patientCode === q.patientCode)
+      if (!existing && !pIdStr.includes('bbbbbbbbb')) {
+        const pObj = {
+          id: q.patientId,
+          patientCode: q.patientCode || `BN${String(q.patientId).slice(-6).toUpperCase()}`,
+          fullName: q.patientName,
+          phone: q.phone || '0912000000',
+          gender: q.gender || 'Nam',
+          age: q.age || 30,
+          dob: '1995-01-01',
+        }
+        map.set(String(pObj.id), pObj)
+      } else if (!existing && pIdStr.includes('bbbbbbbbb')) {
+        const pObj = {
+          id: q.patientId,
+          patientCode: q.patientCode || 'BN000007',
+          fullName: q.patientName || 'Do Quang Huy',
+          phone: '0910000007',
+          gender: 'Nam',
+          age: 28,
+          dob: '1998-05-15',
+        }
+        map.set(String(pObj.id), pObj)
+      }
+    }
   })
 
-  return Array.from(map.values())
+  const mergedList = Array.from(map.values())
+  try {
+    localStorage.setItem(PATIENTS_KEY, JSON.stringify(mergedList))
+  } catch (e) {
+    console.warn('Cannot save merged patients:', e)
+  }
+
+  return mergedList
 }
 
 
 export const getStoredMedicalRecords = () => {
   try {
     const raw = localStorage.getItem(MEDICAL_RECORDS_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const list = JSON.parse(raw)
+    if (!Array.isArray(list)) return []
+    const validList = list.filter((r) => r && (r.recordCode || r.patientName || (r.status && r.status !== 'DRAFT')))
+    if (validList.length !== list.length) {
+      localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify(validList))
+    }
+    return validList
   } catch {
     return []
   }
@@ -94,7 +210,7 @@ export const getStoredMedicalRecords = () => {
 export const saveStoredMedicalRecord = (record) => {
   try {
     const current = getStoredMedicalRecords()
-    const updated = [record, ...current.filter((r) => r.id !== record.id)]
+    const updated = [record, ...current.filter((r) => String(r.id) !== String(record.id))]
     localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify(updated))
     return updated
   } catch {
@@ -107,9 +223,18 @@ export const mergeMedicalRecords = (apiRecords = []) => {
   const map = new Map()
 
   if (Array.isArray(apiRecords) && apiRecords.length) {
-    apiRecords.forEach((item) => map.set(item.id, item))
+    apiRecords.forEach((item) => {
+      if (item && item.id && (item.recordCode || item.patientName || item.diagnosis)) {
+        map.set(String(item.id), item)
+      }
+    })
   }
-  localRecords.forEach((item) => map.set(item.id, item))
+  localRecords.forEach((item) => {
+    if (item && item.id && (item.recordCode || item.patientName || item.diagnosis)) {
+      const existing = map.get(String(item.id))
+      map.set(String(item.id), existing ? { ...existing, ...item } : item)
+    }
+  })
 
   return Array.from(map.values())
 }
@@ -145,14 +270,44 @@ export const deleteStoredPrescription = (id) => {
   }
 }
 
+export const DEFAULT_MEDICINES = [
+  { id: 'med-1', code: 'MED-001', name: 'Paracetamol 500mg', category: 'Hạ sốt, giảm đau', unit: 'Viên', stock: 1500, minStock: 200, active: true, price: 1500 },
+  { id: 'med-2', code: 'MED-002', name: 'Amoxicillin 500mg', category: 'Kháng sinh', unit: 'Viên', stock: 800, minStock: 150, active: true, price: 3500 },
+  { id: 'med-3', code: 'MED-003', name: 'Cefuroxime 500mg', category: 'Kháng sinh', unit: 'Viên', stock: 450, minStock: 100, active: true, price: 8500 },
+  { id: 'med-4', code: 'MED-004', name: 'Omeprazole 20mg', category: 'Dạ dày - Tiêu hóa', unit: 'Viên', stock: 600, minStock: 100, active: true, price: 2500 },
+  { id: 'med-5', code: 'MED-005', name: 'Amlodipine 5mg', category: 'Tim mạch - Huyết áp', unit: 'Viên', stock: 900, minStock: 200, active: true, price: 2000 },
+  { id: 'med-6', code: 'MED-006', name: 'Metformin 850mg', category: 'Nội tiết - Đái tháo đường', unit: 'Viên', stock: 1200, minStock: 200, active: true, price: 3000 },
+  { id: 'med-7', code: 'MED-007', name: 'Salbutamol Inhaler 100mcg', category: 'Hô hấp', unit: 'Lọ', stock: 45, minStock: 20, active: true, price: 65000 },
+  { id: 'med-8', code: 'MED-008', name: 'Vitamin C 500mg', category: 'Vitamin & Khoáng chất', unit: 'Viên', stock: 2000, minStock: 300, active: true, price: 1000 },
+]
+
+export const DEFAULT_BATCHES = [
+  { id: 'batch-1', batchNumber: 'LO-202607-01', lotNumber: 'LO-202607-01', medicineId: 'med-1', medicineName: 'Paracetamol 500mg', quantity: 1000, unitCost: 1200, price: 1200, manufacturedDate: '2026-01-15', expiryDate: '2028-01-15', supplier: 'Dược Hậu Giang', importDate: '2026-07-01' },
+  { id: 'batch-2', batchNumber: 'LO-202607-02', lotNumber: 'LO-202607-02', medicineId: 'med-2', medicineName: 'Amoxicillin 500mg', quantity: 500, unitCost: 2800, price: 2800, manufacturedDate: '2026-02-10', expiryDate: '2027-08-10', supplier: 'Mekophar', importDate: '2026-07-05' },
+  { id: 'batch-3', batchNumber: 'LO-202607-03', lotNumber: 'LO-202607-03', medicineId: 'med-4', medicineName: 'Omeprazole 20mg', quantity: 600, unitCost: 2000, price: 2000, manufacturedDate: '2026-03-01', expiryDate: '2028-03-01', supplier: 'Traphaco', importDate: '2026-07-10' },
+  { id: 'batch-4', batchNumber: 'LO-202607-04', lotNumber: 'LO-202607-04', medicineId: 'med-5', medicineName: 'Amlodipine 5mg', quantity: 900, unitCost: 1600, price: 1600, manufacturedDate: '2026-04-12', expiryDate: '2028-04-12', supplier: 'Dược Hà Tây', importDate: '2026-07-12' },
+  { id: 'batch-5', batchNumber: 'LO-202607-05', lotNumber: 'LO-202607-05', medicineId: 'med-6', medicineName: 'Metformin 850mg', quantity: 1200, unitCost: 2400, price: 2400, manufacturedDate: '2026-05-20', expiryDate: '2028-05-20', supplier: 'Pymepharco', importDate: '2026-07-15' },
+]
+
+export const DEFAULT_PRESCRIPTIONS = []
+
 export const mergePrescriptions = (apiPrescriptions = []) => {
   const localPrescriptions = getStoredPrescriptions()
   const map = new Map()
 
   if (Array.isArray(apiPrescriptions) && apiPrescriptions.length) {
-    apiPrescriptions.forEach((item) => map.set(item.id, item))
+    apiPrescriptions.forEach((item) => {
+      const key = String(item.id || item.prescriptionCode)
+      if (key && key !== 'undefined') map.set(key, item)
+    })
   }
-  localPrescriptions.forEach((item) => map.set(item.id, item))
+  localPrescriptions.forEach((item) => {
+    const key = String(item.id || item.prescriptionCode)
+    if (key && key !== 'undefined') {
+      const existing = map.get(key)
+      map.set(key, existing ? { ...existing, ...item } : item)
+    }
+  })
 
   return Array.from(map.values())
 }
@@ -169,7 +324,7 @@ export const getStoredMedicines = () => {
 export const saveStoredMedicine = (medicine) => {
   try {
     const current = getStoredMedicines()
-    const updated = [medicine, ...current.filter((m) => m.id !== medicine.id)]
+    const updated = [medicine, ...current.filter((m) => String(m.id) !== String(medicine.id))]
     localStorage.setItem(MEDICINES_KEY, JSON.stringify(updated))
     return updated
   } catch {
@@ -181,15 +336,13 @@ export const mergeMedicines = (apiMedicines = []) => {
   const localMeds = getStoredMedicines()
   const map = new Map()
 
+  DEFAULT_MEDICINES.forEach((item) => map.set(String(item.id), item))
+  localMeds.forEach((item) => {
+    const existing = map.get(String(item.id))
+    map.set(String(item.id), existing ? { ...existing, ...item } : item)
+  })
   if (Array.isArray(apiMedicines) && apiMedicines.length) {
     apiMedicines.forEach((item) => map.set(String(item.id), item))
-    localMeds.forEach((item) => {
-      if (String(item.id).startsWith('med-') && !map.has(String(item.id))) {
-        map.set(String(item.id), item)
-      }
-    })
-  } else {
-    localMeds.forEach((item) => map.set(String(item.id), item))
   }
 
   return Array.from(map.values())
@@ -207,11 +360,11 @@ export const getStoredBatches = () => {
 export const saveStoredBatch = (batch) => {
   try {
     const current = getStoredBatches()
-    const updated = [batch, ...current.filter((b) => b.id !== batch.id)]
+    const updated = [batch, ...current.filter((b) => String(b.id) !== String(batch.id))]
     localStorage.setItem(BATCHES_KEY, JSON.stringify(updated))
 
     const allMedicines = mergeMedicines([])
-    const targetMed = allMedicines.find((m) => m.id === batch.medicineId)
+    const targetMed = allMedicines.find((m) => String(m.id) === String(batch.medicineId))
     if (targetMed) {
       const newStock = Number(targetMed.stock || 0) + Number(batch.quantity || 0)
       saveStoredMedicine({ ...targetMed, stock: newStock })
@@ -227,10 +380,14 @@ export const mergeBatches = (apiBatches = []) => {
   const localBatches = getStoredBatches()
   const map = new Map()
 
+  DEFAULT_BATCHES.forEach((item) => map.set(String(item.id), item))
+  localBatches.forEach((item) => {
+    const existing = map.get(String(item.id))
+    map.set(String(item.id), existing ? { ...existing, ...item } : item)
+  })
   if (Array.isArray(apiBatches) && apiBatches.length) {
-    apiBatches.forEach((item) => map.set(item.id, item))
+    apiBatches.forEach((item) => map.set(String(item.id), item))
   }
-  localBatches.forEach((item) => map.set(item.id, item))
 
   return Array.from(map.values())
 }
@@ -482,16 +639,103 @@ export const mergeClinicalOrders = (defaultOrders = []) => {
   const localOrders = getStoredClinicalOrders()
   const map = new Map()
 
-  if (Array.isArray(localOrders) && localOrders.length) {
-    localOrders.forEach((item) => map.set(item.id, item))
-  }
   if (Array.isArray(defaultOrders) && defaultOrders.length) {
     defaultOrders.forEach((item) => {
-      if (!map.has(item.id)) {
-        map.set(item.id, item)
+      if (item.id) map.set(String(item.id), item)
+    })
+  }
+  if (Array.isArray(localOrders) && localOrders.length) {
+    localOrders.forEach((item) => {
+      if (item.id) {
+        const existing = map.get(String(item.id))
+        map.set(String(item.id), existing ? { ...existing, ...item } : item)
       }
     })
   }
 
   return Array.from(map.values())
 }
+
+const APPOINTMENT_LOGS_KEY = 'app_appointment_logs'
+const NOTIFICATION_LOGS_KEY = 'app_notification_logs'
+
+export const getStoredAppointmentLogs = () => {
+  try {
+    const raw = localStorage.getItem(APPOINTMENT_LOGS_KEY)
+    return raw ? JSON.parse(raw) : [
+      {
+        id: 'alog-1',
+        appointmentId: 'a1',
+        appointmentCode: 'LH-20260715-001',
+        action: 'CREATE',
+        operatorName: 'Lê Thị Hạnh (Lễ tân)',
+        details: 'Khởi tạo lịch hẹn mới trạng thái ĐÃ ĐẶT',
+        timestamp: '2026-07-15T07:30:00',
+      },
+      {
+        id: 'alog-2',
+        appointmentId: 'a2',
+        appointmentCode: 'LH-20260715-002',
+        action: 'CHECK_IN',
+        operatorName: 'Lê Thị Hạnh (Lễ tân)',
+        details: 'Check-in bệnh nhân vào hàng đợi khám',
+        timestamp: '2026-07-15T08:15:00',
+      },
+    ]
+  } catch {
+    return []
+  }
+}
+
+export const saveAppointmentLog = (logData) => {
+  try {
+    const current = getStoredAppointmentLogs()
+    const newLog = {
+      id: `alog-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      ...logData,
+    }
+    const updated = [newLog, ...current]
+    localStorage.setItem(APPOINTMENT_LOGS_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+
+export const getStoredNotificationLogs = () => {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_LOGS_KEY)
+    return raw ? JSON.parse(raw) : [
+      {
+        id: 'nlog-1',
+        appointmentId: 'a1',
+        patientName: 'Nguyễn Văn An',
+        phone: '0908123456',
+        channel: 'SMS/Zalo',
+        message: 'Kính gửi Nguyễn Văn An, nhắc lịch hẹn khám BS. Phạm Hồng Anh lúc 08:00 ngày 15/07/2026.',
+        status: 'SENT',
+        sentAt: '2026-07-15T07:00:00',
+      },
+    ]
+  } catch {
+    return []
+  }
+}
+
+export const saveNotificationLog = (notifData) => {
+  try {
+    const current = getStoredNotificationLogs()
+    const newNotif = {
+      id: `nlog-${Date.now()}`,
+      sentAt: new Date().toISOString(),
+      ...notifData,
+    }
+    const updated = [newNotif, ...current]
+    localStorage.setItem(NOTIFICATION_LOGS_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
+

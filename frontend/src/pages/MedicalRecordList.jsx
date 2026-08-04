@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Table, Button, Tag, Typography, Space } from 'antd'
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import medicalRecordApi from '../api/medicalRecordApi'
 import { formatDateTime, formatRecordStatus } from '../utils/helpers'
+import { mergeMedicalRecords } from '../utils/storageHelpers'
 
 const { Title } = Typography
 
 function MedicalRecordList() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
@@ -17,10 +20,14 @@ function MedicalRecordList() {
     setLoading(true)
     try {
       const response = await medicalRecordApi.getAll({ page, size: pageSize })
-      setRecords(response.data.content)
-      setTotal(response.data.totalElements)
-    } catch (error) {
-      console.error('Failed to fetch medical records:', error)
+      const list = response?.data?.content || response?.data || []
+      const merged = mergeMedicalRecords(Array.isArray(list) ? list : [])
+      setRecords(merged)
+      setTotal(merged.length)
+    } catch {
+      const merged = mergeMedicalRecords([])
+      setRecords(merged)
+      setTotal(merged.length)
     } finally {
       setLoading(false)
     }

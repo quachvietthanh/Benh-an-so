@@ -35,7 +35,7 @@ public class GetQueuesService implements GetQueuesUseCase {
     }
 
     private boolean canViewBoard() {
-        return currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST")
-                || currentUserPort.hasRole("NURSE");
+        return currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("DOCTOR")
+                || currentUserPort.hasRole("RECEPTIONIST") || currentUserPort.hasRole("NURSE");
     }
 }

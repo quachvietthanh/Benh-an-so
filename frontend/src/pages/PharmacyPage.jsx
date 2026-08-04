@@ -244,8 +244,13 @@ function PharmacyPage() {
 
   const batchColumns = [
     { title: 'Tên thuốc', dataIndex: 'medicineName', key: 'medicineName', render: (v) => <strong>{v}</strong> },
-    { title: 'Số lô nhập', dataIndex: 'lotNumber', key: 'lotNumber', render: (v) => <Tag color="blue">{v}</Tag> },
-    { title: 'Số lượng nhập', dataIndex: 'quantity', key: 'quantity' },
+    {
+      title: 'Số lô nhập',
+      dataIndex: 'batchNumber',
+      key: 'batchNumber',
+      render: (v, record) => <Tag color="blue">{v || record.lotNumber || 'LO-DEFAULT'}</Tag>,
+    },
+    { title: 'Số lượng nhập', dataIndex: 'quantity', key: 'quantity', render: (v) => `${Number(v || 0).toLocaleString('vi-VN')}` },
     {
       title: 'Hạn sử dụng',
       dataIndex: 'expiryDate',
@@ -267,7 +272,16 @@ function PharmacyPage() {
       title: 'Đơn giá nhập',
       dataIndex: 'unitCost',
       key: 'unitCost',
-      render: (val) => (val ? `${Number(val).toLocaleString('vi-VN')} ₫` : '—'),
+      render: (val, record) => {
+        const price = val || record.price || 1500
+        return `${Number(price).toLocaleString('vi-VN')} ₫`
+      },
+    },
+    {
+      title: 'Nhà cung cấp',
+      dataIndex: 'supplier',
+      key: 'supplier',
+      render: (v) => v || 'Công ty Dược phẩm',
     },
   ]
 
