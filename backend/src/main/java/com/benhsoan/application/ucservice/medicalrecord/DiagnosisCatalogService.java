@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.port.dto.result.DiagnosisCatalogResult;
 import com.benhsoan.port.inbound.medicalrecord.GetDiagnosisCatalogUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.DiagnosisCatalogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.DiagnosisCatalogRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -11,7 +11,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordAccessLogEntity;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAccessLogRepository;
 import com.benhsoan.persistence.mapper.medicalrecord.MedicalRecordAccessLogPersistenceMapper;
-import com.benhsoan.port.outbound.repository.logRepository.MedicalRecordAccessLogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAccessLogRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.port.dto.command.clinical.SearchClinicalServiceCatalogQuery;
 import com.benhsoan.port.dto.result.ClinicalServiceCatalogResult;
 import com.benhsoan.port.inbound.clinical.SearchClinicalServiceCatalogUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalServiceCatalogRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalServiceCatalogRepository;
 
 import lombok.RequiredArgsConstructor;
 

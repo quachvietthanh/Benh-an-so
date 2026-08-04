@@ -39,14 +39,14 @@ import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.command.clinical.EnterClinicalResultCommand;
 import com.benhsoan.port.dto.command.clinical.UpdateClinicalResultCommand;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalResultHistoryRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalResultRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalServiceCatalogRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.MedicalAttachmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalResultHistoryRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalResultRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalServiceCatalogRepository;
+import com.benhsoan.port.outbound.repository.clinical.MedicalAttachmentRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)

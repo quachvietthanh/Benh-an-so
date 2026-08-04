@@ -9,7 +9,7 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.persistence.entity.auditlog.AuditLogEntity;
 import com.benhsoan.persistence.jpaRepository.auditlog.JpaAuditLogRepository;
 import com.benhsoan.persistence.mapper.auditlog.AuditLogPersistenceMapper;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 
 import lombok.RequiredArgsConstructor;
 

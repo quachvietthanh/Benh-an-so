@@ -19,10 +19,10 @@ import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

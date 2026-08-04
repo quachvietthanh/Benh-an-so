@@ -29,8 +29,8 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.UserResult;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
 
 import jakarta.transaction.Transactional;
 

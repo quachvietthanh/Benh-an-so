@@ -12,7 +12,7 @@ import com.benhsoan.domain.queue.exception.UnauthorizedQueueOperationException;
 import com.benhsoan.port.dto.command.queue.CheckInAppointmentCommand;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.inbound.queue.CheckInAppointmentUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

@@ -11,9 +11,9 @@ import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundExceptio
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordDiagnosisRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;

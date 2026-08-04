@@ -5,7 +5,7 @@ import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.infrastructure.security.annotation.CheckPermission;
 import com.benhsoan.infrastructure.security.annotation.PermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.BeforeEach;

@@ -24,5 +24,9 @@ public enum ActionType {
     
     DEACTIVATE,
     
-    CANCEL
+    CANCEL,
+
+    DISPENSE,
+
+    OVERRIDE_DRUG_INTERACTION_WARNING
 }

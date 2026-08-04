@@ -15,7 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.port.dto.result.AppointmentReminderResult;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

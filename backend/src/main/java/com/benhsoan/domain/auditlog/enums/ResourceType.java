@@ -26,5 +26,7 @@ public enum ResourceType {
 
     INVOICE,
 
-    PAYMENT
+    PAYMENT,
+
+    DRUG_INTERACTION
 }

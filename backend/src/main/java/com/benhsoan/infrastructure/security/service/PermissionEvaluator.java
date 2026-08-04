@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.enums.Permission;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 
 import lombok.RequiredArgsConstructor;
 

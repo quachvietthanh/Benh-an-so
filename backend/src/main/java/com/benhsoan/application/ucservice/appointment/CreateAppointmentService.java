@@ -21,10 +21,10 @@ import com.benhsoan.port.dto.command.appointment.CreateAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
 import com.benhsoan.port.outbound.generator.AppointmentCodeGenerator;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;

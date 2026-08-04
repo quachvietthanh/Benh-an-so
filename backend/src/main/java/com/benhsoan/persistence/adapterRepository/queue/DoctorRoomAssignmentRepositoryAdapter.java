@@ -10,7 +10,7 @@ import com.benhsoan.domain.queue.DoctorRoomAssignment;
 import com.benhsoan.domain.queue.exception.DoctorRoomAssignmentConflictException;
 import com.benhsoan.persistence.jpaRepository.queue.JpaDoctorRoomAssignmentRepository;
 import com.benhsoan.persistence.mapper.queue.QueueStructurePersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.DoctorRoomAssignmentRepository;
+import com.benhsoan.port.outbound.repository.queue.DoctorRoomAssignmentRepository;
 
 import lombok.RequiredArgsConstructor;
 

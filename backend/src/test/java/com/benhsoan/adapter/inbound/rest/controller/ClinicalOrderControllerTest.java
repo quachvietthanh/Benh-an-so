@@ -27,8 +27,8 @@ import com.benhsoan.port.dto.result.ClinicalOrderResult;
 import com.benhsoan.port.inbound.clinical.CreateClinicalOrderUseCase;
 import com.benhsoan.port.inbound.clinical.GetClinicalOrdersByVisitUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

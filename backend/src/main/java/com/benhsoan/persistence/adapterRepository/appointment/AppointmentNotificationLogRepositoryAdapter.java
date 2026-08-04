@@ -10,7 +10,7 @@ import com.benhsoan.domain.appointment.notification.enums.NotificationStatus;
 import com.benhsoan.domain.appointment.notification.enums.NotificationType;
 import com.benhsoan.persistence.jpaRepository.appointment.JpaAppointmentNotificationLogRepository;
 import com.benhsoan.persistence.mapper.appointment.AppointmentNotificationLogPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentNotificationLogRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentNotificationLogRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,13 +30,6 @@ public class AppointmentNotificationLogRepositoryAdapter
     @Override
     public AppointmentNotificationLog save(AppointmentNotificationLog notificationLog) {
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(notificationLog)));
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        if (id != null) {
-            jpaRepository.deleteById(id);
-        }
     }
 
     @Override

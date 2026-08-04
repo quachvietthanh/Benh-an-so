@@ -16,7 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.port.dto.result.DiagnosisCatalogResult;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.DiagnosisCatalogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.DiagnosisCatalogRepository;
 
 @DisplayName("DiagnosisCatalogService Tests")
 @ExtendWith(MockitoExtension.class)

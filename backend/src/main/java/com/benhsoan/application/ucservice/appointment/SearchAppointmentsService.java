@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 
 import lombok.RequiredArgsConstructor;
 

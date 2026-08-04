@@ -5,7 +5,7 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.queue.DoctorRoomAssignment;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import lombok.RequiredArgsConstructor;
 @Service @RequiredArgsConstructor

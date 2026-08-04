@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.port.dto.result.DoctorRoomAssignmentResult;
 import com.benhsoan.port.inbound.queue.SearchDoctorRoomAssignmentsUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.DoctorRoomAssignmentRepository;
+import com.benhsoan.port.outbound.repository.queue.DoctorRoomAssignmentRepository;
 import lombok.RequiredArgsConstructor;
 @Service @RequiredArgsConstructor @Transactional(readOnly = true)
 public class SearchDoctorRoomAssignmentsService implements SearchDoctorRoomAssignmentsUseCase {

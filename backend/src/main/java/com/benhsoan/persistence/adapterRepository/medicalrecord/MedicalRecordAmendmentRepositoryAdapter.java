@@ -9,7 +9,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecordAmendment;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordAmendmentEntity;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAmendmentRepository;
 import com.benhsoan.persistence.mapper.medicalrecord.MedicalRecordAmendmentPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordAmendmentRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAmendmentRepository;
 
 import lombok.RequiredArgsConstructor;
 

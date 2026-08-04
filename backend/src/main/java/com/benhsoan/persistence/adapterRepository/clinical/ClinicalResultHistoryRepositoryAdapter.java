@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.domain.clinical.ClinicalResultHistory;
 import com.benhsoan.persistence.jpaRepository.clinical.JpaClinicalResultHistoryRepository;
 import com.benhsoan.persistence.mapper.clinical.ClinicalResultHistoryPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalResultHistoryRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalResultHistoryRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.port.dto.command.queue.SearchRoomsQuery;
 import com.benhsoan.port.dto.result.RoomResult;
 import com.benhsoan.port.inbound.queue.SearchRoomsUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.RoomRepository;
+import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 
 import lombok.RequiredArgsConstructor;
 

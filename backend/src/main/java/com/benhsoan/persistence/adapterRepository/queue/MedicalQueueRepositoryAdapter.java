@@ -10,7 +10,7 @@ import com.benhsoan.domain.queue.MedicalQueue;
 import com.benhsoan.persistence.entity.queue.MedicalQueueEntity;
 import com.benhsoan.persistence.jpaRepository.queue.JpaMedicalQueueRepository;
 import com.benhsoan.persistence.mapper.queue.MedicalQueuePersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
+import com.benhsoan.port.outbound.repository.queue.MedicalQueueRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,11 +30,6 @@ public class MedicalQueueRepositoryAdapter implements MedicalQueueRepository {
     public MedicalQueue save(MedicalQueue queue) {
         MedicalQueueEntity saved = jpaRepository.save(mapper.toEntity(queue));
         return mapper.toDomain(saved);
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override

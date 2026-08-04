@@ -31,9 +31,9 @@ import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.authSecurity.RefreshTokenGeneratorPort;
 import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)

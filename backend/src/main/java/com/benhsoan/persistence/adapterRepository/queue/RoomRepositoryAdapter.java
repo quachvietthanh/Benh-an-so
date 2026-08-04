@@ -12,7 +12,7 @@ import com.benhsoan.domain.queue.Room;
 import com.benhsoan.domain.queue.exception.RoomCodeAlreadyExistsException;
 import com.benhsoan.persistence.jpaRepository.queue.JpaRoomRepository;
 import com.benhsoan.persistence.mapper.queue.QueueStructurePersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.RoomRepository;
+import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 
 import lombok.RequiredArgsConstructor;
 

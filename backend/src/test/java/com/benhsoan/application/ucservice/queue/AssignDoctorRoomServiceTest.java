@@ -25,11 +25,11 @@ import com.benhsoan.domain.queue.Room;
 import com.benhsoan.domain.queue.enums.MedicalQueueStatus;
 import com.benhsoan.domain.queue.exception.DoctorRoomAssignmentConflictException;
 import com.benhsoan.port.dto.command.queue.AssignDoctorRoomCommand;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.DoctorRoomAssignmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.RoomRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.queue.DoctorRoomAssignmentRepository;
+import com.benhsoan.port.outbound.repository.queue.MedicalQueueRepository;
+import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

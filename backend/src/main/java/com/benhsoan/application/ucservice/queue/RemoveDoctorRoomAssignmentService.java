@@ -8,8 +8,8 @@ import com.benhsoan.domain.queue.enums.MedicalQueueStatus;
 import com.benhsoan.domain.queue.exception.DoctorRoomAssignmentConflictException;
 import com.benhsoan.domain.queue.exception.DoctorRoomAssignmentNotFoundException;
 import com.benhsoan.port.inbound.queue.RemoveDoctorRoomAssignmentUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.DoctorRoomAssignmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
+import com.benhsoan.port.outbound.repository.queue.DoctorRoomAssignmentRepository;
+import com.benhsoan.port.outbound.repository.queue.MedicalQueueRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 import lombok.RequiredArgsConstructor;
 @Service @RequiredArgsConstructor @Transactional

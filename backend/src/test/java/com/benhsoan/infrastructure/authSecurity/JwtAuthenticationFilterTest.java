@@ -22,8 +22,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)

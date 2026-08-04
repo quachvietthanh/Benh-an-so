@@ -11,7 +11,7 @@ import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.persistence.jpaRepository.visit.JpaVisitRepository;
 import com.benhsoan.persistence.mapper.visit.VisitPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,11 +35,6 @@ public class VisitRepositoryAdapter implements VisitRepository {
     @Override
     public Visit save(Visit visit) {
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(visit)));
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override

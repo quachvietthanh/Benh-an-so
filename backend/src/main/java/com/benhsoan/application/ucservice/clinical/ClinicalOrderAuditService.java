@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
-import com.benhsoan.port.outbound.repository.logRepository.MedicalRecordAccessLogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAccessLogRepository;
 
 import lombok.RequiredArgsConstructor;
 

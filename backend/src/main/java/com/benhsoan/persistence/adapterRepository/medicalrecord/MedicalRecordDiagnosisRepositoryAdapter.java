@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordDiagnosisRepository;
 import com.benhsoan.persistence.mapper.medicalrecord.MedicalRecordDiagnosisPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordDiagnosisRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 
 import lombok.RequiredArgsConstructor;
 

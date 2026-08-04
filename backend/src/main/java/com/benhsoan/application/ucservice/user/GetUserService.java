@@ -11,8 +11,8 @@ import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
 import com.benhsoan.port.dto.result.UserResult;
 import com.benhsoan.port.inbound.user.GetUserUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 

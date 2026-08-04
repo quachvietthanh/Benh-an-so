@@ -30,10 +30,10 @@ import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.port.outbound.notification.AppointmentNotificationPort;
 import com.benhsoan.port.outbound.notification.AppointmentReminderMessage;
 import com.benhsoan.port.outbound.notification.NotificationSendResult;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentNotificationLogRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentNotificationLogRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ProcessAppointmentReminderServiceTest {

@@ -16,9 +16,9 @@ import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
-import com.benhsoan.port.outbound.repository.logRepository.PatientChangeLogRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;

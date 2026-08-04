@@ -13,7 +13,7 @@ import com.benhsoan.persistence.jpaRepository.patient.JpaPatientRepository;
 import com.benhsoan.persistence.jpaRepository.patient.PatientSpecification;
 import com.benhsoan.persistence.mapper.patient.PatientPersistenceMapper;
 import com.benhsoan.port.dto.command.patient.SearchPatientCommand;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -64,12 +64,6 @@ public class PatientRepositoryAdapter implements PatientRepository {
         return identityNumber != null
                 && jpaRepository.existsByIdentityNumber(identityNumber);
 
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        if(id == null) return;
-        jpaRepository.deleteById(id);
     }
 
     @Override

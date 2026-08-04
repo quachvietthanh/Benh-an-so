@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.result.VisitEncounterResult;
 import com.benhsoan.port.inbound.visit.GetVisitEncounterUseCase;
-import com.benhsoan.port.outbound.repository.queryRepository.visit.VisitEncounterQueryRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitEncounterQueryRepository;
 
 import lombok.RequiredArgsConstructor;
 

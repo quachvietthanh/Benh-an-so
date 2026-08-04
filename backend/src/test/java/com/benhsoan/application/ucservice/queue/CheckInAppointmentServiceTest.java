@@ -18,7 +18,7 @@ import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
 import com.benhsoan.port.dto.command.queue.CheckInAppointmentCommand;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

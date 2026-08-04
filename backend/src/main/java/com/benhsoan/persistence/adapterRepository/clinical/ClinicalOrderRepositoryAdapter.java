@@ -11,7 +11,7 @@ import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.persistence.entity.clinical.ClinicalOrderEntity;
 import com.benhsoan.persistence.jpaRepository.clinical.JpaClinicalOrderRepository;
 import com.benhsoan.persistence.mapper.clinical.ClinicalOrderPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,13 +31,6 @@ public class ClinicalOrderRepositoryAdapter implements ClinicalOrderRepository {
     public ClinicalOrder save(ClinicalOrder order) {
         ClinicalOrderEntity savedEntity = jpaRepository.save(mapper.toEntity(order));
         return mapper.toDomain(savedEntity);
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        if (id != null) {
-            jpaRepository.deleteById(id);
-        }
     }
 
     @Override

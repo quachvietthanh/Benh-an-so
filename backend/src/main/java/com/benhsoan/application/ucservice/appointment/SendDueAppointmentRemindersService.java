@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import com.benhsoan.config.AppointmentReminderProperties;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.port.inbound.appointment.SendDueAppointmentRemindersUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
