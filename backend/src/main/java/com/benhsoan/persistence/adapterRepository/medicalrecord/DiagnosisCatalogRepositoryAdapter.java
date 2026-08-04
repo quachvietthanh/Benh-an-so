@@ -26,11 +26,6 @@ public class DiagnosisCatalogRepositoryAdapter implements DiagnosisCatalogReposi
     }
 
     @Override
-    public DiagnosisCatalog save(DiagnosisCatalog diagnosis) {
-        return mapper.toDomain(jpaRepository.save(mapper.toEntity(diagnosis)));
-    }
-
-    @Override
     public List<DiagnosisCatalog> findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(String code, String name) {
         return jpaRepository.findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(code, name)
                 .stream().map(mapper::toDomain).toList();

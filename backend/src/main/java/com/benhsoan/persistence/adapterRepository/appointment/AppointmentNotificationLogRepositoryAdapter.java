@@ -1,6 +1,5 @@
 package com.benhsoan.persistence.adapterRepository.appointment;
 
-import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Repository;
@@ -21,11 +20,6 @@ public class AppointmentNotificationLogRepositoryAdapter
 
     private final JpaAppointmentNotificationLogRepository jpaRepository;
     private final AppointmentNotificationLogPersistenceMapper mapper;
-
-    @Override
-    public Optional<AppointmentNotificationLog> findById(UUID id) {
-        return jpaRepository.findById(id).map(mapper::toDomain);
-    }
 
     @Override
     public AppointmentNotificationLog save(AppointmentNotificationLog notificationLog) {

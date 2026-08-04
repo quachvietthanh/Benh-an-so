@@ -1,4 +1,4 @@
-package com.benhsoan.port.outbound.repository.logRepository;
+package com.benhsoan.port.outbound.repository.prescription;
 
 import java.util.List;
 import java.util.Optional;

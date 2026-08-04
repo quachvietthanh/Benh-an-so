@@ -1,4 +1,4 @@
-package com.benhsoan.port.outbound.repository.queryRepository.visit;
+package com.benhsoan.port.outbound.repository.visit;
 
 import java.util.Optional;
 import java.util.UUID;

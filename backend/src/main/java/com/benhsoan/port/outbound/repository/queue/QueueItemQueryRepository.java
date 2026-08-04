@@ -1,4 +1,4 @@
-package com.benhsoan.port.outbound.repository.queryRepository.queue;
+package com.benhsoan.port.outbound.repository.queue;
 
 import java.time.LocalDate;
 import java.util.List;

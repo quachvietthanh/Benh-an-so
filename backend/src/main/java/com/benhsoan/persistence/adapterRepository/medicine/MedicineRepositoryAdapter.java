@@ -7,7 +7,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.medicine.Medicine;
-import com.benhsoan.persistence.entity.medicine.MedicineEntity;
 import com.benhsoan.persistence.jpaRepository.medicine.JpaMedicineRepository;
 import com.benhsoan.persistence.mapper.medicine.MedicinePersistenceMapper;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
@@ -22,20 +21,6 @@ public class MedicineRepositoryAdapter
     private final JpaMedicineRepository jpaRepository;
 
     private final MedicinePersistenceMapper mapper;
-
-    @Override
-    public Optional<Medicine> findById(UUID id) {
-        return jpaRepository.findById(id)
-                .map(mapper::toDomain);
-    }
-
-    @Override
-    public Medicine save(Medicine medicine) {
-        MedicineEntity entity = mapper.toEntity(medicine);
-        MedicineEntity savedEntity = jpaRepository.save(entity);
-
-        return mapper.toDomain(savedEntity);
-    }
 
     @Override
     public Optional<Medicine> findByMedicineCode(String medicineCode) {

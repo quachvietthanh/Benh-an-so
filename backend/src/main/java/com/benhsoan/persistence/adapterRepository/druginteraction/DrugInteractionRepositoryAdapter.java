@@ -8,7 +8,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.druginteraction.DrugInteraction;
-import com.benhsoan.persistence.entity.druginteraction.DrugInteractionEntity;
 import com.benhsoan.persistence.jpaRepository.druginteraction.JpaDrugInteractionRepository;
 import com.benhsoan.persistence.mapper.druginteraction.DrugInteractionPersistenceMapper;
 import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRepository;
@@ -23,20 +22,6 @@ public class DrugInteractionRepositoryAdapter
     private final JpaDrugInteractionRepository jpaRepository;
 
     private final DrugInteractionPersistenceMapper mapper;
-
-    @Override
-    public Optional<DrugInteraction> findById(UUID id) {
-        return jpaRepository.findById(id)
-                .map(mapper::toDomain);
-    }
-
-    @Override
-    public DrugInteraction save(DrugInteraction drugInteraction) {
-        DrugInteractionEntity entity = mapper.toEntity(drugInteraction);
-        DrugInteractionEntity savedEntity = jpaRepository.save(entity);
-
-        return mapper.toDomain(savedEntity);
-    }
 
     @Override
     public Optional<DrugInteraction> findByMedicinePair(

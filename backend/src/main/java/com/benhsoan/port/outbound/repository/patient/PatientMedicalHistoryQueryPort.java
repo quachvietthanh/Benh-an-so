@@ -1,4 +1,4 @@
-package com.benhsoan.port.outbound.repository.queryRepository.patient;
+package com.benhsoan.port.outbound.repository.patient;
 
 import org.springframework.data.domain.Page;
 

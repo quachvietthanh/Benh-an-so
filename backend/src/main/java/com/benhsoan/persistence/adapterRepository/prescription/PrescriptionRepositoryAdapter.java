@@ -33,33 +33,6 @@ public class PrescriptionRepositoryAdapter
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Prescription> findById(UUID id) {
-        return jpaRepository.findById(id)
-                .map(this::toDomain);
-    }
-
-    @Override
-    @Transactional
-    public Prescription save(Prescription prescription) {
-        PrescriptionEntity savedEntity = jpaRepository.save(
-                mapper.toEntity(prescription)
-        );
-
-        itemJpaRepository.deleteAllByPrescriptionId(savedEntity.getId());
-
-        List<PrescriptionItemEntity> itemEntities = prescription.getItems()
-                .stream()
-                .map(itemMapper::toEntity)
-                .toList();
-
-        List<PrescriptionItemEntity> savedItemEntities
-                = itemJpaRepository.saveAll(itemEntities);
-
-        return mapper.toDomain(savedEntity, savedItemEntities);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Optional<Prescription> findByPrescriptionCode(
             String prescriptionCode
     ) {

@@ -1,4 +1,4 @@
-package com.benhsoan.port.outbound.repository.logRepository;
+package com.benhsoan.port.outbound.repository.medicalrecord;
 
 import java.time.Instant;
 import java.util.UUID;
