@@ -7,6 +7,8 @@ import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
 
 public interface MedicalRecordDiagnosisRepository {
 
+    boolean existsByMedicalRecordId(UUID medicalRecordId);
+
     List<MedicalRecordDiagnosis> findByMedicalRecordId(UUID medicalRecordId);
 
     List<MedicalRecordDiagnosis> replaceForMedicalRecord(

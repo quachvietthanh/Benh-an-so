@@ -20,6 +20,11 @@ public class MedicalRecordDiagnosisRepositoryAdapter implements MedicalRecordDia
     private final MedicalRecordDiagnosisPersistenceMapper mapper;
 
     @Override
+    public boolean existsByMedicalRecordId(UUID medicalRecordId) {
+        return jpaRepository.existsByMedicalRecordId(medicalRecordId);
+    }
+
+    @Override
     public List<MedicalRecordDiagnosis> findByMedicalRecordId(UUID medicalRecordId) {
         return jpaRepository.findByMedicalRecordId(medicalRecordId).stream()
                 .map(mapper::toDomain)

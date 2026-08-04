@@ -7,6 +7,8 @@ import java.util.UUID;
 import com.benhsoan.domain.prescription.Prescription;
 public interface PrescriptionRepository {
 
+    Prescription save(Prescription prescription);
+
     Optional<Prescription> findByPrescriptionCode(String prescriptionCode);
 
     boolean existsByPrescriptionCode(String prescriptionCode);

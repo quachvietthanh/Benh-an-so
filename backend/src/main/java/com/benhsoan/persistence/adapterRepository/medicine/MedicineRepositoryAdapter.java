@@ -23,6 +23,11 @@ public class MedicineRepositoryAdapter
     private final MedicinePersistenceMapper mapper;
 
     @Override
+    public Optional<Medicine> findById(UUID id) {
+        return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Medicine> findByMedicineCode(String medicineCode) {
         return jpaRepository.findByMedicineCode(medicineCode)
                 .map(mapper::toDomain);
