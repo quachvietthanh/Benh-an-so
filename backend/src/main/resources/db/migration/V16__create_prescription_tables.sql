@@ -1,6 +1,6 @@
 -- =====================================================
 -- V16__create_prescription_tables.sql
--- Medicine catalog, prescriptions and drug interactions
+-- Medicine catalog, prescriptions and drug interaction rules
 -- MySQL 8.x
 -- =====================================================
 
@@ -191,13 +191,45 @@ CREATE INDEX idx_prescription_items_medicine
     ON prescription_items(medicine_id);
 
 -- ===========================
--- Prescription warning logs
+-- Drug interaction rules
 -- ===========================
 
+CREATE TABLE drug_interaction_rules (
+    id BINARY(16) NOT NULL,
+    active_ingredient_a VARCHAR(255) NOT NULL,
+    active_ingredient_b VARCHAR(255) NOT NULL,
+    severity_level VARCHAR(30) NOT NULL,
+    description TEXT NOT NULL,
+    clinical_recommendation TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NULL,
+
+    CONSTRAINT pk_drug_interaction_rules PRIMARY KEY (id),
+    CONSTRAINT uk_drug_interaction_rules_ingredient_pair
+        UNIQUE (active_ingredient_a, active_ingredient_b),
+    CONSTRAINT chk_drug_interaction_rules_different_ingredients CHECK (
+        active_ingredient_a <> active_ingredient_b
+    ),
+    CONSTRAINT chk_drug_interaction_rules_severity CHECK (
+        severity_level IN ('MILD', 'MODERATE', 'SEVERE', 'CONTRAINDICATED')
+    )
+);
+
+CREATE INDEX idx_drug_interaction_rules_ingredient_b
+    ON drug_interaction_rules(active_ingredient_b);
+
+CREATE INDEX idx_drug_interaction_rules_active_severity
+    ON drug_interaction_rules(is_active, severity_level);
+
+-- ===========================
+-- Prescription warning logs
+-- ===========================
 
 CREATE TABLE prescription_warning_logs (
     id BINARY(16) NOT NULL,
     prescription_id BINARY(16) NOT NULL,
+    rule_id BINARY(16) NOT NULL,
     first_medicine_id BINARY(16) NOT NULL,
     second_medicine_id BINARY(16) NOT NULL,
     severity VARCHAR(30) NOT NULL,
@@ -212,6 +244,9 @@ CREATE TABLE prescription_warning_logs (
     CONSTRAINT fk_prescription_warning_logs_prescription
         FOREIGN KEY (prescription_id)
         REFERENCES prescriptions(id),
+    CONSTRAINT fk_prescription_warning_logs_rule
+        FOREIGN KEY (rule_id)
+        REFERENCES drug_interaction_rules(id),
     CONSTRAINT fk_prescription_warning_logs_first_medicine
         FOREIGN KEY (first_medicine_id)
         REFERENCES medicines(id),
@@ -238,6 +273,9 @@ CREATE TABLE prescription_warning_logs (
 
 CREATE INDEX idx_prescription_warning_logs_prescription
     ON prescription_warning_logs(prescription_id);
+
+CREATE INDEX idx_prescription_warning_logs_rule
+    ON prescription_warning_logs(rule_id);
 
 CREATE INDEX idx_prescription_warning_logs_handled_by
     ON prescription_warning_logs(handled_by);

@@ -20,7 +20,6 @@ import com.benhsoan.application.ucservice.prescription.snapshot.PrescriptionSnap
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
-import com.benhsoan.domain.druginteraction.DrugInteraction;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionAmendment;
@@ -38,10 +37,12 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
+import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
-import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAmendmentRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
@@ -61,7 +62,7 @@ public class AmendPrescriptionService
 
     private final MedicineRepository medicineRepository;
 
-    private final DrugInteractionRepository drugInteractionRepository;
+    private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
 
     private final PrescriptionWarningLogRepository warningLogRepository;
 
@@ -126,7 +127,9 @@ public class AmendPrescriptionService
         );
         rejectNoBusinessChanges(beforeBusinessState, candidate);
 
-        List<DrugInteraction> interactions = findInteractions(itemCommands);
+        List<DrugInteractionWarningResult> interactions = findInteractions(
+                replacementItems
+        );
         Map<UUID, String> overrideReasons = validateInteractionOverrides(
                 interactions,
                 command.interactionOverrides()
@@ -355,64 +358,65 @@ public class AmendPrescriptionService
         }
     }
 
-    private List<DrugInteraction> findInteractions(
-            List<AmendPrescriptionItemCommand> itemCommands
+    private List<DrugInteractionWarningResult> findInteractions(
+            List<PrescriptionItem> replacementItems
     ) {
-        Set<UUID> medicineIds = itemCommands.stream()
-                .map(AmendPrescriptionItemCommand::medicineId)
-                .collect(java.util.stream.Collectors.toSet());
-        List<DrugInteraction> interactions = drugInteractionRepository
-                .findActiveInteractionsAmong(medicineIds);
+        List<DrugInteractionWarningResult> interactions = checkDrugInteractionUseCase
+                .check(new CheckDrugInteractionCommand(
+                        replacementItems.stream()
+                                .map(item -> item.getMedicineId())
+                                .toList()
+                ));
         return interactions == null ? List.of() : List.copyOf(interactions);
     }
 
     private Map<UUID, String> validateInteractionOverrides(
-            List<DrugInteraction> interactions,
+            List<DrugInteractionWarningResult> interactions,
             List<PrescriptionInteractionOverrideCommand> overrideCommands
     ) {
         List<PrescriptionInteractionOverrideCommand> safeOverrides
                 = overrideCommands == null ? List.of() : overrideCommands;
-        Map<UUID, String> reasonsByInteractionId = new HashMap<>();
+        Map<UUID, String> reasonsByRuleId = new HashMap<>();
 
         for (PrescriptionInteractionOverrideCommand override : safeOverrides) {
-            if (override == null || override.drugInteractionId() == null) {
+            if (override == null || override.ruleId() == null) {
                 throw new ValidationException(
-                        "Drug interaction id is required for an override."
+                        "Interaction rule id is required for an override."
                 );
             }
             if (override.overrideReason() == null
                     || override.overrideReason().isBlank()) {
                 throw new ValidationException(
-                        "Override reason is required for drug interaction: "
-                                + override.drugInteractionId()
+                        "Override reason is required for interaction rule: "
+                                + override.ruleId()
                 );
             }
-            if (reasonsByInteractionId.put(
-                    override.drugInteractionId(),
+            if (reasonsByRuleId.put(
+                    override.ruleId(),
                     override.overrideReason().trim()
             ) != null) {
                 throw new ValidationException(
-                        "Duplicate override for drug interaction: "
-                                + override.drugInteractionId()
+                        "Duplicate override for interaction rule: "
+                                + override.ruleId()
                 );
             }
         }
 
         Set<UUID> detectedIds = interactions.stream()
-                .map(DrugInteraction::getId)
+                .map(interaction -> interaction.ruleId())
                 .collect(java.util.stream.Collectors.toSet());
-        for (UUID suppliedId : reasonsByInteractionId.keySet()) {
+        for (UUID suppliedId : reasonsByRuleId.keySet()) {
             if (!detectedIds.contains(suppliedId)) {
                 throw new ValidationException(
-                        "Override does not belong to a detected interaction: "
+                        "Override does not belong to a detected interaction rule: "
                                 + suppliedId
                 );
             }
         }
 
-        List<DrugInteraction> unconfirmed = interactions.stream()
-                .filter(interaction -> !reasonsByInteractionId.containsKey(
-                        interaction.getId()
+        List<DrugInteractionWarningResult> unconfirmed = interactions.stream()
+                .filter(interaction -> !reasonsByRuleId.containsKey(
+                        interaction.ruleId()
                 ))
                 .toList();
         if (!unconfirmed.isEmpty()) {
@@ -423,25 +427,25 @@ public class AmendPrescriptionService
             );
         }
 
-        return Map.copyOf(reasonsByInteractionId);
+        return Map.copyOf(reasonsByRuleId);
     }
 
     private InteractionWarning toInteractionWarning(
-            DrugInteraction interaction
+            DrugInteractionWarningResult interaction
     ) {
         return new InteractionWarning(
-                interaction.getId(),
-                interaction.getFirstMedicineId(),
-                interaction.getSecondMedicineId(),
-                interaction.getSeverity(),
-                interaction.getDescription(),
-                interaction.getRecommendation()
+                interaction.ruleId(),
+                interaction.drugIdA(),
+                interaction.drugIdB(),
+                interaction.severity(),
+                interaction.description(),
+                interaction.clinicalRecommendation()
         );
     }
 
     private List<PrescriptionWarningLog> saveWarningLogs(
             UUID prescriptionId,
-            List<DrugInteraction> interactions,
+            List<DrugInteractionWarningResult> interactions,
             Map<UUID, String> overrideReasons,
             UUID handledBy,
             Instant handledAt
@@ -451,13 +455,13 @@ public class AmendPrescriptionService
                         PrescriptionWarningLog.create(
                                 UUID.randomUUID(),
                                 prescriptionId,
-                                interaction.getId(),
-                                interaction.getFirstMedicineId(),
-                                interaction.getSecondMedicineId(),
-                                interaction.getSeverity(),
+                                interaction.ruleId(),
+                                interaction.drugIdA(),
+                                interaction.drugIdB(),
+                                interaction.severity(),
                                 buildWarningMessage(interaction),
                                 WarningAction.OVERRIDDEN,
-                                overrideReasons.get(interaction.getId()),
+                                overrideReasons.get(interaction.ruleId()),
                                 handledBy,
                                 handledAt,
                                 handledAt
@@ -466,10 +470,10 @@ public class AmendPrescriptionService
                 .toList();
     }
 
-    private String buildWarningMessage(DrugInteraction interaction) {
+    private String buildWarningMessage(DrugInteractionWarningResult interaction) {
         return "%s Recommendation: %s".formatted(
-                interaction.getDescription(),
-                interaction.getRecommendation()
+                interaction.description(),
+                interaction.clinicalRecommendation()
         );
     }
 

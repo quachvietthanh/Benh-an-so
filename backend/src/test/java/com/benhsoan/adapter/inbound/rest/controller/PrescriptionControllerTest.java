@@ -22,8 +22,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -41,6 +46,21 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private CreatePrescriptionUseCase createPrescriptionUseCase;
+
+    @MockitoBean
+    private AmendPrescriptionUseCase amendPrescriptionUseCase;
+
+    @MockitoBean
+    private GetPrescriptionUseCase getPrescriptionUseCase;
+
+    @MockitoBean
+    private GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
+
+    @MockitoBean
+    private DispensePrescriptionUseCase dispensePrescriptionUseCase;
+
+    @MockitoBean
+    private CancelPrescriptionUseCase cancelPrescriptionUseCase;
 
     @MockitoBean
     private CheckDrugInteractionUseCase checkDrugInteractionUseCase;

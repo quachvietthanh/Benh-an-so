@@ -1,5 +1,5 @@
 -- =====================================================
--- V17 - Seed medicine, interaction and prescription data
+-- V17 - Seed medicine, drug interaction rule and prescription data
 -- Requires V3 users and V12 medical record seed data.
 -- =====================================================
 
@@ -43,25 +43,38 @@ INSERT INTO medicines (
 (UUID_TO_BIN('16000000-0000-0000-0000-000000000030'), 'MED-ASP-81', 'Aspirin 81 mg', 'Acetylsalicylic acid', '81 mg', 'TABLET', 'vien', 'ORAL', FALSE, '2026-08-01 01:00:00', '2026-08-15 01:00:00');
 
 -- ===========================
--- Active drug interactions
+-- Drug interaction rules
 -- ===========================
 
-INSERT INTO drug_interactions (
-    id, first_medicine_id, second_medicine_id, severity, description,
-    recommendation, active, created_at, updated_at
+INSERT INTO drug_interaction_rules (
+    id, active_ingredient_a, active_ingredient_b, severity_level, description,
+    clinical_recommendation, is_active, created_at, updated_at
 ) VALUES
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000001'), UUID_TO_BIN('16000000-0000-0000-0000-000000000002'), UUID_TO_BIN('16000000-0000-0000-0000-000000000021'), 'MAJOR', 'Ibuprofen va diclofenac lam tang nguy co xuat huyet tieu hoa.', 'Khong phoi hop hai NSAID; chon mot thuoc giam dau phu hop.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000002'), UUID_TO_BIN('16000000-0000-0000-0000-000000000003'), UUID_TO_BIN('16000000-0000-0000-0000-000000000004'), 'MODERATE', 'Trung lap dieu tri khang sinh penicillin.', 'Khong ke dong thoi amoxicillin va amoxicillin clavulanate.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000003'), UUID_TO_BIN('16000000-0000-0000-0000-000000000005'), UUID_TO_BIN('16000000-0000-0000-0000-000000000028'), 'MAJOR', 'Tang nguy co keo dai QT khi dung azithromycin va levofloxacin.', 'Tranh phoi hop; xem xet khang sinh thay the.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000004'), UUID_TO_BIN('16000000-0000-0000-0000-000000000007'), UUID_TO_BIN('16000000-0000-0000-0000-000000000008'), 'MODERATE', 'Trung lap dieu tri PPI.', 'Chi su dung mot thuoc uc che bom proton.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000005'), UUID_TO_BIN('16000000-0000-0000-0000-000000000009'), UUID_TO_BIN('16000000-0000-0000-0000-000000000010'), 'MODERATE', 'Trung lap dieu tri khang histamine H1.', 'Chi dung mot khang histamine de han che buon ngu.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000006'), UUID_TO_BIN('16000000-0000-0000-0000-000000000014'), UUID_TO_BIN('16000000-0000-0000-0000-000000000015'), 'MODERATE', 'Trung lap salbutamol duong uong va duong hit.', 'Danh gia tong lieu salbutamol va nhip tim truoc khi phoi hop.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000007'), UUID_TO_BIN('16000000-0000-0000-0000-000000000016'), UUID_TO_BIN('16000000-0000-0000-0000-000000000017'), 'MINOR', 'Tang nguy co ha duong huyet khi dung metformin va gliclazide.', 'Theo doi duong huyet va huong dan nhan biet ha duong huyet.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000008'), UUID_TO_BIN('16000000-0000-0000-0000-000000000021'), UUID_TO_BIN('16000000-0000-0000-0000-000000000029'), 'CONTRAINDICATED', 'Diclofenac lam tang manh nguy co xuat huyet khi dung warfarin.', 'Tranh phoi hop; dung paracetamol neu can giam dau.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000009'), UUID_TO_BIN('16000000-0000-0000-0000-000000000002'), UUID_TO_BIN('16000000-0000-0000-0000-000000000029'), 'MAJOR', 'Ibuprofen lam tang nguy co xuat huyet khi dung warfarin.', 'Tranh NSAID; can nhac paracetamol va theo doi INR.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000010'), UUID_TO_BIN('16000000-0000-0000-0000-000000000018'), UUID_TO_BIN('16000000-0000-0000-0000-000000000005'), 'MODERATE', 'Azithromycin co the lam tang nong do atorvastatin.', 'Theo doi dau co; can nhac tam dung statin khi dieu tri ngan ngay.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000011'), UUID_TO_BIN('16000000-0000-0000-0000-000000000023'), UUID_TO_BIN('16000000-0000-0000-0000-000000000016'), 'MODERATE', 'Prednisolone co the lam tang duong huyet o nguoi dung metformin.', 'Theo doi duong huyet trong thoi gian su dung corticosteroid.', TRUE, '2026-08-01 01:10:00', NULL),
-(UUID_TO_BIN('16100000-0000-0000-0000-000000000012'), UUID_TO_BIN('16000000-0000-0000-0000-000000000025'), UUID_TO_BIN('16000000-0000-0000-0000-000000000026'), 'MINOR', 'Loperamide co the che lap trieu chung khi tieu chay nhiem trung.', 'Chi dung sau khi danh gia nguyen nhan va ket hop bu nuoc.', TRUE, '2026-08-01 01:10:00', NULL);
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000001'), 'Aspirin', 'Warfarin', 'SEVERE', 'Aspirin increases bleeding risk when used with Warfarin.', 'Avoid the combination when possible; if both are required, monitor INR and bleeding closely.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000002'), 'Ibuprofen', 'Warfarin', 'SEVERE', 'Ibuprofen increases bleeding risk when used with Warfarin.', 'Avoid NSAIDs when possible; consider Paracetamol and monitor INR closely.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000003'), 'Clarithromycin', 'Simvastatin', 'CONTRAINDICATED', 'Clarithromycin can sharply increase Simvastatin exposure and rhabdomyolysis risk.', 'Do not combine; choose another antibiotic or temporarily stop Simvastatin.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000004'), 'Gemfibrozil', 'Simvastatin', 'CONTRAINDICATED', 'Gemfibrozil markedly increases Simvastatin toxicity risk.', 'Do not combine; consider another lipid-lowering strategy.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000005'), 'Amiodarone', 'Simvastatin', 'SEVERE', 'Amiodarone can increase Simvastatin exposure and muscle toxicity.', 'Limit Simvastatin dose or switch to a lower-interaction statin.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000006'), 'Isosorbide Mononitrate', 'Sildenafil', 'CONTRAINDICATED', 'Combining Sildenafil with nitrates can cause profound hypotension.', 'Contraindicated; avoid Sildenafil within 24 to 48 hours of nitrate use.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000007'), 'Methotrexate', 'Trimethoprim', 'CONTRAINDICATED', 'Trimethoprim increases bone marrow suppression risk with Methotrexate.', 'Do not combine; use another antibiotic and monitor blood counts.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000008'), 'Digoxin', 'Furosemide', 'MODERATE', 'Furosemide-induced hypokalemia can increase Digoxin toxicity.', 'Monitor potassium and Digoxin levels and replace potassium if needed.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000009'), 'Ciprofloxacin', 'Tizanidine', 'CONTRAINDICATED', 'Ciprofloxacin can greatly increase Tizanidine exposure.', 'Do not combine; select another antibiotic.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-00000000000a'), 'Ciprofloxacin', 'Theophylline', 'SEVERE', 'Ciprofloxacin can raise Theophylline concentration and toxicity risk.', 'Reduce Theophylline dose and monitor levels if coadministration is unavoidable.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-00000000000b'), 'Ibuprofen', 'Lithium', 'SEVERE', 'NSAIDs can reduce Lithium clearance and increase toxicity.', 'Avoid the combination or monitor Lithium closely.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-00000000000c'), 'Lisinopril', 'Potassium Chloride', 'MODERATE', 'The combination may increase hyperkalemia risk.', 'Monitor serum potassium and limit supplementation unless necessary.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-00000000000d'), 'Paracetamol', 'Warfarin', 'MODERATE', 'Prolonged high-dose Paracetamol may increase INR in patients taking Warfarin.', 'Use the lowest effective Paracetamol dose and monitor INR.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-00000000000e'), 'Fluoxetine', 'Tramadol', 'SEVERE', 'The combination may increase serotonin syndrome and seizure risk.', 'Avoid the combination; consider another analgesic.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-00000000000f'), 'Clopidogrel', 'Omeprazole', 'MODERATE', 'Omeprazole may reduce Clopidogrel activation through CYP2C19 inhibition.', 'Prefer Pantoprazole or another lower-interaction acid suppressor.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('d1a00000-0000-0000-0000-000000000010'), 'Cetirizine', 'Diphenhydramine', 'MILD', 'Dual antihistamine therapy may increase sedation.', 'Advise patients to monitor drowsiness and avoid driving if sedated.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000001'), 'Amoxicillin', 'Amoxicillin + Clavulanic acid', 'MODERATE', 'This duplicates penicillin therapy.', 'Do not prescribe both together unless there is a clear justification.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000002'), 'Azithromycin', 'Levofloxacin', 'SEVERE', 'The combination may increase QT prolongation risk.', 'Avoid the combination and consider an alternative antibiotic.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000003'), 'Omeprazole', 'Esomeprazole', 'MODERATE', 'This duplicates proton pump inhibitor therapy.', 'Use only one proton pump inhibitor at a time.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000004'), 'Cetirizine', 'Loratadine', 'MODERATE', 'This duplicates H1-antihistamine therapy.', 'Use only one antihistamine to reduce excess sedation.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000005'), 'Metformin', 'Gliclazide', 'MILD', 'The combination can increase hypoglycemia risk.', 'Monitor blood glucose and counsel the patient on hypoglycemia symptoms.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000006'), 'Diclofenac', 'Warfarin', 'CONTRAINDICATED', 'Diclofenac can substantially increase bleeding risk when used with Warfarin.', 'Avoid the combination; consider Paracetamol if analgesia is needed.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000007'), 'Atorvastatin', 'Azithromycin', 'MODERATE', 'Azithromycin may increase Atorvastatin exposure in susceptible patients.', 'Monitor for muscle pain and consider holding the statin during short antibiotic courses.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000008'), 'Metformin', 'Prednisolone', 'MODERATE', 'Prednisolone can worsen glycemic control in patients taking Metformin.', 'Monitor blood glucose during corticosteroid treatment.', TRUE, '2026-08-01 01:10:00', NULL),
+(UUID_TO_BIN('17100000-0000-0000-0000-000000000009'), 'Loperamide', 'Oral rehydration salts', 'MILD', 'Loperamide may mask symptoms in infectious diarrhea while rehydration is ongoing.', 'Assess the cause of diarrhea and prioritize rehydration.', TRUE, '2026-08-01 01:10:00', NULL);
 
 -- ===========================
 -- Prescription headers
@@ -105,12 +118,12 @@ INSERT INTO prescription_items (
 -- ===========================
 
 INSERT INTO prescription_warning_logs (
-    id, prescription_id, drug_interaction_id, first_medicine_id,
+    id, prescription_id, rule_id, first_medicine_id,
     second_medicine_id, severity, warning_message, action, override_reason,
     handled_by, handled_at, created_at
 ) VALUES
-(UUID_TO_BIN('16400000-0000-0000-0000-000000000001'), UUID_TO_BIN('16200000-0000-0000-0000-000000000005'), UUID_TO_BIN('16100000-0000-0000-0000-000000000009'), UUID_TO_BIN('16000000-0000-0000-0000-000000000002'), UUID_TO_BIN('16000000-0000-0000-0000-000000000029'), 'MAJOR', 'Ibuprofen lam tang nguy co xuat huyet khi dung warfarin. Recommendation: Tranh NSAID; can nhac paracetamol va theo doi INR.', 'OVERRIDDEN', 'Bac si da danh gia loi ich vuot nguy co trong thoi gian dieu tri rat ngan.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:47:00', '2026-08-20 02:47:00'),
-(UUID_TO_BIN('16400000-0000-0000-0000-000000000002'), UUID_TO_BIN('16200000-0000-0000-0000-000000000003'), UUID_TO_BIN('16100000-0000-0000-0000-000000000007'), UUID_TO_BIN('16000000-0000-0000-0000-000000000016'), UUID_TO_BIN('16000000-0000-0000-0000-000000000017'), 'MINOR', 'Tang nguy co ha duong huyet khi dung metformin va gliclazide. Recommendation: Theo doi duong huyet va huong dan nhan biet ha duong huyet.', 'OVERRIDDEN', 'Phac do phoi hop duoc bac si chi dinh va da huong dan benh nhan theo doi ha duong huyet.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:45:00', '2026-08-20 02:45:00');
+(UUID_TO_BIN('16400000-0000-0000-0000-000000000001'), UUID_TO_BIN('16200000-0000-0000-0000-000000000005'), UUID_TO_BIN('d1a00000-0000-0000-0000-000000000002'), UUID_TO_BIN('16000000-0000-0000-0000-000000000002'), UUID_TO_BIN('16000000-0000-0000-0000-000000000029'), 'SEVERE', 'Ibuprofen increases bleeding risk when used with Warfarin. Recommendation: Avoid NSAIDs when possible; consider Paracetamol and monitor INR closely.', 'OVERRIDDEN', 'Bac si da danh gia loi ich vuot nguy co trong thoi gian dieu tri rat ngan.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:47:00', '2026-08-20 02:47:00'),
+(UUID_TO_BIN('16400000-0000-0000-0000-000000000002'), UUID_TO_BIN('16200000-0000-0000-0000-000000000003'), UUID_TO_BIN('17100000-0000-0000-0000-000000000005'), UUID_TO_BIN('16000000-0000-0000-0000-000000000016'), UUID_TO_BIN('16000000-0000-0000-0000-000000000017'), 'MILD', 'The combination can increase hypoglycemia risk. Recommendation: Monitor blood glucose and counsel the patient on hypoglycemia symptoms.', 'OVERRIDDEN', 'Phac do phoi hop duoc bac si chi dinh va da huong dan benh nhan theo doi ha duong huyet.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:45:00', '2026-08-20 02:45:00');
 
 INSERT INTO prescription_amendments (
     id, prescription_id, change_reason, before_data, after_data,

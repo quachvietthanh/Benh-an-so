@@ -3,7 +3,6 @@ package com.benhsoan.application.ucservice.prescription;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -24,7 +23,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.benhsoan.application.ucservice.prescription.snapshot.PrescriptionSnapshotMapper;
 import com.benhsoan.application.ucservice.prescription.snapshot.PrescriptionSnapshotSerializer;
 import com.benhsoan.domain.auditlog.AuditLog;
-import com.benhsoan.domain.druginteraction.DrugInteraction;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
@@ -40,8 +38,9 @@ import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionAmendm
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
+import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
-import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAmendmentRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
@@ -57,7 +56,7 @@ class AmendPrescriptionServiceTest {
 
     @Mock private PrescriptionRepository prescriptionRepository;
     @Mock private MedicineRepository medicineRepository;
-    @Mock private DrugInteractionRepository drugInteractionRepository;
+    @Mock private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionAmendmentRepository amendmentRepository;
     @Mock private AuditLogRepository auditLogRepository;
@@ -74,7 +73,7 @@ class AmendPrescriptionServiceTest {
         service = new AmendPrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
-                drugInteractionRepository,
+                checkDrugInteractionUseCase,
                 warningLogRepository,
                 amendmentRepository,
                 auditLogRepository,
@@ -98,7 +97,7 @@ class AmendPrescriptionServiceTest {
     void amendsPendingPrescriptionAndStoresCompleteSnapshots() {
         Prescription prescription = pendingPrescription(actorId);
         when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
-        when(drugInteractionRepository.findActiveInteractionsAmong(anySet())).thenReturn(List.of());
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
         when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -170,9 +169,15 @@ class AmendPrescriptionServiceTest {
         UUID additionalMedicineId = UUID.randomUUID();
         when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
         when(medicineRepository.findById(additionalMedicineId)).thenReturn(Optional.of(medicine(additionalMedicineId, true)));
-        when(drugInteractionRepository.findActiveInteractionsAmong(anySet()))
-                .thenReturn(List.of(DrugInteraction.restore(UUID.randomUUID(), existingMedicineId, additionalMedicineId,
-                        InteractionSeverity.MODERATE, "Interaction detected", "Monitor closely", true, CREATED_AT, null)));
+        when(checkDrugInteractionUseCase.check(any()))
+                .thenReturn(List.of(new DrugInteractionWarningResult(
+                        UUID.randomUUID(),
+                        existingMedicineId,
+                        additionalMedicineId,
+                        InteractionSeverity.MODERATE,
+                        "Interaction detected",
+                        "Monitor closely"
+                )));
 
         assertThrows(PrescriptionInteractionConfirmationRequiredException.class,
                 () -> service.amend(command(List.of(item(existingMedicineId, "1 tablet"), item(additionalMedicineId, "1 tablet")))));

@@ -142,10 +142,10 @@ public class PrescriptionRestMapper {
     private PrescriptionInteractionOverrideCommand toCommand(
             PrescriptionInteractionOverrideRequest request
     ) {
-        return PrescriptionInteractionOverrideCommand.builder()
-                .ruleId(request.ruleId())
-                .overrideReason(request.overrideReason())
-                .build();
+        return new PrescriptionInteractionOverrideCommand(
+                request.ruleId(),
+                request.overrideReason()
+        );
     }
 
     private PrescriptionItemResponse toResponse(
