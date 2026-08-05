@@ -140,5 +140,5 @@ INSERT INTO prescription_amendments (
 );
 
 -- The next automatically generated code is RX000007.
-INSERT INTO prescription_code_sequences (code_prefix, last_value)
+INSERT INTO prescription_code_sequences (code_prefix, `last_value`)
 VALUES ('RX', 6);

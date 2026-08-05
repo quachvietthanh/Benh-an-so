@@ -17,9 +17,9 @@ public class PrescriptionCodeSequenceRepositoryAdapter
     @Override
     public long reserveNextValue(String prefix) {
         entityManager.createNativeQuery("""
-                INSERT INTO prescription_code_sequences (code_prefix, last_value)
+                INSERT INTO prescription_code_sequences (code_prefix, `last_value`)
                 VALUES (:prefix, LAST_INSERT_ID(1))
-                ON DUPLICATE KEY UPDATE last_value = LAST_INSERT_ID(last_value + 1)
+                ON DUPLICATE KEY UPDATE `last_value` = LAST_INSERT_ID(`last_value` + 1)
                 """)
                 .setParameter("prefix", prefix)
                 .executeUpdate();
