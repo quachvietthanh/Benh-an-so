@@ -93,8 +93,8 @@ class CheckDrugInteractionServiceTest {
 
         stubMedicine(paracetamolId, "Paracetamol");
         stubMedicine(amoxicillinId, "Amoxicillin");
-        when(ruleRepository.findActiveRuleBetween(anyString(), anyString()))
-                .thenReturn(Optional.empty());
+        when(ruleRepository.findActiveRulesByIngredients(any()))
+                .thenReturn(List.of());
 
         List<DrugInteractionWarningResult> warnings = service.check(
                 new CheckDrugInteractionCommand(
@@ -132,12 +132,8 @@ class CheckDrugInteractionServiceTest {
                 InteractionSeverity.SEVERE
         );
 
-        when(ruleRepository.findActiveRuleBetween("IngredientA", "IngredientB"))
-                .thenReturn(Optional.of(moderate));
-        when(ruleRepository.findActiveRuleBetween("IngredientA", "IngredientC"))
-                .thenReturn(Optional.of(contraindicated));
-        when(ruleRepository.findActiveRuleBetween("IngredientB", "IngredientC"))
-                .thenReturn(Optional.of(severe));
+        when(ruleRepository.findActiveRulesByIngredients(any()))
+                .thenReturn(List.of(moderate, contraindicated, severe));
 
         List<DrugInteractionWarningResult> warnings = service.check(
                 new CheckDrugInteractionCommand(List.of(drugA, drugB, drugC))
@@ -162,7 +158,7 @@ class CheckDrugInteractionServiceTest {
         assertTrue(single.isEmpty());
         assertTrue(empty.isEmpty());
         verify(medicineRepository, never()).findById(any());
-        verify(ruleRepository, never()).findActiveRuleBetween(anyString(), anyString());
+        verify(ruleRepository, never()).findActiveRulesByIngredients(any());
     }
 
     @Test
@@ -173,13 +169,14 @@ class CheckDrugInteractionServiceTest {
 
         stubMedicine(brandId, "Paracetamol");
         stubMedicine(genericId, "Paracetamol");
+        when(ruleRepository.findActiveRulesByIngredients(any()))
+                .thenReturn(List.of());
 
         List<DrugInteractionWarningResult> warnings = service.check(
                 new CheckDrugInteractionCommand(List.of(brandId, genericId))
         );
 
         assertTrue(warnings.isEmpty());
-        verify(ruleRepository, never()).findActiveRuleBetween(anyString(), anyString());
     }
 
     @Test
@@ -220,15 +217,12 @@ class CheckDrugInteractionServiceTest {
             String ingredientB,
             DrugInteractionRule rule
     ) {
-        when(ruleRepository.findActiveRuleBetween(anyString(), anyString()))
+        when(ruleRepository.findActiveRulesByIngredients(any()))
                 .thenAnswer(invocation -> {
-                    Set<String> pair = Set.of(
-                            invocation.getArgument(0),
-                            invocation.getArgument(1)
-                    );
-                    return pair.equals(Set.of(ingredientA, ingredientB))
-                            ? Optional.of(rule)
-                            : Optional.empty();
+                    Set<String> ingredients = invocation.getArgument(0);
+                    return ingredients.containsAll(Set.of(ingredientA, ingredientB))
+                            ? List.of(rule)
+                            : List.of();
                 });
     }
 

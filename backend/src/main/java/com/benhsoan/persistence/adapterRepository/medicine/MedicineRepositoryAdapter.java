@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.medicine;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +26,14 @@ public class MedicineRepositoryAdapter
     @Override
     public Optional<Medicine> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Medicine> findAllById(Collection<UUID> ids) {
+        return jpaRepository.findAllById(ids)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override
