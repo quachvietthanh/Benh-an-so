@@ -25,7 +25,7 @@ public class PrescriptionWarningLog {
 
     private UUID prescriptionId;
 
-    private UUID drugInteractionId;
+    private UUID ruleId;
 
     private UUID firstMedicineId;
 
@@ -48,7 +48,7 @@ public class PrescriptionWarningLog {
     private PrescriptionWarningLog(
             UUID id,
             UUID prescriptionId,
-            UUID drugInteractionId,
+            UUID ruleId,
             UUID firstMedicineId,
             UUID secondMedicineId,
             InteractionSeverity severity,
@@ -61,7 +61,7 @@ public class PrescriptionWarningLog {
     ) {
         this.id = requireNonNull(id, "Prescription warning log id is required.");
         this.prescriptionId = requireNonNull(prescriptionId, "Prescription id is required.");
-        this.drugInteractionId = requireNonNull(drugInteractionId, "Drug interaction id is required.");
+        this.ruleId = requireNonNull(ruleId, "Drug interaction rule id is required.");
         UUID validatedFirstMedicineId = requireNonNull(firstMedicineId, "First medicine id is required.");
         UUID validatedSecondMedicineId = requireNonNull(secondMedicineId, "Second medicine id is required.");
         validateDifferentMedicines(validatedFirstMedicineId, validatedSecondMedicineId);
@@ -84,7 +84,7 @@ public class PrescriptionWarningLog {
     public static PrescriptionWarningLog create(
             UUID id,
             UUID prescriptionId,
-            UUID drugInteractionId,
+            UUID ruleId,
             UUID firstMedicineId,
             UUID secondMedicineId,
             InteractionSeverity severity,
@@ -98,7 +98,7 @@ public class PrescriptionWarningLog {
         return new PrescriptionWarningLog(
                 id,
                 prescriptionId,
-                drugInteractionId,
+                ruleId,
                 firstMedicineId,
                 secondMedicineId,
                 severity,
@@ -114,7 +114,7 @@ public class PrescriptionWarningLog {
     public static PrescriptionWarningLog restore(
             UUID id,
             UUID prescriptionId,
-            UUID drugInteractionId,
+            UUID ruleId,
             UUID firstMedicineId,
             UUID secondMedicineId,
             InteractionSeverity severity,
@@ -128,7 +128,7 @@ public class PrescriptionWarningLog {
         return new PrescriptionWarningLog(
                 id,
                 prescriptionId,
-                drugInteractionId,
+                ruleId,
                 firstMedicineId,
                 secondMedicineId,
                 severity,

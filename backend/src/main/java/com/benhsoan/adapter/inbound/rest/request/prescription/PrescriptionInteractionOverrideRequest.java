@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 public record PrescriptionInteractionOverrideRequest(
 
         @NotNull
-        UUID drugInteractionId,
+        UUID ruleId,
 
         @NotBlank
         String overrideReason

@@ -37,7 +37,7 @@ public class PrescriptionController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('DOCTOR')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
     public PrescriptionResponse create(
             @Valid @RequestBody CreatePrescriptionRequest request
     ) {

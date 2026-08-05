@@ -6,6 +6,8 @@ import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 
 public record DrugInteractionWarningResult(
 
+        UUID ruleId,
+
         UUID drugIdA,
 
         UUID drugIdB,

@@ -84,6 +84,7 @@ public class CheckDrugInteractionService
             Medicine second
     ) {
         return new DrugInteractionWarningResult(
+                rule.getId(),
                 first.getId(),
                 second.getId(),
                 rule.getSeverity(),

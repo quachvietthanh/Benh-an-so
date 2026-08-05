@@ -69,6 +69,7 @@ class PrescriptionControllerTest {
         when(checkDrugInteractionUseCase.check(any()))
                 .thenReturn(List.of(
                         new DrugInteractionWarningResult(
+                                UUID.randomUUID(),
                                 aspirinId,
                                 warfarinId,
                                 InteractionSeverity.SEVERE,

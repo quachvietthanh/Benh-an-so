@@ -100,7 +100,7 @@ public class PrescriptionRestMapper {
             PrescriptionInteractionOverrideRequest request
     ) {
         return PrescriptionInteractionOverrideCommand.builder()
-                .drugInteractionId(request.drugInteractionId())
+                .ruleId(request.ruleId())
                 .overrideReason(request.overrideReason())
                 .build();
     }
@@ -132,7 +132,7 @@ public class PrescriptionRestMapper {
     ) {
         return PrescriptionWarningResponse.builder()
                 .id(result.id())
-                .drugInteractionId(result.drugInteractionId())
+                .ruleId(result.ruleId())
                 .firstMedicineId(result.firstMedicineId())
                 .secondMedicineId(result.secondMedicineId())
                 .severity(result.severity())
@@ -148,6 +148,7 @@ public class PrescriptionRestMapper {
             DrugInteractionWarningResult result
     ) {
         return new DrugInteractionWarningResponse(
+                result.ruleId(),
                 result.drugIdA(),
                 result.drugIdB(),
                 result.severity(),
