@@ -16,7 +16,7 @@ public class PrescriptionWarningLogPersistenceMapper {
         return PrescriptionWarningLog.restore(
                 entity.getId(),
                 entity.getPrescriptionId(),
-                entity.getDrugInteractionId(),
+                entity.getRuleId(),
                 entity.getFirstMedicineId(),
                 entity.getSecondMedicineId(),
                 entity.getSeverity(),
@@ -37,7 +37,7 @@ public class PrescriptionWarningLogPersistenceMapper {
         return PrescriptionWarningLogEntity.builder()
                 .id(domain.getId())
                 .prescriptionId(domain.getPrescriptionId())
-                .drugInteractionId(domain.getDrugInteractionId())
+                .ruleId(domain.getRuleId())
                 .firstMedicineId(domain.getFirstMedicineId())
                 .secondMedicineId(domain.getSecondMedicineId())
                 .severity(domain.getSeverity())

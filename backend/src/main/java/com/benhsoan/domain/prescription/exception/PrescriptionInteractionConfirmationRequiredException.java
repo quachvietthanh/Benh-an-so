@@ -22,7 +22,7 @@ public class PrescriptionInteractionConfirmationRequiredException
     }
 
     public record InteractionWarning(
-            UUID drugInteractionId,
+            UUID ruleId,
             UUID firstMedicineId,
             UUID secondMedicineId,
             InteractionSeverity severity,

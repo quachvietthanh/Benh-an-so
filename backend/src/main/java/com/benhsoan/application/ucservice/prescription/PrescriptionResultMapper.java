@@ -70,7 +70,7 @@ public class PrescriptionResultMapper {
     ) {
         return new PrescriptionWarningResult(
                 warningLog.getId(),
-                warningLog.getDrugInteractionId(),
+                warningLog.getRuleId(),
                 warningLog.getFirstMedicineId(),
                 warningLog.getSecondMedicineId(),
                 warningLog.getSeverity(),
