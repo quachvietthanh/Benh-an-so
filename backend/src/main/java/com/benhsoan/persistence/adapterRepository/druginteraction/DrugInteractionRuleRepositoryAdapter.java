@@ -7,14 +7,14 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.domain.druginteraction.DrugInteractionRule;
 import com.benhsoan.persistence.jpaRepository.druginteraction.JpaDrugInteractionRuleRepository;
 import com.benhsoan.persistence.mapper.druginteraction.DrugInteractionRulePersistenceMapper;
-import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRuleRepositoryPort;
+import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRuleRepository;
 
 import lombok.RequiredArgsConstructor;
 
 @Repository
 @RequiredArgsConstructor
 public class DrugInteractionRuleRepositoryAdapter
-        implements DrugInteractionRuleRepositoryPort {
+        implements DrugInteractionRuleRepository {
 
     private final JpaDrugInteractionRuleRepository jpaRepository;
 

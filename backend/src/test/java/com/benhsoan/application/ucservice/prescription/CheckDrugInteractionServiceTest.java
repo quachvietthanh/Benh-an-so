@@ -31,7 +31,7 @@ import com.benhsoan.domain.medicine.enums.DosageForm;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
-import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRuleRepositoryPort;
+import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRuleRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,7 +40,7 @@ class CheckDrugInteractionServiceTest {
     private static final Instant NOW = Instant.parse("2026-08-05T02:00:00Z");
 
     @Mock private MedicineRepository medicineRepository;
-    @Mock private DrugInteractionRuleRepositoryPort ruleRepository;
+    @Mock private DrugInteractionRuleRepository ruleRepository;
 
     private CheckDrugInteractionService service;
 

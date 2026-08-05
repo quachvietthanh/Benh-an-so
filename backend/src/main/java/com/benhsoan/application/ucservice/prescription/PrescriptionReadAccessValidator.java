@@ -1,14 +1,13 @@
 package com.benhsoan.application.ucservice.prescription;
 
 import java.util.Objects;
-import java.util.UUID;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
-import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
+import com.benhsoan.domain.prescription.Prescription;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;

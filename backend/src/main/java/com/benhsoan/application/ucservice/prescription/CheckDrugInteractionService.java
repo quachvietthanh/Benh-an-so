@@ -16,7 +16,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
-import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRuleRepositoryPort;
+import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRuleRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -29,7 +29,7 @@ public class CheckDrugInteractionService
 
     private final MedicineRepository medicineRepository;
 
-    private final DrugInteractionRuleRepositoryPort ruleRepository;
+    private final DrugInteractionRuleRepository ruleRepository;
 
     @Override
     public List<DrugInteractionWarningResult> check(

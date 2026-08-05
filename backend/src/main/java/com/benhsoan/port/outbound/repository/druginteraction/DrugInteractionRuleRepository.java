@@ -4,7 +4,7 @@ import java.util.Optional;
 
 import com.benhsoan.domain.druginteraction.DrugInteractionRule;
 
-public interface DrugInteractionRuleRepositoryPort {
+public interface DrugInteractionRuleRepository {
 
     Optional<DrugInteractionRule> findActiveRuleBetween(
             String activeIngredientA,
