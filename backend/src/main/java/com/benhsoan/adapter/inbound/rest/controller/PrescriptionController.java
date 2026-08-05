@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +21,10 @@ import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionRespo
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +38,10 @@ public class PrescriptionController {
     private final CreatePrescriptionUseCase createPrescriptionUseCase;
 
     private final AmendPrescriptionUseCase amendPrescriptionUseCase;
+    private final GetPrescriptionUseCase getPrescriptionUseCase;
+    private final GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
+    private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
+    private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
 
     private final PrescriptionRestMapper mapper;
 
@@ -60,5 +69,34 @@ public class PrescriptionController {
         );
 
         return mapper.toResponse(result);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'PHARMACIST')")
+    public PrescriptionResponse getById(@PathVariable UUID id) {
+        return mapper.toResponse(getPrescriptionUseCase.getById(id));
+    }
+
+    @GetMapping("/medical-records/{medicalRecordId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'PHARMACIST')")
+    public java.util.List<PrescriptionResponse> getByMedicalRecordId(
+            @PathVariable UUID medicalRecordId
+    ) {
+        return getPrescriptionsByMedicalRecordUseCase.getByMedicalRecordId(medicalRecordId)
+                .stream()
+                .map(mapper::toResponse)
+                .toList();
+    }
+
+    @PostMapping("/{id}/dispense")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public PrescriptionResponse dispense(@PathVariable UUID id) {
+        return mapper.toResponse(dispensePrescriptionUseCase.dispense(id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public PrescriptionResponse cancel(@PathVariable UUID id) {
+        return mapper.toResponse(cancelPrescriptionUseCase.cancel(id));
     }
 }

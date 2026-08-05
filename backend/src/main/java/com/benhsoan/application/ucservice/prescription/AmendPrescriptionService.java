@@ -1,6 +1,5 @@
 package com.benhsoan.application.ucservice.prescription;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +47,7 @@ import com.benhsoan.port.outbound.repository.prescription.PrescriptionAmendmentR
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -77,7 +77,9 @@ public class AmendPrescriptionService
 
     private final PrescriptionSnapshotSerializer snapshotSerializer;
 
-    private final Clock clock;
+    private final ClockPort clockPort;
+
+    private final PrescriptionClinicalContextValidator clinicalContextValidator;
 
     @Override
     public PrescriptionResult amend(
@@ -87,10 +89,14 @@ public class AmendPrescriptionService
         authorizeDoctor();
 
         UUID currentUserId = currentUserPort.getCurrentUserId();
-        Instant now = clock.instant();
+        Instant now = clockPort.now();
         Prescription prescription = loadForUpdate(command.prescriptionId());
 
         validateAmendmentAccess(prescription, currentUserId);
+        clinicalContextValidator.requireEditableRecordForDoctor(
+                prescription.getMedicalRecordId(),
+                currentUserId
+        );
 
         String beforeData = snapshotSerializer.serialize(
                 snapshotMapper.toSnapshot(prescription)
@@ -240,10 +246,7 @@ public class AmendPrescriptionService
             existingByMedicineId.put(item.getMedicineId(), item);
         }
 
-        Map<UUID, Medicine> addedMedicines = loadAddedMedicines(
-                itemCommands,
-                existingByMedicineId.keySet()
-        );
+        Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
 
         return itemCommands.stream()
                 .map(command -> {
@@ -259,7 +262,7 @@ public class AmendPrescriptionService
                     }
                     return createAddedItem(
                             prescription.getId(),
-                            addedMedicines.get(command.medicineId()),
+                            medicines.get(command.medicineId()),
                             command,
                             updatedAt
                     );
@@ -267,24 +270,19 @@ public class AmendPrescriptionService
                 .toList();
     }
 
-    private Map<UUID, Medicine> loadAddedMedicines(
-            List<AmendPrescriptionItemCommand> itemCommands,
-            Set<UUID> existingMedicineIds
+    private Map<UUID, Medicine> loadActiveMedicines(
+            List<AmendPrescriptionItemCommand> itemCommands
     ) {
         Map<UUID, Medicine> medicines = new LinkedHashMap<>();
 
         for (AmendPrescriptionItemCommand item : itemCommands) {
-            if (existingMedicineIds.contains(item.medicineId())) {
-                continue;
-            }
-
             Medicine medicine = medicineRepository.findById(item.medicineId())
                     .orElseThrow(() -> new ValidationException(
                             "Medicine not found: " + item.medicineId()
                     ));
             if (!medicine.isActive()) {
                 throw new ValidationException(
-                        "Inactive medicine cannot be added: "
+                        "Inactive medicine cannot remain in an amended prescription: "
                                 + medicine.getId()
                 );
             }

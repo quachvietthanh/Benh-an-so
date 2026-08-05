@@ -2,9 +2,8 @@ package com.benhsoan.infrastructure.security.generator;
 
 import org.springframework.stereotype.Component;
 
-import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.port.outbound.generator.PrescriptionCodeGenerator;
-import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionCodeSequenceRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -14,18 +13,13 @@ public class DatabasePrescriptionCodeGenerator implements PrescriptionCodeGenera
 
     private static final String PREFIX = "RX";
 
-    private final PrescriptionRepository prescriptionRepository;
+    private final PrescriptionCodeSequenceRepository sequenceRepository;
 
     @Override
     public String generate() {
-        return prescriptionRepository.findTopByOrderByPrescriptionCodeDesc()
-                .map(Prescription::getPrescriptionCode)
-                .map(this::nextCode)
-                .orElse(PREFIX + "000001");
-    }
-
-    private String nextCode(String currentCode) {
-        int number = Integer.parseInt(currentCode.substring(PREFIX.length()));
-        return PREFIX + String.format("%06d", number + 1);
+        return PREFIX + String.format(
+                "%06d",
+                sequenceRepository.reserveNextValue(PREFIX)
+        );
     }
 }

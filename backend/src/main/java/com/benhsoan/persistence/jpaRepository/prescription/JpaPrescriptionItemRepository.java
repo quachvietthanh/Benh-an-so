@@ -17,7 +17,7 @@ public interface JpaPrescriptionItemRepository
             UUID prescriptionId
     );
 
-    @Modifying(flushAutomatically = true)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from PrescriptionItemEntity item "
             + "where item.prescriptionId = :prescriptionId")
     void deleteAllByPrescriptionId(@Param("prescriptionId") UUID prescriptionId);

@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,12 +53,12 @@ class CreatePrescriptionServiceTest {
     @Mock private PrescriptionRepository prescriptionRepository;
     @Mock private MedicineRepository medicineRepository;
     @Mock private DrugInteractionRepository drugInteractionRepository;
-    @Mock private MedicalRecordRepository medicalRecordRepository;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionCodeGenerator prescriptionCodeGenerator;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private PrescriptionClinicalContextValidator clinicalContextValidator;
 
     private CreatePrescriptionService service;
     private UUID actorId;
@@ -72,14 +71,14 @@ class CreatePrescriptionServiceTest {
                 prescriptionRepository,
                 medicineRepository,
                 drugInteractionRepository,
-                medicalRecordRepository,
                 medicalRecordDiagnosisRepository,
                 warningLogRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
                 new PrescriptionResultMapper(),
                 auditLogRepository,
-                () -> NOW
+                () -> NOW,
+                clinicalContextValidator
         );
         actorId = UUID.randomUUID();
         medicalRecordId = UUID.randomUUID();
@@ -158,18 +157,13 @@ class CreatePrescriptionServiceTest {
     }
 
     @Test
-    void permitsAdministratorConsistentlyWithSecurityConfiguration() {
-        prepareValidCreate();
-        preparePersistence();
-        when(drugInteractionRepository.findActiveInteractionsAmong(any())).thenReturn(List.of());
-        reset(currentUserPort);
-        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
-        when(currentUserPort.hasRole(anyString()))
-                .thenAnswer(invocation -> "ADMIN".equals(invocation.getArgument(0)));
+    void rejectsAdministratorAccordingToPrescriptionBusinessRule() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
 
-        service.create(command(List.of(item(medicineId)), List.of()));
+        assertThrows(AccessDeniedException.class,
+                () -> service.create(command(List.of(item(medicineId)), List.of())));
 
-        verify(prescriptionRepository).save(any(Prescription.class));
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
     }
 
     @Test
@@ -185,7 +179,6 @@ class CreatePrescriptionServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
         when(currentUserPort.hasRole(anyString()))
                 .thenAnswer(invocation -> "DOCTOR".equals(invocation.getArgument(0)));
-        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.of(record()));
         when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(medicalRecordId)).thenReturn(true);
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(activeMedicine(medicineId)));
     }
