@@ -9,6 +9,8 @@ public interface PrescriptionRepository {
 
     Prescription save(Prescription prescription);
 
+    Optional<Prescription> findById(UUID id);
+
     Optional<Prescription> findByPrescriptionCode(String prescriptionCode);
 
     boolean existsByPrescriptionCode(String prescriptionCode);

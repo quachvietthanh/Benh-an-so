@@ -3,9 +3,7 @@ package com.benhsoan.application.ucservice.prescription;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,7 +22,6 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
-import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
@@ -40,7 +37,6 @@ import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.outbound.generator.PrescriptionCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
-import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
@@ -54,12 +50,12 @@ class CreatePrescriptionServiceTest {
     @Mock private PrescriptionRepository prescriptionRepository;
     @Mock private MedicineRepository medicineRepository;
     @Mock private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
-    @Mock private MedicalRecordRepository medicalRecordRepository;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionCodeGenerator prescriptionCodeGenerator;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private PrescriptionClinicalContextValidator clinicalContextValidator;
 
     private CreatePrescriptionService service;
     private UUID actorId;
@@ -72,14 +68,14 @@ class CreatePrescriptionServiceTest {
                 prescriptionRepository,
                 medicineRepository,
                 checkDrugInteractionUseCase,
-                medicalRecordRepository,
                 medicalRecordDiagnosisRepository,
                 warningLogRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
                 new PrescriptionResultMapper(),
                 auditLogRepository,
-                () -> NOW
+                () -> NOW,
+                clinicalContextValidator
         );
         actorId = UUID.randomUUID();
         medicalRecordId = UUID.randomUUID();
@@ -135,10 +131,10 @@ class CreatePrescriptionServiceTest {
 
         var result = service.create(command(
                 List.of(item(medicineId), item(secondMedicineId)),
-                List.of(PrescriptionInteractionOverrideCommand.builder()
-                        .ruleId(warning.ruleId())
-                        .overrideReason("Benefits outweigh the moderate interaction.")
-                        .build())
+                List.of(new PrescriptionInteractionOverrideCommand(
+                        warning.ruleId(),
+                        "Benefits outweigh the moderate interaction."
+                ))
         ));
 
         assertEquals(1, result.warnings().size());
@@ -158,23 +154,18 @@ class CreatePrescriptionServiceTest {
     }
 
     @Test
-    void permitsAdministratorConsistentlyWithSecurityConfiguration() {
-        prepareValidCreate();
-        preparePersistence();
-        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
-        reset(currentUserPort);
-        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
-        when(currentUserPort.hasRole(anyString()))
-                .thenAnswer(invocation -> "ADMIN".equals(invocation.getArgument(0)));
+    void rejectsAdministratorAccordingToPrescriptionBusinessRule() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
 
-        service.create(command(List.of(item(medicineId)), List.of()));
+        assertThrows(AccessDeniedException.class,
+                () -> service.create(command(List.of(item(medicineId)), List.of())));
 
-        verify(prescriptionRepository).save(any(Prescription.class));
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
     }
 
     @Test
-    void rejectsCallerWithoutDoctorOrAdministratorRole() {
-        when(currentUserPort.hasRole(anyString())).thenReturn(false);
+    void rejectsCallerWithoutDoctorRole() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
 
         assertThrows(AccessDeniedException.class, () -> service.create(command(List.of(item(medicineId)), List.of())));
 
@@ -183,9 +174,7 @@ class CreatePrescriptionServiceTest {
 
     private void prepareValidCreate() {
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
-        when(currentUserPort.hasRole(anyString()))
-                .thenAnswer(invocation -> "DOCTOR".equals(invocation.getArgument(0)));
-        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.of(record()));
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
         when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(medicalRecordId)).thenReturn(true);
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(activeMedicine(medicineId)));
     }
@@ -215,10 +204,6 @@ class CreatePrescriptionServiceTest {
                 .frequency("Twice daily")
                 .quantity(10)
                 .build();
-    }
-
-    private MedicalRecord record() {
-        return MedicalRecord.create(UUID.randomUUID(), null, null, null, null, null, null, null, null, actorId, NOW);
     }
 
     private Medicine activeMedicine(UUID id) {

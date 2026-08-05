@@ -1,9 +1,12 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
+import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionItemRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
@@ -12,6 +15,8 @@ import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWa
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionWarningResponse;
+import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
+import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
@@ -23,6 +28,30 @@ import com.benhsoan.port.dto.result.PrescriptionWarningResult;
 
 @Component
 public class PrescriptionRestMapper {
+
+    public AmendPrescriptionCommand toCommand(
+            UUID prescriptionId,
+            AmendPrescriptionRequest request
+    ) {
+        List<PrescriptionInteractionOverrideCommand> interactionOverrides
+                = request.interactionOverrides() == null
+                        ? List.of()
+                        : request.interactionOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
+        return AmendPrescriptionCommand.builder()
+                .prescriptionId(prescriptionId)
+                .note(request.note())
+                .changeReason(request.changeReason())
+                .items(request.items()
+                        .stream()
+                        .map(this::toCommand)
+                        .toList())
+                .interactionOverrides(interactionOverrides)
+                .build();
+    }
 
     public CreatePrescriptionCommand toCommand(
             CreatePrescriptionRequest request
@@ -96,13 +125,27 @@ public class PrescriptionRestMapper {
                 .build();
     }
 
+    private AmendPrescriptionItemCommand toCommand(
+            AmendPrescriptionItemRequest request
+    ) {
+        return AmendPrescriptionItemCommand.builder()
+                .medicineId(request.medicineId())
+                .dosage(request.dosage())
+                .frequency(request.frequency())
+                .route(request.route())
+                .durationDays(request.durationDays())
+                .quantity(request.quantity())
+                .instructions(request.instructions())
+                .build();
+    }
+
     private PrescriptionInteractionOverrideCommand toCommand(
             PrescriptionInteractionOverrideRequest request
     ) {
-        return PrescriptionInteractionOverrideCommand.builder()
-                .ruleId(request.ruleId())
-                .overrideReason(request.overrideReason())
-                .build();
+        return new PrescriptionInteractionOverrideCommand(
+                request.ruleId(),
+                request.overrideReason()
+        );
     }
 
     private PrescriptionItemResponse toResponse(

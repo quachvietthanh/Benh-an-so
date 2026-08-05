@@ -60,6 +60,12 @@ public class PrescriptionRepositoryAdapter
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Prescription> findById(UUID id) {
+        return jpaRepository.findById(id).map(this::toDomain);
+    }
+
+    @Override
     public boolean existsByPrescriptionCode(String prescriptionCode) {
         return jpaRepository.existsByPrescriptionCode(prescriptionCode);
     }

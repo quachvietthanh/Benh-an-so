@@ -36,7 +36,6 @@ import com.benhsoan.port.outbound.generator.PrescriptionCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
-import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -56,8 +55,6 @@ public class CreatePrescriptionService
 
     private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
 
-    private final MedicalRecordRepository medicalRecordRepository;
-
     private final MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
 
     private final PrescriptionWarningLogRepository warningLogRepository;
@@ -72,6 +69,8 @@ public class CreatePrescriptionService
 
     private final ClockPort clockPort;
 
+    private final PrescriptionClinicalContextValidator clinicalContextValidator;
+
     @Override
     public PrescriptionResult create(
             CreatePrescriptionCommand command
@@ -82,7 +81,7 @@ public class CreatePrescriptionService
         UUID currentUserId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
 
-        validateMedicalRecord(command.medicalRecordId());
+        validateMedicalRecord(command.medicalRecordId(), currentUserId);
         List<CreatePrescriptionItemCommand> itemCommands
                 = validateItemCommands(command.items());
         Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
@@ -132,23 +131,18 @@ public class CreatePrescriptionService
     }
 
     private void authorizeDoctor() {
-        if (!currentUserPort.hasRole("ADMIN")
-                && !currentUserPort.hasRole("DOCTOR")) {
+        if (!currentUserPort.hasRole("DOCTOR")) {
             throw new AccessDeniedException(
-                    "Only administrators or doctors are allowed to create prescriptions."
+                    "Only doctors are allowed to create prescriptions."
             );
         }
     }
 
-    private void validateMedicalRecord(UUID medicalRecordId) {
-        if (medicalRecordId == null) {
-            throw new ValidationException("Medical record id is required.");
-        }
-
-        medicalRecordRepository.findById(medicalRecordId)
-                .orElseThrow(() -> new ValidationException(
-                        "Medical record not found: " + medicalRecordId
-                ));
+    private void validateMedicalRecord(UUID medicalRecordId, UUID doctorId) {
+        clinicalContextValidator.requireEditableRecordForDoctor(
+                medicalRecordId,
+                doctorId
+        );
 
         if (!medicalRecordDiagnosisRepository
                 .existsByMedicalRecordId(medicalRecordId)) {
