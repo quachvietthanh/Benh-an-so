@@ -1,6 +1,8 @@
 -- =====================================================
 -- V16__create_prescription_tables.sql
 -- Medicine catalog, prescriptions and drug interaction rules
+-- Includes the warning-log rule_id and severity alignment
+-- previously introduced by V18__update_warning_logs_severity_check.sql
 -- MySQL 8.x
 -- =====================================================
 
@@ -224,6 +226,9 @@ CREATE INDEX idx_drug_interaction_rules_active_severity
 
 -- ===========================
 -- Prescription warning logs
+-- Merged from the old V18 update:
+-- 1) rule_id references drug_interaction_rules
+-- 2) severity uses MILD, MODERATE, SEVERE, CONTRAINDICATED
 -- ===========================
 
 CREATE TABLE prescription_warning_logs (
