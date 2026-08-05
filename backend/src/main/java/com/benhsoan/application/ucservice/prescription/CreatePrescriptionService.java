@@ -1,6 +1,5 @@
 package com.benhsoan.application.ucservice.prescription;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +39,7 @@ import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordReposito
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -69,7 +69,7 @@ public class CreatePrescriptionService
 
     private final AuditLogRepository auditLogRepository;
 
-    private final Clock clock;
+    private final ClockPort clockPort;
 
     @Override
     public PrescriptionResult create(
@@ -79,7 +79,7 @@ public class CreatePrescriptionService
         authorizeDoctor();
 
         UUID currentUserId = currentUserPort.getCurrentUserId();
-        Instant now = clock.instant();
+        Instant now = clockPort.now();
 
         validateMedicalRecord(command.medicalRecordId());
         List<CreatePrescriptionItemCommand> itemCommands
@@ -126,9 +126,10 @@ public class CreatePrescriptionService
     }
 
     private void authorizeDoctor() {
-        if (!currentUserPort.hasRole("DOCTOR")) {
+        if (!currentUserPort.hasRole("ADMIN")
+                && !currentUserPort.hasRole("DOCTOR")) {
             throw new AccessDeniedException(
-                    "Only doctors are allowed to create prescriptions."
+                    "Only administrators or doctors are allowed to create prescriptions."
             );
         }
     }
