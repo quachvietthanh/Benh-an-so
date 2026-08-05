@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
+import com.benhsoan.domain.clinical.ClinicalServiceCatalog;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderInvalidVisitException;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderLockedMedicalRecordException;
 import com.benhsoan.domain.clinical.exception.ClinicalServiceUnavailableException;
@@ -22,11 +23,11 @@ import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.clinical.CreateClinicalOrderCommand;
 import com.benhsoan.port.dto.result.ClinicalOrderResult;
 import com.benhsoan.port.inbound.clinical.CreateClinicalOrderUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalServiceCatalogRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalServiceCatalogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
@@ -70,7 +71,7 @@ public class CreateClinicalOrderService implements CreateClinicalOrderUseCase {
         ensureDistinctServiceIds(serviceIds);
         Map<UUID, com.benhsoan.domain.clinical.ClinicalServiceCatalog> servicesById =
                 clinicalServiceCatalogRepository.findActiveByIdIn(serviceIds).stream()
-                        .collect(Collectors.toMap(com.benhsoan.domain.clinical.ClinicalServiceCatalog::getId,
+                        .collect(Collectors.toMap(ClinicalServiceCatalog::getId,
                                 Function.identity()));
         if (servicesById.size() != serviceIds.size()) {
             throw new ClinicalServiceUnavailableException();

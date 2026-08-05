@@ -18,7 +18,7 @@ import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.domain.visit.exception.VisitEncounterAccessDeniedException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.result.VisitEncounterResult;
-import com.benhsoan.port.outbound.repository.queryRepository.visit.VisitEncounterQueryRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitEncounterQueryRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 class GetVisitEncounterServiceTest {

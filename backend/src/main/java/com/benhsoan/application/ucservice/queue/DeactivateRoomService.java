@@ -10,7 +10,7 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.queue.exception.RoomNotFoundException;
 import com.benhsoan.port.dto.result.RoomResult;
 import com.benhsoan.port.inbound.queue.DeactivateRoomUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.RoomRepository;
+import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;

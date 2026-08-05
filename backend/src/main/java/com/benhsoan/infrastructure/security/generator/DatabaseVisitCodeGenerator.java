@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.outbound.generator.VisitCodeGenerator;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 
 import lombok.RequiredArgsConstructor;
 

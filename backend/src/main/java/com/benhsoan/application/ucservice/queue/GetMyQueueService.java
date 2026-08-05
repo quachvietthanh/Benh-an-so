@@ -10,7 +10,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.queue.GetMyQueueQuery;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
-import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemQueryRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;

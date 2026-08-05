@@ -36,8 +36,8 @@ import com.benhsoan.port.inbound.queue.GetRoomUseCase;
 import com.benhsoan.port.inbound.queue.SearchRoomsUseCase;
 import com.benhsoan.port.inbound.queue.UpdateRoomUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

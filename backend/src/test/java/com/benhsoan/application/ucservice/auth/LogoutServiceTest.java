@@ -23,8 +23,8 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.port.dto.command.auth.LogoutCommand;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)

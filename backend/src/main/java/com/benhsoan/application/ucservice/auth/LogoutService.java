@@ -12,8 +12,8 @@ import com.benhsoan.domain.auth.exception.TokenInvalidException;
 import com.benhsoan.port.dto.command.auth.LogoutCommand;
 import com.benhsoan.port.inbound.auth.LogoutUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;

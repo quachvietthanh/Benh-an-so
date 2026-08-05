@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.port.outbound.generator.AppointmentCodeGenerator;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 
 import lombok.RequiredArgsConstructor;
 

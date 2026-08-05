@@ -10,8 +10,8 @@ import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.command.patient.GetPatientMedicalHistoryQuery;
 import com.benhsoan.port.dto.result.MedicalHistoryItemResult;
 import com.benhsoan.port.inbound.patient.ViewPatientMedicalHistoryUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
-import com.benhsoan.port.outbound.repository.queryRepository.patient.PatientMedicalHistoryQueryPort;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientMedicalHistoryQueryPort;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

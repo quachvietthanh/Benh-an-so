@@ -26,7 +26,7 @@ import com.benhsoan.domain.queue.exception.UnauthorizedQueueOperationException;
 import com.benhsoan.port.dto.command.queue.CreateRoomCommand;
 import com.benhsoan.port.dto.command.queue.SearchRoomsQuery;
 import com.benhsoan.port.dto.command.queue.UpdateRoomCommand;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.RoomRepository;
+import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

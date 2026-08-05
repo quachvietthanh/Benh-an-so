@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.port.outbound.generator.PatientCodeGenerator;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 
 import lombok.RequiredArgsConstructor;
 

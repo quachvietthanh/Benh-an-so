@@ -44,7 +44,7 @@ import com.benhsoan.persistence.mapper.queue.MedicalQueuePersistenceMapper;
 import com.benhsoan.persistence.mapper.queue.QueueStructurePersistenceMapper;
 import com.benhsoan.persistence.mapper.visit.VisitPersistenceMapper;
 import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
-import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemQueryRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

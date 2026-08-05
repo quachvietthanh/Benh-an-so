@@ -10,10 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.clinical.ClinicalServiceCatalog;
-import com.benhsoan.persistence.entity.clinical.ClinicalServiceCatalogEntity;
 import com.benhsoan.persistence.jpaRepository.clinical.JpaClinicalServiceCatalogRepository;
 import com.benhsoan.persistence.mapper.clinical.ClinicalServiceCatalogPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalServiceCatalogRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalServiceCatalogRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,19 +26,6 @@ public class ClinicalServiceCatalogRepositoryAdapter implements ClinicalServiceC
     @Override
     public Optional<ClinicalServiceCatalog> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
-    }
-
-    @Override
-    public ClinicalServiceCatalog save(ClinicalServiceCatalog service) {
-        ClinicalServiceCatalogEntity savedEntity = jpaRepository.save(mapper.toEntity(service));
-        return mapper.toDomain(savedEntity);
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        if (id != null) {
-            jpaRepository.deleteById(id);
-        }
     }
 
     @Override

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.persistence.jpaRepository.visit.JpaVisitRepository;
 import com.benhsoan.persistence.jpaRepository.visit.VisitEncounterProjection;
 import com.benhsoan.port.dto.result.VisitEncounterResult;
-import com.benhsoan.port.outbound.repository.queryRepository.visit.VisitEncounterQueryRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitEncounterQueryRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.domain.clinical.MedicalAttachment;
 import com.benhsoan.persistence.jpaRepository.clinical.JpaMedicalAttachmentRepository;
 import com.benhsoan.persistence.mapper.clinical.MedicalAttachmentPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.MedicalAttachmentRepository;
+import com.benhsoan.port.outbound.repository.clinical.MedicalAttachmentRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,7 +21,6 @@ public class MedicalAttachmentRepositoryAdapter implements MedicalAttachmentRepo
     private final MedicalAttachmentPersistenceMapper mapper;
     public Optional<MedicalAttachment> findById(UUID id) { return jpaRepository.findById(id).map(mapper::toDomain); }
     public MedicalAttachment save(MedicalAttachment attachment) { return mapper.toDomain(jpaRepository.save(mapper.toEntity(attachment))); }
-    public void deleteById(UUID id) { if (id != null) jpaRepository.deleteById(id); }
     public boolean existsByClinicalResultId(UUID resultId) { return resultId != null && jpaRepository.existsByClinicalResultId(resultId); }
     public List<MedicalAttachment> findByClinicalResultId(UUID resultId) { return jpaRepository.findByClinicalResultIdOrderByUploadedAtDesc(resultId).stream().map(mapper::toDomain).toList(); }
     public List<MedicalAttachment> findByClinicalResultIdIn(Collection<UUID> resultIds) {

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.result.PatientResult;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 
 class GetPatientServiceTest {
 

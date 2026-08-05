@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
-import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemQueryRepository;
 
 import lombok.RequiredArgsConstructor;
 

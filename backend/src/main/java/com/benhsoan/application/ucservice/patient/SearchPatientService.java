@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.port.dto.command.patient.SearchPatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.SearchPatientUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 
 import lombok.RequiredArgsConstructor;
 

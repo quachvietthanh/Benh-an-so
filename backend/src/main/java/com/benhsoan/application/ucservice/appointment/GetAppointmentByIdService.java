@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 
 import lombok.RequiredArgsConstructor;
 

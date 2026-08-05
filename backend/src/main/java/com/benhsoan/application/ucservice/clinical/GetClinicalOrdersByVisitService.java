@@ -15,9 +15,9 @@ import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.clinical.GetClinicalOrdersByVisitQuery;
 import com.benhsoan.port.dto.result.ClinicalOrderResult;
 import com.benhsoan.port.inbound.clinical.GetClinicalOrdersByVisitUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.queue.exception.RoomNotFoundException;
 import com.benhsoan.port.dto.result.RoomResult;
 import com.benhsoan.port.inbound.queue.GetRoomUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.RoomRepository;
+import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 
 import lombok.RequiredArgsConstructor;
 

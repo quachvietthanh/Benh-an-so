@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.persistence.jpaRepository.queue.JpaQueueItemRepository;
 import com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection;
 import com.benhsoan.port.dto.result.QueueItemResult;
-import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemQueryRepository;
 
 import lombok.RequiredArgsConstructor;
 

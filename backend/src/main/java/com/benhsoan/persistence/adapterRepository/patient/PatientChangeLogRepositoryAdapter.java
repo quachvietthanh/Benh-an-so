@@ -11,7 +11,7 @@ import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.persistence.entity.patient.PatientChangeLogEntity;
 import com.benhsoan.persistence.jpaRepository.patient.JpaPatientChangeLogRepository;
 import com.benhsoan.persistence.mapper.patient.PatientChangeLogPersistenceMapper;
-import com.benhsoan.port.outbound.repository.logRepository.PatientChangeLogRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 
 import lombok.RequiredArgsConstructor;
 

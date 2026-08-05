@@ -11,7 +11,7 @@ import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
 import com.benhsoan.persistence.jpaRepository.queue.JpaQueueItemRepository;
 import com.benhsoan.persistence.mapper.queue.QueueStructurePersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,11 +23,6 @@ public class QueueItemRepositoryAdapter implements QueueItemRepository {
     private final QueueStructurePersistenceMapper mapper;
 
     @Override
-    public Optional<QueueItem> findById(UUID id) {
-        return jpaRepository.findById(id).map(mapper::toDomain);
-    }
-
-    @Override
     public Optional<QueueItem> findByIdForUpdate(UUID id) {
         return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
     }
@@ -35,11 +30,6 @@ public class QueueItemRepositoryAdapter implements QueueItemRepository {
     @Override
     public QueueItem save(QueueItem item) {
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(item)));
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override

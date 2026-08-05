@@ -25,14 +25,14 @@ import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.outbound.generator.VisitCodeGenerator;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.DoctorRoomAssignmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.RoomRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.queue.DoctorRoomAssignmentRepository;
+import com.benhsoan.port.outbound.repository.queue.MedicalQueueRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.queue.RoomRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -10,7 +10,7 @@ import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.persistence.entity.auth.UserSessionEntity;
 import com.benhsoan.persistence.jpaRepository.auth.JpaUserSessionRepository;
 import com.benhsoan.persistence.mapper.auth.UserSessionPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -54,12 +54,6 @@ public class UserSessionRepositoryAdapter implements UserSessionRepository {
         UserSessionEntity saved = jpaRepository.save(entity);
 
         return mapper.toDomain(saved);
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        if(id == null) return;
-        jpaRepository.deleteById(id);
     }
 
     @Override

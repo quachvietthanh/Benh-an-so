@@ -17,7 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.config.AppointmentReminderProperties;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)

@@ -24,10 +24,10 @@ import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 

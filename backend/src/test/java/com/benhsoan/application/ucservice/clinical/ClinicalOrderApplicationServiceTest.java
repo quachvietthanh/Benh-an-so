@@ -37,11 +37,11 @@ import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.command.clinical.CreateClinicalOrderCommand;
 import com.benhsoan.port.dto.command.clinical.GetClinicalOrdersByVisitQuery;
 import com.benhsoan.port.dto.command.clinical.SearchClinicalServiceCatalogQuery;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalOrderRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.clinical.ClinicalServiceCatalogRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalServiceCatalogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)

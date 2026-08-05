@@ -8,7 +8,7 @@ import com.benhsoan.persistence.jpaRepository.patient.JpaPatientMedicalHistoryRe
 import com.benhsoan.persistence.jpaRepository.patient.PatientMedicalHistoryProjection;
 import com.benhsoan.port.dto.command.patient.GetPatientMedicalHistoryQuery;
 import com.benhsoan.port.dto.result.MedicalHistoryItemResult;
-import com.benhsoan.port.outbound.repository.queryRepository.patient.PatientMedicalHistoryQueryPort;
+import com.benhsoan.port.outbound.repository.patient.PatientMedicalHistoryQueryPort;
 
 import lombok.RequiredArgsConstructor;
 

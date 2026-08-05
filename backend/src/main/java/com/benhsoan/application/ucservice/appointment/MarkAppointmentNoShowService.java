@@ -13,9 +13,9 @@ import com.benhsoan.domain.queue.exception.CheckInConflictException;
 import com.benhsoan.port.dto.command.appointment.MarkAppointmentNoShowCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
-import com.benhsoan.port.outbound.repository.logRepository.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;

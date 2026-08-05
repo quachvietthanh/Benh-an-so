@@ -9,7 +9,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordRepository;
 import com.benhsoan.persistence.mapper.medicalrecord.MedicalRecordPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.MedicalRecordRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,13 +29,6 @@ public class MedicalRecordRepositoryAdapter implements MedicalRecordRepository {
     public MedicalRecord save(MedicalRecord medicalRecord) {
         MedicalRecordEntity savedEntity = jpaRepository.save(mapper.toEntity(medicalRecord));
         return mapper.toDomain(savedEntity);
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        if (id != null) {
-            jpaRepository.deleteById(id);
-        }
     }
 
     @Override

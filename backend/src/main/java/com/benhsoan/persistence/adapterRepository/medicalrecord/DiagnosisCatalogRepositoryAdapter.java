@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaDiagnosisCatalogRepository;
 import com.benhsoan.persistence.mapper.medicalrecord.DiagnosisCatalogPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.medicalrecord.DiagnosisCatalogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.DiagnosisCatalogRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,16 +23,6 @@ public class DiagnosisCatalogRepositoryAdapter implements DiagnosisCatalogReposi
     @Override
     public Optional<DiagnosisCatalog> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
-    }
-
-    @Override
-    public DiagnosisCatalog save(DiagnosisCatalog diagnosis) {
-        return mapper.toDomain(jpaRepository.save(mapper.toEntity(diagnosis)));
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override

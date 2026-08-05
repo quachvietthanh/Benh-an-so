@@ -10,7 +10,7 @@ import com.benhsoan.domain.auth.Role;
 import com.benhsoan.persistence.entity.auth.RoleEntity;
 import com.benhsoan.persistence.jpaRepository.auth.JpaRoleRepository;
 import com.benhsoan.persistence.mapper.auth.RolePersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -46,12 +46,6 @@ public class RoleRepositoryAdapter implements RoleRepository {
         RoleEntity entity = mapper.toEntity(role);
         RoleEntity saved = jpaRepository.save(entity);
         return mapper.toDomain(saved);
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        if(id == null) return;
-        jpaRepository.deleteById(id);
     }
 
     @Override

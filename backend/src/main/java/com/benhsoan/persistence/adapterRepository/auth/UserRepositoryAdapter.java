@@ -10,7 +10,7 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.persistence.entity.auth.UserEntity;
 import com.benhsoan.persistence.jpaRepository.auth.JpaUserRepository;
 import com.benhsoan.persistence.mapper.auth.UserPersistenceMapper;
-import com.benhsoan.port.outbound.repository.crudRepository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 

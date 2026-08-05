@@ -18,7 +18,7 @@ import com.benhsoan.persistence.jpaRepository.appointment.AppointmentSearchSpeci
 import com.benhsoan.persistence.jpaRepository.appointment.JpaAppointmentRepository;
 import com.benhsoan.persistence.mapper.appointment.AppointmentPersistenceMapper;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -47,16 +47,6 @@ public class AppointmentRepositoryAdapter
                 = jpaRepository.save(entity);
 
         return mapper.toDomain(savedEntity);
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-
-        if (id == null) {
-            return;
-        }
-
-        jpaRepository.deleteById(id);
     }
 
     @Override

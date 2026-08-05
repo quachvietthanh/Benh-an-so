@@ -9,7 +9,7 @@ import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.GetPatientByCodeUseCase;
 import com.benhsoan.port.inbound.patient.GetPatientByIdUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -12,11 +12,11 @@ import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
-import com.benhsoan.port.outbound.repository.crudRepository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.MedicalQueueRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.queue.QueueItemRepository;
-import com.benhsoan.port.outbound.repository.crudRepository.visit.VisitRepository;
-import com.benhsoan.port.outbound.repository.queryRepository.queue.QueueItemQueryRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.queue.MedicalQueueRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemQueryRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
