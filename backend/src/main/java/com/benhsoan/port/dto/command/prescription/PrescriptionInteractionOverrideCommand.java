@@ -7,7 +7,7 @@ import lombok.Builder;
 @Builder
 public record PrescriptionInteractionOverrideCommand(
 
-        UUID drugInteractionId,
+        UUID ruleId,
 
         String overrideReason
 

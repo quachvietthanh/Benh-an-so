@@ -20,10 +20,10 @@ import lombok.Setter;
 
 @Entity
 @Table(
-        name = "drug_interactions",
+        name = "drug_interaction_rules",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_drug_interactions_medicine_pair",
-                columnNames = {"first_medicine_id", "second_medicine_id"}
+                name = "uk_drug_interaction_rules_ingredient_pair",
+                columnNames = {"active_ingredient_a", "active_ingredient_b"}
         )
 )
 @Getter
@@ -31,29 +31,29 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class DrugInteractionEntity {
+public class DrugInteractionRuleEntity {
 
     @Id
     @Column(name = "id", nullable = false, columnDefinition = "BINARY(16)")
     private UUID id;
 
-    @Column(name = "first_medicine_id", nullable = false, columnDefinition = "BINARY(16)")
-    private UUID firstMedicineId;
+    @Column(name = "active_ingredient_a", nullable = false, length = 255)
+    private String activeIngredientA;
 
-    @Column(name = "second_medicine_id", nullable = false, columnDefinition = "BINARY(16)")
-    private UUID secondMedicineId;
+    @Column(name = "active_ingredient_b", nullable = false, length = 255)
+    private String activeIngredientB;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "severity", nullable = false, length = 30)
+    @Column(name = "severity_level", nullable = false, length = 30)
     private InteractionSeverity severity;
 
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "recommendation", nullable = false, columnDefinition = "TEXT")
-    private String recommendation;
+    @Column(name = "clinical_recommendation", nullable = false, columnDefinition = "TEXT")
+    private String clinicalRecommendation;
 
-    @Column(name = "active", nullable = false)
+    @Column(name = "is_active", nullable = false)
     private boolean active;
 
     @Column(name = "created_at", nullable = false)

@@ -1,12 +1,13 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,12 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
-import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
+import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
@@ -42,12 +46,13 @@ public class PrescriptionController {
     private final GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
     private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
     private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
+    private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
 
     private final PrescriptionRestMapper mapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('DOCTOR')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
     public PrescriptionResponse create(
             @Valid @RequestBody CreatePrescriptionRequest request
     ) {
@@ -98,5 +103,15 @@ public class PrescriptionController {
     @PreAuthorize("hasRole('DOCTOR')")
     public PrescriptionResponse cancel(@PathVariable UUID id) {
         return mapper.toResponse(cancelPrescriptionUseCase.cancel(id));
+    }
+
+    @PostMapping("/check-interactions")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    public List<DrugInteractionWarningResponse> checkInteractions(
+            @Valid @RequestBody CheckDrugInteractionRequest request
+    ) {
+        return mapper.toResponse(
+                checkDrugInteractionUseCase.check(mapper.toCommand(request))
+        );
     }
 }

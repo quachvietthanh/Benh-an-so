@@ -191,51 +191,13 @@ CREATE INDEX idx_prescription_items_medicine
     ON prescription_items(medicine_id);
 
 -- ===========================
--- Drug interactions
--- ===========================
-
-CREATE TABLE drug_interactions (
-    id BINARY(16) NOT NULL,
-    first_medicine_id BINARY(16) NOT NULL,
-    second_medicine_id BINARY(16) NOT NULL,
-    severity VARCHAR(30) NOT NULL,
-    description TEXT NOT NULL,
-    recommendation TEXT NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NULL,
-
-    CONSTRAINT pk_drug_interactions PRIMARY KEY (id),
-    CONSTRAINT uk_drug_interactions_medicine_pair
-        UNIQUE (first_medicine_id, second_medicine_id),
-    CONSTRAINT fk_drug_interactions_first_medicine
-        FOREIGN KEY (first_medicine_id)
-        REFERENCES medicines(id),
-    CONSTRAINT fk_drug_interactions_second_medicine
-        FOREIGN KEY (second_medicine_id)
-        REFERENCES medicines(id),
-    CONSTRAINT chk_drug_interactions_different_medicines CHECK (
-        first_medicine_id <> second_medicine_id
-    ),
-    CONSTRAINT chk_drug_interactions_severity CHECK (
-        severity IN ('MINOR', 'MODERATE', 'MAJOR', 'CONTRAINDICATED')
-    )
-);
-
-CREATE INDEX idx_drug_interactions_second_medicine
-    ON drug_interactions(second_medicine_id);
-
-CREATE INDEX idx_drug_interactions_active_severity
-    ON drug_interactions(active, severity);
-
--- ===========================
 -- Prescription warning logs
 -- ===========================
+
 
 CREATE TABLE prescription_warning_logs (
     id BINARY(16) NOT NULL,
     prescription_id BINARY(16) NOT NULL,
-    drug_interaction_id BINARY(16) NOT NULL,
     first_medicine_id BINARY(16) NOT NULL,
     second_medicine_id BINARY(16) NOT NULL,
     severity VARCHAR(30) NOT NULL,
@@ -250,9 +212,6 @@ CREATE TABLE prescription_warning_logs (
     CONSTRAINT fk_prescription_warning_logs_prescription
         FOREIGN KEY (prescription_id)
         REFERENCES prescriptions(id),
-    CONSTRAINT fk_prescription_warning_logs_interaction
-        FOREIGN KEY (drug_interaction_id)
-        REFERENCES drug_interactions(id),
     CONSTRAINT fk_prescription_warning_logs_first_medicine
         FOREIGN KEY (first_medicine_id)
         REFERENCES medicines(id),
@@ -266,7 +225,7 @@ CREATE TABLE prescription_warning_logs (
         first_medicine_id <> second_medicine_id
     ),
     CONSTRAINT chk_prescription_warning_logs_severity CHECK (
-        severity IN ('MINOR', 'MODERATE', 'MAJOR', 'CONTRAINDICATED')
+        severity IN ('MILD', 'MODERATE', 'SEVERE', 'CONTRAINDICATED')
     ),
     CONSTRAINT chk_prescription_warning_logs_action CHECK (
         action IN ('REMOVED_MEDICINE', 'REPLACED_MEDICINE', 'OVERRIDDEN')
@@ -279,9 +238,6 @@ CREATE TABLE prescription_warning_logs (
 
 CREATE INDEX idx_prescription_warning_logs_prescription
     ON prescription_warning_logs(prescription_id);
-
-CREATE INDEX idx_prescription_warning_logs_interaction
-    ON prescription_warning_logs(drug_interaction_id);
 
 CREATE INDEX idx_prescription_warning_logs_handled_by
     ON prescription_warning_logs(handled_by);

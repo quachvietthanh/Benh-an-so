@@ -34,8 +34,8 @@ public class PrescriptionWarningLogEntity {
     @Column(name = "prescription_id", nullable = false, columnDefinition = "BINARY(16)")
     private UUID prescriptionId;
 
-    @Column(name = "drug_interaction_id", nullable = false, columnDefinition = "BINARY(16)")
-    private UUID drugInteractionId;
+    @Column(name = "rule_id", nullable = false, columnDefinition = "BINARY(16)")
+    private UUID ruleId;
 
     @Column(name = "first_medicine_id", nullable = false, columnDefinition = "BINARY(16)")
     private UUID firstMedicineId;

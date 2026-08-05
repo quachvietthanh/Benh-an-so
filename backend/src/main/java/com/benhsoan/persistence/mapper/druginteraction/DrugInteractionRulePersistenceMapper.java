@@ -2,42 +2,42 @@ package com.benhsoan.persistence.mapper.druginteraction;
 
 import org.springframework.stereotype.Component;
 
-import com.benhsoan.domain.druginteraction.DrugInteraction;
-import com.benhsoan.persistence.entity.druginteraction.DrugInteractionEntity;
+import com.benhsoan.domain.druginteraction.DrugInteractionRule;
+import com.benhsoan.persistence.entity.druginteraction.DrugInteractionRuleEntity;
 
 @Component
-public class DrugInteractionPersistenceMapper {
+public class DrugInteractionRulePersistenceMapper {
 
-    public DrugInteraction toDomain(DrugInteractionEntity entity) {
+    public DrugInteractionRule toDomain(DrugInteractionRuleEntity entity) {
         if (entity == null) {
             return null;
         }
 
-        return DrugInteraction.restore(
+        return DrugInteractionRule.restore(
                 entity.getId(),
-                entity.getFirstMedicineId(),
-                entity.getSecondMedicineId(),
+                entity.getActiveIngredientA(),
+                entity.getActiveIngredientB(),
                 entity.getSeverity(),
                 entity.getDescription(),
-                entity.getRecommendation(),
+                entity.getClinicalRecommendation(),
                 entity.isActive(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
     }
 
-    public DrugInteractionEntity toEntity(DrugInteraction domain) {
+    public DrugInteractionRuleEntity toEntity(DrugInteractionRule domain) {
         if (domain == null) {
             return null;
         }
 
-        return DrugInteractionEntity.builder()
+        return DrugInteractionRuleEntity.builder()
                 .id(domain.getId())
-                .firstMedicineId(domain.getFirstMedicineId())
-                .secondMedicineId(domain.getSecondMedicineId())
+                .activeIngredientA(domain.getActiveIngredientA())
+                .activeIngredientB(domain.getActiveIngredientB())
                 .severity(domain.getSeverity())
                 .description(domain.getDescription())
-                .recommendation(domain.getRecommendation())
+                .clinicalRecommendation(domain.getClinicalRecommendation())
                 .active(domain.isActive())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())

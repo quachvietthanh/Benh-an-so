@@ -1,8 +1,8 @@
 package com.benhsoan.domain.druginteraction.enums;
 
 public enum InteractionSeverity {
-    MINOR,
+    MILD,
     MODERATE,
-    MAJOR,
+    SEVERE,
     CONTRAINDICATED
 }

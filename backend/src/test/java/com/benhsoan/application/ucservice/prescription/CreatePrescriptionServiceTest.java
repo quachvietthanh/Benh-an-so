@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.auditlog.AuditLog;
-import com.benhsoan.domain.druginteraction.DrugInteraction;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicine.Medicine;
@@ -35,9 +34,10 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
+import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.outbound.generator.PrescriptionCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
-import com.benhsoan.port.outbound.repository.druginteraction.DrugInteractionRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
@@ -52,7 +52,8 @@ class CreatePrescriptionServiceTest {
 
     @Mock private PrescriptionRepository prescriptionRepository;
     @Mock private MedicineRepository medicineRepository;
-    @Mock private DrugInteractionRepository drugInteractionRepository;
+    @Mock private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+    @Mock private MedicalRecordRepository medicalRecordRepository;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionCodeGenerator prescriptionCodeGenerator;
@@ -70,7 +71,8 @@ class CreatePrescriptionServiceTest {
         service = new CreatePrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
-                drugInteractionRepository,
+                checkDrugInteractionUseCase,
+                medicalRecordRepository,
                 medicalRecordDiagnosisRepository,
                 warningLogRepository,
                 prescriptionCodeGenerator,
@@ -89,7 +91,7 @@ class CreatePrescriptionServiceTest {
     void createsPrescriptionWithMedicineSnapshotAndAuditLog() {
         prepareValidCreate();
         preparePersistence();
-        when(drugInteractionRepository.findActiveInteractionsAmong(any())).thenReturn(List.of());
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
 
         var result = service.create(command(List.of(item(medicineId)), List.of()));
 
@@ -112,7 +114,7 @@ class CreatePrescriptionServiceTest {
         prepareValidCreate();
         UUID secondMedicineId = UUID.randomUUID();
         when(medicineRepository.findById(secondMedicineId)).thenReturn(Optional.of(activeMedicine(secondMedicineId)));
-        when(drugInteractionRepository.findActiveInteractionsAmong(any())).thenReturn(List.of(interaction(medicineId, secondMedicineId)));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of(warning(medicineId, secondMedicineId)));
 
         assertThrows(PrescriptionInteractionConfirmationRequiredException.class,
                 () -> service.create(command(List.of(item(medicineId), item(secondMedicineId)), List.of())));
@@ -126,16 +128,16 @@ class CreatePrescriptionServiceTest {
         prepareValidCreate();
         preparePersistence();
         UUID secondMedicineId = UUID.randomUUID();
-        DrugInteraction interaction = interaction(medicineId, secondMedicineId);
+        DrugInteractionWarningResult warning = warning(medicineId, secondMedicineId);
         when(medicineRepository.findById(secondMedicineId)).thenReturn(Optional.of(activeMedicine(secondMedicineId)));
-        when(drugInteractionRepository.findActiveInteractionsAmong(any())).thenReturn(List.of(interaction));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of(warning));
         when(warningLogRepository.save(any(PrescriptionWarningLog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         var result = service.create(command(
                 List.of(item(medicineId), item(secondMedicineId)),
                 List.of(PrescriptionInteractionOverrideCommand.builder()
-                        .drugInteractionId(interaction.getId())
+                        .ruleId(warning.ruleId())
                         .overrideReason("Benefits outweigh the moderate interaction.")
                         .build())
         ));
@@ -157,11 +159,16 @@ class CreatePrescriptionServiceTest {
     }
 
     @Test
-    void rejectsAdministratorAccordingToPrescriptionBusinessRule() {
-        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
+    void permitsAdministratorConsistentlyWithSecurityConfiguration() {
+        prepareValidCreate();
+        preparePersistence();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        reset(currentUserPort);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(currentUserPort.hasRole(anyString()))
+                .thenAnswer(invocation -> "ADMIN".equals(invocation.getArgument(0)));
 
-        assertThrows(AccessDeniedException.class,
-                () -> service.create(command(List.of(item(medicineId)), List.of())));
+        service.create(command(List.of(item(medicineId)), List.of()));
 
         verify(prescriptionRepository, never()).save(any(Prescription.class));
     }
@@ -224,8 +231,14 @@ class CreatePrescriptionServiceTest {
                 "tablet", AdministrationRoute.ORAL, false, NOW, null);
     }
 
-    private DrugInteraction interaction(UUID firstMedicineId, UUID secondMedicineId) {
-        return DrugInteraction.restore(UUID.randomUUID(), firstMedicineId, secondMedicineId,
-                InteractionSeverity.MODERATE, "Interaction detected", "Monitor patient closely", true, NOW, null);
+    private DrugInteractionWarningResult warning(UUID firstMedicineId, UUID secondMedicineId) {
+        return new DrugInteractionWarningResult(
+                UUID.randomUUID(),
+                firstMedicineId,
+                secondMedicineId,
+                InteractionSeverity.MODERATE,
+                "Interaction detected",
+                "Monitor patient closely"
+        );
     }
 }

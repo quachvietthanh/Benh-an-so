@@ -7,17 +7,21 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionInteractionOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionWarningResponse;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
+import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
+import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
@@ -71,6 +75,12 @@ public class PrescriptionRestMapper {
                 .build();
     }
 
+    public CheckDrugInteractionCommand toCommand(
+            CheckDrugInteractionRequest request
+    ) {
+        return new CheckDrugInteractionCommand(request.drugIds());
+    }
+
     public PrescriptionResponse toResponse(
             PrescriptionResult result
     ) {
@@ -93,6 +103,12 @@ public class PrescriptionRestMapper {
                         .map(this::toResponse)
                         .toList())
                 .build();
+    }
+
+    public List<DrugInteractionWarningResponse> toResponse(
+            List<DrugInteractionWarningResult> results
+    ) {
+        return results.stream().map(this::toResponse).toList();
     }
 
     private CreatePrescriptionItemCommand toCommand(
@@ -127,7 +143,7 @@ public class PrescriptionRestMapper {
             PrescriptionInteractionOverrideRequest request
     ) {
         return PrescriptionInteractionOverrideCommand.builder()
-                .drugInteractionId(request.drugInteractionId())
+                .ruleId(request.ruleId())
                 .overrideReason(request.overrideReason())
                 .build();
     }
@@ -159,7 +175,7 @@ public class PrescriptionRestMapper {
     ) {
         return PrescriptionWarningResponse.builder()
                 .id(result.id())
-                .drugInteractionId(result.drugInteractionId())
+                .ruleId(result.ruleId())
                 .firstMedicineId(result.firstMedicineId())
                 .secondMedicineId(result.secondMedicineId())
                 .severity(result.severity())
@@ -169,5 +185,18 @@ public class PrescriptionRestMapper {
                 .handledBy(result.handledBy())
                 .handledAt(result.handledAt())
                 .build();
+    }
+
+    private DrugInteractionWarningResponse toResponse(
+            DrugInteractionWarningResult result
+    ) {
+        return new DrugInteractionWarningResponse(
+                result.ruleId(),
+                result.drugIdA(),
+                result.drugIdB(),
+                result.severity(),
+                result.description(),
+                result.clinicalRecommendation()
+        );
     }
 }

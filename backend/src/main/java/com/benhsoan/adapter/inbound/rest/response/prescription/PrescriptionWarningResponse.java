@@ -13,7 +13,7 @@ public record PrescriptionWarningResponse(
 
         UUID id,
 
-        UUID drugInteractionId,
+        UUID ruleId,
 
         UUID firstMedicineId,
 
