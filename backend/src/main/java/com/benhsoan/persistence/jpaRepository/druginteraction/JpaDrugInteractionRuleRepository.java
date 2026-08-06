@@ -1,6 +1,8 @@
 package com.benhsoan.persistence.jpaRepository.druginteraction;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,5 +25,15 @@ public interface JpaDrugInteractionRuleRepository
     Optional<DrugInteractionRuleEntity> findActiveRuleBetween(
             @Param("ingredientA") String ingredientA,
             @Param("ingredientB") String ingredientB
+    );
+
+    @Query("""
+            select rule from DrugInteractionRuleEntity rule
+            where rule.active = true
+              and (rule.activeIngredientA in :ingredients
+                   or rule.activeIngredientB in :ingredients)
+            """)
+    List<DrugInteractionRuleEntity> findActiveRulesByIngredients(
+            @Param("ingredients") Set<String> ingredients
     );
 }

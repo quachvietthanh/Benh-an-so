@@ -67,6 +67,14 @@ public class MedicineRepositoryAdapter
     }
 
     @Override
+    public List<Medicine> findAllById(Collection<UUID> ids) {
+        return jpaRepository.findAllById(ids)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<Medicine> findByMedicineCode(String medicineCode) {
         Objects.requireNonNull(
                 medicineCode,

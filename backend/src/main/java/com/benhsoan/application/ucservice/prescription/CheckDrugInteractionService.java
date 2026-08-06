@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,21 @@ public class CheckDrugInteractionService
 
         List<Medicine> medicines = loadMedicines(drugIds);
 
+        Set<String> activeIngredients = medicines.stream()
+                .map(Medicine::getActiveIngredient)
+                .collect(Collectors.toUnmodifiableSet());
+        Map<Set<String>, DrugInteractionRule> ruleByIngredientPair = ruleRepository
+                .findActiveRulesByIngredients(activeIngredients)
+                .stream()
+                .collect(Collectors.toMap(
+                        rule -> Set.of(
+                                rule.getActiveIngredientA(),
+                                rule.getActiveIngredientB()
+                        ),
+                        rule -> rule,
+                        (firstRule, secondRule) -> firstRule
+                ));
+
         List<DrugInteractionWarningResult> warnings = new ArrayList<>();
         for (int i = 0; i < medicines.size(); i++) {
             Medicine first = medicines.get(i);
@@ -54,14 +71,13 @@ public class CheckDrugInteractionService
                     continue;
                 }
 
-                ruleRepository
-                        .findActiveRuleBetween(
-                                first.getActiveIngredient(),
-                                second.getActiveIngredient()
-                        )
-                        .ifPresent(rule -> warnings.add(
-                                toWarning(rule, first, second)
-                        ));
+                DrugInteractionRule rule = ruleByIngredientPair.get(Set.of(
+                        first.getActiveIngredient(),
+                        second.getActiveIngredient()
+                ));
+                if (rule != null) {
+                    warnings.add(toWarning(rule, first, second));
+                }
             }
         }
 

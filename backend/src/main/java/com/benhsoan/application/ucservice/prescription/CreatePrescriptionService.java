@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -76,7 +77,7 @@ public class CreatePrescriptionService
             CreatePrescriptionCommand command
     ) {
         requireCommand(command);
-        authorizeDoctor();
+        authorizeDoctorOrAdmin();
 
         UUID currentUserId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
@@ -130,10 +131,11 @@ public class CreatePrescriptionService
         return resultMapper.toResult(saved, warningLogs);
     }
 
-    private void authorizeDoctor() {
-        if (!currentUserPort.hasRole("DOCTOR")) {
+    private void authorizeDoctorOrAdmin() {
+        if (!currentUserPort.hasRole("DOCTOR")
+                && !currentUserPort.hasRole("ADMIN")) {
             throw new AccessDeniedException(
-                    "Only doctors are allowed to create prescriptions."
+                    "Only doctors and admins are allowed to create prescriptions."
             );
         }
     }
@@ -180,14 +182,24 @@ public class CreatePrescriptionService
     private Map<UUID, Medicine> loadActiveMedicines(
             List<CreatePrescriptionItemCommand> itemCommands
     ) {
-        Map<UUID, Medicine> medicines = new LinkedHashMap<>();
+        Map<UUID, Medicine> foundById = medicineRepository
+                .findAllById(itemCommands.stream()
+                        .map(CreatePrescriptionItemCommand::medicineId)
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(
+                        Medicine::getId,
+                        medicine -> medicine
+                ));
 
+        Map<UUID, Medicine> medicines = new LinkedHashMap<>();
         for (CreatePrescriptionItemCommand item : itemCommands) {
-            Medicine medicine = medicineRepository
-                    .findById(item.medicineId())
-                    .orElseThrow(() -> new ValidationException(
-                            "Medicine not found: " + item.medicineId()
-                    ));
+            Medicine medicine = foundById.get(item.medicineId());
+            if (medicine == null) {
+                throw new ValidationException(
+                        "Medicine not found: " + item.medicineId()
+                );
+            }
 
             if (!medicine.isActive()) {
                 throw new ValidationException(
