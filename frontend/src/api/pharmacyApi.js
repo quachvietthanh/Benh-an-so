@@ -27,12 +27,32 @@ const prescriptionPayload = (data = {}, includeChangeReason = false) => ({
 })
 
 const pharmacyApi = {
-<<<<<<< HEAD
-  // Backend có nghiệp vụ đơn thuốc nhưng chưa có API danh mục/tồn kho thuốc.
-  medicines: async () => ({ data: mergeMedicines([]) }),
-  batches: async () => ({ data: mergeBatches([]) }),
-  prescriptions: async () => ({ data: mergePrescriptions([]) }),
+  medicines: async () => {
+    try {
+      const res = await axiosClient.get('/pharmacy/medicines')
+      return res
+    } catch {
+      return { data: mergeMedicines([]) }
+    }
+  },
+  batches: async () => {
+    try {
+      const res = await axiosClient.get('/pharmacy/batches')
+      return res
+    } catch {
+      return { data: mergeBatches([]) }
+    }
+  },
+  prescriptions: async () => {
+    try {
+      const res = await axiosClient.get('/prescriptions')
+      return res
+    } catch {
+      return { data: mergePrescriptions([]) }
+    }
+  },
   getPrescriptionById: (id) => axiosClient.get(`/prescriptions/${id}`),
+  getById: (id) => axiosClient.get(`/prescriptions/${id}`),
   getByMedicalRecord: (medicalRecordId) => axiosClient.get(`/prescriptions/medical-records/${medicalRecordId}`),
   interactions: (medicineIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds: medicineIds }),
   checkInteractions: (medicineIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds: medicineIds }),
@@ -44,37 +64,33 @@ const pharmacyApi = {
   cancelPrescription: (id) => axiosClient.post(`/prescriptions/${id}/cancel`),
   dispense: (id) => axiosClient.post(`/prescriptions/${id}/dispense`),
   createMedicine: async (data) => {
-    const created = { id: `local-medicine-${Date.now()}`, ...data }
-    saveStoredMedicine(created)
-    return { data: created }
+    try {
+      return await axiosClient.post('/pharmacy/medicines', data)
+    } catch {
+      const created = { id: `local-medicine-${Date.now()}`, ...data }
+      saveStoredMedicine(created)
+      return { data: created }
+    }
   },
   updateMedicine: async (id, data) => {
-    const existing = mergeMedicines([]).find((item) => String(item.id) === String(id)) || {}
-    const updated = { ...existing, ...data, id }
-    saveStoredMedicine(updated)
-    return { data: updated }
+    try {
+      return await axiosClient.put(`/pharmacy/medicines/${id}`, data)
+    } catch {
+      const existing = mergeMedicines([]).find((item) => String(item.id) === String(id)) || {}
+      const updated = { ...existing, ...data, id }
+      saveStoredMedicine(updated)
+      return { data: updated }
+    }
   },
   receiveBatch: async (data) => {
-    const created = { id: `local-batch-${Date.now()}`, ...data }
-    saveStoredBatch(created)
-    return { data: created }
+    try {
+      return await axiosClient.post('/pharmacy/batches', data)
+    } catch {
+      const created = { id: `local-batch-${Date.now()}`, ...data }
+      saveStoredBatch(created)
+      return { data: created }
+    }
   },
-=======
-  medicines: () => axiosClient.get('/pharmacy/medicines'),
-  prescriptions: () => axiosClient.get('/prescriptions'),
-  getByMedicalRecord: (medicalRecordId) => axiosClient.get(`/prescriptions/medical-records/${medicalRecordId}`),
-  getById: (id) => axiosClient.get(`/prescriptions/${id}`),
-  checkInteractions: (drugIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds }),
-  interactions: (medicineIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds: medicineIds }),
-  createPrescription: (data) => axiosClient.post('/prescriptions', data),
-  updatePrescription: (id, data) => axiosClient.patch(`/prescriptions/${id}`, data),
-  cancelPrescription: (id) => axiosClient.post(`/prescriptions/${id}/cancel`),
-  batches: () => axiosClient.get('/pharmacy/batches'),
-  createMedicine: (data) => axiosClient.post('/pharmacy/medicines', data),
-  updateMedicine: (id, data) => axiosClient.put(`/pharmacy/medicines/${id}`, data),
-  receiveBatch: (data) => axiosClient.post('/pharmacy/batches', data),
-  dispense: (id) => axiosClient.post(`/pharmacy/prescriptions/${id}/dispense`),
->>>>>>> origin/develop
 }
 
 export default pharmacyApi
