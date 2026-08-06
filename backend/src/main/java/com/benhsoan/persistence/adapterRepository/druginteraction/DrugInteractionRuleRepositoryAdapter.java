@@ -1,6 +1,8 @@
 package com.benhsoan.persistence.adapterRepository.druginteraction;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Repository;
 
@@ -34,5 +36,19 @@ public class DrugInteractionRuleRepositoryAdapter
                 activeIngredientA.trim(),
                 activeIngredientB.trim()
         ).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<DrugInteractionRule> findActiveRulesByIngredients(
+            Set<String> activeIngredients
+    ) {
+        if (activeIngredients == null || activeIngredients.isEmpty()) {
+            return List.of();
+        }
+
+        return jpaRepository.findActiveRulesByIngredients(activeIngredients)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 }

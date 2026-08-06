@@ -46,7 +46,7 @@ public class MedicineRepositoryAdapter
     }
 
     @Override
-    public List<Medicine> findAllByIds(Collection<UUID> ids) {
+    public List<Medicine> findAllById(Collection<UUID> ids) {
         Objects.requireNonNull(ids, "Medicine ids must not be null.");
 
         List<UUID> distinctIds = ids.stream()

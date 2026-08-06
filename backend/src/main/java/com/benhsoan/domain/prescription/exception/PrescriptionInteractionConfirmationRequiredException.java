@@ -4,20 +4,24 @@ import java.util.List;
 import java.util.UUID;
 
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
-import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.shared.exception.DomainException;
 
 import lombok.Getter;
+import org.springframework.http.HttpStatus;
 
 @Getter
 public class PrescriptionInteractionConfirmationRequiredException
-        extends ValidationException {
+        extends DomainException {
 
     private final List<InteractionWarning> warnings;
 
     public PrescriptionInteractionConfirmationRequiredException(
             List<InteractionWarning> warnings
     ) {
-        super("All detected drug interactions must be confirmed with an override reason.");
+        super(
+                HttpStatus.CONFLICT,
+                "All detected drug interactions must be confirmed with an override reason."
+        );
         this.warnings = List.copyOf(warnings);
     }
 

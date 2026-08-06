@@ -14,7 +14,7 @@ public interface MedicineRepository {
 
     Optional<Medicine> findById(UUID id);
 
-    List<Medicine> findAllByIds(Collection<UUID> ids);
+    List<Medicine> findAllById(Collection<UUID> ids);
 
     Optional<Medicine> findByMedicineCode(String medicineCode);
 
