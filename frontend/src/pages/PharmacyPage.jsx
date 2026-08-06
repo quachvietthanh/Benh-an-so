@@ -203,6 +203,11 @@ function PharmacyPage() {
   }
 
   const handleReceiveBatch = async (values) => {
+    if (!canManageMedicineCatalog) {
+      message.error('Bạn không có quyền tạo phiếu nhập kho.')
+      return
+    }
+
     try {
       const selectedMed = medicines.find((m) => m.id === values.medicineId)
       const formattedDate = values.expiryDate.format('YYYY-MM-DD')
@@ -235,6 +240,11 @@ function PharmacyPage() {
   }
 
   const handleDispense = async (prescription) => {
+    if (!canManageMedicineCatalog) {
+      message.error('Bạn không có quyền cấp phát thuốc.')
+      return
+    }
+
     setDispensingId(prescription.id)
     try {
       try {
@@ -259,6 +269,15 @@ function PharmacyPage() {
     setEditingMedicine(null)
     medicineForm.resetFields()
     setMedicineOpen(true)
+  }
+
+  const openBatchModal = () => {
+    if (!canManageMedicineCatalog) {
+      message.error('Chỉ Dược sĩ (PHARMACIST) mới có quyền tạo phiếu nhập kho.')
+      return
+    }
+    batchForm.resetFields()
+    setBatchOpen(true)
   }
 
   const openEditMedicine = (record) => {
@@ -444,7 +463,7 @@ function PharmacyPage() {
         return (
           <Button
             type="primary"
-            disabled={!isPending}
+            disabled={!isPending || !canManageMedicineCatalog}
             loading={dispensingId === record.id}
             icon={<CheckCircleOutlined />}
             onClick={() => handleDispense(record)}
@@ -463,10 +482,19 @@ function PharmacyPage() {
           <MedicineBoxOutlined /> Quản lý kho thuốc và cấp phát
         </h2>
         <Space>
-          <Button icon={<PlusOutlined />} onClick={openAddMedicine}>
+          <Button
+            icon={<PlusOutlined />}
+            disabled={!canManageMedicineCatalog}
+            onClick={openAddMedicine}
+          >
             Thêm thuốc mới
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setBatchOpen(true)}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            disabled={!canManageMedicineCatalog}
+            onClick={openBatchModal}
+          >
             Nhập kho theo lô &amp; hạn dùng
           </Button>
         </Space>
