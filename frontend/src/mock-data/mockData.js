@@ -122,23 +122,265 @@ export const demoMedicalRecords = [
 ]
 
 export const demoMedicines = [
-  { id: 'med1', name: 'Amlodipine 5mg', category: 'Tim mạch', stock: 120, minStock: 20, expiryDate: '2027-10-01', lot: 'LOT-AM-001', price: 2000 },
-  { id: 'med2', name: 'Metformin 500mg', category: 'Tiểu đường', stock: 8, minStock: 20, expiryDate: '2026-08-15', lot: 'LOT-MT-002', price: 1500 },
-  { id: 'med3', name: 'Paracetamol 500mg', category: 'Giảm đau', stock: 300, minStock: 50, expiryDate: '2028-01-20', lot: 'LOT-PA-003', price: 1000 },
-  { id: 'med4', name: 'Ibuprofen 400mg', category: 'Giảm đau, Kháng viêm', stock: 150, minStock: 30, expiryDate: '2027-05-10', lot: 'LOT-IB-004', price: 2500 },
-  { id: 'med5', name: 'Aspirin 81mg', category: 'Tim mạch', stock: 200, minStock: 40, expiryDate: '2028-02-15', lot: 'LOT-AS-005', price: 1200 },
+  { id: '16000000-0000-0000-0000-000000000001', name: 'Paracetamol 500 mg', category: 'Hạ sốt, giảm đau', stock: 1500, minStock: 200, expiryDate: '2028-10-01', lot: 'LOT-PA-001', price: 1500 },
+  { id: '16000000-0000-0000-0000-000000000002', name: 'Ibuprofen 400 mg', category: 'Giảm đau, kháng viêm', stock: 800, minStock: 150, expiryDate: '2027-05-10', lot: 'LOT-IB-002', price: 2500 },
+  { id: '16000000-0000-0000-0000-000000000007', name: 'Omeprazole 20 mg', category: 'Dạ dày', stock: 900, minStock: 100, expiryDate: '2028-01-20', lot: 'LOT-OM-003', price: 2500 },
+  { id: '16000000-0000-0000-0000-000000000016', name: 'Metformin 500 mg', category: 'Tiểu đường', stock: 1200, minStock: 200, expiryDate: '2028-08-15', lot: 'LOT-MT-004', price: 2500 },
+  { id: '16000000-0000-0000-0000-000000000019', name: 'Amlodipine 5 mg', category: 'Tim mạch', stock: 900, minStock: 200, expiryDate: '2027-10-01', lot: 'LOT-AM-005', price: 2000 },
+  { id: '16000000-0000-0000-0000-000000000029', name: 'Warfarin 2 mg', category: 'Chống đông', stock: 450, minStock: 50, expiryDate: '2028-02-15', lot: 'LOT-WF-006', price: 3500 },
+  { id: '16000000-0000-0000-0000-000000000030', name: 'Aspirin 81 mg', category: 'Tim mạch', stock: 1000, minStock: 100, expiryDate: '2028-02-15', lot: 'LOT-AS-007', price: 1500 },
 ]
 
 export const drugInteractions = [
   {
-    drugs: ['med3', 'med4'], 
-    severity: 'Cảnh báo (Vừa)',
-    description: 'Dùng chung Paracetamol và Ibuprofen có thể tăng nguy cơ tác dụng phụ lên dạ dày và thận. Cần cân nhắc liều lượng.'
+    id: 'd1a00000-0000-0000-0000-000000000001',
+    ingredientA: 'Aspirin',
+    ingredientB: 'Warfarin',
+    drugs: ['16000000-0000-0000-0000-000000000030', '16000000-0000-0000-0000-000000000029'],
+    severity: 'Chống chỉ định (SEVERE)',
+    severityLevel: 'SEVERE',
+    description: 'Aspirin increases bleeding risk when used with Warfarin.',
+    clinicalRecommendation: 'Avoid the combination when possible; if both are required, monitor INR and bleeding closely.'
   },
   {
-    drugs: ['med4', 'med5'], 
-    severity: 'Nghiêm trọng (Cao)',
-    description: 'Ibuprofen làm giảm tác dụng bảo vệ tim mạch của Aspirin liều thấp và tăng nguy cơ xuất huyết tiêu hóa. Chống chỉ định dùng chung.'
+    id: 'd1a00000-0000-0000-0000-000000000002',
+    ingredientA: 'Ibuprofen',
+    ingredientB: 'Warfarin',
+    drugs: ['16000000-0000-0000-0000-000000000002', '16000000-0000-0000-0000-000000000029'],
+    severity: 'Chống chỉ định (SEVERE)',
+    severityLevel: 'SEVERE',
+    description: 'Ibuprofen increases bleeding risk when used with Warfarin.',
+    clinicalRecommendation: 'Avoid NSAIDs when possible; consider Paracetamol and monitor INR closely.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000003',
+    ingredientA: 'Clarithromycin',
+    ingredientB: 'Simvastatin',
+    drugs: [],
+    severity: 'Chống chỉ định tuyệt đối (CONTRAINDICATED)',
+    severityLevel: 'CONTRAINDICATED',
+    description: 'Clarithromycin can sharply increase Simvastatin exposure and rhabdomyolysis risk.',
+    clinicalRecommendation: 'Do not combine; choose another antibiotic or temporarily stop Simvastatin.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000004',
+    ingredientA: 'Gemfibrozil',
+    ingredientB: 'Simvastatin',
+    drugs: [],
+    severity: 'Chống chỉ định tuyệt đối (CONTRAINDICATED)',
+    severityLevel: 'CONTRAINDICATED',
+    description: 'Gemfibrozil markedly increases Simvastatin toxicity risk.',
+    clinicalRecommendation: 'Do not combine; consider another lipid-lowering strategy.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000005',
+    ingredientA: 'Amiodarone',
+    ingredientB: 'Simvastatin',
+    drugs: [],
+    severity: 'Nghiêm trọng (SEVERE)',
+    severityLevel: 'SEVERE',
+    description: 'Amiodarone can increase Simvastatin exposure and muscle toxicity.',
+    clinicalRecommendation: 'Limit Simvastatin dose or switch to a lower-interaction statin.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000006',
+    ingredientA: 'Isosorbide Mononitrate',
+    ingredientB: 'Sildenafil',
+    drugs: [],
+    severity: 'Chống chỉ định tuyệt đối (CONTRAINDICATED)',
+    severityLevel: 'CONTRAINDICATED',
+    description: 'Combining Sildenafil with nitrates can cause profound hypotension.',
+    clinicalRecommendation: 'Contraindicated; avoid Sildenafil within 24 to 48 hours of nitrate use.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000007',
+    ingredientA: 'Methotrexate',
+    ingredientB: 'Trimethoprim',
+    drugs: [],
+    severity: 'Chống chỉ định tuyệt đối (CONTRAINDICATED)',
+    severityLevel: 'CONTRAINDICATED',
+    description: 'Trimethoprim increases bone marrow suppression risk with Methotrexate.',
+    clinicalRecommendation: 'Do not combine; use another antibiotic and monitor blood counts.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000008',
+    ingredientA: 'Digoxin',
+    ingredientB: 'Furosemide',
+    drugs: [],
+    severity: 'Cảnh báo (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'Furosemide-induced hypokalemia can increase Digoxin toxicity.',
+    clinicalRecommendation: 'Monitor potassium and Digoxin levels and replace potassium if needed.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000009',
+    ingredientA: 'Ciprofloxacin',
+    ingredientB: 'Tizanidine',
+    drugs: [],
+    severity: 'Chống chỉ định tuyệt đối (CONTRAINDICATED)',
+    severityLevel: 'CONTRAINDICATED',
+    description: 'Ciprofloxacin can greatly increase Tizanidine exposure.',
+    clinicalRecommendation: 'Do not combine; select another antibiotic.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-00000000000a',
+    ingredientA: 'Ciprofloxacin',
+    ingredientB: 'Theophylline',
+    drugs: [],
+    severity: 'Nghiêm trọng (SEVERE)',
+    severityLevel: 'SEVERE',
+    description: 'Ciprofloxacin can raise Theophylline concentration and toxicity risk.',
+    clinicalRecommendation: 'Reduce Theophylline dose and monitor levels if coadministration is unavoidable.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-00000000000b',
+    ingredientA: 'Ibuprofen',
+    ingredientB: 'Lithium',
+    drugs: ['16000000-0000-0000-0000-000000000002'],
+    severity: 'Nghiêm trọng (SEVERE)',
+    severityLevel: 'SEVERE',
+    description: 'NSAIDs can reduce Lithium clearance and increase toxicity.',
+    clinicalRecommendation: 'Avoid the combination or monitor Lithium closely.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-00000000000c',
+    ingredientA: 'Lisinopril',
+    ingredientB: 'Potassium Chloride',
+    drugs: [],
+    severity: 'Cảnh báo (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'The combination may increase hyperkalemia risk.',
+    clinicalRecommendation: 'Monitor serum potassium and limit supplementation unless necessary.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-00000000000d',
+    ingredientA: 'Paracetamol',
+    ingredientB: 'Warfarin',
+    drugs: ['16000000-0000-0000-0000-000000000001', '16000000-0000-0000-0000-000000000029'],
+    severity: 'Cảnh báo (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'Prolonged high-dose Paracetamol may increase INR in patients taking Warfarin.',
+    clinicalRecommendation: 'Use the lowest effective Paracetamol dose and monitor INR.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-00000000000e',
+    ingredientA: 'Fluoxetine',
+    ingredientB: 'Tramadol',
+    drugs: [],
+    severity: 'Nghiêm trọng (SEVERE)',
+    severityLevel: 'SEVERE',
+    description: 'The combination may increase serotonin syndrome and seizure risk.',
+    clinicalRecommendation: 'Avoid the combination; consider another analgesic.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-00000000000f',
+    ingredientA: 'Clopidogrel',
+    ingredientB: 'Omeprazole',
+    drugs: ['16000000-0000-0000-0000-000000000007'],
+    severity: 'Cảnh báo (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'Omeprazole may reduce Clopidogrel activation through CYP2C19 inhibition.',
+    clinicalRecommendation: 'Prefer Pantoprazole or another lower-interaction acid suppressor.'
+  },
+  {
+    id: 'd1a00000-0000-0000-0000-000000000010',
+    ingredientA: 'Cetirizine',
+    ingredientB: 'Diphenhydramine',
+    drugs: ['16000000-0000-0000-0000-000000000009'],
+    severity: 'Nhẹ (MILD)',
+    severityLevel: 'MILD',
+    description: 'Dual antihistamine therapy may increase sedation.',
+    clinicalRecommendation: 'Advise patients to monitor drowsiness and avoid driving if sedated.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000001',
+    ingredientA: 'Amoxicillin',
+    ingredientB: 'Amoxicillin + Clavulanic acid',
+    drugs: ['16000000-0000-0000-0000-000000000003', '16000000-0000-0000-0000-000000000004'],
+    severity: 'Trùng lặp điều trị (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'This duplicates penicillin therapy.',
+    clinicalRecommendation: 'Do not prescribe both together unless there is a clear justification.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000002',
+    ingredientA: 'Azithromycin',
+    ingredientB: 'Levofloxacin',
+    drugs: ['16000000-0000-0000-0000-000000000005', '16000000-0000-0000-0000-000000000028'],
+    severity: 'Nghiêm trọng (SEVERE)',
+    severityLevel: 'SEVERE',
+    description: 'The combination may increase QT prolongation risk.',
+    clinicalRecommendation: 'Avoid the combination and consider an alternative antibiotic.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000003',
+    ingredientA: 'Omeprazole',
+    ingredientB: 'Esomeprazole',
+    drugs: ['16000000-0000-0000-0000-000000000007', '16000000-0000-0000-0000-000000000008'],
+    severity: 'Trùng lặp PPI (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'This duplicates proton pump inhibitor therapy.',
+    clinicalRecommendation: 'Use only one proton pump inhibitor at a time.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000004',
+    ingredientA: 'Cetirizine',
+    ingredientB: 'Loratadine',
+    drugs: ['16000000-0000-0000-0000-000000000009', '16000000-0000-0000-0000-000000000010'],
+    severity: 'Trùng lặp Antihistamine (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'This duplicates H1-antihistamine therapy.',
+    clinicalRecommendation: 'Use only one antihistamine to reduce excess sedation.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000005',
+    ingredientA: 'Metformin',
+    ingredientB: 'Gliclazide',
+    drugs: ['16000000-0000-0000-0000-000000000016', '16000000-0000-0000-0000-000000000017'],
+    severity: 'Tăng nguy cơ hạ đường huyết (MILD)',
+    severityLevel: 'MILD',
+    description: 'The combination can increase hypoglycemia risk.',
+    clinicalRecommendation: 'Monitor blood glucose and counsel the patient on hypoglycemia symptoms.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000006',
+    ingredientA: 'Diclofenac',
+    ingredientB: 'Warfarin',
+    drugs: ['16000000-0000-0000-0000-000000000021', '16000000-0000-0000-0000-000000000029'],
+    severity: 'Chống chỉ định (CONTRAINDICATED)',
+    severityLevel: 'CONTRAINDICATED',
+    description: 'Diclofenac can substantially increase bleeding risk when used with Warfarin.',
+    clinicalRecommendation: 'Avoid the combination; consider Paracetamol if analgesia is needed.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000007',
+    ingredientA: 'Atorvastatin',
+    ingredientB: 'Azithromycin',
+    drugs: ['16000000-0000-0000-0000-000000000018', '16000000-0000-0000-0000-000000000005'],
+    severity: 'Cảnh báo (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'Azithromycin may increase Atorvastatin exposure in susceptible patients.',
+    clinicalRecommendation: 'Monitor for muscle pain and consider holding the statin during short antibiotic courses.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000008',
+    ingredientA: 'Metformin',
+    ingredientB: 'Prednisolone',
+    drugs: ['16000000-0000-0000-0000-000000000016', '16000000-0000-0000-0000-000000000023'],
+    severity: 'Cảnh báo (MODERATE)',
+    severityLevel: 'MODERATE',
+    description: 'Prednisolone can worsen glycemic control in patients taking Metformin.',
+    clinicalRecommendation: 'Monitor blood glucose during corticosteroid treatment.'
+  },
+  {
+    id: '17100000-0000-0000-0000-000000000009',
+    ingredientA: 'Loperamide',
+    ingredientB: 'Oral rehydration salts',
+    drugs: ['16000000-0000-0000-0000-000000000026', '16000000-0000-0000-0000-000000000025'],
+    severity: 'Cảnh báo nhẹ (MILD)',
+    severityLevel: 'MILD',
+    description: 'Loperamide may mask symptoms in infectious diarrhea while rehydration is ongoing.',
+    clinicalRecommendation: 'Assess the cause of diarrhea and prioritize rehydration.'
   }
 ]
 

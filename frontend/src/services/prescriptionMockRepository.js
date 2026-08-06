@@ -79,12 +79,24 @@ export const checkMockDrugInteractions = (medicineIds = []) => {
       const drugA = cleanIds[i]
       const drugB = cleanIds[j]
 
-      // Match against rules in mockData
+      const medAObj = allMeds.find((m) => String(m.id) === drugA)
+      const medBObj = allMeds.find((m) => String(m.id) === drugB)
+
+      // Match against rules in mockData by drug ID or Active Ingredient
       const matchedRule = rules.find((rule) => {
         const ruleDrugs = (rule.drugs || []).map(String)
-        const hasA = ruleDrugs.includes(drugA) || ruleDrugs.some(id => drugA.includes(id) || id.includes(drugA))
-        const hasB = ruleDrugs.includes(drugB) || ruleDrugs.some(id => drugB.includes(id) || id.includes(drugB))
-        return hasA && hasB
+        const hasIdMatch = (ruleDrugs.includes(drugA) && ruleDrugs.includes(drugB))
+
+        const ingA = (rule.ingredientA || '').toLowerCase()
+        const ingB = (rule.ingredientB || '').toLowerCase()
+        const medAIng = (medAObj?.activeIngredient || medAObj?.name || '').toLowerCase()
+        const medBIng = (medBObj?.activeIngredient || medBObj?.name || '').toLowerCase()
+
+        const hasIngMatch =
+          (medAIng.includes(ingA) && medBIng.includes(ingB)) ||
+          (medAIng.includes(ingB) && medBIng.includes(ingA))
+
+        return hasIdMatch || (ingA && ingB && hasIngMatch)
       })
 
       if (matchedRule) {

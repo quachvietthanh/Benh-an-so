@@ -457,9 +457,6 @@ function PrescriptionPage() {
           <Title level={3} style={{ margin: 0, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 10 }}>
             <MedicineBoxOutlined style={{ color: '#2563EB' }} /> Kê đơn thuốc và Cảnh báo tương tác thuốc
           </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            Chức năng chuyên môn dành riêng cho Bác sĩ điều trị phụ trách lượt khám (NCL-04, NCL-05).
-          </Text>
         </div>
         <Space>
           {editingPrescription && <Button onClick={resetForm}>Hủy điều chỉnh</Button>}

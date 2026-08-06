@@ -14,7 +14,7 @@ const pharmacyApi = {
   createMedicine: (data) => axiosClient.post('/pharmacy/medicines', data),
   updateMedicine: (id, data) => axiosClient.put(`/pharmacy/medicines/${id}`, data),
   receiveBatch: (data) => axiosClient.post('/pharmacy/batches', data),
-  dispense: (id) => axiosClient.post(`/pharmacy/prescriptions/${id}/dispense`),
+  dispense: (id) => axiosClient.post(`/prescriptions/${id}/dispense`),
 }
 
 export default pharmacyApi
