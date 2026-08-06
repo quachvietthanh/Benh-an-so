@@ -63,6 +63,9 @@ import {
   checkQueuePermissions,
   handleQueueApiError,
 } from '../utils/queueHelpers'
+import AppointmentListTab from '../components/queue/AppointmentListTab'
+import ReceptionQueueTab from '../components/queue/ReceptionQueueTab'
+import DoctorQueueTab from '../components/queue/DoctorQueueTab'
 import {
   getStoredAppointmentLogs,
   getStoredNotificationLogs,
@@ -454,12 +457,14 @@ function AppointmentQueue() {
         ? queues
         : queues.filter((q) => String(q.doctorId) === String(queueDoctorFilter) || String(q.doctorName) === String(queueDoctorFilter))
     }
+    const safeItems = Array.isArray(items) ? items : []
     const sortByNumber = (list) => [...list].sort((a, b) => Number(a.queueNumber || 999999) - Number(b.queueNumber || 999999))
     return {
-      inProgress: sortByNumber(items.filter((q) => q.status === 'IN_PROGRESS')),
-      waiting: sortByNumber(items.filter((q) => q.status === 'WAITING')),
-      waitingForResult: sortByNumber(items.filter((q) => q.status === 'WAITING_FOR_RESULT')),
-      finished: sortByNumber(items.filter((q) => ['COMPLETED', 'SKIPPED', 'CANCELLED'].includes(q.status))),
+      inProgress: sortByNumber(safeItems.filter((q) => q?.status === 'IN_PROGRESS')),
+      waiting: sortByNumber(safeItems.filter((q) => q?.status === 'WAITING')),
+      waitingForResult: sortByNumber(safeItems.filter((q) => q?.status === 'WAITING_FOR_RESULT')),
+      skipped: sortByNumber(safeItems.filter((q) => q?.status === 'SKIPPED')),
+      finished: sortByNumber(safeItems.filter((q) => ['COMPLETED', 'CANCELLED'].includes(q?.status))),
     }
   }, [permissions.isDoctorOnly, myQueueData, queues, user?.id, queueDoctorFilter])
 
@@ -1466,58 +1471,20 @@ function AppointmentQueue() {
               </span>
             ),
             children: (
-              <Card style={{ borderRadius: 12 }}>
-                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                  <Col xs={24} sm={8} md={6}>
-                    <Input
-                      placeholder="Tìm mã LH, tên bệnh nhân..."
-                      prefix={<SearchOutlined />}
-                      value={appKeyword}
-                      onChange={(e) => setAppKeyword(e.target.value)}
-                      allowClear
-                    />
-                  </Col>
-                  <Col xs={12} sm={8} md={6}>
-                    <Select
-                      style={{ width: '100%' }}
-                      value={appDoctorFilter}
-                      onChange={setAppDoctorFilter}
-                      options={
-                        permissions.isDoctorOnly
-                          ? [{ value: 'ALL', label: `Bác sĩ: ${user?.fullName || user?.username || 'Bạn'}` }]
-                          : [
-                              { value: 'ALL', label: 'Tất cả Bác sĩ' },
-                              ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
-                            ]
-                      }
-                      disabled={permissions.isDoctorOnly}
-                    />
-                  </Col>
-                  <Col xs={12} sm={8} md={6}>
-                    <Select
-                      style={{ width: '100%' }}
-                      value={appStatusFilter}
-                      onChange={setAppStatusFilter}
-                      options={[
-                        { value: 'ALL', label: 'Tất cả trạng thái' },
-                        { value: 'SCHEDULED', label: 'Đã đặt (SCHEDULED)' },
-                        { value: 'CHECKED_IN', label: 'Đã check-in' },
-                        { value: 'NO_SHOW', label: 'Không đến (NO_SHOW)' },
-                        { value: 'COMPLETED', label: 'Đã hoàn thành' },
-                        { value: 'CANCELLED', label: 'Đã hủy' },
-                      ]}
-                    />
-                  </Col>
-                </Row>
-
-                <Table
-                  dataSource={filteredAppointments}
-                  columns={appointmentColumns}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ pageSize: 10, showSizeChanger: true }}
-                />
-              </Card>
+              <AppointmentListTab
+                filteredAppointments={filteredAppointments}
+                appointmentColumns={appointmentColumns}
+                loading={loading}
+                appKeyword={appKeyword}
+                setAppKeyword={setAppKeyword}
+                appDoctorFilter={appDoctorFilter}
+                setAppDoctorFilter={setAppDoctorFilter}
+                appStatusFilter={appStatusFilter}
+                setAppStatusFilter={setAppStatusFilter}
+                permissions={permissions}
+                user={user}
+                doctors={doctors}
+              />
             ),
           },
           {
@@ -1528,101 +1495,27 @@ function AppointmentQueue() {
               </span>
             ),
             children: (
-              <Card style={{ borderRadius: 12 }}>
-                <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-                  <Col xs={24} sm={6} md={5}>
-                    <Input
-                      placeholder="Tìm tên, mã BN, mã lượt..."
-                      prefix={<SearchOutlined />}
-                      value={queueKeyword}
-                      onChange={(e) => setQueueKeyword(e.target.value)}
-                      allowClear
-                    />
-                  </Col>
-                  <Col xs={12} sm={6} md={4}>
-                    <Select
-                      style={{ width: '100%' }}
-                      value={queueDoctorFilter}
-                      onChange={setQueueDoctorFilter}
-                      options={
-                        permissions.isDoctorOnly
-                          ? [{ value: 'ALL', label: `Bác sĩ: ${user?.fullName || user?.username || 'Bạn'}` }]
-                          : [
-                              { value: 'ALL', label: 'Tất cả Bác sĩ' },
-                              ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
-                            ]
-                      }
-                      disabled={permissions.isDoctorOnly}
-                    />
-                  </Col>
-                  <Col xs={12} sm={6} md={4}>
-                    <Select
-                      style={{ width: '100%' }}
-                      value={queueRoomFilter}
-                      onChange={setQueueRoomFilter}
-                      options={[
-                        { value: 'ALL', label: 'Tất cả Phòng khám' },
-                        ...extractedRooms.map((r) => ({ value: r.id, label: `${r.code} - ${r.name}` })),
-                      ]}
-                    />
-                  </Col>
-                  <Col xs={12} sm={6} md={4}>
-                    <Select
-                      style={{ width: '100%' }}
-                      value={queueStatusFilter}
-                      onChange={setQueueStatusFilter}
-                      options={[
-                        { value: 'ALL', label: 'Tất cả Trạng thái' },
-                        { value: 'WAITING', label: 'WAITING (Đang chờ)' },
-                        { value: 'IN_PROGRESS', label: 'IN_PROGRESS (Đang khám)' },
-                        { value: 'WAITING_FOR_RESULT', label: 'WAITING_FOR_RESULT (Chờ CĐLS)' },
-                        { value: 'COMPLETED', label: 'COMPLETED (Hoàn thành)' },
-                        { value: 'SKIPPED', label: 'SKIPPED (Vắng mặt)' },
-                        { value: 'CANCELLED', label: 'CANCELLED (Đã hủy)' },
-                      ]}
-                    />
-                  </Col>
-                  <Col xs={12} sm={6} md={4}>
-                    <Select
-                      style={{ width: '100%' }}
-                      value={queueSourceFilter}
-                      onChange={setQueueSourceFilter}
-                      options={[
-                        { value: 'ALL', label: 'Tất cả Nguồn' },
-                        { value: 'APPOINTMENT', label: 'Hẹn trước (Appointment)' },
-                        { value: 'WALK_IN', label: 'Tự đến (Walk-in)' },
-                      ]}
-                    />
-                  </Col>
-                  <Col xs={24} sm={24} md={3} style={{ textAlign: 'right' }}>
-                    {permissions.canCallNext && (
-                      <Button
-                        type="primary"
-                        icon={<StepForwardOutlined />}
-                        loading={actionLoading}
-                        onClick={() => handleCallNext()}
-                      >
-                        Gọi tiếp
-                      </Button>
-                    )}
-                  </Col>
-                </Row>
-
-                {filteredQueues.length === 0 ? (
-                  <Empty
-                    description="Hàng đợi hiện tại đang trống. Bệnh nhân sau khi check-in sẽ xuất hiện ở đây theo thứ tự."
-                    style={{ margin: '40px 0' }}
-                  />
-                ) : (
-                  <Table
-                    dataSource={filteredQueues}
-                    columns={queueBoardColumns}
-                    rowKey="id"
-                    loading={loading}
-                    pagination={{ pageSize: 10, showSizeChanger: true }}
-                  />
-                )}
-              </Card>
+              <ReceptionQueueTab
+                filteredQueues={filteredQueues}
+                queueBoardColumns={queueBoardColumns}
+                loading={loading}
+                queueKeyword={queueKeyword}
+                setQueueKeyword={setQueueKeyword}
+                queueDoctorFilter={queueDoctorFilter}
+                setQueueDoctorFilter={setQueueDoctorFilter}
+                queueRoomFilter={queueRoomFilter}
+                setQueueRoomFilter={setQueueRoomFilter}
+                queueStatusFilter={queueStatusFilter}
+                setQueueStatusFilter={setQueueStatusFilter}
+                queueSourceFilter={queueSourceFilter}
+                setQueueSourceFilter={setQueueSourceFilter}
+                permissions={permissions}
+                user={user}
+                doctors={doctors}
+                extractedRooms={extractedRooms}
+                actionLoading={actionLoading}
+                handleCallNext={handleCallNext}
+              />
             ),
           },
           {
@@ -1633,184 +1526,23 @@ function AppointmentQueue() {
               </span>
             ),
             children: (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {!permissions.isDoctorOnly && (
-                  <Card style={{ borderRadius: 12, backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }} bodyStyle={{ padding: 12 }}>
-                    <Row gutter={[16, 16]} align="middle">
-                      <Col xs={24} sm={12} md={8}>
-                        <Text strong style={{ marginRight: 8 }}>Bác sĩ phụ trách (Hôm nay):</Text>
-                        <Select
-                          style={{ width: '220px' }}
-                          value={queueDoctorFilter}
-                          onChange={setQueueDoctorFilter}
-                          options={[
-                            { value: 'ALL', label: 'Tất cả Bác sĩ (Hôm nay)' },
-                            ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
-                          ]}
-                        />
-                      </Col>
-                      <Col xs={24} sm={12} md={16}>
-                        <Text type="secondary">Quyền Admin / Lễ tân: Bạn có thể xem toàn bộ bệnh nhân hoặc chọn từng bác sĩ để xem danh sách phụ trách riêng.</Text>
-                      </Col>
-                    </Row>
-                  </Card>
-                )}
-                <Card
-                  title={<Text strong style={{ color: '#16a34a' }}>🔴 BỆNH NHÂN ĐANG KHÁM ({doctorQueueGroups.inProgress.length})</Text>}
-                  style={{ borderRadius: 12, borderColor: '#bbf7d0' }}
-                >
-                  {doctorQueueGroups.inProgress.length === 0 ? (
-                    <Text type="secondary">Chưa có bệnh nhân nào đang trong phòng khám.</Text>
-                  ) : (
-                    <List
-                      dataSource={doctorQueueGroups.inProgress}
-                      renderItem={(item) => {
-                        const pInfo = getPatientInfo(item.patientId, item.patientName)
-                        return (
-                          <List.Item
-                            actions={[
-                              (permissions.isAdmin || permissions.isDoctor || permissions.isNurse) && (
-                                <Button
-                                  key="exam"
-                                  type="primary"
-                                  icon={<MedicineBoxOutlined />}
-                                  onClick={() => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId, queueItemId: item.id } })}
-                                >
-                                  Ghi bệnh án / Khám
-                                </Button>
-                              ),
-                              permissions.canUpdateStatus && (
-                                <Button
-                                  key="cdls"
-                                  style={{ borderColor: '#9333ea', color: '#9333ea' }}
-                                  onClick={() => handleUpdateItemStatus(item.id, 'WAITING_FOR_RESULT')}
-                                >
-                                  Chờ CĐLS
-                                </Button>
-                              ),
-                              permissions.canComplete && (
-                                <Popconfirm
-                                  key="complete"
-                                  title="Xác nhận hoàn tất lượt khám?"
-                                  description="Đảm bảo bệnh án đã được Bác sĩ ký/khóa trước khi hoàn tất."
-                                  onConfirm={() => handleCompleteItem(item.id)}
-                                >
-                                  <Button type="primary" style={{ backgroundColor: '#16a34a' }}>
-                                    Hoàn tất
-                                  </Button>
-                                </Popconfirm>
-                              ),
-                              permissions.canSkip && (
-                                <Button
-                                  key="skip"
-                                  danger
-                                  onClick={() => {
-                                    skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                                    setSkipModalItem(item)
-                                  }}
-                                >
-                                  Skip
-                                </Button>
-                              ),
-                            ].filter(Boolean)}
-                          >
-                            <List.Item.Meta
-                              avatar={<Avatar size="large" style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>}
-                              title={<Text strong>{pInfo.name} - <Text type="secondary">STT: {item.queueNumber}</Text></Text>}
-                              description={`Mã lượt: ${item.visitCode || item.visitId || 'N/A'} | Nguồn: ${item.sourceType === 'WALK_IN' ? 'Walk-in' : 'Hẹn trước'}`}
-                            />
-                          </List.Item>
-                        )
-                      }}
-                    />
-                  )}
-                </Card>
-
-                <Card
-                  title={<Text strong style={{ color: '#2563eb' }}>🟡 BỆNH NHÂN ĐANG CHỜ ({doctorQueueGroups.waiting.length})</Text>}
-                  style={{ borderRadius: 12 }}
-                >
-                  <List
-                    dataSource={doctorQueueGroups.waiting}
-                    pagination={{ pageSize: 5 }}
-                    renderItem={(item) => {
-                      const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      return (
-                        <List.Item
-                          actions={[
-                            permissions.canCallNext && (
-                              <Button
-                                key="call-next"
-                                type="primary"
-                                icon={<StepForwardOutlined />}
-                                onClick={() => handleCallNext(item.medicalQueueId || item.queueId)}
-                              >
-                                Gọi vào khám
-                              </Button>
-                            ),
-                            permissions.canSkip && (
-                              <Button
-                                key="skip"
-                                danger
-                                onClick={() => {
-                                  skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                                  setSkipModalItem(item)
-                                }}
-                              >
-                                Skip
-                              </Button>
-                            ),
-                          ].filter(Boolean)}
-                        >
-                          <List.Item.Meta
-                            avatar={<Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>}
-                            title={<Text strong>STT {item.queueNumber}: {pInfo.name}</Text>}
-                            description={`Đến lúc: ${item.checkedInAt ? dayjs(item.checkedInAt).format('HH:mm') : 'N/A'}`}
-                          />
-                        </List.Item>
-                      )
-                    }}
-                  />
-                </Card>
-
-                <Card
-                  title={<Text strong style={{ color: '#9333ea' }}>🟣 BỆNH NHÂN CHỜ KẾT QUẢ CĐLS ({doctorQueueGroups.waitingForResult.length})</Text>}
-                  style={{ borderRadius: 12, borderColor: '#e9d5ff' }}
-                >
-                  <List
-                    dataSource={doctorQueueGroups.waitingForResult}
-                    pagination={{ pageSize: 5 }}
-                    renderItem={(item) => {
-                      const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      return (
-                        <List.Item
-                          actions={[
-                            permissions.canUpdateStatus && (
-                              <Button
-                                key="resume"
-                                type="primary"
-                                style={{ backgroundColor: '#16a34a' }}
-                                onClick={() => handleUpdateItemStatus(item.id, 'IN_PROGRESS')}
-                              >
-                                Tiếp tục khám
-                              </Button>
-                            ),
-                            <Button key="view-record" onClick={() => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId } })}>
-                              Xem bệnh án
-                            </Button>,
-                          ].filter(Boolean)}
-                        >
-                          <List.Item.Meta
-                            avatar={<Avatar style={{ backgroundColor: '#9333ea' }}>{getInitials(pInfo.name)}</Avatar>}
-                            title={<Text strong>{pInfo.name}</Text>}
-                            description="Đã gửi chỉ định CĐLS, đang chờ phòng xét nghiệm / CĐHA trả kết quả."
-                          />
-                        </List.Item>
-                      )
-                    }}
-                  />
-                </Card>
-              </div>
+              <DoctorQueueTab
+                doctorQueueGroups={doctorQueueGroups}
+                permissions={permissions}
+                queueDoctorFilter={queueDoctorFilter}
+                setQueueDoctorFilter={setQueueDoctorFilter}
+                doctors={doctors}
+                getPatientInfo={getPatientInfo}
+                getAvatarStyle={getAvatarStyle}
+                getInitials={getInitials}
+                navigate={navigate}
+                handleCallNext={handleCallNext}
+                handleRecallQueueItem={handleRecallQueueItem}
+                handleUpdateItemStatus={handleUpdateItemStatus}
+                handleCompleteItem={handleCompleteItem}
+                skipForm={skipForm}
+                setSkipModalItem={setSkipModalItem}
+              />
             ),
           },
         ]}
