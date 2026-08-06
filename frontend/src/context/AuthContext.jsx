@@ -1,11 +1,10 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import authApi from '../api/authApi'
-import { loginUser } from '../services/mockDataService'
 
 const AuthContext = createContext(null)
 
 const normalizeRoles = (rawRoles) => {
-  if (!rawRoles) return ['admin', 'doctor', 'receptionist', 'nurse', 'pharmacist']
+  if (!rawRoles) return []
   const arr = Array.isArray(rawRoles) ? rawRoles : [rawRoles]
   const normalized = new Set()
   arr.forEach((r) => {
@@ -25,11 +24,20 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const storedUser = localStorage.getItem('user')
     const storedToken = localStorage.getItem('token')
+
+    if (storedToken === 'demo-token') {
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      setLoading(false)
+      return
+    }
+
     if (storedUser && storedToken) {
       try {
         const parsed = JSON.parse(storedUser)
         if (parsed && typeof parsed === 'object') {
-          const raw = parsed.roles || parsed.role || ['doctor']
+          const raw = parsed.roles || parsed.role || []
           parsed.roles = normalizeRoles(raw)
           setUser(parsed)
         } else {
@@ -51,7 +59,7 @@ export const AuthProvider = ({ children }) => {
       const response = await authApi.login(credentials)
       const data = response.data
 
-      const rawRoles = data.roles || (data.role ? [data.role] : ['doctor'])
+      const rawRoles = data.roles || (data.role ? [data.role] : [])
       const normalizedUser = {
         id: data.userId || data.id,
         username: data.username,
@@ -61,36 +69,24 @@ export const AuthProvider = ({ children }) => {
       }
 
       localStorage.setItem('token', data.accessToken)
+      localStorage.setItem('refreshToken', data.refreshToken)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       setUser(normalizedUser)
 
       return { success: true }
     } catch (error) {
-      // Try mock login if backend is unreachable or returns error
-      try {
-        const mockUser = loginUser(credentials)
-        const rawRoles = mockUser.roles || [mockUser.role || 'doctor']
-        const normalizedUser = {
-          id: mockUser.id,
-          username: mockUser.username,
-          fullName: mockUser.fullName,
-          roles: normalizeRoles(rawRoles),
-        }
-
-        localStorage.setItem('token', mockUser.token || 'demo-token')
-        localStorage.setItem('user', JSON.stringify(normalizedUser))
-        setUser(normalizedUser)
-
-        return { success: true }
-      } catch (mockError) {
-        const message = error.response?.data?.message || mockError.message || 'Tên đăng nhập hoặc mật khẩu không đúng'
-        return { success: false, message }
-      }
+      const message = error.response?.data?.message
+        || error.response?.data?.detail
+        || 'Tên đăng nhập hoặc mật khẩu không đúng'
+      return { success: false, message }
     }
   }
 
   const logout = () => {
+    const accessToken = localStorage.getItem('token')
+    if (accessToken) authApi.logout(accessToken).catch(() => {})
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
     setUser(null)
   }

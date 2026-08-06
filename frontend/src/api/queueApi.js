@@ -1,5 +1,6 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 import dayjs from 'dayjs'
+import { pickFields } from './apiContract.js'
 
 const queueApi = {
   /**
@@ -7,10 +8,10 @@ const queueApi = {
    * @param {Object} params { date, doctorId, roomId, status, sourceType }
    */
   getQueues: (params = {}) => {
-    const formattedParams = {
+    const formattedParams = pickFields({
       date: dayjs().format('YYYY-MM-DD'),
       ...params,
-    }
+    }, ['date', 'doctorId', 'roomId'])
     // Clean up empty params
     Object.keys(formattedParams).forEach((key) => {
       if (formattedParams[key] === null || formattedParams[key] === undefined || formattedParams[key] === '') {
@@ -25,10 +26,10 @@ const queueApi = {
    * @param {Object} params { date }
    */
   getMyQueue: (params = {}) => {
-    const formattedParams = {
+    const formattedParams = pickFields({
       date: dayjs().format('YYYY-MM-DD'),
       ...params,
-    }
+    }, ['date'])
     return axiosClient.get('/queues/me', { params: formattedParams })
   },
 
@@ -46,7 +47,10 @@ const queueApi = {
    * Check-in bệnh nhân tự đến (Walk-in)
    * @param {Object} data { patientId, doctorId, reason, notes }
    */
-  checkInWalkIn: (data) => axiosClient.post('/queue-items/walk-in', data),
+  checkInWalkIn: (data) => axiosClient.post(
+    '/queue-items/walk-in',
+    pickFields(data, ['patientId', 'doctorId', 'reason', 'note']),
+  ),
 
   /**
    * Gọi người tiếp theo trong hàng đợi
@@ -58,7 +62,16 @@ const queueApi = {
    * @param {string} itemId
    * @param {Object} data { status }
    */
-  updateStatus: (itemId, data) => axiosClient.patch(`/queue-items/${itemId}/status`, data),
+  updateStatus: (itemId, targetStatus, cancelReason) => {
+    const status = typeof targetStatus === 'string'
+      ? targetStatus
+      : (targetStatus?.targetStatus || targetStatus?.status)
+    const reason = cancelReason ?? targetStatus?.cancelReason
+    return axiosClient.patch(`/queue-items/${itemId}/status`, {
+      targetStatus: status,
+      ...(reason ? { cancelReason: reason } : {}),
+    })
+  },
 
   /**
    * Đánh dấu bỏ qua/vắng mặt bệnh nhân khi gọi (IN_PROGRESS -> SKIPPED)

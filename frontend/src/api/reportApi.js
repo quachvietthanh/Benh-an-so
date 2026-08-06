@@ -1,9 +1,25 @@
-import axiosClient from './axiosClient'
-export default {
- summary:(params)=>axiosClient.get('/reports/summary',{params}),
- timeline:(params)=>axiosClient.get('/reports/visits-timeline',{params}),
- topMedicines:(params)=>axiosClient.get('/reports/top-medicines',{params}),
- audit:(params)=>axiosClient.get('/reports/audit-logs',{params}),
- dashboard:()=>axiosClient.get('/reports/dashboard'),
- export:(params)=>axiosClient.get('/reports/export',{params,responseType:'blob'}),
+import { getDashboardStats } from '../services/mockDataService.js'
+import {
+  getStoredAuditLogs,
+  getStoredInvoices,
+  getStoredMedicalRecords,
+  getStoredPrescriptions,
+} from '../utils/storageHelpers.js'
+
+// Backend chưa cung cấp report controller; các báo cáo được tổng hợp từ dữ liệu FE đã lưu.
+const reportApi = {
+  summary: async () => ({
+    data: {
+      records: getStoredMedicalRecords(),
+      invoices: getStoredInvoices(),
+      prescriptions: getStoredPrescriptions(),
+    },
+  }),
+  timeline: async () => ({ data: [] }),
+  topMedicines: async () => ({ data: [] }),
+  audit: async () => ({ data: getStoredAuditLogs() }),
+  dashboard: async () => ({ data: getDashboardStats() }),
+  export: async () => ({ data: new Blob([], { type: 'text/csv' }) }),
 }
+
+export default reportApi

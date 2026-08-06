@@ -25,8 +25,8 @@ const { Header, Sider, Content } = Layout
 
 const roleNames = {
   admin: 'Quản trị viên',
-  manager: 'Quản lý',
   doctor: 'Bác sĩ',
+  nurse: 'Điều dưỡng',
   receptionist: 'Lễ tân',
   pharmacist: 'Dược sĩ',
 }
@@ -66,9 +66,6 @@ function MainLayout() {
   React.useEffect(() => {
     syncPatients()
   }, [syncPatients, location.pathname])
-
-  const allPatients = useMemo(() => mergePatients([]), [])
-  const allAppointments = useMemo(() => mergeAppointments([]), [])
 
   const searchOptions = useMemo(() => {
     const keyword = searchValue.trim().toLowerCase()
@@ -180,7 +177,7 @@ function MainLayout() {
 
     if (valStr.startsWith('patient:')) {
       const patientId = valStr.replace('patient:', '')
-      const currentPatients = mergePatients([...remotePatients, ...getPatients()])
+      const currentPatients = mergePatients(remotePatients)
       const foundPatient = option?.patient || currentPatients.find((p) => String(p.id) === String(patientId))
       navigate(`/patients/${patientId}`, { state: { patient: foundPatient } })
     } else if (valStr.startsWith('appointment:')) {
@@ -199,7 +196,7 @@ function MainLayout() {
     const keyword = searchValue.trim()
     setSearchValue('')
 
-    const currentPatients = mergePatients([...remotePatients, ...getPatients()])
+    const currentPatients = mergePatients(remotePatients)
     const matched = currentPatients.find((p) =>
       [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
         .some((val) => String(val || '').toLowerCase() === keyword.toLowerCase())

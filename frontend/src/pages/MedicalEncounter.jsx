@@ -536,7 +536,11 @@ function MedicalEncounter() {
     {
       title: 'Trạng thái',
       dataIndex: 'status',
-      render: (value) => <Tag color="green">{value || 'COMPLETED'}</Tag>,
+      render: (value) => (
+        <Tag color={value === 'IN_PROGRESS' ? 'processing' : 'success'}>
+          {value === 'IN_PROGRESS' ? 'Đang khám' : value === 'WAITING_FOR_RESULT' ? 'Chờ kết quả CĐLS' : 'Hoàn thành'}
+        </Tag>
+      ),
     },
     {
       title: 'Thao tác',

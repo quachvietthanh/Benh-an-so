@@ -129,12 +129,12 @@ export const ClinicalOrderTable = ({
       title: 'Bác sĩ & Ngày tạo',
       dataIndex: 'doctorName',
       key: 'doctorName',
-      width: 160,
+      width: 170,
       render: (docName, record) => (
         <div>
-          <Text style={{ fontSize: 13 }}>{docName || 'BS. Trực'}</Text>
+          <Text style={{ fontSize: 13, fontWeight: 500 }}>{docName || 'BS. Trực'}</Text>
           <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-            {record.createdAt ? new Date(record.createdAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
+            {record.createdAt ? new Date(record.createdAt).toLocaleDateString('vi-VN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
           </div>
         </div>
       ),
@@ -142,72 +142,75 @@ export const ClinicalOrderTable = ({
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 140,
+      width: 120,
       align: 'center',
       fixed: 'right',
       render: (_, record) => {
-        const statusMenu = [
-          { key: 'PENDING', label: 'Chuyển: Chờ tiếp nhận', icon: <SyncOutlined /> },
-          { key: 'IN_PROGRESS', label: 'Chuyển: Đang thực hiện', icon: <SyncOutlined spin /> },
-          { key: 'RESULTED', label: 'Chuyển: Đã có kết quả', icon: <FileDoneOutlined /> },
-          { key: 'COMPLETED', label: 'Chuyển: Hoàn tất', icon: <CheckOutlined /> },
+        const canEdit = canManage && record.status !== 'COMPLETED' && record.status !== 'CANCELLED'
+        const menuItems = [
+          {
+            key: 'detail',
+            label: 'Xem chi tiết phiếu',
+            icon: <EyeOutlined style={{ color: '#1890ff' }} />,
+            onClick: () => onViewDetail(record),
+          },
+          {
+            key: 'print',
+            label: 'In phiếu chỉ định',
+            icon: <PrinterOutlined style={{ color: '#52c41a' }} />,
+            onClick: () => onPrintOrder(record),
+          },
+          ...(canEdit
+            ? [
+                {
+                  key: 'edit',
+                  label: 'Chỉnh sửa chỉ định',
+                  icon: <EditOutlined style={{ color: '#fa8c16' }} />,
+                  onClick: () => onEditOrder(record),
+                },
+              ]
+            : []),
+          { type: 'divider' },
+          {
+            key: 'status_pending',
+            label: 'Đánh dấu: Chờ tiếp nhận',
+            icon: <SyncOutlined />,
+            onClick: () => onUpdateStatus(record.id, 'PENDING'),
+          },
+          {
+            key: 'status_progress',
+            label: 'Đánh dấu: Đang thực hiện',
+            icon: <SyncOutlined spin />,
+            onClick: () => onUpdateStatus(record.id, 'IN_PROGRESS'),
+          },
+          {
+            key: 'status_result',
+            label: 'Đánh dấu: Đã có kết quả',
+            icon: <FileDoneOutlined />,
+            onClick: () => onUpdateStatus(record.id, 'RESULTED'),
+          },
+          {
+            key: 'status_completed',
+            label: 'Đánh dấu: Hoàn tất',
+            icon: <CheckOutlined />,
+            onClick: () => onUpdateStatus(record.id, 'COMPLETED'),
+          },
+          { type: 'divider' },
+          {
+            key: 'cancel',
+            label: 'Hủy phiếu chỉ định',
+            danger: true,
+            icon: <DeleteOutlined />,
+            onClick: () => onDeleteOrder(record.id),
+          },
         ]
 
         return (
-          <Space size="small">
-            <Tooltip title="Xem chi tiết phiếu chỉ định">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined style={{ color: '#1890ff' }} />}
-                onClick={() => onViewDetail(record)}
-              />
-            </Tooltip>
-
-            <Tooltip title="In phiếu chỉ định">
-              <Button
-                type="text"
-                size="small"
-                icon={<PrinterOutlined style={{ color: '#52c41a' }} />}
-                onClick={() => onPrintOrder(record)}
-              />
-            </Tooltip>
-
-            {canManage && record.status !== 'COMPLETED' && record.status !== 'CANCELLED' && (
-              <Tooltip title="Chỉnh sửa chỉ định">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined style={{ color: '#fa8c16' }} />}
-                  onClick={() => onEditOrder(record)}
-                />
-              </Tooltip>
-            )}
-
-            <Dropdown
-              menu={{
-                items: [
-                  ...statusMenu.map((m) => ({
-                    key: m.key,
-                    label: m.label,
-                    icon: m.icon,
-                    onClick: () => onUpdateStatus(record.id, m.key),
-                  })),
-                  { type: 'divider' },
-                  {
-                    key: 'CANCELLED',
-                    label: 'Hủy phiếu chỉ định',
-                    danger: true,
-                    icon: <DeleteOutlined />,
-                    onClick: () => onDeleteOrder(record.id),
-                  },
-                ],
-              }}
-              trigger={['click']}
-            >
-              <Button type="text" size="small" icon={<MoreOutlined />} />
-            </Dropdown>
-          </Space>
+          <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+            <Button size="small" icon={<MoreOutlined />}>
+              Thao tác
+            </Button>
+          </Dropdown>
         )
       },
     },

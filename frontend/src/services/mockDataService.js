@@ -30,9 +30,9 @@ const clone = (value) => JSON.parse(JSON.stringify(value))
 
 export const roleRoutes = {
   admin: ['/', '/patients', '/appointments', '/medical-records', '/prescriptions', '/clinical-orders', '/clinical-results', '/results', '/pharmacy', '/billing', '/reports', '/system-management', '/users', '/services', '/public-lookup'],
-  manager: ['/', '/patients', '/medical-records', '/prescriptions', '/clinical-orders', '/clinical-results', '/results', '/pharmacy', '/billing', '/reports', '/services'],
   doctor: ['/', '/patients', '/appointments', '/medical-records', '/clinical-orders', '/clinical-results', '/results', '/prescriptions'],
-  receptionist: ['/', '/patients', '/appointments', '/clinical-orders', '/clinical-results', '/results', '/billing'],
+  nurse: ['/', '/medical-records'],
+  receptionist: ['/', '/patients', '/appointments', '/billing'],
   pharmacist: ['/', '/pharmacy', '/prescriptions'],
 }
 
@@ -42,18 +42,18 @@ export const getNavigationItems = (roles = []) => {
     .filter(Boolean)
 
   const allItems = [
-    { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist', 'pharmacist'] },
+    { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'receptionist'] },
-    { key: '/medical-records', label: 'Khám bệnh & bệnh án điện tử', icon: FileTextOutlined, roles: ['admin', 'manager', 'doctor'] },
-    { key: '/prescriptions', label: 'Kê đơn thuốc & cảnh báo TT', icon: MedicineBoxOutlined, roles: ['admin', 'manager', 'doctor', 'pharmacist'] },
-    { key: '/clinical-orders', label: 'Chỉ định cận lâm sàng', icon: ExperimentOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
-    { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileDoneOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
-    { key: '/pharmacy', label: 'Quản lý kho thuốc & cấp phát', icon: MedicineBoxOutlined, roles: ['admin', 'manager', 'pharmacist'] },
-    { key: '/billing', label: 'Thu phí & hóa đơn', icon: DollarCircleOutlined, roles: ['admin', 'manager', 'receptionist'] },
-    { key: '/reports', label: 'Báo cáo vận hành & nhật ký', icon: BarChartOutlined, roles: ['admin', 'manager'] },
+    { key: '/medical-records', label: 'Khám bệnh & bệnh án điện tử', icon: FileTextOutlined, roles: ['admin', 'doctor', 'nurse'] },
+    { key: '/prescriptions', label: 'Kê đơn thuốc', icon: MedicineBoxOutlined, roles: ['admin', 'doctor', 'pharmacist'] },
+    { key: '/clinical-orders', label: 'Chỉ định cận lâm sàng', icon: ExperimentOutlined, roles: ['admin', 'doctor'] },
+    { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileDoneOutlined, roles: ['admin', 'doctor'] },
+    { key: '/pharmacy', label: 'Quản lý kho thuốc & cấp phát', icon: MedicineBoxOutlined, roles: ['admin', 'pharmacist'] },
+    { key: '/billing', label: 'Thu phí & hóa đơn', icon: DollarCircleOutlined, roles: ['admin', 'receptionist'] },
+    { key: '/reports', label: 'Báo cáo vận hành & nhật ký', icon: BarChartOutlined, roles: ['admin'] },
     { key: '/system-management', label: 'Quản trị hệ thống & dịch vụ', icon: SettingOutlined, roles: ['admin'] },
-    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SafetyCertificateOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist', 'pharmacist'] },
+    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SafetyCertificateOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
   ]
 
   if (!normalizedUserRoles.length) return allItems

@@ -4,7 +4,7 @@ import {
   saveAftercareNote,
   saveFollowupReminder,
   updateReminderStatus,
-} from '../utils/aftercareHelpers'
+} from '../utils/aftercareHelpers.js'
 
 const aftercareApi = {
   getReminders: async () => {

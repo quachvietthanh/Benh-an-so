@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Card,
   Row,
@@ -7,7 +8,6 @@ import {
   Button,
   Typography,
   Space,
-  message,
   Breadcrumb,
 } from 'antd'
 import {
@@ -29,8 +29,10 @@ import queueApi from '../api/queueApi'
 import { mergeClinicalOrders, saveStoredClinicalOrder, getStoredQueueItems, saveStoredQueueItem, getStoredMedicalRecords, saveStoredMedicalRecord } from '../utils/storageHelpers'
 
 const { Title, Text } = Typography
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export function ResultPage() {
+  const location = useLocation()
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])
 
@@ -46,32 +48,32 @@ export function ResultPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // 1. Attempt RESTful API fetch GET /api/results
-      try {
-        const response = await clinicalResultApi.getAll({
-          search: searchText,
-          status: statusFilter,
-          category: categoryFilter,
-        })
-        if (response.data && Array.isArray(response.data)) {
-          setOrders(response.data)
-          setLoading(false)
-          return
-        }
-      } catch (apiErr) {
-        // Fallback to local storage & mock data if backend not connected yet
+      const localOrders = mergeClinicalOrders([])
+      const visitId = location.state?.visitId
+      if (!visitId) {
+        setOrders(localOrders)
+        return
       }
 
-      // 2. Local storage fallback (real database/user created clinical orders)
-      const merged = mergeClinicalOrders([])
+      const response = await clinicalResultApi.getByVisit(visitId, { page: 0, size: 100 })
+      const backendResults = response.data?.content || []
+      const merged = localOrders.map((order) => {
+        if (String(order.visitId || '') !== String(visitId)) return order
+        const items = (order.items || []).map((item) => {
+          const result = backendResults.find((candidate) => (
+            String(candidate.clinicalOrderItemId) === String(item.clinicalOrderItemId || item.id)
+          ))
+          return result ? { ...item, backendResultId: result.id, backendResult: result } : item
+        })
+        return { ...order, items }
+      })
       setOrders(merged)
     } catch (err) {
-      console.error('Error loading clinical results:', err)
-      message.error('Không thể tải danh sách chỉ định cận lâm sàng')
+      setOrders(mergeClinicalOrders([]))
     } finally {
       setLoading(false)
     }
-  }, [searchText, statusFilter, categoryFilter])
+  }, [location.state?.visitId])
 
   useEffect(() => {
     loadData()
@@ -132,9 +134,39 @@ export function ResultPage() {
   }
 
   const handleSaveResultSuccess = async (updatedOrder) => {
+    let syncedOrder = updatedOrder
+
+    try {
+      const syncedItems = await Promise.all((updatedOrder.items || []).map(async (item) => {
+        const itemId = item.clinicalOrderItemId || item.id
+        if (!itemId || !UUID_PATTERN.test(String(itemId))) return item
+
+        const payload = {
+          textValue: updatedOrder.resultValues,
+          abnormalFlag: 'NORMAL',
+          conclusion: updatedOrder.conclusion,
+        }
+        const response = item.backendResultId
+          ? await clinicalResultApi.update(item.backendResultId, {
+              ...payload,
+              changeReason: updatedOrder.notes || 'Cập nhật kết quả từ màn hình cận lâm sàng',
+            })
+          : await clinicalResultApi.enter(itemId, payload)
+
+        const result = response.data
+        if (updatedOrder.status === 'CONFIRMED' && result?.id) {
+          await clinicalResultApi.finalize(result.id)
+        }
+        return { ...item, backendResultId: result?.id || item.backendResultId, backendResult: result }
+      }))
+      syncedOrder = { ...updatedOrder, items: syncedItems }
+    } catch (error) {
+      console.warn('Backend clinical result sync error:', error)
+    }
+
     // 1. Save locally to LocalStorage
-    saveStoredClinicalOrder(updatedOrder)
-    setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)))
+    saveStoredClinicalOrder(syncedOrder)
+    setOrders((prev) => prev.map((o) => (o.id === syncedOrder.id ? syncedOrder : o)))
 
     // 2. Đồng bộ chu trình: Khi Bác sĩ Xác nhận & Khóa (CONFIRMED/COMPLETED), chuyển lượt khám trong Hàng Đợi sang COMPLETED & bổ sung kết quả vào Hồ Sơ
     if (['CONFIRMED', 'COMPLETED'].includes(updatedOrder.status)) {
@@ -176,12 +208,6 @@ export function ResultPage() {
       }
     }
 
-    // 3. Call RESTful API PUT /api/results/{id} if backend available
-    try {
-      await clinicalResultApi.update(updatedOrder.id, updatedOrder)
-    } catch {
-      // silent fallback
-    }
   }
 
   return (

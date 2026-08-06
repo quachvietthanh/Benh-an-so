@@ -66,6 +66,7 @@ import {
 import {
   getStoredAppointmentLogs,
   getStoredNotificationLogs,
+  getStoredQueueItems,
   mergeAppointments,
   mergePatients,
   mergeQueues,
@@ -78,6 +79,14 @@ import {
 } from '../utils/storageHelpers'
 
 const { Text, Title, Paragraph } = Typography
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const isBackendUuid = (value) => UUID_PATTERN.test(String(value || ''))
+const normalizeQueueItem = (item = {}) => ({
+  ...item,
+  id: item.id || item.queueItemId,
+  status: item.status || item.queueItemStatus,
+  roomName: item.roomName || item.roomNumber,
+})
 
 const avatarPalette = [
   ['#e7f0ff', '#1c68ce'],
@@ -226,7 +235,7 @@ function AppointmentQueue() {
   const loadDirectories = useCallback(async () => {
     try {
       const [patientRes, doctorRes] = await Promise.allSettled([
-        patientApi.getAll({ page: 0, size: 500 }),
+        patientApi.getAll({ page: 0, size: 100 }),
         userApi.getDoctors(),
       ])
 
@@ -284,7 +293,7 @@ function AppointmentQueue() {
       }
       const res = await queueApi.getQueues(params)
       const list = Array.isArray(res.data) ? res.data : (res.data?.content || [])
-      setQueues(mergeQueues(list))
+      setQueues(mergeQueues(list.map(normalizeQueueItem)))
     } catch {
       setQueues(mergeQueues([]))
     }
@@ -299,7 +308,7 @@ function AppointmentQueue() {
     try {
       const res = await queueApi.getMyQueue({ date: selectedDate.format('YYYY-MM-DD') })
       const list = Array.isArray(res.data) ? res.data : (res.data?.items || res.data?.content || [])
-      setMyQueueData(mergeQueues(list))
+      setMyQueueData(mergeQueues(list.map(normalizeQueueItem)))
     } catch {
       const allLocal = getStoredQueueItems()
       setMyQueueData(allLocal.filter((q) => !user?.id || String(q.doctorId) === String(user?.id)))
@@ -488,9 +497,6 @@ function AppointmentQueue() {
       const dInfo = getDoctorInfo(values.doctorId)
       const code = `LH-${dayjs().format('YYYYMMDD')}-${Math.floor(1000 + Math.random() * 9000)}`
 
-      const bePatientId = String(values.patientId).includes('-') ? values.patientId : 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001'
-      const beDoctorId = String(values.doctorId).includes('-') ? values.doctorId : 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'
-
       const newAppointment = {
         id: `app_${Date.now()}`,
         appointmentCode: code,
@@ -511,10 +517,10 @@ function AppointmentQueue() {
         createdAt: new Date().toISOString(),
       }
 
-      try {
+      if (isBackendUuid(values.patientId) && isBackendUuid(values.doctorId)) try {
         const apiPayload = {
-          patientId: bePatientId,
-          doctorId: beDoctorId,
+          patientId: values.patientId,
+          doctorId: values.doctorId,
           startTime: appointmentTime.toISOString(),
           endTime: appointmentTime.add(30, 'minute').toISOString(),
           reason: values.reason || 'Khám bệnh',
@@ -560,9 +566,8 @@ function AppointmentQueue() {
     setActionLoading(true)
     try {
       const reason = values.reason || 'Bệnh nhân báo bận'
-      const beAppId = String(app.id).includes('-') && String(app.id).length >= 30 ? app.id : 'cccccccc-cccc-cccc-cccc-ccccccccc001'
       try {
-        await appointmentApi.cancel(beAppId, reason)
+        if (isBackendUuid(app.id)) await appointmentApi.cancel(app.id, reason)
       } catch {
         // Local fallback
       }
@@ -618,7 +623,7 @@ function AppointmentQueue() {
         setActionLoading(true)
         try {
           try {
-            await appointmentApi.noShow(record.id)
+            if (isBackendUuid(record.id)) await appointmentApi.noShow(record.id)
           } catch {
             // Local fallback
           }
@@ -658,12 +663,12 @@ function AppointmentQueue() {
     try {
       const pInfo = getPatientInfo(app?.patientId, app?.patientName)
       const dInfo = getDoctorInfo(app?.doctorId, app?.doctorName, app?.department)
-      const beAppId = String(appId).includes('-') && String(appId).length >= 30 ? appId : 'cccccccc-cccc-cccc-cccc-ccccccccc001'
-
       let backendItem = null
       try {
-        const res = await queueApi.checkInAppointment(beAppId)
-        if (res?.data && res?.data?.id) backendItem = res.data
+        if (isBackendUuid(appId)) {
+          const res = await queueApi.checkInAppointment(appId)
+          if (res?.data?.queueItemId) backendItem = res.data
+        }
       } catch (err) {
         if (err?.response?.status === 409) {
           handleQueueApiError(err)
@@ -678,7 +683,7 @@ function AppointmentQueue() {
 
       // Tạo Queue Item đưa bệnh nhân vào Hàng Đợi Khám
       const newQueueItem = {
-        id: backendItem?.id || `q_item_${Date.now()}`,
+        id: backendItem?.queueItemId || `q_item_${Date.now()}`,
         medicalQueueId: backendItem?.medicalQueueId || '90000000-0000-0000-0000-000000000001',
         patientId: app?.patientId || 'p1',
         patientCode: pInfo.code,
@@ -689,7 +694,11 @@ function AppointmentQueue() {
         department: dInfo.department,
         roomName: 'Phòng khám 101',
         sourceType: app?.sourceType || 'APPOINTMENT',
-        status: backendItem?.status || 'WAITING',
+        visitId: backendItem?.visitId,
+        visitCode: backendItem?.visitCode,
+        roomId: backendItem?.roomId,
+        queueDate: backendItem?.queueDate,
+        status: backendItem?.queueItemStatus || 'WAITING',
         queueNumber: backendItem?.queueNumber || (queues.length + 1),
         checkedInAt: backendItem?.checkedInAt || new Date().toISOString(),
       }
@@ -723,12 +732,9 @@ function AppointmentQueue() {
 
     setActionLoading(true)
     try {
-      const bePatientId = String(values.patientId).includes('-') ? values.patientId : 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002'
-      const beDoctorId = String(values.doctorId).includes('-') ? values.doctorId : 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'
-
       const payload = {
-        patientId: bePatientId,
-        doctorId: beDoctorId,
+        patientId: values.patientId,
+        doctorId: values.doctorId,
         reason: values.reason || 'Khám Walk-in',
         note: values.notes || '',
         notes: values.notes || '',
@@ -736,7 +742,9 @@ function AppointmentQueue() {
 
       let apiRes = null
       try {
-        apiRes = await queueApi.checkInWalkIn(payload)
+        if (isBackendUuid(values.patientId) && isBackendUuid(values.doctorId)) {
+          apiRes = await queueApi.checkInWalkIn(payload)
+        }
       } catch {
         // Fallback
       }
@@ -772,7 +780,7 @@ function AppointmentQueue() {
 
       // Tự động thêm bệnh nhân Walk-in vào Hàng đợi khám (Queue)
       const walkInQueueItem = {
-        id: apiRes?.data?.id || `q_wi_${Date.now()}`,
+        id: apiRes?.data?.queueItemId || `q_wi_${Date.now()}`,
         medicalQueueId: apiRes?.data?.medicalQueueId || '90000000-0000-0000-0000-000000000001',
         patientId: values.patientId,
         patientCode: pInfo.code || `BN-${Date.now()}`,
@@ -783,7 +791,11 @@ function AppointmentQueue() {
         department: dInfo.department,
         roomName: 'Phòng khám 101',
         sourceType: 'WALK_IN',
-        status: apiRes?.data?.status || 'WAITING',
+        visitId: apiRes?.data?.visitId,
+        visitCode: apiRes?.data?.visitCode,
+        roomId: apiRes?.data?.roomId,
+        queueDate: apiRes?.data?.queueDate,
+        status: apiRes?.data?.queueItemStatus || 'WAITING',
         queueNumber: apiRes?.data?.queueNumber || (queues.length + 1),
         checkedInAt: nowIso,
       }
@@ -880,7 +892,7 @@ function AppointmentQueue() {
       const msgText = `[Nhắc lịch hẹn] Kính gửi bệnh nhân ${pInfo.name}, quý khách có lịch hẹn khám với ${dInfo.name} vào lúc ${timeVal ? dayjs(timeVal).format('HH:mm DD/MM/YYYY') : 'khung giờ hẹn'}. Vui lòng có mặt trước 15 phút.`
 
       try {
-        await appointmentApi.sendReminder?.(record.id)
+        if (isBackendUuid(record.id)) await appointmentApi.sendReminder(record.id)
       } catch {
         // Local fallback
       }
@@ -1512,7 +1524,7 @@ function AppointmentQueue() {
             key: 'reception_queue',
             label: (
               <span>
-                <TeamOutlined /> Queue Board Lễ Tân & Điều Dưỡng ({filteredQueues.length})
+                <TeamOutlined /> Hàng Đợi Khám Lễ Tân & Điều Dưỡng ({filteredQueues.length})
               </span>
             ),
             children: (
@@ -1617,7 +1629,7 @@ function AppointmentQueue() {
             key: 'doctor_queue',
             label: (
               <span>
-                <UserSwitchOutlined /> Queue Khám Bệnh Của Bác Sĩ
+                <UserSwitchOutlined /> Hàng Đợi Khám Bệnh Của Bác Sĩ
               </span>
             ),
             children: (

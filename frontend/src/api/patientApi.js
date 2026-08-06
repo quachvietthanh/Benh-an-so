@@ -1,27 +1,31 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
+import { pageParams, pickFields } from './apiContract.js'
+
+const PATIENT_FIELDS = [
+  'fullName', 'dateOfBirth', 'gender', 'phone', 'email', 'address',
+  'identityNumber', 'insuranceNumber', 'bloodType', 'emergencyContact', 'emergencyPhone',
+]
+
+const PATIENT_SEARCH_FIELDS = [
+  'patientCode', 'fullName', 'phone', 'identityNumber', 'insuranceNumber',
+  'dateOfBirth', 'gender', 'active',
+]
 
 const patientApi = {
-  getAll: (params) => {
-    return axiosClient.get('/patients', { params })
-  },
-  getById: (id) => {
-    return axiosClient.get(`/patients/${id}`)
-  },
-  getByCode: (code) => {
-    return axiosClient.get(`/patients/code/${code}`)
-  },
-  getHistory: (patientId, params) => {
-    return axiosClient.get(`/medical-history/patients/${patientId}`, { params })
-  },
-  create: (data) => {
-    return axiosClient.post('/patients', data)
-  },
-  update: (id, data) => {
-    return axiosClient.put(`/patients/${id}`, data)
-  },
-  delete: (id) => {
-    return axiosClient.delete(`/patients/${id}`)
-  },
+  getAll: (params = {}) => axiosClient.get('/patients', {
+    params: pageParams(params, PATIENT_SEARCH_FIELDS),
+  }),
+  getById: (id) => axiosClient.get(`/patients/${id}`),
+  getByCode: (code) => axiosClient.get(`/patients/code/${encodeURIComponent(code)}`),
+  getHistory: (patientId, params = {}) => axiosClient.get(
+    `/medical-history/patients/${patientId}`,
+    { params: pageParams(params, ['from', 'to']) },
+  ),
+  create: (data) => axiosClient.post('/patients', pickFields(data, PATIENT_FIELDS)),
+  update: (id, data) => axiosClient.put(`/patients/${id}`, {
+    ...pickFields(data, PATIENT_FIELDS),
+    active: data.active ?? true,
+  }),
 }
 
 export default patientApi

@@ -37,7 +37,6 @@ import { useAuthContext } from '../context/AuthContext'
 import {
   mergeClinicalOrders,
   saveStoredClinicalOrder,
-  deleteStoredClinicalOrder,
   logMedicalAccess,
 } from '../utils/storageHelpers'
 
@@ -47,7 +46,7 @@ const { Title, Text } = Typography
 
 export function ClinicalOrdersPage() {
   const { user } = useAuthContext()
-  const canManage = user?.roles?.some((role) => ['admin', 'doctor', 'receptionist'].includes(role))
+  const canManage = user?.roles?.some((role) => ['admin', 'doctor'].includes(role))
 
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])

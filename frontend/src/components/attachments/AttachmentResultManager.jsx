@@ -3,9 +3,7 @@ import { Button, Card, Form, message, Tabs } from 'antd'
 import { CloudUploadOutlined, FileTextOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAuthContext } from '../../context/AuthContext'
-import medicalRecordApi from '../../api/medicalRecordApi'
 import patientApi from '../../api/patientApi'
-import clinicalResultApi from '../../api/clinicalResultApi'
 import {
   deleteStoredAttachment,
   getStoredAttachments,
@@ -53,69 +51,13 @@ function AttachmentResultManager({ patientIdFilter = null, patientNameFilter = n
         setDbCategoryOptions(dynamicCats)
       }
 
-      // 2. Fetch patient records and clinical results/attachments from CSDL
-      const [patientRes, resultRes, recordRes] = await Promise.allSettled([
-        patientApi.getAll({ page: 0, size: 200 }),
-        clinicalResultApi.getAll(),
-        medicalRecordApi.getAll(),
-      ])
+      // Backend chỉ cho tải tệp khi đã có clinicalResultId cụ thể; màn hình tổng hợp dùng dữ liệu local.
+      const patientRes = await patientApi.getAll({ page: 0, size: 100 })
 
-      let loadedPatients = []
-      if (patientRes.status === 'fulfilled') {
-        loadedPatients = patientRes.value.data?.content || patientRes.value.data || []
-      }
+      const loadedPatients = patientRes.data?.content || patientRes.data || []
       const combinedPatients = mergePatients(loadedPatients)
       setPatients(combinedPatients)
-
-      let apiAttachments = []
-
-      // Add entries from clinical results API (CSDL)
-      if (resultRes.status === 'fulfilled' && Array.isArray(resultRes.value.data)) {
-        resultRes.value.data.forEach((resItem) => {
-          apiAttachments.push({
-            id: resItem.id || `res-${Date.now()}`,
-            attachmentCode: resItem.resultCode || `KQ-${resItem.id}`,
-            patientId: resItem.patientId,
-            patientName: resItem.patientName || 'Bệnh nhân',
-            category: resItem.category || resItem.serviceName || 'Xét nghiệm',
-            testDate: resItem.testDate || dayjs(resItem.createdAt).format('YYYY-MM-DD HH:mm'),
-            doctorName: resItem.doctorName || user?.fullName || 'Bác sĩ',
-            status: resItem.status || 'NORMAL',
-            resultSummary: resItem.resultSummary || resItem.note || 'Kết quả xét nghiệm CSDL',
-            fileName: resItem.fileName || 'ket_qua_xet_nghiem.pdf',
-            fileType: resItem.fileType || 'application/pdf',
-            fileSize: resItem.fileSize || '1.2 MB',
-            fileUrl: resItem.fileUrl || '',
-          })
-        })
-      }
-
-      // Add entries from medical record attachments (CSDL)
-      if (recordRes.status === 'fulfilled' && Array.isArray(recordRes.value.data)) {
-        recordRes.value.data.forEach((rec) => {
-          if (Array.isArray(rec.attachments)) {
-            rec.attachments.forEach((att) => {
-              apiAttachments.push({
-                id: att.id || `att-${rec.id}`,
-                attachmentCode: att.attachmentCode || `KQ-${rec.recordCode || rec.id}`,
-                patientId: rec.patientId,
-                patientName: rec.patientName || 'Bệnh nhân',
-                category: att.category || 'Khác',
-                testDate: rec.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
-                doctorName: rec.doctorName || user?.fullName || 'Bác sĩ',
-                status: att.status || 'NORMAL',
-                resultSummary: att.description || rec.diagnosis || 'Kết quả cận lâm sàng đính kèm',
-                fileName: att.fileName || 'tep_dinh_kem.pdf',
-                fileType: att.fileType || 'application/pdf',
-                fileSize: att.fileSize || '1.5 MB',
-                fileUrl: att.fileUrl || '',
-              })
-            })
-          }
-        })
-      }
-
-      setAttachments(mergeAttachments(apiAttachments))
+      setAttachments(mergeAttachments([]))
     } catch (error) {
       console.error('Error loading attachments from database:', error)
       setAttachments(getStoredAttachments())
@@ -201,14 +143,6 @@ function AttachmentResultManager({ patientIdFilter = null, patientNameFilter = n
         fileSize: fileObj.size ? `${(fileObj.size / (1024 * 1024)).toFixed(1)} MB` : '1.2 MB',
         fileUrl: objectUrl || 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=800&q=80',
         createdAt: dayjs().toISOString(),
-      }
-
-      try {
-        if (values.medicalRecordId) {
-          await medicalRecordApi.attach(values.medicalRecordId, rawFile)
-        }
-      } catch {
-        // Fallback save local
       }
 
       saveStoredAttachment(newAttachment)

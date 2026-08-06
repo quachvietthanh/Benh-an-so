@@ -21,8 +21,13 @@ function UserList() {
         page,
         size: pageSize,
       })
-      setUsers(response.data.content)
-      setTotal(response.data.totalElements)
+      // Backend /users returns a plain array (not a Spring Page).
+      const allUsers = Array.isArray(response.data)
+        ? response.data
+        : (response.data?.content || [])
+      const start = page * pageSize
+      setUsers(allUsers.slice(start, start + pageSize))
+      setTotal(allUsers.length)
     } catch (error) {
       console.error('Failed to fetch users:', error)
       message.error('Không thể tải danh sách người dùng')

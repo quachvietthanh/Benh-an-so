@@ -279,17 +279,17 @@ function MedicalEncounterForm({
                     />
                   </Form.Item>
 
-                  {/* Popular ICD quick picker */}
+                  {/* Popular ICD quick picker (Top 10 popular categories) */}
                   <div style={{ marginTop: 10 }}>
-                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Gợi ý mã ICD-10 phổ biến:
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6, fontWeight: 600 }}>
+                      📌 10 Danh mục / Mã bệnh ICD-10 phổ biến nhất (Click để chọn nhanh):
                     </Text>
                     <Space wrap>
-                      {getPopularIcd10().slice(0, 8).map((icd) => (
+                      {getPopularIcd10().slice(0, 10).map((icd) => (
                         <Tag
                           key={icd.code}
                           color="cyan"
-                          style={{ cursor: 'pointer', padding: '4px 8px', fontSize: 12 }}
+                          style={{ cursor: 'pointer', padding: '4px 8px', fontSize: 12, borderRadius: 4 }}
                           onClick={() => {
                             setPrimaryIcd(icd)
                             form.setFieldsValue({ diagnosisText: `[${icd.code}] ${icd.name}` })
@@ -304,8 +304,19 @@ function MedicalEncounterForm({
               )}
             </Form.Item>
 
-            {/* Secondary / Accompanying Diagnoses */}
-            <Form.Item label="Chẩn đoán kèm theo / Bệnh phụ (Mã ICD-10 phụ)">
+            {/* Secondary / Accompanying Diagnoses (Excluding Primary Diagnosis) */}
+            <Form.Item
+              label={
+                <Space>
+                  <span>Chẩn đoán kèm theo / Bệnh phụ (Mã ICD-10 phụ)</span>
+                  {primaryIcd && (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      (Đã loại trừ Chẩn đoán chính <b>[{primaryIcd.code}]</b>)
+                    </Text>
+                  )}
+                </Space>
+              }
+            >
               <div>
                 {secondaryIcds.length > 0 && (
                   <div style={{ marginBottom: 10 }}>
@@ -327,18 +338,20 @@ function MedicalEncounterForm({
 
                 <Select
                   showSearch
-                  placeholder="Chọn thêm bệnh kèm theo (Mã ICD-10)..."
+                  placeholder={primaryIcd ? `Chọn thêm bệnh phụ (Đã ẩn [${primaryIcd.code}] ${primaryIcd.name})...` : "Chọn thêm bệnh kèm theo (Mã ICD-10)..."}
                   value={null}
                   onChange={(code) => {
                     const item = commonIcd10List.find((i) => i.code === code)
-                    if (item && !secondaryIcds.some((i) => i.code === item.code)) {
+                    if (item && (!primaryIcd || item.code !== primaryIcd.code) && !secondaryIcds.some((i) => i.code === item.code)) {
                       setSecondaryIcds((prev) => [...prev, item])
                     }
                   }}
-                  options={commonIcd10List.map((item) => ({
-                    value: item.code,
-                    label: `[${item.code}] ${item.name}`,
-                  }))}
+                  options={commonIcd10List
+                    .filter((item) => !primaryIcd || item.code !== primaryIcd.code)
+                    .map((item) => ({
+                      value: item.code,
+                      label: `[${item.code}] ${item.name}`,
+                    }))}
                 />
               </div>
             </Form.Item>

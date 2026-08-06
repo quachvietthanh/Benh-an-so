@@ -12,12 +12,14 @@ export const useAuth = () => {
       const response = await authApi.login(credentials)
       const data = response.data
 
-      localStorage.setItem('token', data.token)
+      localStorage.setItem('token', data.accessToken)
+      localStorage.setItem('refreshToken', data.refreshToken)
       localStorage.setItem('user', JSON.stringify({
+        id: data.userId,
         username: data.username,
-        fullName: data.fullName,
-        email: data.email,
-        roles: data.roles,
+        fullName: data.username,
+        roles: data.role ? [String(data.role).toLowerCase()] : [],
+        expiredAt: data.expiredAt,
       }))
 
       return { success: true, data }
@@ -30,8 +32,11 @@ export const useAuth = () => {
     }
   }
 
-  const logout = () => {
+  const logout = async () => {
+    const accessToken = localStorage.getItem('token')
+    if (accessToken) await authApi.logout(accessToken).catch(() => {})
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
     window.location.href = '/login'
   }

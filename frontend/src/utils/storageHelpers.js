@@ -45,7 +45,7 @@ export const mergeAppointments = (apiAppointments = []) => {
   localApps.forEach((item) => {
     if (item.id) {
       const existing = map.get(String(item.id))
-      map.set(String(item.id), existing ? { ...existing, ...item } : item)
+      map.set(String(item.id), existing ? { ...item, ...existing } : item)
     }
   })
 
@@ -101,7 +101,7 @@ export const mergeQueues = (apiQueues = []) => {
     const key = String(item.id || item.medicalQueueId)
     if (key && key !== 'undefined') {
       const existing = map.get(key)
-      map.set(key, existing ? { ...existing, ...item } : item)
+      map.set(key, existing ? { ...item, ...existing } : item)
     }
   })
 
@@ -145,7 +145,7 @@ export const mergePatients = (apiPatients = []) => {
   localPatients.forEach((item) => {
     if (item.id) {
       const existing = map.get(String(item.id))
-      map.set(String(item.id), existing ? { ...existing, ...item } : item)
+      map.set(String(item.id), existing ? { ...item, ...existing } : item)
     }
   })
   // Tự động đồng bộ toàn bộ bệnh nhân từ Hàng đợi (Queue) vào danh sách Bệnh nhân
@@ -232,7 +232,7 @@ export const mergeMedicalRecords = (apiRecords = []) => {
   localRecords.forEach((item) => {
     if (item && item.id && (item.recordCode || item.patientName || item.diagnosis)) {
       const existing = map.get(String(item.id))
-      map.set(String(item.id), existing ? { ...existing, ...item } : item)
+      map.set(String(item.id), existing ? { ...item, ...existing } : item)
     }
   })
 
@@ -271,22 +271,22 @@ export const deleteStoredPrescription = (id) => {
 }
 
 export const DEFAULT_MEDICINES = [
-  { id: 'med-1', code: 'MED-001', name: 'Paracetamol 500mg', category: 'Hạ sốt, giảm đau', unit: 'Viên', stock: 1500, minStock: 200, active: true, price: 1500 },
-  { id: 'med-2', code: 'MED-002', name: 'Amoxicillin 500mg', category: 'Kháng sinh', unit: 'Viên', stock: 800, minStock: 150, active: true, price: 3500 },
-  { id: 'med-3', code: 'MED-003', name: 'Cefuroxime 500mg', category: 'Kháng sinh', unit: 'Viên', stock: 450, minStock: 100, active: true, price: 8500 },
-  { id: 'med-4', code: 'MED-004', name: 'Omeprazole 20mg', category: 'Dạ dày - Tiêu hóa', unit: 'Viên', stock: 600, minStock: 100, active: true, price: 2500 },
-  { id: 'med-5', code: 'MED-005', name: 'Amlodipine 5mg', category: 'Tim mạch - Huyết áp', unit: 'Viên', stock: 900, minStock: 200, active: true, price: 2000 },
-  { id: 'med-6', code: 'MED-006', name: 'Metformin 850mg', category: 'Nội tiết - Đái tháo đường', unit: 'Viên', stock: 1200, minStock: 200, active: true, price: 3000 },
-  { id: 'med-7', code: 'MED-007', name: 'Salbutamol Inhaler 100mcg', category: 'Hô hấp', unit: 'Lọ', stock: 45, minStock: 20, active: true, price: 65000 },
-  { id: 'med-8', code: 'MED-008', name: 'Vitamin C 500mg', category: 'Vitamin & Khoáng chất', unit: 'Viên', stock: 2000, minStock: 300, active: true, price: 1000 },
+  { id: '16000000-0000-0000-0000-000000000001', code: 'MED-PARA-500', name: 'Paracetamol 500 mg', activeIngredient: 'Paracetamol', category: 'Hạ sốt, giảm đau', unit: 'vien', route: 'ORAL', stock: 1500, minStock: 200, active: true, price: 1500 },
+  { id: '16000000-0000-0000-0000-000000000003', code: 'MED-AMOX-500', name: 'Amoxicillin 500 mg', activeIngredient: 'Amoxicillin', category: 'Kháng sinh', unit: 'vien', route: 'ORAL', stock: 800, minStock: 150, active: true, price: 3500 },
+  { id: '16000000-0000-0000-0000-000000000006', code: 'MED-CEFU-500', name: 'Cefuroxime 500 mg', activeIngredient: 'Cefuroxime', category: 'Kháng sinh', unit: 'vien', route: 'ORAL', stock: 450, minStock: 100, active: true, price: 8500 },
+  { id: '16000000-0000-0000-0000-000000000007', code: 'MED-OMEP-20', name: 'Omeprazole 20 mg', activeIngredient: 'Omeprazole', category: 'Dạ dày - Tiêu hóa', unit: 'vien', route: 'ORAL', stock: 600, minStock: 100, active: true, price: 2500 },
+  { id: '16000000-0000-0000-0000-000000000019', code: 'MED-AMLO-5', name: 'Amlodipine 5 mg', activeIngredient: 'Amlodipine', category: 'Tim mạch - Huyết áp', unit: 'vien', route: 'ORAL', stock: 900, minStock: 200, active: true, price: 2000 },
+  { id: '16000000-0000-0000-0000-000000000016', code: 'MED-METFO-500', name: 'Metformin 500 mg', activeIngredient: 'Metformin', category: 'Nội tiết - Đái tháo đường', unit: 'vien', route: 'ORAL', stock: 1200, minStock: 200, active: true, price: 3000 },
+  { id: '16000000-0000-0000-0000-000000000015', code: 'MED-VENTO', name: 'Salbutamol inhaler', activeIngredient: 'Salbutamol', category: 'Hô hấp', unit: 'binh', route: 'INHALATION', stock: 45, minStock: 20, active: true, price: 65000 },
+  { id: '16000000-0000-0000-0000-000000000002', code: 'MED-IBU-400', name: 'Ibuprofen 400 mg', activeIngredient: 'Ibuprofen', category: 'Giảm đau, kháng viêm', unit: 'vien', route: 'ORAL', stock: 800, minStock: 100, active: true, price: 2500 },
 ]
 
 export const DEFAULT_BATCHES = [
-  { id: 'batch-1', batchNumber: 'LO-202607-01', lotNumber: 'LO-202607-01', medicineId: 'med-1', medicineName: 'Paracetamol 500mg', quantity: 1000, unitCost: 1200, price: 1200, manufacturedDate: '2026-01-15', expiryDate: '2028-01-15', supplier: 'Dược Hậu Giang', importDate: '2026-07-01' },
-  { id: 'batch-2', batchNumber: 'LO-202607-02', lotNumber: 'LO-202607-02', medicineId: 'med-2', medicineName: 'Amoxicillin 500mg', quantity: 500, unitCost: 2800, price: 2800, manufacturedDate: '2026-02-10', expiryDate: '2027-08-10', supplier: 'Mekophar', importDate: '2026-07-05' },
-  { id: 'batch-3', batchNumber: 'LO-202607-03', lotNumber: 'LO-202607-03', medicineId: 'med-4', medicineName: 'Omeprazole 20mg', quantity: 600, unitCost: 2000, price: 2000, manufacturedDate: '2026-03-01', expiryDate: '2028-03-01', supplier: 'Traphaco', importDate: '2026-07-10' },
-  { id: 'batch-4', batchNumber: 'LO-202607-04', lotNumber: 'LO-202607-04', medicineId: 'med-5', medicineName: 'Amlodipine 5mg', quantity: 900, unitCost: 1600, price: 1600, manufacturedDate: '2026-04-12', expiryDate: '2028-04-12', supplier: 'Dược Hà Tây', importDate: '2026-07-12' },
-  { id: 'batch-5', batchNumber: 'LO-202607-05', lotNumber: 'LO-202607-05', medicineId: 'med-6', medicineName: 'Metformin 850mg', quantity: 1200, unitCost: 2400, price: 2400, manufacturedDate: '2026-05-20', expiryDate: '2028-05-20', supplier: 'Pymepharco', importDate: '2026-07-15' },
+  { id: 'batch-1', batchNumber: 'LO-202607-01', lotNumber: 'LO-202607-01', medicineId: '16000000-0000-0000-0000-000000000001', medicineName: 'Paracetamol 500 mg', quantity: 1000, unitCost: 1200, price: 1200, manufacturedDate: '2026-01-15', expiryDate: '2028-01-15', supplier: 'Dược Hậu Giang', importDate: '2026-07-01' },
+  { id: 'batch-2', batchNumber: 'LO-202607-02', lotNumber: 'LO-202607-02', medicineId: '16000000-0000-0000-0000-000000000003', medicineName: 'Amoxicillin 500 mg', quantity: 500, unitCost: 2800, price: 2800, manufacturedDate: '2026-02-10', expiryDate: '2027-08-10', supplier: 'Mekophar', importDate: '2026-07-05' },
+  { id: 'batch-3', batchNumber: 'LO-202607-03', lotNumber: 'LO-202607-03', medicineId: '16000000-0000-0000-0000-000000000007', medicineName: 'Omeprazole 20 mg', quantity: 600, unitCost: 2000, price: 2000, manufacturedDate: '2026-03-01', expiryDate: '2028-03-01', supplier: 'Traphaco', importDate: '2026-07-10' },
+  { id: 'batch-4', batchNumber: 'LO-202607-04', lotNumber: 'LO-202607-04', medicineId: '16000000-0000-0000-0000-000000000019', medicineName: 'Amlodipine 5 mg', quantity: 900, unitCost: 1600, price: 1600, manufacturedDate: '2026-04-12', expiryDate: '2028-04-12', supplier: 'Dược Hà Tây', importDate: '2026-07-12' },
+  { id: 'batch-5', batchNumber: 'LO-202607-05', lotNumber: 'LO-202607-05', medicineId: '16000000-0000-0000-0000-000000000016', medicineName: 'Metformin 500 mg', quantity: 1200, unitCost: 2400, price: 2400, manufacturedDate: '2026-05-20', expiryDate: '2028-05-20', supplier: 'Pymepharco', importDate: '2026-07-15' },
 ]
 
 export const DEFAULT_PRESCRIPTIONS = []
@@ -305,7 +305,7 @@ export const mergePrescriptions = (apiPrescriptions = []) => {
     const key = String(item.id || item.prescriptionCode)
     if (key && key !== 'undefined') {
       const existing = map.get(key)
-      map.set(key, existing ? { ...existing, ...item } : item)
+      map.set(key, existing ? { ...item, ...existing } : item)
     }
   })
 

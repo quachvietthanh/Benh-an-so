@@ -1,18 +1,18 @@
 import axios from 'axios'
 
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
+  baseURL: import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// Request interceptor: thêm JWT token vào header nếu không phải demo-token
+// Gửi JWT do backend cấp cho mọi API được bảo vệ.
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
-    if (token && token !== 'demo-token') {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -26,12 +26,11 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const token = localStorage.getItem('token')
-    // Nếu token là demo-token hoặc đang ở trang /login thì không ép hard-reload chuyển hướng
-    if (error.response?.status === 401 && token !== 'demo-token') {
+    if (error.response?.status === 401 && typeof localStorage !== 'undefined') {
       localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
       localStorage.removeItem('user')
-      if (window.location.pathname !== '/login') {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
     }

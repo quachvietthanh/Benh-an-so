@@ -1,36 +1,35 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import publicLookupApi from './publicLookupApi.js'
+const store = new Map()
+globalThis.localStorage = {
+  getItem: (key) => store.get(key) ?? null,
+  setItem: (key, value) => store.set(key, String(value)),
+  removeItem: (key) => store.delete(key),
+}
 
-test('sends the verified lookup payload through the public client without a JWT', async () => {
-  const payload = {
-    appointmentCode: 'LH-1234567890',
-    dateOfBirth: '1990-05-12',
-  }
-  let capturedConfig
+const { default: publicLookupApi } = await import('./publicLookupApi.js')
 
-  const response = await publicLookupApi.lookupAppointment(payload, {
-    adapter: async (config) => {
-      capturedConfig = config
-      return {
-        data: {
-          matched: false,
-          careState: null,
-          scheduledAt: null,
-        },
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config,
-        request: {},
-      }
+test('looks up a stored appointment without calling an unsupported backend endpoint', async () => {
+  store.set('app_patients', JSON.stringify([
+    { id: 'patient-1', dateOfBirth: '1990-05-12' },
+  ]))
+  store.set('app_appointments', JSON.stringify([
+    {
+      id: 'appointment-1',
+      patientId: 'patient-1',
+      appointmentCode: 'LH-1234567890',
+      startTime: '2026-08-07T08:00:00Z',
+      status: 'SCHEDULED',
     },
+  ]))
+
+  const response = await publicLookupApi.lookupAppointment({
+    appointmentCode: 'lh-1234567890',
+    dateOfBirth: '1990-05-12',
   })
 
-  assert.equal(capturedConfig.method, 'post')
-  assert.equal(capturedConfig.url, '/public/appointments/lookup')
-  assert.equal(capturedConfig.headers.get('Authorization'), undefined)
-  assert.deepEqual(JSON.parse(capturedConfig.data), payload)
-  assert.equal(response.data.matched, false)
+  assert.equal(response.data.matched, true)
+  assert.equal(response.data.careState, 'SCHEDULED')
+  assert.equal(response.data.scheduledAt, '2026-08-07T08:00:00Z')
 })
