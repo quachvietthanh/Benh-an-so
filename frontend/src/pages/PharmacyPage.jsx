@@ -29,7 +29,7 @@ import {
 import dayjs from 'dayjs'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
-import { mergeMedicines, mergeBatches, saveStoredBatch } from '../utils/storageHelpers'
+import { mergeMedicines, mergeBatches } from '../utils/storageHelpers'
 
 const parseItems = (value) => {
   try {
@@ -222,18 +222,7 @@ function PharmacyPage() {
 
       await pharmacyApi.receiveBatch(receiptPayload)
 
-      saveStoredBatch({
-        id: `batch-${Date.now()}`,
-        batchNumber: values.lotNumber,
-        lotNumber: values.lotNumber,
-        medicineId: values.medicineId,
-        medicineName: selectedMed?.medicineName || selectedMed?.name || '',
-        quantity: Number(values.quantity),
-        unitCost: Number(values.unitCost || 0),
-        expiryDate: formattedDate,
-      })
-
-      message.success(`Đã nhập kho theo lô ${values.lotNumber} cho thuốc ${selectedMed?.medicineName || selectedMed?.name || ''}`)
+      message.success(`Đã nhập kho theo lô ${values.lotNumber} cho thuốc ${selectedMed?.name || selectedMed?.medicineName || ''}`)
       setBatchOpen(false)
       batchForm.resetFields()
       await loadData()
