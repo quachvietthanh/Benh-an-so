@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.inventory.InventoryReceipt;
-import com.benhsoan.domain.inventory.InventoryReceipt.InventoryReceiptItem;
+import com.benhsoan.domain.inventory.InventoryReceiptItem;
 import com.benhsoan.domain.inventory.MedicineBatch;
 import com.benhsoan.port.dto.result.InventoryReceiptItemResult;
 import com.benhsoan.port.dto.result.InventoryReceiptResult;

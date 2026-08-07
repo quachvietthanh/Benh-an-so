@@ -2,7 +2,7 @@ package com.benhsoan.persistence.mapper.inventory;
 
 import org.springframework.stereotype.Component;
 
-import com.benhsoan.domain.inventory.InventoryReceipt.InventoryReceiptItem;
+import com.benhsoan.domain.inventory.InventoryReceiptItem;
 import com.benhsoan.persistence.entity.inventory.InventoryReceiptItemEntity;
 
 @Component

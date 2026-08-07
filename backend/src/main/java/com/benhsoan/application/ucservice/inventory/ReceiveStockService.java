@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.inventory.InventoryReceipt;
-import com.benhsoan.domain.inventory.InventoryReceipt.InventoryReceiptItem;
+import com.benhsoan.domain.inventory.InventoryReceiptItem;
 import com.benhsoan.domain.inventory.MedicineBatch;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.inventory.ReceiveStockCommand;
