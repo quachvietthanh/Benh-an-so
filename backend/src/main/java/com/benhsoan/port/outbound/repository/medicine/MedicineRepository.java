@@ -33,4 +33,6 @@ public interface MedicineRepository {
     Page<Medicine> search(MedicineSearchCriteria criteria, Pageable pageable);
 
     Medicine save(Medicine medicine);
+
+    void updateStockQuantity(UUID medicineId, int quantity);
 }
