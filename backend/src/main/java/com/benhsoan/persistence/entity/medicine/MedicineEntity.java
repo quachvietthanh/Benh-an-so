@@ -62,4 +62,7 @@ public class MedicineEntity {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Column(name = "stock_quantity", nullable = false)
+    private int stockQuantity;
 }
