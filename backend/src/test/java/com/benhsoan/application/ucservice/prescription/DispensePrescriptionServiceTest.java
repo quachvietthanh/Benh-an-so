@@ -30,6 +30,7 @@ import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
@@ -159,6 +160,41 @@ class DispensePrescriptionServiceTest {
         assertEquals(prescriptionId, ex.getPrescriptionId());
         assertEquals(1, ex.getDetails().size());
         assertEquals(50, ex.getDetails().get(0).shortageQuantity());
+    }
+
+    @Test
+    void shouldTranslateConcurrentDeductionFailureToInsufficientStockConflict() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        Prescription prescription = prescription(prescriptionId, medicineId);
+        PrescriptionItem prescriptionItem = prescriptionItem(prescriptionId, medicineId, 70);
+
+        MedicineBatch firstBatch = batch(medicineId, "BATCH-A", LocalDate.of(2026, 10, 1), 20);
+        MedicineBatch secondBatch = batch(medicineId, "BATCH-B", LocalDate.of(2026, 12, 1), 60);
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionItemRepository.findByPrescriptionId(prescriptionId)).thenReturn(List.of(prescriptionItem));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine(medicineId, "MED-001", "Paracetamol")));
+        when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), eq(LocalDate.of(2026, 8, 7))))
+                .thenReturn(List.of(firstBatch, secondBatch));
+        org.mockito.Mockito.doThrow(new ValidationException("Unable to deduct stock for batch id"))
+                .when(medicineBatchRepository)
+                .deductStockQuantity(secondBatch.getId(), 50, BatchStatus.ACTIVE, NOW);
+
+        PrescriptionInsufficientStockException ex = assertThrows(
+                PrescriptionInsufficientStockException.class,
+                () -> service.dispense(prescriptionId)
+        );
+
+        assertEquals(prescriptionId, ex.getPrescriptionId());
+        assertEquals(1, ex.getDetails().size());
+        assertEquals(prescriptionItem.getId(), ex.getDetails().get(0).prescriptionItemId());
+        assertEquals(medicineId, ex.getDetails().get(0).medicineId());
+        assertEquals("MED-001", ex.getDetails().get(0).medicineCode());
+        assertEquals("Paracetamol", ex.getDetails().get(0).medicineName());
+        assertEquals(70, ex.getDetails().get(0).requiredQuantity());
+        assertEquals(60, ex.getDetails().get(0).availableQuantity());
+        assertEquals(10, ex.getDetails().get(0).shortageQuantity());
     }
 
     private Prescription prescription(UUID prescriptionId, UUID medicineId) {

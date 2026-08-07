@@ -23,8 +23,10 @@ import com.benhsoan.domain.inventory.enums.StockMovementType;
 import com.benhsoan.domain.medicine.exception.MedicineNotFoundException;
 import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
 import com.benhsoan.domain.prescription.PrescriptionItem;
+import com.benhsoan.domain.prescription.exception.PrescriptionAllocationInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.DispenseAllocationResult;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
@@ -168,12 +170,21 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
             MedicineBatch batch = plan.batch();
             int quantityBefore = batch.getQuantity();
             batch.deductStock(plan.allocatedQuantity(), now);
-            medicineBatchRepository.deductStockQuantity(
-                    batch.getId(),
-                    plan.allocatedQuantity(),
-                    batch.getStatus(),
-                    now
-            );
+            try {
+                medicineBatchRepository.deductStockQuantity(
+                        batch.getId(),
+                        plan.allocatedQuantity(),
+                        batch.getStatus(),
+                        now
+                );
+            } catch (ValidationException ex) {
+                throw new PrescriptionAllocationInsufficientStockException(
+                        plan.item().getPrescriptionId(),
+                        plan.item(),
+                        plan.medicineCode(),
+                        quantityBefore
+                );
+            }
 
             dispenseItems.add(PrescriptionDispenseItem.create(
                     UUID.randomUUID(),

@@ -3,6 +3,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,6 +30,7 @@ public class InventoryController {
     private final InventoryRestMapper mapper;
 
     @GetMapping("/stocks")
+    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
     public List<InventoryStockResponse> listStocks(
             @RequestParam(required = false) Boolean active
     ) {
@@ -38,6 +40,7 @@ public class InventoryController {
     }
 
     @GetMapping("/batches")
+    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
     public List<InventoryBatchResponse> listBatches(
             @RequestParam(required = false) UUID medicineId,
             @RequestParam(required = false) BatchStatus status,
