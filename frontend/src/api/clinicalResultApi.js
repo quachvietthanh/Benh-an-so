@@ -6,7 +6,10 @@ import axiosClient from './axiosClient'
  */
 const clinicalResultApi = {
   getAll: (params) => {
-    return axiosClient.get('/clinical-results', { params })
+    return axiosClient.get('/clinical-results', { params }).catch((err) => {
+      console.warn('Backend /clinical-results global list endpoint not available, returning empty array:', err?.message)
+      return { data: [] }
+    })
   },
   getById: (id) => {
     return axiosClient.get(`/clinical-results/${id}`)

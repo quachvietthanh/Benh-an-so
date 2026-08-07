@@ -95,8 +95,8 @@ function PrescriptionPage() {
   const visitDiagnosis = selectedRecord?.diagnosis || ''
   const hasSavedDiagnosis = Boolean(visitDiagnosis && visitDiagnosis.trim())
 
-  // Master Permission Flag for Prescribing (delegated to Backend Security)
-  const canPrescribe = Boolean(selectedRecordId) && editingPrescription?.status !== 'DISPENSED'
+  // Master Permission Flag for Prescribing
+  const canPrescribe = isDoctor && isAssignedDoctor && Boolean(selectedRecordId) && hasSavedDiagnosis && editingPrescription?.status !== 'DISPENSED'
 
   // Pre-fill state from navigation
   useEffect(() => {
@@ -205,6 +205,15 @@ function PrescriptionPage() {
   const validateForm = () => {
     if (!selectedRecordId && !editingPrescription) {
       return 'Không xác định được lượt khám để kê đơn.'
+    }
+    if (!hasSavedDiagnosis && !editingPrescription) {
+      return 'Cần lưu chẩn đoán trước khi kê đơn thuốc.'
+    }
+    if (!isDoctor) {
+      return 'Chỉ Bác sĩ mới được phép kê đơn thuốc.'
+    }
+    if (!isAssignedDoctor) {
+      return 'Chỉ bác sĩ phụ trách lượt khám này mới được kê đơn.'
     }
     if (!items || items.length === 0) {
       return 'Vui lòng chọn thuốc.'
@@ -484,7 +493,7 @@ function PrescriptionPage() {
                 onChange={(val) => handleItemChange(item.id, 'medicineId', val)}
                 options={medicines.map((m) => ({
                   value: m.id,
-                  label: `${m.name || m.medicineName} (Tồn kho: ${m.stock !== undefined ? m.stock : 100} ${m.unit || 'đơn vị'})`,
+                  label: `${m.medicineName || m.name} (Tồn kho: ${m.stockQuantity ?? m.stock ?? 100} ${m.unit || 'đơn vị'})`,
                 }))}
               />
             </Form.Item>
@@ -589,12 +598,20 @@ function PrescriptionPage() {
             {
               title: 'Bệnh nhân',
               dataIndex: 'patientName',
-              render: (val) => val || '—',
+              render: (val, row) => {
+                if (val) return val
+                const r = records.find((rec) => String(rec.id) === String(row.medicalRecordId))
+                return r ? r.patientName : '—'
+              },
             },
             {
               title: 'Bác sĩ chỉ định',
               dataIndex: 'doctorName',
-              render: (val, row) => val || row.createdBy || 'BS. Phạm Hồng Anh',
+              render: (val, row) => {
+                if (val) return val
+                const r = records.find((rec) => String(rec.id) === String(row.medicalRecordId))
+                return r ? (r.doctorName || 'Bác sĩ phụ trách') : (row.createdBy || 'Bác sĩ phụ trách')
+              },
             },
             {
               title: 'Danh sách thuốc',

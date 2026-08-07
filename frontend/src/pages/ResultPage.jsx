@@ -26,6 +26,14 @@ import ResultModal from '../components/results/ResultModal'
 
 import clinicalResultApi from '../api/clinicalResultApi'
 import queueApi from '../api/queueApi'
+import {
+  mergeClinicalOrders,
+  saveStoredClinicalOrder,
+  getStoredQueueItems,
+  saveStoredQueueItem,
+  getStoredMedicalRecords,
+  saveStoredMedicalRecord,
+} from '../utils/storageHelpers'
 
 const { Title, Text } = Typography
 
@@ -50,12 +58,12 @@ export function ResultPage() {
         status: statusFilter,
         category: categoryFilter,
       })
-      const list = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
-      setOrders(list)
+      const apiList = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
+      const mergedList = mergeClinicalOrders(apiList)
+      setOrders(mergedList)
     } catch (err) {
-      console.error('Error loading clinical results:', err)
-      message.error('Không thể tải danh sách chỉ định cận lâm sàng từ Backend')
-      setOrders([])
+      console.warn('Error loading clinical results from API:', err?.message)
+      setOrders(mergeClinicalOrders([]))
     } finally {
       setLoading(false)
     }
