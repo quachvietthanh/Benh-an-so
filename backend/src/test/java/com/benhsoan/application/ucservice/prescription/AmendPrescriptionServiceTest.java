@@ -232,6 +232,6 @@ class AmendPrescriptionServiceTest {
 
     private Medicine medicine(UUID id, boolean active) {
         return Medicine.restore(id, "MED-001", "Amoxicillin", "Amoxicillin", "500 mg", DosageForm.CAPSULE,
-                "capsule", AdministrationRoute.ORAL, active, CREATED_AT, null);
+                "capsule", AdministrationRoute.ORAL, active, CREATED_AT, null, 0);
     }
 }

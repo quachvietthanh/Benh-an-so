@@ -231,12 +231,12 @@ class CreatePrescriptionServiceTest {
 
     private Medicine activeMedicine(UUID id) {
         return Medicine.restore(id, "MED001", "Paracetamol", "Paracetamol", "500 mg", DosageForm.TABLET,
-                "tablet", AdministrationRoute.ORAL, true, NOW, null);
+                "tablet", AdministrationRoute.ORAL, true, NOW, null, 0);
     }
 
     private Medicine inactiveMedicine(UUID id) {
         return Medicine.restore(id, "MED001", "Paracetamol", "Paracetamol", "500 mg", DosageForm.TABLET,
-                "tablet", AdministrationRoute.ORAL, false, NOW, null);
+                "tablet", AdministrationRoute.ORAL, false, NOW, null, 0);
     }
 
     private DrugInteractionWarningResult warning(UUID firstMedicineId, UUID secondMedicineId) {

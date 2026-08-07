@@ -30,7 +30,7 @@ import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
-import com.benhsoan.port.dto.result.PrescriptionResult;
+import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
 import com.benhsoan.port.outbound.repository.inventory.StockMovementRepository;
@@ -59,6 +59,8 @@ class DispensePrescriptionServiceTest {
     private final ClockPort clockPort = mock(ClockPort.class);
     private final AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
     private final PrescriptionDisplayContextResolver displayContextResolver = mock(PrescriptionDisplayContextResolver.class);
+    private final DispensePrescriptionResultMapper dispensePrescriptionResultMapper =
+            new DispensePrescriptionResultMapper(new PrescriptionResultMapper(displayContextResolver));
 
     private DispensePrescriptionService service;
 
@@ -92,7 +94,7 @@ class DispensePrescriptionServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                new PrescriptionResultMapper(displayContextResolver)
+                dispensePrescriptionResultMapper
         );
     }
 
@@ -113,10 +115,20 @@ class DispensePrescriptionServiceTest {
                 .thenReturn(List.of(firstBatch, secondBatch));
         when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        PrescriptionResult result = service.dispense(prescriptionId);
+        DispensePrescriptionResult result = service.dispense(prescriptionId);
 
         assertNotNull(result);
-        assertEquals(PrescriptionStatus.DISPENSED, result.status());
+        assertEquals(PrescriptionStatus.DISPENSED, result.prescription().status());
+        assertEquals(ACTOR_ID, result.dispensedBy());
+        assertEquals(NOW, result.dispensedAt());
+        assertEquals(2, result.allocationCount());
+        assertEquals(70, result.totalDispensedQuantity());
+        assertEquals("BATCH-A", result.allocations().get(0).batchNumber());
+        assertEquals(20, result.allocations().get(0).dispensedQuantity());
+        assertEquals(0, result.allocations().get(0).batchQuantityRemaining());
+        assertEquals("BATCH-B", result.allocations().get(1).batchNumber());
+        assertEquals(50, result.allocations().get(1).dispensedQuantity());
+        assertEquals(10, result.allocations().get(1).batchQuantityRemaining());
         verify(medicineBatchRepository).deductStockQuantity(firstBatch.getId(), 20, BatchStatus.DEPLETED, NOW);
         verify(medicineBatchRepository).deductStockQuantity(secondBatch.getId(), 50, BatchStatus.ACTIVE, NOW);
         verify(medicineRepository).updateStockQuantity(medicineId, -70);
@@ -210,7 +222,8 @@ class DispensePrescriptionServiceTest {
                 AdministrationRoute.ORAL,
                 true,
                 NOW.minusSeconds(86400),
-                null
+                null,
+                120
         );
     }
 }

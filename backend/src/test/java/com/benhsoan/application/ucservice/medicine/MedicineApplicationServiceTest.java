@@ -231,7 +231,8 @@ class MedicineApplicationServiceTest {
                 AdministrationRoute.ORAL,
                 true,
                 NOW.minusSeconds(60),
-                null
+                null,
+                0
         );
     }
 
@@ -247,7 +248,8 @@ class MedicineApplicationServiceTest {
                 AdministrationRoute.ORAL,
                 false,
                 NOW.minusSeconds(60),
-                null
+                null,
+                0
         );
     }
 }
