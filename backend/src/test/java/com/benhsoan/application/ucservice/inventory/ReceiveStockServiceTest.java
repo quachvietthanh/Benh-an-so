@@ -272,7 +272,6 @@ class ReceiveStockServiceTest {
     private Medicine createMedicine(UUID id, String code, String name) {
         return Medicine.restore(
                 id, code, name, name, "500 mg", DosageForm.TABLET, "vien",
-                AdministrationRoute.ORAL, true, NOW.minusSeconds(86400), null);
+                AdministrationRoute.ORAL, true, NOW.minusSeconds(86400), null, 0);
     }
 }
-

@@ -1,23 +1,22 @@
 package com.benhsoan.application.ucservice.prescription;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mock;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.application.ucservice.prescription.snapshot.PrescriptionSnapshotMapper;
@@ -62,6 +61,7 @@ class AmendPrescriptionServiceTest {
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private PrescriptionClinicalContextValidator clinicalContextValidator;
+    @Mock private PrescriptionDisplayContextResolver displayContextResolver;
 
     private AmendPrescriptionService service;
     private UUID actorId;
@@ -70,6 +70,15 @@ class AmendPrescriptionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(displayContextResolver.resolve(any(), any()))
+                .thenReturn(new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                ));
         service = new AmendPrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
@@ -78,7 +87,7 @@ class AmendPrescriptionServiceTest {
                 amendmentRepository,
                 auditLogRepository,
                 currentUserPort,
-                new PrescriptionResultMapper(),
+                new PrescriptionResultMapper(displayContextResolver),
                 new PrescriptionSnapshotMapper(),
                 new PrescriptionSnapshotSerializer(new ObjectMapper().findAndRegisterModules()),
                 () -> AMENDED_AT,
@@ -222,6 +231,6 @@ class AmendPrescriptionServiceTest {
 
     private Medicine medicine(UUID id, boolean active) {
         return Medicine.restore(id, "MED-001", "Amoxicillin", "Amoxicillin", "500 mg", DosageForm.CAPSULE,
-                "capsule", AdministrationRoute.ORAL, active, CREATED_AT, null);
+                "capsule", AdministrationRoute.ORAL, active, CREATED_AT, null, 0);
     }
 }

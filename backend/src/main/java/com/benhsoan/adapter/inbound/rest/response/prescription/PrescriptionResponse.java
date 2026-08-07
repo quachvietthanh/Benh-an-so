@@ -17,11 +17,23 @@ public record PrescriptionResponse(
 
         UUID medicalRecordId,
 
+        UUID visitId,
+
+        String visitCode,
+
+        UUID patientId,
+
+        String patientCode,
+
+        String patientName,
+
         PrescriptionStatus status,
 
         String note,
 
         UUID prescribedBy,
+
+        String doctorName,
 
         Instant prescribedAt,
 

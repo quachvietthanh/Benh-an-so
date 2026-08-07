@@ -24,7 +24,8 @@ public class MedicinePersistenceMapper {
                 entity.getDefaultRoute(),
                 entity.isActive(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getStockQuantity()
         );
     }
 
@@ -45,6 +46,7 @@ public class MedicinePersistenceMapper {
                 .active(domain.isActive())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
+                .stockQuantity(domain.getStockQuantity())
                 .build();
     }
 }

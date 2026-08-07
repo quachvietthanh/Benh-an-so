@@ -1,0 +1,58 @@
+package com.benhsoan.adapter.inbound.rest.mapper;
+
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
+import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockResponse;
+import com.benhsoan.port.dto.result.InventoryBatchResult;
+import com.benhsoan.port.dto.result.InventoryStockResult;
+
+@Component
+public class InventoryRestMapper {
+
+    public List<InventoryBatchResponse> toBatchResponses(List<InventoryBatchResult> results) {
+        return results.stream()
+                .map(this::toBatchResponse)
+                .toList();
+    }
+
+    public List<InventoryStockResponse> toStockResponses(List<InventoryStockResult> results) {
+        return results.stream()
+                .map(this::toStockResponse)
+                .toList();
+    }
+
+    private InventoryBatchResponse toBatchResponse(InventoryBatchResult result) {
+        return new InventoryBatchResponse(
+                result.batchId(),
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.batchNumber(),
+                result.expiryDate(),
+                result.quantity(),
+                result.status(),
+                result.eligibleForDispense(),
+                result.createdAt(),
+                result.updatedAt()
+        );
+    }
+
+    private InventoryStockResponse toStockResponse(InventoryStockResult result) {
+        return new InventoryStockResponse(
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.activeIngredient(),
+                result.strength(),
+                result.unit(),
+                result.active(),
+                result.stockQuantity(),
+                result.eligibleStockQuantity(),
+                result.activeBatchCount(),
+                result.nearestExpiryDate()
+        );
+    }
+}

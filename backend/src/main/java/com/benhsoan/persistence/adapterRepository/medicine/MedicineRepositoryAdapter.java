@@ -38,6 +38,11 @@ public class MedicineRepositoryAdapter
     private final MedicinePersistenceMapper mapper;
 
     @Override
+    public List<Medicine> findAll() {
+        return mapToDomain(jpaRepository.findAll(DEFAULT_SORT));
+    }
+
+    @Override
     public Optional<Medicine> findById(UUID id) {
         Objects.requireNonNull(id, "Medicine id must not be null.");
 

@@ -86,4 +86,24 @@ public class MedicineBatch {
         this.status = BatchStatus.ACTIVE;
         this.updatedAt = Guard.require(updatedAt, "Update time");
     }
+
+    public void deductStock(int deductionQuantity, Instant updatedAt) {
+        if (deductionQuantity <= 0) {
+            throw new ValidationException("Deduction quantity must be greater than 0.");
+        }
+        if (deductionQuantity > quantity) {
+            throw new ValidationException("Deduction quantity exceeds available batch stock.");
+        }
+
+        this.quantity -= deductionQuantity;
+        this.status = this.quantity == 0 ? BatchStatus.DEPLETED : BatchStatus.ACTIVE;
+        this.updatedAt = Guard.require(updatedAt, "Update time");
+    }
+
+    public boolean isEligibleForDispenseOn(LocalDate today) {
+        LocalDate validatedToday = Guard.require(today, "Today");
+        return status == BatchStatus.ACTIVE
+                && quantity > 0
+                && !expiryDate.isBefore(validatedToday);
+    }
 }

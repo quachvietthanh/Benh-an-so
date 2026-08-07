@@ -19,6 +19,7 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.shared.exception.DomainException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,6 +67,25 @@ public class GlobalExceptionHandler {
                         ex.getMessage(),
                         request.getRequestURI(),
                         ex.getWarnings()
+                ));
+    }
+
+    @ExceptionHandler(PrescriptionInsufficientStockException.class)
+    public ResponseEntity<PrescriptionInsufficientStockResponse> handleInsufficientStock(
+            PrescriptionInsufficientStockException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new PrescriptionInsufficientStockResponse(
+                        Instant.now(),
+                        HttpStatus.CONFLICT.value(),
+                        HttpStatus.CONFLICT.getReasonPhrase(),
+                        "INSUFFICIENT_STOCK",
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        ex.getPrescriptionId(),
+                        ex.getDetails()
                 ));
     }
 

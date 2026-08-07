@@ -12,6 +12,8 @@ import com.benhsoan.domain.medicine.Medicine;
 
 public interface MedicineRepository {
 
+    List<Medicine> findAll();
+
     Optional<Medicine> findById(UUID id);
 
     List<Medicine> findAllById(Collection<UUID> ids);
