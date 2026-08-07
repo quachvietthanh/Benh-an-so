@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.prescription;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +57,7 @@ class CreatePrescriptionServiceTest {
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private PrescriptionClinicalContextValidator clinicalContextValidator;
+    @Mock private PrescriptionDisplayContextResolver displayContextResolver;
 
     private CreatePrescriptionService service;
     private UUID actorId;
@@ -64,6 +66,15 @@ class CreatePrescriptionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(displayContextResolver.resolve(any(), any()))
+                .thenReturn(new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                ));
         service = new CreatePrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
@@ -72,7 +83,7 @@ class CreatePrescriptionServiceTest {
                 warningLogRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
-                new PrescriptionResultMapper(),
+                new PrescriptionResultMapper(displayContextResolver),
                 auditLogRepository,
                 () -> NOW,
                 clinicalContextValidator

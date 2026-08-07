@@ -62,6 +62,7 @@ class AmendPrescriptionServiceTest {
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private PrescriptionClinicalContextValidator clinicalContextValidator;
+    @Mock private PrescriptionDisplayContextResolver displayContextResolver;
 
     private AmendPrescriptionService service;
     private UUID actorId;
@@ -70,6 +71,15 @@ class AmendPrescriptionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(displayContextResolver.resolve(any(), any()))
+                .thenReturn(new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                ));
         service = new AmendPrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
@@ -78,7 +88,7 @@ class AmendPrescriptionServiceTest {
                 amendmentRepository,
                 auditLogRepository,
                 currentUserPort,
-                new PrescriptionResultMapper(),
+                new PrescriptionResultMapper(displayContextResolver),
                 new PrescriptionSnapshotMapper(),
                 new PrescriptionSnapshotSerializer(new ObjectMapper().findAndRegisterModules()),
                 () -> AMENDED_AT,
