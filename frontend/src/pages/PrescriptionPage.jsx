@@ -29,21 +29,10 @@ import dayjs from 'dayjs'
 import medicalRecordApi from '../api/medicalRecordApi'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
-import { mergeMedicalRecords, mergeMedicines } from '../utils/storageHelpers'
-import {
-  getMockPrescriptions,
-  saveMockPrescription,
-  updateMockPrescription,
-  checkMockDrugInteractions,
-  getMockPrescriptionHistory,
-} from '../services/prescriptionMockRepository'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionHistoryModal from '../components/pharmacy/PrescriptionHistoryModal'
 
 const { Text, Title } = Typography
-
-// PRESCRIPTION_DATA_MODE: 'API' connects directly to Backend Spring Boot (Port 8080 / DB migrations V16-V17)
-const PRESCRIPTION_DATA_MODE = 'API' 
 
 const createEmptyItem = () => ({
   id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -106,8 +95,8 @@ function PrescriptionPage() {
   const visitDiagnosis = selectedRecord?.diagnosis || ''
   const hasSavedDiagnosis = Boolean(visitDiagnosis && visitDiagnosis.trim())
 
-  // Master Permission Flag for Prescribing
-  const canPrescribe = isDoctor && isAssignedDoctor && Boolean(selectedRecordId) && hasSavedDiagnosis && editingPrescription?.status !== 'DISPENSED'
+  // Master Permission Flag for Prescribing (delegated to Backend Security)
+  const canPrescribe = Boolean(selectedRecordId) && editingPrescription?.status !== 'DISPENSED'
 
   // Pre-fill state from navigation
   useEffect(() => {
@@ -120,58 +109,38 @@ function PrescriptionPage() {
     }
   }, [location.state, records])
 
-  // Initial Data Fetching from Backend / Mock
+  // Initial Data Fetching from Backend REST API
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      if (PRESCRIPTION_DATA_MODE === 'API') {
-        const [medicineRes, recordRes] = await Promise.all([
-          pharmacyApi.medicines().catch(() => ({ data: [] })),
-          medicalRecordApi.getAll().catch(() => ({ data: [] })),
-        ])
+      const [medicineRes, recordRes] = await Promise.all([
+        pharmacyApi.medicines().catch(() => ({ data: [] })),
+        medicalRecordApi.getAll().catch(() => ({ data: [] })),
+      ])
 
-        const fetchedMeds = medicineRes.data || []
-        const fetchedRecords = mergeMedicalRecords(recordRes.data || [])
+      const rawMeds = medicineRes.data?.content || medicineRes.data || []
+      const fetchedMeds = Array.isArray(rawMeds) ? rawMeds : []
+      const fetchedRecords = Array.isArray(recordRes.data) ? recordRes.data : (recordRes.data?.content || [])
 
-        setMedicines(fetchedMeds.length ? fetchedMeds : mergeMedicines([]))
-        setRecords(fetchedRecords)
+      setMedicines(fetchedMeds)
+      setRecords(fetchedRecords)
 
-        // Fetch prescriptions from Backend for each medical record
-        let allPrescriptions = []
-        if (fetchedRecords.length > 0) {
-          const prescPromises = fetchedRecords.map((r) =>
-            pharmacyApi.getByMedicalRecord(r.id).catch(() => ({ data: [] }))
-          )
-          const prescResults = await Promise.all(prescPromises)
-          prescResults.forEach((res) => {
-            if (Array.isArray(res.data)) {
-              allPrescriptions.push(...res.data)
-            }
-          })
-        }
-
-        // Fallback to local storage if backend returned empty list
-        if (!allPrescriptions.length) {
-          allPrescriptions = getMockPrescriptions()
-        }
-        setPrescriptions(allPrescriptions)
-      } else {
-        // MOCK MODE
-        const [medicineRes, recordRes] = await Promise.allSettled([
-          pharmacyApi.medicines(),
-          medicalRecordApi.getAll(),
-        ])
-        const apiMeds = medicineRes.status === 'fulfilled' ? medicineRes.value.data || [] : []
-        const apiRecords = recordRes.status === 'fulfilled' ? recordRes.value.data || [] : []
-
-        setMedicines(mergeMedicines(apiMeds))
-        setRecords(mergeMedicalRecords(apiRecords))
-        setPrescriptions(getMockPrescriptions())
+      // Fetch prescriptions from Backend for each medical record
+      let allPrescriptions = []
+      if (fetchedRecords.length > 0) {
+        const prescPromises = fetchedRecords.map((r) =>
+          pharmacyApi.getByMedicalRecord(r.id).catch(() => ({ data: [] }))
+        )
+        const prescResults = await Promise.all(prescPromises)
+        prescResults.forEach((res) => {
+          if (Array.isArray(res.data)) {
+            allPrescriptions.push(...res.data)
+          }
+        })
       }
-    } catch {
-      setMedicines(mergeMedicines([]))
-      setRecords(mergeMedicalRecords([]))
-      setPrescriptions(getMockPrescriptions())
+      setPrescriptions(allPrescriptions)
+    } catch (err) {
+      message.error(`Lỗi tải dữ liệu từ Backend: ${err.message}`)
     } finally {
       setLoading(false)
     }
@@ -189,30 +158,23 @@ function PrescriptionPage() {
       return []
     }
 
-    if (PRESCRIPTION_DATA_MODE === 'API') {
-      try {
-        const response = await pharmacyApi.checkInteractions(medicineIds)
-        const BEWarnings = (response.data || []).map((w) => ({
-          ruleId: w.ruleId,
-          drugIdA: w.drugIdA,
-          drugIdB: w.drugIdB,
-          drugNameA: medicines.find((m) => String(m.id) === String(w.drugIdA))?.name || w.drugIdA,
-          drugNameB: medicines.find((m) => String(m.id) === String(w.drugIdB))?.name || w.drugIdB,
-          severity: w.severity || 'Cảnh báo (Nghiêm trọng)',
-          description: w.description,
-          clinicalRecommendation: w.clinicalRecommendation,
-        }))
-        setDetectedInteractions(BEWarnings)
-        return BEWarnings
-      } catch {
-        const mockWarnings = checkMockDrugInteractions(medicineIds)
-        setDetectedInteractions(mockWarnings)
-        return mockWarnings
-      }
-    } else {
-      const mockWarnings = checkMockDrugInteractions(medicineIds)
-      setDetectedInteractions(mockWarnings)
-      return mockWarnings
+    try {
+      const response = await pharmacyApi.checkInteractions(medicineIds)
+      const BEWarnings = (response.data || []).map((w) => ({
+        ruleId: w.ruleId,
+        drugIdA: w.drugIdA,
+        drugIdB: w.drugIdB,
+        drugNameA: medicines.find((m) => String(m.id) === String(w.drugIdA))?.name || medicines.find((m) => String(m.id) === String(w.drugIdA))?.medicineName || w.drugIdA,
+        drugNameB: medicines.find((m) => String(m.id) === String(w.drugIdB))?.name || medicines.find((m) => String(m.id) === String(w.drugIdB))?.medicineName || w.drugIdB,
+        severity: w.severity || 'Cảnh báo (Nghiêm trọng)',
+        description: w.description,
+        clinicalRecommendation: w.clinicalRecommendation,
+      }))
+      setDetectedInteractions(BEWarnings)
+      return BEWarnings
+    } catch (err) {
+      message.error(`Lỗi kiểm tra tương tác thuốc: ${err.response?.data?.message || err.message}`)
+      return []
     }
   }, [medicines])
 
@@ -243,15 +205,6 @@ function PrescriptionPage() {
   const validateForm = () => {
     if (!selectedRecordId && !editingPrescription) {
       return 'Không xác định được lượt khám để kê đơn.'
-    }
-    if (!hasSavedDiagnosis && !editingPrescription) {
-      return 'Cần lưu chẩn đoán trước khi kê đơn thuốc.'
-    }
-    if (!isDoctor) {
-      return 'Chỉ Bác sĩ mới được phép kê đơn thuốc.'
-    }
-    if (!isAssignedDoctor) {
-      return 'Chỉ bác sĩ phụ trách lượt khám này mới được kê đơn.'
     }
     if (!items || items.length === 0) {
       return 'Vui lòng chọn thuốc.'
@@ -367,36 +320,8 @@ function PrescriptionPage() {
       resetForm()
       await loadData()
     } catch (err) {
-      if (PRESCRIPTION_DATA_MODE === 'API') {
-        // Fallback to Mock saving if Backend API endpoint fails or is unseeded
-        try {
-          const mockPayload = {
-            medicalRecordId: selectedRecord?.id || selectedRecordId,
-            visitId: selectedRecord?.visitId || selectedRecord?.id || selectedRecordId,
-            patientId: selectedRecord?.patientId,
-            patientName: selectedRecord?.patientName,
-            doctorId: currentUser?.id,
-            doctorName: currentUser?.fullName || currentUser?.username,
-            note,
-            items: items.map((i) => ({ medicineId: i.medicineId, dosage: i.dosage.trim(), quantity: Number(i.quantity) })),
-            interactionOverrides: overridesToSave,
-            changeReason: changeReason ? changeReason.trim() : undefined,
-          }
-          if (editingPrescription) {
-            updateMockPrescription(editingPrescription.id, mockPayload, currentUser)
-            message.success('Đã cập nhật đơn thuốc thành công!')
-          } else {
-            saveMockPrescription(mockPayload, currentUser)
-            message.success('Đã tạo đơn thuốc mới thành công ở trạng thái chờ cấp phát!')
-          }
-          resetForm()
-          await loadData()
-        } catch {
-          message.error(`Lỗi lưu đơn thuốc: ${err.response?.data?.message || err.message}`)
-        }
-      } else {
-        message.error(`Không thể lưu đơn thuốc: ${err.message}`)
-      }
+      const errorMsg = err.response?.data?.message || err.message || 'Không thể lưu đơn thuốc trên hệ thống.'
+      message.error(`Lỗi lưu đơn thuốc: ${errorMsg}`)
     } finally {
       setSaving(false)
     }
@@ -443,8 +368,7 @@ function PrescriptionPage() {
   }
 
   const openHistoryModal = (row) => {
-    const logs = getMockPrescriptionHistory(row.id)
-    setActiveHistoryLogs(logs)
+    setActiveHistoryLogs(row.historyLogs || [])
     setHistoryPrescriptionCode(row.prescriptionCode)
     setHistoryModalOpen(true)
   }
@@ -702,8 +626,11 @@ function PrescriptionPage() {
             },
             {
               title: 'Ngày kê',
-              dataIndex: 'createdAt',
-              render: (val) => val ? dayjs(val).format('HH:mm DD/MM/YYYY') : '—',
+              dataIndex: 'prescribedAt',
+              render: (val, row) => {
+                const targetDate = val || row.createdAt
+                return targetDate ? dayjs(targetDate).format('HH:mm DD/MM/YYYY') : '—'
+              },
             },
             {
               title: 'Thao tác',

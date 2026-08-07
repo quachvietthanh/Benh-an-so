@@ -4,7 +4,6 @@ import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import medicalRecordApi from '../api/medicalRecordApi'
 import { formatDateTime, formatRecordStatus } from '../utils/helpers'
-import { mergeMedicalRecords } from '../utils/storageHelpers'
 
 const { Title } = Typography
 
@@ -20,14 +19,13 @@ function MedicalRecordList() {
     setLoading(true)
     try {
       const response = await medicalRecordApi.getAll({ page, size: pageSize })
-      const list = response?.data?.content || response?.data || []
-      const merged = mergeMedicalRecords(Array.isArray(list) ? list : [])
-      setRecords(merged)
-      setTotal(merged.length)
+      const raw = response?.data?.content || response?.data || []
+      const list = Array.isArray(raw) ? raw : []
+      setRecords(list)
+      setTotal(response?.data?.totalElements || list.length)
     } catch {
-      const merged = mergeMedicalRecords([])
-      setRecords(merged)
-      setTotal(merged.length)
+      setRecords([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }

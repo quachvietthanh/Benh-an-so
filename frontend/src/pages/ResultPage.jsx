@@ -26,7 +26,6 @@ import ResultModal from '../components/results/ResultModal'
 
 import clinicalResultApi from '../api/clinicalResultApi'
 import queueApi from '../api/queueApi'
-import { mergeClinicalOrders, saveStoredClinicalOrder, getStoredQueueItems, saveStoredQueueItem, getStoredMedicalRecords, saveStoredMedicalRecord } from '../utils/storageHelpers'
 
 const { Title, Text } = Typography
 
@@ -46,28 +45,17 @@ export function ResultPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // 1. Attempt RESTful API fetch GET /api/results
-      try {
-        const response = await clinicalResultApi.getAll({
-          search: searchText,
-          status: statusFilter,
-          category: categoryFilter,
-        })
-        if (response.data && Array.isArray(response.data)) {
-          setOrders(response.data)
-          setLoading(false)
-          return
-        }
-      } catch (apiErr) {
-        // Fallback to local storage & mock data if backend not connected yet
-      }
-
-      // 2. Local storage fallback (real database/user created clinical orders)
-      const merged = mergeClinicalOrders([])
-      setOrders(merged)
+      const response = await clinicalResultApi.getAll({
+        search: searchText,
+        status: statusFilter,
+        category: categoryFilter,
+      })
+      const list = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
+      setOrders(list)
     } catch (err) {
       console.error('Error loading clinical results:', err)
-      message.error('Không thể tải danh sách chỉ định cận lâm sàng')
+      message.error('Không thể tải danh sách chỉ định cận lâm sàng từ Backend')
+      setOrders([])
     } finally {
       setLoading(false)
     }
