@@ -187,6 +187,16 @@ public class MedicineRepositoryAdapter
         return mapper.toDomain(savedEntity);
     }
 
+    @Override
+    public void updateStockQuantity(UUID medicineId, int delta) {
+        Objects.requireNonNull(medicineId, "Medicine id must not be null.");
+
+        int updated = jpaRepository.addStockQuantity(medicineId, delta);
+        if (updated == 0) {
+            throw new com.benhsoan.domain.medicine.exception.MedicineNotFoundException(medicineId);
+        }
+    }
+
     private List<Medicine> mapToDomain(List<MedicineEntity> entities) {
         return entities.stream()
                 .map(mapper::toDomain)
