@@ -25,7 +25,8 @@ import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
-import com.benhsoan.port.dto.result.PrescriptionResult;
+import com.benhsoan.port.dto.result.DispenseAllocationResult;
+import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
 import com.benhsoan.port.outbound.repository.inventory.StockMovementRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
@@ -55,10 +56,10 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
-    private final PrescriptionResultMapper resultMapper;
+    private final DispensePrescriptionResultMapper resultMapper;
 
     @Override
-    public PrescriptionResult dispense(UUID prescriptionId) {
+    public DispensePrescriptionResult dispense(UUID prescriptionId) {
         if (!currentUserPort.hasRole("PHARMACIST")
                 && !currentUserPort.hasRole("ADMIN")) {
             throw new AccessDeniedException("Only pharmacists can dispense prescriptions.");
@@ -73,12 +74,11 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         AllocationComputation computation = computeAllocations(
                 prescription.getId(),
                 prescriptionItems,
-                actorId,
                 now,
                 today
         );
 
-        applyAllocations(computation, now);
+        List<DispenseAllocationResult> allocations = applyAllocations(computation, actorId, now);
         prescription.markDispensed(actorId, now);
         var saved = prescriptionRepository.save(prescription);
         auditLogRepository.save(AuditLog.create(
@@ -91,14 +91,16 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         ));
         return resultMapper.toResult(
                 saved,
-                warningLogRepository.findByPrescriptionId(saved.getId())
+                warningLogRepository.findByPrescriptionId(saved.getId()),
+                actorId,
+                now,
+                allocations
         );
     }
 
     private AllocationComputation computeAllocations(
             UUID prescriptionId,
             List<PrescriptionItem> prescriptionItems,
-            UUID actorId,
             Instant now,
             LocalDate today
     ) {
@@ -135,7 +137,12 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
                     break;
                 }
                 int allocatedQuantity = Math.min(remaining, batch.getQuantity());
-                allocationPlans.add(new AllocationPlan(item, batch, allocatedQuantity));
+                allocationPlans.add(new AllocationPlan(
+                        item,
+                        batch,
+                        medicine.getMedicineCode(),
+                        allocatedQuantity
+                ));
                 remaining -= allocatedQuantity;
             }
         }
@@ -144,13 +151,18 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
             throw new PrescriptionInsufficientStockException(prescriptionId, shortages);
         }
 
-        return new AllocationComputation(allocationPlans, actorId, now);
+        return new AllocationComputation(allocationPlans);
     }
 
-    private void applyAllocations(AllocationComputation computation, Instant now) {
+    private List<DispenseAllocationResult> applyAllocations(
+            AllocationComputation computation,
+            UUID actorId,
+            Instant now
+    ) {
         List<PrescriptionDispenseItem> dispenseItems = new ArrayList<>();
         List<StockMovement> stockMovements = new ArrayList<>();
         Map<UUID, Integer> medicineDeltas = new HashMap<>();
+        List<DispenseAllocationResult> allocations = new ArrayList<>();
 
         for (AllocationPlan plan : computation.allocationPlans()) {
             MedicineBatch batch = plan.batch();
@@ -170,8 +182,8 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
                     plan.item().getMedicineId(),
                     batch.getId(),
                     plan.allocatedQuantity(),
-                    computation.actorId(),
-                    computation.performedAt()
+                    actorId,
+                    now
             ));
 
             stockMovements.add(StockMovement.create(
@@ -184,30 +196,43 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
                     -plan.allocatedQuantity(),
                     quantityBefore,
                     batch.getQuantity(),
-                    computation.actorId(),
-                    computation.performedAt(),
+                    actorId,
+                    now,
                     "Dispensed for prescription item " + plan.item().getId()
             ));
 
             medicineDeltas.merge(plan.item().getMedicineId(), -plan.allocatedQuantity(), Integer::sum);
+
+            allocations.add(new DispenseAllocationResult(
+                    dispenseItems.get(dispenseItems.size() - 1).getId(),
+                    plan.item().getId(),
+                    plan.item().getMedicineId(),
+                    plan.medicineCode(),
+                    plan.item().getMedicineName(),
+                    batch.getId(),
+                    batch.getBatchNumber(),
+                    batch.getExpiryDate(),
+                    plan.allocatedQuantity(),
+                    batch.getQuantity()
+            ));
         }
 
         prescriptionDispenseItemRepository.saveAll(dispenseItems);
         stockMovementRepository.saveAll(stockMovements);
         medicineDeltas.forEach(medicineRepository::updateStockQuantity);
+        return allocations;
     }
 
     private record AllocationPlan(
             PrescriptionItem item,
             MedicineBatch batch,
+            String medicineCode,
             int allocatedQuantity
     ) {
     }
 
     private record AllocationComputation(
-            List<AllocationPlan> allocationPlans,
-            UUID actorId,
-            Instant performedAt
+            List<AllocationPlan> allocationPlans
     ) {
     }
 }

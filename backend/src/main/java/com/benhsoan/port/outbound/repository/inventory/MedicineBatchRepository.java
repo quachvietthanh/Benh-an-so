@@ -11,6 +11,10 @@ import com.benhsoan.domain.inventory.MedicineBatch;
 
 public interface MedicineBatchRepository {
 
+    List<MedicineBatch> findAll();
+
+    List<MedicineBatch> findByMedicineId(UUID medicineId);
+
     Optional<MedicineBatch> findByMedicineIdAndBatchNumber(UUID medicineId, String batchNumber);
 
     List<MedicineBatch> findAvailableByMedicineId(UUID medicineId, LocalDate today);

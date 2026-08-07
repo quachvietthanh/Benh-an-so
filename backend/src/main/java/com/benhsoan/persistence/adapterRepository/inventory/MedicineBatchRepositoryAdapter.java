@@ -27,6 +27,24 @@ public class MedicineBatchRepositoryAdapter implements MedicineBatchRepository {
     private final MedicineBatchPersistenceMapper mapper;
 
     @Override
+    public List<MedicineBatch> findAll() {
+        return jpaRepository.findAllByOrderByExpiryDateAscCreatedAtAsc()
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<MedicineBatch> findByMedicineId(UUID medicineId) {
+        Objects.requireNonNull(medicineId, "Medicine id must not be null.");
+
+        return jpaRepository.findByMedicineIdOrderByExpiryDateAscCreatedAtAsc(medicineId)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<MedicineBatch> findByMedicineIdAndBatchNumber(
             UUID medicineId, String batchNumber) {
         Objects.requireNonNull(medicineId, "Medicine id must not be null.");

@@ -8,8 +8,11 @@ import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockE
 
 public record PrescriptionInsufficientStockResponse(
         Instant timestamp,
+        int status,
+        String error,
         String code,
         String message,
+        String path,
         UUID prescriptionId,
         List<StockShortageDetail> details
 ) {

@@ -19,6 +19,10 @@ import jakarta.persistence.LockModeType;
 public interface JpaMedicineBatchRepository
         extends JpaRepository<MedicineBatchEntity, UUID> {
 
+    List<MedicineBatchEntity> findAllByOrderByExpiryDateAscCreatedAtAsc();
+
+    List<MedicineBatchEntity> findByMedicineIdOrderByExpiryDateAscCreatedAtAsc(UUID medicineId);
+
     Optional<MedicineBatchEntity> findByMedicineIdAndBatchNumber(
             UUID medicineId, String batchNumber);
 

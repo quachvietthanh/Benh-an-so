@@ -12,6 +12,8 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescription
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionInteractionOverrideRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseAllocationResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionWarningResponse;
@@ -22,6 +24,8 @@ import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.dto.result.DispenseAllocationResult;
+import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
@@ -117,6 +121,22 @@ public class PrescriptionRestMapper {
         return results.stream().map(this::toResponse).toList();
     }
 
+    public DispensePrescriptionResponse toResponse(
+            DispensePrescriptionResult result
+    ) {
+        return new DispensePrescriptionResponse(
+                toResponse(result.prescription()),
+                result.dispensedBy(),
+                result.dispensedAt(),
+                result.allocationCount(),
+                result.totalDispensedQuantity(),
+                result.allocations()
+                        .stream()
+                        .map(this::toResponse)
+                        .toList()
+        );
+    }
+
     private CreatePrescriptionItemCommand toCommand(
             CreatePrescriptionItemRequest request
     ) {
@@ -203,6 +223,23 @@ public class PrescriptionRestMapper {
                 result.severity(),
                 result.description(),
                 result.clinicalRecommendation()
+        );
+    }
+
+    private DispenseAllocationResponse toResponse(
+            DispenseAllocationResult result
+    ) {
+        return new DispenseAllocationResponse(
+                result.dispenseItemId(),
+                result.prescriptionItemId(),
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.batchId(),
+                result.batchNumber(),
+                result.expiryDate(),
+                result.dispensedQuantity(),
+                result.batchQuantityRemaining()
         );
     }
 }

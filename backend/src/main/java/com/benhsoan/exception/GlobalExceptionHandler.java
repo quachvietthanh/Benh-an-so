@@ -79,8 +79,11 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.CONFLICT)
                 .body(new PrescriptionInsufficientStockResponse(
                         Instant.now(),
+                        HttpStatus.CONFLICT.value(),
+                        HttpStatus.CONFLICT.getReasonPhrase(),
                         "INSUFFICIENT_STOCK",
                         ex.getMessage(),
+                        request.getRequestURI(),
                         ex.getPrescriptionId(),
                         ex.getDetails()
                 ));

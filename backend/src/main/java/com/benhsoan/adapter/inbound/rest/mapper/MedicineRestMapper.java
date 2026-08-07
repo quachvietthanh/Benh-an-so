@@ -54,7 +54,8 @@ public class MedicineRestMapper {
                 result.defaultRoute(),
                 result.active(),
                 result.createdAt(),
-                result.updatedAt()
+                result.updatedAt(),
+                result.stockQuantity()
         );
     }
 

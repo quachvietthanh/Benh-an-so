@@ -42,6 +42,8 @@ public class Medicine {
 
     private Instant updatedAt;
 
+    private int stockQuantity;
+
     private Medicine(
             UUID id,
             String medicineCode,
@@ -53,7 +55,8 @@ public class Medicine {
             AdministrationRoute defaultRoute,
             boolean active,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            int stockQuantity
     ) {
         this.id = requireNonNull(id, "Medicine id is required.");
         this.medicineCode = requireText(medicineCode, "Medicine code is required.");
@@ -66,6 +69,7 @@ public class Medicine {
         this.active = active;
         this.createdAt = requireNonNull(createdAt, "Medicine creation time is required.");
         this.updatedAt = updatedAt;
+        this.stockQuantity = requireNonNegative(stockQuantity, "Medicine stock quantity must not be negative.");
     }
 
     public static Medicine create(
@@ -90,7 +94,8 @@ public class Medicine {
                 defaultRoute,
                 true,
                 createdAt,
-                null
+                null,
+                0
         );
     }
 
@@ -105,7 +110,8 @@ public class Medicine {
             AdministrationRoute defaultRoute,
             boolean active,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            int stockQuantity
     ) {
         return new Medicine(
                 id,
@@ -118,7 +124,8 @@ public class Medicine {
                 defaultRoute,
                 active,
                 createdAt,
-                updatedAt
+                updatedAt,
+                stockQuantity
         );
     }
 
@@ -172,6 +179,13 @@ public class Medicine {
 
     private static <T> T requireNonNull(T value, String message) {
         if (Objects.isNull(value)) {
+            throw new ValidationException(message);
+        }
+        return value;
+    }
+
+    private static int requireNonNegative(int value, String message) {
+        if (value < 0) {
             throw new ValidationException(message);
         }
         return value;
