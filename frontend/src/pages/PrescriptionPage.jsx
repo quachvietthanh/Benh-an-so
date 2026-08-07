@@ -14,6 +14,9 @@ import {
   Typography,
   message,
   Descriptions,
+  Tabs,
+  Tooltip,
+  Badge,
 } from 'antd'
 import {
   MedicineBoxOutlined,
@@ -24,6 +27,8 @@ import {
   HistoryOutlined,
   CheckCircleOutlined,
   LockOutlined,
+  SearchOutlined,
+  FilterOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import medicalRecordApi from '../api/medicalRecordApi'
@@ -39,6 +44,7 @@ import {
 } from '../services/prescriptionMockRepository'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionHistoryModal from '../components/pharmacy/PrescriptionHistoryModal'
+import EditPrescriptionModal from '../components/pharmacy/EditPrescriptionModal'
 
 const { Text, Title } = Typography
 
@@ -79,6 +85,14 @@ function PrescriptionPage() {
   const [activeHistoryLogs, setActiveHistoryLogs] = useState([])
   const [historyPrescriptionCode, setHistoryPrescriptionCode] = useState('')
 
+  // Edit Modal State
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [modalPrescription, setModalPrescription] = useState(null)
+
+  // Filter & Search State
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [searchKeyword, setSearchKeyword] = useState('')
+
   // Loading state
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -108,6 +122,31 @@ function PrescriptionPage() {
 
   // Master Permission Flag for Prescribing
   const canPrescribe = isDoctor && isAssignedDoctor && Boolean(selectedRecordId) && hasSavedDiagnosis && editingPrescription?.status !== 'DISPENSED'
+
+  // Filtered Prescriptions Computation
+  const filteredPrescriptions = useMemo(() => {
+    return prescriptions.filter((p) => {
+      // Status filter
+      if (statusFilter === 'PENDING' && p.status === 'DISPENSED') return false
+      if (statusFilter === 'DISPENSED' && p.status !== 'DISPENSED') return false
+
+      // Search keyword
+      if (!searchKeyword.trim()) return true
+      const kw = searchKeyword.toLowerCase().trim()
+      const codeMatch = String(p.prescriptionCode || '').toLowerCase().includes(kw)
+      const nameMatch = String(p.patientName || '').toLowerCase().includes(kw)
+      const docMatch = String(p.doctorName || p.createdBy || '').toLowerCase().includes(kw)
+      return codeMatch || nameMatch || docMatch
+    })
+  }, [prescriptions, statusFilter, searchKeyword])
+
+  const pendingCount = useMemo(() => {
+    return prescriptions.filter((p) => p.status !== 'DISPENSED').length
+  }, [prescriptions])
+
+  const dispensedCount = useMemo(() => {
+    return prescriptions.filter((p) => p.status === 'DISPENSED').length
+  }, [prescriptions])
 
   // Pre-fill state from navigation
   useEffect(() => {
@@ -651,11 +690,57 @@ function PrescriptionPage() {
       </Card>
 
       {/* Prescriptions List Table Card */}
-      <Card bordered title="Danh sách đơn thuốc đã phát hành">
+      <Card
+        bordered
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <span style={{ fontSize: 16, fontWeight: 600, color: '#0F172A' }}>
+              Danh sách đơn thuốc & Điều chỉnh đơn thuốc khi chưa cấp phát
+            </span>
+            <Input
+              placeholder="Tìm mã đơn, tên bệnh nhân, bác sĩ..."
+              prefix={<SearchOutlined style={{ color: '#94A3B8' }} />}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              style={{ width: 280 }}
+              allowClear
+            />
+          </div>
+        }
+      >
+        {/* Status Filter Tabs */}
+        <Tabs
+          activeKey={statusFilter}
+          onChange={setStatusFilter}
+          items={[
+            {
+              key: 'ALL',
+              label: `Tất cả đơn thuốc (${prescriptions.length})`,
+            },
+            {
+              key: 'PENDING',
+              label: (
+                <span>
+                  Đơn thuốc Chờ cấp phát <Badge count={pendingCount} overflowCount={99} style={{ backgroundColor: '#F59E0B', marginLeft: 4 }} />
+                </span>
+              ),
+            },
+            {
+              key: 'DISPENSED',
+              label: (
+                <span>
+                  Đơn thuốc Đã cấp phát <Badge count={dispensedCount} overflowCount={99} style={{ backgroundColor: '#10B981', marginLeft: 4 }} />
+                </span>
+              ),
+            },
+          ]}
+          style={{ marginBottom: 12 }}
+        />
+
         <Table
           rowKey="id"
           loading={loading}
-          dataSource={prescriptions}
+          dataSource={filteredPrescriptions}
           columns={[
             {
               title: 'Mã đơn thuốc',
@@ -673,7 +758,7 @@ function PrescriptionPage() {
               render: (val, row) => val || row.createdBy || 'BS. Phạm Hồng Anh',
             },
             {
-              title: 'Danh sách thuốc',
+              title: 'Danh sách thuốc chỉ định',
               dataIndex: 'items',
               render: (value) => {
                 let parsed = []
@@ -682,20 +767,29 @@ function PrescriptionPage() {
                 } catch {
                   parsed = []
                 }
-                return parsed.map((item) => {
-                  const m = medicines.find((med) => String(med.id) === String(item.medicineId))
-                  return m ? `${m.name || m.medicineName} (${item.quantity})` : (item.medicineName || item.medicineId)
-                }).filter(Boolean).join('; ') || '—'
+                return (
+                  <div>
+                    {parsed.map((item, idx) => {
+                      const m = medicines.find((med) => String(med.id) === String(item.medicineId))
+                      const name = m ? (m.name || m.medicineName) : (item.medicineName || item.medicineId)
+                      return (
+                        <Tag color="blue" key={idx} style={{ marginBottom: 2 }}>
+                          {name} ({item.quantity})
+                        </Tag>
+                      )
+                    })}
+                  </div>
+                )
               },
             },
             {
-              title: 'Trạng thái',
+              title: 'Trạng thái cấp phát',
               dataIndex: 'status',
               render: (value) => {
                 const isDispensed = value === 'DISPENSED'
                 return (
-                  <Tag color={isDispensed ? 'green' : 'orange'}>
-                    {isDispensed ? 'Đã cấp phát' : 'Chờ cấp phát'}
+                  <Tag color={isDispensed ? 'green' : 'orange'} style={{ fontWeight: 600 }}>
+                    {isDispensed ? 'Đã cấp phát (Khóa sửa)' : 'Chờ cấp phát (Được sửa)'}
                   </Tag>
                 )
               },
@@ -703,30 +797,48 @@ function PrescriptionPage() {
             {
               title: 'Ngày kê',
               dataIndex: 'createdAt',
-              render: (val) => val ? dayjs(val).format('HH:mm DD/MM/YYYY') : '—',
+              render: (val) => (val ? dayjs(val).format('HH:mm DD/MM/YYYY') : '—'),
             },
             {
-              title: 'Thao tác',
+              title: 'Thao tác điều chỉnh',
               key: 'actions',
-              render: (_, row) => (
-                <Space>
-                  <Button
-                    icon={<EditOutlined />}
-                    size="small"
-                    disabled={!isDoctor || row.status === 'DISPENSED'}
-                    onClick={() => startEditPrescription(row)}
-                  >
-                    Điều chỉnh
-                  </Button>
-                  <Button
-                    icon={<HistoryOutlined />}
-                    size="small"
-                    onClick={() => openHistoryModal(row)}
-                  >
-                    Xem lịch sử
-                  </Button>
-                </Space>
-              ),
+              render: (_, row) => {
+                const isDispensed = row.status === 'DISPENSED'
+                return (
+                  <Space>
+                    <Tooltip
+                      title={
+                        isDispensed
+                          ? 'Đơn thuốc đã được cấp phát, không thể điều chỉnh.'
+                          : !isDoctor
+                          ? 'Chỉ Bác sĩ mới có quyền điều chỉnh đơn thuốc.'
+                          : 'Bấm để sửa liều lượng, đổi thuốc hoặc bỏ thuốc trong đơn'
+                      }
+                    >
+                      <Button
+                        type="primary"
+                        ghost={!isDispensed}
+                        icon={<EditOutlined />}
+                        size="small"
+                        disabled={!isDoctor || isDispensed}
+                        onClick={() => {
+                          setModalPrescription(row)
+                          setEditModalOpen(true)
+                        }}
+                      >
+                        Điều chỉnh
+                      </Button>
+                    </Tooltip>
+                    <Button
+                      icon={<HistoryOutlined />}
+                      size="small"
+                      onClick={() => openHistoryModal(row)}
+                    >
+                      Xem lịch sử
+                    </Button>
+                  </Space>
+                )
+              },
             },
           ]}
         />
@@ -748,6 +860,17 @@ function PrescriptionPage() {
         prescriptionCode={historyPrescriptionCode}
         historyLogs={activeHistoryLogs}
         medicines={medicines}
+      />
+
+      {/* Dedicated Edit Prescription Modal */}
+      <EditPrescriptionModal
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
+        onSuccess={() => loadData()}
+        prescription={modalPrescription}
+        medicines={medicines}
+        currentUser={currentUser}
+        records={records}
       />
     </div>
   )
