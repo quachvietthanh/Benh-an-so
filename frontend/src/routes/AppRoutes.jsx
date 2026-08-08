@@ -11,6 +11,7 @@ import AppointmentQueue from '../pages/AppointmentQueue'
 import MedicalEncounter from '../pages/MedicalEncounter'
 import PrescriptionPage from '../pages/PrescriptionPage'
 import PharmacyPage from '../pages/PharmacyPage'
+import MedicineCatalogPage from '../pages/MedicineCatalogPage'
 import BillingPage from '../pages/BillingPage'
 import ReportsPage from '../pages/ReportsPage'
 import UsersPage from '../pages/UsersPage'
@@ -74,6 +75,8 @@ function AppRoutes() {
         <Route path="clinical-results" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'receptionist']}><ResultPage /></PrivateRoute>} />
         <Route path="results" element={<Navigate to="/clinical-results" replace />} />
         <Route path="pharmacy" element={<PrivateRoute allowedRoles={['admin', 'manager', 'pharmacist']}><PharmacyPage /></PrivateRoute>} />
+        <Route path="medicines" element={<PrivateRoute allowedRoles={['pharmacist']}><MedicineCatalogPage /></PrivateRoute>} />
+        <Route path="medicine-catalog" element={<PrivateRoute allowedRoles={['pharmacist']}><MedicineCatalogPage /></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedRoles={['admin', 'manager', 'receptionist']}><BillingPage /></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedRoles={['admin', 'manager']}><ReportsPage /></PrivateRoute>} />
         <Route path="system-management" element={<PrivateRoute allowedRoles={['admin']}><SystemManagementPage /></PrivateRoute>} />

@@ -30,6 +30,7 @@ import dayjs from 'dayjs'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
 import { mergeMedicines, mergeBatches } from '../utils/storageHelpers'
+import MedicineCatalogPage from './MedicineCatalogPage'
 
 const parseItems = (value) => {
   try {
@@ -554,34 +555,8 @@ function PharmacyPage() {
           },
           {
             key: 'med',
-            label: <span><MedicineBoxOutlined /> Danh mục &amp; tồn kho thuốc ({medicines.length})</span>,
-            children: (
-              <Card
-                title="Danh mục thuốc dùng chung cho kê đơn và kho"
-                extra={
-                  <Space>
-                    <Input.Search
-                      placeholder="Tìm theo tên thuốc hoặc hoạt chất..."
-                      allowClear
-                      style={{ width: 280 }}
-                      onChange={(e) => setSearchKeyword(e.target.value)}
-                    />
-                    <Select
-                      defaultValue="ALL"
-                      style={{ width: 140 }}
-                      onChange={(val) => setStatusFilter(val)}
-                      options={[
-                        { value: 'ALL', label: 'Tất cả trạng thái' },
-                        { value: 'ACTIVE', label: 'Đang dùng' },
-                        { value: 'INACTIVE', label: 'Ngừng dùng' },
-                      ]}
-                    />
-                  </Space>
-                }
-              >
-                <Table rowKey="id" columns={medicineColumns} dataSource={filteredMedicines} loading={loading} />
-              </Card>
-            ),
+            label: <span><MedicineBoxOutlined /> Quản lý danh mục thuốc</span>,
+            children: <MedicineCatalogPage />,
           },
           {
             key: 'batch',
