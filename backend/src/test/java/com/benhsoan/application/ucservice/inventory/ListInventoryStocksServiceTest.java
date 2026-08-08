@@ -17,13 +17,14 @@ import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
-import com.benhsoan.port.dto.result.LowStockMedicineResult;
+import com.benhsoan.port.dto.query.inventory.ListInventoryStocksQuery;
+import com.benhsoan.port.dto.result.InventoryStockResult;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
-class ListLowStockMedicinesServiceTest {
+class ListInventoryStocksServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-08T00:00:00Z");
 
@@ -32,11 +33,8 @@ class ListLowStockMedicinesServiceTest {
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
     private final ClockPort clockPort = mock(ClockPort.class);
     private final InventoryManagementAuthorizer authorizer = new InventoryManagementAuthorizer(currentUserPort);
-    private final LowStockEvaluator lowStockEvaluator = new LowStockEvaluator();
-    private final EligibleStockSnapshotService eligibleStockSnapshotService =
-            new EligibleStockSnapshotService(medicineBatchRepository, lowStockEvaluator);
 
-    private ListLowStockMedicinesService service;
+    private ListInventoryStocksService service;
 
     @BeforeEach
     void setUp() {
@@ -44,46 +42,39 @@ class ListLowStockMedicinesServiceTest {
         when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
         when(clockPort.now()).thenReturn(NOW);
 
-        service = new ListLowStockMedicinesService(
+        service = new ListInventoryStocksService(
                 medicineRepository,
+                medicineBatchRepository,
                 authorizer,
-                clockPort,
-                eligibleStockSnapshotService,
-                lowStockEvaluator
+                clockPort
         );
     }
 
     @Test
-    void returnsOnlyMedicinesBelowThreshold() {
-        UUID lowMedicineId = UUID.randomUUID();
-        UUID okMedicineId = UUID.randomUUID();
-
-        when(medicineRepository.findAllActive()).thenReturn(List.of(
-                medicine(lowMedicineId, "MED-LOW", "Metformin", 40, 100),
-                medicine(okMedicineId, "MED-OK", "Amlodipine", 20, 100)
-        ));
-        when(medicineBatchRepository.findByMedicineId(lowMedicineId)).thenReturn(List.of(
-                batch(lowMedicineId, "L1", LocalDate.of(2026, 8, 20), 15)
-        ));
-        when(medicineBatchRepository.findByMedicineId(okMedicineId)).thenReturn(List.of(
-                batch(okMedicineId, "O1", LocalDate.of(2026, 8, 20), 25)
+    void excludesExpiredBatchesFromActiveBatchCountAndNearestExpiryDate() {
+        UUID medicineId = UUID.randomUUID();
+        when(medicineRepository.findAll()).thenReturn(List.of(medicine(medicineId)));
+        when(medicineBatchRepository.findAll()).thenReturn(List.of(
+                batch(medicineId, "B-EXPIRED", LocalDate.of(2026, 8, 7), 10, BatchStatus.ACTIVE),
+                batch(medicineId, "B-ELIGIBLE-1", LocalDate.of(2026, 8, 10), 20, BatchStatus.ACTIVE),
+                batch(medicineId, "B-ELIGIBLE-2", LocalDate.of(2026, 8, 9), 15, BatchStatus.ACTIVE),
+                batch(medicineId, "B-DEPLETED", LocalDate.of(2026, 8, 12), 0, BatchStatus.DEPLETED)
         ));
 
-        List<LowStockMedicineResult> results = service.list();
+        List<InventoryStockResult> results = service.list(new ListInventoryStocksQuery(null));
 
         assertEquals(1, results.size());
-        assertEquals(lowMedicineId, results.get(0).medicineId());
-        assertEquals(15, results.get(0).eligibleStockQuantity());
-        assertEquals(40, results.get(0).minStockThreshold());
-        assertEquals(25, results.get(0).shortageQuantity());
+        assertEquals(35, results.getFirst().eligibleStockQuantity());
+        assertEquals(2, results.getFirst().activeBatchCount());
+        assertEquals(LocalDate.of(2026, 8, 9), results.getFirst().nearestExpiryDate());
     }
 
-    private Medicine medicine(UUID id, String code, String name, int minStockThreshold, int stockQuantity) {
+    private Medicine medicine(UUID medicineId) {
         return Medicine.restore(
-                id,
-                code,
-                name,
-                name,
+                medicineId,
+                "MED-001",
+                "Paracetamol",
+                "Paracetamol",
                 "500 mg",
                 DosageForm.TABLET,
                 "vien",
@@ -91,19 +82,25 @@ class ListLowStockMedicinesServiceTest {
                 true,
                 NOW.minusSeconds(3600),
                 null,
-                stockQuantity,
-                minStockThreshold
+                45,
+                20
         );
     }
 
-    private MedicineBatch batch(UUID medicineId, String batchNumber, LocalDate expiryDate, int quantity) {
+    private MedicineBatch batch(
+            UUID medicineId,
+            String batchNumber,
+            LocalDate expiryDate,
+            int quantity,
+            BatchStatus status
+    ) {
         return MedicineBatch.restore(
                 UUID.randomUUID(),
                 medicineId,
                 batchNumber,
                 expiryDate,
                 quantity,
-                BatchStatus.ACTIVE,
+                status,
                 NOW.minusSeconds(7200),
                 null
         );

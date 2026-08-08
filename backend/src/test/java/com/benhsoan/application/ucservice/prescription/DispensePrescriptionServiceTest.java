@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.prescription;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -56,6 +57,8 @@ class DispensePrescriptionServiceTest {
     private final MedicineRepository medicineRepository = mock(MedicineRepository.class);
     private final MedicineBatchRepository medicineBatchRepository = mock(MedicineBatchRepository.class);
     private final StockMovementRepository stockMovementRepository = mock(StockMovementRepository.class);
+    private final com.benhsoan.application.ucservice.inventory.EligibleStockSnapshotService eligibleStockSnapshotService =
+            mock(com.benhsoan.application.ucservice.inventory.EligibleStockSnapshotService.class);
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
     private final ClockPort clockPort = mock(ClockPort.class);
     private final AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
@@ -94,6 +97,7 @@ class DispensePrescriptionServiceTest {
                 medicineRepository,
                 medicineBatchRepository,
                 stockMovementRepository,
+                eligibleStockSnapshotService,
                 lowStockAlertTransitionService,
                 currentUserPort,
                 clockPort,
@@ -117,6 +121,8 @@ class DispensePrescriptionServiceTest {
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine(medicineId, "MED-001", "Paracetamol")));
         when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), eq(LocalDate.of(2026, 8, 7))))
                 .thenReturn(List.of(firstBatch, secondBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 80));
         when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DispensePrescriptionResult result = service.dispense(prescriptionId);
@@ -139,7 +145,7 @@ class DispensePrescriptionServiceTest {
         verify(prescriptionDispenseItemRepository).saveAll(any());
         verify(stockMovementRepository).saveAll(any());
         verify(auditLogRepository).save(any());
-        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(NOW));
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(LocalDate.of(2026, 8, 7)), eq(NOW));
     }
 
     @Test
@@ -155,6 +161,8 @@ class DispensePrescriptionServiceTest {
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine(medicineId, "MED-001", "Paracetamol")));
         when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), eq(LocalDate.of(2026, 8, 7))))
                 .thenReturn(List.of(onlyBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 20));
 
         PrescriptionInsufficientStockException ex = assertThrows(
                 PrescriptionInsufficientStockException.class,
@@ -181,6 +189,8 @@ class DispensePrescriptionServiceTest {
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine(medicineId, "MED-001", "Paracetamol")));
         when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), eq(LocalDate.of(2026, 8, 7))))
                 .thenReturn(List.of(firstBatch, secondBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 80));
         org.mockito.Mockito.doThrow(new ValidationException("Unable to deduct stock for batch id"))
                 .when(medicineBatchRepository)
                 .deductStockQuantity(secondBatch.getId(), 50, BatchStatus.ACTIVE, NOW);
@@ -199,6 +209,36 @@ class DispensePrescriptionServiceTest {
         assertEquals(70, ex.getDetails().get(0).requiredQuantity());
         assertEquals(60, ex.getDetails().get(0).availableQuantity());
         assertEquals(10, ex.getDetails().get(0).shortageQuantity());
+    }
+
+    @Test
+    void shouldUseFullEligibleStockSnapshotWhenEvaluatingLowStockTransition() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        Prescription prescription = prescription(prescriptionId, medicineId);
+        PrescriptionItem prescriptionItem = prescriptionItem(prescriptionId, medicineId, 70);
+
+        MedicineBatch firstBatch = batch(medicineId, "BATCH-A", LocalDate.of(2026, 10, 1), 20);
+        MedicineBatch secondBatch = batch(medicineId, "BATCH-B", LocalDate.of(2026, 12, 1), 60);
+        MedicineBatch thirdBatch = batch(medicineId, "BATCH-C", LocalDate.of(2027, 1, 1), 50);
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionItemRepository.findByPrescriptionId(prescriptionId)).thenReturn(List.of(prescriptionItem));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine(medicineId, "MED-001", "Paracetamol")));
+        when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), eq(LocalDate.of(2026, 8, 7))))
+                .thenReturn(List.of(firstBatch, secondBatch, thirdBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 130));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.dispense(prescriptionId);
+
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(
+                argThat(ids -> ids.size() == 1 && ids.contains(medicineId)),
+                argThat(before -> before.size() == 1 && Integer.valueOf(130).equals(before.get(medicineId))),
+                eq(LocalDate.of(2026, 8, 7)),
+                eq(NOW)
+        );
     }
 
     private Prescription prescription(UUID prescriptionId, UUID medicineId) {

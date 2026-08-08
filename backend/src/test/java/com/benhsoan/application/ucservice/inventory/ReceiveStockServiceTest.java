@@ -3,7 +3,9 @@ package com.benhsoan.application.ucservice.inventory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -51,6 +53,7 @@ class ReceiveStockServiceTest {
     private final InventoryManagementAuthorizer authorizer =
             new InventoryManagementAuthorizer(currentUserPort);
     private final InventoryReceiptResultMapper resultMapper = new InventoryReceiptResultMapper();
+    private final EligibleStockSnapshotService eligibleStockSnapshotService = mock(EligibleStockSnapshotService.class);
 
     private ReceiveStockService service;
 
@@ -67,6 +70,7 @@ class ReceiveStockServiceTest {
                 inventoryReceiptRepository,
                 authorizer,
                 resultMapper,
+                eligibleStockSnapshotService,
                 lowStockAlertTransitionService,
                 currentUserPort,
                 clockPort
@@ -81,6 +85,9 @@ class ReceiveStockServiceTest {
         UUID medicineId = UUID.randomUUID();
         Medicine medicine = createMedicine(medicineId, "MED-001", "Paracetamol");
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine));
+        when(medicineBatchRepository.findByMedicineId(medicineId)).thenReturn(List.of());
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 0));
 
         when(medicineBatchRepository.findByMedicineIdAndBatchNumber(eq(medicineId), anyString()))
                 .thenReturn(Optional.empty());
@@ -108,7 +115,7 @@ class ReceiveStockServiceTest {
 
         verify(medicineRepository).updateStockQuantity(medicineId, 100);
         verify(inventoryReceiptRepository).save(any());
-        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(NOW));
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(LocalDate.of(2026, 8, 7)), eq(NOW));
     }
 
     @Test
@@ -119,6 +126,9 @@ class ReceiveStockServiceTest {
         UUID medicineId = UUID.randomUUID();
         Medicine medicine = createMedicine(medicineId, "MED-002", "Ibuprofen");
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine));
+        when(medicineBatchRepository.findByMedicineId(medicineId)).thenReturn(List.of());
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 0));
 
         when(medicineBatchRepository.findByMedicineIdAndBatchNumber(eq(medicineId), anyString()))
                 .thenReturn(Optional.empty());
@@ -242,6 +252,9 @@ class ReceiveStockServiceTest {
                 batchId, medicineId, "BATCH-EXISTING",
                 LocalDate.of(2027, 12, 31), 50, BatchStatus.ACTIVE,
                 NOW.minusSeconds(3600), null);
+        when(medicineBatchRepository.findByMedicineId(medicineId)).thenReturn(List.of(existingBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 50));
         when(medicineBatchRepository.findByMedicineIdAndBatchNumber(eq(medicineId), eq("BATCH-EXISTING")))
                 .thenReturn(Optional.of(existingBatch));
 
@@ -256,7 +269,98 @@ class ReceiveStockServiceTest {
         assertEquals(30, result.items().get(0).quantity());
         verify(medicineBatchRepository).addStockQuantity(batchId, 30);
         verify(medicineRepository).updateStockQuantity(medicineId, 30);
-        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(NOW));
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(LocalDate.of(2026, 8, 7)), eq(NOW));
+    }
+
+    @Test
+    void shouldCalculateAfterEligibleStockFromActualBatchState() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+
+        UUID medicineId = UUID.randomUUID();
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(createMedicine(medicineId, "MED-011", "Loratadine")));
+
+        MedicineBatch expiredBatch = MedicineBatch.restore(
+                UUID.randomUUID(),
+                medicineId,
+                "BATCH-EXPIRED",
+                LocalDate.of(2026, 8, 1),
+                10,
+                BatchStatus.ACTIVE,
+                NOW.minusSeconds(7200),
+                null
+        );
+        when(medicineBatchRepository.findByMedicineId(medicineId)).thenReturn(List.of(expiredBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 0));
+        when(medicineBatchRepository.findByMedicineIdAndBatchNumber(eq(medicineId), eq("BATCH-NEW")))
+                .thenReturn(Optional.empty());
+
+        ReceiveStockItemCommand item = new ReceiveStockItemCommand(
+                medicineId,
+                "BATCH-NEW",
+                LocalDate.of(2027, 12, 31),
+                30,
+                BigDecimal.valueOf(7.00)
+        );
+
+        service.receiveStock(new ReceiveStockCommand("Receipt with expired stock present", List.of(item)));
+
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(
+                argThat(ids -> ids.size() == 1 && ids.contains(medicineId)),
+                argThat(before -> before.size() == 1 && Integer.valueOf(0).equals(before.get(medicineId))),
+                eq(LocalDate.of(2026, 8, 7)),
+                eq(NOW)
+        );
+    }
+
+    @Test
+    void rejectsExistingBatchWithMismatchedExpiryDate() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+
+        UUID medicineId = UUID.randomUUID();
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(createMedicine(medicineId, "MED-012", "Cefixime")));
+
+        MedicineBatch existingBatch = MedicineBatch.restore(
+                UUID.randomUUID(),
+                medicineId,
+                "BATCH-MISMATCH",
+                LocalDate.of(2027, 12, 31),
+                50,
+                BatchStatus.ACTIVE,
+                NOW.minusSeconds(3600),
+                null
+        );
+        when(medicineBatchRepository.findByMedicineId(medicineId)).thenReturn(List.of(existingBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 50));
+        when(medicineBatchRepository.findByMedicineIdAndBatchNumber(eq(medicineId), eq("BATCH-MISMATCH")))
+                .thenReturn(Optional.of(existingBatch));
+
+        ReceiveStockItemCommand item = new ReceiveStockItemCommand(
+                medicineId,
+                "BATCH-MISMATCH",
+                LocalDate.of(2028, 1, 1),
+                10,
+                BigDecimal.valueOf(5.00)
+        );
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> service.receiveStock(new ReceiveStockCommand("Mismatch expiry", List.of(item)))
+        );
+
+        assertEquals(
+                "Batch number must map to a single expiry date for the same medicine."
+                        + " medicineId=" + medicineId
+                        + ", batchNumber=BATCH-MISMATCH"
+                        + ", existingExpiryDate=2027-12-31"
+                        + ", requestedExpiryDate=2028-01-01",
+                ex.getMessage()
+        );
+        verify(medicineBatchRepository, never()).addStockQuantity(any(), anyInt());
+        verify(lowStockAlertTransitionService, never()).handleEligibleStockTransitions(any(), any(), any(LocalDate.class), any());
     }
 
     @Test

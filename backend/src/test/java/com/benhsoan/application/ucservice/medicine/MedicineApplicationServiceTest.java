@@ -108,6 +108,31 @@ class MedicineApplicationServiceTest {
     }
 
     @Test
+    void rejectsDuplicateMedicineCodeIgnoringCaseAndOuterWhitespace() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
+        when(medicineRepository.existsByMedicineCode("med-001")).thenReturn(true);
+        CreateMedicineService service = new CreateMedicineService(
+                medicineRepository,
+                authorizer,
+                resultMapper,
+                clockPort
+        );
+
+        assertThrows(ValidationException.class, () -> service.create(
+                new CreateMedicineCommand(
+                        " MED-001 ",
+                        "Paracetamol",
+                        "Acetaminophen",
+                        "500 mg",
+                        DosageForm.TABLET,
+                        "vien",
+                        AdministrationRoute.ORAL,
+                        20
+                )
+        ));
+    }
+
+    @Test
     void searchesMedicinesWithPageableForPharmacist() {
         when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
         Medicine medicine = activeMedicine(UUID.randomUUID(), "MED-001", "Paracetamol");

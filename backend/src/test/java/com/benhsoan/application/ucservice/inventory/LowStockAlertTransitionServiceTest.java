@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,6 +30,7 @@ class LowStockAlertTransitionServiceTest {
 
     private final MedicineRepository medicineRepository = mock(MedicineRepository.class);
     private final InventoryAlertLogRepository inventoryAlertLogRepository = mock(InventoryAlertLogRepository.class);
+    private final EligibleStockSnapshotService eligibleStockSnapshotService = mock(EligibleStockSnapshotService.class);
     private final LowStockEvaluator lowStockEvaluator = new LowStockEvaluator();
 
     private LowStockAlertTransitionService service;
@@ -38,6 +40,7 @@ class LowStockAlertTransitionServiceTest {
         service = new LowStockAlertTransitionService(
                 medicineRepository,
                 inventoryAlertLogRepository,
+                eligibleStockSnapshotService,
                 lowStockEvaluator
         );
     }
@@ -89,6 +92,64 @@ class LowStockAlertTransitionServiceTest {
         );
 
         verify(inventoryAlertLogRepository).save(activeAlert);
+    }
+
+    @Test
+    void doesNotCreateAlertWhenDispenseLeavesEligibleStockAboveThreshold() {
+        UUID medicineId = UUID.randomUUID();
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 8)))
+                .thenReturn(Map.of(medicineId, 60));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(medicine(medicineId, 40)));
+
+        service.handleEligibleStockTransitions(
+                List.of(medicineId),
+                Map.of(medicineId, 130),
+                LocalDate.of(2026, 8, 8),
+                NOW
+        );
+
+        verify(inventoryAlertLogRepository, never()).findActiveByMedicineIdAndAlertType(any(), any());
+        verify(inventoryAlertLogRepository, never()).save(any(InventoryAlertLog.class));
+    }
+
+    @Test
+    void doesNotResolveAlertWhenAfterSnapshotStaysLow() {
+        UUID medicineId = UUID.randomUUID();
+        InventoryAlertLog activeAlert = InventoryAlertLog.createLowStock(medicineId, 40, 15, NOW.minusSeconds(60));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 8)))
+                .thenReturn(Map.of(medicineId, 15));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(medicine(medicineId, 40)));
+        when(inventoryAlertLogRepository.findActiveByMedicineIdAndAlertType(medicineId, InventoryAlertType.LOW_STOCK))
+                .thenReturn(Optional.of(activeAlert));
+
+        service.handleEligibleStockTransitions(
+                List.of(medicineId),
+                Map.of(medicineId, 15),
+                LocalDate.of(2026, 8, 8),
+                NOW
+        );
+
+        verify(inventoryAlertLogRepository, never()).save(activeAlert);
+    }
+
+    @Test
+    void snapshotsAfterEligibleStockThroughSharedService() {
+        UUID medicineId = UUID.randomUUID();
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 8)))
+                .thenReturn(Map.of(medicineId, 15));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(medicine(medicineId, 40)));
+        when(inventoryAlertLogRepository.findActiveByMedicineIdAndAlertType(medicineId, InventoryAlertType.LOW_STOCK))
+                .thenReturn(Optional.empty());
+
+        service.handleEligibleStockTransitions(
+                List.of(medicineId),
+                Map.of(medicineId, 50),
+                LocalDate.of(2026, 8, 8),
+                NOW
+        );
+
+        verify(eligibleStockSnapshotService).snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 8));
+        verify(inventoryAlertLogRepository).save(any(InventoryAlertLog.class));
     }
 
     private Medicine medicine(UUID id, int minStockThreshold) {

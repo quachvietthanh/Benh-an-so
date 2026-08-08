@@ -40,9 +40,12 @@ public class ReceiveStockService implements ReceiveStockUseCase {
     private final InventoryReceiptRepository inventoryReceiptRepository;
     private final InventoryManagementAuthorizer authorizer;
     private final InventoryReceiptResultMapper resultMapper;
+    private final EligibleStockSnapshotService eligibleStockSnapshotService;
     private final LowStockAlertTransitionService lowStockAlertTransitionService;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
+    private static final String BATCH_EXPIRY_MISMATCH_MESSAGE =
+            "Batch number must map to a single expiry date for the same medicine.";
 
     @Override
     public InventoryReceiptResult receiveStock(ReceiveStockCommand command) {
@@ -53,27 +56,29 @@ public class ReceiveStockService implements ReceiveStockUseCase {
         UUID receivedBy = currentUserPort.getCurrentUserId();
         UUID receiptId = UUID.randomUUID();
         LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        List<UUID> medicineIds = command.items().stream()
+                .map(ReceiveStockItemCommand::medicineId)
+                .distinct()
+                .toList();
 
         List<MedicineBatch> batches = new ArrayList<>();
         List<InventoryReceiptItem> receiptItems = new ArrayList<>();
-        Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>();
-        Map<UUID, Integer> addedEligibleQuantities = new HashMap<>();
+        Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>(
+                eligibleStockSnapshotService.snapshotEligibleStockQuantities(medicineIds, today)
+        );
+        Map<UUID, List<MedicineBatch>> trackedBatchesByMedicine = new HashMap<>();
 
         for (ReceiveStockItemCommand itemCommand : command.items()) {
             validateItem(itemCommand, now);
 
             UUID itemId = UUID.randomUUID();
             UUID medicineId = itemCommand.medicineId();
-            beforeEligibleQuantities.computeIfAbsent(
+            List<MedicineBatch> trackedBatches = trackedBatchesByMedicine.computeIfAbsent(
                     medicineId,
-                    id -> medicineBatchRepository.findAvailableByMedicineId(id, today)
-                            .stream()
-                            .mapToInt(MedicineBatch::getQuantity)
-                            .sum()
+                    id -> new ArrayList<>(medicineBatchRepository.findByMedicineId(id))
             );
-            addedEligibleQuantities.merge(medicineId, itemCommand.quantity(), Integer::sum);
 
-            MedicineBatch batch = findOrCreateBatch(itemCommand, now);
+            MedicineBatch batch = findOrCreateBatch(itemCommand, now, trackedBatches);
             batches.add(batch);
 
             UUID batchId = batch.getId();
@@ -102,16 +107,10 @@ public class ReceiveStockService implements ReceiveStockUseCase {
         );
 
         inventoryReceiptRepository.save(receipt);
-        Map<UUID, Integer> afterEligibleQuantities = new HashMap<>();
-        for (Map.Entry<UUID, Integer> entry : beforeEligibleQuantities.entrySet()) {
-            afterEligibleQuantities.put(
-                    entry.getKey(),
-                    entry.getValue() + addedEligibleQuantities.getOrDefault(entry.getKey(), 0)
-            );
-        }
         lowStockAlertTransitionService.handleEligibleStockTransitions(
+                medicineIds,
                 beforeEligibleQuantities,
-                afterEligibleQuantities,
+                today,
                 now
         );
 
@@ -144,10 +143,15 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                         "Medicine not found with id: " + item.medicineId()));
     }
 
-    private MedicineBatch findOrCreateBatch(ReceiveStockItemCommand item, Instant now) {
+    private MedicineBatch findOrCreateBatch(
+            ReceiveStockItemCommand item,
+            Instant now,
+            List<MedicineBatch> trackedBatches
+    ) {
         return medicineBatchRepository
                 .findByMedicineIdAndBatchNumber(item.medicineId(), item.batchNumber().trim())
                 .map(existingBatch -> {
+                    validateBatchExpiryConsistency(existingBatch, item);
                     existingBatch.addStock(item.quantity(), now);
                     medicineBatchRepository.addStockQuantity(existingBatch.getId(), item.quantity());
                     return existingBatch;
@@ -161,8 +165,24 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                             now
                     );
                     newBatch.addStock(item.quantity(), now);
-                    return medicineBatchRepository.save(newBatch);
+                    MedicineBatch savedBatch = medicineBatchRepository.save(newBatch);
+                    trackedBatches.add(savedBatch);
+                    return savedBatch;
                 });
+    }
+
+    private void validateBatchExpiryConsistency(MedicineBatch existingBatch, ReceiveStockItemCommand item) {
+        if (existingBatch.getExpiryDate().equals(item.expiryDate())) {
+            return;
+        }
+
+        throw new ValidationException(
+                BATCH_EXPIRY_MISMATCH_MESSAGE
+                        + " medicineId=" + item.medicineId()
+                        + ", batchNumber=" + item.batchNumber().trim()
+                        + ", existingExpiryDate=" + existingBatch.getExpiryDate()
+                        + ", requestedExpiryDate=" + item.expiryDate()
+        );
     }
 
     private static void requireCommand(ReceiveStockCommand command) {

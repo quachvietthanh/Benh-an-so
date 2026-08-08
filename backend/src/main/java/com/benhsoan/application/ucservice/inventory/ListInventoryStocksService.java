@@ -54,15 +54,14 @@ public class ListInventoryStocksService implements ListInventoryStocksUseCase {
     }
 
     private InventoryStockResult toResult(Medicine medicine, List<MedicineBatch> batches, LocalDate today) {
-        int eligibleStockQuantity = batches.stream()
+        List<MedicineBatch> eligibleBatches = batches.stream()
                 .filter(batch -> batch.isEligibleForDispenseOn(today))
+                .toList();
+        int eligibleStockQuantity = eligibleBatches.stream()
                 .mapToInt(MedicineBatch::getQuantity)
                 .sum();
-        int activeBatchCount = (int) batches.stream()
-                .filter(batch -> batch.getQuantity() > 0)
-                .count();
-        LocalDate nearestExpiryDate = batches.stream()
-                .filter(batch -> batch.getQuantity() > 0)
+        int activeBatchCount = eligibleBatches.size();
+        LocalDate nearestExpiryDate = eligibleBatches.stream()
                 .map(MedicineBatch::getExpiryDate)
                 .min(Comparator.naturalOrder())
                 .orElse(null);

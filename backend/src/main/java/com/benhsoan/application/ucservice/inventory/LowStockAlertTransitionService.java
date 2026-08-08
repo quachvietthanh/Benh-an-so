@@ -1,6 +1,8 @@
 package com.benhsoan.application.ucservice.inventory;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,7 +25,21 @@ public class LowStockAlertTransitionService {
 
     private final MedicineRepository medicineRepository;
     private final InventoryAlertLogRepository inventoryAlertLogRepository;
+    private final EligibleStockSnapshotService eligibleStockSnapshotService;
     private final LowStockEvaluator lowStockEvaluator;
+
+    public void handleEligibleStockTransitions(
+            Collection<UUID> medicineIds,
+            Map<UUID, Integer> beforeEligibleQuantities,
+            LocalDate today,
+            Instant now
+    ) {
+        handleEligibleStockTransitions(
+                beforeEligibleQuantities,
+                eligibleStockSnapshotService.snapshotEligibleStockQuantities(medicineIds, today),
+                now
+        );
+    }
 
     public void handleEligibleStockTransitions(
             Map<UUID, Integer> beforeEligibleQuantities,
