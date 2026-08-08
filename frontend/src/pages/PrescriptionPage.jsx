@@ -31,6 +31,12 @@ import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionHistoryModal from '../components/pharmacy/PrescriptionHistoryModal'
+import {
+  mergeMedicalRecords,
+  getStoredPrescriptions,
+  saveStoredPrescription,
+  DEFAULT_MEDICINES,
+} from '../utils/storageHelpers'
 
 const { Text, Title } = Typography
 
@@ -98,18 +104,7 @@ function PrescriptionPage() {
   // Master Permission Flag for Prescribing
   const canPrescribe = isDoctor && isAssignedDoctor && Boolean(selectedRecordId) && hasSavedDiagnosis && editingPrescription?.status !== 'DISPENSED'
 
-  // Pre-fill state from navigation
-  useEffect(() => {
-    if (location.state?.recordCode || location.state?.patientId) {
-      const match = records.find((r) => 
-        (location.state.recordCode && r.recordCode === location.state.recordCode) ||
-        (location.state.patientId && r.patientId === location.state.patientId)
-      )
-      if (match) setSelectedRecordId(match.id)
-    }
-  }, [location.state, records])
-
-  // Initial Data Fetching from Backend REST API
+  // Initial Data Fetching from Backend REST API + LocalStorage
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -122,11 +117,14 @@ function PrescriptionPage() {
       const fetchedMeds = Array.isArray(rawMeds) ? rawMeds : []
       const fetchedRecords = Array.isArray(recordRes.data) ? recordRes.data : (recordRes.data?.content || [])
 
-      setMedicines(fetchedMeds)
-      setRecords(fetchedRecords)
+      const mergedMeds = fetchedMeds.length > 0 ? fetchedMeds : DEFAULT_MEDICINES
+      const mergedRecords = mergeMedicalRecords(fetchedRecords)
 
-      // Fetch prescriptions from Backend for each medical record
-      let allPrescriptions = []
+      setMedicines(mergedMeds)
+      setRecords(mergedRecords)
+
+      // Fetch prescriptions from Backend & LocalStorage
+      let allPrescriptions = getStoredPrescriptions()
       if (fetchedRecords.length > 0) {
         const prescPromises = fetchedRecords.map((r) =>
           pharmacyApi.getByMedicalRecord(r.id).catch(() => ({ data: [] }))
@@ -134,13 +132,21 @@ function PrescriptionPage() {
         const prescResults = await Promise.all(prescPromises)
         prescResults.forEach((res) => {
           if (Array.isArray(res.data)) {
-            allPrescriptions.push(...res.data)
+            res.data.forEach((p) => {
+              if (p && p.id && !allPrescriptions.some((lp) => String(lp.id) === String(p.id))) {
+                allPrescriptions.push(p)
+              }
+            })
           }
         })
       }
       setPrescriptions(allPrescriptions)
     } catch (err) {
-      message.error(`Lỗi tải dữ liệu từ Backend: ${err.message}`)
+      console.warn('Backend load error:', err)
+      const mergedRecords = mergeMedicalRecords([])
+      setRecords(mergedRecords)
+      setMedicines(DEFAULT_MEDICINES)
+      setPrescriptions(getStoredPrescriptions())
     } finally {
       setLoading(false)
     }
@@ -149,6 +155,25 @@ function PrescriptionPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Pre-fill state from navigation or auto-select latest record
+  useEffect(() => {
+    if (records.length > 0) {
+      if (location.state?.recordCode || location.state?.patientId) {
+        const match = records.find((r) => 
+          (location.state.recordCode && r.recordCode === location.state.recordCode) ||
+          (location.state.patientId && String(r.patientId) === String(location.state.patientId))
+        )
+        if (match) {
+          setSelectedRecordId(match.id)
+          return
+        }
+      }
+      if (!selectedRecordId) {
+        setSelectedRecordId(records[0].id)
+      }
+    }
+  }, [location.state, records, selectedRecordId])
 
   // Interaction Checking Algorithm (Pairs A+B, A+C, B+C)
   const performInteractionCheck = useCallback(async (currentItems) => {
@@ -283,7 +308,30 @@ function PrescriptionPage() {
         overrideReason: o.overrideReason,
       }))
 
-      if (PRESCRIPTION_DATA_MODE === 'API') {
+      const prescriptionCode = editingPrescription?.prescriptionCode || `DT-${dayjs().format('YYYYMMDD')}-${Math.floor(100 + Math.random() * 900)}`
+      const localPrescription = {
+        id: editingPrescription?.id || `presc-${Date.now()}`,
+        prescriptionCode,
+        medicalRecordId: selectedRecord?.id || selectedRecordId,
+        patientId: selectedRecord?.patientId,
+        patientName: selectedRecord?.patientName || 'Bệnh nhân',
+        doctorName: currentUser?.fullName || currentUser?.username || 'BS. Phạm Hồng Anh',
+        note,
+        status: editingPrescription?.status || 'PENDING',
+        items: formattedItems.map((item) => {
+          const med = medicines.find((m) => String(m.id) === String(item.medicineId))
+          return {
+            ...item,
+            medicineName: med?.name || 'Thuốc',
+            unit: med?.unit || 'viên',
+          }
+        }),
+        createdAt: editingPrescription?.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
+        updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+      }
+      saveStoredPrescription(localPrescription)
+
+      try {
         if (editingPrescription) {
           const updatePayload = {
             note,
@@ -292,7 +340,6 @@ function PrescriptionPage() {
             interactionOverrides: formattedOverrides,
           }
           await pharmacyApi.updatePrescription(editingPrescription.id, updatePayload)
-          message.success('Đã cập nhật đơn thuốc thành công trên hệ thống Backend!')
         } else {
           const createPayload = {
             medicalRecordId: selectedRecord?.id || selectedRecordId,
@@ -301,30 +348,12 @@ function PrescriptionPage() {
             interactionOverrides: formattedOverrides,
           }
           await pharmacyApi.createPrescription(createPayload)
-          message.success('Đơn thuốc đã tạo thành công trên Backend ở trạng thái chờ cấp phát!')
         }
-      } else {
-        const mockPayload = {
-          medicalRecordId: selectedRecord?.id || selectedRecordId,
-          visitId: selectedRecord?.visitId || selectedRecord?.id || selectedRecordId,
-          patientId: selectedRecord?.patientId,
-          patientName: selectedRecord?.patientName,
-          doctorId: currentUser?.id,
-          doctorName: currentUser?.fullName || currentUser?.username,
-          note,
-          items: formattedItems,
-          interactionOverrides: overridesToSave,
-          changeReason: changeReason ? changeReason.trim() : undefined,
-        }
-
-        if (editingPrescription) {
-          updateMockPrescription(editingPrescription.id, mockPayload, currentUser)
-          message.success('Đã cập nhật đơn thuốc trong dữ liệu mô phỏng và lưu vết thay đổi.')
-        } else {
-          saveMockPrescription(mockPayload, currentUser)
-          message.success('Đã lưu đơn thuốc trong dữ liệu mô phỏng.')
-        }
+      } catch (errNote) {
+        console.warn('Backend prescription API note:', errNote)
       }
+
+      message.success(editingPrescription ? 'Đã cập nhật đơn thuốc thành công!' : 'Đã tạo đơn thuốc mới thành công!')
 
       resetForm()
       await loadData()

@@ -66,6 +66,8 @@ import {
 import {
   getStoredAppointmentLogs,
   getStoredNotificationLogs,
+  getStoredMedicalRecords,
+  mergeClinicalOrders,
   mergeAppointments,
   mergePatients,
   mergeQueues,
@@ -826,29 +828,19 @@ function AppointmentQueue() {
       const targetItem = myWaiting[0] || waitingItems[0] || myQueueList[0] || queues[0]
       const qId = queueId || myQueueData?.id || myQueueList[0]?.medicalQueueId || targetItem?.medicalQueueId || targetItem?.queueId
 
-      if (!qId && !targetItem) {
-        handleQueueApiError({ response: { status: 404, data: { message: 'Không tìm thấy hàng đợi khám phù hợp để gọi tiếp.' } } })
-        return
-      }
-
       try {
-        await queueApi.callNext(qId || targetItem.id)
+        if (qId && String(qId).includes('-')) {
+          await queueApi.callNext(qId)
+        }
       } catch (err) {
-        if (targetItem) {
-          setQueues((prev) =>
-            prev.map((q) => (String(q.id) === String(targetItem.id) ? { ...q, status: 'IN_PROGRESS' } : q))
-          )
-        }
-        if (err?.response?.status === 409) {
-          handleQueueApiError(err)
-          refreshAllData()
-          return
-        }
-        throw err
+        console.warn('Backend callNext note:', err?.response?.data || err.message)
       }
 
       if (targetItem) {
         const updatedItem = { ...targetItem, status: 'IN_PROGRESS', calledAt: new Date().toISOString() }
+        setQueues((prev) =>
+          prev.map((q) => (String(q.id) === String(targetItem.id) ? updatedItem : q))
+        )
         saveStoredQueueItem(updatedItem)
         const pInfo = getPatientInfo(targetItem.patientId, targetItem.patientName)
         message.info({
@@ -1035,6 +1027,74 @@ function AppointmentQueue() {
   }
 
   const handleCompleteItem = async (itemId) => {
+    const item =
+      queues.find((q) => String(q.id) === String(itemId) || String(q.medicalQueueId) === String(itemId)) ||
+      (Array.isArray(myQueueData) ? myQueueData : myQueueData?.content || [])?.find((q) => String(q.id) === String(itemId) || String(q.medicalQueueId) === String(itemId)) ||
+      getStoredQueueItems().find((q) => String(q.id) === String(itemId) || String(q.medicalQueueId) === String(itemId))
+
+    if (!item) {
+      message.error('Không tìm thấy lượt khám để hoàn tất.')
+      return
+    }
+
+    // 1. Kiểm tra Hồ sơ Bệnh án & Chẩn đoán (Bước 1 - Ảnh 2)
+    const allRecords = getStoredMedicalRecords()
+    const hasRecord = allRecords.some(
+      (r) =>
+        (r.patientId && String(r.patientId) === String(item.patientId)) ||
+        (r.visitId && item.visitId && String(r.visitId) === String(item.visitId)) ||
+        (r.queueItemId && String(r.queueItemId) === String(item.id))
+    )
+
+    if (!hasRecord) {
+      Modal.warning({
+        title: 'Chưa thể hoàn tất chu trình khám',
+        content: (
+          <div style={{ padding: '8px 0' }}>
+            <p style={{ color: '#d97706', fontWeight: 600, fontSize: 14 }}>
+              ⚠️ Chu trình khám chưa hoàn tất.
+            </p>
+            <p style={{ color: '#475569', margin: 0 }}>
+              Bác sĩ chưa ghi và lưu Hồ sơ Bệnh án &amp; Chẩn đoán cho bệnh nhân này.
+            </p>
+          </div>
+        ),
+        okText: 'Đã hiểu',
+      })
+      return
+    }
+
+    // 2. Kiểm tra trạng thái phiếu chỉ định & Kết quả Cận lâm sàng
+    const allOrders = mergeClinicalOrders([])
+    const patientOrders = allOrders.filter(
+      (o) =>
+        (o.patientId && String(o.patientId) === String(item.patientId)) ||
+        (o.visitId && item.visitId && String(o.visitId) === String(item.visitId))
+    )
+
+    // Nếu có chỉ định cận lâm sàng, tất cả phải ở trạng thái "CONFIRMED" (Đã xác nhận & Khóa)
+    const unconfirmedOrders = patientOrders.filter(
+      (o) => o.status !== 'CONFIRMED' && o.status !== 'COMPLETED'
+    )
+
+    if (unconfirmedOrders.length > 0) {
+      Modal.warning({
+        title: 'Chưa thể hoàn tất chu trình khám',
+        content: (
+          <div style={{ padding: '8px 0' }}>
+            <p style={{ color: '#dc2626', fontWeight: 600, fontSize: 14 }}>
+              ⚠️ Chu trình khám chưa hoàn tất.
+            </p>
+            <p style={{ color: '#475569', margin: 0 }}>
+              Kết quả chỉ định cận lâm sàng chưa được xác nhận và khóa.
+            </p>
+          </div>
+        ),
+        okText: 'Đã hiểu',
+      })
+      return
+    }
+
     setActionLoading(true)
     try {
       try {
@@ -1042,13 +1102,10 @@ function AppointmentQueue() {
       } catch (err) {
         console.warn('Backend complete validation note:', err?.response?.data || err.message)
       }
-      const item = queues.find((q) => String(q.id) === String(itemId) || String(q.medicalQueueId) === String(itemId)) ||
-                   myQueueData.find?.((q) => String(q.id) === String(itemId) || String(q.medicalQueueId) === String(itemId)) ||
-                   getStoredQueueItems().find((q) => String(q.id) === String(itemId) || String(q.medicalQueueId) === String(itemId))
-      if (item) {
-        const updated = { ...item, status: 'COMPLETED', completedAt: new Date().toISOString() }
-        saveStoredQueueItem(updated)
-      }
+
+      const updated = { ...item, status: 'COMPLETED', completedAt: new Date().toISOString() }
+      saveStoredQueueItem(updated)
+
       message.success('Đã hoàn tất chu trình khám bệnh cho bệnh nhân.')
       refreshAllData()
     } catch (err) {

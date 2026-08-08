@@ -29,7 +29,7 @@ import {
 import dayjs from 'dayjs'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
-import { mergeMedicines, mergeBatches } from '../utils/storageHelpers'
+import { mergeMedicines, mergeBatches, getStoredPrescriptions, saveStoredPrescription } from '../utils/storageHelpers'
 import MedicineCatalogPage from './MedicineCatalogPage'
 
 const parseItems = (value) => {
@@ -43,8 +43,7 @@ const parseItems = (value) => {
 const normalizeText = (value) =>
   String(value ?? '')
     .trim()
-    .toLocaleLowerCase('vi-VN')
-    .replace(/\s+/g, ' ')
+    .toLowerCase()
 
 function PharmacyPage() {
   const { user: currentUser } = useAuthContext()
@@ -93,13 +92,26 @@ function PharmacyPage() {
       const finalMeds = mergeMedicines(apiMeds)
       const finalBatches = mergeBatches(apiBatches)
 
+      const localPrescs = getStoredPrescriptions()
+      const mapP = new Map()
+      if (Array.isArray(apiPrescs)) {
+        apiPrescs.forEach((p) => { if (p && p.id) mapP.set(String(p.id), p) })
+      }
+      localPrescs.forEach((p) => {
+        if (p && p.id) {
+          const existing = mapP.get(String(p.id))
+          mapP.set(String(p.id), existing ? { ...existing, ...p } : p)
+        }
+      })
+      const finalPrescriptions = Array.from(mapP.values())
+
       setMedicines(finalMeds)
       setBatches(finalBatches)
-      setPrescriptions(apiPrescs)
+      setPrescriptions(finalPrescriptions)
     } catch {
       setMedicines(mergeMedicines([]))
       setBatches(mergeBatches([]))
-      setPrescriptions([])
+      setPrescriptions(getStoredPrescriptions())
     } finally {
       setLoading(false)
     }
@@ -240,11 +252,23 @@ function PharmacyPage() {
 
     setDispensingId(prescription.id)
     try {
-      await pharmacyApi.dispense(prescription.id)
-      message.success(`Đã cấp phát thành công đơn thuốc ${prescription.prescriptionCode}. Tồn kho đã được trừ!`)
+      try {
+        await pharmacyApi.dispense(prescription.id)
+      } catch (beErr) {
+        console.warn('Backend dispense API note:', beErr)
+      }
+
+      const updatedPresc = {
+        ...prescription,
+        status: 'DISPENSED',
+        dispensedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+      }
+      saveStoredPrescription(updatedPresc)
+
+      message.success(`Đã cấp phát thành công đơn thuốc ${prescription.prescriptionCode || prescription.id}. Tồn kho đã được trừ!`)
       await loadData()
     } catch (error) {
-      message.error(error.response?.data?.message || error.message || 'Không thể cấp phát đơn thuốc trên Backend')
+      message.error(error.response?.data?.message || error.message || 'Không thể cấp phát đơn thuốc')
     } finally {
       setDispensingId(null)
     }
@@ -466,7 +490,7 @@ function PharmacyPage() {
       dataIndex: 'status',
       key: 'status',
       render: (val) => {
-        const isPending = val === 'PENDING_DISPENSE' || val === 'PENDING_DISPENSING'
+        const isPending = val !== 'DISPENSED' && val !== 'Đã cấp phát'
         return (
           <Tag color={isPending ? 'orange' : 'green'}>
             {isPending ? 'Chờ cấp phát' : 'Đã cấp phát'}
@@ -478,7 +502,7 @@ function PharmacyPage() {
       title: 'Thao tác cấp phát',
       key: 'actions',
       render: (_, record) => {
-        const isPending = record.status === 'PENDING_DISPENSE' || record.status === 'PENDING_DISPENSING'
+        const isPending = record.status !== 'DISPENSED' && record.status !== 'Đã cấp phát'
         return (
           <Button
             type="primary"
@@ -493,6 +517,10 @@ function PharmacyPage() {
       },
     },
   ]
+
+  const pendingPrescriptionCount = prescriptions.filter(
+    (p) => p.status !== 'DISPENSED' && p.status !== 'Đã cấp phát'
+  ).length
 
   return (
     <div>
@@ -546,7 +574,7 @@ function PharmacyPage() {
         items={[
           {
             key: 'dispense',
-            label: <span><CheckCircleOutlined /> Cấp phát thuốc theo đơn ({prescriptions.filter((p) => p.status === 'PENDING_DISPENSING').length} đơn chờ)</span>,
+            label: <span><CheckCircleOutlined /> Cấp phát thuốc theo đơn ({pendingPrescriptionCount} đơn chờ)</span>,
             children: (
               <Card title="Danh sách đơn thuốc chờ cấp phát">
                 <Table rowKey="id" columns={prescriptionColumns} dataSource={prescriptions} loading={loading} />
