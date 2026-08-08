@@ -162,8 +162,8 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
 
                                                 // ===== PHARMACY / INVOICES =====
-                                                .requestMatchers(HttpMethod.DELETE, "/pharmacy/inventory/**").hasRole("ADMIN")
-                                                .requestMatchers("/pharmacy/inventory/**")
+                                                .requestMatchers(HttpMethod.DELETE, "/inventory/**").hasRole("ADMIN")
+                                                .requestMatchers("/inventory/**")
                                                 .hasAnyRole("ADMIN", "PHARMACIST")
                                                 .requestMatchers("/invoices/**")
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")

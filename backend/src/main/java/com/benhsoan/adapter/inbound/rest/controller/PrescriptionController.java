@@ -20,6 +20,7 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionR
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
@@ -95,7 +96,7 @@ public class PrescriptionController {
 
     @PostMapping("/{id}/dispense")
     @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
-    public PrescriptionResponse dispense(@PathVariable UUID id) {
+    public DispensePrescriptionResponse dispense(@PathVariable UUID id) {
         return mapper.toResponse(dispensePrescriptionUseCase.dispense(id));
     }
 

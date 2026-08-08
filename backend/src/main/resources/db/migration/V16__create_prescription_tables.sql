@@ -20,6 +20,8 @@ CREATE TABLE medicines (
     unit VARCHAR(50) NOT NULL,
     default_route VARCHAR(30) NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
+    stock_quantity INT NOT NULL DEFAULT 0,
+    min_stock_threshold INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NULL,
 
@@ -62,7 +64,9 @@ CREATE TABLE medicines (
             'TRANSDERMAL',
             'OTHER'
         )
-    )
+    ),
+    CONSTRAINT chk_medicines_stock_quantity CHECK (stock_quantity >= 0),
+    CONSTRAINT chk_medicines_min_stock_threshold CHECK (min_stock_threshold >= 0)
 );
 
 CREATE INDEX idx_medicines_name

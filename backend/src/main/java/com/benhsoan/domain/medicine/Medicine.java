@@ -42,6 +42,10 @@ public class Medicine {
 
     private Instant updatedAt;
 
+    private int stockQuantity;
+
+    private int minStockThreshold;
+
     private Medicine(
             UUID id,
             String medicineCode,
@@ -53,7 +57,9 @@ public class Medicine {
             AdministrationRoute defaultRoute,
             boolean active,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            int stockQuantity,
+            int minStockThreshold
     ) {
         this.id = requireNonNull(id, "Medicine id is required.");
         this.medicineCode = requireText(medicineCode, "Medicine code is required.");
@@ -66,6 +72,11 @@ public class Medicine {
         this.active = active;
         this.createdAt = requireNonNull(createdAt, "Medicine creation time is required.");
         this.updatedAt = updatedAt;
+        this.stockQuantity = requireNonNegative(stockQuantity, "Medicine stock quantity must not be negative.");
+        this.minStockThreshold = requireNonNegative(
+                minStockThreshold,
+                "Medicine minimum stock threshold must not be negative."
+        );
     }
 
     public static Medicine create(
@@ -77,6 +88,7 @@ public class Medicine {
             DosageForm dosageForm,
             String unit,
             AdministrationRoute defaultRoute,
+            int minStockThreshold,
             Instant createdAt
     ) {
         return new Medicine(
@@ -90,7 +102,9 @@ public class Medicine {
                 defaultRoute,
                 true,
                 createdAt,
-                null
+                null,
+                0,
+                minStockThreshold
         );
     }
 
@@ -105,7 +119,9 @@ public class Medicine {
             AdministrationRoute defaultRoute,
             boolean active,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            int stockQuantity,
+            int minStockThreshold
     ) {
         return new Medicine(
                 id,
@@ -118,7 +134,9 @@ public class Medicine {
                 defaultRoute,
                 active,
                 createdAt,
-                updatedAt
+                updatedAt,
+                stockQuantity,
+                minStockThreshold
         );
     }
 
@@ -129,6 +147,7 @@ public class Medicine {
             DosageForm dosageForm,
             String unit,
             AdministrationRoute defaultRoute,
+            int minStockThreshold,
             Instant updatedAt
     ) {
         String validatedMedicineName = requireText(medicineName, "Medicine name is required.");
@@ -140,6 +159,10 @@ public class Medicine {
                 defaultRoute,
                 "Default administration route is required."
         );
+        int validatedMinStockThreshold = requireNonNegative(
+                minStockThreshold,
+                "Medicine minimum stock threshold must not be negative."
+        );
         Instant validatedUpdatedAt = requireNonNull(updatedAt, "Medicine update time is required.");
 
         this.medicineName = validatedMedicineName;
@@ -148,6 +171,7 @@ public class Medicine {
         this.dosageForm = validatedDosageForm;
         this.unit = validatedUnit;
         this.defaultRoute = validatedDefaultRoute;
+        this.minStockThreshold = validatedMinStockThreshold;
         this.updatedAt = validatedUpdatedAt;
     }
 
@@ -172,6 +196,13 @@ public class Medicine {
 
     private static <T> T requireNonNull(T value, String message) {
         if (Objects.isNull(value)) {
+            throw new ValidationException(message);
+        }
+        return value;
+    }
+
+    private static int requireNonNegative(int value, String message) {
+        if (value < 0) {
             throw new ValidationException(message);
         }
         return value;
