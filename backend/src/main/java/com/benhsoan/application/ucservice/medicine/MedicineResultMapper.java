@@ -20,7 +20,9 @@ class MedicineResultMapper {
                 medicine.getDefaultRoute(),
                 medicine.isActive(),
                 medicine.getCreatedAt(),
-                medicine.getUpdatedAt()
+                medicine.getUpdatedAt(),
+                medicine.getStockQuantity(),
+                medicine.getMinStockThreshold()
         );
     }
 }

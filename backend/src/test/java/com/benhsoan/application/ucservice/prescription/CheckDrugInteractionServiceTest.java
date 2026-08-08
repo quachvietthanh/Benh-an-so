@@ -238,7 +238,9 @@ class CheckDrugInteractionServiceTest {
                 AdministrationRoute.ORAL,
                 true,
                 NOW,
-                null
+                null,
+                0,
+                20
         );
     }
 

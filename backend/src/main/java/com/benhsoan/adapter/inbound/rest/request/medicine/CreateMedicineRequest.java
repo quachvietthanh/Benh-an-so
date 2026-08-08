@@ -5,6 +5,7 @@ import com.benhsoan.domain.medicine.enums.DosageForm;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 public record CreateMedicineRequest(
@@ -32,6 +33,9 @@ public record CreateMedicineRequest(
         String unit,
 
         @NotNull(message = "Default administration route is required.")
-        AdministrationRoute defaultRoute
+        AdministrationRoute defaultRoute,
+
+        @PositiveOrZero(message = "Minimum stock threshold must be greater than or equal to 0.")
+        int minStockThreshold
 ) {
 }

@@ -6,13 +6,6 @@
 -- =====================================================
 
 -- ===========================
--- Add stock_quantity to medicines
--- ===========================
-
-ALTER TABLE medicines
-    ADD COLUMN stock_quantity INT NOT NULL DEFAULT 0;
-
--- ===========================
 -- Medicine Batches
 -- ===========================
 
@@ -105,4 +98,3 @@ CREATE INDEX idx_inventory_receipt_items_medicine
 
 CREATE INDEX idx_inventory_receipt_items_batch
     ON inventory_receipt_items(medicine_batch_id);
-

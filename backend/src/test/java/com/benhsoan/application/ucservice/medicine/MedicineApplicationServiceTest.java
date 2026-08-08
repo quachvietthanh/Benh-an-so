@@ -67,7 +67,8 @@ class MedicineApplicationServiceTest {
                 "500 mg",
                 DosageForm.TABLET,
                 "vien",
-                AdministrationRoute.ORAL
+                AdministrationRoute.ORAL,
+                20
         ));
 
         assertEquals("med-001", result.medicineCode());
@@ -100,7 +101,33 @@ class MedicineApplicationServiceTest {
                         "500 mg",
                         DosageForm.TABLET,
                         "vien",
-                        AdministrationRoute.ORAL
+                        AdministrationRoute.ORAL,
+                        20
+                )
+        ));
+    }
+
+    @Test
+    void rejectsDuplicateMedicineCodeIgnoringCaseAndOuterWhitespace() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
+        when(medicineRepository.existsByMedicineCode("med-001")).thenReturn(true);
+        CreateMedicineService service = new CreateMedicineService(
+                medicineRepository,
+                authorizer,
+                resultMapper,
+                clockPort
+        );
+
+        assertThrows(ValidationException.class, () -> service.create(
+                new CreateMedicineCommand(
+                        " MED-001 ",
+                        "Paracetamol",
+                        "Acetaminophen",
+                        "500 mg",
+                        DosageForm.TABLET,
+                        "vien",
+                        AdministrationRoute.ORAL,
+                        20
                 )
         ));
     }
@@ -164,7 +191,8 @@ class MedicineApplicationServiceTest {
                         "400 mg",
                         DosageForm.TABLET,
                         "vien",
-                        AdministrationRoute.ORAL
+                        AdministrationRoute.ORAL,
+                        20
                 )
         ));
     }
@@ -214,7 +242,8 @@ class MedicineApplicationServiceTest {
                         "500 mg",
                         DosageForm.TABLET,
                         "vien",
-                        AdministrationRoute.ORAL
+                        AdministrationRoute.ORAL,
+                        20
                 )
         ));
     }
@@ -231,7 +260,9 @@ class MedicineApplicationServiceTest {
                 AdministrationRoute.ORAL,
                 true,
                 NOW.minusSeconds(60),
-                null
+                null,
+                0,
+                20
         );
     }
 
@@ -247,7 +278,9 @@ class MedicineApplicationServiceTest {
                 AdministrationRoute.ORAL,
                 false,
                 NOW.minusSeconds(60),
-                null
+                null,
+                0,
+                20
         );
     }
 }
