@@ -239,7 +239,8 @@ class CheckDrugInteractionServiceTest {
                 true,
                 NOW,
                 null,
-                0
+                0,
+                20
         );
     }
 

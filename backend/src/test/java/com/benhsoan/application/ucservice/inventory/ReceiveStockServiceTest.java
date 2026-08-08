@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +47,7 @@ class ReceiveStockServiceTest {
     private final InventoryReceiptRepository inventoryReceiptRepository = mock(InventoryReceiptRepository.class);
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
     private final ClockPort clockPort = mock(ClockPort.class);
+    private final LowStockAlertTransitionService lowStockAlertTransitionService = mock(LowStockAlertTransitionService.class);
     private final InventoryManagementAuthorizer authorizer =
             new InventoryManagementAuthorizer(currentUserPort);
     private final InventoryReceiptResultMapper resultMapper = new InventoryReceiptResultMapper();
@@ -65,6 +67,7 @@ class ReceiveStockServiceTest {
                 inventoryReceiptRepository,
                 authorizer,
                 resultMapper,
+                lowStockAlertTransitionService,
                 currentUserPort,
                 clockPort
         );
@@ -105,6 +108,7 @@ class ReceiveStockServiceTest {
 
         verify(medicineRepository).updateStockQuantity(medicineId, 100);
         verify(inventoryReceiptRepository).save(any());
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(NOW));
     }
 
     @Test
@@ -252,6 +256,7 @@ class ReceiveStockServiceTest {
         assertEquals(30, result.items().get(0).quantity());
         verify(medicineBatchRepository).addStockQuantity(batchId, 30);
         verify(medicineRepository).updateStockQuantity(medicineId, 30);
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(NOW));
     }
 
     @Test
@@ -272,6 +277,6 @@ class ReceiveStockServiceTest {
     private Medicine createMedicine(UUID id, String code, String name) {
         return Medicine.restore(
                 id, code, name, name, "500 mg", DosageForm.TABLET, "vien",
-                AdministrationRoute.ORAL, true, NOW.minusSeconds(86400), null, 0);
+                AdministrationRoute.ORAL, true, NOW.minusSeconds(86400), null, 0, 20);
     }
 }

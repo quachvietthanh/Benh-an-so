@@ -28,6 +28,7 @@ public class ListLowStockMedicinesService implements ListLowStockMedicinesUseCas
     private final MedicineBatchRepository medicineBatchRepository;
     private final InventoryManagementAuthorizer authorizer;
     private final ClockPort clockPort;
+    private final LowStockEvaluator lowStockEvaluator;
 
     @Override
     public List<LowStockMedicineResult> list() {
@@ -40,27 +41,20 @@ public class ListLowStockMedicinesService implements ListLowStockMedicinesUseCas
                 .collect(Collectors.groupingBy(MedicineBatch::getMedicineId));
 
         return medicines.stream()
-                .map(medicine -> toResult(medicine, batchesByMedicineId.getOrDefault(medicine.getId(), List.of()), today))
-                .filter(result -> result.eligibleStockQuantity() < result.minStockThreshold())
+                .map(medicine -> toResult(
+                        medicine,
+                        batchesByMedicineId.getOrDefault(medicine.getId(), List.of()),
+                        today
+                ))
+                .filter(result -> lowStockEvaluator.isLowStockByThreshold(
+                        result.eligibleStockQuantity(),
+                        result.minStockThreshold()
+                ))
                 .toList();
     }
 
     private LowStockMedicineResult toResult(Medicine medicine, List<MedicineBatch> batches, LocalDate today) {
-        int eligibleStockQuantity = batches.stream()
-                .filter(batch -> batch.isEligibleForDispenseOn(today))
-                .mapToInt(MedicineBatch::getQuantity)
-                .sum();
-        int minStockThreshold = medicine.getMinStockThreshold();
-
-        return new LowStockMedicineResult(
-                medicine.getId(),
-                medicine.getMedicineCode(),
-                medicine.getMedicineName(),
-                medicine.getUnit(),
-                medicine.getStockQuantity(),
-                eligibleStockQuantity,
-                minStockThreshold,
-                Math.max(0, minStockThreshold - eligibleStockQuantity)
-        );
+        int eligibleStockQuantity = lowStockEvaluator.calculateEligibleStockQuantity(batches, today);
+        return lowStockEvaluator.toLowStockResult(medicine, eligibleStockQuantity);
     }
 }

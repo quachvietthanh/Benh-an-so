@@ -13,6 +13,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
@@ -55,6 +56,7 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
     private final MedicineRepository medicineRepository;
     private final MedicineBatchRepository medicineBatchRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final LowStockAlertTransitionService lowStockAlertTransitionService;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
@@ -164,11 +166,13 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         List<PrescriptionDispenseItem> dispenseItems = new ArrayList<>();
         List<StockMovement> stockMovements = new ArrayList<>();
         Map<UUID, Integer> medicineDeltas = new HashMap<>();
+        Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>();
         List<DispenseAllocationResult> allocations = new ArrayList<>();
 
         for (AllocationPlan plan : computation.allocationPlans()) {
             MedicineBatch batch = plan.batch();
             int quantityBefore = batch.getQuantity();
+            beforeEligibleQuantities.merge(plan.item().getMedicineId(), quantityBefore, Integer::sum);
             batch.deductStock(plan.allocatedQuantity(), now);
             try {
                 medicineBatchRepository.deductStockQuantity(
@@ -231,6 +235,18 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         prescriptionDispenseItemRepository.saveAll(dispenseItems);
         stockMovementRepository.saveAll(stockMovements);
         medicineDeltas.forEach(medicineRepository::updateStockQuantity);
+        Map<UUID, Integer> afterEligibleQuantities = new HashMap<>();
+        for (Map.Entry<UUID, Integer> entry : beforeEligibleQuantities.entrySet()) {
+            afterEligibleQuantities.put(
+                    entry.getKey(),
+                    entry.getValue() + medicineDeltas.getOrDefault(entry.getKey(), 0)
+            );
+        }
+        lowStockAlertTransitionService.handleEligibleStockTransitions(
+                beforeEligibleQuantities,
+                afterEligibleQuantities,
+                now
+        );
         return allocations;
     }
 

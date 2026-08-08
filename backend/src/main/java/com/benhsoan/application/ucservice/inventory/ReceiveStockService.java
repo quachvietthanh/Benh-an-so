@@ -2,9 +2,12 @@ package com.benhsoan.application.ucservice.inventory;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,6 +40,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
     private final InventoryReceiptRepository inventoryReceiptRepository;
     private final InventoryManagementAuthorizer authorizer;
     private final InventoryReceiptResultMapper resultMapper;
+    private final LowStockAlertTransitionService lowStockAlertTransitionService;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
 
@@ -48,15 +52,26 @@ public class ReceiveStockService implements ReceiveStockUseCase {
         Instant now = clockPort.now();
         UUID receivedBy = currentUserPort.getCurrentUserId();
         UUID receiptId = UUID.randomUUID();
+        LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
 
         List<MedicineBatch> batches = new ArrayList<>();
         List<InventoryReceiptItem> receiptItems = new ArrayList<>();
+        Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>();
+        Map<UUID, Integer> addedEligibleQuantities = new HashMap<>();
 
         for (ReceiveStockItemCommand itemCommand : command.items()) {
             validateItem(itemCommand, now);
 
             UUID itemId = UUID.randomUUID();
             UUID medicineId = itemCommand.medicineId();
+            beforeEligibleQuantities.computeIfAbsent(
+                    medicineId,
+                    id -> medicineBatchRepository.findAvailableByMedicineId(id, today)
+                            .stream()
+                            .mapToInt(MedicineBatch::getQuantity)
+                            .sum()
+            );
+            addedEligibleQuantities.merge(medicineId, itemCommand.quantity(), Integer::sum);
 
             MedicineBatch batch = findOrCreateBatch(itemCommand, now);
             batches.add(batch);
@@ -87,6 +102,18 @@ public class ReceiveStockService implements ReceiveStockUseCase {
         );
 
         inventoryReceiptRepository.save(receipt);
+        Map<UUID, Integer> afterEligibleQuantities = new HashMap<>();
+        for (Map.Entry<UUID, Integer> entry : beforeEligibleQuantities.entrySet()) {
+            afterEligibleQuantities.put(
+                    entry.getKey(),
+                    entry.getValue() + addedEligibleQuantities.getOrDefault(entry.getKey(), 0)
+            );
+        }
+        lowStockAlertTransitionService.handleEligibleStockTransitions(
+                beforeEligibleQuantities,
+                afterEligibleQuantities,
+                now
+        );
 
         return resultMapper.toResult(receipt, batches);
     }

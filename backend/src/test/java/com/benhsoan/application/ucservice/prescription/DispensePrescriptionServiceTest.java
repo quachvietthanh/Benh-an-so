@@ -59,6 +59,8 @@ class DispensePrescriptionServiceTest {
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
     private final ClockPort clockPort = mock(ClockPort.class);
     private final AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+    private final com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService lowStockAlertTransitionService =
+            mock(com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService.class);
     private final PrescriptionDisplayContextResolver displayContextResolver = mock(PrescriptionDisplayContextResolver.class);
     private final DispensePrescriptionResultMapper dispensePrescriptionResultMapper =
             new DispensePrescriptionResultMapper(new PrescriptionResultMapper(displayContextResolver));
@@ -92,6 +94,7 @@ class DispensePrescriptionServiceTest {
                 medicineRepository,
                 medicineBatchRepository,
                 stockMovementRepository,
+                lowStockAlertTransitionService,
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
@@ -136,6 +139,7 @@ class DispensePrescriptionServiceTest {
         verify(prescriptionDispenseItemRepository).saveAll(any());
         verify(stockMovementRepository).saveAll(any());
         verify(auditLogRepository).save(any());
+        verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(NOW));
     }
 
     @Test
@@ -259,7 +263,8 @@ class DispensePrescriptionServiceTest {
                 true,
                 NOW.minusSeconds(86400),
                 null,
-                120
+                120,
+                20
         );
     }
 }

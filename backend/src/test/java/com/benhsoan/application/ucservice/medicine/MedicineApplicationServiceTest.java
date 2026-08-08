@@ -67,7 +67,8 @@ class MedicineApplicationServiceTest {
                 "500 mg",
                 DosageForm.TABLET,
                 "vien",
-                AdministrationRoute.ORAL
+                AdministrationRoute.ORAL,
+                20
         ));
 
         assertEquals("med-001", result.medicineCode());
@@ -100,7 +101,8 @@ class MedicineApplicationServiceTest {
                         "500 mg",
                         DosageForm.TABLET,
                         "vien",
-                        AdministrationRoute.ORAL
+                        AdministrationRoute.ORAL,
+                        20
                 )
         ));
     }
@@ -164,7 +166,8 @@ class MedicineApplicationServiceTest {
                         "400 mg",
                         DosageForm.TABLET,
                         "vien",
-                        AdministrationRoute.ORAL
+                        AdministrationRoute.ORAL,
+                        20
                 )
         ));
     }
@@ -214,7 +217,8 @@ class MedicineApplicationServiceTest {
                         "500 mg",
                         DosageForm.TABLET,
                         "vien",
-                        AdministrationRoute.ORAL
+                        AdministrationRoute.ORAL,
+                        20
                 )
         ));
     }
@@ -232,7 +236,8 @@ class MedicineApplicationServiceTest {
                 true,
                 NOW.minusSeconds(60),
                 null,
-                0
+                0,
+                20
         );
     }
 
@@ -249,7 +254,8 @@ class MedicineApplicationServiceTest {
                 false,
                 NOW.minusSeconds(60),
                 null,
-                0
+                0,
+                20
         );
     }
 }
