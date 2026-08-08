@@ -18,6 +18,7 @@ public record MedicineResponse(
         boolean active,
         Instant createdAt,
         Instant updatedAt,
-        int stockQuantity
+        int stockQuantity,
+        int minStockThreshold
 ) {
 }

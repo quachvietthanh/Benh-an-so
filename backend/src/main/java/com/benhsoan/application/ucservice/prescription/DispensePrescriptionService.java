@@ -13,6 +13,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.inventory.EligibleStockSnapshotService;
+import com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
@@ -55,6 +57,8 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
     private final MedicineRepository medicineRepository;
     private final MedicineBatchRepository medicineBatchRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final EligibleStockSnapshotService eligibleStockSnapshotService;
+    private final LowStockAlertTransitionService lowStockAlertTransitionService;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
@@ -72,10 +76,15 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         var prescription = prescriptionRepository.findByIdForUpdate(prescriptionId)
                 .orElseThrow(() -> new PrescriptionNotFoundException(prescriptionId));
         List<PrescriptionItem> prescriptionItems = prescriptionItemRepository.findByPrescriptionId(prescriptionId);
+        List<UUID> medicineIds = prescriptionItems.stream()
+                .map(PrescriptionItem::getMedicineId)
+                .distinct()
+                .toList();
 
         AllocationComputation computation = computeAllocations(
                 prescription.getId(),
                 prescriptionItems,
+                medicineIds,
                 now,
                 today
         );
@@ -103,11 +112,15 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
     private AllocationComputation computeAllocations(
             UUID prescriptionId,
             List<PrescriptionItem> prescriptionItems,
+            List<UUID> medicineIds,
             Instant now,
             LocalDate today
     ) {
         List<AllocationPlan> allocationPlans = new ArrayList<>();
         List<PrescriptionInsufficientStockException.StockShortageDetail> shortages = new ArrayList<>();
+        Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>(
+                eligibleStockSnapshotService.snapshotEligibleStockQuantities(medicineIds, today)
+        );
 
         for (PrescriptionItem item : prescriptionItems) {
             var medicine = medicineRepository.findById(item.getMedicineId())
@@ -153,7 +166,7 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
             throw new PrescriptionInsufficientStockException(prescriptionId, shortages);
         }
 
-        return new AllocationComputation(allocationPlans);
+        return new AllocationComputation(allocationPlans, beforeEligibleQuantities);
     }
 
     private List<DispenseAllocationResult> applyAllocations(
@@ -231,6 +244,12 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         prescriptionDispenseItemRepository.saveAll(dispenseItems);
         stockMovementRepository.saveAll(stockMovements);
         medicineDeltas.forEach(medicineRepository::updateStockQuantity);
+        lowStockAlertTransitionService.handleEligibleStockTransitions(
+                computation.beforeEligibleQuantities().keySet(),
+                computation.beforeEligibleQuantities(),
+                LocalDate.ofInstant(now, ZoneOffset.UTC),
+                now
+        );
         return allocations;
     }
 
@@ -243,7 +262,8 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
     }
 
     private record AllocationComputation(
-            List<AllocationPlan> allocationPlans
+            List<AllocationPlan> allocationPlans,
+            Map<UUID, Integer> beforeEligibleQuantities
     ) {
     }
 }

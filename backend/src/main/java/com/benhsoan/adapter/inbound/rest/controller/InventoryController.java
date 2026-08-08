@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.InventoryRestMapper;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.LowStockMedicineResponse;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.port.dto.query.inventory.ListInventoryBatchesQuery;
 import com.benhsoan.port.dto.query.inventory.ListInventoryStocksQuery;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
+import com.benhsoan.port.inbound.inventory.ListLowStockMedicinesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryStocksUseCase;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class InventoryController {
 
     private final ListInventoryStocksUseCase listInventoryStocksUseCase;
     private final ListInventoryBatchesUseCase listInventoryBatchesUseCase;
+    private final ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
     private final InventoryRestMapper mapper;
 
     @GetMapping("/stocks")
@@ -50,6 +53,14 @@ public class InventoryController {
                 listInventoryBatchesUseCase.list(
                         new ListInventoryBatchesQuery(medicineId, status, eligibleForDispense)
                 )
+        );
+    }
+
+    @GetMapping("/low-stock")
+    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
+    public List<LowStockMedicineResponse> listLowStockMedicines() {
+        return mapper.toLowStockResponses(
+                listLowStockMedicinesUseCase.list()
         );
     }
 }

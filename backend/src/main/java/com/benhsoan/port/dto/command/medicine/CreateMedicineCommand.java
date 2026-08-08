@@ -10,6 +10,7 @@ public record CreateMedicineCommand(
         String strength,
         DosageForm dosageForm,
         String unit,
-        AdministrationRoute defaultRoute
+        AdministrationRoute defaultRoute,
+        int minStockThreshold
 ) {
 }

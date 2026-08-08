@@ -23,7 +23,9 @@ import com.benhsoan.adapter.inbound.rest.mapper.InventoryRestMapper;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.port.dto.result.InventoryBatchResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
+import com.benhsoan.port.dto.result.LowStockMedicineResult;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
+import com.benhsoan.port.inbound.inventory.ListLowStockMedicinesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryStocksUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -45,6 +47,9 @@ class InventoryControllerTest {
 
     @MockitoBean
     private ListInventoryBatchesUseCase listInventoryBatchesUseCase;
+
+    @MockitoBean
+    private ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -123,5 +128,42 @@ class InventoryControllerTest {
                 .andExpect(jsonPath("$[0].quantity").value(40))
                 .andExpect(jsonPath("$[0].status").value("ACTIVE"))
                 .andExpect(jsonPath("$[0].eligibleForDispense").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /inventory/low-stock returns low stock alerts")
+    void listLowStockReturnsAlerts() throws Exception {
+        UUID medicineId = UUID.randomUUID();
+
+        when(listLowStockMedicinesUseCase.list())
+                .thenReturn(List.of(new LowStockMedicineResult(
+                        medicineId,
+                        "MED-LOW-001",
+                        "Metformin 500 mg",
+                        "vien",
+                        80,
+                        15,
+                        40,
+                        25
+                )));
+
+        mockMvc.perform(get("/inventory/low-stock"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].medicineId").value(medicineId.toString()))
+                .andExpect(jsonPath("$[0].medicineCode").value("MED-LOW-001"))
+                .andExpect(jsonPath("$[0].eligibleStockQuantity").value(15))
+                .andExpect(jsonPath("$[0].minStockThreshold").value(40))
+                .andExpect(jsonPath("$[0].shortageQuantity").value(25));
+    }
+
+    @Test
+    @DisplayName("GET /inventory/low-stock returns empty array when no alerts")
+    void listLowStockReturnsEmptyArray() throws Exception {
+        when(listLowStockMedicinesUseCase.list()).thenReturn(List.of());
+
+        mockMvc.perform(get("/inventory/low-stock"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
     }
 }
