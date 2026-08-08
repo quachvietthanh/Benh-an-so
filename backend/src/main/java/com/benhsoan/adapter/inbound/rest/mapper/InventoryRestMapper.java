@@ -6,8 +6,10 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.LowStockMedicineResponse;
 import com.benhsoan.port.dto.result.InventoryBatchResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
+import com.benhsoan.port.dto.result.LowStockMedicineResult;
 
 @Component
 public class InventoryRestMapper {
@@ -21,6 +23,12 @@ public class InventoryRestMapper {
     public List<InventoryStockResponse> toStockResponses(List<InventoryStockResult> results) {
         return results.stream()
                 .map(this::toStockResponse)
+                .toList();
+    }
+
+    public List<LowStockMedicineResponse> toLowStockResponses(List<LowStockMedicineResult> results) {
+        return results.stream()
+                .map(this::toLowStockResponse)
                 .toList();
     }
 
@@ -53,6 +61,19 @@ public class InventoryRestMapper {
                 result.eligibleStockQuantity(),
                 result.activeBatchCount(),
                 result.nearestExpiryDate()
+        );
+    }
+
+    private LowStockMedicineResponse toLowStockResponse(LowStockMedicineResult result) {
+        return new LowStockMedicineResponse(
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.unit(),
+                result.stockQuantity(),
+                result.eligibleStockQuantity(),
+                result.minStockThreshold(),
+                result.shortageQuantity()
         );
     }
 }
