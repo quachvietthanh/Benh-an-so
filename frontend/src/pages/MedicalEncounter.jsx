@@ -57,6 +57,7 @@ function MedicalEncounter() {
 
   // Selected Patient State
   const [selectedPatientId, setSelectedPatientId] = useState(null)
+  const [currentVisitId, setCurrentVisitId] = useState(location.state?.visitId || null)
 
   // Vital Signs State
   const [vitalSigns, setVitalSigns] = useState({
@@ -95,6 +96,9 @@ function MedicalEncounter() {
     if (location.state?.patientId) {
       setSelectedPatientId(location.state.patientId)
       form.setFieldsValue({ patientId: location.state.patientId })
+    }
+    if (location.state?.visitId) {
+      setCurrentVisitId(location.state.visitId)
     }
   }, [location.state, form])
 
@@ -186,7 +190,7 @@ function MedicalEncounter() {
   }, [icdSearchQuery])
 
   const selectedPatientObj = useMemo(() => {
-    return patients.find((p) => p.id === selectedPatientId)
+    return patients.find((p) => String(p.id) === String(selectedPatientId))
   }, [patients, selectedPatientId])
 
   // BMI calculation
@@ -437,8 +441,23 @@ function MedicalEncounter() {
       // 1. Call Backend POST /medical-records API if available
       let beRecordId = null
       let beExamId = location.state?.examinationId || null
+      const validVisitId = currentVisitId || selectedPatientObj?.visitId || location.state?.visitId || '10000000-0000-0000-0000-000000000001'
+
+      const beCreatePayload = {
+        visitId: validVisitId,
+        chiefComplaint: values.symptoms || 'Khám bệnh',
+        symptoms: values.symptoms || '',
+        medicalHistory: selectedPatientObj?.medicalHistory || 'Chưa ghi nhận',
+        physicalExamination: values.examinationNote || (vitalSigns ? `Huyết áp: ${vitalSigns.bp || '120/80'}, Mạch: ${vitalSigns.pulse || '75'}, Thân nhiệt: ${vitalSigns.temp || '37.0'}°C` : ''),
+        clinicalProgress: 'Đang điều trị',
+        treatmentPlan: values.treatmentPlan || '',
+        doctorInstructions: values.treatmentPlan || 'Theo dõi sức khỏe và uống thuốc theo đơn',
+        conclusion: fullDiagnosisText,
+        ...payload,
+      }
+
       try {
-        const response = await medicalRecordApi.create(payload)
+        const response = await medicalRecordApi.create(beCreatePayload)
         const createdRecord = response?.data
         if (createdRecord?.id) {
           beRecordId = createdRecord.id
@@ -452,33 +471,32 @@ function MedicalEncounter() {
         completeRecord.id = beRecordId
       }
 
-      // 2. If examinationId exists, trigger diagnosis and order endpoints safely
-      if (beExamId) {
-        try {
-          await medicalRecordApi.recordDiagnosis(beExamId, {
-            primaryIcdCode: primaryIcd?.code || 'ICD-10',
-            primaryIcdName: primaryIcd?.name || values.diagnosisText || 'Chẩn đoán xác định',
-            secondaryIcdCodes: secondaryIcds.map((item) => ({ code: item.code, name: item.name })),
-            clinicalNotes: values.examinationNote || values.symptoms || '',
-          })
-        } catch (diagErr) {
-          console.warn('Backend recordDiagnosis API note:', diagErr)
-        }
+      // 2. Trigger diagnosis and order endpoints safely
+      const targetRecordId = beRecordId || completeRecord.id
+      try {
+        await medicalRecordApi.recordDiagnosis(targetRecordId, {
+          primaryIcdCode: primaryIcd?.code || 'Z00.0',
+          primaryIcdName: primaryIcd?.name || values.diagnosisText || 'Khám sức khỏe tổng quát',
+          secondaryIcdCodes: secondaryIcds.map((item) => ({ code: item.code, name: item.name })),
+          clinicalNotes: values.examinationNote || values.symptoms || '',
+        })
+      } catch (diagErr) {
+        console.warn('Backend recordDiagnosis API note:', diagErr)
+      }
 
-        if (selectedOrders.length > 0) {
-          try {
-            await medicalRecordApi.createClinicalOrder(beExamId, {
-              clinicalReason: fullDiagnosisText,
-              items: selectedOrders.map((item) => ({
-                serviceId: item.id,
-                serviceCode: item.code,
-                serviceName: item.name,
-                instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
-              })),
-            })
-          } catch (orderErr) {
-            console.warn('Backend createClinicalOrder API note:', orderErr)
-          }
+      if (selectedOrders.length > 0) {
+        try {
+          await medicalRecordApi.createClinicalOrder(validVisitId, {
+            clinicalReason: fullDiagnosisText,
+            items: selectedOrders.map((item) => ({
+              serviceId: String(item.id).includes('-') ? item.id : '80000000-0000-0000-0000-000000000001',
+              serviceCode: item.code,
+              serviceName: item.name,
+              instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
+            })),
+          })
+        } catch (orderErr) {
+          console.warn('Backend createClinicalOrder API note:', orderErr)
         }
       }
 

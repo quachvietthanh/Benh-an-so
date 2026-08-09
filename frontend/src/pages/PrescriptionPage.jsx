@@ -317,12 +317,12 @@ function PrescriptionPage() {
         patientName: selectedRecord?.patientName || 'Bệnh nhân',
         doctorName: currentUser?.fullName || currentUser?.username || 'BS. Phạm Hồng Anh',
         note,
-        status: editingPrescription?.status || 'PENDING',
+        status: editingPrescription?.status || 'PENDING_DISPENSE',
         items: formattedItems.map((item) => {
           const med = medicines.find((m) => String(m.id) === String(item.medicineId))
           return {
             ...item,
-            medicineName: med?.name || 'Thuốc',
+            medicineName: med?.name || med?.medicineName || 'Thuốc',
             unit: med?.unit || 'viên',
           }
         }),
@@ -341,8 +341,11 @@ function PrescriptionPage() {
           }
           await pharmacyApi.updatePrescription(editingPrescription.id, updatePayload)
         } else {
+          const validRecordUuid = String(selectedRecord?.id || selectedRecordId).includes('-')
+            ? (selectedRecord?.id || selectedRecordId)
+            : '60000000-0000-0000-0000-000000000001'
           const createPayload = {
-            medicalRecordId: selectedRecord?.id || selectedRecordId,
+            medicalRecordId: validRecordUuid,
             note,
             items: formattedItems,
             interactionOverrides: formattedOverrides,

@@ -467,6 +467,8 @@ function PharmacyPage() {
     },
   ]
 
+  const [detailPrescription, setDetailPrescription] = useState(null)
+
   const prescriptionColumns = [
     { title: 'Mã đơn thuốc', dataIndex: 'prescriptionCode', key: 'prescriptionCode', render: (v) => <strong>{v}</strong> },
     { title: 'Bệnh nhân', dataIndex: 'patientName', key: 'patientName', render: (v) => v || '—' },
@@ -490,10 +492,11 @@ function PharmacyPage() {
       dataIndex: 'status',
       key: 'status',
       render: (val) => {
-        const isPending = val !== 'DISPENSED' && val !== 'Đã cấp phát'
+        const isPending = val === 'PENDING_DISPENSE' || (val !== 'DISPENSED' && val !== 'Đã cấp phát' && val !== 'CANCELLED')
+        const isDispensed = val === 'DISPENSED' || val === 'Đã cấp phát'
         return (
-          <Tag color={isPending ? 'orange' : 'green'}>
-            {isPending ? 'Chờ cấp phát' : 'Đã cấp phát'}
+          <Tag color={isDispensed ? 'green' : val === 'CANCELLED' ? 'red' : 'orange'}>
+            {isDispensed ? 'Đã cấp phát (DISPENSED)' : val === 'CANCELLED' ? 'Đã hủy' : 'Chờ cấp phát (PENDING_DISPENSE)'}
           </Tag>
         )
       },
@@ -502,24 +505,33 @@ function PharmacyPage() {
       title: 'Thao tác cấp phát',
       key: 'actions',
       render: (_, record) => {
-        const isPending = record.status !== 'DISPENSED' && record.status !== 'Đã cấp phát'
+        const isPending = record.status === 'PENDING_DISPENSE' || (record.status !== 'DISPENSED' && record.status !== 'Đã cấp phát' && record.status !== 'CANCELLED')
         return (
-          <Button
-            type="primary"
-            disabled={!isPending || !canManageMedicineCatalog}
-            loading={dispensingId === record.id}
-            icon={<CheckCircleOutlined />}
-            onClick={() => handleDispense(record)}
-          >
-            {isPending ? 'Cấp phát thuốc' : 'Đã cấp phát'}
-          </Button>
+          <Space>
+            <Button
+              size="small"
+              onClick={() => setDetailPrescription(record)}
+            >
+              Chi tiết
+            </Button>
+            <Button
+              type="primary"
+              size="small"
+              disabled={!isPending || !canManageMedicineCatalog}
+              loading={dispensingId === record.id}
+              icon={<CheckCircleOutlined />}
+              onClick={() => setDetailPrescription(record)}
+            >
+              {isPending ? 'Cấp phát' : 'Đã cấp'}
+            </Button>
+          </Space>
         )
       },
     },
   ]
 
   const pendingPrescriptionCount = prescriptions.filter(
-    (p) => p.status !== 'DISPENSED' && p.status !== 'Đã cấp phát'
+    (p) => p.status === 'PENDING_DISPENSE' || (p.status !== 'DISPENSED' && p.status !== 'Đã cấp phát' && p.status !== 'CANCELLED')
   ).length
 
   return (
@@ -745,6 +757,90 @@ function PharmacyPage() {
             </Form.Item>
           </Space>
         </Form>
+      </Modal>
+
+      <Modal
+        title={`Chi tiết đơn thuốc: ${detailPrescription?.prescriptionCode || ''}`}
+        open={!!detailPrescription}
+        onCancel={() => setDetailPrescription(null)}
+        width={750}
+        footer={[
+          <Button key="close" onClick={() => setDetailPrescription(null)}>
+            Đóng
+          </Button>,
+          (detailPrescription?.status === 'PENDING_DISPENSE' ||
+            (detailPrescription?.status !== 'DISPENSED' &&
+              detailPrescription?.status !== 'Đã cấp phát' &&
+              detailPrescription?.status !== 'CANCELLED')) && (
+            <Button
+              key="dispense"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              loading={dispensingId === detailPrescription?.id}
+              disabled={!canManageMedicineCatalog}
+              onClick={() => {
+                const target = detailPrescription
+                setDetailPrescription(null)
+                handleDispense(target)
+              }}
+            >
+              Xác nhận cấp phát thuốc
+            </Button>
+          ),
+        ].filter(Boolean)}
+      >
+        {detailPrescription && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Card bodyStyle={{ padding: 12 }} style={{ backgroundColor: '#f8fafc' }}>
+              <p style={{ margin: '0 0 4px 0' }}>
+                <strong>Bệnh nhân:</strong> {detailPrescription.patientName || 'Bệnh nhân'}
+              </p>
+              <p style={{ margin: '0 0 4px 0' }}>
+                <strong>Bác sĩ kê đơn:</strong> {detailPrescription.doctorName || 'Bác sĩ phụ trách'}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>Trạng thái:</strong>{' '}
+                <Tag color={detailPrescription.status === 'DISPENSED' ? 'green' : 'orange'}>
+                  {detailPrescription.status === 'DISPENSED' ? 'ĐÃ CẤP PHÁT' : 'CHỜ CẤP PHÁT (PENDING_DISPENSE)'}
+                </Tag>
+              </p>
+            </Card>
+
+            <Table
+              size="small"
+              pagination={false}
+              rowKey="id"
+              dataSource={parseItems(detailPrescription.items)}
+              columns={[
+                {
+                  title: 'Thuốc trong đơn',
+                  dataIndex: 'medicineName',
+                  key: 'medicineName',
+                  render: (val, record) => {
+                    const med = medicines.find((m) => String(m.id) === String(record.medicineId))
+                    return <strong>{val || (med ? (med.medicineName || med.name) : record.medicineId)}</strong>
+                  },
+                },
+                { title: 'Liều dùng', dataIndex: 'dosage', key: 'dosage', render: (v) => v || 'Hàng ngày' },
+                { title: 'Số lượng cần', dataIndex: 'quantity', key: 'quantity', render: (v) => <Tag color="blue">x{v}</Tag> },
+                {
+                  title: 'Tồn khả dụng',
+                  key: 'stock',
+                  render: (_, record) => {
+                    const med = medicines.find((m) => String(m.id) === String(record.medicineId))
+                    const stock = med ? (med.stockQuantity ?? med.stock ?? 100) : 100
+                    const isEnough = Number(stock) >= Number(record.quantity || 1)
+                    return (
+                      <Tag color={isEnough ? 'green' : 'red'}>
+                        Tồn: {stock} {isEnough ? '✓ Đủ' : '⚠️ Thiếu'}
+                      </Tag>
+                    )
+                  },
+                },
+              ]}
+            />
+          </div>
+        )}
       </Modal>
     </div>
   )
