@@ -9,12 +9,12 @@ import {
   Col,
   DatePicker,
   Drawer,
+  Dropdown,
   Empty,
   Form,
   Input,
   List,
   Modal,
-  Popconfirm,
   Radio,
   Row,
   Select,
@@ -40,6 +40,7 @@ import {
   FilterOutlined,
   HistoryOutlined,
   MedicineBoxOutlined,
+  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   RightCircleOutlined,
@@ -67,6 +68,7 @@ import {
   getStoredAppointmentLogs,
   getStoredNotificationLogs,
   getStoredMedicalRecords,
+  getStoredQueueItems,
   mergeClinicalOrders,
   mergeAppointments,
   mergePatients,
@@ -87,6 +89,16 @@ const avatarPalette = [
   ['#e8f7ef', '#21835a'],
   ['#f1eaff', '#7541b7'],
 ]
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const isUuid = (value) => UUID_PATTERN.test(String(value || ''))
+const isDemoSession = () => localStorage.getItem('token') === 'demo-token'
+const getDisplayStatus = (item) => {
+  const meta = item?.type === 'appointment'
+    ? APPOINTMENT_STATUS_META[item?.status]
+    : QUEUE_STATUS_META[item?.status]
+  return meta || { label: 'Không xác định', tone: 'default' }
+}
 
 const getInitials = (name = '') =>
   name
@@ -542,7 +554,7 @@ function AppointmentQueue() {
       bookForm.resetFields()
       refreshAllData()
     } catch (err) {
-      message.error('Không thể tạo lịch hẹn: ' + (err.message || 'Lỗi hệ thống'))
+      handleQueueApiError(err, 'Không thể tạo lịch hẹn. Vui lòng kiểm tra lại thông tin và thử lại.')
     } finally {
       setActionLoading(false)
     }
@@ -574,7 +586,7 @@ function AppointmentQueue() {
       removeStoredQueueItemByPatient(app.patientId)
       saveAppointmentLog({
         appointmentId: app.id,
-        appointmentCode: app.appointmentCode || 'LH-N/A',
+        appointmentCode: app.appointmentCode || 'Chưa có mã',
         action: 'CANCEL',
         operatorName: user?.fullName || user?.username || 'Lễ tân',
         details: `Lễ tân hủy lịch hẹn. Lý do: ${reason}. Khung giờ được giải phóng.`,
@@ -596,7 +608,7 @@ function AppointmentQueue() {
     const isAlreadyCheckedIn = record.status === 'CHECKED_IN' || queues.some((q) => String(q.patientId) === String(record.patientId) && ['WAITING', 'IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(q.status))
 
     if (isAlreadyCheckedIn) {
-      message.error('Hệ thống không cho đánh dấu: Bệnh nhân đã check-in trước đó!')
+      message.error('Không thể đánh dấu: bệnh nhân đã được tiếp nhận trước đó.')
       return
     }
 
@@ -612,7 +624,7 @@ function AppointmentQueue() {
     const pInfo = getPatientInfo(record.patientId, record.patientName)
     Modal.confirm({
       title: 'Xác nhận đánh dấu Bệnh nhân KHÔNG ĐẾN?',
-      content: `Bệnh nhân ${pInfo.name} (${record.appointmentCode}) đã quá 15 phút so với giờ hẹn (${appTime.format('HH:mm DD/MM/YYYY')}) mà chưa đến check-in. Bạn có muốn chuyển lịch sang trạng thái KHÔNG ĐẾN?`,
+      content: `Bệnh nhân ${pInfo.name} (${record.appointmentCode}) đã quá 15 phút so với giờ hẹn (${appTime.format('HH:mm DD/MM/YYYY')}) mà chưa đến tiếp nhận. Bạn có muốn chuyển lịch sang trạng thái KHÔNG ĐẾN?`,
       okText: 'Xác nhận Đánh dấu Không Đến',
       okType: 'danger',
       cancelText: 'Hủy',
@@ -646,7 +658,7 @@ function AppointmentQueue() {
     })
   }
 
-  // NCL-03-CN-004: Check-in vào hàng đợi
+  // NCL-03-CN-004: Tiếp nhận vào hàng đợi
   const handleCheckInAppointment = async (appId) => {
     const app = appointments.find((a) => String(a.id) === String(appId))
     const isAlreadyInQueue = queues.some((q) => isSamePatient(q.patientId, app?.patientId) && ['WAITING', 'IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(q.status))
@@ -660,40 +672,50 @@ function AppointmentQueue() {
     try {
       const pInfo = getPatientInfo(app?.patientId, app?.patientName)
       const dInfo = getDoctorInfo(app?.doctorId, app?.doctorName, app?.department)
-      const beAppId = String(appId).includes('-') && String(appId).length >= 30 ? appId : 'cccccccc-cccc-cccc-cccc-ccccccccc001'
-
       let backendItem = null
-      try {
-        const res = await queueApi.checkInAppointment(beAppId)
-        if (res?.data && res?.data?.id) backendItem = res.data
-      } catch (err) {
-        if (err?.response?.status === 409) {
-          handleQueueApiError(err)
-          refreshAllData()
-          return
+      if (isUuid(appId)) {
+        try {
+          const res = await queueApi.checkInAppointment(appId)
+          backendItem = res?.data || null
+        } catch (err) {
+          if (err?.response?.status === 409) {
+            handleQueueApiError(err)
+            refreshAllData()
+            return
+          }
+          if (!isDemoSession()) {
+            throw err
+          }
         }
+      } else if (!isDemoSession()) {
+        throw new Error('Mã lịch hẹn không hợp lệ. Vui lòng tải lại danh sách trước khi tiếp nhận.')
       }
 
       // Cập nhật trạng thái Lịch hẹn
-      const updatedApp = { ...(app || {}), id: appId, status: 'CHECKED_IN', checkedInAt: new Date().toISOString() }
+      const checkedInAt = backendItem?.checkedInAt || new Date().toISOString()
+      const updatedApp = { ...(app || {}), id: appId, status: 'CHECKED_IN', checkedInAt }
       saveStoredAppointment(updatedApp)
 
       // Tạo Queue Item đưa bệnh nhân vào Hàng Đợi Khám
       const newQueueItem = {
-        id: backendItem?.id || `q_item_${Date.now()}`,
+        id: backendItem?.queueItemId || `q_item_${Date.now()}`,
         medicalQueueId: backendItem?.medicalQueueId || '90000000-0000-0000-0000-000000000001',
-        patientId: app?.patientId || 'p1',
+        visitId: backendItem?.visitId,
+        visitCode: backendItem?.visitCode,
+        appointmentId: backendItem?.appointmentId || appId,
+        roomId: backendItem?.roomId,
+        patientId: backendItem?.patientId || app?.patientId,
         patientCode: pInfo.code,
         patientName: pInfo.name,
         phone: pInfo.phone,
-        doctorId: app?.doctorId || 'd1',
+        doctorId: backendItem?.doctorId || app?.doctorId,
         doctorName: dInfo.name,
         department: dInfo.department,
-        roomName: 'Phòng khám 101',
-        sourceType: app?.sourceType || 'APPOINTMENT',
-        status: backendItem?.status || 'WAITING',
+        sourceType: backendItem?.sourceType || app?.sourceType || 'APPOINTMENT',
+        status: backendItem?.queueItemStatus || 'WAITING',
         queueNumber: backendItem?.queueNumber || (queues.length + 1),
-        checkedInAt: backendItem?.checkedInAt || new Date().toISOString(),
+        queueDate: backendItem?.queueDate,
+        checkedInAt,
       }
       saveStoredQueueItem(newQueueItem)
 
@@ -702,19 +724,19 @@ function AppointmentQueue() {
         appointmentCode: app?.appointmentCode || '',
         action: 'CHECK_IN',
         operatorName: user?.fullName || user?.username || 'Lễ tân',
-        details: `Check-in bệnh nhân ${pInfo.name} -> Đã chuyển trạng thái ĐÃ CHECK-IN & đưa vào Hàng đợi khám.`,
+        details: `Tiếp nhận bệnh nhân ${pInfo.name} và đưa vào hàng đợi khám.`,
       })
 
-      message.success(`Đã Check-in thành công cho bệnh nhân ${pInfo.name}! Bệnh nhân đã xuất hiện trong Hàng Đợi Khám.`)
+      message.success(`Đã tiếp nhận bệnh nhân ${pInfo.name} vào hàng đợi khám.`)
       refreshAllData()
     } catch (err) {
-      handleQueueApiError(err, 'Không thể Check-in lịch hẹn')
+      handleQueueApiError(err, 'Không thể tiếp nhận lịch hẹn')
     } finally {
       setActionLoading(false)
     }
   }
 
-  // Check-in Walk-in (Tiếp nhận tự đến -> Tạo Lịch hẹn & Hàng đợi)
+  // Tiếp nhận bệnh nhân tự đến và đưa vào hàng đợi
   const handleCheckInWalkInSubmit = async (values) => {
     const isAlreadyInQueue = queues.some((q) => isSamePatient(q.patientId, values.patientId) && ['WAITING', 'IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(q.status))
 
@@ -725,86 +747,72 @@ function AppointmentQueue() {
 
     setActionLoading(true)
     try {
-      const bePatientId = String(values.patientId).includes('-') ? values.patientId : 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002'
-      const beDoctorId = String(values.doctorId).includes('-') ? values.doctorId : 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'
+      const useLocalDemo = !isUuid(values.patientId) || !isUuid(values.doctorId)
+      if (useLocalDemo && !isDemoSession()) {
+        throw new Error('Thông tin bệnh nhân hoặc bác sĩ chưa đồng bộ. Vui lòng tải lại dữ liệu trước khi tiếp nhận.')
+      }
 
       const payload = {
-        patientId: bePatientId,
-        doctorId: beDoctorId,
-        reason: values.reason || 'Khám Walk-in',
+        patientId: values.patientId,
+        doctorId: values.doctorId,
+        reason: values.reason || 'Khám không hẹn trước',
         note: values.notes || '',
-        notes: values.notes || '',
       }
 
       let apiRes = null
-      try {
-        apiRes = await queueApi.checkInWalkIn(payload)
-      } catch {
-        // Fallback
+      if (!useLocalDemo) {
+        try {
+          apiRes = await queueApi.checkInWalkIn(payload)
+        } catch (err) {
+          if (!isDemoSession()) {
+            throw err
+          }
+        }
       }
 
       const pInfo = getPatientInfo(values.patientId)
       const dInfo = getDoctorInfo(values.doctorId)
-      const code = `LH-WI-${dayjs().format('YYYYMMDD')}-${Math.floor(1000 + Math.random() * 9000)}`
-      const nowIso = new Date().toISOString()
+      const responseData = apiRes?.data || {}
+      const checkedInAt = responseData.checkedInAt || new Date().toISOString()
+      const visitCode = responseData.visitCode || `LK-${dayjs().format('YYYYMMDD')}-${Math.floor(1000 + Math.random() * 9000)}`
 
-      // Tự động tạo bản ghi Lịch hẹn với trạng thái CHECKED_IN trong Danh sách Lịch hẹn
-      const walkInAppointment = {
-        id: apiRes?.data?.appointmentId || `app_wi_${Date.now()}`,
-        appointmentCode: code,
-        patientId: values.patientId,
-        patientCode: pInfo.code || `BN-${Date.now()}`,
-        patientName: pInfo.name,
-        phone: pInfo.phone || '',
-        doctorId: values.doctorId,
-        doctorName: dInfo.name,
-        department: dInfo.department,
-        appointmentAt: nowIso,
-        startTime: nowIso,
-        date: dayjs().format('YYYY-MM-DD'),
-        slot: dayjs().format('HH:mm'),
-        reason: values.reason,
-        notes: values.notes || '',
-        status: 'CHECKED_IN',
-        sourceType: 'WALK_IN',
-        createdAt: nowIso,
-      }
-
-      saveStoredAppointment(walkInAppointment)
-
-      // Tự động thêm bệnh nhân Walk-in vào Hàng đợi khám (Queue)
+      // Lưu bản sao để giao diện hoạt động ở chế độ trình diễn và đồng bộ đúng dữ liệu máy chủ.
       const walkInQueueItem = {
-        id: apiRes?.data?.id || `q_wi_${Date.now()}`,
-        medicalQueueId: apiRes?.data?.medicalQueueId || '90000000-0000-0000-0000-000000000001',
-        patientId: values.patientId,
+        id: responseData.queueItemId || `q_wi_${Date.now()}`,
+        medicalQueueId: responseData.medicalQueueId || `queue_demo_${dayjs().format('YYYYMMDD')}`,
+        visitId: responseData.visitId,
+        visitCode,
+        appointmentId: responseData.appointmentId || null,
+        roomId: responseData.roomId,
+        queueDate: responseData.queueDate || dayjs(checkedInAt).format('YYYY-MM-DD'),
+        patientId: responseData.patientId || values.patientId,
         patientCode: pInfo.code || `BN-${Date.now()}`,
         patientName: pInfo.name,
         phone: pInfo.phone || '',
-        doctorId: values.doctorId,
+        doctorId: responseData.doctorId || values.doctorId,
         doctorName: dInfo.name,
         department: dInfo.department,
-        roomName: 'Phòng khám 101',
-        sourceType: 'WALK_IN',
-        status: apiRes?.data?.status || 'WAITING',
-        queueNumber: apiRes?.data?.queueNumber || (queues.length + 1),
-        checkedInAt: nowIso,
+        sourceType: responseData.sourceType || 'WALK_IN',
+        status: responseData.queueItemStatus || 'WAITING',
+        queueNumber: responseData.queueNumber || (queues.length + 1),
+        checkedInAt,
       }
       saveStoredQueueItem(walkInQueueItem)
 
       saveAppointmentLog({
-        appointmentId: walkInAppointment.id,
-        appointmentCode: walkInAppointment.appointmentCode,
+        appointmentId: responseData.appointmentId || responseData.visitId || walkInQueueItem.id,
+        appointmentCode: visitCode,
         action: 'WALK_IN_CHECKIN',
         operatorName: user?.fullName || user?.username || 'Lễ tân',
-        details: `Tiếp nhận Walk-in bệnh nhân ${pInfo.name} -> Tạo lịch hẹn ${code} (Trạng thái: Đã check-in) & đưa vào Hàng đợi khám.`,
+        details: `Tiếp nhận bệnh nhân tự đến ${pInfo.name}, mã lượt ${visitCode}, và đưa vào hàng đợi khám.`,
       })
 
-      message.success(`Đã tiếp nhận bệnh nhân ${pInfo.name}! Đã thêm vào Danh sách Lịch Hẹn (Mã: ${code}) & Hàng đợi khám.`)
+      message.success(`Đã tiếp nhận bệnh nhân ${pInfo.name} vào hàng đợi. Mã lượt: ${visitCode}.`)
       setWalkInModalOpen(false)
       walkInForm.resetFields()
       refreshAllData()
     } catch (err) {
-      handleQueueApiError(err, 'Không thể tiếp nhận lượt khám Walk-in')
+      handleQueueApiError(err, 'Không thể tiếp nhận bệnh nhân tự đến')
     } finally {
       setActionLoading(false)
     }
@@ -819,7 +827,7 @@ function AppointmentQueue() {
     const myWaiting = myQueueList.filter((q) => q.status === 'WAITING')
 
     if (waitingItems.length === 0 && myWaiting.length === 0) {
-      message.warning('Hàng đợi hiện tại chưa có bệnh nhân nào đang chờ khám. Vui lòng check-in bệnh nhân vào hàng đợi trước!')
+      message.warning('Hàng đợi hiện chưa có bệnh nhân. Vui lòng tiếp nhận bệnh nhân trước khi gọi khám.')
       return
     }
 
@@ -881,7 +889,7 @@ function AppointmentQueue() {
         appointmentId: record.id,
         patientName: pInfo.name,
         phone: pInfo.phone || '0908123456',
-        channel: 'SMS / Zalo / System',
+        channel: 'Tin nhắn SMS / Zalo / Hệ thống',
         message: msgText,
         status: 'SENT',
       })
@@ -967,7 +975,7 @@ function AppointmentQueue() {
         skippedAt: new Date().toISOString(),
       }
       saveStoredQueueItem(updatedItem)
-      message.success('Đã chuyển bệnh nhân vào danh sách bỏ qua (Skipped).')
+      message.success('Đã chuyển bệnh nhân vào danh sách bỏ qua.')
       setSkipModalItem(null)
       skipForm.resetFields()
       refreshAllData()
@@ -994,7 +1002,8 @@ function AppointmentQueue() {
       }
       refreshAllData()
     } catch (err) {
-      handleQueueApiError(err, `Không thể chuyển trạng thái lượt khám sang ${newStatus}`)
+      const targetStatusLabel = QUEUE_STATUS_META[newStatus]?.label || 'trạng thái được yêu cầu'
+      handleQueueApiError(err, `Không thể chuyển lượt khám sang ${targetStatusLabel}`)
     } finally {
       setActionLoading(false)
     }
@@ -1121,7 +1130,7 @@ function AppointmentQueue() {
       title: 'Mã lịch hẹn',
       dataIndex: 'appointmentCode',
       key: 'appointmentCode',
-      render: (code) => <Text strong style={{ color: '#2563eb' }}>{code || 'LH-N/A'}</Text>,
+      render: (code) => <Text strong style={{ color: '#2563eb' }}>{code || 'Chưa có'}</Text>,
     },
     {
       title: 'Bệnh nhân',
@@ -1177,101 +1186,84 @@ function AppointmentQueue() {
       dataIndex: 'status',
       key: 'status',
       render: (st) => {
-        const meta = APPOINTMENT_STATUS_META[st] || { label: st, tone: 'gray' }
+        const meta = APPOINTMENT_STATUS_META[st] || { label: 'Không xác định', tone: 'gray' }
         return <Tag color={meta.tone}>{meta.label}</Tag>
       },
     },
     {
       title: 'Thao tác',
       key: 'action',
+      width: 130,
       render: (_, record) => {
         const timeVal = record.appointmentAt || record.startTime || record.date
         const appTime = dayjs(timeVal)
         const isOverdue15Min = timeVal && dayjs().isAfter(appTime.add(15, 'minute'))
-        return (
-          <Space wrap>
-            {record.status === 'SCHEDULED' && permissions.canCheckIn && (
-              <Button
-                type="primary"
-                size="small"
-                icon={<CheckCircleOutlined />}
-                loading={actionLoading}
-                onClick={() => handleCheckInAppointment(record.id)}
-              >
-                Check-in
-              </Button>
-            )}
+        const openDetail = () => {
+          const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
+          const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
+          setDetailItem({
+            type: 'appointment',
+            ...record,
+            patientName: pInfo.name,
+            doctorName: dInfo.name,
+            department: dInfo.department,
+          })
+        }
 
-            {record.status !== 'CANCELLED' && (
-              <Tooltip title="Gửi nhắc lịch cho bệnh nhân trước giờ hẹn">
-                <Button
-                  size="small"
-                  icon={<SendOutlined />}
-                  style={{ color: '#2563eb', borderColor: '#2563eb' }}
-                  onClick={() => handleSendReminder(record)}
-                >
-                  Nhắc lịch
-                </Button>
-              </Tooltip>
-            )}
-
-            {['SCHEDULED', 'CONFIRMED'].includes(record.status) && (
-              <Tooltip title={
-                record.status === 'CHECKED_IN'
-                  ? 'Bệnh nhân đã check in trước đó, hệ thống không cho đánh dấu'
-                  : !isOverdue15Min
-                  ? 'Chỉ được đánh dấu Không Đến khi quá 15 phút so với giờ hẹn'
-                  : 'Đã quá 15 phút từ giờ hẹn - Bấm để đánh dấu Không Đến'
-              }>
-                <Button
-                  danger={isOverdue15Min}
-                  size="small"
-                  disabled={!isOverdue15Min || record.status === 'CHECKED_IN'}
-                  onClick={() => handleMarkNoShow(record)}
-                >
-                  Không đến
-                </Button>
-              </Tooltip>
-            )}
-
-            {['SCHEDULED', 'CONFIRMED'].includes(record.status) ? (
-              <Button
-                danger
-                size="small"
-                icon={<CloseCircleOutlined />}
-                onClick={() => {
+        const secondaryActionItems = [
+          ...(record.status === 'SCHEDULED' && permissions.canCheckIn
+            ? [{
+                key: 'check-in',
+                label: 'Tiếp nhận bệnh nhân',
+                icon: <CheckCircleOutlined />,
+                disabled: actionLoading,
+                onClick: () => handleCheckInAppointment(record.id),
+              }]
+            : []),
+          ...(record.status !== 'CANCELLED'
+            ? [{
+                key: 'remind',
+                label: 'Gửi nhắc lịch',
+                icon: <SendOutlined />,
+                onClick: () => handleSendReminder(record),
+              }]
+            : []),
+          ...(['SCHEDULED', 'CONFIRMED'].includes(record.status)
+            ? [{
+                key: 'no-show',
+                label: 'Đánh dấu không đến',
+                icon: <CloseCircleOutlined />,
+                disabled: !isOverdue15Min,
+                danger: isOverdue15Min,
+                onClick: () => handleMarkNoShow(record),
+              }, {
+                key: 'cancel',
+                label: 'Hủy lịch hẹn',
+                icon: <CloseCircleOutlined />,
+                danger: true,
+                onClick: () => {
                   cancelForm.setFieldsValue({ reason: 'Bệnh nhân báo bận' })
                   setCancelModalItem(record)
-                }}
-              >
-                Hủy lịch
-              </Button>
-            ) : (
-              <Tooltip title="Lịch hẹn đã hoàn tất hoặc đã hủy, hệ thống không cho hủy">
-                <Button size="small" disabled icon={<CloseCircleOutlined />}>
-                  Hủy lịch
-                </Button>
-              </Tooltip>
-            )}
+                },
+              }]
+            : []),
+        ]
+        const actionItems = [
+          {
+            key: 'detail',
+            label: 'Xem chi tiết',
+            icon: <EyeOutlined />,
+            onClick: openDetail,
+          },
+          ...(secondaryActionItems.length ? [{ type: 'divider' }, ...secondaryActionItems] : []),
+        ]
 
-            <Button
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => {
-                const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
-                const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
-                setDetailItem({
-                  type: 'appointment',
-                  ...record,
-                  patientName: pInfo.name,
-                  doctorName: dInfo.name,
-                  department: dInfo.department,
-                })
-              }}
-            >
+        return (
+          <Dropdown menu={{ items: actionItems }} trigger={['click']} placement="bottomRight">
+            <Button size="small" icon={<MoreOutlined />} aria-label={`Thao tác với lịch hẹn ${record.appointmentCode || ''}`}>
               Chi tiết
             </Button>
-          </Space>
+          </Dropdown>
         )
       },
     },
@@ -1310,7 +1302,7 @@ function AppointmentQueue() {
       key: 'visitCode',
       width: 140,
       render: (val, record) => {
-        const rawCode = val || record.visitId || record.id || 'N/A'
+        const rawCode = val || record.visitId || record.id || 'Chưa có'
         let displayCode = rawCode
         if (displayCode.length > 20) {
           displayCode = `VIS-${String(rawCode).slice(-6).toUpperCase()}`
@@ -1324,7 +1316,7 @@ function AppointmentQueue() {
       key: 'sourceType',
       render: (src) => (
         src === 'WALK_IN'
-          ? <Tag color="orange">Tự đến (Walk-in)</Tag>
+          ? <Tag color="orange">Bệnh nhân tự đến</Tag>
           : <Tag color="blue">Hẹn trước</Tag>
       ),
     },
@@ -1341,14 +1333,14 @@ function AppointmentQueue() {
       title: 'Phòng',
       dataIndex: 'roomName',
       key: 'roomName',
-      render: (room, record) => room || record.roomCode || 'Phòng khám',
+      render: (room, record) => room || record.roomNumber || record.roomCode || 'Chưa phân phòng',
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       render: (st) => {
-        const meta = QUEUE_STATUS_META[st] || { label: st, tone: 'gray' }
+        const meta = QUEUE_STATUS_META[st] || { label: 'Không xác định', tone: 'gray' }
         return <Tag color={meta.tone}>{meta.label}</Tag>
       },
     },
@@ -1356,89 +1348,87 @@ function AppointmentQueue() {
       title: 'Thời gian đến',
       dataIndex: 'checkedInAt',
       key: 'checkedInAt',
-      render: (time) => (time ? dayjs(time).format('HH:mm DD/MM') : 'N/A'),
+      render: (time) => (time ? dayjs(time).format('HH:mm DD/MM/YYYY') : 'Chưa ghi nhận'),
     },
     {
       title: 'Thao tác',
       key: 'action',
-      render: (_, record) => (
-        <Space wrap>
-          {permissions.canCallNext && record.status === 'WAITING' && (
-            <Button
-              type="primary"
-              size="small"
-              icon={<StepForwardOutlined />}
-              onClick={() => handleCallNext(record.medicalQueueId || record.queueId || record.id)}
-            >
-              Gọi khám
-            </Button>
-          )}
+      width: 130,
+      render: (_, record) => {
+        const openDetail = () => {
+          const pInfo = getPatientInfo(record.patientId, record.patientName)
+          const dInfo = getDoctorInfo(record.doctorId, record.doctorName)
+          setDetailItem({
+            type: 'queue',
+            ...record,
+            patientName: pInfo.name,
+            doctorName: dInfo.name,
+          })
+        }
 
-          {permissions.canUpdateStatus && (record.status === 'SKIPPED' || record.status === 'IN_PROGRESS') && (
-            <Button
-              type="primary"
-              size="small"
-              icon={<ReloadOutlined />}
-              style={{ backgroundColor: '#2563eb' }}
-              onClick={() => handleRecallQueueItem(record)}
-            >
-              Gọi lại
-            </Button>
-          )}
+        const secondaryActionItems = [
+          ...(permissions.canCallNext && record.status === 'WAITING'
+            ? [{
+                key: 'call',
+                label: 'Gọi vào khám',
+                icon: <StepForwardOutlined />,
+                onClick: () => handleCallNext(record.medicalQueueId || record.queueId || record.id),
+              }]
+            : []),
+          ...(permissions.canUpdateStatus && (record.status === 'SKIPPED' || record.status === 'IN_PROGRESS')
+            ? [{
+                key: 'recall',
+                label: 'Gọi lại',
+                icon: <ReloadOutlined />,
+                onClick: () => handleRecallQueueItem(record),
+              }]
+            : []),
+          ...(permissions.canSkip && record.status === 'IN_PROGRESS'
+            ? [{
+                key: 'skip',
+                label: 'Bỏ qua lượt khám',
+                icon: <CloseCircleOutlined />,
+                danger: true,
+                onClick: () => {
+                  skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
+                  setSkipModalItem(record)
+                },
+              }]
+            : []),
+          ...(permissions.canUpdateStatus && record.status === 'IN_PROGRESS'
+            ? [{
+                key: 'wait-result',
+                label: 'Chờ kết quả cận lâm sàng',
+                onClick: () => handleUpdateItemStatus(record.id, 'WAITING_FOR_RESULT'),
+              }]
+            : []),
+          ...(permissions.canUpdateStatus && record.status === 'WAITING_FOR_RESULT'
+            ? [{
+                key: 'resume',
+                label: 'Tiếp tục khám',
+                icon: <CheckCircleOutlined />,
+                onClick: () => handleUpdateItemStatus(record.id, 'IN_PROGRESS'),
+              }]
+            : []),
+        ]
+        const actionItems = [
+          {
+            key: 'detail',
+            label: 'Xem chi tiết',
+            icon: <EyeOutlined />,
+            onClick: openDetail,
+          },
+          ...(secondaryActionItems.length ? [{ type: 'divider' }, ...secondaryActionItems] : []),
+        ]
 
-          {permissions.canSkip && record.status === 'IN_PROGRESS' && (
-            <Button
-              danger
-              size="small"
-              icon={<CloseCircleOutlined />}
-              onClick={() => {
-                skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                setSkipModalItem(record)
-              }}
-            >
-              Skip
+        return (
+          <Dropdown menu={{ items: actionItems }} trigger={['click']} placement="bottomRight">
+            <Button size="small" icon={<MoreOutlined />} aria-label={`Thao tác với bệnh nhân ${record.patientName || ''}`}>
+              Chi tiết
             </Button>
-          )}
-
-          {permissions.canUpdateStatus && record.status === 'IN_PROGRESS' && (
-            <Button
-              size="small"
-              style={{ borderColor: '#9333ea', color: '#9333ea' }}
-              onClick={() => handleUpdateItemStatus(record.id, 'WAITING_FOR_RESULT')}
-            >
-              Chờ CĐLS
-            </Button>
-          )}
-
-          {permissions.canUpdateStatus && record.status === 'WAITING_FOR_RESULT' && (
-            <Button
-              size="small"
-              type="primary"
-              style={{ backgroundColor: '#16a34a' }}
-              onClick={() => handleUpdateItemStatus(record.id, 'IN_PROGRESS')}
-            >
-              Tiếp tục khám
-            </Button>
-          )}
-
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => {
-              const pInfo = getPatientInfo(record.patientId, record.patientName)
-              const dInfo = getDoctorInfo(record.doctorId, record.doctorName)
-              setDetailItem({
-                type: 'queue',
-                ...record,
-                patientName: pInfo.name,
-                doctorName: dInfo.name,
-              })
-            }}
-          >
-            Chi tiết
-          </Button>
-        </Space>
-      ),
+          </Dropdown>
+        )
+      },
     },
   ]
 
@@ -1489,7 +1479,7 @@ function AppointmentQueue() {
                   onClick={() => setWalkInModalOpen(true)}
                   style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
                 >
-                  + Check-in Walk-in
+                  Tiếp nhận bệnh nhân tự đến
                 </Button>
               )}
             </Space>
@@ -1545,9 +1535,9 @@ function AppointmentQueue() {
                       onChange={setAppStatusFilter}
                       options={[
                         { value: 'ALL', label: 'Tất cả trạng thái' },
-                        { value: 'SCHEDULED', label: 'Đã đặt (SCHEDULED)' },
-                        { value: 'CHECKED_IN', label: 'Đã check-in' },
-                        { value: 'NO_SHOW', label: 'Không đến (NO_SHOW)' },
+                        { value: 'SCHEDULED', label: 'Đã đặt hẹn' },
+                        { value: 'CHECKED_IN', label: 'Đã tiếp nhận' },
+                        { value: 'NO_SHOW', label: 'Không đến' },
                         { value: 'COMPLETED', label: 'Đã hoàn thành' },
                         { value: 'CANCELLED', label: 'Đã hủy' },
                       ]}
@@ -1569,7 +1559,7 @@ function AppointmentQueue() {
             key: 'reception_queue',
             label: (
               <span>
-                <TeamOutlined /> Queue Board Lễ Tân & Điều Dưỡng ({filteredQueues.length})
+                <TeamOutlined /> Hàng đợi lễ tân & điều dưỡng ({filteredQueues.length})
               </span>
             ),
             children: (
@@ -1618,12 +1608,12 @@ function AppointmentQueue() {
                       onChange={setQueueStatusFilter}
                       options={[
                         { value: 'ALL', label: 'Tất cả Trạng thái' },
-                        { value: 'WAITING', label: 'WAITING (Đang chờ)' },
-                        { value: 'IN_PROGRESS', label: 'IN_PROGRESS (Đang khám)' },
-                        { value: 'WAITING_FOR_RESULT', label: 'WAITING_FOR_RESULT (Chờ CĐLS)' },
-                        { value: 'COMPLETED', label: 'COMPLETED (Hoàn thành)' },
-                        { value: 'SKIPPED', label: 'SKIPPED (Vắng mặt)' },
-                        { value: 'CANCELLED', label: 'CANCELLED (Đã hủy)' },
+                        { value: 'WAITING', label: 'Đang chờ' },
+                        { value: 'IN_PROGRESS', label: 'Đang khám' },
+                        { value: 'WAITING_FOR_RESULT', label: 'Chờ kết quả cận lâm sàng' },
+                        { value: 'COMPLETED', label: 'Hoàn thành' },
+                        { value: 'SKIPPED', label: 'Vắng mặt' },
+                        { value: 'CANCELLED', label: 'Đã hủy' },
                       ]}
                     />
                   </Col>
@@ -1634,8 +1624,8 @@ function AppointmentQueue() {
                       onChange={setQueueSourceFilter}
                       options={[
                         { value: 'ALL', label: 'Tất cả Nguồn' },
-                        { value: 'APPOINTMENT', label: 'Hẹn trước (Appointment)' },
-                        { value: 'WALK_IN', label: 'Tự đến (Walk-in)' },
+                        { value: 'APPOINTMENT', label: 'Hẹn trước' },
+                        { value: 'WALK_IN', label: 'Bệnh nhân tự đến' },
                       ]}
                     />
                   </Col>
@@ -1655,7 +1645,7 @@ function AppointmentQueue() {
 
                 {filteredQueues.length === 0 ? (
                   <Empty
-                    description="Hàng đợi hiện tại đang trống. Bệnh nhân sau khi check-in sẽ xuất hiện ở đây theo thứ tự."
+                    description="Hàng đợi hiện đang trống. Bệnh nhân sau khi tiếp nhận sẽ xuất hiện tại đây theo thứ tự."
                     style={{ margin: '40px 0' }}
                   />
                 ) : (
@@ -1674,7 +1664,7 @@ function AppointmentQueue() {
             key: 'doctor_queue',
             label: (
               <span>
-                <UserSwitchOutlined /> Queue Khám Bệnh Của Bác Sĩ
+                <UserSwitchOutlined /> Hàng đợi khám của bác sĩ
               </span>
             ),
             children: (
@@ -1695,7 +1685,7 @@ function AppointmentQueue() {
                         />
                       </Col>
                       <Col xs={24} sm={12} md={16}>
-                        <Text type="secondary">Quyền Admin / Lễ tân: Bạn có thể xem toàn bộ bệnh nhân hoặc chọn từng bác sĩ để xem danh sách phụ trách riêng.</Text>
+                        <Text type="secondary">Quản trị viên và lễ tân có thể xem toàn bộ bệnh nhân hoặc lọc theo bác sĩ phụ trách.</Text>
                       </Col>
                     </Row>
                   </Card>
@@ -1711,6 +1701,41 @@ function AppointmentQueue() {
                       dataSource={doctorQueueGroups.inProgress}
                       renderItem={(item) => {
                         const pInfo = getPatientInfo(item.patientId, item.patientName)
+                        const secondaryActions = [
+                          ...(permissions.canUpdateStatus
+                            ? [{
+                                key: 'wait-result',
+                                label: 'Chờ kết quả cận lâm sàng',
+                                onClick: () => handleUpdateItemStatus(item.id, 'WAITING_FOR_RESULT'),
+                              }]
+                            : []),
+                          ...(permissions.canComplete
+                            ? [{
+                                key: 'complete',
+                                label: 'Hoàn tất lượt khám',
+                                icon: <CheckCircleOutlined />,
+                                onClick: () => Modal.confirm({
+                                  title: 'Xác nhận hoàn tất lượt khám?',
+                                  content: 'Đảm bảo bệnh án đã được bác sĩ ký hoặc khóa trước khi hoàn tất.',
+                                  okText: 'Hoàn tất',
+                                  cancelText: 'Hủy',
+                                  onOk: () => handleCompleteItem(item.id),
+                                }),
+                              }]
+                            : []),
+                          ...(permissions.canSkip
+                            ? [{
+                                key: 'skip',
+                                label: 'Bỏ qua lượt khám',
+                                icon: <CloseCircleOutlined />,
+                                danger: true,
+                                onClick: () => {
+                                  skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
+                                  setSkipModalItem(item)
+                                },
+                              }]
+                            : []),
+                        ]
                         return (
                           <List.Item
                             actions={[
@@ -1724,45 +1749,19 @@ function AppointmentQueue() {
                                   Ghi bệnh án / Khám
                                 </Button>
                               ),
-                              permissions.canUpdateStatus && (
-                                <Button
-                                  key="cdls"
-                                  style={{ borderColor: '#9333ea', color: '#9333ea' }}
-                                  onClick={() => handleUpdateItemStatus(item.id, 'WAITING_FOR_RESULT')}
-                                >
-                                  Chờ CĐLS
-                                </Button>
-                              ),
-                              permissions.canComplete && (
-                                <Popconfirm
-                                  key="complete"
-                                  title="Xác nhận hoàn tất lượt khám?"
-                                  description="Đảm bảo bệnh án đã được Bác sĩ ký/khóa trước khi hoàn tất."
-                                  onConfirm={() => handleCompleteItem(item.id)}
-                                >
-                                  <Button type="primary" style={{ backgroundColor: '#16a34a' }}>
-                                    Hoàn tất
+                              secondaryActions.length > 0 && (
+                                <Dropdown key="more" menu={{ items: secondaryActions }} trigger={['click']} placement="bottomRight">
+                                  <Button icon={<MoreOutlined />} aria-label={`Thao tác khác với bệnh nhân ${pInfo.name}`}>
+                                    Chi tiết
                                   </Button>
-                                </Popconfirm>
-                              ),
-                              permissions.canSkip && (
-                                <Button
-                                  key="skip"
-                                  danger
-                                  onClick={() => {
-                                    skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                                    setSkipModalItem(item)
-                                  }}
-                                >
-                                  Skip
-                                </Button>
+                                </Dropdown>
                               ),
                             ].filter(Boolean)}
                           >
                             <List.Item.Meta
                               avatar={<Avatar size="large" style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>}
                               title={<Text strong>{pInfo.name} - <Text type="secondary">STT: {item.queueNumber}</Text></Text>}
-                              description={`Mã lượt: ${item.visitCode || item.visitId || 'N/A'} | Nguồn: ${item.sourceType === 'WALK_IN' ? 'Walk-in' : 'Hẹn trước'}`}
+                              description={`Mã lượt: ${item.visitCode || item.visitId || 'Chưa có'} | Nguồn: ${item.sourceType === 'WALK_IN' ? 'Tự đến' : 'Hẹn trước'}`}
                             />
                           </List.Item>
                         )
@@ -1780,6 +1779,18 @@ function AppointmentQueue() {
                     pagination={{ pageSize: 5 }}
                     renderItem={(item) => {
                       const pInfo = getPatientInfo(item.patientId, item.patientName)
+                      const secondaryActions = permissions.canSkip
+                        ? [{
+                            key: 'skip',
+                            label: 'Bỏ qua lượt khám',
+                            icon: <CloseCircleOutlined />,
+                            danger: true,
+                            onClick: () => {
+                              skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
+                              setSkipModalItem(item)
+                            },
+                          }]
+                        : []
                       return (
                         <List.Item
                           actions={[
@@ -1793,24 +1804,19 @@ function AppointmentQueue() {
                                 Gọi vào khám
                               </Button>
                             ),
-                            permissions.canSkip && (
-                              <Button
-                                key="skip"
-                                danger
-                                onClick={() => {
-                                  skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                                  setSkipModalItem(item)
-                                }}
-                              >
-                                Skip
-                              </Button>
+                            secondaryActions.length > 0 && (
+                              <Dropdown key="more" menu={{ items: secondaryActions }} trigger={['click']} placement="bottomRight">
+                                <Button icon={<MoreOutlined />} aria-label={`Thao tác khác với bệnh nhân ${pInfo.name}`}>
+                                  Chi tiết
+                                </Button>
+                              </Dropdown>
                             ),
                           ].filter(Boolean)}
                         >
                           <List.Item.Meta
                             avatar={<Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>}
                             title={<Text strong>STT {item.queueNumber}: {pInfo.name}</Text>}
-                            description={`Đến lúc: ${item.checkedInAt ? dayjs(item.checkedInAt).format('HH:mm') : 'N/A'}`}
+                            description={`Đến lúc: ${item.checkedInAt ? dayjs(item.checkedInAt).format('HH:mm DD/MM/YYYY') : 'Chưa ghi nhận'}`}
                           />
                         </List.Item>
                       )
@@ -1827,6 +1833,12 @@ function AppointmentQueue() {
                     pagination={{ pageSize: 5 }}
                     renderItem={(item) => {
                       const pInfo = getPatientInfo(item.patientId, item.patientName)
+                      const secondaryActions = [{
+                        key: 'record',
+                        label: 'Xem bệnh án',
+                        icon: <EyeOutlined />,
+                        onClick: () => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId } }),
+                      }]
                       return (
                         <List.Item
                           actions={[
@@ -1837,13 +1849,15 @@ function AppointmentQueue() {
                                 style={{ backgroundColor: '#16a34a' }}
                                 onClick={() => handleUpdateItemStatus(item.id, 'IN_PROGRESS')}
                               >
-                                Tiếp tục khám
-                              </Button>
-                            ),
-                            <Button key="view-record" onClick={() => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId } })}>
-                              Xem bệnh án
-                            </Button>,
-                          ].filter(Boolean)}
+                              Tiếp tục khám
+                            </Button>
+                          ),
+                          <Dropdown key="more" menu={{ items: secondaryActions }} trigger={['click']} placement="bottomRight">
+                            <Button icon={<MoreOutlined />} aria-label={`Thao tác khác với bệnh nhân ${pInfo.name}`}>
+                              Chi tiết
+                            </Button>
+                          </Dropdown>,
+                        ].filter(Boolean)}
                         >
                           <List.Item.Meta
                             avatar={<Avatar style={{ backgroundColor: '#9333ea' }}>{getInitials(pInfo.name)}</Avatar>}
@@ -1885,7 +1899,7 @@ function AppointmentQueue() {
                     optionFilterProp="children"
                     options={patients.map((p) => ({
                       value: p.id,
-                      label: `${p.fullName || p.name} (${p.patientCode || 'BN'} - ${p.phone || p.phoneNumber || 'N/A'})`,
+                      label: `${p.fullName || p.name} (${p.patientCode || 'BN'} - ${p.phone || p.phoneNumber || 'Chưa có SĐT'})`,
                     }))}
                   />
                 </Form.Item>
@@ -1967,9 +1981,9 @@ function AppointmentQueue() {
         </Form>
       </Modal>
 
-      {/* Modal 2: Check-in Walk-in */}
+      {/* Modal 2: Tiếp nhận bệnh nhân tự đến */}
       <Modal
-        title="Check-in Bệnh Nhân Tự Đến (Walk-in)"
+        title="Tiếp nhận bệnh nhân tự đến"
         open={walkInModalOpen}
         onCancel={() => setWalkInModalOpen(false)}
         footer={null}
@@ -2034,7 +2048,7 @@ function AppointmentQueue() {
             <Space>
               <Button onClick={() => setWalkInModalOpen(false)}>Hủy</Button>
               <Button type="primary" htmlType="submit" loading={actionLoading}>
-                Check-in Walk-in
+                Xác nhận tiếp nhận
               </Button>
             </Space>
           </Form.Item>
@@ -2141,9 +2155,9 @@ function AppointmentQueue() {
         </Form>
       </Modal>
 
-      {/* Modal 5: Skip lượt khám */}
+      {/* Modal 5: Bỏ qua lượt khám */}
       <Modal
-        title="Xác nhận bỏ qua lượt khám (Skip)"
+        title="Xác nhận bỏ qua lượt khám"
         open={!!skipModalItem}
         onCancel={() => setSkipModalItem(null)}
         footer={null}
@@ -2169,7 +2183,7 @@ function AppointmentQueue() {
             <Space>
               <Button onClick={() => setSkipModalItem(null)}>Hủy</Button>
               <Button type="primary" danger htmlType="submit" loading={actionLoading}>
-                Xác nhận Skip
+                Xác nhận bỏ qua
               </Button>
             </Space>
           </Form.Item>
@@ -2178,7 +2192,7 @@ function AppointmentQueue() {
 
       {/* Drawer: Xem Nhật ký Lịch hẹn & Thông báo */}
       <Drawer
-        title="Nhật Ký Lịch Hẹn & Nhật Ký Thông Báo (Audit Trail)"
+        title="Nhật ký lịch hẹn & thông báo"
         width={650}
         open={logsDrawerOpen}
         onClose={() => setLogsDrawerOpen(false)}
@@ -2194,7 +2208,7 @@ function AppointmentQueue() {
                   rowKey="id"
                   pagination={{ pageSize: 8 }}
                   columns={[
-                    { title: 'Thời điểm', dataIndex: 'timestamp', render: (t) => dayjs(t).format('HH:mm - DD/MM') },
+                    { title: 'Thời điểm', dataIndex: 'timestamp', render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY') },
                     { title: 'Mã LH', dataIndex: 'appointmentCode', render: (c) => <Text code>{c}</Text> },
                     { title: 'Người thao tác', dataIndex: 'operatorName' },
                     { title: 'Chi tiết thao tác', dataIndex: 'details' },
@@ -2211,9 +2225,17 @@ function AppointmentQueue() {
                   rowKey="id"
                   pagination={{ pageSize: 8 }}
                   columns={[
-                    { title: 'Thời điểm', dataIndex: 'sentAt', render: (t) => dayjs(t).format('HH:mm - DD/MM') },
+                    { title: 'Thời điểm', dataIndex: 'sentAt', render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY') },
                     { title: 'Bệnh nhân', dataIndex: 'patientName' },
-                    { title: 'Kênh', dataIndex: 'channel', render: (c) => <Tag color="blue">{c}</Tag> },
+                    {
+                      title: 'Kênh',
+                      dataIndex: 'channel',
+                      render: (channel) => (
+                        <Tag color="blue">
+                          {String(channel || 'Hệ thống').replace(/System/gi, 'Hệ thống')}
+                        </Tag>
+                      ),
+                    },
                     { title: 'Nội dung nhắc', dataIndex: 'message' },
                   ]}
                 />
@@ -2238,7 +2260,7 @@ function AppointmentQueue() {
             <Paragraph><Text type="secondary">Bệnh nhân:</Text> <Text strong>{detailItem.patientName}</Text></Paragraph>
             <Paragraph><Text type="secondary">Bác sĩ phụ trách:</Text> <Text strong>{detailItem.doctorName || 'Chưa gán'}</Text></Paragraph>
             <Paragraph><Text type="secondary">Chuyên khoa:</Text> <Tag color="cyan">{detailItem.department || 'Nội tổng quát'}</Tag></Paragraph>
-            <Paragraph><Text type="secondary">Trạng thái:</Text> <Tag color="blue">{detailItem.status}</Tag></Paragraph>
+            <Paragraph><Text type="secondary">Trạng thái:</Text> <Tag color={getDisplayStatus(detailItem).tone}>{getDisplayStatus(detailItem).label}</Tag></Paragraph>
             {detailItem.reason && <Paragraph><Text type="secondary">Lý do khám:</Text> {detailItem.reason}</Paragraph>}
             {detailItem.cancelReason && <Paragraph><Text type="secondary">Lý do hủy:</Text> <Text type="danger">{detailItem.cancelReason}</Text></Paragraph>}
             {(detailItem.appointmentAt || detailItem.startTime) && <Paragraph><Text type="secondary">Thời gian hẹn:</Text> {dayjs(detailItem.appointmentAt || detailItem.startTime).format('HH:mm - DD/MM/YYYY')}</Paragraph>}

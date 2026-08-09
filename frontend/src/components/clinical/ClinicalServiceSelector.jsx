@@ -28,8 +28,8 @@ import clinicalServiceApi from '../../api/clinicalServiceApi'
 const { Text, Title } = Typography
 
 const DB_CATALOG_FALLBACK = [
-  { id: 'db-1', code: 'LAB-GLU', name: 'Blood glucose (Định lượng Glucose máu)', category: 'LABORATORY', categoryName: 'Xét nghiệm', price: 95000, room: 'Phòng 102 - Sinh hóa', description: 'Đơn vị: mmol/L | Tham chiếu: 3.9-5.5 | Fasting blood glucose' },
-  { id: 'db-2', code: 'IMG-CTH', name: 'Head CT scan (Chụp CT-Scanner sọ não)', category: 'IMAGING', categoryName: 'Chẩn đoán hình ảnh', price: 1200000, room: 'Phòng CT-Scanner', description: 'Non-contrast head CT' },
+  { id: 'db-1', code: 'LAB-GLU', name: 'Định lượng glucose máu', category: 'LABORATORY', categoryName: 'Xét nghiệm', price: 95000, room: 'Phòng 102 - Sinh hóa', description: 'Đơn vị: mmol/L | Tham chiếu: 3,9-5,5 | Đường huyết lúc đói' },
+  { id: 'db-2', code: 'IMG-CTH', name: 'Chụp CT sọ não', category: 'IMAGING', categoryName: 'Chẩn đoán hình ảnh', price: 1200000, room: 'Phòng CT', description: 'Chụp CT sọ não không tiêm thuốc cản quang' },
   { id: 'db-3', code: 'LAB-CBC', name: 'Công thức máu toàn bộ (CBC 24 chỉ số)', category: 'LABORATORY', categoryName: 'Xét nghiệm', price: 120000, room: 'Phòng 101 - Huyết học', description: 'Đánh giá các chỉ số hồng cầu, bạch cầu, tiểu cầu' },
   { id: 'db-4', code: 'LAB-HGB', name: 'Định lượng Hemoglobin', category: 'LABORATORY', categoryName: 'Xét nghiệm', price: 85000, room: 'Phòng 101 - Huyết học', description: 'Đơn vị: g/dL | Tham chiếu: Nam: 13.5-17.5; Nữ: 12.0-16.0' },
   { id: 'db-5', code: 'LAB-PLT', name: 'Đếm số lượng tiểu cầu', category: 'LABORATORY', categoryName: 'Xét nghiệm', price: 75000, room: 'Phòng 101 - Huyết học', description: 'Đơn vị: G/L | Tham chiếu: 150-450' },
@@ -74,17 +74,29 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
           const refDesc = item.referenceRange ? `Tham chiếu: ${item.referenceRange}` : ''
           const fullDesc = [unitDesc, refDesc, item.description].filter(Boolean).join(' | ')
 
+          const serviceCode = item.serviceCode || item.code || 'XN-01'
+          const serviceName = serviceCode === 'LAB-GLU'
+            ? 'Định lượng glucose máu'
+            : serviceCode === 'IMG-CTH'
+              ? 'Chụp CT sọ não'
+              : item.serviceName || item.name || ''
+          const serviceDescription = serviceCode === 'LAB-GLU'
+            ? [unitDesc, refDesc, 'Đường huyết lúc đói'].filter(Boolean).join(' | ')
+            : serviceCode === 'IMG-CTH'
+              ? 'Chụp CT sọ não không tiêm thuốc cản quang'
+              : fullDesc || 'Dịch vụ cận lâm sàng từ hệ thống'
+
           return {
             id: item.id || `cls-${item.serviceCode}`,
-            code: item.serviceCode || item.code || 'XN-01',
-            name: item.serviceName || item.name || '',
+            code: serviceCode,
+            name: serviceName,
             category,
             categoryName,
-            price: Number(item.price || (category === 'IMAGING' ? 1200000 : category === 'FUNCTIONAL' ? 150000 : 95000)),
+            price: item.price == null ? null : Number(item.price),
             room: item.room || room,
             unit: item.unit || '',
             referenceRange: item.referenceRange || '',
-            description: fullDesc || 'Chỉ định cận lâm sàng CSDL',
+            description: serviceDescription,
           }
         })
         setCatalog(mapped)
@@ -154,12 +166,15 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
   const totalAmount = useMemo(() => {
     return selectedServices.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0)
   }, [selectedServices])
+  const hasCompletePricing = selectedServices.length > 0 && selectedServices.every((item) =>
+    item.price !== null && item.price !== undefined && Number.isFinite(Number(item.price)),
+  )
 
   return (
     <div style={{ background: '#fff', borderRadius: 8 }}>
-      <Row gutter={[16, 16]}>
+      <Row gutter={[16, 16]} align="stretch">
         {/* Left Column: Service Catalog Browser */}
-        <Col xs={24} lg={14}>
+        <Col xs={24} lg={14} style={{ display: 'flex' }}>
           <Card
             title={
               <Space>
@@ -168,7 +183,7 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
               </Space>
             }
             size="small"
-            style={{ borderRadius: 8 }}
+            style={{ width: '100%', height: '100%', borderRadius: 12 }}
           >
             <Input
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
@@ -229,7 +244,7 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
 
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ color: '#cf1322', fontWeight: 600, fontSize: 14 }}>
-                          {item.price.toLocaleString('vi-VN')} đ
+                          {item.price == null ? 'Chưa cập nhật giá' : `${item.price.toLocaleString('vi-VN')} đ`}
                         </div>
                         <Button
                           type={isSelected ? 'primary' : 'default'}
@@ -249,7 +264,7 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
         </Col>
 
         {/* Right Column: Selected Services & Notes */}
-        <Col xs={24} lg={10}>
+        <Col xs={24} lg={10} style={{ display: 'flex' }}>
           <Card
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -265,7 +280,7 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
               </div>
             }
             size="small"
-            style={{ borderRadius: 8, height: '100%', display: 'flex', flexDirection: 'column' }}
+            style={{ width: '100%', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
           >
             <div style={{ flex: 1, maxHeight: 380, overflowY: 'auto' }}>
               {selectedServices.length === 0 ? (
@@ -314,7 +329,7 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
                         <Tag color="purple" style={{ margin: 0 }}>{item.categoryName || 'Chỉ định'}</Tag>
                         <Text strong style={{ color: '#cf1322' }}>
-                          {Number(item.price || 0).toLocaleString('vi-VN')} đ
+                          {item.price == null ? 'Chưa cập nhật giá' : `${Number(item.price).toLocaleString('vi-VN')} đ`}
                         </Text>
                       </div>
                     </div>
@@ -326,9 +341,9 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
             {/* Total Footer Summary */}
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14 }}>Tổng chi phí tạm tính:</Text>
+                <Text style={{ fontSize: 14 }}>{hasCompletePricing ? 'Tổng chi phí tạm tính:' : 'Bảng giá:'}</Text>
                 <Title level={4} style={{ color: '#cf1322', margin: 0 }}>
-                  {totalAmount.toLocaleString('vi-VN')} đ
+                  {hasCompletePricing ? `${totalAmount.toLocaleString('vi-VN')} đ` : 'Chưa cập nhật'}
                 </Title>
               </div>
             </div>

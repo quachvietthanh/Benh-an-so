@@ -71,7 +71,7 @@ function AppRoutes() {
         <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><AppointmentQueue /></PrivateRoute>} />
         <Route path="medical-records" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
         <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'pharmacist']}><PrescriptionPage /></PrivateRoute>} />
-        <Route path="clinical-orders" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'receptionist']}><ClinicalOrdersPage /></PrivateRoute>} />
+        <Route path="clinical-orders" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'nurse']}><ClinicalOrdersPage /></PrivateRoute>} />
         <Route path="clinical-results" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'receptionist']}><ResultPage /></PrivateRoute>} />
         <Route path="results" element={<Navigate to="/clinical-results" replace />} />
         <Route path="pharmacy" element={<PrivateRoute allowedRoles={['admin', 'manager', 'pharmacist']}><PharmacyPage /></PrivateRoute>} />

@@ -1,4 +1,4 @@
-import { message, notification } from 'antd'
+import { notification } from 'antd'
 
 /**
  * Metadata cho Trạng thái QueueItem / Visit / Appointment
@@ -14,7 +14,7 @@ export const QUEUE_STATUS_META = {
 
 export const APPOINTMENT_STATUS_META = {
   SCHEDULED: { label: 'Đã đặt hẹn', tone: 'blue', color: '#2563eb' },
-  CHECKED_IN: { label: 'Đã check-in (Chờ khám)', tone: 'cyan', color: '#0891b2' },
+  CHECKED_IN: { label: 'Đã tiếp nhận (Chờ khám)', tone: 'cyan', color: '#0891b2' },
   COMPLETED: { label: 'Đã khám xong', tone: 'gray', color: '#475569' },
   CANCELLED: { label: 'Đã hủy', tone: 'red', color: '#dc2626' },
   NO_SHOW: { label: 'Không đến', tone: 'orange', color: '#d97706' },
@@ -35,6 +35,24 @@ export const translateBackendMessage = (msg) => {
   if (str.includes('already in queue') || str.includes('already checked in')) {
     return 'Bệnh nhân đã xuất hiện trong hàng đợi khám, hệ thống không thêm trùng.'
   }
+  if (str.includes('inactive patients')) {
+    return 'Bệnh nhân đang ở trạng thái ngừng hoạt động nên không thể tiếp nhận.'
+  }
+  if (str.includes('assigned doctor does not exist')) {
+    return 'Không tìm thấy bác sĩ được phân công. Vui lòng chọn lại bác sĩ.'
+  }
+  if (str.includes('inactive doctors')) {
+    return 'Bác sĩ đang ở trạng thái ngừng hoạt động nên không thể nhận bệnh nhân.'
+  }
+  if (str.includes('active room assignment')) {
+    return 'Bác sĩ chưa được phân công phòng khám đang hoạt động.'
+  }
+  if (str.includes('scheduled date')) {
+    return 'Chỉ có thể tiếp nhận lịch hẹn đúng ngày đã đặt.'
+  }
+  if (str.includes('doctor queue is closed')) {
+    return 'Hàng đợi của bác sĩ đã đóng trong ngày được chọn.'
+  }
   if (str.includes('overlapping') || str.includes('busy slot')) {
     return 'Bác sĩ đã có lịch hẹn trùng trong cùng khung giờ.'
   }
@@ -50,7 +68,8 @@ export const translateBackendMessage = (msg) => {
   if (str.includes('medical record is not locked')) {
     return 'Bệnh án chưa được ký hoặc khóa trước khi hoàn tất.'
   }
-  return msg
+  // Không đưa nguyên văn thông báo tiếng Anh chưa được ánh xạ lên giao diện.
+  return /[À-ỹĐđ]/.test(String(msg)) ? msg : ''
 }
 
 /**
@@ -87,7 +106,7 @@ export const handleQueueApiError = (error, defaultMessage = 'Thao tác không th
       break
     default:
       if (status >= 500) {
-        title = '500 - Lỗi máy chủ Backend'
+        title = '500 - Lỗi máy chủ'
         detail = backendMsg || 'Hệ thống máy chủ gặp sự cố. Vui lòng thử lại sau.'
       }
       break

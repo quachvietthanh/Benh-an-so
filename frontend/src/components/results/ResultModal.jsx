@@ -21,6 +21,7 @@ import {
   SafetyCertificateOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
+import { formatGender } from '../../utils/helpers'
 import ResultForm from './ResultForm'
 import ResultStatusBadge from './ResultStatusBadge'
 
@@ -193,7 +194,7 @@ export const ResultModal = ({
             <Col xs={12} sm={6} md={4}>
               <div style={{ fontSize: 12, color: '#64748b' }}>Giới tính / Tuổi:</div>
               <div style={{ fontWeight: 600, fontSize: 14, color: '#334155' }}>
-                {order.gender || 'Nam'} ({order.age || 30}T)
+                {formatGender(order.gender || 'Nam')} ({order.age || 30}T)
               </div>
             </Col>
 

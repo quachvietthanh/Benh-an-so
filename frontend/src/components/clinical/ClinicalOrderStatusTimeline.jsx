@@ -11,9 +11,11 @@ import {
 const { Step } = Steps
 
 const STATUS_INDEX_MAP = {
+  ORDERED: 0,
   PENDING: 0,
   IN_PROGRESS: 1,
   RESULTED: 2,
+  PARTIALLY_COMPLETED: 2,
   COMPLETED: 3,
   CANCELLED: -1,
 }
