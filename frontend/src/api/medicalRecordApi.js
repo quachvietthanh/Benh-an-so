@@ -26,14 +26,14 @@ const medicalRecordApi = {
     return axiosClient.delete(`/medical-records/${id}`)
   },
   // Diagnosis & Clinical Orders endpoints connected to Backend
-  recordDiagnosis: (examinationId, data) => {
-    return axiosClient.post(`/examinations/${examinationId}/diagnosis`, data)
+  recordDiagnosis: (recordId, data) => {
+    return axiosClient.put(`/medical-records/${recordId}/diagnoses`, data)
   },
-  getDiagnosis: (examinationId) => {
-    return axiosClient.get(`/examinations/${examinationId}/diagnosis`)
+  getDiagnosis: (recordId) => {
+    return axiosClient.get(`/medical-records/${recordId}/diagnoses`)
   },
-  createClinicalOrder: (examinationId, data) => {
-    return axiosClient.post(`/examinations/${examinationId}/clinical-orders`, data)
+  createClinicalOrder: (visitId, data) => {
+    return axiosClient.post(`/clinical-orders/visits/${visitId}`, data)
   },
   getDiagnosisCatalog: (searchQuery) => {
     return axiosClient.get('/diagnosis-catalog', { params: { search: searchQuery } })

@@ -21,7 +21,7 @@ import {
   ExperimentOutlined,
 } from '@ant-design/icons'
 import ClinicalServiceSelector from './ClinicalServiceSelector'
-import { mergePatients } from '../../utils/storageHelpers'
+import { mergePatients, getStoredQueueItems } from '../../utils/storageHelpers'
 import patientApi from '../../api/patientApi'
 
 const { Option } = Select
@@ -36,18 +36,53 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
 
   useEffect(() => {
     if (visible) {
-      setPatients(mergePatients([]))
+      const todayQueues = getStoredQueueItems()
+      const inProgressItem = todayQueues.find((q) => q.status === 'IN_PROGRESS' || q.status === 'WAITING_FOR_RESULT')
+
+      const initialMerged = mergePatients([])
+      setPatients(initialMerged)
+
       patientApi.getAll({ page: 0, size: 500 }).then((res) => {
         const list = res.data?.content || (Array.isArray(res.data) ? res.data : [])
-        setPatients(mergePatients(list))
+        const merged = mergePatients(list)
+        
+        // Đẩy bệnh nhân đang khám lên đầu danh sách
+        const sorted = [...merged].sort((a, b) => {
+          const aIsExamining = todayQueues.some((q) => String(q.patientId) === String(a.id) && (q.status === 'IN_PROGRESS' || q.status === 'WAITING_FOR_RESULT'))
+          const bIsExamining = todayQueues.some((q) => String(q.patientId) === String(b.id) && (q.status === 'IN_PROGRESS' || q.status === 'WAITING_FOR_RESULT'))
+          if (aIsExamining && !bIsExamining) return -1
+          if (!aIsExamining && bIsExamining) return 1
+          return 0
+        })
+
+        setPatients(sorted)
+
+        const defaultP = inProgressItem ? sorted.find((p) => String(p.id) === String(inProgressItem.patientId)) : null
+        if (defaultP) {
+          form.setFieldsValue({
+            patientId: defaultP.id,
+            patientCode: defaultP.patientCode,
+            patientName: defaultP.fullName,
+            gender: defaultP.gender || 'Nam',
+            age: defaultP.age || 30,
+            phone: defaultP.phone || defaultP.phoneNumber || '',
+          })
+        }
       }).catch(() => {})
+
       setSelectedServices([])
       form.resetFields()
+
+      const defaultId = inProgressItem ? inProgressItem.patientId : null
       form.setFieldsValue({
         priority: 'NORMAL',
         department: 'Khoa Nội tổng quát',
         doctorName: 'BS. Phạm Hồng Anh',
+        ...(defaultId ? { patientId: defaultId } : {}),
       })
+      if (inProgressItem) {
+        handlePatientSelect(inProgressItem.patientId)
+      }
     }
   }, [visible, form])
 
@@ -145,11 +180,15 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
                   (option?.children || '').toLowerCase().includes(input.toLowerCase())
                 }
               >
-                {patients.map((p) => (
-                  <Option key={p.id} value={p.id}>
-                    [{p.patientCode}] {p.fullName} - {p.phone || p.phoneNumber || 'SĐT chưa có'}
-                  </Option>
-                ))}
+                {patients.map((p) => {
+                  const todayQueues = getStoredQueueItems()
+                  const isExamining = todayQueues.some((q) => String(q.patientId) === String(p.id) && (q.status === 'IN_PROGRESS' || q.status === 'WAITING_FOR_RESULT'))
+                  return (
+                    <Option key={p.id} value={p.id}>
+                      {isExamining ? '🔴 [Đang khám] ' : ''}[{p.patientCode}] {p.fullName} - {p.phone || p.phoneNumber || 'SĐT chưa có'}
+                    </Option>
+                  )
+                })}
               </Select>
             </Form.Item>
           </Col>

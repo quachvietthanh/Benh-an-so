@@ -33,7 +33,6 @@ import {
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
-import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate } from '../utils/helpers'
 
 const { RangePicker } = DatePicker
@@ -93,11 +92,9 @@ function PatientList() {
     try {
       const response = await patientApi.getAll({ page: 0, size: 500 })
       const apiList = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
-      const merged = mergePatients(apiList)
-      setAllPatients(merged)
+      setAllPatients(apiList)
     } catch {
-      const merged = mergePatients([])
-      setAllPatients(merged)
+      setAllPatients([])
     } finally {
       setLoading(false)
     }
@@ -149,55 +146,34 @@ function PatientList() {
 
   const handleRegister = async (values) => {
     setSaving(true)
-    let newPatient = null
     try {
       const payload = {
         ...values,
-        dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD'),
-        gender: values.gender.toUpperCase(),
+        dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null,
+        gender: values.gender ? values.gender.toUpperCase() : 'OTHER',
         phone: values.phone || null,
         insuranceNumber: values.insuranceNumber || null,
       }
       const response = await patientApi.create(payload)
-      newPatient = response.data || { id: 'p_' + Date.now(), patientCode: 'BN-' + Math.floor(100000 + Math.random() * 900000), fullName: values.fullName, dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD'), gender: values.gender.toUpperCase() }
-      saveStoredPatient(newPatient)
-      setAllPatients((prev) => mergePatients([newPatient, ...prev]))
-    } catch {
-      newPatient = {
-        id: 'p_' + Date.now(),
-        patientCode: 'BN-' + Math.floor(100000 + Math.random() * 900000),
-        fullName: values.fullName,
-        dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD'),
-        gender: values.gender.toUpperCase(),
-        phone: values.phone || null,
-        email: values.email || null,
-        address: values.address || null,
-        identityNumber: values.identityNumber || null,
-        insuranceNumber: values.insuranceNumber || null,
-        emergencyContact: values.emergencyContact || null,
-        emergencyPhone: values.emergencyPhone || null,
-        active: true,
-        createdAt: new Date().toISOString(),
-      }
-      saveStoredPatient(newPatient)
-      setAllPatients((prev) => mergePatients([newPatient, ...prev]))
-    } finally {
-      setSaving(false)
-    }
-
-    if (newPatient) {
-      message.success(`Tạo hồ sơ thành công: ${newPatient.patientCode || ''}`)
+      const newPatient = response.data
+      message.success(`Tạo hồ sơ thành công: ${newPatient?.patientCode || ''}`)
+      await loadPatients()
       setRegisterOpen(false)
       registerForm.resetFields()
       setPage(0)
 
       Modal.confirm({
-        title: `Đã tạo thành công bệnh nhân: ${newPatient.fullName}`,
+        title: `Đã tạo thành công bệnh nhân: ${newPatient?.fullName}`,
         content: 'Bạn có muốn CHUYỂN SANG BƯỚC TIẾP THEO (Đặt lịch khám & Xếp hàng) cho bệnh nhân này không?',
         okText: 'Chuyển sang Đặt lịch khám',
         cancelText: 'Về danh sách bệnh nhân',
-        onOk: () => navigate('/appointments', { state: { patientId: newPatient.id, patientName: newPatient.fullName } }),
+        onOk: () => navigate('/appointments', { state: { patientId: newPatient?.id, patientName: newPatient?.fullName } }),
       })
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Không thể tạo hồ sơ bệnh nhân trên Backend'
+      message.error(`Lỗi tạo hồ sơ: ${errorMsg}`)
+    } finally {
+      setSaving(false)
     }
   }
 

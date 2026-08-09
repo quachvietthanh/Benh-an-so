@@ -26,7 +26,14 @@ import ResultModal from '../components/results/ResultModal'
 
 import clinicalResultApi from '../api/clinicalResultApi'
 import queueApi from '../api/queueApi'
-import { mergeClinicalOrders, saveStoredClinicalOrder, getStoredQueueItems, saveStoredQueueItem, getStoredMedicalRecords, saveStoredMedicalRecord } from '../utils/storageHelpers'
+import {
+  mergeClinicalOrders,
+  saveStoredClinicalOrder,
+  getStoredQueueItems,
+  saveStoredQueueItem,
+  getStoredMedicalRecords,
+  saveStoredMedicalRecord,
+} from '../utils/storageHelpers'
 
 const { Title, Text } = Typography
 
@@ -46,28 +53,17 @@ export function ResultPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // 1. Attempt RESTful API fetch GET /api/results
-      try {
-        const response = await clinicalResultApi.getAll({
-          search: searchText,
-          status: statusFilter,
-          category: categoryFilter,
-        })
-        if (response.data && Array.isArray(response.data)) {
-          setOrders(response.data)
-          setLoading(false)
-          return
-        }
-      } catch (apiErr) {
-        // Fallback to local storage & mock data if backend not connected yet
-      }
-
-      // 2. Local storage fallback (real database/user created clinical orders)
-      const merged = mergeClinicalOrders([])
-      setOrders(merged)
+      const response = await clinicalResultApi.getAll({
+        search: searchText,
+        status: statusFilter,
+        category: categoryFilter,
+      })
+      const apiList = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
+      const mergedList = mergeClinicalOrders(apiList)
+      setOrders(mergedList)
     } catch (err) {
-      console.error('Error loading clinical results:', err)
-      message.error('Không thể tải danh sách chỉ định cận lâm sàng')
+      console.warn('Error loading clinical results from API:', err?.message)
+      setOrders(mergeClinicalOrders([]))
     } finally {
       setLoading(false)
     }
@@ -136,7 +132,7 @@ export function ResultPage() {
     saveStoredClinicalOrder(updatedOrder)
     setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)))
 
-    // 2. Đồng bộ chu trình: Khi Bác sĩ Xác nhận & Khóa (CONFIRMED/COMPLETED), chuyển lượt khám trong Hàng Đợi sang COMPLETED & bổ sung kết quả vào Hồ Sơ
+    // 2. Đồng bộ chu trình: Khi Bác sĩ Xác nhận & Khóa (CONFIRMED/COMPLETED), chuyển lượt khám trong Hàng Đợi về IN_PROGRESS (Đang khám) để Bác sĩ xem kết quả và chủ động bấm Hoàn tất
     if (['CONFIRMED', 'COMPLETED'].includes(updatedOrder.status)) {
       try {
         const allQueues = getStoredQueueItems()
@@ -145,11 +141,11 @@ export function ResultPage() {
             (updatedOrder.patientId && String(q.patientId) === String(updatedOrder.patientId)) ||
             (updatedOrder.patientName && q.patientName === updatedOrder.patientName)
           ) {
-            if (['IN_PROGRESS', 'WAITING_FOR_RESULT', 'WAITING'].includes(q.status)) {
-              const completedItem = { ...q, status: 'COMPLETED', completedAt: new Date().toISOString() }
-              saveStoredQueueItem(completedItem)
+            if (['WAITING_FOR_RESULT', 'WAITING', 'IN_PROGRESS'].includes(q.status)) {
+              const updatedItem = { ...q, status: 'IN_PROGRESS' }
+              saveStoredQueueItem(updatedItem)
               if (q.id && !String(q.id).startsWith('local') && !String(q.id).startsWith('qi-')) {
-                queueApi.complete(q.id).catch(() => {})
+                queueApi.updateStatus(q.id, { status: 'IN_PROGRESS' }).catch(() => {})
               }
             }
           }
@@ -162,7 +158,7 @@ export function ResultPage() {
           ) {
             const updatedRec = {
               ...r,
-              status: 'COMPLETED',
+              status: 'IN_PROGRESS',
               clinicalResults: {
                 ...(r.clinicalResults || {}),
                 [updatedOrder.orderCode]: updatedOrder.conclusion || updatedOrder.resultSummary || 'Đã có kết quả CĐLS',
