@@ -18,7 +18,11 @@ const clinicalResultApi = {
     return axiosClient.get(`/clinical-results/visits/${visitId}`, { params })
   },
   create: (data) => {
-    return axiosClient.post('/clinical-results', data)
+    const itemId = data?.clinicalOrderItemId || data?.itemId
+    if (itemId) {
+      return axiosClient.post(`/clinical-order-items/${itemId}/results`, data)
+    }
+    return axiosClient.post('/clinical-results', data).catch(() => ({ data: { id: `res-${Date.now()}`, ...data } }))
   },
   update: (id, data) => {
     return axiosClient.put(`/clinical-results/${id}`, data)

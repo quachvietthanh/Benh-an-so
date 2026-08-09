@@ -92,7 +92,7 @@ function MedicalEncounterForm({
                 onChange={(val) => setSelectedPatientId(val)}
                 options={patients.map((p) => ({
                   value: p.id,
-                  label: `${p.fullName} - ${p.patientCode} (${p.phoneNumber || 'Không SĐT'})`,
+                  label: `${p.fullName} - ${p.patientCode} (${p.phoneNumber || 'Không SĐT'}${p.queueNumber ? ` - STT: ${p.queueNumber}` : ''}${p.checkInTimeStr ? ` — Đến lúc: ${p.checkInTimeStr}` : ''})`,
                 }))}
               />
             </Form.Item>

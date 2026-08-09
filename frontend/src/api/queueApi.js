@@ -58,7 +58,12 @@ const queueApi = {
    * @param {string} itemId
    * @param {Object} data { status }
    */
-  updateStatus: (itemId, data) => axiosClient.patch(`/queue-items/${itemId}/status`, data),
+  updateStatus: (itemId, data) => {
+    const payload = typeof data === 'string' 
+      ? { targetStatus: data } 
+      : { targetStatus: data?.targetStatus || data?.status, cancelReason: data?.cancelReason }
+    return axiosClient.patch(`/queue-items/${itemId}/status`, payload)
+  },
 
   /**
    * Đánh dấu bỏ qua/vắng mặt bệnh nhân khi gọi (IN_PROGRESS -> SKIPPED)

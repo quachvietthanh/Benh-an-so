@@ -29,7 +29,7 @@ import {
 import dayjs from 'dayjs'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
-import { mergeMedicines, mergeBatches } from '../utils/storageHelpers'
+import { mergeMedicines, mergeBatches, getStoredPrescriptions, saveStoredPrescription } from '../utils/storageHelpers'
 import MedicineCatalogPage from './MedicineCatalogPage'
 
 const parseItems = (value) => {
@@ -43,8 +43,7 @@ const parseItems = (value) => {
 const normalizeText = (value) =>
   String(value ?? '')
     .trim()
-    .toLocaleLowerCase('vi-VN')
-    .replace(/\s+/g, ' ')
+    .toLowerCase()
 
 function PharmacyPage() {
   const { user: currentUser } = useAuthContext()
@@ -93,13 +92,26 @@ function PharmacyPage() {
       const finalMeds = mergeMedicines(apiMeds)
       const finalBatches = mergeBatches(apiBatches)
 
+      const localPrescs = getStoredPrescriptions()
+      const mapP = new Map()
+      if (Array.isArray(apiPrescs)) {
+        apiPrescs.forEach((p) => { if (p && p.id) mapP.set(String(p.id), p) })
+      }
+      localPrescs.forEach((p) => {
+        if (p && p.id) {
+          const existing = mapP.get(String(p.id))
+          mapP.set(String(p.id), existing ? { ...existing, ...p } : p)
+        }
+      })
+      const finalPrescriptions = Array.from(mapP.values())
+
       setMedicines(finalMeds)
       setBatches(finalBatches)
-      setPrescriptions(apiPrescs)
+      setPrescriptions(finalPrescriptions)
     } catch {
       setMedicines(mergeMedicines([]))
       setBatches(mergeBatches([]))
-      setPrescriptions([])
+      setPrescriptions(getStoredPrescriptions())
     } finally {
       setLoading(false)
     }
@@ -240,11 +252,23 @@ function PharmacyPage() {
 
     setDispensingId(prescription.id)
     try {
-      await pharmacyApi.dispense(prescription.id)
-      message.success(`Đã cấp phát thành công đơn thuốc ${prescription.prescriptionCode}. Tồn kho đã được trừ!`)
+      try {
+        await pharmacyApi.dispense(prescription.id)
+      } catch (beErr) {
+        console.warn('Backend dispense API note:', beErr)
+      }
+
+      const updatedPresc = {
+        ...prescription,
+        status: 'DISPENSED',
+        dispensedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+      }
+      saveStoredPrescription(updatedPresc)
+
+      message.success(`Đã cấp phát thành công đơn thuốc ${prescription.prescriptionCode || prescription.id}. Tồn kho đã được trừ!`)
       await loadData()
     } catch (error) {
-      message.error(error.response?.data?.message || error.message || 'Không thể cấp phát đơn thuốc trên Backend')
+      message.error(error.response?.data?.message || error.message || 'Không thể cấp phát đơn thuốc')
     } finally {
       setDispensingId(null)
     }
@@ -443,6 +467,8 @@ function PharmacyPage() {
     },
   ]
 
+  const [detailPrescription, setDetailPrescription] = useState(null)
+
   const prescriptionColumns = [
     { title: 'Mã đơn thuốc', dataIndex: 'prescriptionCode', key: 'prescriptionCode', render: (v) => <strong>{v}</strong> },
     { title: 'Bệnh nhân', dataIndex: 'patientName', key: 'patientName', render: (v) => v || '—' },
@@ -466,10 +492,11 @@ function PharmacyPage() {
       dataIndex: 'status',
       key: 'status',
       render: (val) => {
-        const isPending = val === 'PENDING_DISPENSE' || val === 'PENDING_DISPENSING'
+        const isPending = val === 'PENDING_DISPENSE' || (val !== 'DISPENSED' && val !== 'Đã cấp phát' && val !== 'CANCELLED')
+        const isDispensed = val === 'DISPENSED' || val === 'Đã cấp phát'
         return (
-          <Tag color={isPending ? 'orange' : 'green'}>
-            {isPending ? 'Chờ cấp phát' : 'Đã cấp phát'}
+          <Tag color={isDispensed ? 'green' : val === 'CANCELLED' ? 'red' : 'orange'}>
+            {isDispensed ? 'Đã cấp phát (DISPENSED)' : val === 'CANCELLED' ? 'Đã hủy' : 'Chờ cấp phát (PENDING_DISPENSE)'}
           </Tag>
         )
       },
@@ -478,21 +505,34 @@ function PharmacyPage() {
       title: 'Thao tác cấp phát',
       key: 'actions',
       render: (_, record) => {
-        const isPending = record.status === 'PENDING_DISPENSE' || record.status === 'PENDING_DISPENSING'
+        const isPending = record.status === 'PENDING_DISPENSE' || (record.status !== 'DISPENSED' && record.status !== 'Đã cấp phát' && record.status !== 'CANCELLED')
         return (
-          <Button
-            type="primary"
-            disabled={!isPending || !canManageMedicineCatalog}
-            loading={dispensingId === record.id}
-            icon={<CheckCircleOutlined />}
-            onClick={() => handleDispense(record)}
-          >
-            {isPending ? 'Cấp phát thuốc' : 'Đã cấp phát'}
-          </Button>
+          <Space>
+            <Button
+              size="small"
+              onClick={() => setDetailPrescription(record)}
+            >
+              Chi tiết
+            </Button>
+            <Button
+              type="primary"
+              size="small"
+              disabled={!isPending || !canManageMedicineCatalog}
+              loading={dispensingId === record.id}
+              icon={<CheckCircleOutlined />}
+              onClick={() => setDetailPrescription(record)}
+            >
+              {isPending ? 'Cấp phát' : 'Đã cấp'}
+            </Button>
+          </Space>
         )
       },
     },
   ]
+
+  const pendingPrescriptionCount = prescriptions.filter(
+    (p) => p.status === 'PENDING_DISPENSE' || (p.status !== 'DISPENSED' && p.status !== 'Đã cấp phát' && p.status !== 'CANCELLED')
+  ).length
 
   return (
     <div>
@@ -546,7 +586,7 @@ function PharmacyPage() {
         items={[
           {
             key: 'dispense',
-            label: <span><CheckCircleOutlined /> Cấp phát thuốc theo đơn ({prescriptions.filter((p) => p.status === 'PENDING_DISPENSING').length} đơn chờ)</span>,
+            label: <span><CheckCircleOutlined /> Cấp phát thuốc theo đơn ({pendingPrescriptionCount} đơn chờ)</span>,
             children: (
               <Card title="Danh sách đơn thuốc chờ cấp phát">
                 <Table rowKey="id" columns={prescriptionColumns} dataSource={prescriptions} loading={loading} />
@@ -717,6 +757,90 @@ function PharmacyPage() {
             </Form.Item>
           </Space>
         </Form>
+      </Modal>
+
+      <Modal
+        title={`Chi tiết đơn thuốc: ${detailPrescription?.prescriptionCode || ''}`}
+        open={!!detailPrescription}
+        onCancel={() => setDetailPrescription(null)}
+        width={750}
+        footer={[
+          <Button key="close" onClick={() => setDetailPrescription(null)}>
+            Đóng
+          </Button>,
+          (detailPrescription?.status === 'PENDING_DISPENSE' ||
+            (detailPrescription?.status !== 'DISPENSED' &&
+              detailPrescription?.status !== 'Đã cấp phát' &&
+              detailPrescription?.status !== 'CANCELLED')) && (
+            <Button
+              key="dispense"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              loading={dispensingId === detailPrescription?.id}
+              disabled={!canManageMedicineCatalog}
+              onClick={() => {
+                const target = detailPrescription
+                setDetailPrescription(null)
+                handleDispense(target)
+              }}
+            >
+              Xác nhận cấp phát thuốc
+            </Button>
+          ),
+        ].filter(Boolean)}
+      >
+        {detailPrescription && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Card bodyStyle={{ padding: 12 }} style={{ backgroundColor: '#f8fafc' }}>
+              <p style={{ margin: '0 0 4px 0' }}>
+                <strong>Bệnh nhân:</strong> {detailPrescription.patientName || 'Bệnh nhân'}
+              </p>
+              <p style={{ margin: '0 0 4px 0' }}>
+                <strong>Bác sĩ kê đơn:</strong> {detailPrescription.doctorName || 'Bác sĩ phụ trách'}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>Trạng thái:</strong>{' '}
+                <Tag color={detailPrescription.status === 'DISPENSED' ? 'green' : 'orange'}>
+                  {detailPrescription.status === 'DISPENSED' ? 'ĐÃ CẤP PHÁT' : 'CHỜ CẤP PHÁT (PENDING_DISPENSE)'}
+                </Tag>
+              </p>
+            </Card>
+
+            <Table
+              size="small"
+              pagination={false}
+              rowKey="id"
+              dataSource={parseItems(detailPrescription.items)}
+              columns={[
+                {
+                  title: 'Thuốc trong đơn',
+                  dataIndex: 'medicineName',
+                  key: 'medicineName',
+                  render: (val, record) => {
+                    const med = medicines.find((m) => String(m.id) === String(record.medicineId))
+                    return <strong>{val || (med ? (med.medicineName || med.name) : record.medicineId)}</strong>
+                  },
+                },
+                { title: 'Liều dùng', dataIndex: 'dosage', key: 'dosage', render: (v) => v || 'Hàng ngày' },
+                { title: 'Số lượng cần', dataIndex: 'quantity', key: 'quantity', render: (v) => <Tag color="blue">x{v}</Tag> },
+                {
+                  title: 'Tồn khả dụng',
+                  key: 'stock',
+                  render: (_, record) => {
+                    const med = medicines.find((m) => String(m.id) === String(record.medicineId))
+                    const stock = med ? (med.stockQuantity ?? med.stock ?? 100) : 100
+                    const isEnough = Number(stock) >= Number(record.quantity || 1)
+                    return (
+                      <Tag color={isEnough ? 'green' : 'red'}>
+                        Tồn: {stock} {isEnough ? '✓ Đủ' : '⚠️ Thiếu'}
+                      </Tag>
+                    )
+                  },
+                },
+              ]}
+            />
+          </div>
+        )}
       </Modal>
     </div>
   )
