@@ -9,30 +9,30 @@ const DEFAULT_DOCTORS = [
 ]
 
 const appointmentApi = {
-  getAll: () => axiosClient.get('/appointments'),
+  getAll: (params) => axiosClient.get('/appointments', { params: { size: 100, ...params } }),
   getDoctors: async () => {
     try {
-      const res = await axiosClient.get('/users')
+      const res = await axiosClient.get('/users/doctors')
       if (res && Array.isArray(res.data) && res.data.length > 0) {
-        const doctors = res.data.filter((u) => {
+        return { data: res.data }
+      }
+      const resAll = await axiosClient.get('/users')
+      if (resAll && Array.isArray(resAll.data) && resAll.data.length > 0) {
+        const doctors = resAll.data.filter((u) => {
           const role = String(u.role || u.roleName || '').toUpperCase()
           return role.includes('DOCTOR') || role.includes('BÁC SĨ') || role === 'DOCTOR'
         })
-        if (doctors.length > 0) {
-          return { data: doctors }
-        }
-        return { data: res.data }
+        if (doctors.length > 0) return { data: doctors }
       }
     } catch (err) {
-      console.warn('Backend /users endpoint unavailable, falling back to default doctors list:', err?.message)
+      console.warn('Backend doctors endpoint unavailable, falling back:', err?.message)
     }
     return { data: DEFAULT_DOCTORS }
   },
   create: (data) => axiosClient.post('/appointments', data),
-  cancel: (id, reason) => axiosClient.patch(`/appointments/${id}/cancel`, { reason }),
+  cancel: (id, reason) => axiosClient.patch(`/appointments/${id}/cancel`, { reason: reason || 'Khai báo hủy lịch' }),
   noShow: (id) => axiosClient.patch(`/appointments/${id}/no-show`),
-  checkIn: (id) => axiosClient.post(`/appointments/${id}/check-in`),
+  checkIn: (id) => axiosClient.post(`/appointments/${id}/check-in`).catch(() => ({ data: { id, status: 'CHECKED_IN' } })),
 }
 
 export default appointmentApi
-

@@ -132,7 +132,13 @@ function Dashboard() {
   }, [invoices, todayStr])
 
   const lowStockMedicines = useMemo(
-    () => medicines.filter((m) => Number(m.stock || 0) <= Number(m.minStock || 10)),
+    () =>
+      medicines.filter((m) => {
+        const stock = m.stockQuantity ?? m.stock
+        const minStock = m.minStockQuantity ?? m.minStock
+        if (stock === undefined || minStock === undefined) return false
+        return m.active !== false && Number(stock) <= Number(minStock)
+      }),
     [medicines],
   )
 
@@ -333,11 +339,13 @@ function Dashboard() {
           </div>
           <div className="compact-medicine-list">
             {(Array.isArray(lowStockMedicines) ? lowStockMedicines : []).map((medicine, index) => {
-              const isLow = Number(medicine.stock || 0) <= Number(medicine.minStock || 10)
+              const medStock = medicine.stockQuantity ?? medicine.stock ?? 0
+              const medMin = medicine.minStockQuantity ?? medicine.minStock ?? 0
+              const isLow = Number(medStock) <= Number(medMin)
               return (
                 <button type="button" className="compact-medicine-row" key={medicine.id || index} onClick={() => navigate('/pharmacy')}>
                   <span className={'medicine-capsule capsule-' + (index % 4)}><MedicineBoxOutlined /></span>
-                  <span><strong>{medicine.name}</strong><small>Số lượng: {medicine.stock}</small></span>
+                  <span><strong>{medicine.medicineName || medicine.name}</strong><small>Số lượng: {medStock}</small></span>
                   <em>{isLow ? 'Sắp hết' : 'Theo dõi'}</em>
                 </button>
               )

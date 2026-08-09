@@ -31,7 +31,7 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import patientApi from '../api/patientApi'
 import queueApi from '../api/queueApi'
 import { useAuthContext } from '../context/AuthContext'
-import { logMedicalAccess, mergeMedicalRecords, saveStoredMedicalRecord, getStoredQueueItems, saveStoredQueueItem, saveStoredClinicalOrder } from '../utils/storageHelpers'
+import { logMedicalAccess, mergeMedicalRecords, saveStoredMedicalRecord, getStoredQueueItems, saveStoredQueueItem, saveStoredClinicalOrder, mergeQueues } from '../utils/storageHelpers'
 import { saveStoredAttachment } from '../utils/attachmentHelpers'
 import { commonIcd10List, icd10Categories, searchIcd10 } from '../utils/icd10Data'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
@@ -57,6 +57,7 @@ function MedicalEncounter() {
 
   // Selected Patient State
   const [selectedPatientId, setSelectedPatientId] = useState(null)
+  const [currentVisitId, setCurrentVisitId] = useState(location.state?.visitId || null)
 
   // Vital Signs State
   const [vitalSigns, setVitalSigns] = useState({
@@ -96,23 +97,78 @@ function MedicalEncounter() {
       setSelectedPatientId(location.state.patientId)
       form.setFieldsValue({ patientId: location.state.patientId })
     }
+    if (location.state?.visitId) {
+      setCurrentVisitId(location.state.visitId)
+    }
   }, [location.state, form])
 
   const loadData = useCallback(async () => {
     try {
-      const [patientResponse, recordResponse] = await Promise.allSettled([
+      const [patientResponse, recordResponse, queueResponse] = await Promise.allSettled([
         patientApi.getAll({ page: 0, size: 200 }),
         medicalRecordApi.getAll(),
+        queueApi.getQueues({ date: dayjs().format('YYYY-MM-DD') }),
       ])
-      if (patientResponse.status === 'fulfilled') {
-        setPatients(patientResponse.value.data?.content || [])
+
+      const allPatients = patientResponse.status === 'fulfilled'
+        ? (patientResponse.value.data?.content || [])
+        : []
+      
+      const apiQueues = queueResponse.status === 'fulfilled'
+        ? (queueResponse.value.data || [])
+        : []
+
+      const todayQueues = mergeQueues(apiQueues)
+
+      // Lọc danh sách bệnh nhân đã check-in hàng đợi ngày hôm nay theo thời gian/STT
+      const sortedTodayQueues = [...todayQueues].sort((a, b) => {
+        const numA = a.queueNumber !== undefined && a.queueNumber !== null ? a.queueNumber : 999999
+        const numB = b.queueNumber !== undefined && b.queueNumber !== null ? b.queueNumber : 999999
+        if (numA !== numB) return numA - numB
+        return new Date(a.checkedInAt || 0) - new Date(b.checkedInAt || 0)
+      })
+
+      const todayPatientsList = []
+      const addedIds = new Set()
+
+      sortedTodayQueues.forEach((qItem) => {
+        const pIdStr = String(qItem.patientId)
+        if (!addedIds.has(pIdStr) && qItem.patientId) {
+          addedIds.add(pIdStr)
+          const pObj = allPatients.find((p) => String(p.id) === pIdStr) || {}
+          const timeLabel = qItem.checkedInAt ? dayjs(qItem.checkedInAt).format('HH:mm') : 'Hôm nay'
+          todayPatientsList.push({
+            ...pObj,
+            id: qItem.patientId,
+            fullName: pObj.fullName || qItem.patientName || pObj.name || 'Bệnh nhân',
+            patientCode: pObj.patientCode || qItem.patientCode || 'BN-N/A',
+            phoneNumber: pObj.phoneNumber || qItem.phone || 'Không SĐT',
+            gender: pObj.gender || qItem.gender || 'MALE',
+            dateOfBirth: pObj.dateOfBirth || '1995-01-01',
+            healthInsuranceCode: pObj.healthInsuranceCode || 'Không có',
+            medicalHistory: pObj.medicalHistory || 'Chưa ghi nhận',
+            checkInTimeStr: timeLabel,
+            queueNumber: qItem.queueNumber,
+            visitId: qItem.visitId,
+            queueStatus: qItem.status,
+          })
+        }
+      })
+
+      // Đảm bảo giữ bệnh nhân chuyển từ màn hình khác sang nếu có
+      if (location.state?.patientId && !addedIds.has(String(location.state.patientId))) {
+        const targetP = allPatients.find((p) => String(p.id) === String(location.state.patientId))
+        if (targetP) todayPatientsList.unshift(targetP)
       }
+
+      setPatients(todayPatientsList)
+
       const apiRecords = recordResponse.status === 'fulfilled' ? recordResponse.value.data || [] : []
       setRecords(mergeMedicalRecords(apiRecords))
     } catch {
       setRecords(mergeMedicalRecords([]))
     }
-  }, [])
+  }, [location.state?.patientId])
 
   useEffect(() => {
     loadData()
@@ -134,7 +190,7 @@ function MedicalEncounter() {
   }, [icdSearchQuery])
 
   const selectedPatientObj = useMemo(() => {
-    return patients.find((p) => p.id === selectedPatientId)
+    return patients.find((p) => String(p.id) === String(selectedPatientId))
   }, [patients, selectedPatientId])
 
   // BMI calculation
@@ -210,11 +266,47 @@ function MedicalEncounter() {
     return selectedOrders.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
   }, [selectedOrders])
 
+  // Tự động lưu/đồng bộ phiếu chỉ định khi bác sĩ chọn dịch vụ CĐLS cho bệnh nhân đang khám
+  useEffect(() => {
+    if (selectedPatientId && selectedOrders && selectedOrders.length > 0) {
+      const orderCode = `CD-${dayjs().format('YYYYMMDD')}-${Math.floor(100 + Math.random() * 900)}`
+      const clinicalOrderObj = {
+        id: `ord-${selectedPatientId}`,
+        orderCode,
+        patientId: selectedPatientId,
+        patientCode: selectedPatientObj?.patientCode || `BN${String(selectedPatientId).slice(-6).toUpperCase()}`,
+        patientName: selectedPatientObj?.fullName || selectedPatientObj?.name || 'Bệnh nhân',
+        gender: selectedPatientObj?.gender || 'Nam',
+        age: selectedPatientObj?.age || 30,
+        department: user?.department || 'Khoa Nội tổng quát',
+        doctorName: user?.fullName || user?.username || 'BS. Phạm Hồng Anh',
+        orderDate: dayjs().format('YYYY-MM-DD HH:mm'),
+        priority: selectedOrders.some((o) => o.isUrgent) ? 'URGENT' : 'NORMAL',
+        status: 'PENDING',
+        totalAmount: totalOrderFee,
+        items: selectedOrders.map((item, idx) => ({
+          serviceId: item.id || `srv-${idx}-${Date.now()}`,
+          serviceCode: item.code || `CDHA-${idx + 1}`,
+          serviceName: item.name,
+          category: item.category || 'Chẩn đoán hình ảnh',
+          price: Number(item.price) || 0,
+          quantity: 1,
+          instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
+          status: 'PENDING',
+        })),
+        resultSummary: '',
+        createdAt: dayjs().toISOString(),
+        updatedAt: dayjs().toISOString(),
+      }
+      saveStoredClinicalOrder(clinicalOrderObj)
+    }
+  }, [selectedOrders, selectedPatientId, selectedPatientObj, totalOrderFee, user])
+
   // Đồng bộ trạng thái hàng đợi & tự động tạo phiếu Chỉ định Lâm sàng sang các màn hình CĐLS và Nhập kết quả
   const syncQueueCompletion = async (patientId) => {
     try {
       const hasOrders = selectedOrders && selectedOrders.length > 0
-      const targetStatus = hasOrders ? 'WAITING_FOR_RESULT' : 'COMPLETED'
+      const targetStatus = hasOrders ? 'WAITING_FOR_RESULT' : 'IN_PROGRESS'
       const targetQueueId = location.state?.queueItemId
 
       // 1. Nếu có chỉ định CĐLS, lưu phiếu vào hệ thống để xuất hiện ngay trong màn Chỉ định và Nhập kết quả CĐLS
@@ -251,11 +343,10 @@ function MedicalEncounter() {
         saveStoredClinicalOrder(clinicalOrderObj)
       }
 
-      // 2. Đồng bộ trạng thái về trang Quản lý Lịch hẹn & Hàng Đợi (Chờ CĐLS hoặc Hoàn tất)
+      // 2. Đồng bộ trạng thái về trang Quản lý Lịch hẹn & Hàng Đợi (Chờ CĐLS hoặc tiếp tục Đang khám, KHÔNG tự động Hoàn tất)
       if (targetQueueId) {
         try {
-          if (targetStatus === 'COMPLETED') await queueApi.complete(targetQueueId)
-          else await queueApi.updateStatus(targetQueueId, { status: targetStatus })
+          await queueApi.updateStatus(targetQueueId, { status: targetStatus })
         } catch (err) {
           console.warn('Backend sync queue note:', err)
         }
@@ -269,12 +360,10 @@ function MedicalEncounter() {
           const updatedItem = {
             ...q,
             status: targetStatus,
-            ...(targetStatus === 'COMPLETED' ? { completedAt: dayjs().toISOString() } : {}),
           }
           saveStoredQueueItem(updatedItem)
           if (!targetQueueId && q.id && !String(q.id).startsWith('local') && !String(q.id).startsWith('qi-')) {
-            if (targetStatus === 'COMPLETED') queueApi.complete(q.id).catch(() => {})
-            else queueApi.updateStatus(q.id, { status: targetStatus }).catch(() => {})
+            queueApi.updateStatus(q.id, { status: targetStatus }).catch(() => {})
           }
         }
       })
@@ -343,7 +432,7 @@ function MedicalEncounter() {
       clinicalOrderItems: selectedOrders,
       clinicalResults: Object.fromEntries(Object.entries(results).filter(([, value]) => value?.trim())),
       totalFee: totalOrderFee,
-      status: 'COMPLETED',
+      status: 'IN_PROGRESS',
       createdAt: dayjs().toISOString(),
       attachments: files.map((file) => ({ id: file.uid || String(Date.now()), fileName: file.name })),
     }
@@ -352,8 +441,23 @@ function MedicalEncounter() {
       // 1. Call Backend POST /medical-records API if available
       let beRecordId = null
       let beExamId = location.state?.examinationId || null
+      const validVisitId = currentVisitId || selectedPatientObj?.visitId || location.state?.visitId || '10000000-0000-0000-0000-000000000001'
+
+      const beCreatePayload = {
+        visitId: validVisitId,
+        chiefComplaint: values.symptoms || 'Khám bệnh',
+        symptoms: values.symptoms || '',
+        medicalHistory: selectedPatientObj?.medicalHistory || 'Chưa ghi nhận',
+        physicalExamination: values.examinationNote || (vitalSigns ? `Huyết áp: ${vitalSigns.bp || '120/80'}, Mạch: ${vitalSigns.pulse || '75'}, Thân nhiệt: ${vitalSigns.temp || '37.0'}°C` : ''),
+        clinicalProgress: 'Đang điều trị',
+        treatmentPlan: values.treatmentPlan || '',
+        doctorInstructions: values.treatmentPlan || 'Theo dõi sức khỏe và uống thuốc theo đơn',
+        conclusion: fullDiagnosisText,
+        ...payload,
+      }
+
       try {
-        const response = await medicalRecordApi.create(payload)
+        const response = await medicalRecordApi.create(beCreatePayload)
         const createdRecord = response?.data
         if (createdRecord?.id) {
           beRecordId = createdRecord.id
@@ -367,33 +471,32 @@ function MedicalEncounter() {
         completeRecord.id = beRecordId
       }
 
-      // 2. If examinationId exists, trigger diagnosis and order endpoints safely
-      if (beExamId) {
-        try {
-          await medicalRecordApi.recordDiagnosis(beExamId, {
-            primaryIcdCode: primaryIcd?.code || 'ICD-10',
-            primaryIcdName: primaryIcd?.name || values.diagnosisText || 'Chẩn đoán xác định',
-            secondaryIcdCodes: secondaryIcds.map((item) => ({ code: item.code, name: item.name })),
-            clinicalNotes: values.examinationNote || values.symptoms || '',
-          })
-        } catch (diagErr) {
-          console.warn('Backend recordDiagnosis API note:', diagErr)
-        }
+      // 2. Trigger diagnosis and order endpoints safely
+      const targetRecordId = beRecordId || completeRecord.id
+      try {
+        await medicalRecordApi.recordDiagnosis(targetRecordId, {
+          primaryIcdCode: primaryIcd?.code || 'Z00.0',
+          primaryIcdName: primaryIcd?.name || values.diagnosisText || 'Khám sức khỏe tổng quát',
+          secondaryIcdCodes: secondaryIcds.map((item) => ({ code: item.code, name: item.name })),
+          clinicalNotes: values.examinationNote || values.symptoms || '',
+        })
+      } catch (diagErr) {
+        console.warn('Backend recordDiagnosis API note:', diagErr)
+      }
 
-        if (selectedOrders.length > 0) {
-          try {
-            await medicalRecordApi.createClinicalOrder(beExamId, {
-              clinicalReason: fullDiagnosisText,
-              items: selectedOrders.map((item) => ({
-                serviceId: item.id,
-                serviceCode: item.code,
-                serviceName: item.name,
-                instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
-              })),
-            })
-          } catch (orderErr) {
-            console.warn('Backend createClinicalOrder API note:', orderErr)
-          }
+      if (selectedOrders.length > 0) {
+        try {
+          await medicalRecordApi.createClinicalOrder(validVisitId, {
+            clinicalReason: fullDiagnosisText,
+            items: selectedOrders.map((item) => ({
+              serviceId: String(item.id).includes('-') ? item.id : '80000000-0000-0000-0000-000000000001',
+              serviceCode: item.code,
+              serviceName: item.name,
+              instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
+            })),
+          })
+        } catch (orderErr) {
+          console.warn('Backend createClinicalOrder API note:', orderErr)
         }
       }
 
