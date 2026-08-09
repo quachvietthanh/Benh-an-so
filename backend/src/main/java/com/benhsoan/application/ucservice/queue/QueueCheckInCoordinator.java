@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.queue;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -110,7 +111,16 @@ class QueueCheckInCoordinator {
     }
 
     private void ensurePatientHasNoActiveCareFlow(UUID patientId, LocalDate queueDate) {
-        if (visitRepository.existsByPatientIdAndStatusIn(patientId, ACTIVE_VISIT_STATUSES)
+        ZonedDateTime queueDateStart = queueDate.atStartOfDay(CLINIC_ZONE_ID);
+        Instant fromInclusive = queueDateStart.toInstant();
+        Instant toExclusive = queueDateStart.plusDays(1).toInstant();
+
+        if (visitRepository.existsByPatientIdAndStatusInAndVisitAtBetween(
+                patientId,
+                ACTIVE_VISIT_STATUSES,
+                fromInclusive,
+                toExclusive
+        )
                 || queueItemRepository.existsByPatientIdAndQueueDateAndStatusIn(patientId, queueDate,
                         ACTIVE_QUEUE_ITEM_STATUSES)) {
             throw new CheckInConflictException("Patient already has an active visit or queue item.");

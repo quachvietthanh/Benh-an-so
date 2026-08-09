@@ -32,6 +32,15 @@ public interface JpaAppointmentRepository
 
     Optional<AppointmentEntity> findTopByOrderByAppointmentCodeDesc();
 
+    @Query(value = """
+            SELECT appointment_code
+            FROM appointments
+            WHERE appointment_code REGEXP '[0-9]{6}$'
+            ORDER BY CAST(RIGHT(appointment_code, 6) AS UNSIGNED) DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<String> findAppointmentCodeWithHighestSequence();
+
     @Query("select appointment.id from AppointmentEntity appointment "
             + "where appointment.startTime > :now "
             + "and appointment.startTime <= :reminderDeadline "

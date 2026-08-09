@@ -70,7 +70,7 @@ class QueueCheckInCoordinatorTest {
         Patient patient = mock(Patient.class);
         when(patient.isActive()).thenReturn(true);
         when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(patient));
-        when(visitRepository.existsByPatientIdAndStatusIn(any(), any())).thenReturn(false);
+        when(visitRepository.existsByPatientIdAndStatusInAndVisitAtBetween(any(), any(), any(), any())).thenReturn(false);
         when(queueItemRepository.existsByPatientIdAndQueueDateAndStatusIn(any(), any(), any())).thenReturn(false);
         User doctor = mock(User.class);
         when(doctor.isActive()).thenReturn(true);
@@ -104,7 +104,7 @@ class QueueCheckInCoordinatorTest {
         Patient patient = mock(Patient.class);
         when(patient.isActive()).thenReturn(true);
         when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(patient));
-        when(visitRepository.existsByPatientIdAndStatusIn(any(), any())).thenReturn(true);
+        when(visitRepository.existsByPatientIdAndStatusInAndVisitAtBetween(any(), any(), any(), any())).thenReturn(true);
 
         assertThrows(CheckInConflictException.class,
                 () -> coordinator.checkIn(patientId, UUID.randomUUID(), null, QueueItemSourceType.WALK_IN,
@@ -121,6 +121,41 @@ class QueueCheckInCoordinatorTest {
         assertThrows(CheckInConflictException.class,
                 () -> coordinator.checkIn(patientId, UUID.randomUUID(), null, QueueItemSourceType.WALK_IN,
                         "Kham tong quat", null, UUID.randomUUID(), Instant.parse("2026-07-31T02:00:00Z")));
+    }
+
+    @Test
+    void allowsCheckInWhenOnlyPastDayVisitRemainsActive() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID roomId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-09T02:00:00Z");
+        MedicalQueue queue = MedicalQueue.create(doctorId, roomId, LocalDate.of(2026, 8, 9), now);
+
+        Patient patient = mock(Patient.class);
+        when(patient.isActive()).thenReturn(true);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(patient));
+        when(visitRepository.existsByPatientIdAndStatusInAndVisitAtBetween(any(), any(), any(), any())).thenReturn(false);
+        when(queueItemRepository.existsByPatientIdAndQueueDateAndStatusIn(any(), any(), any())).thenReturn(false);
+        User doctor = mock(User.class);
+        when(doctor.isActive()).thenReturn(true);
+        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+        when(assignmentRepository.findByDoctorIdForUpdate(doctorId)).thenReturn(Optional.of(
+                DoctorRoomAssignment.restore(UUID.randomUUID(), doctorId, roomId, actorId, now)));
+        when(roomRepository.findActiveById(roomId)).thenReturn(Optional.of(
+                Room.restore(roomId, "P101", "Phong 101", true, now, now)));
+        when(medicalQueueRepository.findByDoctorIdAndQueueDateForUpdate(doctorId, LocalDate.of(2026, 8, 9)))
+                .thenReturn(Optional.of(queue));
+        when(visitCodeGenerator.generate()).thenReturn("VIS000009");
+        when(visitRepository.save(any(Visit.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(queueItemRepository.findMaxQueueNumber(queue.getId())).thenReturn(1);
+        when(queueItemRepository.save(any(QueueItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        QueueCheckInResult result = coordinator.checkIn(patientId, doctorId, UUID.randomUUID(),
+                QueueItemSourceType.APPOINTMENT, "Tai kham", null, actorId, now);
+
+        assertEquals("VIS000009", result.visitCode());
+        assertEquals(LocalDate.of(2026, 8, 9), result.queueDate());
     }
 
     @Test

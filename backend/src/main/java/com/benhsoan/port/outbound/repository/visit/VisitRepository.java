@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
@@ -22,5 +23,12 @@ public interface VisitRepository {
     List<Visit> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 
     boolean existsByPatientIdAndStatusIn(UUID patientId, Collection<VisitStatus> statuses);
+
+    boolean existsByPatientIdAndStatusInAndVisitAtBetween(
+            UUID patientId,
+            Collection<VisitStatus> statuses,
+            Instant fromInclusive,
+            Instant toExclusive
+    );
 
 }
