@@ -32,22 +32,45 @@ import CreateClinicalOrderModal from '../components/clinical/CreateClinicalOrder
 import EditClinicalOrderModal from '../components/clinical/EditClinicalOrderModal'
 import ClinicalOrderDetailModal from '../components/clinical/ClinicalOrderDetailModal'
 import PrintClinicalOrderModal from '../components/clinical/PrintClinicalOrderModal'
+import medicalRecordApi from '../api/medicalRecordApi'
+import queueApi from '../api/queueApi'
 
 import { useAuthContext } from '../context/AuthContext'
 import {
   mergeClinicalOrders,
   saveStoredClinicalOrder,
-  deleteStoredClinicalOrder,
   logMedicalAccess,
 } from '../utils/storageHelpers'
 
 import { Form, Select, Input } from 'antd'
 
 const { Title, Text } = Typography
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const normalizeServerOrderStatus = (status) => {
+  if (status === 'ORDERED') return 'PENDING'
+  if (status === 'PARTIALLY_COMPLETED') return 'RESULTED'
+  return status || 'PENDING'
+}
+
+const getServiceCategory = (serviceCode) => {
+  const code = String(serviceCode || '').toUpperCase()
+  if (code.startsWith('LAB-')) return { category: 'LABORATORY', categoryName: 'Xét nghiệm' }
+  if (code.startsWith('IMG-')) return { category: 'IMAGING', categoryName: 'Chẩn đoán hình ảnh' }
+  return { category: 'FUNCTIONAL', categoryName: 'Thăm dò chức năng' }
+}
 
 export function ClinicalOrdersPage() {
   const { user } = useAuthContext()
-  const canManage = user?.roles?.some((role) => ['admin', 'doctor', 'receptionist'].includes(role))
+  const normalizedRoles = useMemo(() => (
+    (Array.isArray(user?.roles) ? user.roles : [user?.role])
+      .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
+      .filter(Boolean)
+  ), [user?.role, user?.roles])
+  const canManage = normalizedRoles.some((role) => ['admin', 'doctor'].includes(role))
+  const canLoadServerOrders = normalizedRoles.some((role) => ['admin', 'doctor', 'nurse'].includes(role))
+  const useDoctorQueue = normalizedRoles.includes('doctor') && !normalizedRoles.includes('admin')
+  const isDemo = localStorage.getItem('token') === 'demo-token'
 
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])
@@ -111,18 +134,94 @@ export function ClinicalOrdersPage() {
     setOrderToCancel(null)
   }
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const merged = mergeClinicalOrders([])
-      setOrders(merged)
+      const localOrders = mergeClinicalOrders([])
+      if (isDemo || !canLoadServerOrders) {
+        setOrders(localOrders)
+        return
+      }
+
+      const queueResponse = await (useDoctorQueue ? queueApi.getMyQueue() : queueApi.getQueues())
+      const queueItems = Array.isArray(queueResponse?.data)
+        ? queueResponse.data
+        : (queueResponse?.data?.content || [])
+      const queueByVisit = new Map(
+        queueItems
+          .filter((item) => UUID_PATTERN.test(String(item.visitId || '')))
+          .map((item) => [String(item.visitId), item]),
+      )
+      const visitIds = Array.from(new Set([
+        ...queueByVisit.keys(),
+        ...(useDoctorQueue
+          ? []
+          : localOrders
+              .map((order) => String(order.visitId || ''))
+              .filter((visitId) => UUID_PATTERN.test(visitId))),
+      ]))
+      const orderResponses = await Promise.allSettled(
+        visitIds.map((visitId) => medicalRecordApi.getClinicalOrders(visitId, { page: 0, size: 100 })),
+      )
+
+      const serverOrders = orderResponses.flatMap((result) => {
+        if (result.status !== 'fulfilled') return []
+        const page = result.value?.data
+        const records = Array.isArray(page) ? page : (page?.content || [])
+        return records.map((order) => {
+          const queueItem = queueByVisit.get(String(order.visitId)) || {}
+          return {
+            id: order.id,
+            orderCode: order.orderCode,
+            visitId: order.visitId,
+            patientId: order.patientId,
+            doctorId: order.orderedBy,
+            diagnosis: order.clinicalReason,
+            priority: 'NORMAL',
+            status: normalizeServerOrderStatus(order.status),
+            items: (order.items || []).map((item) => {
+              const serviceCategory = getServiceCategory(item.serviceCode)
+              return {
+                id: item.id,
+                serviceId: item.id,
+                serviceCode: item.serviceCode,
+                serviceName: item.serviceName,
+                instruction: item.instruction || '',
+                note: item.instruction || '',
+                status: normalizeServerOrderStatus(item.status),
+                quantity: 1,
+                price: null,
+                ...serviceCategory,
+              }
+            }),
+            totalAmount: null,
+            createdAt: order.orderedAt,
+            updatedAt: order.completedAt || order.orderedAt,
+            serverBacked: true,
+            ...(queueItem.patientName ? { patientName: queueItem.patientName } : {}),
+            ...(queueItem.doctorName ? { doctorName: queueItem.doctorName } : {}),
+          }
+        })
+      })
+
+      const mergedOrders = mergeClinicalOrders(serverOrders)
+      const visibleOrders = useDoctorQueue
+        ? mergedOrders.filter((order) => queueByVisit.has(String(order.visitId || '')))
+        : mergedOrders
+      const cacheableOrders = [...visibleOrders].reverse()
+      cacheableOrders.forEach(saveStoredClinicalOrder)
+      setOrders(visibleOrders)
+      if (orderResponses.some((result) => result.status === 'rejected')) {
+        message.warning('Một số lượt khám chưa tải được chỉ định mới nhất. Vui lòng thử tải lại.')
+      }
     } catch (err) {
       console.error(err)
-      message.error('Không thể tải danh sách chỉ định cận lâm sàng')
+      if (!useDoctorQueue) setOrders(mergeClinicalOrders([]))
+      message.error('Không thể tải danh sách chỉ định cận lâm sàng từ máy chủ.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canLoadServerOrders, isDemo, useDoctorQueue, user?.fullName, user?.username])
 
   useEffect(() => {
     loadData()
@@ -253,7 +352,7 @@ export function ClinicalOrdersPage() {
               onClick={() => setCreateModalVisible(true)}
               style={{ background: '#1890ff', borderColor: '#1890ff' }}
             >
-              Tạo chỉ định mới
+              Tạo chỉ định cận lâm sàng
             </Button>
           )}
         </Space>

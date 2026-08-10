@@ -135,7 +135,7 @@ function PrescriptionPage() {
   const isDoctor = roles.includes('doctor') || roles.includes('admin')
   const isAssignedDoctor = Boolean(
     roles.includes('admin') ||
-      (currentUser?.id && encounter?.doctor?.id && String(currentUser.id) === String(encounter.doctor.id)),
+    (currentUser?.id && encounter?.doctor?.id && String(currentUser.id) === String(encounter.doctor.id)),
   )
   const recordLocked = record?.status === 'LOCKED'
   const prescriptionBlockReason = getQueueInProgressBlockReason(
@@ -290,7 +290,7 @@ function PrescriptionPage() {
     const nextItems = items.filter((entry) => entry.clientId !== clientId)
     setItems(nextItems)
     setConfirmedOverrides([])
-    performInteractionCheck(nextItems).catch(() => {})
+    performInteractionCheck(nextItems).catch(() => { })
   }
 
   const validateForm = () => {

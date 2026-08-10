@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons'
 import ClinicalOrderStatusBadge, { ClinicalOrderPriorityBadge } from './ClinicalOrderStatusBadge'
 import ClinicalOrderStatusTimeline from './ClinicalOrderStatusTimeline'
+import { formatGender } from '../../utils/helpers'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -70,10 +71,10 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
       key: 'price',
       width: 120,
       align: 'right',
-      render: (price) => `${Number(price || 0).toLocaleString('vi-VN')} đ`,
+      render: (price) => (price == null ? 'Chưa cập nhật' : `${Number(price).toLocaleString('vi-VN')} đ`),
     },
     {
-      title: 'Trạng thái item',
+      title: 'Trạng thái dịch vụ',
       dataIndex: 'status',
       key: 'status',
       width: 130,
@@ -131,7 +132,7 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
               <Text strong>{order.patientName}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="Giới tính / Tuổi">
-              {order.gender} ({order.age} tuổi)
+              {formatGender(order.gender)} ({order.age} tuổi)
             </Descriptions.Item>
 
             <Descriptions.Item label="Số điện thoại">
@@ -179,7 +180,7 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', background: '#fff1f0', padding: '12px 16px', borderRadius: 6, border: '1px solid #ffa39e' }}>
           <Text style={{ fontSize: 15, marginRight: 16 }}>Tổng phí dịch vụ cận lâm sàng:</Text>
           <Title level={3} style={{ color: '#cf1322', margin: 0 }}>
-            {Number(order.totalAmount || 0).toLocaleString('vi-VN')} đ
+            {order.totalAmount == null ? 'Chưa cập nhật' : `${Number(order.totalAmount).toLocaleString('vi-VN')} đ`}
           </Title>
         </div>
       </Space>

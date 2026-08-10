@@ -101,7 +101,8 @@ export const mergeQueues = (apiQueues = []) => {
     const key = String(item.id || item.medicalQueueId)
     if (key && key !== 'undefined') {
       const existing = map.get(key)
-      map.set(key, existing ? { ...existing, ...item } : item)
+      // Dữ liệu API là nguồn chính thức; bản local chỉ bổ sung các trường giao diện còn thiếu.
+      map.set(key, existing ? { ...item, ...existing } : item)
     }
   })
 
@@ -670,7 +671,8 @@ export const mergeClinicalOrders = (defaultOrders = []) => {
     localOrders.forEach((item) => {
       if (item.id) {
         const existing = map.get(String(item.id))
-        map.set(String(item.id), existing ? { ...existing, ...item } : item)
+        // Dữ liệu máy chủ là nguồn chính thức; bản local chỉ bổ sung thông tin hiển thị.
+        map.set(String(item.id), existing ? { ...item, ...existing } : item)
       }
     })
   }
@@ -700,7 +702,7 @@ export const getStoredAppointmentLogs = () => {
         appointmentCode: 'LH-20260715-002',
         action: 'CHECK_IN',
         operatorName: 'Lê Thị Hạnh (Lễ tân)',
-        details: 'Check-in bệnh nhân vào hàng đợi khám',
+        details: 'Tiếp nhận bệnh nhân vào hàng đợi khám',
         timestamp: '2026-07-15T08:15:00',
       },
     ]

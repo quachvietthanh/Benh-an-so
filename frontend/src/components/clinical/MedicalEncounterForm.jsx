@@ -28,7 +28,6 @@ import {
   SearchOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { getPopularIcd10 } from '../../utils/icd10Data'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
 
 const { Title, Text } = Typography
@@ -44,10 +43,14 @@ function MedicalEncounterForm({
   diagnosisType,
   setDiagnosisType,
   primaryIcd,
-  setPrimaryIcd,
+  clearPrimaryDiagnosis,
+  selectPrimaryDiagnosis,
   secondaryIcds,
   setSecondaryIcds,
-  commonIcd10List,
+  addSecondaryDiagnosis,
+  diagnosisOptions,
+  diagnosisSearching,
+  onDiagnosisSearch,
   setDiagnosisModalOpen,
   selectedOrders,
   orderCategory,
@@ -200,7 +203,7 @@ function MedicalEncounterForm({
         {/* Right Column: Symptoms & ICD Diagnosis */}
         <Col xs={24} lg={16}>
           <Card
-            title={<span style={{ color: '#1E3A8A' }}><MedicineBoxOutlined /> Khám Lâm Sàng & Khám Bệnh</span>}
+            title={<span style={{ color: '#1E3A8A' }}><MedicineBoxOutlined /> Khám lâm sàng</span>}
             style={{ marginBottom: 16 }}
             bordered
           >
@@ -227,7 +230,7 @@ function MedicalEncounterForm({
           <Card
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#2563EB' }}><FileSearchOutlined /> Phân Loại & Mã Bệnh Chẩn Đoán (ICD-10)</span>
+                <span style={{ color: '#2563EB' }}><FileSearchOutlined /> Phân loại và mã bệnh chẩn đoán (ICD-10)</span>
                 <Button
                   type="dashed"
                   icon={<SearchOutlined />}
@@ -248,7 +251,7 @@ function MedicalEncounterForm({
                 onChange={setDiagnosisType}
                 options={[
                   { value: 'PRELIMINARY', label: 'Chẩn đoán Sơ bộ (Lâm sàng)' },
-                  { value: 'DEFINITIVE', label: 'Chẩn đoán Xác định (Có Cận lâm sàng)' },
+                  { value: 'DEFINITIVE', label: 'Chẩn đoán xác định (có cận lâm sàng)' },
                   { value: 'DIFFERENTIAL', label: 'Chẩn đoán Phân biệt' },
                 ]}
               />
@@ -266,7 +269,7 @@ function MedicalEncounterForm({
                       {primaryIcd.name}
                     </Text>
                   </div>
-                  <Button type="text" danger icon={<DeleteOutlined />} onClick={() => setPrimaryIcd(null)}>
+                  <Button type="text" danger icon={<DeleteOutlined />} onClick={clearPrimaryDiagnosis}>
                     Đổi mã
                   </Button>
                 </div>
@@ -275,25 +278,22 @@ function MedicalEncounterForm({
                   <Form.Item name="diagnosisText" noStyle>
                     <Input.TextArea
                       rows={2}
-                      placeholder="Gõ tên bệnh hoặc click chọn từ mã ICD-10 gợi ý bên dưới..."
+                      placeholder="Gõ tên bệnh hoặc chọn mã ICD-10 gợi ý bên dưới..."
                     />
                   </Form.Item>
 
                   {/* Popular ICD quick picker */}
                   <div style={{ marginTop: 10 }}>
                     <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Gợi ý mã ICD-10 phổ biến:
+                      10 chẩn đoán gần đây hoặc thường dùng:
                     </Text>
                     <Space wrap>
-                      {getPopularIcd10().slice(0, 8).map((icd) => (
+                      {diagnosisOptions.slice(0, 10).map((icd) => (
                         <Tag
                           key={icd.code}
                           color="cyan"
                           style={{ cursor: 'pointer', padding: '4px 8px', fontSize: 12 }}
-                          onClick={() => {
-                            setPrimaryIcd(icd)
-                            form.setFieldsValue({ diagnosisText: `[${icd.code}] ${icd.name}` })
-                          }}
+                          onClick={() => selectPrimaryDiagnosis(icd)}
                         >
                           <b>{icd.code}</b> - {icd.name}
                         </Tag>
@@ -307,6 +307,20 @@ function MedicalEncounterForm({
             {/* Secondary / Accompanying Diagnoses */}
             <Form.Item label="Chẩn đoán kèm theo / Bệnh phụ (Mã ICD-10 phụ)">
               <div>
+                <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${primaryIcd ? '#BFDBFE' : '#FDE68A'}`, background: primaryIcd ? '#EFF6FF' : '#FFFBEB' }}>
+                  <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+                    Chẩn đoán chính đang chọn
+                  </Text>
+                  {primaryIcd ? (
+                    <Space size={6} wrap>
+                      <Tag color="blue" style={{ margin: 0, fontWeight: 700 }}>{primaryIcd.code}</Tag>
+                      <Text strong style={{ color: '#1E40AF' }}>{primaryIcd.name}</Text>
+                    </Space>
+                  ) : (
+                    <Text type="warning">Vui lòng chọn chẩn đoán chính trước khi thêm chẩn đoán phụ.</Text>
+                  )}
+                </div>
+
                 {secondaryIcds.length > 0 && (
                   <div style={{ marginBottom: 10 }}>
                     <Space wrap>
@@ -327,15 +341,19 @@ function MedicalEncounterForm({
 
                 <Select
                   showSearch
-                  placeholder="Chọn thêm bệnh kèm theo (Mã ICD-10)..."
+                  placeholder={primaryIcd ? 'Tìm mã hoặc tên bệnh kèm theo...' : 'Chọn chẩn đoán chính trước'}
                   value={null}
+                  disabled={!primaryIcd}
+                  loading={diagnosisSearching}
+                  filterOption={false}
+                  onSearch={onDiagnosisSearch}
+                  onDropdownVisibleChange={(open) => open && onDiagnosisSearch('')}
                   onChange={(code) => {
-                    const item = commonIcd10List.find((i) => i.code === code)
-                    if (item && !secondaryIcds.some((i) => i.code === item.code)) {
-                      setSecondaryIcds((prev) => [...prev, item])
-                    }
+                    const item = diagnosisOptions.find((diagnosis) => diagnosis.code === code)
+                    if (item) addSecondaryDiagnosis(item)
                   }}
-                  options={commonIcd10List.map((item) => ({
+                  notFoundContent={diagnosisSearching ? 'Đang tìm trong danh mục...' : 'Không tìm thấy chẩn đoán phù hợp'}
+                  options={diagnosisOptions.map((item) => ({
                     value: item.code,
                     label: `[${item.code}] ${item.name}`,
                   }))}
@@ -375,18 +393,21 @@ function MedicalEncounterForm({
         )}
         <Row gutter={[16, 16]}>
           {/* Left catalog selector */}
-          <Col xs={24} lg={10}>
-            <div style={{ background: '#F8FAFC', padding: 12, borderRadius: 8, border: '1px solid #E2E8F0' }}>
-              <Title level={5} style={{ margin: '0 0 10px 0', fontSize: 14 }}>
-                Danh mục Dịch vụ Cận lâm sàng
-              </Title>
+          <Col xs={24} lg={10} style={{ display: 'flex' }}>
+            <Card
+              size="small"
+              title="Danh mục dịch vụ cận lâm sàng"
+              style={{ width: '100%', height: '100%', borderRadius: 12, borderColor: '#DCE7E1' }}
+              bodyStyle={{ background: '#F8FAFC', borderRadius: '0 0 12px 12px' }}
+            >
 
               <Input
                 prefix={<SearchOutlined />}
-                placeholder="Tìm dịch vụ (Xét nghiệm, X-quang, SA...)"
+                placeholder="Tìm xét nghiệm, X-quang, siêu âm..."
                 value={orderSearchQuery}
                 onChange={(e) => setOrderSearchQuery(e.target.value)}
                 style={{ marginBottom: 10 }}
+                allowClear
               />
 
               <Select
@@ -425,7 +446,9 @@ function MedicalEncounterForm({
                           description={
                             <div style={{ fontSize: 11 }}>
                               <Tag color="cyan">{item.code}</Tag>
-                              <Text type="danger" strong>{formatCurrency(item.price)}</Text> | {item.department}
+                              <Text type={item.price == null ? 'secondary' : 'danger'} strong>
+                                {item.price == null ? 'Chưa cập nhật giá' : formatCurrency(item.price)}
+                              </Text> | {item.department}
                             </div>
                           }
                         />
@@ -434,103 +457,108 @@ function MedicalEncounterForm({
                   }}
                 />
               </div>
-            </div>
+            </Card>
           </Col>
 
           {/* Right selected orders list */}
-          <Col xs={24} lg={14}>
-            <Title level={5} style={{ margin: '0 0 10px 0', fontSize: 14 }}>
-              Danh sách Chỉ định Cận lâm sàng đã chọn ({selectedOrders.length})
-            </Title>
-
-            {selectedOrders.length === 0 ? (
-              <div style={{ border: '2px dashed #CBD5E1', padding: 40, textAlign: 'center', borderRadius: 8, color: '#64748B' }}>
-                <FileTextOutlined style={{ fontSize: 32, marginBottom: 8, color: '#94A3B8' }} />
-                <div>Chưa có dịch vụ cận lâm sàng nào được chỉ định.</div>
-                <div style={{ fontSize: 12 }}>Chọn từ danh mục bên trái để thêm xét nghiệm/CĐHA cho bệnh nhân.</div>
-              </div>
-            ) : (
-              <div>
-                <Table
-                  size="small"
-                  rowKey="code"
-                  pagination={false}
-                  dataSource={selectedOrders}
-                  columns={[
-                    {
-                      title: 'Dịch vụ',
-                      key: 'name',
-                      render: (r) => (
-                        <div>
-                          <Text strong>{r.name}</Text>
-                          <div style={{ fontSize: 11, color: '#64748B' }}>Mã: {r.code} - {r.department}</div>
-                        </div>
-                      ),
-                    },
-                    {
-                      title: 'Cấp cứu',
-                      key: 'urgent',
-                      width: 90,
-                      render: (r) => (
-                        <Button
-                          size="small"
-                          type={r.isUrgent ? 'primary' : 'default'}
-                          danger={r.isUrgent}
-                          onClick={() => handleToggleUrgent(r.code)}
-                        >
-                          {r.isUrgent ? 'CẤP CỨU' : 'Thường'}
-                        </Button>
-                      ),
-                    },
-                    {
-                      title: 'Ghi chú KTV',
-                      key: 'note',
-                      width: 160,
-                      render: (r) => (
-                        <Input
-                          size="small"
-                          placeholder="Nhịn ăn, chụp nghiêng..."
-                          value={r.note}
-                          onChange={(e) => handleUpdateOrderNote(r.code, e.target.value)}
-                        />
-                      ),
-                    },
-                    {
-                      title: 'Giá tiền',
-                      dataIndex: 'price',
-                      width: 100,
-                      align: 'right',
-                      render: (val) => formatCurrency(val),
-                    },
-                    {
-                      title: '',
-                      key: 'action',
-                      width: 40,
-                      render: (r) => (
-                        <Button
-                          type="text"
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={() => handleRemoveOrder(r.code)}
-                        />
-                      ),
-                    },
-                  ]}
-                />
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                  <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
-                    Xem trước & In Phiếu chỉ định
-                  </Button>
-                  <Text strong style={{ fontSize: 15 }}>
-                    Tổng cộng: <span style={{ color: '#DC2626' }}>{formatCurrency(totalOrderFee)}</span>
-                  </Text>
+          <Col xs={24} lg={14} style={{ display: 'flex' }}>
+            <Card
+              size="small"
+              title={`Dịch vụ đã chọn (${selectedOrders.length})`}
+              style={{ width: '100%', height: '100%', borderRadius: 12, borderColor: '#DCE7E1' }}
+            >
+              {selectedOrders.length === 0 ? (
+                <div style={{ border: '2px dashed #CBD5E1', padding: 40, textAlign: 'center', borderRadius: 10, color: '#64748B' }}>
+                  <FileTextOutlined style={{ fontSize: 32, marginBottom: 8, color: '#94A3B8' }} />
+                  <div>Chưa có dịch vụ cận lâm sàng nào được chỉ định.</div>
+                  <div style={{ fontSize: 12 }}>Chọn dịch vụ từ danh mục bên trái để thêm vào phiếu.</div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div>
+                  <Table
+                    size="small"
+                    rowKey="code"
+                    pagination={false}
+                    dataSource={selectedOrders}
+                    columns={[
+                      {
+                        title: 'Dịch vụ',
+                        key: 'name',
+                        render: (r) => (
+                          <div>
+                            <Text strong>{r.name}</Text>
+                            <div style={{ fontSize: 11, color: '#64748B' }}>Mã: {r.code} - {r.department}</div>
+                          </div>
+                        ),
+                      },
+                      {
+                        title: 'Ưu tiên',
+                        key: 'urgent',
+                        width: 90,
+                        render: (r) => (
+                          <Button
+                            size="small"
+                            type={r.isUrgent ? 'primary' : 'default'}
+                            danger={r.isUrgent}
+                            onClick={() => handleToggleUrgent(r.code)}
+                          >
+                            {r.isUrgent ? 'Khẩn' : 'Thường'}
+                          </Button>
+                        ),
+                      },
+                      {
+                        title: 'Ghi chú kỹ thuật',
+                        key: 'note',
+                        width: 170,
+                        render: (r) => (
+                          <Input
+                            size="small"
+                            placeholder="Nhịn ăn, tư thế chụp..."
+                            value={r.note}
+                            onChange={(e) => handleUpdateOrderNote(r.code, e.target.value)}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Chi phí',
+                        dataIndex: 'price',
+                        width: 100,
+                        align: 'right',
+                        render: (val) => (val == null ? 'Chưa cập nhật' : formatCurrency(val)),
+                      },
+                      {
+                        title: '',
+                        key: 'action',
+                        width: 44,
+                        render: (r) => (
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            aria-label={`Xóa dịch vụ ${r.name}`}
+                            onClick={() => handleRemoveOrder(r.code)}
+                          />
+                        ),
+                      },
+                    ]}
+                  />
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                    <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
+                      Xem trước và in phiếu
+                    </Button>
+                    <Text strong style={{ fontSize: 15 }}>
+                      {hasCompletePricing
+                        ? <>Tổng tạm tính: <span style={{ color: '#DC2626' }}>{formatCurrency(totalOrderFee)}</span></>
+                        : 'Chưa có đủ dữ liệu bảng giá'}
+                    </Text>
+                  </div>
+                </div>
+              )}
+            </Card>
           </Col>
         </Row>
-      </Card>
+      </section>
 
     </Form>
   )

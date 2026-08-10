@@ -108,6 +108,8 @@ function MedicalEncounter() {
   const [icdSearchQuery, setIcdSearchQuery] = useState('')
   const [icdCategory, setIcdCategory] = useState('ALL')
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
+  const [icdSearching, setIcdSearching] = useState(false)
+  const [recentIcds, setRecentIcds] = useState(loadRecentDiagnoses)
 
   const [selectedOrders, setSelectedOrders] = useState([])
   const [orderCategory, setOrderCategory] = useState('ALL')
@@ -150,10 +152,10 @@ function MedicalEncounter() {
     setPrimaryIcd(
       primary
         ? {
-            code: primary.diagnosisCode,
-            name: primary.diagnosisName,
-            note: primary.note,
-          }
+          code: primary.diagnosisCode,
+          name: primary.diagnosisName,
+          note: primary.note,
+        }
         : detail.primaryIcdCode
           ? { code: detail.primaryIcdCode, name: detail.primaryIcdName }
           : null,
@@ -628,14 +630,14 @@ function MedicalEncounter() {
           <Descriptions.Item label="Bác sĩ">{encounter?.doctor?.fullName || '—'}</Descriptions.Item>
           <Descriptions.Item label="Trạng thái hàng đợi">
             <Tag color="processing">{
-    {
-      WAITING: 'Chờ khám',
-      IN_PROGRESS: 'Đang khám',
-      WAITING_FOR_RESULT: 'Chờ kết quả CĐLS',
-      COMPLETED: 'Đã hoàn tất',
-      SKIPPED: 'Đã bỏ qua'
-    }[encounter?.queueItem?.status] || encounter?.queueItem?.status || '—'
-  }</Tag>
+              {
+                WAITING: 'Chờ khám',
+                IN_PROGRESS: 'Đang khám',
+                WAITING_FOR_RESULT: 'Chờ kết quả CĐLS',
+                COMPLETED: 'Đã hoàn tất',
+                SKIPPED: 'Đã bỏ qua'
+              }[encounter?.queueItem?.status] || encounter?.queueItem?.status || '—'
+            }</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Mã bệnh án">
             {currentRecordId ? <Text code>{currentRecordId}</Text> : <Tag>Chưa tạo</Tag>}
@@ -687,11 +689,15 @@ function MedicalEncounter() {
                 diagnosisType={diagnosisType}
                 setDiagnosisType={setDiagnosisType}
                 primaryIcd={primaryIcd}
-                setPrimaryIcd={setPrimaryIcd}
+                clearPrimaryDiagnosis={clearPrimaryDiagnosis}
+                selectPrimaryDiagnosis={selectPrimaryDiagnosis}
                 secondaryIcds={secondaryIcds}
                 setSecondaryIcds={setSecondaryIcds}
-                commonIcd10List={commonIcd10List}
-                setDiagnosisModalOpen={setDiagnosisModalOpen}
+                addSecondaryDiagnosis={addSecondaryDiagnosis}
+                diagnosisOptions={diagnosisSelectOptions}
+                diagnosisSearching={icdSearching}
+                onDiagnosisSearch={setIcdSearchQuery}
+                setDiagnosisModalOpen={setDiagnosisModalVisibility}
                 selectedOrders={selectedOrders}
                 orderCategory={orderCategory}
                 setOrderCategory={setOrderCategory}
@@ -749,7 +755,8 @@ function MedicalEncounter() {
           size="small"
           rowKey={(item) => item.id || item.code}
           dataSource={filteredIcdList}
-          pagination={{ pageSize: 8 }}
+          loading={icdSearching}
+          pagination={false}
           columns={[
             { title: 'Mã', dataIndex: 'code', width: 100, render: (value) => <Tag color="blue">{value}</Tag> },
             { title: 'Tên chẩn đoán', dataIndex: 'name' },
@@ -766,9 +773,8 @@ function MedicalEncounter() {
                   <Button
                     size="small"
                     type="primary"
-                    onClick={() => {
-                      setPrimaryIcd(item)
-                      form.setFieldsValue({ diagnosisText: `[${item.code}] ${item.name}` })
+                    onClick={async () => {
+                      await selectPrimaryDiagnosis(item)
                       setDiagnosisModalOpen(false)
                     }}
                   >
@@ -782,7 +788,7 @@ function MedicalEncounter() {
                       }
                     }}
                   >
-                    + Phụ
+                    Thêm phụ
                   </Button>
                 </Space>
               ),

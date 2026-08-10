@@ -1,5 +1,5 @@
 import React from 'react'
-import { Table, Space, Button, Tag, Dropdown, Menu, Tooltip, Popconfirm, Typography } from 'antd'
+import { Table, Space, Button, Tag, Dropdown, Tooltip, Typography } from 'antd'
 import {
   EyeOutlined,
   EditOutlined,
@@ -14,6 +14,14 @@ import {
 import ClinicalOrderStatusBadge, { ClinicalOrderPriorityBadge } from './ClinicalOrderStatusBadge'
 
 const { Text } = Typography
+
+const GENDER_LABELS = {
+  MALE: 'Nam',
+  FEMALE: 'Nữ',
+  OTHER: 'Khác',
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const ClinicalOrderTable = ({
   dataSource = [],
@@ -30,7 +38,7 @@ export const ClinicalOrderTable = ({
       title: 'Mã chỉ định',
       dataIndex: 'orderCode',
       key: 'orderCode',
-      width: 140,
+      width: 130,
       render: (code, record) => (
         <div>
           <Text strong style={{ color: '#1890ff' }}>{code}</Text>
@@ -45,9 +53,11 @@ export const ClinicalOrderTable = ({
       width: 190,
       render: (_, record) => (
         <div>
-          <Text strong>{record.patientName}</Text>
+          <Text strong>{record.patientName || 'Bệnh nhân'}</Text>
           <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-            <Tag color="default" style={{ margin: 0 }}>{record.patientCode}</Tag> • {record.gender || 'Nam'} ({record.age || 30}T)
+            <Tag color="default" style={{ margin: 0 }}>{record.patientCode || 'Chưa có mã'}</Tag>
+            {' • '}{GENDER_LABELS[record.gender] || record.gender || 'Chưa cập nhật giới tính'}
+            {record.age !== null && record.age !== undefined ? ` (${record.age}T)` : ''}
           </div>
         </div>
       ),
@@ -113,7 +123,7 @@ export const ClinicalOrderTable = ({
       align: 'right',
       render: (amount) => (
         <Text strong style={{ color: '#cf1322' }}>
-          {Number(amount || 0).toLocaleString('vi-VN')} đ
+          {amount == null ? 'Chưa cập nhật' : `${Number(amount).toLocaleString('vi-VN')} đ`}
         </Text>
       ),
     },
@@ -153,61 +163,50 @@ export const ClinicalOrderTable = ({
           { key: 'COMPLETED', label: 'Chuyển: Hoàn tất', icon: <CheckOutlined /> },
         ]
 
+        const isServerOrder = UUID_PATTERN.test(String(record.id || ''))
+        const canChange = canManage && !isServerOrder && record.status !== 'COMPLETED' && record.status !== 'CANCELLED'
+        const menuItems = [
+          {
+            key: 'detail',
+            label: 'Xem chi tiết',
+            icon: <EyeOutlined />,
+            onClick: () => onViewDetail(record),
+          },
+          {
+            key: 'print',
+            label: 'In phiếu chỉ định',
+            icon: <PrinterOutlined />,
+            onClick: () => onPrintOrder(record),
+          },
+          ...(canChange
+            ? [{
+                key: 'edit',
+                label: 'Chỉnh sửa chỉ định',
+                icon: <EditOutlined />,
+                onClick: () => onEditOrder(record),
+              }, { type: 'divider' }, ...statusMenu
+                .filter((item) => item.key !== record.status)
+                .map((item) => ({
+                  key: `status-${item.key}`,
+                  label: item.label,
+                  icon: item.icon,
+                  onClick: () => onUpdateStatus(record.id, item.key),
+                })), {
+                key: 'cancel',
+                label: 'Hủy phiếu chỉ định',
+                danger: true,
+                icon: <DeleteOutlined />,
+                onClick: () => onDeleteOrder(record.id),
+              }]
+            : []),
+        ]
+
         return (
-          <Space size="small">
-            <Tooltip title="Xem chi tiết phiếu chỉ định">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined style={{ color: '#1890ff' }} />}
-                onClick={() => onViewDetail(record)}
-              />
-            </Tooltip>
-
-            <Tooltip title="In phiếu chỉ định">
-              <Button
-                type="text"
-                size="small"
-                icon={<PrinterOutlined style={{ color: '#52c41a' }} />}
-                onClick={() => onPrintOrder(record)}
-              />
-            </Tooltip>
-
-            {canManage && record.status !== 'COMPLETED' && record.status !== 'CANCELLED' && (
-              <Tooltip title="Chỉnh sửa chỉ định">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined style={{ color: '#fa8c16' }} />}
-                  onClick={() => onEditOrder(record)}
-                />
-              </Tooltip>
-            )}
-
-            <Dropdown
-              menu={{
-                items: [
-                  ...statusMenu.map((m) => ({
-                    key: m.key,
-                    label: m.label,
-                    icon: m.icon,
-                    onClick: () => onUpdateStatus(record.id, m.key),
-                  })),
-                  { type: 'divider' },
-                  {
-                    key: 'CANCELLED',
-                    label: 'Hủy phiếu chỉ định',
-                    danger: true,
-                    icon: <DeleteOutlined />,
-                    onClick: () => onDeleteOrder(record.id),
-                  },
-                ],
-              }}
-              trigger={['click']}
-            >
-              <Button type="text" size="small" icon={<MoreOutlined />} />
-            </Dropdown>
-          </Space>
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+            <Button size="small" icon={<MoreOutlined />} aria-label={`Thao tác với phiếu ${record.orderCode || ''}`}>
+              Chi tiết
+            </Button>
+          </Dropdown>
         )
       },
     },
