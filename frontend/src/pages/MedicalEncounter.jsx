@@ -67,6 +67,19 @@ const mapClinicalService = (item) => ({
   price: 0,
 })
 
+const loadRecentDiagnoses = () => {
+  try {
+    const raw = localStorage.getItem('recent_icd10')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {
+    // ignore
+  }
+  return commonIcd10List.slice(0, 10)
+}
+
 function MedicalEncounter() {
   const { visitId: visitIdFromPath } = useParams()
   const location = useLocation()
@@ -264,6 +277,48 @@ function MedicalEncounter() {
     )
     return Array.from(combined.values())
   }, [backendIcdCatalog, icdCategory, icdSearchQuery])
+
+  const diagnosisSelectOptions = useMemo(() => {
+    return filteredIcdList.length > 0 ? filteredIcdList : commonIcd10List
+  }, [filteredIcdList])
+
+  const selectPrimaryDiagnosis = useCallback((icd) => {
+    if (!icd) return
+    const icdObj = {
+      id: icd.id,
+      code: icd.code,
+      name: icd.name || icd.label,
+      note: icd.note || '',
+    }
+    setPrimaryIcd(icdObj)
+    form.setFieldsValue({
+      diagnosisText: `[${icdObj.code}] ${icdObj.name}`,
+    })
+    setRecentIcds((prev) => {
+      const updated = [icdObj, ...(prev || []).filter((item) => item.code !== icdObj.code)].slice(0, 10)
+      try {
+        localStorage.setItem('recent_icd10', JSON.stringify(updated))
+      } catch {
+        // ignore
+      }
+      return updated
+    })
+  }, [form])
+
+  const clearPrimaryDiagnosis = useCallback(() => {
+    setPrimaryIcd(null)
+    form.setFieldsValue({
+      diagnosisText: '',
+    })
+  }, [form])
+
+  const addSecondaryDiagnosis = useCallback((icd) => {
+    if (!icd?.code) return
+    setSecondaryIcds((prev) => {
+      if (prev.some((item) => item.code === icd.code)) return prev
+      return [...prev, { id: icd.id, code: icd.code, name: icd.name || icd.label, note: icd.note || '' }]
+    })
+  }, [])
 
   const filteredCatalog = useMemo(() => {
     const query = orderSearchQuery.trim().toLowerCase()
@@ -697,7 +752,7 @@ function MedicalEncounter() {
                 diagnosisOptions={diagnosisSelectOptions}
                 diagnosisSearching={icdSearching}
                 onDiagnosisSearch={setIcdSearchQuery}
-                setDiagnosisModalOpen={setDiagnosisModalVisibility}
+                setDiagnosisModalOpen={setDiagnosisModalOpen}
                 selectedOrders={selectedOrders}
                 orderCategory={orderCategory}
                 setOrderCategory={setOrderCategory}

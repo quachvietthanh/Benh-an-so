@@ -1551,98 +1551,106 @@ function AppointmentQueue() {
                   title={<Text strong style={{ color: '#2563eb' }}>🟡 BỆNH NHÂN ĐANG CHỜ ({doctorQueueGroups.waiting.length})</Text>}
                   style={{ borderRadius: 12 }}
                 >
-                  <List
-                    dataSource={doctorQueueGroups.waiting}
-                    pagination={{ pageSize: 5 }}
-                    renderItem={(item) => {
-                      const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      const secondaryActions = permissions.canSkip
-                        ? [{
-                          key: 'skip',
-                          label: 'Bỏ qua lượt khám',
-                          icon: <CloseCircleOutlined />,
-                          danger: true,
-                          onClick: () => {
-                            skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                            setSkipModalItem(item)
-                          },
-                        }]
-                        : []
-                      return (
-                        <List.Item
-                          actions={[
-                            permissions.canCallNext && (
-                              <Button
-                                key="call-next"
-                                type="primary"
-                                icon={<StepForwardOutlined />}
-                                onClick={() => handleCallNext(item.medicalQueueId || item.queueId)}
-                              >
-                                Gọi vào khám
-                              </Button>
-                            ),
-                          ].filter(Boolean)}
-                        >
-                          <List.Item.Meta
-                            avatar={<Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>}
-                            title={<Text strong>STT {item.queueNumber}: {pInfo.name}</Text>}
-                            description={`Đến lúc: ${item.checkedInAt ? dayjs(item.checkedInAt).format('HH:mm DD/MM/YYYY') : 'Chưa ghi nhận'}`}
-                          />
-                        </List.Item>
-                      )
-                    }}
-                  />
+                  {doctorQueueGroups.waiting.length === 0 ? (
+                    <Text type="secondary">Chưa có bệnh nhân nào đang chờ trong phòng khám.</Text>
+                  ) : (
+                    <List
+                      dataSource={doctorQueueGroups.waiting}
+                      pagination={{ pageSize: 5 }}
+                      renderItem={(item) => {
+                        const pInfo = getPatientInfo(item.patientId, item.patientName)
+                        const secondaryActions = permissions.canSkip
+                          ? [{
+                            key: 'skip',
+                            label: 'Bỏ qua lượt khám',
+                            icon: <CloseCircleOutlined />,
+                            danger: true,
+                            onClick: () => {
+                              skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
+                              setSkipModalItem(item)
+                            },
+                          }]
+                          : []
+                        return (
+                          <List.Item
+                            actions={[
+                              permissions.canCallNext && (
+                                <Button
+                                  key="call-next"
+                                  type="primary"
+                                  icon={<StepForwardOutlined />}
+                                  onClick={() => handleCallNext(item.medicalQueueId || item.queueId)}
+                                >
+                                  Gọi vào khám
+                                </Button>
+                              ),
+                            ].filter(Boolean)}
+                          >
+                            <List.Item.Meta
+                              avatar={<Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>}
+                              title={<Text strong>STT {item.queueNumber}: {pInfo.name}</Text>}
+                              description={`Đến lúc: ${item.checkedInAt ? dayjs(item.checkedInAt).format('HH:mm DD/MM/YYYY') : 'Chưa ghi nhận'}`}
+                            />
+                          </List.Item>
+                        )
+                      }}
+                    />
+                  )}
                 </Card>
 
                 <Card
                   title={<Text strong style={{ color: '#9333ea' }}>🟣 BỆNH NHÂN CHỜ KẾT QUẢ CĐLS ({doctorQueueGroups.waitingForResult.length})</Text>}
                   style={{ borderRadius: 12, borderColor: '#e9d5ff' }}
                 >
-                  <List
-                    dataSource={doctorQueueGroups.waitingForResult}
-                    pagination={{ pageSize: 5 }}
-                    renderItem={(item) => {
-                      const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      const secondaryActions = [{
-                        key: 'record',
-                        label: 'Xem bệnh án',
-                        icon: <EyeOutlined />,
-                        onClick: () => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId } }),
-                      }]
-                      return (
-                        <List.Item
-                          actions={[
-                            permissions.canUpdateStatus && (
-                              <Button
-                                key="resume"
-                                type="primary"
-                                style={{ backgroundColor: '#16a34a' }}
-                                onClick={() => handleUpdateItemStatus(item.id, 'IN_PROGRESS')}
-                              >
-                                Tiếp tục khám
-                              </Button>
-                            ),
-                            <Button key="view-record" onClick={() => openEncounter(item)}>
-                              Xem bệnh án
-                            </Button>,
-                          ].filter(Boolean)}
-                        >
-                          <List.Item.Meta
-                            avatar={<Avatar style={{ backgroundColor: '#9333ea' }}>{getInitials(pInfo.name)}</Avatar>}
-                            title={<Text strong>{pInfo.name}</Text>}
-                            description="Đã gửi chỉ định CĐLS, đang chờ phòng xét nghiệm / CĐHA trả kết quả."
-                          />
-                        </List.Item>
-                      )
-                    }}
-                  />
+                  {doctorQueueGroups.waitingForResult.length === 0 ? (
+                    <Text type="secondary">Chưa có bệnh nhân nào đang chờ kết quả cận lâm sàng.</Text>
+                  ) : (
+                    <List
+                      dataSource={doctorQueueGroups.waitingForResult}
+                      pagination={{ pageSize: 5 }}
+                      renderItem={(item) => {
+                        const pInfo = getPatientInfo(item.patientId, item.patientName)
+                        const secondaryActions = [{
+                          key: 'record',
+                          label: 'Xem bệnh án',
+                          icon: <EyeOutlined />,
+                          onClick: () => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId } }),
+                        }]
+                        return (
+                          <List.Item
+                            actions={[
+                              permissions.canUpdateStatus && (
+                                <Button
+                                  key="resume"
+                                  type="primary"
+                                  style={{ backgroundColor: '#16a34a' }}
+                                  onClick={() => handleUpdateItemStatus(item.id, 'IN_PROGRESS')}
+                                >
+                                  Tiếp tục khám
+                                </Button>
+                              ),
+                              <Button key="view-record" onClick={() => openEncounter(item)}>
+                                Xem bệnh án
+                              </Button>,
+                            ].filter(Boolean)}
+                          >
+                            <List.Item.Meta
+                              avatar={<Avatar style={{ backgroundColor: '#9333ea' }}>{getInitials(pInfo.name)}</Avatar>}
+                              title={<Text strong>{pInfo.name}</Text>}
+                              description="Đã gửi chỉ định CĐLS, đang chờ phòng xét nghiệm / CĐHA trả kết quả."
+                            />
+                          </List.Item>
+                        )
+                      }}
+                    />
+                  )}
                 </Card>
               </div>
             ),
           },
         ].filter((item) => {
           if (permissions.isAdmin) return true
-          if (permissions.isDoctor) return item.key === 'doctor_queue'
+          if (permissions.isDoctor) return ['appointments', 'doctor_queue'].includes(item.key)
           if (permissions.isNurse) return item.key === 'reception_queue'
           return ['appointments', 'reception_queue'].includes(item.key)
         })}
