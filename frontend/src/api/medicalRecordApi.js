@@ -27,6 +27,10 @@ const medicalRecordApi = {
   },
   // Diagnosis & Clinical Orders endpoints connected to Backend
   recordDiagnosis: (recordId, data) => {
+    const secondarySource = data.secondaryDiagnoses || data.secondaryIcds || data.secondaryIcdCodes || []
+    const secondaryDiagnoses = Array.isArray(secondarySource)
+      ? secondarySource
+      : String(secondarySource).split(',').map((code) => code.trim()).filter(Boolean)
     const payload = data.primaryDiagnosis
       ? data
       : {
@@ -34,17 +38,18 @@ const medicalRecordApi = {
             diagnosisCatalogId:
               data.primaryDiagnosisCatalogId ||
               data.diagnosisCatalogId ||
-              '90000000-0000-0000-0000-000000000001',
+              data.primaryIcd?.diagnosisCatalogId ||
+              data.primaryIcd?.id,
             code: data.primaryIcdCode || data.primaryIcd?.code || 'Z00.0',
             name: data.primaryIcdName || data.primaryIcd?.name || 'Khám sức khỏe tổng quát',
             note: data.clinicalNotes || data.note || '',
           },
-          secondaryDiagnoses: (data.secondaryDiagnoses || data.secondaryIcds || []).map((sec) => ({
+          secondaryDiagnoses: secondaryDiagnoses.map((sec) => ({
             diagnosisCatalogId:
-              sec.diagnosisCatalogId || '90000000-0000-0000-0000-000000000001',
+              sec.diagnosisCatalogId || sec.id,
             code: typeof sec === 'string' ? sec : sec.code,
             name: typeof sec === 'string' ? sec : sec.name || sec.code,
-            note: sec.note || '',
+            note: typeof sec === 'string' ? '' : sec.note || '',
           })),
         }
     return axiosClient.put(`/medical-records/${recordId}/diagnoses`, payload)
@@ -54,6 +59,9 @@ const medicalRecordApi = {
   },
   createClinicalOrder: (visitId, data) => {
     return axiosClient.post(`/clinical-orders/visits/${visitId}`, data)
+  },
+  getClinicalOrders: (visitId, params = {}) => {
+    return axiosClient.get(`/clinical-orders/visits/${visitId}`, { params })
   },
   getDiagnosisCatalog: (searchQuery) => {
     return axiosClient.get('/diagnosis-catalog', { params: { search: searchQuery } })

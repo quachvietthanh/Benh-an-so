@@ -28,25 +28,104 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import medicalRecordApi from '../api/medicalRecordApi'
+import clinicalServiceApi from '../api/clinicalServiceApi'
 import patientApi from '../api/patientApi'
 import queueApi from '../api/queueApi'
 import { useAuthContext } from '../context/AuthContext'
 import { logMedicalAccess, mergeMedicalRecords, saveStoredMedicalRecord, getStoredQueueItems, saveStoredQueueItem, saveStoredClinicalOrder, mergeQueues } from '../utils/storageHelpers'
 import { saveStoredAttachment } from '../utils/attachmentHelpers'
-import { commonIcd10List, icd10Categories, searchIcd10 } from '../utils/icd10Data'
+import { getPopularIcd10, icd10Categories, searchIcd10 } from '../utils/icd10Data'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintModal'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 
 const { Text, Paragraph } = Typography
 
+const RECENT_DIAGNOSES_KEY = 'benhsoan_recent_diagnoses'
+const MAX_DIAGNOSIS_OPTIONS = 10
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const isUuid = (value) => UUID_PATTERN.test(String(value || ''))
+const MEDICAL_RECORD_STATUS_LABELS = {
+  DRAFT: 'Bản nháp',
+  IN_PROGRESS: 'Đang khám',
+  COMPLETED: 'Hoàn thành',
+  LOCKED: 'Đã khóa',
+  CANCELLED: 'Đã hủy',
+}
+
+const normalizeDiagnosis = (item) => {
+  if (!item?.code) return null
+  return {
+    ...item,
+    diagnosisCatalogId: item.diagnosisCatalogId || item.id || null,
+  }
+}
+
+const mergeDiagnosisOptions = (...lists) => {
+  const byCode = new Map()
+  lists.flat().filter(Boolean).forEach((rawItem) => {
+    const item = normalizeDiagnosis(rawItem)
+    if (!item) return
+    const existing = byCode.get(item.code)
+    byCode.set(item.code, existing
+      ? {
+          ...item,
+          ...existing,
+          diagnosisCatalogId: existing.diagnosisCatalogId || item.diagnosisCatalogId,
+        }
+      : item)
+  })
+  return Array.from(byCode.values())
+}
+
+const loadRecentDiagnoses = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(RECENT_DIAGNOSES_KEY) || '[]')
+    return mergeDiagnosisOptions(stored, getPopularIcd10()).slice(0, MAX_DIAGNOSIS_OPTIONS)
+  } catch {
+    return getPopularIcd10().slice(0, MAX_DIAGNOSIS_OPTIONS)
+  }
+}
+
+const normalizeClinicalService = (item) => {
+  const code = item?.serviceCode || item?.code
+  if (!code) return null
+  const fallback = clinicalServiceCatalog.find((service) => service.code === code) || {}
+  const type = String(item.serviceType || item.category || fallback.category || '').toUpperCase()
+  const category = type.includes('LAB')
+    ? 'XET_NGHIEM'
+    : type.includes('IMAG') || type.includes('CDHA')
+      ? 'CDHA'
+      : type.includes('FUNC') || type.includes('THAM_DO')
+        ? 'THAM_DO_CHUC_NANG'
+        : fallback.category || 'THU_THUAT'
+  const translatedName = code === 'LAB-GLU'
+    ? 'Định lượng glucose máu'
+    : code === 'IMG-CTH'
+      ? 'Chụp CT sọ não không tiêm thuốc cản quang'
+      : item.serviceName || item.name || fallback.name
+
+  return {
+    ...fallback,
+    ...item,
+    id: item.id || fallback.id,
+    code,
+    name: translatedName,
+    category,
+    price: item.price ?? fallback.price ?? null,
+    department: item.department || fallback.department || (category === 'XET_NGHIEM' ? 'Phòng Xét nghiệm' : 'Phòng Cận lâm sàng'),
+    preparation: item.description || fallback.preparation || '',
+  }
+}
+
 function MedicalEncounter() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuthContext()
-  const isDoctor = user?.roles?.some((role) =>
-    ['admin', 'doctor', 'role_admin', 'role_doctor'].includes(String(role).toLowerCase())
-  )
+  const normalizedUserRoles = (Array.isArray(user?.roles) ? user.roles : [user?.role])
+    .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
+  const isDoctor = normalizedUserRoles.some((role) => ['admin', 'doctor'].includes(role))
+  const shouldUseMyQueue = normalizedUserRoles.includes('doctor') && !normalizedUserRoles.includes('admin')
 
   const [form] = Form.useForm()
   const [patients, setPatients] = useState([])
@@ -78,11 +157,14 @@ function MedicalEncounter() {
   const [icdSearchQuery, setIcdSearchQuery] = useState('')
   const [icdCategory, setIcdCategory] = useState('ALL')
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
+  const [icdSearching, setIcdSearching] = useState(false)
+  const [recentIcds, setRecentIcds] = useState(loadRecentDiagnoses)
 
   // Clinical Orders State
   const [selectedOrders, setSelectedOrders] = useState([])
   const [orderCategory, setOrderCategory] = useState('ALL')
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
+  const [serviceCatalog, setServiceCatalog] = useState(clinicalServiceCatalog)
 
   // Results & Attachments State
   const [results, setResults] = useState({})
@@ -107,7 +189,9 @@ function MedicalEncounter() {
       const [patientResponse, recordResponse, queueResponse] = await Promise.allSettled([
         patientApi.getAll({ page: 0, size: 200 }),
         medicalRecordApi.getAll(),
-        queueApi.getQueues({ date: dayjs().format('YYYY-MM-DD') }),
+        shouldUseMyQueue
+          ? queueApi.getMyQueue({ date: dayjs().format('YYYY-MM-DD') })
+          : queueApi.getQueues({ date: dayjs().format('YYYY-MM-DD') }),
       ])
 
       const allPatients = patientResponse.status === 'fulfilled'
@@ -118,10 +202,16 @@ function MedicalEncounter() {
         ? (queueResponse.value.data || [])
         : []
 
-      const todayQueues = mergeQueues(apiQueues)
+      const doctorQueueIds = new Set(apiQueues.map((item) => String(item.id || item.queueItemId)))
+      const todayQueues = shouldUseMyQueue && localStorage.getItem('token') !== 'demo-token'
+        ? mergeQueues(apiQueues).filter((item) => doctorQueueIds.has(String(item.id || item.queueItemId)))
+        : mergeQueues(apiQueues)
+      const examiningQueues = todayQueues.filter((item) =>
+        ['IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(item.status),
+      )
 
       // Lọc danh sách bệnh nhân đã check-in hàng đợi ngày hôm nay theo thời gian/STT
-      const sortedTodayQueues = [...todayQueues].sort((a, b) => {
+      const sortedTodayQueues = [...examiningQueues].sort((a, b) => {
         const numA = a.queueNumber !== undefined && a.queueNumber !== null ? a.queueNumber : 999999
         const numB = b.queueNumber !== undefined && b.queueNumber !== null ? b.queueNumber : 999999
         if (numA !== numB) return numA - numB
@@ -136,12 +226,12 @@ function MedicalEncounter() {
         if (!addedIds.has(pIdStr) && qItem.patientId) {
           addedIds.add(pIdStr)
           const pObj = allPatients.find((p) => String(p.id) === pIdStr) || {}
-          const timeLabel = qItem.checkedInAt ? dayjs(qItem.checkedInAt).format('HH:mm') : 'Hôm nay'
+          const timeLabel = qItem.checkedInAt ? dayjs(qItem.checkedInAt).format('HH:mm DD/MM/YYYY') : 'Hôm nay'
           todayPatientsList.push({
             ...pObj,
             id: qItem.patientId,
             fullName: pObj.fullName || qItem.patientName || pObj.name || 'Bệnh nhân',
-            patientCode: pObj.patientCode || qItem.patientCode || 'BN-N/A',
+            patientCode: pObj.patientCode || qItem.patientCode || 'Chưa có mã bệnh nhân',
             phoneNumber: pObj.phoneNumber || qItem.phone || 'Không SĐT',
             gender: pObj.gender || qItem.gender || 'MALE',
             dateOfBirth: pObj.dateOfBirth || '1995-01-01',
@@ -150,6 +240,7 @@ function MedicalEncounter() {
             checkInTimeStr: timeLabel,
             queueNumber: qItem.queueNumber,
             visitId: qItem.visitId,
+            queueItemId: qItem.id || qItem.queueItemId,
             queueStatus: qItem.status,
           })
         }
@@ -168,30 +259,70 @@ function MedicalEncounter() {
     } catch {
       setRecords(mergeMedicalRecords([]))
     }
-  }, [location.state?.patientId])
+  }, [location.state?.patientId, shouldUseMyQueue])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
+  useEffect(() => {
+    let active = true
+    clinicalServiceApi.getCatalog({ page: 0, size: 200 })
+      .then((response) => {
+        if (!active) return
+        const list = Array.isArray(response.data) ? response.data : (response.data?.content || [])
+        const normalized = list.map(normalizeClinicalService).filter(Boolean)
+        if (normalized.length) setServiceCatalog(normalized)
+      })
+      .catch(() => {
+        if (active) setServiceCatalog(clinicalServiceCatalog)
+      })
+    return () => { active = false }
+  }, [])
+
   // Fetch Backend Diagnosis ICD-10 Catalog API
   useEffect(() => {
-    const fetchCatalog = async () => {
+    const query = icdSearchQuery.trim()
+    if (query.length < 2) {
+      setBackendIcdCatalog([])
+      setIcdSearching(false)
+      return undefined
+    }
+
+    let active = true
+    const timeoutId = window.setTimeout(async () => {
+      setIcdSearching(true)
       try {
-        const response = await medicalRecordApi.getDiagnosisCatalog(icdSearchQuery)
-        if (Array.isArray(response.data)) {
-          setBackendIcdCatalog(response.data)
+        const response = await medicalRecordApi.getDiagnosisCatalog(query)
+        if (active) {
+          const list = Array.isArray(response.data) ? response.data : []
+          setBackendIcdCatalog(list
+            .filter((item) => item?.active !== false)
+            .map(normalizeDiagnosis)
+            .filter(Boolean))
         }
       } catch {
-        // Fallback to local catalog
+        if (active) setBackendIcdCatalog([])
+      } finally {
+        if (active) setIcdSearching(false)
       }
+    }, 350)
+
+    return () => {
+      active = false
+      window.clearTimeout(timeoutId)
     }
-    fetchCatalog()
   }, [icdSearchQuery])
 
   const selectedPatientObj = useMemo(() => {
     return patients.find((p) => String(p.id) === String(selectedPatientId))
   }, [patients, selectedPatientId])
+
+  const handlePatientSelection = useCallback((patientId) => {
+    const patient = patients.find((item) => String(item.id) === String(patientId))
+    setSelectedPatientId(patientId)
+    setCurrentVisitId(patient?.visitId || null)
+  }, [patients])
 
   // BMI calculation
   const bmiValue = useMemo(() => {
@@ -205,28 +336,115 @@ function MedicalEncounter() {
 
   // ICD-10 Search Results (combining Backend API & Local fallback)
   const filteredIcdList = useMemo(() => {
+    const query = icdSearchQuery.trim()
     const localMatches = searchIcd10(icdSearchQuery, icdCategory)
-    if (!backendIcdCatalog.length) return localMatches
+    const baseList = query
+      ? mergeDiagnosisOptions(backendIcdCatalog, localMatches)
+      : recentIcds
 
-    const combinedMap = new Map()
-    localMatches.forEach((item) => combinedMap.set(item.code, item))
-    backendIcdCatalog.forEach((item) => {
-      if (!combinedMap.has(item.code)) {
-        combinedMap.set(item.code, { code: item.code, name: item.name, category: 'ALL' })
+    return baseList
+      .filter((item) => icdCategory === 'ALL' || !item.category || item.category === icdCategory)
+      .slice(0, MAX_DIAGNOSIS_OPTIONS)
+  }, [icdSearchQuery, icdCategory, backendIcdCatalog, recentIcds])
+
+  const diagnosisSelectOptions = useMemo(() => {
+    const source = icdSearchQuery.trim() ? filteredIcdList : recentIcds
+    return source
+      .filter((item) => item.code !== primaryIcd?.code)
+      .slice(0, MAX_DIAGNOSIS_OPTIONS)
+  }, [filteredIcdList, icdSearchQuery, primaryIcd?.code, recentIcds])
+
+  const rememberDiagnosis = useCallback((rawItem) => {
+    const item = normalizeDiagnosis(rawItem)
+    if (!item) return
+    setRecentIcds((current) => {
+      const next = mergeDiagnosisOptions([item], current).slice(0, MAX_DIAGNOSIS_OPTIONS)
+      try {
+        localStorage.setItem(RECENT_DIAGNOSES_KEY, JSON.stringify(next))
+      } catch {
+        // Không chặn thao tác khám nếu bộ nhớ trình duyệt không khả dụng.
       }
+      return next
     })
-    return Array.from(combinedMap.values())
-  }, [icdSearchQuery, icdCategory, backendIcdCatalog])
+  }, [])
+
+  const resolveDiagnosisFromCatalog = useCallback(async (rawItem) => {
+    const item = normalizeDiagnosis(rawItem)
+    if (!item) return null
+    try {
+      const response = await medicalRecordApi.getDiagnosisCatalog(item.code)
+      const exactMatch = (Array.isArray(response.data) ? response.data : [])
+        .filter((candidate) => candidate?.active !== false)
+        .map(normalizeDiagnosis)
+        .find((candidate) => candidate?.code === item.code)
+      return exactMatch ? { ...item, ...exactMatch } : item
+    } catch {
+      return item
+    }
+  }, [])
+
+  const selectPrimaryDiagnosis = useCallback((rawItem) => {
+    const item = normalizeDiagnosis(rawItem)
+    if (!item) return
+    setPrimaryIcd(item)
+    setSecondaryIcds((current) => current.filter((diagnosis) => diagnosis.code !== item.code))
+    form.setFieldsValue({ diagnosisText: `[${item.code}] ${item.name}` })
+    rememberDiagnosis(item)
+
+    resolveDiagnosisFromCatalog(item).then((resolved) => {
+      if (!resolved?.diagnosisCatalogId) return
+      setPrimaryIcd((current) => current?.code === resolved.code ? resolved : current)
+      rememberDiagnosis(resolved)
+    })
+    return item
+  }, [form, rememberDiagnosis, resolveDiagnosisFromCatalog])
+
+  const addSecondaryDiagnosis = useCallback((rawItem) => {
+    const item = normalizeDiagnosis(rawItem)
+    if (!item) return false
+    if (primaryIcd?.code === item.code) {
+      message.warning('Chẩn đoán này đang được chọn làm chẩn đoán chính.')
+      return false
+    }
+    if (secondaryIcds.some((diagnosis) => diagnosis.code === item.code)) {
+      message.info('Chẩn đoán phụ này đã có trong danh sách.')
+      return false
+    }
+    setSecondaryIcds((current) => {
+      return [...current, item]
+    })
+    rememberDiagnosis(item)
+    resolveDiagnosisFromCatalog(item).then((resolved) => {
+      if (!resolved?.diagnosisCatalogId) return
+      setSecondaryIcds((current) => current.map((diagnosis) =>
+        diagnosis.code === resolved.code ? resolved : diagnosis
+      ))
+      rememberDiagnosis(resolved)
+    })
+    return true
+  }, [primaryIcd?.code, rememberDiagnosis, resolveDiagnosisFromCatalog, secondaryIcds])
+
+  const clearPrimaryDiagnosis = useCallback(() => {
+    setPrimaryIcd(null)
+    form.setFieldValue('diagnosisText', '')
+  }, [form])
+
+  const setDiagnosisModalVisibility = useCallback((open) => {
+    setIcdSearchQuery('')
+    setIcdCategory('ALL')
+    setBackendIcdCatalog([])
+    setDiagnosisModalOpen(open)
+  }, [])
 
   // Clinical Orders Catalog Filtered
   const filteredCatalog = useMemo(() => {
     const q = orderSearchQuery.toLowerCase().trim()
-    return clinicalServiceCatalog.filter((item) => {
+    return serviceCatalog.filter((item) => {
       const matchesCat = orderCategory === 'ALL' || item.category === orderCategory
       const matchesQ = !q || item.name.toLowerCase().includes(q) || item.code.toLowerCase().includes(q)
       return matchesCat && matchesQ
     })
-  }, [orderCategory, orderSearchQuery])
+  }, [orderCategory, orderSearchQuery, serviceCatalog])
 
   // Order helper actions
   const handleAddOrder = (catalogItem) => {
@@ -265,110 +483,42 @@ function MedicalEncounter() {
   const totalOrderFee = useMemo(() => {
     return selectedOrders.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
   }, [selectedOrders])
+  const persistedOrderFee = selectedOrders.length > 0 && selectedOrders.every((item) =>
+    item.price !== null && item.price !== undefined && Number.isFinite(Number(item.price)),
+  ) ? totalOrderFee : null
 
-  // Tự động lưu/đồng bộ phiếu chỉ định khi bác sĩ chọn dịch vụ CĐLS cho bệnh nhân đang khám
-  useEffect(() => {
-    if (selectedPatientId && selectedOrders && selectedOrders.length > 0) {
-      const orderCode = `CD-${dayjs().format('YYYYMMDD')}-${Math.floor(100 + Math.random() * 900)}`
-      const clinicalOrderObj = {
-        id: `ord-${selectedPatientId}`,
-        orderCode,
-        patientId: selectedPatientId,
-        patientCode: selectedPatientObj?.patientCode || `BN${String(selectedPatientId).slice(-6).toUpperCase()}`,
-        patientName: selectedPatientObj?.fullName || selectedPatientObj?.name || 'Bệnh nhân',
-        gender: selectedPatientObj?.gender || 'Nam',
-        age: selectedPatientObj?.age || 30,
-        department: user?.department || 'Khoa Nội tổng quát',
-        doctorName: user?.fullName || user?.username || 'BS. Phạm Hồng Anh',
-        orderDate: dayjs().format('YYYY-MM-DD HH:mm'),
-        priority: selectedOrders.some((o) => o.isUrgent) ? 'URGENT' : 'NORMAL',
-        status: 'PENDING',
-        totalAmount: totalOrderFee,
-        items: selectedOrders.map((item, idx) => ({
-          serviceId: item.id || `srv-${idx}-${Date.now()}`,
-          serviceCode: item.code || `CDHA-${idx + 1}`,
-          serviceName: item.name,
-          category: item.category || 'Chẩn đoán hình ảnh',
-          price: Number(item.price) || 0,
-          quantity: 1,
-          instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
-          status: 'PENDING',
-        })),
-        resultSummary: '',
-        createdAt: dayjs().toISOString(),
-        updatedAt: dayjs().toISOString(),
-      }
-      saveStoredClinicalOrder(clinicalOrderObj)
-    }
-  }, [selectedOrders, selectedPatientId, selectedPatientObj, totalOrderFee, user])
+  // Đồng bộ trạng thái hàng đợi sau khi phiếu chỉ định đã được tạo thành công.
+  const syncQueueCompletion = async (patientId, hasOrders) => {
+    if (!hasOrders) return true
 
-  // Đồng bộ trạng thái hàng đợi & tự động tạo phiếu Chỉ định Lâm sàng sang các màn hình CĐLS và Nhập kết quả
-  const syncQueueCompletion = async (patientId) => {
     try {
-      const hasOrders = selectedOrders && selectedOrders.length > 0
-      const targetStatus = hasOrders ? 'WAITING_FOR_RESULT' : 'IN_PROGRESS'
-      const targetQueueId = location.state?.queueItemId
+      const targetStatus = 'WAITING_FOR_RESULT'
+      const targetQueueId = selectedPatientObj?.queueItemId || (
+        String(location.state?.patientId) === String(patientId)
+          ? location.state?.queueItemId
+          : null
+      )
+      const isDemo = localStorage.getItem('token') === 'demo-token'
 
-      // 1. Nếu có chỉ định CĐLS, lưu phiếu vào hệ thống để xuất hiện ngay trong màn Chỉ định và Nhập kết quả CĐLS
-      if (hasOrders) {
-        const orderCode = `CD-${dayjs().format('YYYYMMDD')}-${Math.floor(100 + Math.random() * 900)}`
-        const clinicalOrderObj = {
-          id: `ord-${Date.now()}`,
-          orderCode,
-          patientId: patientId,
-          patientCode: selectedPatientObj?.patientCode || `BN${String(patientId).slice(-6).toUpperCase()}`,
-          patientName: selectedPatientObj?.fullName || 'Bệnh nhân',
-          gender: selectedPatientObj?.gender || 'Nam',
-          age: selectedPatientObj?.age || 30,
-          department: user?.department || 'Khoa Nội tổng quát',
-          doctorName: user?.fullName || user?.username || 'BS. Phạm Hồng Anh',
-          orderDate: dayjs().format('YYYY-MM-DD HH:mm'),
-          priority: selectedOrders.some((o) => o.isUrgent) ? 'URGENT' : 'NORMAL',
-          status: 'PENDING',
-          totalAmount: totalOrderFee,
-          items: selectedOrders.map((item, idx) => ({
-            serviceId: item.id || `srv-${idx}-${Date.now()}`,
-            serviceCode: item.code || `CDHA-${idx + 1}`,
-            serviceName: item.name,
-            category: item.category || 'Chẩn đoán hình ảnh',
-            price: Number(item.price) || 0,
-            quantity: 1,
-            instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
-            status: 'PENDING',
-          })),
-          resultSummary: '',
-          createdAt: dayjs().toISOString(),
-          updatedAt: dayjs().toISOString(),
-        }
-        saveStoredClinicalOrder(clinicalOrderObj)
+      if (!targetQueueId && !isDemo) return false
+      if (targetQueueId && !isDemo && selectedPatientObj?.queueStatus !== targetStatus) {
+        await queueApi.updateStatus(targetQueueId, { status: targetStatus })
       }
 
-      // 2. Đồng bộ trạng thái về trang Quản lý Lịch hẹn & Hàng Đợi (Chờ CĐLS hoặc tiếp tục Đang khám, KHÔNG tự động Hoàn tất)
-      if (targetQueueId) {
-        try {
-          await queueApi.updateStatus(targetQueueId, { status: targetStatus })
-        } catch (err) {
-          console.warn('Backend sync queue note:', err)
-        }
-      }
+      // Chỉ cập nhật bộ nhớ cục bộ sau khi máy chủ xác nhận (hoặc trong chế độ minh họa).
       const allQueues = getStoredQueueItems()
       allQueues.forEach((q) => {
         if (
           (targetQueueId && String(q.id) === String(targetQueueId)) ||
-          (!targetQueueId && String(q.patientId) === String(patientId) && ['IN_PROGRESS', 'WAITING', 'WAITING_FOR_RESULT'].includes(q.status))
+          (isDemo && !targetQueueId && String(q.patientId) === String(patientId) && ['IN_PROGRESS', 'WAITING', 'WAITING_FOR_RESULT'].includes(q.status))
         ) {
-          const updatedItem = {
-            ...q,
-            status: targetStatus,
-          }
-          saveStoredQueueItem(updatedItem)
-          if (!targetQueueId && q.id && !String(q.id).startsWith('local') && !String(q.id).startsWith('qi-')) {
-            queueApi.updateStatus(q.id, { status: targetStatus }).catch(() => {})
-          }
+          saveStoredQueueItem({ ...q, status: targetStatus })
         }
       })
+      return true
     } catch (e) {
-      console.warn('Sync queue error:', e)
+      console.warn('Không thể đồng bộ trạng thái hàng đợi:', e)
+      return false
     }
   }
 
@@ -388,30 +538,42 @@ function MedicalEncounter() {
     }
 
     setSaving(true)
+    const isDemo = localStorage.getItem('token') === 'demo-token'
+
+    const canonicalPrimaryIcd = primaryIcd
+      ? await resolveDiagnosisFromCatalog(primaryIcd)
+      : null
+    const canonicalSecondaryIcds = (await Promise.all(
+      secondaryIcds.map((item) => resolveDiagnosisFromCatalog(item)),
+    )).filter(Boolean)
+    if (canonicalPrimaryIcd) {
+      setPrimaryIcd(canonicalPrimaryIcd)
+      rememberDiagnosis(canonicalPrimaryIcd)
+    }
+    setSecondaryIcds(canonicalSecondaryIcds)
+
+    const unresolvedDiagnoses = [
+      ...(canonicalPrimaryIcd && !isUuid(canonicalPrimaryIcd.diagnosisCatalogId) ? [canonicalPrimaryIcd] : []),
+      ...canonicalSecondaryIcds.filter((item) => !isUuid(item.diagnosisCatalogId)),
+    ]
+    if (!isDemo && unresolvedDiagnoses.length > 0) {
+      const codes = unresolvedDiagnoses.map((item) => item.code).filter(Boolean).join(', ')
+      message.error(`Không thể lưu vì mã chẩn đoán ${codes || 'đã chọn'} không còn hoạt động trong danh mục. Vui lòng tìm và chọn lại.`)
+      setSaving(false)
+      return
+    }
+    if (!isDemo && canonicalSecondaryIcds.length > 0 && !isUuid(canonicalPrimaryIcd?.diagnosisCatalogId)) {
+      message.error('Vui lòng chọn chẩn đoán chính từ danh mục trước khi thêm chẩn đoán phụ.')
+      setSaving(false)
+      return
+    }
 
     // Format full diagnosis text
-    const primaryDiagStr = primaryIcd ? `[${primaryIcd.code}] ${primaryIcd.name}` : values.diagnosisText
-    const secondaryDiagStr = secondaryIcds.map((item) => `[${item.code}] ${item.name}`).join('; ')
+    const primaryDiagStr = canonicalPrimaryIcd ? `[${canonicalPrimaryIcd.code}] ${canonicalPrimaryIcd.name}` : values.diagnosisText
+    const secondaryDiagStr = canonicalSecondaryIcds.map((item) => `[${item.code}] ${item.name}`).join('; ')
     const fullDiagnosisText = secondaryDiagStr ? `${primaryDiagStr} (Kèm theo: ${secondaryDiagStr})` : primaryDiagStr
 
     const orderNamesList = selectedOrders.map((o) => `${o.name} (${o.isUrgent ? 'CẤP CỨU' : 'Thường'})`)
-
-    const payload = {
-      ...values,
-      patientId: values.patientId,
-      symptoms: values.symptoms,
-      examinationNote: values.examinationNote || '',
-      diagnosis: fullDiagnosisText,
-      diagnosisType,
-      primaryIcdCode: primaryIcd?.code || '',
-      primaryIcdName: primaryIcd?.name || values.diagnosisText || '',
-      secondaryIcdCodes: secondaryIcds.map((i) => i.code).join(','),
-      vitalSigns,
-      treatmentPlan: values.treatmentPlan || '',
-      clinicalOrders: orderNamesList,
-      clinicalOrderItems: selectedOrders,
-      clinicalResults: Object.fromEntries(Object.entries(results).filter(([, value]) => value?.trim())),
-    }
 
     const recordCode = `BA-${dayjs().format('YYYYMMDDHHmmss')}`
     const completeRecord = {
@@ -424,14 +586,14 @@ function MedicalEncounter() {
       examinationNote: values.examinationNote || '',
       diagnosis: fullDiagnosisText,
       diagnosisType,
-      primaryIcd: primaryIcd || { code: 'ICD-10', name: values.diagnosisText || 'Chẩn đoán xác định' },
-      secondaryIcds,
+      primaryIcd: canonicalPrimaryIcd || { code: 'ICD-10', name: values.diagnosisText || 'Chẩn đoán xác định' },
+      secondaryIcds: canonicalSecondaryIcds,
       vitalSigns,
       treatmentPlan: values.treatmentPlan || '',
       clinicalOrders: orderNamesList,
       clinicalOrderItems: selectedOrders,
       clinicalResults: Object.fromEntries(Object.entries(results).filter(([, value]) => value?.trim())),
-      totalFee: totalOrderFee,
+      totalFee: persistedOrderFee,
       status: 'IN_PROGRESS',
       createdAt: dayjs().toISOString(),
       attachments: files.map((file) => ({ id: file.uid || String(Date.now()), fileName: file.name })),
@@ -440,8 +602,10 @@ function MedicalEncounter() {
     try {
       // 1. Call Backend POST /medical-records API if available
       let beRecordId = null
-      let beExamId = location.state?.examinationId || null
-      const validVisitId = currentVisitId || selectedPatientObj?.visitId || location.state?.visitId || '10000000-0000-0000-0000-000000000001'
+      const navigationVisitId = String(location.state?.patientId) === String(values.patientId)
+        ? location.state?.visitId
+        : null
+      const validVisitId = selectedPatientObj?.visitId || currentVisitId || navigationVisitId
 
       const beCreatePayload = {
         visitId: validVisitId,
@@ -453,51 +617,163 @@ function MedicalEncounter() {
         treatmentPlan: values.treatmentPlan || '',
         doctorInstructions: values.treatmentPlan || 'Theo dõi sức khỏe và uống thuốc theo đơn',
         conclusion: fullDiagnosisText,
-        ...payload,
       }
 
-      try {
-        const response = await medicalRecordApi.create(beCreatePayload)
-        const createdRecord = response?.data
-        if (createdRecord?.id) {
-          beRecordId = createdRecord.id
-          beExamId = createdRecord.examinationId || createdRecord.id || beExamId
+      if (!isUuid(validVisitId) && !isDemo) {
+        throw new Error('Lượt khám chưa được đồng bộ với hệ thống. Vui lòng tải lại danh sách bệnh nhân.')
+      }
+
+      if (isUuid(validVisitId)) {
+        try {
+          const existingResponse = await medicalRecordApi.getByVisit(validVisitId)
+          const existingRecord = existingResponse?.data || {}
+          const existingRecordId = existingRecord.medicalRecordId || existingRecord.id || null
+          if (!existingRecordId) {
+            throw new Error('Không tìm thấy mã bệnh án của lượt khám hiện tại.')
+          }
+          if (existingRecord.status === 'LOCKED') {
+            throw new Error('Bệnh án đã khóa nên không thể chỉnh sửa hoặc tạo thêm chỉ định.')
+          }
+          const updatePayload = {
+            chiefComplaint: beCreatePayload.chiefComplaint,
+            symptoms: beCreatePayload.symptoms,
+            medicalHistory: beCreatePayload.medicalHistory,
+            physicalExamination: beCreatePayload.physicalExamination,
+            clinicalProgress: beCreatePayload.clinicalProgress,
+            treatmentPlan: beCreatePayload.treatmentPlan,
+            doctorInstructions: beCreatePayload.doctorInstructions,
+            conclusion: beCreatePayload.conclusion,
+          }
+          await medicalRecordApi.update(existingRecordId, updatePayload)
+          beRecordId = existingRecordId
+        } catch (getError) {
+          if (getError?.response?.status === 404) {
+            try {
+              const response = await medicalRecordApi.create(beCreatePayload)
+              beRecordId = response?.data?.id || null
+              if (!beRecordId) throw new Error('Máy chủ không trả về mã bệnh án vừa tạo.')
+            } catch (createError) {
+              if (!isDemo) throw new Error('Không thể tạo bệnh án cho lượt khám hiện tại.', { cause: createError })
+              console.warn('Không thể tạo bệnh án trên máy chủ:', createError)
+            }
+          } else {
+            if (!isDemo) {
+              if (getError instanceof Error && !getError?.response) throw getError
+              throw new Error('Không thể tải hoặc cập nhật bệnh án trên máy chủ.', { cause: getError })
+            }
+            console.warn('Không thể tải hoặc cập nhật bệnh án trên máy chủ:', getError)
+          }
         }
-      } catch (beErr) {
-        console.warn('Backend create API unavailable or error, using local ID:', beErr)
+      }
+
+      if (!beRecordId && !isDemo) {
+        throw new Error('Bệnh án chưa được lưu trên máy chủ. Vui lòng thử lại.')
       }
 
       if (beRecordId) {
         completeRecord.id = beRecordId
       }
 
-      // 2. Trigger diagnosis and order endpoints safely
-      const targetRecordId = beRecordId || completeRecord.id
-      try {
-        await medicalRecordApi.recordDiagnosis(targetRecordId, {
-          primaryIcdCode: primaryIcd?.code || 'Z00.0',
-          primaryIcdName: primaryIcd?.name || values.diagnosisText || 'Khám sức khỏe tổng quát',
-          secondaryIcdCodes: secondaryIcds.map((item) => ({ code: item.code, name: item.name })),
-          clinicalNotes: values.examinationNote || values.symptoms || '',
-        })
-      } catch (diagErr) {
-        console.warn('Backend recordDiagnosis API note:', diagErr)
+      // 2. Đồng bộ chẩn đoán theo đúng mã danh mục từ máy chủ.
+      if (beRecordId && isUuid(canonicalPrimaryIcd?.diagnosisCatalogId)) {
+        try {
+          await medicalRecordApi.recordDiagnosis(beRecordId, {
+            primaryDiagnosis: {
+              diagnosisCatalogId: canonicalPrimaryIcd.diagnosisCatalogId,
+              code: canonicalPrimaryIcd.code,
+              name: canonicalPrimaryIcd.name,
+              note: values.examinationNote || values.symptoms || '',
+            },
+            secondaryDiagnoses: canonicalSecondaryIcds
+              .filter((item) => isUuid(item.diagnosisCatalogId) && item.code !== canonicalPrimaryIcd.code)
+              .map((item) => ({
+                diagnosisCatalogId: item.diagnosisCatalogId,
+                code: item.code,
+                name: item.name,
+                note: item.note || '',
+              })),
+          })
+        } catch (diagErr) {
+          console.warn('Không thể đồng bộ chẩn đoán với máy chủ:', diagErr)
+          if (!isDemo) {
+            throw new Error('Bệnh án đã lưu nhưng danh mục chẩn đoán chưa đồng bộ. Biểu mẫu được giữ lại để bạn thử lại.')
+          }
+        }
+      } else if (beRecordId) {
+        message.warning('Bệnh án đã lưu, nhưng chẩn đoán tự nhập không có mã danh mục để đồng bộ.')
       }
 
+      let storedClinicalOrder = null
+      let clinicalOrderSyncFailed = false
       if (selectedOrders.length > 0) {
-        try {
-          await medicalRecordApi.createClinicalOrder(validVisitId, {
-            clinicalReason: fullDiagnosisText,
-            items: selectedOrders.map((item) => ({
-              serviceId: String(item.id).includes('-') ? item.id : '80000000-0000-0000-0000-000000000001',
-              serviceCode: item.code,
-              serviceName: item.name,
-              instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
-            })),
-          })
-        } catch (orderErr) {
-          console.warn('Backend createClinicalOrder API note:', orderErr)
+        const canSyncOrder = Boolean(beRecordId) && isUuid(validVisitId) && selectedOrders.every((item) => isUuid(item.id))
+        let serverOrder = null
+        if (canSyncOrder) {
+          try {
+            const response = await medicalRecordApi.createClinicalOrder(validVisitId, {
+              clinicalReason: fullDiagnosisText,
+              items: selectedOrders.map((item) => ({
+                serviceId: item.id,
+                instruction: item.note || (item.isUrgent ? 'CẤP CỨU' : ''),
+              })),
+            })
+            serverOrder = response?.data || null
+            if (!serverOrder?.id) throw new Error('Máy chủ không trả về mã phiếu chỉ định.')
+          } catch (orderErr) {
+            console.warn('Không thể đồng bộ chỉ định cận lâm sàng:', orderErr)
+            clinicalOrderSyncFailed = !isDemo
+          }
+        } else if (!isDemo) {
+          clinicalOrderSyncFailed = true
         }
+
+        if (!clinicalOrderSyncFailed) {
+          const normalizeOrderStatus = (status) => {
+            if (status === 'ORDERED') return 'PENDING'
+            if (status === 'PARTIALLY_COMPLETED') return 'RESULTED'
+            return status || 'PENDING'
+          }
+          const fallbackOrderCode = `CD-${dayjs().format('YYYYMMDD-HHmmss')}`
+          storedClinicalOrder = {
+            id: serverOrder?.id || `ord-${Date.now()}`,
+            orderCode: serverOrder?.orderCode || fallbackOrderCode,
+            visitId: serverOrder?.visitId || validVisitId,
+            patientId: serverOrder?.patientId || values.patientId,
+            patientCode: selectedPatientObj?.patientCode || '',
+            patientName: selectedPatientObj?.fullName || selectedPatientObj?.patientName || 'Bệnh nhân',
+            gender: selectedPatientObj?.gender,
+            age: selectedPatientObj?.age,
+            doctorId: serverOrder?.orderedBy || user?.id,
+            doctorName: user?.fullName || user?.username || 'Bác sĩ trực',
+            department: user?.department || 'Khoa khám bệnh',
+            diagnosis: fullDiagnosisText,
+            priority: selectedOrders.some((item) => item.isUrgent) ? 'URGENT' : 'NORMAL',
+            status: normalizeOrderStatus(serverOrder?.status),
+            items: selectedOrders.map((item, index) => {
+              const serverItem = serverOrder?.items?.[index]
+              return {
+                ...item,
+                id: serverItem?.id || item.id,
+                serviceId: item.id,
+                serviceCode: serverItem?.serviceCode || item.code,
+                serviceName: serverItem?.serviceName || item.name,
+                instruction: serverItem?.instruction || item.note || '',
+                status: normalizeOrderStatus(serverItem?.status),
+                price: item.price == null ? null : Number(item.price),
+                quantity: 1,
+              }
+            }),
+            totalAmount: persistedOrderFee,
+            createdAt: serverOrder?.orderedAt || dayjs().toISOString(),
+            updatedAt: dayjs().toISOString(),
+          }
+          saveStoredClinicalOrder(storedClinicalOrder)
+        }
+      }
+
+      if (clinicalOrderSyncFailed) {
+        message.error('Bệnh án đã được lưu nhưng chưa tạo được phiếu chỉ định cận lâm sàng. Biểu mẫu được giữ lại để bạn thử lại.')
+        return
       }
 
       // 3. File Attachments
@@ -532,15 +808,19 @@ function MedicalEncounter() {
         action: 'Tạo bệnh án & chẩn đoán ICD-10 mới',
       })
 
+      const hasCreatedOrders = selectedOrders.length > 0 && Boolean(storedClinicalOrder)
+      const queueSynced = await syncQueueCompletion(values.patientId, hasCreatedOrders)
+      if (!queueSynced) {
+        message.warning('Bệnh án và phiếu chỉ định đã được lưu, nhưng trạng thái hàng đợi chưa cập nhật. Vui lòng thử lại tại màn hình hàng đợi.')
+      }
       message.success(`Đã lưu thành công bệnh án ${recordCode}`)
       resetFormState()
       await loadData()
-      await syncQueueCompletion(values.patientId)
       setActiveTab('history')
-      showSuccessModal(recordCode, values.patientId)
+      showSuccessModal(recordCode, values.patientId, hasCreatedOrders)
     } catch (err) {
       console.error('Lỗi khi lưu bệnh án:', err)
-      message.error('Có lỗi xảy ra, vui lòng thử lại!')
+      message.error(err?.message || 'Có lỗi xảy ra, vui lòng thử lại!')
     } finally {
       setSaving(false)
     }
@@ -557,9 +837,9 @@ function MedicalEncounter() {
     setFiles([])
   }
 
-  const showSuccessModal = (code, pId) => {
+  const showSuccessModal = (code, pId, hasOrders) => {
     Modal.confirm({
-      title: 'Đã lưu bệnh án & chỉ định thành công!',
+      title: hasOrders ? 'Đã lưu bệnh án và tạo chỉ định thành công!' : 'Đã lưu bệnh án thành công!',
       icon: <CheckCircleOutlined style={{ color: '#16A34A' }} />,
       content: (
         <div>
@@ -639,7 +919,7 @@ function MedicalEncounter() {
     {
       title: 'Trạng thái',
       dataIndex: 'status',
-      render: (value) => <Tag color="green">{value || 'COMPLETED'}</Tag>,
+      render: (value) => <Tag color="green">{MEDICAL_RECORD_STATUS_LABELS[value] || 'Hoàn thành'}</Tag>,
     },
     {
       title: 'Thao tác',
@@ -657,21 +937,21 @@ function MedicalEncounter() {
       <div className="page-header" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ margin: 0, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <MedicineBoxOutlined style={{ color: '#2563EB' }} /> Khám bệnh & Phân loại Chẩn đoán Y Khoa
+            <MedicineBoxOutlined style={{ color: '#2563EB' }} /> Khám bệnh & phân loại chẩn đoán y khoa
           </h2>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Lập trình chẩn đoán ICD-10 tiêu chuẩn, chỉ định dịch vụ cận lâm sàng và quản lý bệnh án điện tử.
+            Ghi nhận chẩn đoán ICD-10, tạo chỉ định cận lâm sàng và quản lý bệnh án điện tử.
           </Text>
         </div>
         {isDoctor && (
           <Space>
             {selectedOrders.length > 0 && (
               <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
-                In Phiếu Chỉ Định ({selectedOrders.length})
+                In phiếu chỉ định ({selectedOrders.length})
               </Button>
             )}
             <Button type="primary" size="large" loading={saving} icon={<CheckCircleOutlined />} onClick={saveRecord}>
-              Lưu Hồ Sơ Bệnh Án
+              Lưu hồ sơ bệnh án
             </Button>
           </Space>
         )}
@@ -680,8 +960,8 @@ function MedicalEncounter() {
       <Alert
         showIcon
         type="info"
-        message="Quy trình Khám bệnh chuẩn:"
-        description="1. Chọn bệnh nhân & nhập sinh hiệu -> 2. Chọn Mã bệnh ICD-10 (Chẩn đoán chính & phụ) -> 3. Nhập chỉ định Cận lâm sàng -> 4. Đính kèm kết quả -> 5. Lưu bệnh án & chuyển Kê đơn."
+        message="Quy trình khám bệnh"
+        description="1. Chọn bệnh nhân và nhập sinh hiệu → 2. Chọn mã ICD-10 cho chẩn đoán chính và phụ → 3. Tạo chỉ định cận lâm sàng → 4. Đính kèm kết quả → 5. Lưu bệnh án và chuyển kê đơn."
         style={{ marginBottom: 16, borderRadius: 8 }}
       />
 
@@ -694,7 +974,7 @@ function MedicalEncounter() {
             key: 'current',
             label: (
               <span>
-                <SolutionOutlined /> Ghi Bệnh Án & Chẩn Đoán
+                <SolutionOutlined /> Ghi bệnh án & chẩn đoán
               </span>
             ),
             children: (
@@ -702,8 +982,7 @@ function MedicalEncounter() {
                 form={form}
                 isDoctor={isDoctor}
                 patients={patients}
-                selectedPatientId={selectedPatientId}
-                setSelectedPatientId={setSelectedPatientId}
+                setSelectedPatientId={handlePatientSelection}
                 selectedPatientObj={selectedPatientObj}
                 vitalSigns={vitalSigns}
                 setVitalSigns={setVitalSigns}
@@ -711,11 +990,15 @@ function MedicalEncounter() {
                 diagnosisType={diagnosisType}
                 setDiagnosisType={setDiagnosisType}
                 primaryIcd={primaryIcd}
-                setPrimaryIcd={setPrimaryIcd}
+                clearPrimaryDiagnosis={clearPrimaryDiagnosis}
+                selectPrimaryDiagnosis={selectPrimaryDiagnosis}
                 secondaryIcds={secondaryIcds}
                 setSecondaryIcds={setSecondaryIcds}
-                commonIcd10List={commonIcd10List}
-                setDiagnosisModalOpen={setDiagnosisModalOpen}
+                addSecondaryDiagnosis={addSecondaryDiagnosis}
+                diagnosisOptions={diagnosisSelectOptions}
+                diagnosisSearching={icdSearching}
+                onDiagnosisSearch={setIcdSearchQuery}
+                setDiagnosisModalOpen={setDiagnosisModalVisibility}
                 selectedOrders={selectedOrders}
                 setSelectedOrders={setSelectedOrders}
                 orderCategory={orderCategory}
@@ -739,7 +1022,7 @@ function MedicalEncounter() {
           },
           {
             key: 'history',
-            label: `Lịch Sử Hồ Sơ Bệnh Án (${records.length})`,
+            label: `Lịch sử hồ sơ bệnh án (${records.length})`,
             children: (
               <Card bordered>
                 <Table
@@ -756,22 +1039,34 @@ function MedicalEncounter() {
 
       {/* Modal ICD-10 Search Catalog */}
       <Modal
-        title="Tra Cứu Danh Mục Mã Bệnh Tiêu Chuẩn ICD-10"
+        title="Tra cứu danh mục mã bệnh ICD-10"
         open={diagnosisModalOpen}
-        onCancel={() => setDiagnosisModalOpen(false)}
+        onCancel={() => setDiagnosisModalVisibility(false)}
         footer={[
-          <Button key="close" onClick={() => setDiagnosisModalOpen(false)}>
+          <Button key="close" onClick={() => setDiagnosisModalVisibility(false)}>
             Đóng
           </Button>,
         ]}
         width={750}
       >
+        <Alert
+          type={primaryIcd ? 'info' : 'warning'}
+          showIcon
+          message={primaryIcd
+            ? `Chẩn đoán chính: [${primaryIcd.code}] ${primaryIcd.name}`
+            : 'Chưa chọn chẩn đoán chính'}
+          description={primaryIcd
+            ? 'Chẩn đoán chính sẽ không xuất hiện trong lựa chọn chẩn đoán phụ.'
+            : 'Hãy chọn chẩn đoán chính trước khi thêm chẩn đoán phụ.'}
+          style={{ marginBottom: 12 }}
+        />
         <div style={{ marginBottom: 12, display: 'flex', gap: 10 }}>
           <Input
             prefix={<SearchOutlined />}
             placeholder="Tìm theo mã bệnh (J00, K29...) hoặc tên bệnh..."
             value={icdSearchQuery}
             onChange={(e) => setIcdSearchQuery(e.target.value)}
+            allowClear
           />
           <Select
             value={icdCategory}
@@ -781,11 +1076,18 @@ function MedicalEncounter() {
           />
         </div>
 
+        <Text type="secondary" style={{ display: 'block', marginBottom: 10 }}>
+          {icdSearchQuery.trim()
+            ? 'Tối đa 10 kết quả phù hợp từ danh mục ICD-10.'
+            : '10 chẩn đoán gần đây hoặc thường dùng. Nhập ít nhất 2 ký tự để tìm thêm từ hệ thống.'}
+        </Text>
+
         <Table
           size="small"
           rowKey="code"
           dataSource={filteredIcdList}
-          pagination={{ pageSize: 8 }}
+          loading={icdSearching}
+          pagination={false}
           columns={[
             {
               title: 'Mã ICD',
@@ -802,9 +1104,8 @@ function MedicalEncounter() {
                   <Button
                     size="small"
                     type="primary"
-                    onClick={() => {
-                      setPrimaryIcd(item)
-                      form.setFieldsValue({ diagnosisText: `[${item.code}] ${item.name}` })
+                    onClick={async () => {
+                      await selectPrimaryDiagnosis(item)
                       setDiagnosisModalOpen(false)
                       message.success(`Đã chọn chẩn đoán chính: [${item.code}] ${item.name}`)
                     }}
@@ -813,14 +1114,13 @@ function MedicalEncounter() {
                   </Button>
                   <Button
                     size="small"
-                    onClick={() => {
-                      if (!secondaryIcds.some((i) => i.code === item.code)) {
-                        setSecondaryIcds((prev) => [...prev, item])
-                        message.success(`Đã thêm chẩn đoán phụ: [${item.code}] ${item.name}`)
-                      }
+                    disabled={!primaryIcd || primaryIcd.code === item.code}
+                    onClick={async () => {
+                      const added = await addSecondaryDiagnosis(item)
+                      if (added) message.success(`Đã thêm chẩn đoán phụ: [${item.code}] ${item.name}`)
                     }}
                   >
-                    + Phụ
+                    Thêm phụ
                   </Button>
                 </Space>
               ),
@@ -831,7 +1131,7 @@ function MedicalEncounter() {
 
       {/* Modal View Medical Record Details */}
       <Modal
-        title={`Chi Tiết Hồ Sơ Bệnh Án Điện Tử ${viewing?.recordCode || ''}`}
+        title={`Chi tiết hồ sơ bệnh án điện tử ${viewing?.recordCode || ''}`}
         open={!!viewing}
         onCancel={() => setViewing(null)}
         footer={<Button onClick={() => setViewing(null)}>Đóng</Button>}

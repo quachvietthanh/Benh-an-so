@@ -20,6 +20,7 @@ import patientApi from '../../api/patientApi'
 import { useAuthContext } from '../../context/AuthContext'
 import { getNavigationItems } from '../../services/mockDataService'
 import { mergeAppointments, mergePatients } from '../../utils/storageHelpers'
+import { APPOINTMENT_STATUS_META } from '../../utils/queueHelpers'
 
 const { Header, Sider, Content } = Layout
 
@@ -66,9 +67,6 @@ function MainLayout() {
   React.useEffect(() => {
     syncPatients()
   }, [syncPatients, location.pathname])
-
-  const allPatients = useMemo(() => mergePatients([]), [])
-  const allAppointments = useMemo(() => mergeAppointments([]), [])
 
   const searchOptions = useMemo(() => {
     const keyword = searchValue.trim().toLowerCase()
@@ -159,7 +157,7 @@ function MainLayout() {
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', cursor: 'pointer' }}
               >
                 <span><strong>{a.patientName || 'Lịch hẹn'}</strong> <small style={{ color: '#64748b' }}>({a.slot || a.time || 'Hôm nay'})</small></span>
-                <small style={{ color: '#16a34a' }}>{a.status || 'Đã đặt'}</small>
+                <small style={{ color: '#16a34a' }}>{APPOINTMENT_STATUS_META[a.status]?.label || 'Không xác định'}</small>
               </div>
             ),
             type: 'appointment',
@@ -180,7 +178,7 @@ function MainLayout() {
 
     if (valStr.startsWith('patient:')) {
       const patientId = valStr.replace('patient:', '')
-      const currentPatients = mergePatients([...remotePatients, ...getPatients()])
+      const currentPatients = mergePatients(remotePatients)
       const foundPatient = option?.patient || currentPatients.find((p) => String(p.id) === String(patientId))
       navigate(`/patients/${patientId}`, { state: { patient: foundPatient } })
     } else if (valStr.startsWith('appointment:')) {
@@ -199,7 +197,7 @@ function MainLayout() {
     const keyword = searchValue.trim()
     setSearchValue('')
 
-    const currentPatients = mergePatients([...remotePatients, ...getPatients()])
+    const currentPatients = mergePatients(remotePatients)
     const matched = currentPatients.find((p) =>
       [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
         .some((val) => String(val || '').toLowerCase() === keyword.toLowerCase())

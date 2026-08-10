@@ -7,6 +7,7 @@ import {
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import ResultStatusBadge from './ResultStatusBadge'
+import { formatGender } from '../../utils/helpers'
 
 const { Text } = Typography
 
@@ -51,7 +52,7 @@ export const ResultTable = ({
             {name}
           </Text>
           <div style={{ fontSize: 12, color: '#64748b' }}>
-            {record.gender || 'Nam'} ({record.age || 30}T)
+            {formatGender(record.gender || 'Nam')} ({record.age || 30}T)
           </div>
         </div>
       ),

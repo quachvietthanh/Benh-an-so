@@ -45,7 +45,7 @@ const STATUS_MAP = {
 export const ResultStatusBadge = ({ status = 'PENDING' }) => {
   const config = STATUS_MAP[status] || {
     color: 'default',
-    text: status || 'Chưa xác định',
+    text: 'Chưa xác định',
     icon: null,
     bg: '#fafafa',
     border: '#d9d9d9',

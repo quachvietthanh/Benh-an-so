@@ -19,7 +19,9 @@ export const formatDateTime = (date) => {
  */
 export const formatGender = (gender) => {
   const map = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' }
-  return map[gender] || gender
+  if (map[gender]) return map[gender]
+  if (['Nam', 'Nữ', 'Khác'].includes(gender)) return gender
+  return 'Không xác định'
 }
 
 /**
@@ -32,7 +34,7 @@ export const formatRecordStatus = (status) => {
     COMPLETED: { label: 'Hoàn thành', color: 'green' },
     CANCELLED: { label: 'Đã hủy', color: 'red' },
   }
-  return map[status] || { label: status, color: 'default' }
+  return map[status] || { label: 'Không xác định', color: 'default' }
 }
 
 /**

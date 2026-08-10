@@ -14,6 +14,7 @@ import {
 } from 'antd'
 import { EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import ClinicalServiceSelector from './ClinicalServiceSelector'
+import { formatGender } from '../../utils/helpers'
 
 const { Option } = Select
 const { TextArea } = Input
@@ -46,7 +47,12 @@ export const EditClinicalOrderModal = ({ visible, order, onClose, onUpdateSucces
 
       setLoading(true)
 
-      const totalAmount = selectedServices.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0)
+      const hasCompletePricing = selectedServices.every((item) =>
+        item.price !== null && item.price !== undefined && Number.isFinite(Number(item.price)),
+      )
+      const totalAmount = hasCompletePricing
+        ? selectedServices.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity || 1)), 0)
+        : null
 
       const updatedOrder = {
         ...order,
@@ -96,7 +102,7 @@ export const EditClinicalOrderModal = ({ visible, order, onClose, onUpdateSucces
               <div style={{ fontSize: 12, color: '#8c8c8c' }}>Bệnh nhân:</div>
               <div style={{ fontWeight: 600, fontSize: 15 }}>{order.patientName}</div>
               <div style={{ fontSize: 12, color: '#595959' }}>
-                [{order.patientCode}] • {order.gender} ({order.age}T)
+                [{order.patientCode}] • {formatGender(order.gender)} ({order.age}T)
               </div>
             </div>
           </Col>

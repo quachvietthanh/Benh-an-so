@@ -10,6 +10,11 @@ import {
 } from '@ant-design/icons'
 
 const STATUS_CONFIG = {
+  ORDERED: {
+    color: 'processing',
+    text: 'Chờ tiếp nhận',
+    icon: <ClockCircleOutlined />,
+  },
   PENDING: {
     color: 'processing',
     text: 'Chờ tiếp nhận',
@@ -23,6 +28,11 @@ const STATUS_CONFIG = {
   RESULTED: {
     color: 'purple',
     text: 'Đã có kết quả',
+    icon: <FileDoneOutlined />,
+  },
+  PARTIALLY_COMPLETED: {
+    color: 'purple',
+    text: 'Đã có một phần kết quả',
     icon: <FileDoneOutlined />,
   },
   COMPLETED: {
@@ -40,7 +50,7 @@ const STATUS_CONFIG = {
 export const ClinicalOrderStatusBadge = ({ status }) => {
   const config = STATUS_CONFIG[status] || {
     color: 'default',
-    text: status || 'Không xác định',
+    text: 'Không xác định',
     icon: null,
   }
 

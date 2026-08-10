@@ -2,6 +2,11 @@ import React from 'react'
 import AppRoutes from './routes/AppRoutes'
 import './App.css'
 import { ConfigProvider, message } from 'antd'
+import viVN from 'antd/locale/vi_VN'
+import dayjs from 'dayjs'
+import 'dayjs/locale/vi'
+
+dayjs.locale('vi')
 
 message.config({
   maxCount: 2,
@@ -11,6 +16,7 @@ message.config({
 function App() {
   return (
     <ConfigProvider
+      locale={viVN}
       theme={{
         token: {
           colorPrimary: '#2563EB',
