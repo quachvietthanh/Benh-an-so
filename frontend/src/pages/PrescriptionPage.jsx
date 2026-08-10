@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  Col,
   Descriptions,
   Divider,
   Dropdown,
@@ -14,6 +15,7 @@ import {
   message,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Space,
   Spin,
@@ -24,7 +26,9 @@ import {
   Typography,
 } from 'antd'
 import {
+  CalendarOutlined,
   CheckCircleOutlined,
+  ClockCircleOutlined,
   CloseCircleOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -37,6 +41,7 @@ import {
   MedicineBoxOutlined,
   PlusOutlined,
   RollbackOutlined,
+  SearchOutlined,
   StopOutlined,
   SwapOutlined,
   SyncOutlined,
@@ -131,6 +136,9 @@ function PrescriptionPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
+  const [queueItems, setQueueItems] = useState([])
+  const [loadingQueue, setLoadingQueue] = useState(false)
+  const [quickSearchId, setQuickSearchId] = useState('')
 
   const isDoctor = roles.includes('doctor') || roles.includes('admin')
   const isAssignedDoctor = Boolean(
@@ -224,6 +232,41 @@ function PrescriptionPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (medicalRecordId) return
+    let isMounted = true
+    setLoadingQueue(true)
+
+    const fetchQueue = async () => {
+      try {
+        const today = dayjs().format('YYYY-MM-DD')
+        let res
+        if (roles.includes('doctor')) {
+          try {
+            res = await queueApi.getMyQueue({ date: today })
+          } catch {
+            res = await queueApi.getQueues({ date: today })
+          }
+        } else {
+          res = await queueApi.getQueues({ date: today })
+        }
+        if (isMounted) {
+          const list = Array.isArray(res.data) ? res.data : []
+          setQueueItems(list)
+        }
+      } catch {
+        if (isMounted) setQueueItems([])
+      } finally {
+        if (isMounted) setLoadingQueue(false)
+      }
+    }
+
+    fetchQueue()
+    return () => {
+      isMounted = false
+    }
+  }, [medicalRecordId, roles])
 
   const requireLiveInProgressQueue = useCallback(async (action) => {
     const queueItemId = encounter?.queueItem?.id
@@ -694,16 +737,207 @@ function PrescriptionPage() {
   ]
 
   if (!medicalRecordId) {
+    const queueColumns = [
+      {
+        title: 'STT',
+        dataIndex: 'queueNumber',
+        width: 80,
+        render: (num) => (
+          <Tag color="blue" style={{ fontWeight: 700 }}>
+            #{num || '—'}
+          </Tag>
+        ),
+      },
+      {
+        title: 'Mã lượt khám',
+        dataIndex: 'visitCode',
+        render: (code, item) => (
+          <Text code>{code || item.visitId || '—'}</Text>
+        ),
+      },
+      {
+        title: 'Bệnh nhân',
+        dataIndex: 'patientName',
+        render: (name) => <Text strong>{name || 'Chưa có tên'}</Text>,
+      },
+      {
+        title: 'Bác sĩ phụ trách',
+        dataIndex: 'doctorName',
+        render: (name) => name || '—',
+      },
+      {
+        title: 'Trạng thái',
+        dataIndex: 'status',
+        render: (status) => {
+          const meta = {
+            IN_PROGRESS: { label: 'Đang khám', color: 'processing' },
+            WAITING_FOR_RESULT: { label: 'Chờ kết quả CĐLS', color: 'warning' },
+            WAITING: { label: 'Chờ gọi', color: 'default' },
+            COMPLETED: { label: 'Đã hoàn tất', color: 'success' },
+            SKIPPED: { label: 'Đã bỏ qua', color: 'error' },
+          }[status] || { label: status, color: 'default' }
+          return <Tag color={meta.color}>{meta.label}</Tag>
+        },
+      },
+      {
+        title: 'Thao tác',
+        key: 'action',
+        render: (_, item) => (
+          <Button
+            type="primary"
+            size="small"
+            icon={<MedicineBoxOutlined />}
+            onClick={() => {
+              if (item.visitId) {
+                navigate(`/medical-records/visits/${item.visitId}`)
+              } else {
+                navigate('/appointments')
+              }
+            }}
+          >
+            Khám & Kê đơn
+          </Button>
+        ),
+      },
+    ]
+
     return (
-      <Card>
-        <Alert
-          type="warning"
-          showIcon
-          message="Chưa có bệnh án để kê đơn"
-          description="Màn kê đơn chỉ mở từ một lượt khám đã lưu và phải có mã bệnh án trên đường dẫn."
-          action={<Button onClick={() => navigate('/appointments')}>Về danh sách lượt khám</Button>}
-        />
-      </Card>
+      <div style={{ paddingBottom: 40 }}>
+        <div
+          className="page-header"
+          style={{
+            marginBottom: 16,
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <MedicineBoxOutlined style={{ color: '#2563eb' }} />
+              Kê đơn thuốc theo bệnh án
+            </Title>
+            <Text type="secondary">
+              Đơn thuốc được tạo và liên kết trực tiếp với bệnh án và lượt khám của bệnh nhân.
+            </Text>
+          </div>
+          <Button
+            type="primary"
+            icon={<CalendarOutlined />}
+            onClick={() => navigate('/appointments')}
+          >
+            Mở Danh sách Hàng đợi khám
+          </Button>
+        </div>
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={12}>
+            <Card
+              title={
+                <span>
+                  <SearchOutlined style={{ color: '#2563eb', marginRight: 8 }} />
+                  Mở nhanh theo Mã Bệnh án / Mã Lượt khám
+                </span>
+              }
+              bordered
+            >
+              <Paragraph type="secondary">
+                Nếu bạn đã có mã bệnh án hoặc mã lượt khám, hãy nhập trực tiếp để chuyển đến màn hình kê đơn:
+              </Paragraph>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  placeholder="Nhập mã bệnh án (UUID) hoặc mã lượt khám..."
+                  value={quickSearchId}
+                  onChange={(e) => setQuickSearchId(e.target.value)}
+                  onPressEnter={() => {
+                    if (quickSearchId.trim()) {
+                      navigate(`/prescriptions/${quickSearchId.trim()}`)
+                    }
+                  }}
+                />
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    if (quickSearchId.trim()) {
+                      navigate(`/prescriptions/${quickSearchId.trim()}`)
+                    } else {
+                      message.warning('Vui lòng nhập mã bệnh án.')
+                    }
+                  }}
+                >
+                  Mở đơn thuốc
+                </Button>
+              </Space.Compact>
+            </Card>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Card
+              title={
+                <span>
+                  <InfoCircleOutlined style={{ color: '#16a34a', marginRight: 8 }} />
+                  Quy trình Kê đơn thuốc chuẩn
+                </span>
+              }
+              bordered
+            >
+              <Paragraph style={{ marginBottom: 6 }}>
+                <strong>1. Chọn lượt khám:</strong> Vào hàng đợi khám và bắt đầu lượt khám của bệnh nhân.
+              </Paragraph>
+              <Paragraph style={{ marginBottom: 6 }}>
+                <strong>2. Khám & Chẩn đoán:</strong> Nhập triệu chứng và chọn mã ICD-10 chính.
+              </Paragraph>
+              <Paragraph style={{ marginBottom: 0 }}>
+                <strong>3. Kê đơn thuốc:</strong> Lưu bệnh án và hệ thống sẽ tự động mở màn kê đơn thuốc tương ứng.
+              </Paragraph>
+            </Card>
+          </Col>
+
+          <Col xs={24}>
+            <Card
+              title={
+                <span>
+                  <MedicineBoxOutlined style={{ color: '#2563eb', marginRight: 8 }} />
+                  Danh sách lượt khám trong hàng đợi hôm nay ({queueItems.length})
+                </span>
+              }
+              bordered
+              extra={
+                <Button
+                  size="small"
+                  icon={<SyncOutlined />}
+                  loading={loadingQueue}
+                  onClick={() => {
+                    const today = dayjs().format('YYYY-MM-DD')
+                    setLoadingQueue(true)
+                    const fetcher = roles.includes('doctor')
+                      ? queueApi.getMyQueue({ date: today }).catch(() => queueApi.getQueues({ date: today }))
+                      : queueApi.getQueues({ date: today })
+                    fetcher
+                      .then((res) => setQueueItems(Array.isArray(res.data) ? res.data : []))
+                      .catch(() => setQueueItems([]))
+                      .finally(() => setLoadingQueue(false))
+                  }}
+                >
+                  Làm mới
+                </Button>
+              }
+            >
+              <Table
+                rowKey={(item) => item.id || item.visitId}
+                columns={queueColumns}
+                dataSource={queueItems}
+                loading={loadingQueue}
+                pagination={{ pageSize: 10 }}
+                locale={{
+                  emptyText: 'Hiện tại chưa có bệnh nhân nào trong hàng đợi hôm nay.',
+                }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </div>
     )
   }
 
