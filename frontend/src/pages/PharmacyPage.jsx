@@ -1,751 +1,566 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Button,
   Card,
-  DatePicker,
-  Form,
+  Col,
+  Descriptions,
+  Empty,
   Input,
-  InputNumber,
+  List,
   message,
-  Modal,
-  Select,
+  Pagination,
+  Popconfirm,
+  Row,
   Space,
+  Statistic,
   Table,
-  Tabs,
   Tag,
-  Tooltip,
+  Typography,
 } from 'antd'
 import {
-  AlertOutlined,
   CheckCircleOutlined,
-  EditOutlined,
-  ExclamationCircleOutlined,
+  InboxOutlined,
   MedicineBoxOutlined,
-  PlusOutlined,
-  SafetyCertificateOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  SearchOutlined,
+  ShopOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
-import { mergeMedicines, mergeBatches, getStoredPrescriptions, saveStoredPrescription } from '../utils/storageHelpers'
-import MedicineCatalogPage from './MedicineCatalogPage'
+import { buildFefoPreview } from '../utils/workflowContract'
+
+const { Text, Title } = Typography
+const PRESCRIPTION_PAGE_SIZE = 20
+
+const toCollection = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.content)) return payload.content
+  return []
+}
 
 const parseItems = (value) => {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string') return []
   try {
-    return typeof value === 'string' ? JSON.parse(value) : (value || [])
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
 }
 
-const normalizeText = (value) =>
-  String(value ?? '')
-    .trim()
-    .toLowerCase()
+const normalizeBatch = (batch) => ({
+  ...batch,
+  batchId: batch?.batchId || batch?.id,
+  id: batch?.batchId || batch?.id,
+})
+
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message || error?.message || fallback
+
+const formatDateTime = (value) =>
+  value && dayjs(value).isValid() ? dayjs(value).format('HH:mm DD/MM/YYYY') : '—'
 
 function PharmacyPage() {
-  const { user: currentUser } = useAuthContext()
-  const userRoleList = Array.isArray(currentUser?.roles)
-    ? currentUser.roles
-    : currentUser?.role
-    ? [currentUser.role]
-    : []
+  const navigate = useNavigate()
+  const { user } = useAuthContext()
+  const roles = useMemo(() => {
+    const values = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
+    return values
+      .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
+      .filter(Boolean)
+  }, [user])
+  const canDispense = roles.includes('pharmacist') || roles.includes('admin')
 
-  const normalizedRoles = userRoleList.map((r) =>
-    String(r).toLowerCase().replace(/^role_/, ''),
-  )
-
-  const canManageMedicineCatalog = normalizedRoles.includes('pharmacist')
-
-  const [medicines, setMedicines] = useState([])
-  const [batches, setBatches] = useState([])
   const [prescriptions, setPrescriptions] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [medicineOpen, setMedicineOpen] = useState(false)
-  const [batchOpen, setBatchOpen] = useState(false)
-  const [editingMedicine, setEditingMedicine] = useState(null)
-  const [deletingMedicine, setDeletingMedicine] = useState(null)
-  const [dispensingId, setDispensingId] = useState(null)
-
+  const [prescriptionPage, setPrescriptionPage] = useState(0)
+  const [prescriptionTotal, setPrescriptionTotal] = useState(0)
+  const [prescriptionTotalPages, setPrescriptionTotalPages] = useState(0)
+  const [batches, setBatches] = useState([])
+  const [stocks, setStocks] = useState([])
+  const [lowStockItems, setLowStockItems] = useState([])
+  const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null)
   const [searchKeyword, setSearchKeyword] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [prescriptionLoading, setPrescriptionLoading] = useState(false)
+  const [inventoryLoading, setInventoryLoading] = useState(false)
+  const [dispensingId, setDispensingId] = useState(null)
+  const [prescriptionLoadError, setPrescriptionLoadError] = useState('')
+  const [inventoryLoadError, setInventoryLoadError] = useState('')
+  const [shortageDetails, setShortageDetails] = useState([])
+  const prescriptionRequestIdRef = useRef(0)
+  const inventoryRequestIdRef = useRef(0)
 
-  const [medicineForm] = Form.useForm()
-  const [batchForm] = Form.useForm()
-
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const loadPrescriptionPage = useCallback(async (pageNumber) => {
+    const requestId = prescriptionRequestIdRef.current + 1
+    prescriptionRequestIdRef.current = requestId
+    setPrescriptionLoading(true)
+    setPrescriptionLoadError('')
     try {
-      const [medicineRes, batchRes, prescriptionRes] = await Promise.allSettled([
-        pharmacyApi.medicines(),
-        pharmacyApi.batches(),
-        pharmacyApi.prescriptions(),
-      ])
-
-      const rawMeds = medicineRes.status === 'fulfilled' ? (medicineRes.value.data?.content || medicineRes.value.data || []) : []
-      const apiMeds = Array.isArray(rawMeds) ? rawMeds : []
-      const apiBatches = batchRes.status === 'fulfilled' ? (Array.isArray(batchRes.value.data) ? batchRes.value.data : []) : []
-      const apiPrescs = prescriptionRes.status === 'fulfilled' ? (prescriptionRes.value.data || []) : []
-
-      const finalMeds = mergeMedicines(apiMeds)
-      const finalBatches = mergeBatches(apiBatches)
-
-      const localPrescs = getStoredPrescriptions()
-      const mapP = new Map()
-      if (Array.isArray(apiPrescs)) {
-        apiPrescs.forEach((p) => { if (p && p.id) mapP.set(String(p.id), p) })
-      }
-      localPrescs.forEach((p) => {
-        if (p && p.id) {
-          const existing = mapP.get(String(p.id))
-          mapP.set(String(p.id), existing ? { ...existing, ...p } : p)
-        }
+      const prescriptionResponse = await pharmacyApi.prescriptions({
+        status: 'PENDING_DISPENSE',
+        page: pageNumber,
+        size: PRESCRIPTION_PAGE_SIZE,
       })
-      const finalPrescriptions = Array.from(mapP.values())
+      if (requestId !== prescriptionRequestIdRef.current) return
 
-      setMedicines(finalMeds)
-      setBatches(finalBatches)
-      setPrescriptions(finalPrescriptions)
-    } catch {
-      setMedicines(mergeMedicines([]))
-      setBatches(mergeBatches([]))
-      setPrescriptions(getStoredPrescriptions())
+      const payload = prescriptionResponse.data
+      const nextPrescriptions = toCollection(payload)
+        .filter((item) => item?.status === 'PENDING_DISPENSE')
+        .sort((first, second) =>
+          String(first.prescribedAt || '').localeCompare(String(second.prescribedAt || '')),
+        )
+      const parsedTotal = Number(payload?.totalElements)
+      const nextTotal = Number.isFinite(parsedTotal) ? Math.max(parsedTotal, 0) : nextPrescriptions.length
+      const parsedTotalPages = Number(payload?.totalPages)
+      const calculatedTotalPages = Math.ceil(nextTotal / PRESCRIPTION_PAGE_SIZE)
+      const nextTotalPages = Number.isFinite(parsedTotalPages)
+        && (parsedTotalPages > 0 || nextTotal === 0)
+        ? Math.max(parsedTotalPages, 0)
+        : calculatedTotalPages
+
+      setPrescriptionTotal(nextTotal)
+      setPrescriptionTotalPages(nextTotalPages)
+
+      if (nextTotal > 0 && pageNumber >= nextTotalPages) {
+        setPrescriptions([])
+        setSelectedPrescriptionId(null)
+        setPrescriptionPage(Math.max(nextTotalPages - 1, 0))
+        return
+      }
+
+      if (nextTotal === 0 && pageNumber !== 0) {
+        setPrescriptions([])
+        setSelectedPrescriptionId(null)
+        setPrescriptionPage(0)
+        return
+      }
+
+      setPrescriptions(nextPrescriptions)
+      setSelectedPrescriptionId((currentId) => {
+        if (nextPrescriptions.some((item) => String(item.id) === String(currentId))) {
+          return currentId
+        }
+        return nextPrescriptions[0]?.id || null
+      })
+    } catch (error) {
+      if (requestId === prescriptionRequestIdRef.current) {
+        setPrescriptionLoadError(getErrorMessage(error, 'Không thể tải danh sách đơn chờ cấp phát.'))
+      }
     } finally {
-      setLoading(false)
+      if (requestId === prescriptionRequestIdRef.current) {
+        setPrescriptionLoading(false)
+      }
     }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
-
-  const handleSaveMedicine = async (values) => {
-    if (!canManageMedicineCatalog) {
-      message.error('Bạn không có quyền quản lý danh mục thuốc.')
-      return
-    }
-
-    const trimmedName = String(values.name ?? '').trim()
-    const trimmedUnit = String(values.unit ?? '').trim()
-    const trimmedActive = String(values.activeIngredient ?? '').trim() || 'Chưa cập nhật'
-    const trimmedStrength = String(values.strength ?? '').trim() || '500 mg'
-    const dosageFormVal = values.dosageForm || 'TABLET'
-    const defaultRouteVal = values.defaultRoute || 'ORAL'
-
-    if (!trimmedName) {
-      message.error('Vui lòng nhập tên thuốc.')
-      return
-    }
-    if (!trimmedUnit) {
-      message.error('Vui lòng nhập đơn vị tính.')
-      return
-    }
-
-    const targetKey = normalizeText(trimmedName) + '_' + normalizeText(trimmedActive)
-    const isDuplicate = medicines.some((m) => {
-      if (editingMedicine && m.id === editingMedicine.id) return false
-      const existingKey = normalizeText(m.name || m.medicineName) + '_' + normalizeText(m.activeIngredient)
-      return existingKey === targetKey
-    })
-
-    if (isDuplicate) {
-      message.warning('Thuốc đã tồn tại trong danh mục.')
-      return
-    }
-
+  const loadInventoryData = useCallback(async () => {
+    const requestId = inventoryRequestIdRef.current + 1
+    inventoryRequestIdRef.current = requestId
+    setInventoryLoading(true)
+    setInventoryLoadError('')
     try {
-      if (editingMedicine) {
-        const payload = {
-          medicineName: trimmedName,
-          activeIngredient: trimmedActive,
-          strength: trimmedStrength,
-          dosageForm: dosageFormVal,
-          unit: trimmedUnit,
-          defaultRoute: defaultRouteVal,
-        }
-        await pharmacyApi.updateMedicine(editingMedicine.id, payload)
+      const [batchResponse, stockResponse, lowStockResponse] = await Promise.all([
+        pharmacyApi.batches(),
+        pharmacyApi.stocks({ active: true }),
+        pharmacyApi.lowStock(),
+      ])
+      if (requestId !== inventoryRequestIdRef.current) return
 
-        if (typeof values.active === 'boolean' && values.active !== (editingMedicine.active !== false)) {
-          await pharmacyApi.updateMedicineStatus(editingMedicine.id, values.active)
-        }
+      const nextBatches = toCollection(batchResponse.data).map(normalizeBatch)
 
-        message.success(`Đã cập nhật thông tin thuốc ${trimmedName}`)
-      } else {
-        const newMed = {
-          medicineCode: `MED-${Date.now().toString().slice(-6)}`,
-          medicineName: trimmedName,
-          activeIngredient: trimmedActive,
-          strength: trimmedStrength,
-          dosageForm: dosageFormVal,
-          unit: trimmedUnit,
-          defaultRoute: defaultRouteVal,
-        }
-        await pharmacyApi.createMedicine(newMed)
-        message.success(`Đã thêm thuốc mới ${trimmedName} vào danh mục`)
-      }
-      setMedicineOpen(false)
-      setEditingMedicine(null)
-      medicineForm.resetFields()
-      await loadData()
+      setBatches(nextBatches)
+      setStocks(toCollection(stockResponse.data))
+      setLowStockItems(toCollection(lowStockResponse.data))
     } catch (error) {
-      message.error(error.response?.data?.message || error.message || 'Không thể lưu thông tin thuốc trên Backend')
+      if (requestId === inventoryRequestIdRef.current) {
+        setInventoryLoadError(getErrorMessage(error, 'Không thể tải dữ liệu tồn kho từ máy chủ.'))
+      }
+    } finally {
+      if (requestId === inventoryRequestIdRef.current) {
+        setInventoryLoading(false)
+      }
     }
+  }, [])
+
+  const loadData = useCallback(() => Promise.all([
+    loadPrescriptionPage(prescriptionPage),
+    loadInventoryData(),
+  ]), [loadInventoryData, loadPrescriptionPage, prescriptionPage])
+
+  useEffect(() => {
+    loadPrescriptionPage(prescriptionPage)
+  }, [loadPrescriptionPage, prescriptionPage])
+
+  useEffect(() => {
+    loadInventoryData()
+  }, [loadInventoryData])
+
+  const loading = prescriptionLoading || inventoryLoading
+  const loadError = [prescriptionLoadError, inventoryLoadError].filter(Boolean).join(' ')
+
+  const filteredPrescriptions = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+    if (!keyword) return prescriptions
+    return prescriptions.filter((item) =>
+      [item.prescriptionCode, item.patientCode, item.patientName, item.visitCode]
+        .some((value) => String(value || '').toLowerCase().includes(keyword)),
+    )
+  }, [prescriptions, searchKeyword])
+
+  const selectedPrescription = useMemo(
+    () => prescriptions.find((item) => String(item.id) === String(selectedPrescriptionId)) || null,
+    [prescriptions, selectedPrescriptionId],
+  )
+
+  const stockByMedicineId = useMemo(
+    () => new Map(stocks.map((stock) => [String(stock.medicineId), stock])),
+    [stocks],
+  )
+
+  const fefoPreview = useMemo(
+    () => buildFefoPreview(parseItems(selectedPrescription?.items), batches),
+    [selectedPrescription, batches],
+  )
+  const hasPreviewShortage = fefoPreview.some((item) => Number(item.shortageQuantity) > 0)
+
+  const selectPrescription = (prescriptionId) => {
+    setSelectedPrescriptionId(prescriptionId)
+    setShortageDetails([])
   }
 
-  const handleToggleMedicineStatus = async (medRecord, targetActiveState = false) => {
-    if (!canManageMedicineCatalog) {
-      message.error('Bạn không có quyền quản lý danh mục thuốc.')
-      return
-    }
-
-    try {
-      if (medRecord.id) {
-        await pharmacyApi.updateMedicineStatus(medRecord.id, targetActiveState)
-      }
-      message.success(`Đã ${targetActiveState ? 'kích hoạt lại' : 'ngừng sử dụng'} thuốc ${medRecord.medicineName || medRecord.name}`)
-      setDeletingMedicine(null)
-      await loadData()
-    } catch (error) {
-      message.error(error.response?.data?.message || error.message || 'Không thể cập nhật trạng thái thuốc')
-    }
+  const changePrescriptionPage = (pageNumber) => {
+    setPrescriptionPage(pageNumber - 1)
+    setPrescriptions([])
+    setSelectedPrescriptionId(null)
+    setSearchKeyword('')
+    setShortageDetails([])
   }
 
-  const handleReceiveBatch = async (values) => {
-    if (!canManageMedicineCatalog) {
-      message.error('Bạn không có quyền tạo phiếu nhập kho.')
+  const handleDispense = async () => {
+    if (!selectedPrescription) return
+    if (!canDispense) {
+      message.error('Chỉ dược sĩ hoặc quản trị viên mới được cấp phát thuốc.')
       return
     }
 
+    setDispensingId(selectedPrescription.id)
+    setShortageDetails([])
     try {
-      const selectedMed = medicines.find((m) => m.id === values.medicineId)
-      const formattedDate = values.expiryDate.format('YYYY-MM-DD')
-
-      const receiptPayload = {
-        note: values.note || `Nhập lô thuốc ${values.lotNumber || ''}`,
-        items: [
-          {
-            medicineId: values.medicineId,
-            batchNumber: values.lotNumber,
-            expiryDate: formattedDate,
-            quantity: Number(values.quantity),
-            importPrice: Number(values.unitCost || 0),
-          },
-        ],
-      }
-
-      await pharmacyApi.receiveBatch(receiptPayload)
-
-      message.success(`Đã nhập kho theo lô ${values.lotNumber} cho thuốc ${selectedMed?.name || selectedMed?.medicineName || ''}`)
-      setBatchOpen(false)
-      batchForm.resetFields()
+      const response = await pharmacyApi.dispense(selectedPrescription.id)
+      const allocationCount = Number(response.data?.allocationCount) || 0
+      message.success(
+        `Đã cấp phát đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id}`
+        + (allocationCount ? ` qua ${allocationCount} lượt phân bổ FEFO.` : '.'),
+      )
       await loadData()
     } catch (error) {
-      message.error(error.response?.data?.message || error.message || 'Không thể nhập kho theo lô')
-    }
-  }
-
-  const handleDispense = async (prescription) => {
-    if (!canManageMedicineCatalog) {
-      message.error('Bạn không có quyền cấp phát thuốc.')
-      return
-    }
-
-    setDispensingId(prescription.id)
-    try {
-      try {
-        await pharmacyApi.dispense(prescription.id)
-      } catch (beErr) {
-        console.warn('Backend dispense API note:', beErr)
+      const responseData = error?.response?.data
+      if (error?.response?.status === 409 && Array.isArray(responseData?.details)) {
+        setShortageDetails(responseData.details)
       }
-
-      const updatedPresc = {
-        ...prescription,
-        status: 'DISPENSED',
-        dispensedAt: dayjs().format('YYYY-MM-DD HH:mm'),
-      }
-      saveStoredPrescription(updatedPresc)
-
-      message.success(`Đã cấp phát thành công đơn thuốc ${prescription.prescriptionCode || prescription.id}. Tồn kho đã được trừ!`)
-      await loadData()
-    } catch (error) {
-      message.error(error.response?.data?.message || error.message || 'Không thể cấp phát đơn thuốc')
+      message.error(getErrorMessage(error, 'Không thể cấp phát đơn thuốc.'))
     } finally {
       setDispensingId(null)
     }
   }
 
-  const openAddMedicine = () => {
-    if (!canManageMedicineCatalog) {
-      message.error('Chỉ Dược sĩ (PHARMACIST) mới có quyền thêm thuốc mới. Admin có quyền xem và giám sát.')
-      return
-    }
-    setEditingMedicine(null)
-    medicineForm.resetFields()
-    medicineForm.setFieldsValue({
-      strength: '500 mg',
-      dosageForm: 'TABLET',
-      defaultRoute: 'ORAL',
-      unit: 'vien',
-    })
-    setMedicineOpen(true)
-  }
-
-  const openBatchModal = () => {
-    if (!canManageMedicineCatalog) {
-      message.error('Chỉ Dược sĩ (PHARMACIST) mới có quyền tạo phiếu nhập kho. Admin có quyền xem và giám sát.')
-      return
-    }
-    batchForm.resetFields()
-    setBatchOpen(true)
-  }
-
-  const openEditMedicine = (record) => {
-    if (!canManageMedicineCatalog) {
-      message.error('Chỉ Dược sĩ (PHARMACIST) mới có quyền sửa danh mục thuốc. Admin có quyền xem và giám sát.')
-      return
-    }
-    setEditingMedicine(record)
-    medicineForm.setFieldsValue({
-      name: record.medicineName || record.name,
-      activeIngredient: record.activeIngredient || '',
-      strength: record.strength || '500 mg',
-      dosageForm: record.dosageForm || 'TABLET',
-      defaultRoute: record.defaultRoute || 'ORAL',
-      category: record.category || '',
-      unit: record.unit || 'vien',
-      minStock: record.minStock || 0,
-      active: record.active !== false,
-    })
-    setMedicineOpen(true)
-  }
-
-  const filteredMedicines = medicines.filter((m) => {
-    const medName = String(m.name || m.medicineName || '').toLowerCase()
-    const activeIng = String(m.activeIngredient || '').toLowerCase()
-    const kw = searchKeyword.trim().toLowerCase()
-
-    const matchesKw = !kw || medName.includes(kw) || activeIng.includes(kw)
-    const matchesStatus =
-      statusFilter === 'ALL'
-        ? true
-        : statusFilter === 'ACTIVE'
-        ? m.active !== false
-        : m.active === false
-
-    return matchesKw && matchesStatus
-  })
-
-  const lowStockMedicines = medicines.filter((m) => {
-    const medStock = m.stockQuantity ?? m.stock
-    const medMinStock = m.minStockQuantity ?? m.minStock
-    if (medStock === undefined || medMinStock === undefined) return false
-    return m.active !== false && Number(medStock) <= Number(medMinStock)
-  })
-
-  const expiringBatches = batches.filter((b) => {
-    const diff = dayjs(b.expiryDate).diff(dayjs(), 'day')
-    return diff <= 30
-  })
-
-  const medicineColumns = [
+  const previewColumns = [
     {
-      title: 'Tên thuốc',
-      dataIndex: 'medicineName',
-      key: 'medicineName',
-      render: (val, record) => <strong>{val || record.name || '—'}</strong>,
-    },
-    {
-      title: 'Hoạt chất',
-      dataIndex: 'activeIngredient',
-      key: 'activeIngredient',
-      render: (v) => v || '—',
-    },
-    { title: 'Hàm lượng', dataIndex: 'strength', key: 'strength', render: (v) => v || '—' },
-    { title: 'Đơn vị tính', dataIndex: 'unit', key: 'unit', render: (v) => v || '—' },
-    {
-      title: 'Số lượng tồn',
-      dataIndex: 'stockQuantity',
-      key: 'stockQuantity',
-      render: (val, record) => {
-        const stockVal = val ?? record.stock ?? 100
-        const isLow = Number(stockVal) <= Number(record.minStock || 10)
-        return (
-          <Tag color={isLow ? 'red' : 'green'}>
-            {stockVal} {record.unit || 'đơn vị'} {isLow && '⚠️ Tồn thấp'}
-          </Tag>
-        )
-      },
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'active',
-      key: 'active',
-      render: (val) => (
-        <Tag color={val !== false ? 'green' : 'default'}>
-          {val !== false ? 'Đang dùng' : 'Ngừng dùng'}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Thao tác',
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            icon={<EditOutlined />}
-            size="small"
-            disabled={!canManageMedicineCatalog}
-            onClick={() => openEditMedicine(record)}
-          >
-            Sửa
-          </Button>
-          {record.active !== false ? (
-            <Button
-              danger
-              size="small"
-              disabled={!canManageMedicineCatalog}
-              onClick={() => setDeletingMedicine(record)}
-            >
-              Ngừng dùng
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              ghost
-              size="small"
-              disabled={!canManageMedicineCatalog}
-              onClick={() => handleToggleMedicineStatus(record, true)}
-            >
-              Kích hoạt lại
-            </Button>
-          )}
+      title: 'Thuốc',
+      key: 'medicine',
+      width: 210,
+      render: (_, item) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{item.medicineName || item.medicineId}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {[item.activeIngredient, item.strength].filter(Boolean).join(' · ') || item.dosage || '—'}
+          </Text>
         </Space>
       ),
     },
-  ]
-
-  const batchColumns = [
-    { title: 'Tên thuốc', dataIndex: 'medicineName', key: 'medicineName', render: (v) => <strong>{v}</strong> },
     {
-      title: 'Số lô nhập',
-      dataIndex: 'batchNumber',
-      key: 'batchNumber',
-      render: (v, record) => <Tag color="blue">{v || record.lotNumber || 'LO-DEFAULT'}</Tag>,
+      title: 'Cần cấp',
+      dataIndex: 'requiredQuantity',
+      width: 90,
+      align: 'center',
+      render: (quantity, item) => <Text strong>{quantity} {item.unit || ''}</Text>,
     },
-    { title: 'Số lượng nhập', dataIndex: 'quantity', key: 'quantity', render: (v) => `${Number(v || 0).toLocaleString('vi-VN')}` },
     {
-      title: 'Hạn sử dụng',
-      dataIndex: 'expiryDate',
-      key: 'expiryDate',
-      render: (dateStr) => {
-        const isExpired = dayjs(dateStr).isBefore(dayjs(), 'day')
-        const daysLeft = dayjs(dateStr).diff(dayjs(), 'day')
-        const isNear = daysLeft <= 30 && !isExpired
-
-        return (
-          <Tag color={isExpired ? 'red' : isNear ? 'orange' : 'green'}>
-            {dayjs(dateStr).format('DD/MM/YYYY')}
-            {isExpired ? ' (ĐÃ HẾT HẠN - CHẶN CẤP PHÁT)' : isNear ? ` (Còn ${daysLeft} ngày)` : ''}
-          </Tag>
-        )
+      title: 'Tồn khả dụng',
+      key: 'available',
+      width: 115,
+      align: 'center',
+      render: (_, item) => {
+        const stock = stockByMedicineId.get(String(item.medicineId))
+        const available = stock?.eligibleStockQuantity ?? item.availableQuantity
+        return <Tag color={Number(available) < Number(item.requiredQuantity) ? 'red' : 'green'}>{available}</Tag>
       },
     },
     {
-      title: 'Đơn giá nhập',
-      dataIndex: 'unitCost',
-      key: 'unitCost',
-      render: (val, record) => {
-        const price = val || record.importPrice || record.price || 1500
-        return `${Number(price).toLocaleString('vi-VN')} ₫`
-      },
+      title: 'Phân bổ FEFO dự kiến',
+      key: 'allocations',
+      render: (_, item) => item.allocations.length ? (
+        <Space direction="vertical" size={4}>
+          {item.allocations.map((allocation) => (
+            <Tag key={`${allocation.batchId}-${allocation.quantity}`} color="blue">
+              {allocation.batchNumber} · HSD {dayjs(allocation.expiryDate).format('DD/MM/YYYY')} · x{allocation.quantity}
+            </Tag>
+          ))}
+        </Space>
+      ) : <Text type="danger">Không có lô đủ điều kiện</Text>,
     },
     {
-      title: 'Nhà cung cấp',
-      dataIndex: 'supplier',
-      key: 'supplier',
-      render: (v) => v || 'Công ty Dược phẩm',
+      title: 'Kết quả',
+      key: 'result',
+      width: 105,
+      align: 'center',
+      render: (_, item) => Number(item.shortageQuantity) > 0
+        ? <Tag color="red">Thiếu {item.shortageQuantity}</Tag>
+        : <Tag color="green">Đủ tồn</Tag>,
     },
   ]
 
-  const prescriptionColumns = [
-    { title: 'Mã đơn thuốc', dataIndex: 'prescriptionCode', key: 'prescriptionCode', render: (v) => <strong>{v}</strong> },
-    { title: 'Bệnh nhân', dataIndex: 'patientName', key: 'patientName', render: (v) => v || '—' },
+  const shortageColumns = [
+    { title: 'Thuốc', dataIndex: 'medicineName', key: 'medicineName' },
+    { title: 'Cần', dataIndex: 'requiredQuantity', key: 'requiredQuantity', align: 'center' },
+    { title: 'Khả dụng', dataIndex: 'availableQuantity', key: 'availableQuantity', align: 'center' },
     {
-      title: 'Danh sách thuốc trong đơn',
-      dataIndex: 'items',
-      key: 'items',
-      render: (val) => {
-        const parsed = parseItems(val)
-        return (
-          parsed.map((item) => {
-            const med = medicines.find((m) => String(m.id) === String(item.medicineId))
-            const medName = item.medicineName || (med ? (med.medicineName || med.name) : item.medicineId)
-            return `${medName} (x${item.quantity} ${item.dosage ? `— ${item.dosage}` : ''})`
-          }).join(' | ') || '—'
-        )
-      },
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      render: (val) => {
-        const isPending = val !== 'DISPENSED' && val !== 'Đã cấp phát'
-        return (
-          <Tag color={isPending ? 'orange' : 'green'}>
-            {isPending ? 'Chờ cấp phát' : 'Đã cấp phát'}
-          </Tag>
-        )
-      },
-    },
-    {
-      title: 'Thao tác cấp phát',
-      key: 'actions',
-      render: (_, record) => {
-        const isPending = record.status !== 'DISPENSED' && record.status !== 'Đã cấp phát'
-        return (
-          <Button
-            type="primary"
-            disabled={!isPending || !canManageMedicineCatalog}
-            loading={dispensingId === record.id}
-            icon={<CheckCircleOutlined />}
-            onClick={() => handleDispense(record)}
-          >
-            {isPending ? 'Cấp phát thuốc' : 'Đã cấp phát'}
-          </Button>
-        )
-      },
+      title: 'Thiếu',
+      dataIndex: 'shortageQuantity',
+      key: 'shortageQuantity',
+      align: 'center',
+      render: (value) => <Tag color="red">{value}</Tag>,
     },
   ]
 
-  const pendingPrescriptionCount = prescriptions.filter(
-    (p) => p.status !== 'DISPENSED' && p.status !== 'Đã cấp phát'
-  ).length
+  const eligibleBatchCount = batches.filter((batch) => batch.eligibleForDispense !== false).length
 
   return (
-    <div>
-      <div className="page-header">
-        <h2 style={{ margin: 0 }}>
-          <MedicineBoxOutlined /> Quản lý kho thuốc và cấp phát
-        </h2>
-        <Space>
-          <Button
-            icon={<PlusOutlined />}
-            disabled={!canManageMedicineCatalog}
-            onClick={openAddMedicine}
-          >
-            Thêm thuốc mới
+    <div style={{ paddingBottom: 32 }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+        <div>
+          <Title level={2} style={{ margin: 0 }}>
+            <MedicineBoxOutlined /> Cấp phát thuốc
+          </Title>
+          <Text type="secondary">Xử lý đơn chờ cấp phát và xem trước phân bổ lô theo FEFO.</Text>
+        </div>
+        <Space wrap>
+          <Button icon={<InboxOutlined />} onClick={() => navigate('/pharmacy/receipts')}>
+            Nhập kho
           </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            disabled={!canManageMedicineCatalog}
-            onClick={openBatchModal}
-          >
-            Nhập kho theo lô &amp; hạn dùng
+          <Button icon={<ShopOutlined />} onClick={() => navigate('/medicines')}>
+            Danh mục thuốc
+          </Button>
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={loadData}>
+            Làm mới
           </Button>
         </Space>
       </div>
 
-      {lowStockMedicines.length > 0 && (
-        <Alert
-          type="warning"
-          showIcon
-          icon={<WarningOutlined />}
-          message="CẢNH BÁO TỒN KHO THẤP"
-          description={`Các thuốc sau có số lượng tồn dưới hoặc bằng ngưỡng tối thiểu: ${lowStockMedicines.map((m) => `${m.medicineName || m.name} (Tồn: ${m.stockQuantity ?? m.stock}/${m.minStockQuantity ?? m.minStock})`).join(', ')}`}
-          style={{ marginBottom: 16 }}
-        />
-      )}
-
-      {expiringBatches.length > 0 && (
+      {loadError && (
         <Alert
           type="error"
           showIcon
-          icon={<AlertOutlined />}
-          message="CẢNH BÁO THUỐC HẾT HẠN / GẦN HẾT HẠN"
-          description={`Có ${expiringBatches.length} lô thuốc sắp hết hạn (trong vòng 30 ngày) hoặc đã hết hạn. Các lô đã hết hạn sẽ tự động bị chặn cấp phát.`}
+          message="Không tải được workspace cấp phát"
+          description={loadError}
+          action={<Button size="small" onClick={loadData}>Thử lại</Button>}
           style={{ marginBottom: 16 }}
         />
       )}
 
-      <Tabs
-        defaultActiveKey="dispense"
-        items={[
-          {
-            key: 'dispense',
-            label: <span><CheckCircleOutlined /> Cấp phát thuốc theo đơn ({pendingPrescriptionCount} đơn chờ)</span>,
-            children: (
-              <Card title="Danh sách đơn thuốc chờ cấp phát">
-                <Table rowKey="id" columns={prescriptionColumns} dataSource={prescriptions} loading={loading} />
-              </Card>
-            ),
-          },
-          {
-            key: 'med',
-            label: <span><MedicineBoxOutlined /> Quản lý danh mục thuốc</span>,
-            children: <MedicineCatalogPage />,
-          },
-          {
-            key: 'batch',
-            label: <span><SafetyCertificateOutlined /> Nhập kho theo lô &amp; Hạn dùng ({batches.length} lô)</span>,
-            children: (
-              <Card title="Quản lý lô nhập và hạn sử dụng">
-                <Table rowKey="id" columns={batchColumns} dataSource={batches} loading={loading} />
-              </Card>
-            ),
-          },
-        ]}
-      />
-
-      <Modal
-        title={editingMedicine ? `Sửa thông tin thuốc: ${editingMedicine.name || editingMedicine.medicineName}` : 'Thêm thuốc mới vào danh mục'}
-        open={medicineOpen}
-        onCancel={() => { setMedicineOpen(false); setEditingMedicine(null) }}
-        onOk={() => medicineForm.submit()}
-        okText="Lưu thông tin"
-        cancelText="Hủy"
-      >
-        <Form form={medicineForm} layout="vertical" onFinish={handleSaveMedicine}>
-          <Form.Item
-            name="name"
-            label="Tên thuốc"
-            rules={[{ required: true, message: 'Vui lòng nhập tên thuốc.' }]}
-          >
-            <Input placeholder="Nhập tên thuốc (VD: Paracetamol 500mg)" />
-          </Form.Item>
-
-          <Form.Item name="activeIngredient" label="Hoạt chất">
-            <Input placeholder="Nhập hoạt chất chính (VD: Paracetamol, Ibuprofen...)" />
-          </Form.Item>
-
-          <Form.Item name="strength" label="Hàm lượng" rules={[{ required: true, message: 'Nhập hàm lượng' }]}>
-            <Input placeholder="VD: 500 mg, 10mg/5ml..." />
-          </Form.Item>
-
-          <Space style={{ display: 'flex' }} align="baseline">
-            <Form.Item name="dosageForm" label="Dạng bào chế" rules={[{ required: true, message: 'Chọn dạng bào chế' }]}>
-              <Select
-                style={{ width: 190 }}
-                options={[
-                  { value: 'TABLET', label: 'Viên nén' },
-                  { value: 'CAPSULE', label: 'Viên nang' },
-                  { value: 'SYRUP', label: 'Siro' },
-                  { value: 'SUSPENSION', label: 'Hỗn dịch' },
-                  { value: 'SOLUTION', label: 'Dung dịch' },
-                  { value: 'INJECTION', label: 'Tiêm' },
-                  { value: 'CREAM', label: 'Kem bôi' },
-                  { value: 'OINTMENT', label: 'Thuốc mỡ' },
-                  { value: 'INHALER', label: 'Xịt/Hít' },
-                  { value: 'POWDER', label: 'Thuốc bột' },
-                  { value: 'OTHER', label: 'Khác' },
-                ]}
-              />
-            </Form.Item>
-
-            <Form.Item name="defaultRoute" label="Đường dùng" rules={[{ required: true, message: 'Chọn đường dùng' }]}>
-              <Select
-                style={{ width: 190 }}
-                options={[
-                  { value: 'ORAL', label: 'Uống' },
-                  { value: 'TOPICAL', label: 'Bôi ngoài' },
-                  { value: 'INHALATION', label: 'Hít/Xịt' },
-                  { value: 'INTRAVENOUS', label: 'Tiêm IV' },
-                  { value: 'INTRAMUSCULAR', label: 'Tiêm IM' },
-                  { value: 'SUBCUTANEOUS', label: 'Tiêm SC' },
-                  { value: 'OTHER', label: 'Khác' },
-                ]}
-              />
-            </Form.Item>
-          </Space>
-
-          <Form.Item name="category" label="Nhóm thuốc / Phân loại">
-            <Input placeholder="Nhập nhóm thuốc (VD: Hạ sốt, Kháng sinh, Tim mạch...)" />
-          </Form.Item>
-
-          <Space style={{ display: 'flex' }} align="baseline">
-            <Form.Item
-              name="unit"
-              label="Đơn vị tính"
-              rules={[{ required: true, message: 'Vui lòng nhập đơn vị tính.' }]}
-            >
-              <Input placeholder="viên / chai / tuyp / goi..." style={{ width: 200 }} />
-            </Form.Item>
-
-            <Form.Item name="minStock" label="Tồn tối thiểu (Cảnh báo)">
-              <InputNumber min={0} style={{ width: 200 }} placeholder="Số lượng tối thiểu" />
-            </Form.Item>
-          </Space>
-
-          {!editingMedicine && (
-            <Form.Item name="stock" label="Số lượng tồn kho ban đầu">
-              <InputNumber min={0} placeholder="0" style={{ width: '100%' }} />
-            </Form.Item>
-          )}
-
-          {editingMedicine && (
-            <Form.Item name="active" label="Trạng thái sử dụng">
-              <Select options={[{ value: true, label: 'Đang dùng' }, { value: false, label: 'Ngừng dùng (Vô hiệu hóa)' }]} />
-            </Form.Item>
-          )}
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Xác nhận ngừng sử dụng thuốc"
-        open={!!deletingMedicine}
-        onCancel={() => setDeletingMedicine(null)}
-        onOk={() => deletingMedicine && handleToggleMedicineStatus(deletingMedicine, false)}
-        okText="Xác nhận ngừng dùng"
-        okButtonProps={{ danger: true }}
-        cancelText="Hủy"
-      >
-        <p>
-          Bạn có chắc chắn muốn <strong>ngừng sử dụng</strong> thuốc{' '}
-          <strong>{deletingMedicine?.name || deletingMedicine?.medicineName}</strong> không?
-        </p>
-        <p style={{ color: '#8c8c8c', fontSize: 13 }}>
-          * Thuốc sẽ chuyển sang trạng thái <em>Ngừng dùng</em>, không xuất hiện khi kê đơn mới nhưng vẫn được lưu vết trong lịch sử và báo cáo tồn kho cũ.
-        </p>
-      </Modal>
-
-      <Modal
-        title="Nhập kho theo lô & Hạn sử dụng"
-        open={batchOpen}
-        onCancel={() => setBatchOpen(false)}
-        onOk={() => batchForm.submit()}
-        okText="Xác nhận nhập kho"
-        cancelText="Hủy"
-      >
-        <Form form={batchForm} layout="vertical" onFinish={handleReceiveBatch}>
-          <Form.Item name="medicineId" label="Chọn thuốc" rules={[{ required: true, message: 'Vui lòng chọn thuốc' }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="Chọn thuốc trong danh mục"
-              options={medicines.filter((m) => m.active !== false).map((m) => ({ value: m.id, label: `${m.medicineName || m.name} (Tồn hiện tại: ${m.stockQuantity ?? m.stock ?? 0})` }))}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} md={8}>
+          <Card><Statistic title="Đơn chờ cấp phát" value={prescriptionTotal} prefix={<MedicineBoxOutlined />} /></Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card><Statistic title="Lô đủ điều kiện FEFO" value={eligibleBatchCount} prefix={<CheckCircleOutlined />} /></Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card>
+            <Statistic
+              title="Thuốc dưới ngưỡng tồn"
+              value={lowStockItems.length}
+              valueStyle={lowStockItems.length ? { color: '#cf1322' } : undefined}
+              prefix={<WarningOutlined />}
             />
-          </Form.Item>
+          </Card>
+        </Col>
+      </Row>
 
-          <Form.Item name="lotNumber" label="Số lô nhập" rules={[{ required: true, message: 'Nhập số lô' }]}>
-            <Input placeholder="VD: LOT-2026-001" />
-          </Form.Item>
+      {lowStockItems.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          message={`${lowStockItems.length} thuốc đang dưới ngưỡng tồn tối thiểu`}
+          description={lowStockItems
+            .slice(0, 5)
+            .map((item) => `${item.medicineName}: khả dụng ${item.eligibleStockQuantity}, thiếu ${item.shortageQuantity}`)
+            .join(' · ')}
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
-          <Form.Item name="expiryDate" label="Hạn sử dụng" rules={[{ required: true, message: 'Chọn hạn sử dụng' }]}>
-            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày hết hạn" />
-          </Form.Item>
+      <Row gutter={[16, 16]} align="stretch">
+        <Col xs={24} xl={9}>
+          <Card
+            title={`Danh sách đơn chờ (${prescriptionTotal})`}
+            styles={{ body: { padding: 12 } }}
+            style={{ height: '100%' }}
+          >
+            <Input
+              allowClear
+              prefix={<SearchOutlined />}
+              placeholder="Tìm trong trang hiện tại"
+              value={searchKeyword}
+              onChange={(event) => setSearchKeyword(event.target.value)}
+              style={{ marginBottom: 12 }}
+            />
+            <List
+              loading={prescriptionLoading}
+              dataSource={filteredPrescriptions}
+              locale={{ emptyText: <Empty description="Không có đơn chờ cấp phát" /> }}
+              style={{ maxHeight: 650, overflowY: 'auto' }}
+              renderItem={(item) => {
+                const selected = String(item.id) === String(selectedPrescriptionId)
+                return (
+                  <List.Item
+                    key={item.id}
+                    onClick={() => selectPrescription(item.id)}
+                    style={{
+                      cursor: 'pointer',
+                      border: selected ? '1px solid #1677ff' : '1px solid #f0f0f0',
+                      background: selected ? '#e6f4ff' : '#fff',
+                      borderRadius: 8,
+                      marginBottom: 8,
+                      padding: 12,
+                    }}
+                    extra={<RightOutlined style={{ color: selected ? '#1677ff' : '#bfbfbf' }} />}
+                  >
+                    <List.Item.Meta
+                      title={(
+                        <Space wrap>
+                          <Text strong>{item.prescriptionCode || item.id}</Text>
+                          <Tag color="orange">Chờ cấp phát</Tag>
+                        </Space>
+                      )}
+                      description={(
+                        <Space direction="vertical" size={1}>
+                          <Text>{item.patientName || 'Chưa có tên bệnh nhân'} ({item.patientCode || '—'})</Text>
+                          <Text type="secondary">Lượt khám: {item.visitCode || item.visitId || '—'}</Text>
+                          <Text type="secondary">Kê lúc {formatDateTime(item.prescribedAt)}</Text>
+                        </Space>
+                      )}
+                    />
+                  </List.Item>
+                )
+              }}
+            />
+            {prescriptionTotal > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
+                <Text type="secondary">
+                  Trang {prescriptionPage + 1}/{prescriptionTotalPages || 1} · Tổng {prescriptionTotal} đơn
+                </Text>
+                <Pagination
+                  current={prescriptionPage + 1}
+                  pageSize={PRESCRIPTION_PAGE_SIZE}
+                  total={prescriptionTotal}
+                  showSizeChanger={false}
+                  hideOnSinglePage
+                  onChange={changePrescriptionPage}
+                />
+              </div>
+            )}
+          </Card>
+        </Col>
 
-          <Space style={{ display: 'flex' }} align="baseline">
-            <Form.Item name="quantity" label="Số lượng nhập" rules={[{ required: true, message: 'Nhập số lượng' }]}>
-              <InputNumber min={1} style={{ width: 220 }} placeholder="Số lượng" />
-            </Form.Item>
+        <Col xs={24} xl={15}>
+          <Card
+            title={selectedPrescription
+              ? `Chi tiết đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id}`
+              : 'Chi tiết đơn thuốc'}
+            style={{ height: '100%' }}
+          >
+            {!selectedPrescription ? (
+              <Empty description="Chọn một đơn thuốc để xem chi tiết cấp phát" />
+            ) : (
+              <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
+                  <Descriptions.Item label="Bệnh nhân">
+                    {selectedPrescription.patientName || '—'} ({selectedPrescription.patientCode || '—'})
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Lượt khám">{selectedPrescription.visitCode || selectedPrescription.visitId || '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Bác sĩ">{selectedPrescription.doctorName || '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Ngày kê">{formatDateTime(selectedPrescription.prescribedAt)}</Descriptions.Item>
+                  <Descriptions.Item label="Ghi chú" span={2}>{selectedPrescription.note || 'Không có'}</Descriptions.Item>
+                </Descriptions>
 
-            <Form.Item name="unitCost" label="Đơn giá nhập (VNĐ)">
-              <InputNumber min={0} style={{ width: 220 }} placeholder="Giá nhập" />
-            </Form.Item>
-          </Space>
-        </Form>
-      </Modal>
+                {hasPreviewShortage && (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="Không đủ tồn khả dụng để cấp toàn bộ đơn"
+                    description="Xem từng dòng thuốc bên dưới và nhập bổ sung trước khi cấp phát."
+                  />
+                )}
+
+                <Table
+                  rowKey={(item) => item.id || item.medicineId}
+                  columns={previewColumns}
+                  dataSource={fefoPreview}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 850 }}
+                />
+
+                {shortageDetails.length > 0 && (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="Máy chủ từ chối cấp phát do thiếu tồn kho"
+                    description={(
+                      <Table
+                        rowKey={(item) => item.prescriptionItemId || item.medicineId}
+                        columns={shortageColumns}
+                        dataSource={shortageDetails}
+                        pagination={false}
+                        size="small"
+                        style={{ marginTop: 8 }}
+                      />
+                    )}
+                  />
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Popconfirm
+                    title="Xác nhận cấp phát thuốc"
+                    description={`Cấp đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id} theo phân bổ FEFO đang hiển thị?`}
+                    okText="Xác nhận cấp phát"
+                    cancelText="Kiểm tra lại"
+                    onConfirm={handleDispense}
+                    disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                  >
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<CheckCircleOutlined />}
+                      loading={dispensingId === selectedPrescription.id}
+                      disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                    >
+                      Xác nhận cấp phát theo FEFO
+                    </Button>
+                  </Popconfirm>
+                </div>
+                {!canDispense && <Text type="danger">Tài khoản hiện tại không có quyền cấp phát thuốc.</Text>}
+              </Space>
+            )}
+          </Card>
+        </Col>
+      </Row>
     </div>
   )
 }

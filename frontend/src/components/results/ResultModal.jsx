@@ -88,8 +88,6 @@ export const ResultModal = ({
         attachments: fileList,
         status: targetStatus,
         updatedAt: new Date().toISOString(),
-        enteredBy: order?.enteredBy || 'KTV. Nguyễn Văn Hùng',
-        confirmedBy: targetStatus === 'CONFIRMED' ? 'BS. Phạm Hồng Anh' : order?.confirmedBy,
       }
 
       await onSaveSuccess(updatedRecord)
@@ -103,7 +101,11 @@ export const ResultModal = ({
       onClose()
     } catch (err) {
       console.error(err)
-      message.error('Có lỗi xảy ra khi lưu kết quả cận lâm sàng')
+      message.error(
+        err?.response?.data?.message ||
+        err?.message ||
+        'Có lỗi xảy ra khi lưu kết quả cận lâm sàng',
+      )
     } finally {
       setSaving(false)
     }
@@ -193,24 +195,24 @@ export const ResultModal = ({
             <Col xs={12} sm={6} md={4}>
               <div style={{ fontSize: 12, color: '#64748b' }}>Giới tính / Tuổi:</div>
               <div style={{ fontWeight: 600, fontSize: 14, color: '#334155' }}>
-                {order.gender || 'Nam'} ({order.age || 30}T)
+                {order.gender || '—'} {order.age !== null && order.age !== undefined ? `(${order.age}T)` : ''}
               </div>
             </Col>
 
             <Col xs={12} sm={6} md={4}>
               <div style={{ fontSize: 12, color: '#64748b' }}>Ngày sinh:</div>
               <div style={{ fontWeight: 600, fontSize: 14, color: '#334155' }}>
-                {order.dateOfBirth || '15/08/1990'}
+                {order.dateOfBirth || '—'}
               </div>
             </Col>
 
             <Col xs={24} sm={12} md={8}>
               <div style={{ fontSize: 12, color: '#64748b' }}>Bác sĩ chỉ định:</div>
               <div style={{ fontWeight: 600, fontSize: 14, color: '#334155' }}>
-                {order.doctorName || 'BS. Phạm Hồng Anh'}
+                {order.doctorName || '—'}
               </div>
               <div style={{ fontSize: 12, color: '#64748b' }}>
-                {order.department || 'Khoa Nội'} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : ''}
+                {order.department || '—'} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '—'}
               </div>
             </Col>
           </Row>

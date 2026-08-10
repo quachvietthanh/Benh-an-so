@@ -3,6 +3,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,6 +24,8 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescription
 import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.port.dto.command.prescription.SearchPrescriptionsQuery;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
@@ -30,6 +34,7 @@ import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
+import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,11 +50,23 @@ public class PrescriptionController {
     private final AmendPrescriptionUseCase amendPrescriptionUseCase;
     private final GetPrescriptionUseCase getPrescriptionUseCase;
     private final GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
+    private final SearchPrescriptionsUseCase searchPrescriptionsUseCase;
     private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
     private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
     private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
 
     private final PrescriptionRestMapper mapper;
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public Page<PrescriptionResponse> search(
+            @RequestParam PrescriptionStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return searchPrescriptionsUseCase.search(new SearchPrescriptionsQuery(status, page, size))
+                .map(mapper::toResponse);
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

@@ -31,9 +31,10 @@ export const createAccessLog = ({ userName, patientName, recordCode, action = 'X
  */
 export const validateMedicalRecordDetail = (record) => {
   const errors = []
-  if (!record?.recordCode) errors.push('Thiếu mã bệnh án (recordCode)')
-  if (!record?.patientName && !record?.patientId) errors.push('Thiếu thông tin bệnh nhân')
-  if (!record?.diagnosis && !record?.primaryIcdCode) errors.push('Thiếu thông tin chẩn đoán ICD-10')
+  if (!record?.medicalRecordId && !record?.id) errors.push('Thiếu medicalRecordId')
+  if (!record?.visitId && !record?.visit?.id) errors.push('Thiếu visitId')
+  if (!record?.patientName && !record?.patientId && !record?.patient?.id) errors.push('Thiếu thông tin bệnh nhân')
+  if (!record?.diagnosis && !record?.primaryIcdCode && !record?.diagnoses?.length) errors.push('Thiếu thông tin chẩn đoán ICD-10')
 
   return {
     isValid: errors.length === 0,
@@ -60,8 +61,8 @@ test('1. KIỂM THỬ QUYỀN XEM BỆNH ÁN (Role-Based Authorization Test)', (
 
 test('2. KIỂM THỬ HIỂN THỊ NỘI DUNG CHI TIẾT BỆNH ÁN (Record Content Integrity)', () => {
   const sampleRecord = {
-    id: 'mr-101',
-    recordCode: 'BA-20260731',
+    medicalRecordId: 'mr-101',
+    visitId: 'visit-101',
     patientName: 'Nguyễn Văn An (BN000001)',
     doctorName: 'BS. Phạm Hồng Anh',
     symptoms: 'Đau ngực, ho kéo dài',
@@ -75,7 +76,7 @@ test('2. KIỂM THỬ HIỂN THỊ NỘI DUNG CHI TIẾT BỆNH ÁN (Record Cont
   const result = validateMedicalRecordDetail(sampleRecord)
   assert.equal(result.isValid, true)
   assert.equal(result.errors.length, 0)
-  assert.equal(sampleRecord.recordCode, 'BA-20260731')
+  assert.equal(sampleRecord.medicalRecordId, 'mr-101')
   assert.equal(sampleRecord.attachments.length, 1)
 })
 

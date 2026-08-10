@@ -11,12 +11,12 @@ import AppointmentQueue from '../pages/AppointmentQueue'
 import MedicalEncounter from '../pages/MedicalEncounter'
 import PrescriptionPage from '../pages/PrescriptionPage'
 import PharmacyPage from '../pages/PharmacyPage'
+import InventoryReceiptPage from '../pages/InventoryReceiptPage'
 import MedicineCatalogPage from '../pages/MedicineCatalogPage'
 import BillingPage from '../pages/BillingPage'
 import ReportsPage from '../pages/ReportsPage'
 import UsersPage from '../pages/UsersPage'
 import ServicesPage from '../pages/ServicesPage'
-import ClinicalOrdersPage from '../pages/ClinicalOrdersPage'
 import ResultPage from '../pages/ResultPage'
 import PublicLookupPage from '../pages/PublicLookupPage'
 import SystemManagementPage from '../pages/SystemManagementPage'
@@ -68,15 +68,18 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="patients" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientList /></PrivateRoute>} />
         <Route path="patients/:id" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientDetail /></PrivateRoute>} />
-        <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><AppointmentQueue /></PrivateRoute>} />
+        <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'nurse', 'receptionist']}><AppointmentQueue /></PrivateRoute>} />
         <Route path="medical-records" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
-        <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'pharmacist']}><PrescriptionPage /></PrivateRoute>} />
-        <Route path="clinical-orders" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'receptionist']}><ClinicalOrdersPage /></PrivateRoute>} />
-        <Route path="clinical-results" element={<PrivateRoute allowedRoles={['admin', 'manager', 'doctor', 'receptionist']}><ResultPage /></PrivateRoute>} />
+        <Route path="medical-records/visits/:visitId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
+        <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><PrescriptionPage /></PrivateRoute>} />
+        <Route path="prescriptions/:medicalRecordId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><PrescriptionPage /></PrivateRoute>} />
+        <Route path="clinical-orders" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><Navigate to="/appointments" replace /></PrivateRoute>} />
+        <Route path="clinical-results" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><ResultPage /></PrivateRoute>} />
         <Route path="results" element={<Navigate to="/clinical-results" replace />} />
-        <Route path="pharmacy" element={<PrivateRoute allowedRoles={['admin', 'manager', 'pharmacist']}><PharmacyPage /></PrivateRoute>} />
-        <Route path="medicines" element={<PrivateRoute allowedRoles={['pharmacist']}><MedicineCatalogPage /></PrivateRoute>} />
-        <Route path="medicine-catalog" element={<PrivateRoute allowedRoles={['pharmacist']}><MedicineCatalogPage /></PrivateRoute>} />
+        <Route path="pharmacy" element={<PrivateRoute allowedRoles={['admin', 'pharmacist']}><PharmacyPage /></PrivateRoute>} />
+        <Route path="pharmacy/receipts" element={<PrivateRoute allowedRoles={['admin', 'pharmacist']}><InventoryReceiptPage /></PrivateRoute>} />
+        <Route path="medicines" element={<PrivateRoute allowedRoles={['admin', 'pharmacist']}><MedicineCatalogPage /></PrivateRoute>} />
+        <Route path="medicine-catalog" element={<PrivateRoute allowedRoles={['admin', 'pharmacist']}><MedicineCatalogPage /></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedRoles={['admin', 'manager', 'receptionist']}><BillingPage /></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedRoles={['admin', 'manager']}><ReportsPage /></PrivateRoute>} />
         <Route path="system-management" element={<PrivateRoute allowedRoles={['admin']}><SystemManagementPage /></PrivateRoute>} />

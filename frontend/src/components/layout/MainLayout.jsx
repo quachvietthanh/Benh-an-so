@@ -18,8 +18,6 @@ import {
 } from '@ant-design/icons'
 import patientApi from '../../api/patientApi'
 import { useAuthContext } from '../../context/AuthContext'
-import { getNavigationItems } from '../../services/mockDataService'
-import { mergeAppointments, mergePatients } from '../../utils/storageHelpers'
 
 const { Header, Sider, Content } = Layout
 
@@ -42,6 +40,28 @@ const navigationSections = [
   { key: 'lookup', label: 'Tra cứu', paths: ['/public-lookup'] },
 ]
 
+const getNavigationItems = (roles = []) => {
+  const normalizedRoles = (Array.isArray(roles) ? roles : [roles])
+    .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
+    .filter(Boolean)
+
+  if (!normalizedRoles.length) return []
+
+  const items = [
+    { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
+    { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'doctor', 'receptionist'] },
+    { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
+    { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, roles: ['admin', 'doctor'] },
+    { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, roles: ['admin', 'pharmacist'] },
+    { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, roles: ['admin', 'manager', 'receptionist'] },
+    { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, roles: ['admin', 'manager'] },
+    { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, roles: ['admin'] },
+    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SearchOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
+  ]
+
+  return items.filter((item) => item.roles.some((role) => normalizedRoles.includes(role)))
+}
+
 function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
@@ -55,11 +75,9 @@ function MainLayout() {
     try {
       const res = await patientApi.getAll({ page: 0, size: 200 })
       const list = res.data?.content || res.data || []
-      if (Array.isArray(list) && list.length) {
-        setRemotePatients(list)
-      }
+      setRemotePatients(Array.isArray(list) ? list : [])
     } catch {
-      // fallback
+      setRemotePatients([])
     }
   }, [])
 
@@ -67,45 +85,12 @@ function MainLayout() {
     syncPatients()
   }, [syncPatients, location.pathname])
 
-  const allPatients = useMemo(() => mergePatients([]), [])
-  const allAppointments = useMemo(() => mergeAppointments([]), [])
-
   const searchOptions = useMemo(() => {
     const keyword = searchValue.trim().toLowerCase()
     if (!keyword) return []
 
-    const currentPatients = mergePatients(remotePatients)
-    const currentAppointments = mergeAppointments([])
-
-    // Combine patients from patient list and appointment records so every patient is searchable
-    const appointmentPatientsMap = new Map()
-    currentAppointments.forEach((a) => {
-      if (a.patientName) {
-        const pId = a.patientId || `p_${a.id}`
-        if (!currentPatients.some((p) => String(p.id) === String(a.patientId) || p.fullName === a.patientName) && !appointmentPatientsMap.has(pId)) {
-          appointmentPatientsMap.set(pId, {
-            id: pId,
-            fullName: a.patientName,
-            patientCode: a.patientCode || `BN-${pId}`,
-            phone: a.phone || a.phoneNumber || '',
-            active: true,
-          })
-        }
-      }
-    })
-
-    const allCombinedPatients = [
-      ...currentPatients,
-      ...Array.from(appointmentPatientsMap.values()),
-    ]
-
-    const matchedPatients = allCombinedPatients.filter((p) =>
+    const matchedPatients = remotePatients.filter((p) =>
       [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
-        .some((val) => String(val || '').toLowerCase().includes(keyword)),
-    ).slice(0, 5)
-
-    const matchedAppointments = currentAppointments.filter((a) =>
-      [a.patientName, a.patientCode, a.id, a.doctorName]
         .some((val) => String(val || '').toLowerCase().includes(keyword)),
     ).slice(0, 5)
 
@@ -138,39 +123,6 @@ function MainLayout() {
       })
     }
 
-    if (matchedAppointments.length > 0) {
-      options.push({
-        label: <span style={{ fontWeight: 600, color: '#16a34a', fontSize: 12 }}>📅 LỊCH HẸN ({matchedAppointments.length})</span>,
-        options: matchedAppointments.map((a) => {
-          const targetPatientId = a.patientId || allCombinedPatients.find((p) => p.fullName === a.patientName)?.id || a.id
-          const targetPatientObj = allCombinedPatients.find((p) => String(p.id) === String(targetPatientId) || p.fullName === a.patientName) || { id: targetPatientId, fullName: a.patientName || 'Bệnh nhân' }
-
-          return {
-            value: `appointment:${a.id}`,
-            label: (
-              <div
-                className="search-appointment-item"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setSearchValue('')
-                  navigate(`/patients/${targetPatientId}`, { state: { patient: targetPatientObj } })
-                }}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', cursor: 'pointer' }}
-              >
-                <span><strong>{a.patientName || 'Lịch hẹn'}</strong> <small style={{ color: '#64748b' }}>({a.slot || a.time || 'Hôm nay'})</small></span>
-                <small style={{ color: '#16a34a' }}>{a.status || 'Đã đặt'}</small>
-              </div>
-            ),
-            type: 'appointment',
-            id: a.id,
-            patientId: targetPatientId,
-            patient: targetPatientObj,
-          }
-        }),
-      })
-    }
-
     return options
   }, [searchValue, remotePatients, navigate])
 
@@ -180,17 +132,8 @@ function MainLayout() {
 
     if (valStr.startsWith('patient:')) {
       const patientId = valStr.replace('patient:', '')
-      const currentPatients = mergePatients([...remotePatients, ...getPatients()])
-      const foundPatient = option?.patient || currentPatients.find((p) => String(p.id) === String(patientId))
+      const foundPatient = option?.patient || remotePatients.find((p) => String(p.id) === String(patientId))
       navigate(`/patients/${patientId}`, { state: { patient: foundPatient } })
-    } else if (valStr.startsWith('appointment:')) {
-      const targetPatientId = option?.patientId || option?.patient?.id
-      if (targetPatientId) {
-        navigate(`/patients/${targetPatientId}`, { state: { patient: option?.patient } })
-      } else {
-        const appointmentId = valStr.replace('appointment:', '')
-        navigate('/appointments', { state: { appointmentId } })
-      }
     }
   }
 
@@ -199,11 +142,10 @@ function MainLayout() {
     const keyword = searchValue.trim()
     setSearchValue('')
 
-    const currentPatients = mergePatients([...remotePatients, ...getPatients()])
-    const matched = currentPatients.find((p) =>
+    const matched = remotePatients.find((p) =>
       [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
         .some((val) => String(val || '').toLowerCase() === keyword.toLowerCase())
-    ) || currentPatients.find((p) =>
+    ) || remotePatients.find((p) =>
       [p.fullName, p.patientCode, p.phone, p.phoneNumber, p.identityNumber]
         .some((val) => String(val || '').toLowerCase().includes(keyword.toLowerCase()))
     )
@@ -266,7 +208,7 @@ function MainLayout() {
   }, [location.pathname, navigationItems])
 
   const primaryRole = user?.roles?.[0] || 'doctor'
-  const displayName = user?.fullName || user?.username || 'Nguyễn Văn A'
+  const displayName = user?.fullName || user?.username || 'Người dùng'
 
   const handleLogout = () => {
     logout()
@@ -386,7 +328,7 @@ function MainLayout() {
           </AutoComplete>
 
           <div className="clinic-header-actions">
-            <Badge count={3} size="small" offset={[-2, 3]}>
+            <Badge count={0} size="small" offset={[-2, 3]}>
               <button type="button" className="notification-button" aria-label="Thông báo">
                 <BellOutlined />
               </button>

@@ -1,35 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Table, Button, Tag, Typography, Space } from 'antd'
-import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
+import { Alert, Table, Button, Tag, Typography } from 'antd'
+import { EyeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import medicalRecordApi from '../api/medicalRecordApi'
 import { formatDateTime, formatRecordStatus } from '../utils/helpers'
+import { normalizeMedicalRecordDetail } from '../utils/workflowContract'
 
 const { Title } = Typography
 
-function MedicalRecordList() {
+function MedicalRecordList({ patientId }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
 
   const fetchRecords = useCallback(async () => {
+    if (!patientId) {
+      setRecords([])
+      return
+    }
     setLoading(true)
     try {
-      const response = await medicalRecordApi.getAll({ page, size: pageSize })
-      const raw = response?.data?.content || response?.data || []
-      const list = Array.isArray(raw) ? raw : []
+      const response = await medicalRecordApi.getByPatient(patientId)
+      const list = Array.isArray(response?.data)
+        ? response.data.map(normalizeMedicalRecordDetail).filter(Boolean)
+        : []
       setRecords(list)
-      setTotal(response?.data?.totalElements || list.length)
     } catch {
       setRecords([])
-      setTotal(0)
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize])
+  }, [patientId])
 
   useEffect(() => {
     fetchRecords()
@@ -93,7 +94,8 @@ function MedicalRecordList() {
         <Button
           type="link"
           icon={<EyeOutlined />}
-          onClick={() => console.log('View record:', record.id)}
+          disabled={!record.visitId}
+          onClick={() => navigate(`/medical-records/visits/${record.visitId}`)}
         >
           Xem
         </Button>
@@ -104,11 +106,18 @@ function MedicalRecordList() {
   return (
     <div>
       <div className="page-header">
-        <Title level={4} style={{ margin: 0 }}>Quản lý hồ sơ bệnh án</Title>
-        <Button type="primary" icon={<PlusOutlined />}>
-          Tạo hồ sơ mới
-        </Button>
+        <Title level={4} style={{ margin: 0 }}>Lịch sử bệnh án theo bệnh nhân</Title>
       </div>
+
+      {!patientId && (
+        <Alert
+          type="info"
+          showIcon
+          message="Cần patientId để tải lịch sử bệnh án"
+          description="Backend không cung cấp danh sách bệnh án toàn hệ thống; hãy mở lịch sử từ hồ sơ một bệnh nhân cụ thể."
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       <Table
         columns={columns}
@@ -116,15 +125,9 @@ function MedicalRecordList() {
         rowKey="id"
         loading={loading}
         pagination={{
-          current: page + 1,
-          pageSize,
-          total,
+          pageSize: 10,
           showSizeChanger: true,
           showTotal: (total) => `Tổng số: ${total} hồ sơ`,
-          onChange: (newPage, newSize) => {
-            setPage(newPage - 1)
-            setPageSize(newSize)
-          },
         }}
       />
     </div>

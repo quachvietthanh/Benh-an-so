@@ -221,7 +221,7 @@ function Dashboard() {
 
   return (
     <div className="compact-dashboard">
-      <h1 className="dashboard-title">Dashboard</h1>
+      <h1 className="dashboard-title">Tổng quan phòng khám</h1>
 
       <section className="compact-stats" aria-label="Tổng quan phòng khám">
         {statCards.map((card) => {
@@ -245,7 +245,7 @@ function Dashboard() {
         <article className="compact-panel revenue-chart-panel">
           <div className="compact-panel-header">
             <h2>Doanh thu 7 ngày qua</h2>
-            <button type="button" className="compact-filter">7 ngày qua⌄</button>
+            <button type="button" className="compact-filter">7 ngày qua</button>
           </div>
           <div className="chart-area">
             <svg viewBox="0 0 750 260" role="img" aria-label="Biểu đồ doanh thu bảy ngày qua">

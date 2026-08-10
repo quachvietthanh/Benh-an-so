@@ -1,5 +1,4 @@
 import {
-  demoUsers,
   demoPatients,
   demoAppointments,
   demoMedicalRecords,
@@ -59,18 +58,6 @@ export const getNavigationItems = (roles = []) => {
   if (!normalizedUserRoles.length) return allItems
 
   return allItems.filter((item) => item.roles.some((role) => normalizedUserRoles.includes(role)))
-}
-
-export const loginUser = ({ username, password }) => {
-  const found = demoUsers.find((user) => user.username === username && user.password === password)
-  if (!found) {
-    throw new Error('Tên đăng nhập hoặc mật khẩu không đúng')
-  }
-
-  return {
-    ...clone(found),
-    token: 'demo-token',
-  }
 }
 
 export const getDashboardStats = () => {

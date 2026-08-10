@@ -38,7 +38,7 @@ export const ResultTable = ({
       dataIndex: 'patientCode',
       key: 'patientCode',
       width: 110,
-      render: (code) => <Tag color="blue" style={{ borderRadius: 6, fontWeight: 600 }}>{code || 'BN0001'}</Tag>,
+      render: (code) => <Tag color="blue" style={{ borderRadius: 6, fontWeight: 600 }}>{code || '—'}</Tag>,
     },
     {
       title: 'Họ tên bệnh nhân',
@@ -51,7 +51,7 @@ export const ResultTable = ({
             {name}
           </Text>
           <div style={{ fontSize: 12, color: '#64748b' }}>
-            {record.gender || 'Nam'} ({record.age || 30}T)
+            {record.gender || '—'} {record.age !== null && record.age !== undefined ? `(${record.age}T)` : ''}
           </div>
         </div>
       ),
@@ -108,7 +108,7 @@ export const ResultTable = ({
       width: 150,
       render: (doctor) => (
         <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>
-          {doctor || 'BS. Trực'}
+          {doctor || '—'}
         </span>
       ),
     },

@@ -4,10 +4,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.prescription.Prescription;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionItemEntity;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionItemRepository;
@@ -85,6 +88,16 @@ public class PrescriptionRepositoryAdapter
                 .stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Prescription> findByStatus(
+            PrescriptionStatus status,
+            Pageable pageable
+    ) {
+        return jpaRepository.findByStatus(status, pageable)
+                .map(this::toDomain);
     }
 
     @Override

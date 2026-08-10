@@ -1,41 +1,83 @@
 import axiosClient from './axiosClient'
 
+const DEFAULT_PAGE_PARAMS = { page: 0, size: 100 }
+
+const enterRequest = (data = {}) => ({
+  numericValue: data.numericValue ?? null,
+  textValue: data.textValue ?? null,
+  abnormalFlag: data.abnormalFlag ?? 'UNKNOWN',
+  conclusion: data.conclusion ?? null,
+})
+
+const updateRequest = (data = {}) => ({
+  ...enterRequest(data),
+  changeReason: data.changeReason,
+})
+
 /**
- * RESTful API Client for Clinical Results & Attachments Management
- * Chuẩn hóa Namespace: /clinical-results/*
+ * API client matching ClinicalResultController and ClinicalOrderController.
+ * Clinical results do not have a global list/create endpoint: every read is
+ * scoped to a visit and every create is scoped to a clinical-order item.
  */
 const clinicalResultApi = {
-  getAll: (params) => {
-    return axiosClient.get('/clinical-results', { params }).catch((err) => {
-      console.warn('Backend /clinical-results global list endpoint not available, returning empty array:', err?.message)
-      return { data: [] }
+  // Kept for callers that still use the old name, but never calls the invalid
+  // GET /clinical-results endpoint. A visit context is mandatory.
+  getAll: (params = {}) => {
+    const { visitId, ...query } = params
+    if (!visitId) {
+      return Promise.reject(new Error('visitId is required to load clinical results.'))
+    }
+    return axiosClient.get(`/clinical-results/visits/${visitId}`, {
+      params: { ...DEFAULT_PAGE_PARAMS, ...query },
     })
   },
-  getById: (id) => {
-    return axiosClient.get(`/clinical-results/${id}`)
-  },
-  getByVisit: (visitId, params) => {
-    return axiosClient.get(`/clinical-results/visits/${visitId}`, { params })
-  },
-  create: (data) => {
-    return axiosClient.post('/clinical-results', data)
-  },
-  update: (id, data) => {
-    return axiosClient.put(`/clinical-results/${id}`, data)
-  },
+
+  getById: (resultId) => axiosClient.get(`/clinical-results/${resultId}`),
+
+  getByVisit: (visitId, params = {}) =>
+    axiosClient.get(`/clinical-results/visits/${visitId}`, {
+      params: { ...DEFAULT_PAGE_PARAMS, ...params },
+    }),
+
+  getOrdersByVisit: (visitId, params = {}) =>
+    axiosClient.get(`/clinical-orders/visits/${visitId}`, {
+      params: { ...DEFAULT_PAGE_PARAMS, ...params },
+    }),
+
+  enter: (clinicalOrderItemId, data) =>
+    axiosClient.post(
+      `/clinical-order-items/${clinicalOrderItemId}/results`,
+      enterRequest(data)
+    ),
+
+  update: (resultId, data) =>
+    axiosClient.put(`/clinical-results/${resultId}`, updateRequest(data)),
+
+  finalize: (resultId) =>
+    axiosClient.post(`/clinical-results/${resultId}/finalize`),
+
+  getHistory: (resultId) =>
+    axiosClient.get(`/clinical-results/${resultId}/history`),
+
   uploadAttachment: (resultId, file) => {
+    if (!resultId) {
+      return Promise.reject(new Error('resultId is required to upload a clinical result attachment.'))
+    }
+    if (!file) {
+      return Promise.reject(new Error('A file is required to upload a clinical result attachment.'))
+    }
+
     const formData = new FormData()
     formData.append('file', file)
-    const endpoint = resultId ? `/clinical-results/${resultId}/attachments` : '/clinical-results/upload'
-    return axiosClient.post(endpoint, formData, {
+    return axiosClient.post(`/clinical-results/${resultId}/attachments`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })
   },
-  getDownloadUrl: (attachmentId) => {
-    return axiosClient.get(`/clinical-result-attachments/${attachmentId}/download`)
-  },
+
+  getDownloadUrl: (attachmentId) =>
+    axiosClient.get(`/clinical-result-attachments/${attachmentId}/download`),
 }
 
 export default clinicalResultApi

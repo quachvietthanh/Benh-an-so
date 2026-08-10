@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import dayjs from 'dayjs'
 import {
   Card,
   Row,
@@ -8,7 +9,6 @@ import {
   Typography,
   Space,
   message,
-  Breadcrumb,
 } from 'antd'
 import {
   FileDoneOutlined,
@@ -25,19 +25,128 @@ import ResultTable from '../components/results/ResultTable'
 import ResultModal from '../components/results/ResultModal'
 
 import clinicalResultApi from '../api/clinicalResultApi'
+import clinicalServiceApi from '../api/clinicalServiceApi'
+import patientApi from '../api/patientApi'
 import queueApi from '../api/queueApi'
-import {
-  mergeClinicalOrders,
-  saveStoredClinicalOrder,
-  getStoredQueueItems,
-  saveStoredQueueItem,
-  getStoredMedicalRecords,
-  saveStoredMedicalRecord,
-} from '../utils/storageHelpers'
+import { useAuthContext } from '../context/AuthContext'
 
 const { Title, Text } = Typography
 
+const PAGE_SIZE = 100
+const TERMINAL_ORDER_ITEM_STATUSES = new Set(['COMPLETED', 'CANCELLED'])
+
+const responseItems = (response) => {
+  const data = response?.data
+  if (Array.isArray(data)) return data
+  return Array.isArray(data?.content) ? data.content : []
+}
+
+const apiErrorMessage = (error) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.detail ||
+  error?.message ||
+  'Lỗi không xác định từ máy chủ.'
+
+const calculateAge = (dateOfBirth) => {
+  if (!dateOfBirth || !dayjs(dateOfBirth).isValid()) return null
+  return String(dayjs().diff(dayjs(dateOfBirth), 'year'))
+}
+
+const uiStatusForResult = (result, orderItem) => {
+  if (orderItem?.status === 'CANCELLED') return 'CANCELLED'
+  if (!result) return 'PENDING'
+  if (result.status === 'FINAL') return 'CONFIRMED'
+  if (['DRAFT', 'CORRECTED'].includes(result.status)) return 'RESULTED'
+  return 'IN_PROGRESS'
+}
+
+const resultValues = (result) => {
+  if (!result) return ''
+  if (result.resultType === 'NUMBER' && result.numericValue !== null && result.numericValue !== undefined) {
+    return String(result.numericValue)
+  }
+  return result.textValue || ''
+}
+
+const normalizeAttachments = (attachments = []) =>
+  attachments.map((attachment) => ({
+    ...attachment,
+    name: attachment.fileName || attachment.name,
+    size: attachment.fileSize ?? attachment.size,
+    type: attachment.contentType || attachment.type,
+  }))
+
+const mergeResultIntoOrder = (order, result) => ({
+  ...order,
+  id: result.id,
+  clinicalResultId: result.id,
+  resultType: result.resultType || order.resultType,
+  numericValue: result.numericValue ?? null,
+  textValue: result.textValue ?? null,
+  resultValues: resultValues(result),
+  conclusion: result.conclusion || '',
+  abnormalFlag: result.abnormalFlag || 'UNKNOWN',
+  backendStatus: result.status,
+  status: uiStatusForResult(result, order.items?.[0]),
+  attachments: normalizeAttachments(result.attachments),
+})
+
+const normalizeQueueItem = (item = {}) => ({
+  ...item,
+  id: item.id || item.queueItemId,
+  status: item.status || item.queueItemStatus,
+  roomNumber: item.roomNumber || item.roomName,
+})
+
+const buildResultRequest = (order) => {
+  const rawValue = String(order.resultValues || '').trim()
+  const resultType = order.resultType
+
+  if (!resultType) {
+    throw new Error(`Không xác định được kiểu kết quả cho dịch vụ ${order.items?.[0]?.serviceCode || ''}.`)
+  }
+
+  let numericValue = order.numericValue ?? null
+  let textValue = rawValue || null
+
+  if (resultType === 'NUMBER') {
+    const normalizedNumber = rawValue.replace(',', '.')
+    if (!/^-?\d+(\.\d+)?$/.test(normalizedNumber)) {
+      throw new Error('Kết quả của dịch vụ này phải là một giá trị số hợp lệ.')
+    }
+    numericValue = Number(normalizedNumber)
+    textValue = null
+  }
+
+  return {
+    numericValue,
+    textValue,
+    abnormalFlag: order.abnormalFlag || 'UNKNOWN',
+    conclusion: String(order.conclusion || '').trim() || null,
+  }
+}
+
+const requireClinicalResult = (response) => {
+  const result = response?.data
+  if (!result?.id) {
+    throw new Error('Máy chủ không trả về clinical result hợp lệ.')
+  }
+  return result
+}
+
+const requireClinicalAttachment = (response) => {
+  const attachment = response?.data
+  if (!attachment?.id) {
+    throw new Error('Máy chủ không trả về tệp đính kèm hợp lệ.')
+  }
+  return attachment
+}
+
 export function ResultPage() {
+  const { user } = useAuthContext()
+  const isAdmin = (user?.roles || [])
+    .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
+    .includes('admin')
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])
 
@@ -53,21 +162,135 @@ export function ResultPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await clinicalResultApi.getAll({
-        search: searchText,
-        status: statusFilter,
-        category: categoryFilter,
+      const queueResponse = await (isAdmin ? queueApi.getQueues : queueApi.getMyQueue)({
+        date: dayjs().format('YYYY-MM-DD'),
       })
-      const apiList = response?.data?.content || (Array.isArray(response?.data) ? response.data : [])
-      const mergedList = mergeClinicalOrders(apiList)
-      setOrders(mergedList)
+      const waitingQueues = responseItems(queueResponse)
+        .map(normalizeQueueItem)
+        .filter((item) => item.status === 'WAITING_FOR_RESULT')
+
+      if (waitingQueues.some((item) => !item.id || !item.visitId || !item.patientId)) {
+        throw new Error('Queue WAITING_FOR_RESULT thiếu queueItemId, visitId hoặc patientId.')
+      }
+
+      const queueByVisit = new Map()
+      waitingQueues.forEach((item) => {
+        if (!queueByVisit.has(String(item.visitId))) {
+          queueByVisit.set(String(item.visitId), item)
+        }
+      })
+      const visitQueues = [...queueByVisit.values()]
+
+      if (!visitQueues.length) {
+        setOrders([])
+        return
+      }
+
+      const patientIds = [...new Set(visitQueues.map((item) => String(item.patientId)))]
+      const [catalogResponse, patientEntries, visitEntries] = await Promise.all([
+        clinicalServiceApi.getCatalog({ page: 0, size: PAGE_SIZE }),
+        Promise.all(
+          patientIds.map(async (patientId) => {
+            const response = await patientApi.getById(patientId)
+            return [patientId, response?.data]
+          })
+        ),
+        Promise.all(
+          visitQueues.map(async (queueItem) => {
+            const [clinicalOrdersResponse, clinicalResultsResponse] = await Promise.all([
+              clinicalResultApi.getOrdersByVisit(queueItem.visitId, { page: 0, size: PAGE_SIZE }),
+              clinicalResultApi.getByVisit(queueItem.visitId, { page: 0, size: PAGE_SIZE }),
+            ])
+            return {
+              queueItem,
+              clinicalOrders: responseItems(clinicalOrdersResponse),
+              clinicalResults: responseItems(clinicalResultsResponse),
+            }
+          })
+        ),
+      ])
+
+      const servicesByCode = new Map(
+        responseItems(catalogResponse).map((service) => [String(service.serviceCode), service])
+      )
+      const patientsById = new Map(patientEntries)
+
+      const nextOrders = visitEntries.flatMap(({ queueItem, clinicalOrders, clinicalResults }) => {
+        const patient = patientsById.get(String(queueItem.patientId))
+        if (!patient?.id) {
+          throw new Error(`Không tải được bệnh nhân ${queueItem.patientId} của visit ${queueItem.visitId}.`)
+        }
+
+        const resultsByOrderItem = new Map(
+          clinicalResults.map((result) => [String(result.clinicalOrderItemId), result])
+        )
+
+        return clinicalOrders.flatMap((clinicalOrder) =>
+          (clinicalOrder.items || []).map((item) => {
+            const service = servicesByCode.get(String(item.serviceCode))
+            const result = resultsByOrderItem.get(String(item.id))
+            const resolvedResultType = result?.resultType || service?.resultDataType
+            if (!resolvedResultType) {
+              throw new Error(`Không tìm thấy kiểu kết quả của dịch vụ ${item.serviceCode}.`)
+            }
+
+            const normalizedItem = {
+              ...item,
+              category: service?.serviceType || 'OTHER',
+              resultDataType: resolvedResultType,
+              unit: result?.unit || service?.unit || null,
+              referenceRange: result?.referenceRange || service?.referenceRange || null,
+            }
+            const order = {
+              id: result?.id || item.id,
+              clinicalResultId: result?.id || null,
+              clinicalOrderId: clinicalOrder.id,
+              clinicalOrderItemId: item.id,
+              visitId: queueItem.visitId,
+              queueItemId: queueItem.id,
+              queueStatus: queueItem.status,
+              patientId: patient.id,
+              patientCode: patient.patientCode,
+              patientName: patient.fullName || queueItem.patientName,
+              gender: patient.gender,
+              dateOfBirth: patient.dateOfBirth
+                ? dayjs(patient.dateOfBirth).format('DD/MM/YYYY')
+                : null,
+              age: calculateAge(patient.dateOfBirth),
+              doctorId: queueItem.doctorId,
+              doctorName: queueItem.doctorName,
+              department: queueItem.roomNumber
+                ? `Phòng ${queueItem.roomNumber}`
+                : 'Cận lâm sàng',
+              orderCode: clinicalOrder.orderCode,
+              diagnosis: clinicalOrder.clinicalReason,
+              createdAt: clinicalOrder.orderedAt || queueItem.checkedInAt,
+              items: [normalizedItem],
+              resultType: resolvedResultType,
+              numericValue: result?.numericValue ?? null,
+              textValue: result?.textValue ?? null,
+              resultValues: resultValues(result),
+              conclusion: result?.conclusion || '',
+              abnormalFlag: result?.abnormalFlag || 'UNKNOWN',
+              backendStatus: result?.status || null,
+              status: uiStatusForResult(result, item),
+              attachments: normalizeAttachments(result?.attachments),
+            }
+
+            return order
+          })
+        )
+      })
+
+      setOrders(nextOrders)
     } catch (err) {
-      console.warn('Error loading clinical results from API:', err?.message)
-      setOrders(mergeClinicalOrders([]))
+      console.error('Error loading clinical results from API:', err)
+      setOrders([])
+      message.error(`Không thể tải kết quả cận lâm sàng: ${apiErrorMessage(err)}`)
     } finally {
       setLoading(false)
     }
-  }, [searchText, statusFilter, categoryFilter])
+  }, [isAdmin])
 
   useEffect(() => {
     loadData()
@@ -88,6 +311,7 @@ export function ResultPage() {
           order.patientCode,
           order.diagnosis,
           order.doctorName,
+          ...((order.items || []).flatMap((item) => [item.serviceCode, item.serviceName])),
         ].some((val) => String(val || '').toLowerCase().includes(kw))
 
       const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter
@@ -95,10 +319,10 @@ export function ResultPage() {
       const matchesCategory =
         categoryFilter === 'ALL' ||
         order.items?.some((item) => {
-          const cat = item.category || item.categoryName || ''
-          if (categoryFilter === 'LABORATORY') return cat.includes('LAB') || cat.includes('Xét nghiệm')
-          if (categoryFilter === 'IMAGING') return cat.includes('IMG') || cat.includes('hình ảnh')
-          if (categoryFilter === 'FUNCTIONAL') return cat.includes('FUNC') || cat.includes('chức năng')
+          const category = String(item.category || '').toUpperCase()
+          if (categoryFilter === 'LABORATORY') return category === 'LAB_TEST'
+          if (categoryFilter === 'IMAGING') return category === 'IMAGING'
+          if (categoryFilter === 'FUNCTIONAL') return category === 'OTHER'
           return true
         })
 
@@ -128,56 +352,136 @@ export function ResultPage() {
   }
 
   const handleSaveResultSuccess = async (updatedOrder) => {
-    // 1. Save locally to LocalStorage
-    saveStoredClinicalOrder(updatedOrder)
-    setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)))
+    // Resolve every server operation before ResultModal is allowed to show success.
+    if (!['RESULTED', 'CONFIRMED'].includes(updatedOrder.status)) {
+      throw new Error(`Trạng thái kết quả không được hỗ trợ: ${updatedOrder.status}.`)
+    }
+    if (!updatedOrder.visitId || !updatedOrder.queueItemId) {
+      throw new Error('Kết quả thiếu visitId hoặc queueItemId của lượt khám.')
+    }
 
-    // 2. Đồng bộ chu trình: Khi Bác sĩ Xác nhận & Khóa (CONFIRMED/COMPLETED), chuyển lượt khám trong Hàng Đợi về IN_PROGRESS (Đang khám) để Bác sĩ xem kết quả và chủ động bấm Hoàn tất
-    if (['CONFIRMED', 'COMPLETED'].includes(updatedOrder.status)) {
-      try {
-        const allQueues = getStoredQueueItems()
-        allQueues.forEach((q) => {
-          if (
-            (updatedOrder.patientId && String(q.patientId) === String(updatedOrder.patientId)) ||
-            (updatedOrder.patientName && q.patientName === updatedOrder.patientName)
-          ) {
-            if (['WAITING_FOR_RESULT', 'WAITING', 'IN_PROGRESS'].includes(q.status)) {
-              const updatedItem = { ...q, status: 'IN_PROGRESS' }
-              saveStoredQueueItem(updatedItem)
-              if (q.id && !String(q.id).startsWith('local') && !String(q.id).startsWith('qi-')) {
-                queueApi.updateStatus(q.id, { status: 'IN_PROGRESS' }).catch(() => {})
-              }
-            }
-          }
-        })
-        const allRecords = getStoredMedicalRecords()
-        allRecords.forEach((r) => {
-          if (
-            (updatedOrder.patientId && String(r.patientId) === String(updatedOrder.patientId)) ||
-            (updatedOrder.patientName && r.patientName === updatedOrder.patientName)
-          ) {
-            const updatedRec = {
-              ...r,
-              status: 'IN_PROGRESS',
-              clinicalResults: {
-                ...(r.clinicalResults || {}),
-                [updatedOrder.orderCode]: updatedOrder.conclusion || updatedOrder.resultSummary || 'Đã có kết quả CĐLS',
-              },
-            }
-            saveStoredMedicalRecord(updatedRec)
-          }
-        })
-      } catch (err) {
-        console.warn('Sync order completion error:', err)
+    const request = buildResultRequest(updatedOrder)
+    const newAttachments = (updatedOrder.attachments || []).filter((attachment) => attachment?.file)
+    const shouldFinalize = updatedOrder.status === 'CONFIRMED'
+    let persistedResult
+
+    const reflectServerResult = (result) => {
+      const serverOrder = mergeResultIntoOrder(updatedOrder, result)
+      setOrders((currentOrders) =>
+        currentOrders.map((order) =>
+          String(order.clinicalOrderItemId) === String(updatedOrder.clinicalOrderItemId)
+            ? serverOrder
+            : order
+        )
+      )
+      setSelectedOrder(serverOrder)
+      return serverOrder
+    }
+
+    if (updatedOrder.clinicalResultId) {
+      const currentResult = requireClinicalResult(
+        await clinicalResultApi.getById(updatedOrder.clinicalResultId)
+      )
+
+      // A retry remains safe if finalization succeeded but resuming the queue
+      // failed in a later request.
+      if (currentResult.status === 'FINAL') {
+        if (!shouldFinalize) {
+          throw new Error('Kết quả đã được xác nhận và không thể chỉnh sửa.')
+        }
+        if (newAttachments.length) {
+          throw new Error('Không thể tải thêm tệp vào kết quả đã được xác nhận.')
+        }
+        persistedResult = currentResult
+      } else {
+        persistedResult = requireClinicalResult(
+          await clinicalResultApi.update(currentResult.id, {
+            ...request,
+            changeReason:
+              String(updatedOrder.notes || '').trim() ||
+              'Cập nhật kết quả từ màn hình nhập kết quả cận lâm sàng.',
+          })
+        )
+      }
+    } else {
+      if (!updatedOrder.clinicalOrderItemId) {
+        throw new Error('Kết quả thiếu clinicalOrderItemId để tạo mới.')
+      }
+      persistedResult = requireClinicalResult(
+        await clinicalResultApi.enter(updatedOrder.clinicalOrderItemId, request)
+      )
+    }
+
+    // Keep the server-issued resultId in state even if a later attachment,
+    // finalize, or queue request fails; the next attempt can safely resume.
+    reflectServerResult(persistedResult)
+
+    if (persistedResult.status !== 'FINAL' && newAttachments.length) {
+      const uploadedAttachments = await Promise.all(
+        newAttachments.map((attachment) =>
+          clinicalResultApi
+            .uploadAttachment(persistedResult.id, attachment.file)
+            .then(requireClinicalAttachment)
+        )
+      )
+      persistedResult = {
+        ...persistedResult,
+        attachments: [...(persistedResult.attachments || []), ...uploadedAttachments],
+      }
+      reflectServerResult(persistedResult)
+    }
+
+    if (shouldFinalize && persistedResult.status !== 'FINAL') {
+      persistedResult = requireClinicalResult(
+        await clinicalResultApi.finalize(persistedResult.id)
+      )
+      reflectServerResult(persistedResult)
+    }
+
+    if (shouldFinalize) {
+      const clinicalOrdersResponse = await clinicalResultApi.getOrdersByVisit(
+        updatedOrder.visitId,
+        { page: 0, size: PAGE_SIZE }
+      )
+      const visitOrderItems = responseItems(clinicalOrdersResponse)
+        .flatMap((clinicalOrder) => clinicalOrder.items || [])
+
+      if (!visitOrderItems.length) {
+        throw new Error('Máy chủ không trả về chỉ định cận lâm sàng của lượt khám.')
+      }
+
+      const allItemsFinished = visitOrderItems.every((item) =>
+        TERMINAL_ORDER_ITEM_STATUSES.has(item.status)
+      )
+
+      if (allItemsFinished) {
+        const queueResponse = await queueApi.getById(updatedOrder.queueItemId)
+        let queueItem = normalizeQueueItem(queueResponse?.data)
+        if (!queueItem.id) {
+          throw new Error('Máy chủ không trả về queue item hợp lệ.')
+        }
+
+        if (queueItem.status === 'WAITING_FOR_RESULT') {
+          queueItem = normalizeQueueItem(
+            (await queueApi.updateStatus(queueItem.id, 'IN_PROGRESS'))?.data
+          )
+        }
+
+        if (!queueItem.id || queueItem.status !== 'IN_PROGRESS') {
+          throw new Error(
+            `Không thể đưa lượt khám về IN_PROGRESS (trạng thái hiện tại: ${queueItem.status || 'không xác định'}).`
+          )
+        }
+
+        setOrders((currentOrders) =>
+          currentOrders.filter(
+            (order) => String(order.visitId) !== String(updatedOrder.visitId)
+          )
+        )
       }
     }
 
-    // 3. Call RESTful API PUT /api/results/{id} if backend available
-    try {
-      await clinicalResultApi.update(updatedOrder.id, updatedOrder)
-    } catch {
-      // silent fallback
-    }
+    return persistedResult
   }
 
   return (
@@ -199,7 +503,7 @@ export function ResultPage() {
             Nhập kết quả cận lâm sàng
           </Title>
           <Text style={{ color: '#64748b', fontSize: 14 }}>
-            Quy trình nghiệp vụ Kỹ thuật viên nhập kết quả & Bác sĩ duyệt xác nhận khóa thông tin
+            Nhập và xác nhận kết quả theo lượt khám đang chờ cận lâm sàng.
           </Text>
         </div>
 

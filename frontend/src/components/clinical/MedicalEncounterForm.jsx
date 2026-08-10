@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Col,
+  Descriptions,
   Divider,
   Form,
   Input,
@@ -14,7 +15,6 @@ import {
   Table,
   Tag,
   Typography,
-  Upload,
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -26,7 +26,6 @@ import {
   PlusOutlined,
   PrinterOutlined,
   SearchOutlined,
-  UploadOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { getPopularIcd10 } from '../../utils/icd10Data'
@@ -37,9 +36,7 @@ const { Title, Text } = Typography
 function MedicalEncounterForm({
   form,
   isDoctor,
-  patients,
-  selectedPatientId,
-  setSelectedPatientId,
+  encounterContext,
   selectedPatientObj,
   vitalSigns,
   setVitalSigns,
@@ -64,38 +61,41 @@ function MedicalEncounterForm({
   handleUpdateOrderNote,
   totalOrderFee,
   setPrintModalOpen,
-  results,
-  setResults,
-  files,
-  setFiles,
-  beforeUpload,
+  serviceCatalogError,
 }) {
   return (
     <Form form={form} layout="vertical" disabled={!isDoctor}>
       <Row gutter={[16, 16]}>
-        {/* Left Column: Patient Selection & Vital Signs */}
+        {/* Left Column: Visit context & Vital Signs */}
         <Col xs={24} lg={8}>
           <Card
-            title={<span style={{ color: '#1E3A8A' }}><UserOutlined /> Thông tin Bệnh nhân</span>}
+            title={<span style={{ color: '#1E3A8A' }}><UserOutlined /> Thông tin lượt khám</span>}
             style={{ marginBottom: 16 }}
             bordered
           >
-            <Form.Item
-              name="patientId"
-              label="Chọn bệnh nhân khám"
-              rules={[{ required: true, message: 'Vui lòng chọn bệnh nhân' }]}
-            >
-              <Select
-                showSearch
-                placeholder="Gõ tên hoặc mã bệnh nhân (BN-...)"
-                optionFilterProp="label"
-                onChange={(val) => setSelectedPatientId(val)}
-                options={patients.map((p) => ({
-                  value: p.id,
-                  label: `${p.fullName} - ${p.patientCode} (${p.phoneNumber || 'Không SĐT'}${p.queueNumber ? ` - STT: ${p.queueNumber}` : ''}${p.checkInTimeStr ? ` — Đến lúc: ${p.checkInTimeStr}` : ''})`,
-                }))}
-              />
+            <Form.Item name="patientId" hidden>
+              <Input />
             </Form.Item>
+
+            <Descriptions size="small" column={1} bordered style={{ marginBottom: 12 }}>
+              <Descriptions.Item label="Mã lượt khám">
+                <Text strong>{encounterContext?.visit?.visitCode || encounterContext?.visit?.id}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Queue / STT">
+                {encounterContext?.queueItem
+                  ? `${encounterContext.queueItem.id} / ${encounterContext.queueItem.queueNumber}`
+                  : 'Không có'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phòng">
+                {encounterContext?.room?.roomNumber || 'Chưa phân phòng'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Bác sĩ">
+                {encounterContext?.doctor?.fullName || 'Chưa phân công'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                <Tag color="processing">{encounterContext?.queueItem?.status || encounterContext?.visit?.status}</Tag>
+              </Descriptions.Item>
+            </Descriptions>
 
             {selectedPatientObj && (
               <div style={{ background: '#F8FAFC', padding: 12, borderRadius: 8, border: '1px solid #E2E8F0', marginBottom: 16 }}>
@@ -368,6 +368,11 @@ function MedicalEncounterForm({
         bordered
         style={{ marginTop: 16 }}
       >
+        {serviceCatalogError && (
+          <div style={{ color: '#b42318', marginBottom: 12 }}>
+            {serviceCatalogError}
+          </div>
+        )}
         <Row gutter={[16, 16]}>
           {/* Left catalog selector */}
           <Col xs={24} lg={10}>
@@ -527,38 +532,6 @@ function MedicalEncounterForm({
         </Row>
       </Card>
 
-      {/* Section 3: Results & File Attachments */}
-      <Card
-        title={<span style={{ color: '#7C3AED' }}><UploadOutlined /> Kết Quả Cận Lâm Sàng & Tệp Đính Kèm</span>}
-        bordered
-        style={{ marginTop: 16 }}
-      >
-        {selectedOrders.length > 0 && (
-          <Form.Item label="Nhập nhanh kết quả các xét nghiệm / chỉ định:">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              {selectedOrders.map((order) => (
-                <Input
-                  key={order.code}
-                  addonBefore={<Tag color="purple">{order.name}</Tag>}
-                  value={results[order.code] || ''}
-                  placeholder="Ghi nhận kết quả (Ví dụ: Bình thường, 5.2 mmol/L, có ổ viêm...)"
-                  onChange={(e) => setResults((prev) => ({ ...prev, [order.code]: e.target.value }))}
-                />
-              ))}
-            </Space>
-          </Form.Item>
-        )}
-
-        <Form.Item label="Tệp đính kèm kết quả (PDF / JPG / PNG, tối đa 10 MB)">
-          <Upload
-            beforeUpload={beforeUpload}
-            fileList={files}
-            onRemove={(file) => setFiles((current) => current.filter((item) => item.uid !== file.uid))}
-          >
-            <Button icon={<UploadOutlined />}>Tải tệp đính kèm lên</Button>
-          </Upload>
-        </Form.Item>
-      </Card>
     </Form>
   )
 }

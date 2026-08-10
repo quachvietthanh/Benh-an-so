@@ -1,6 +1,6 @@
 import React from 'react'
-import { Button, Popconfirm, Space, Table, Tag, Tooltip, Typography } from 'antd'
-import { DeleteOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons'
+import { Button, Space, Table, Tag, Tooltip, Typography } from 'antd'
+import { DownloadOutlined, EyeOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { CATEGORY_OPTIONS, getFileIcon, STATUS_MAP } from './attachmentConstants.jsx'
 
@@ -11,10 +11,9 @@ function AttachmentTable({
   loading,
   compact = false,
   patientIdFilter = null,
-  isDoctorOrAdmin = false,
+  downloadingId = null,
   onOpenPreview,
   onDownload,
-  onDelete,
 }) {
   const columns = [
     {
@@ -147,20 +146,13 @@ function AttachmentTable({
             <Button type="primary" ghost size="small" icon={<EyeOutlined />} onClick={() => onOpenPreview(record)} />
           </Tooltip>
           <Tooltip title="Tải tệp về máy">
-            <Button size="small" icon={<DownloadOutlined />} onClick={() => onDownload(record)} />
+            <Button
+              size="small"
+              icon={<DownloadOutlined />}
+              loading={String(downloadingId) === String(record.id)}
+              onClick={() => onDownload(record)}
+            />
           </Tooltip>
-          {isDoctorOrAdmin && (
-            <Popconfirm
-              title="Xóa tệp đính kèm?"
-              description="Bạn có chắc chắn muốn xóa tệp kết quả này không?"
-              onConfirm={() => onDelete(record.id)}
-              okText="Xóa"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true }}
-            >
-              <Button size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          )}
         </Space>
       ),
     },

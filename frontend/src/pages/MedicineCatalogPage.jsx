@@ -5,6 +5,7 @@ import {
   Card,
   Form,
   Input,
+  InputNumber,
   message,
   Modal,
   Pagination,
@@ -84,17 +85,11 @@ function MedicineCatalogPage() {
     ? [currentUser.role]
     : []
 
-  const normalizedRole = String(
-    userRoles.find(
-      (r) => String(r).toUpperCase().replace(/^ROLE_/, '') === 'PHARMACIST'
-    ) ||
-      currentUser?.role ||
-      ''
+  const normalizedRoles = userRoles.map((role) =>
+    String(role || '').toUpperCase().replace(/^ROLE_/, ''),
   )
-    .toUpperCase()
-    .replace(/^ROLE_/, '')
-
-  const canManageMedicineCatalog = normalizedRole === 'PHARMACIST'
+  const canManageMedicineCatalog =
+    normalizedRoles.includes('PHARMACIST') || normalizedRoles.includes('ADMIN')
 
   // State màn hình
   const [medicines, setMedicines] = useState([])
@@ -183,6 +178,7 @@ function MedicineCatalogPage() {
       dosageForm: 'TABLET',
       defaultRoute: 'ORAL',
       unit: 'Viên',
+      minStockThreshold: 0,
     })
     setModalOpen(true)
   }
@@ -202,6 +198,7 @@ function MedicineCatalogPage() {
       dosageForm: record.dosageForm || 'TABLET',
       unit: record.unit || '',
       defaultRoute: record.defaultRoute || 'ORAL',
+      minStockThreshold: record.minStockThreshold ?? 0,
     })
     setModalOpen(true)
   }
@@ -272,6 +269,7 @@ function MedicineCatalogPage() {
           dosageForm: dosageFormVal,
           unit: trimmedUnit,
           defaultRoute: defaultRouteVal,
+          minStockThreshold: Number(values.minStockThreshold || 0),
         }
         await medicineApi.update(editingMedicine.id, updatePayload)
         message.success(`Đã cập nhật thuốc ${trimmedName}`)
@@ -285,6 +283,7 @@ function MedicineCatalogPage() {
           dosageForm: dosageFormVal,
           unit: trimmedUnit,
           defaultRoute: defaultRouteVal,
+          minStockThreshold: Number(values.minStockThreshold || 0),
         }
         await medicineApi.create(createPayload)
         message.success(`Đã thêm thuốc mới ${trimmedName} vào danh mục thành công`)
@@ -336,7 +335,7 @@ function MedicineCatalogPage() {
     }
   }
 
-  // Nếu người dùng không phải PHARMACIST (Dược sĩ): Chặn truy cập theo TC-04
+  // Chặn tài khoản không thuộc workspace dược.
   if (!canManageMedicineCatalog) {
     return (
       <div style={{ padding: 24 }}>
@@ -345,7 +344,7 @@ function MedicineCatalogPage() {
           showIcon
           icon={<StopOutlined />}
           message="Từ chối truy cập"
-          description="Bạn không có quyền quản lý danh mục thuốc. Chức năng này chỉ dành riêng cho Dược sĩ (PHARMACIST)."
+          description="Bạn không có quyền quản lý danh mục thuốc. Chức năng này dành cho Dược sĩ hoặc Quản trị viên."
           style={{ maxWidth: 600, margin: '40px auto' }}
         />
       </div>
@@ -401,6 +400,14 @@ function MedicineCatalogPage() {
       key: 'unit',
       width: 110,
       render: (v) => v || '—',
+    },
+    {
+      title: 'Ngưỡng tồn',
+      dataIndex: 'minStockThreshold',
+      key: 'minStockThreshold',
+      width: 110,
+      align: 'right',
+      render: (value) => Number(value || 0).toLocaleString('vi-VN'),
     },
     {
       title: 'Trạng thái',
@@ -587,6 +594,7 @@ function MedicineCatalogPage() {
             dosageForm: 'TABLET',
             defaultRoute: 'ORAL',
             unit: 'Viên',
+            minStockThreshold: 0,
           }}
         >
           <Form.Item
@@ -662,6 +670,14 @@ function MedicineCatalogPage() {
             rules={[{ required: true, message: 'Vui lòng nhập đơn vị tính.' }]}
           >
             <Input placeholder="Nhập đơn vị tính (Viên / Chai / Tuýp / Gói...)" />
+          </Form.Item>
+
+          <Form.Item
+            name="minStockThreshold"
+            label="Ngưỡng tồn kho tối thiểu"
+            rules={[{ required: true, message: 'Vui lòng nhập ngưỡng tồn kho.' }]}
+          >
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>
