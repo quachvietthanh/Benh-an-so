@@ -10,7 +10,6 @@ import {
   DatePicker,
   Drawer,
   Dropdown,
-  Dropdown,
   Empty,
   Form,
   Input,
@@ -42,7 +41,6 @@ import {
   FilterOutlined,
   HistoryOutlined,
   MedicineBoxOutlined,
-  MoreOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -1090,8 +1088,7 @@ function AppointmentQueue() {
       render: (src) => (
         src === 'WALK_IN'
           ? <Tag color="orange">Bệnh nhân tự đến</Tag>
-            ? <Tag color="orange">Bệnh nhân tự đến</Tag>
-            : <Tag color="blue">Hẹn trước</Tag>
+          : <Tag color="blue">Hẹn trước</Tag>
       ),
     },
     {
@@ -1941,7 +1938,6 @@ function AppointmentQueue() {
 
       {/* Modal 5: Bỏ qua lượt khám */}
       <Modal
-        title="Xác nhận bỏ qua lượt khám"
         title="Xác nhận bỏ qua lượt khám"
         open={!!skipModalItem}
         onCancel={() => setSkipModalItem(null)}

@@ -66,6 +66,8 @@ function MedicalEncounterForm({
   setPrintModalOpen,
   serviceCatalogError,
 }) {
+  const hasCompletePricing = selectedOrders.every((order) => order.price != null)
+
   return (
     <Form form={form} layout="vertical" disabled={!isDoctor}>
       <Row gutter={[16, 16]}>
@@ -558,7 +560,7 @@ function MedicalEncounterForm({
             </Card>
           </Col>
         </Row>
-      </section>
+      </Card>
 
     </Form>
   )
