@@ -24,6 +24,8 @@ public interface AppointmentRepository {
 
     Optional<Appointment> findTopByOrderByAppointmentCodeDesc();
 
+    Optional<String> findAppointmentCodeWithHighestSequence();
+
     Page<Appointment> search(SearchAppointmentCommand command);
 
     boolean existsActiveAppointmentConflict( UUID doctorId, Instant startTime, Instant endTime);

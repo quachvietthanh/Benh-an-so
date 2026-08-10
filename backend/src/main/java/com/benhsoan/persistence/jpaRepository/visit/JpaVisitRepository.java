@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -35,6 +36,13 @@ public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {
     List<VisitEntity> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 
     boolean existsByPatientIdAndStatusIn(UUID patientId, Collection<VisitStatus> statuses);
+
+    boolean existsByPatientIdAndStatusInAndVisitAtBetween(
+            UUID patientId,
+            Collection<VisitStatus> statuses,
+            Instant fromInclusive,
+            Instant toExclusive
+    );
 
     @Query("""
             select new com.benhsoan.persistence.jpaRepository.visit.VisitEncounterProjection(
