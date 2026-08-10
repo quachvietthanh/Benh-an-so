@@ -12,9 +12,11 @@ import com.benhsoan.domain.medicine.Medicine;
 
 public interface MedicineRepository {
 
+    List<Medicine> findAll();
+
     Optional<Medicine> findById(UUID id);
 
-    List<Medicine> findAllByIds(Collection<UUID> ids);
+    List<Medicine> findAllById(Collection<UUID> ids);
 
     Optional<Medicine> findByMedicineCode(String medicineCode);
 
@@ -33,4 +35,6 @@ public interface MedicineRepository {
     Page<Medicine> search(MedicineSearchCriteria criteria, Pageable pageable);
 
     Medicine save(Medicine medicine);
+
+    void updateStockQuantity(UUID medicineId, int quantity);
 }

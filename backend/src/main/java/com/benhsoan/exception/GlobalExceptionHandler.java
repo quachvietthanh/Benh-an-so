@@ -18,6 +18,8 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.shared.exception.DomainException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -49,6 +51,42 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ex.getStatus())
                 .body(response);
+    }
+
+    @ExceptionHandler(PrescriptionInteractionConfirmationRequiredException.class)
+    public ResponseEntity<InteractionConflictResponse> handleInteractionConfirmationRequired(
+            PrescriptionInteractionConfirmationRequiredException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new InteractionConflictResponse(
+                        Instant.now(),
+                        HttpStatus.CONFLICT.value(),
+                        HttpStatus.CONFLICT.getReasonPhrase(),
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        ex.getWarnings()
+                ));
+    }
+
+    @ExceptionHandler(PrescriptionInsufficientStockException.class)
+    public ResponseEntity<PrescriptionInsufficientStockResponse> handleInsufficientStock(
+            PrescriptionInsufficientStockException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new PrescriptionInsufficientStockResponse(
+                        Instant.now(),
+                        HttpStatus.CONFLICT.value(),
+                        HttpStatus.CONFLICT.getReasonPhrase(),
+                        "INSUFFICIENT_STOCK",
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        ex.getPrescriptionId(),
+                        ex.getDetails()
+                ));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

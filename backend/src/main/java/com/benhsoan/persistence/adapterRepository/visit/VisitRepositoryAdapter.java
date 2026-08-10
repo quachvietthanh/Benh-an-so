@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import org.springframework.stereotype.Repository;
 
@@ -57,5 +58,20 @@ public class VisitRepositoryAdapter implements VisitRepository {
     @Override
     public boolean existsByPatientIdAndStatusIn(UUID patientId, Collection<VisitStatus> statuses) {
         return jpaRepository.existsByPatientIdAndStatusIn(patientId, statuses);
+    }
+
+    @Override
+    public boolean existsByPatientIdAndStatusInAndVisitAtBetween(
+            UUID patientId,
+            Collection<VisitStatus> statuses,
+            Instant fromInclusive,
+            Instant toExclusive
+    ) {
+        return jpaRepository.existsByPatientIdAndStatusInAndVisitAtBetween(
+                patientId,
+                statuses,
+                fromInclusive,
+                toExclusive
+        );
     }
 }

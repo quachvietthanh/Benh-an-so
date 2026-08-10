@@ -23,6 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.benhsoan.adapter.inbound.rest.mapper.QueueRestMapper;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
+import com.benhsoan.domain.visit.enums.VisitStatus;
+import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -60,6 +62,25 @@ class QueueControllerTest {
     @MockitoBean private UserSessionRepository userSessionRepository;
     @MockitoBean private CurrentUserPort currentUserPort;
     @MockitoBean private ClockPort clockPort;
+
+    @Test
+    void checksInAppointment() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        UUID queueItemId = UUID.randomUUID();
+        when(checkInAppointmentUseCase.checkIn(any())).thenReturn(new QueueCheckInResult(
+                queueItemId, UUID.randomUUID(), UUID.randomUUID(), "VIS000120", appointmentId,
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 3, LocalDate.of(2026, 8, 9),
+                QueueItemSourceType.APPOINTMENT, QueueItemStatus.WAITING, VisitStatus.WAITING,
+                Instant.parse("2026-08-09T02:00:00Z")
+        ));
+
+        mockMvc.perform(post("/appointments/{appointmentId}/check-in", appointmentId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.queueItemId").value(queueItemId.toString()))
+                .andExpect(jsonPath("$.appointmentId").value(appointmentId.toString()))
+                .andExpect(jsonPath("$.visitCode").value("VIS000120"))
+                .andExpect(jsonPath("$.sourceType").value("APPOINTMENT"));
+    }
 
     @Test
     void skipsQueueItem() throws Exception {

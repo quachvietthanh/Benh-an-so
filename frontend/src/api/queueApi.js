@@ -4,12 +4,14 @@ import dayjs from 'dayjs'
 const queueApi = {
   /**
    * Lấy danh sách Queue Board công khai / lễ tân
-   * @param {Object} params { date, doctorId, roomId, status, sourceType }
+   * @param {Object} params { date, doctorId, roomId }
    */
   getQueues: (params = {}) => {
     const formattedParams = {
       date: dayjs().format('YYYY-MM-DD'),
-      ...params,
+      doctorId: params.doctorId,
+      roomId: params.roomId,
+      ...('date' in params ? { date: params.date } : {}),
     }
     // Clean up empty params
     Object.keys(formattedParams).forEach((key) => {
@@ -56,9 +58,14 @@ const queueApi = {
   /**
    * Cập nhật trạng thái lượt khám (VD: sang WAITING_FOR_RESULT hoặc IN_PROGRESS)
    * @param {string} itemId
-   * @param {Object} data { status }
+   * @param {string} targetStatus
+   * @param {string} cancelReason
    */
-  updateStatus: (itemId, data) => axiosClient.patch(`/queue-items/${itemId}/status`, data),
+  updateStatus: (itemId, targetStatus, cancelReason) =>
+    axiosClient.patch(`/queue-items/${itemId}/status`, {
+      targetStatus,
+      ...(cancelReason ? { cancelReason } : {}),
+    }),
 
   /**
    * Đánh dấu bỏ qua/vắng mặt bệnh nhân khi gọi (IN_PROGRESS -> SKIPPED)

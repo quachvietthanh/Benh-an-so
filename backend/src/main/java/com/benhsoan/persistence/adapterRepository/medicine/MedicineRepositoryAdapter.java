@@ -38,6 +38,11 @@ public class MedicineRepositoryAdapter
     private final MedicinePersistenceMapper mapper;
 
     @Override
+    public List<Medicine> findAll() {
+        return mapToDomain(jpaRepository.findAll(DEFAULT_SORT));
+    }
+
+    @Override
     public Optional<Medicine> findById(UUID id) {
         Objects.requireNonNull(id, "Medicine id must not be null.");
 
@@ -46,7 +51,7 @@ public class MedicineRepositoryAdapter
     }
 
     @Override
-    public List<Medicine> findAllByIds(Collection<UUID> ids) {
+    public List<Medicine> findAllById(Collection<UUID> ids) {
         Objects.requireNonNull(ids, "Medicine ids must not be null.");
 
         List<UUID> distinctIds = ids.stream()
@@ -185,6 +190,16 @@ public class MedicineRepositoryAdapter
         MedicineEntity savedEntity = jpaRepository.save(entity);
 
         return mapper.toDomain(savedEntity);
+    }
+
+    @Override
+    public void updateStockQuantity(UUID medicineId, int delta) {
+        Objects.requireNonNull(medicineId, "Medicine id must not be null.");
+
+        int updated = jpaRepository.addStockQuantity(medicineId, delta);
+        if (updated == 0) {
+            throw new com.benhsoan.domain.medicine.exception.MedicineNotFoundException(medicineId);
+        }
     }
 
     private List<Medicine> mapToDomain(List<MedicineEntity> entities) {

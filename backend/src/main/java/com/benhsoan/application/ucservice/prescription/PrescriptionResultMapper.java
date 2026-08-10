@@ -11,8 +11,13 @@ import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class PrescriptionResultMapper {
+
+    private final PrescriptionDisplayContextResolver displayContextResolver;
 
     public PrescriptionResult toResult(
             Prescription prescription,
@@ -21,14 +26,24 @@ public class PrescriptionResultMapper {
         List<PrescriptionWarningLog> safeWarningLogs = warningLogs == null
                 ? List.of()
                 : warningLogs;
+        var displayContext = displayContextResolver.resolve(
+                prescription.getMedicalRecordId(),
+                prescription.getPrescribedBy()
+        );
 
         return new PrescriptionResult(
                 prescription.getId(),
                 prescription.getPrescriptionCode(),
                 prescription.getMedicalRecordId(),
+                displayContext.visitId(),
+                displayContext.visitCode(),
+                displayContext.patientId(),
+                displayContext.patientCode(),
+                displayContext.patientName(),
                 prescription.getStatus(),
                 prescription.getNote(),
                 prescription.getPrescribedBy(),
+                displayContext.doctorName(),
                 prescription.getPrescribedAt(),
                 prescription.getUpdatedBy(),
                 prescription.getUpdatedAt(),

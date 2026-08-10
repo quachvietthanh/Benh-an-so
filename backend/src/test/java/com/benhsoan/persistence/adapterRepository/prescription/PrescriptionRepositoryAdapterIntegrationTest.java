@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,6 +92,50 @@ class PrescriptionRepositoryAdapterIntegrationTest {
         assertFalse(dosageByItemId.containsKey(removedItemId));
     }
 
+    @Test
+    void findsRequestedStatusOldestFirstWithPagination() {
+        UUID oldestPendingId = UUID.randomUUID();
+        UUID newestPendingId = UUID.randomUUID();
+        UUID dispensedId = UUID.randomUUID();
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            prescriptionRepository.save(prescription(
+                    newestPendingId,
+                    "RXSEARCH003",
+                    PrescriptionStatus.PENDING_DISPENSE,
+                    CREATED_AT.plusSeconds(120),
+                    null
+            ));
+            prescriptionRepository.save(prescription(
+                    oldestPendingId,
+                    "RXSEARCH001",
+                    PrescriptionStatus.PENDING_DISPENSE,
+                    CREATED_AT,
+                    null
+            ));
+            prescriptionRepository.save(prescription(
+                    dispensedId,
+                    "RXSEARCH002",
+                    PrescriptionStatus.DISPENSED,
+                    CREATED_AT.plusSeconds(60),
+                    AMENDED_AT
+            ));
+        });
+
+        var firstPage = prescriptionRepository.findByStatus(
+                PrescriptionStatus.PENDING_DISPENSE,
+                PageRequest.of(0, 1, Sort.by(Sort.Direction.ASC, "prescribedAt"))
+        );
+        var secondPage = prescriptionRepository.findByStatus(
+                PrescriptionStatus.PENDING_DISPENSE,
+                PageRequest.of(1, 1, Sort.by(Sort.Direction.ASC, "prescribedAt"))
+        );
+
+        assertEquals(2, firstPage.getTotalElements());
+        assertEquals(oldestPendingId, firstPage.getContent().getFirst().getId());
+        assertEquals(newestPendingId, secondPage.getContent().getFirst().getId());
+    }
+
     private Prescription prescription(
             UUID id,
             String code,
@@ -107,6 +153,35 @@ class PrescriptionRepositoryAdapterIntegrationTest {
                 updatedAt == null ? null : UUID.randomUUID(),
                 updatedAt,
                 items
+        );
+    }
+
+    private Prescription prescription(
+            UUID id,
+            String code,
+            PrescriptionStatus status,
+            Instant prescribedAt,
+            Instant updatedAt
+    ) {
+        UUID itemId = UUID.randomUUID();
+        return Prescription.restore(
+                id,
+                code,
+                UUID.randomUUID(),
+                status,
+                "Take after meals",
+                UUID.randomUUID(),
+                prescribedAt,
+                updatedAt == null ? null : UUID.randomUUID(),
+                updatedAt,
+                List.of(item(
+                        itemId,
+                        id,
+                        UUID.randomUUID(),
+                        "1 tablet",
+                        prescribedAt,
+                        updatedAt
+                ))
         );
     }
 

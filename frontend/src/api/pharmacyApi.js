@@ -1,16 +1,22 @@
 import axiosClient from './axiosClient'
 
 const pharmacyApi = {
-  medicines: () => axiosClient.get('/pharmacy/medicines'),
-  prescriptions: () => axiosClient.get('/prescriptions'),
-  interactions: (medicineIds) => axiosClient.post('/prescriptions/interactions', medicineIds),
+  medicines: (params) => axiosClient.get('/medicines', { params: { size: 200, ...params } }),
+  prescriptions: (params = { status: 'PENDING_DISPENSE' }) => axiosClient.get('/prescriptions', { params }),
+  getByMedicalRecord: (medicalRecordId) => axiosClient.get(`/prescriptions/medical-records/${medicalRecordId}`),
+  getById: (id) => axiosClient.get(`/prescriptions/${id}`),
+  checkInteractions: (drugIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds }),
   createPrescription: (data) => axiosClient.post('/prescriptions', data),
-  updatePrescription: (id, data) => axiosClient.put(`/prescriptions/${id}`, data),
-  batches: () => axiosClient.get('/pharmacy/batches'),
-  createMedicine: (data) => axiosClient.post('/pharmacy/medicines', data),
-  updateMedicine: (id, data) => axiosClient.put(`/pharmacy/medicines/${id}`, data),
-  receiveBatch: (data) => axiosClient.post('/pharmacy/batches', data),
-  dispense: (id) => axiosClient.post(`/pharmacy/prescriptions/${id}/dispense`),
+  updatePrescription: (id, data) => axiosClient.patch(`/prescriptions/${id}`, data),
+  cancelPrescription: (id) => axiosClient.post(`/prescriptions/${id}/cancel`),
+  stocks: (params) => axiosClient.get('/inventory/stocks', { params }),
+  lowStock: () => axiosClient.get('/inventory/low-stock'),
+  batches: (params) => axiosClient.get('/inventory/batches', { params }),
+  createMedicine: (data) => axiosClient.post('/medicines', data),
+  updateMedicine: (id, data) => axiosClient.put(`/medicines/${id}`, data),
+  updateMedicineStatus: (id, active) => axiosClient.patch(`/medicines/${id}/status`, { active }),
+  receiveBatch: (data) => axiosClient.post('/inventory/receipts', data),
+  dispense: (id) => axiosClient.post(`/prescriptions/${id}/dispense`),
 }
 
 export default pharmacyApi

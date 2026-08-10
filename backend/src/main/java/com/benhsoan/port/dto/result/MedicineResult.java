@@ -17,6 +17,8 @@ public record MedicineResult(
         AdministrationRoute defaultRoute,
         boolean active,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        int stockQuantity,
+        int minStockThreshold
 ) {
 }

@@ -75,6 +75,11 @@ public class AppointmentRepositoryAdapter
     }
 
     @Override
+    public Optional<String> findAppointmentCodeWithHighestSequence() {
+        return jpaRepository.findAppointmentCodeWithHighestSequence();
+    }
+
+    @Override
     public Page<Appointment> search(
             SearchAppointmentCommand command
     ) {

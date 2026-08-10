@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.prescription;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +57,7 @@ class CreatePrescriptionServiceTest {
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private PrescriptionClinicalContextValidator clinicalContextValidator;
+    @Mock private PrescriptionDisplayContextResolver displayContextResolver;
 
     private CreatePrescriptionService service;
     private UUID actorId;
@@ -64,6 +66,15 @@ class CreatePrescriptionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(displayContextResolver.resolve(any(), any()))
+                .thenReturn(new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                ));
         service = new CreatePrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
@@ -72,7 +83,7 @@ class CreatePrescriptionServiceTest {
                 warningLogRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
-                new PrescriptionResultMapper(),
+                new PrescriptionResultMapper(displayContextResolver),
                 auditLogRepository,
                 () -> NOW,
                 clinicalContextValidator
@@ -108,7 +119,8 @@ class CreatePrescriptionServiceTest {
     void rejectsUnconfirmedDrugInteractionBeforeSavingPrescription() {
         prepareValidCreate();
         UUID secondMedicineId = UUID.randomUUID();
-        when(medicineRepository.findById(secondMedicineId)).thenReturn(Optional.of(activeMedicine(secondMedicineId)));
+        when(medicineRepository.findAllById(any())).thenReturn(
+                List.of(activeMedicine(medicineId), activeMedicine(secondMedicineId)));
         when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of(warning(medicineId, secondMedicineId)));
 
         assertThrows(PrescriptionInteractionConfirmationRequiredException.class,
@@ -124,7 +136,8 @@ class CreatePrescriptionServiceTest {
         preparePersistence();
         UUID secondMedicineId = UUID.randomUUID();
         DrugInteractionWarningResult warning = warning(medicineId, secondMedicineId);
-        when(medicineRepository.findById(secondMedicineId)).thenReturn(Optional.of(activeMedicine(secondMedicineId)));
+        when(medicineRepository.findAllById(any())).thenReturn(
+                List.of(activeMedicine(medicineId), activeMedicine(secondMedicineId)));
         when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of(warning));
         when(warningLogRepository.save(any(PrescriptionWarningLog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -146,7 +159,7 @@ class CreatePrescriptionServiceTest {
     @Test
     void rejectsInactiveMedicineBeforeSavingPrescription() {
         prepareValidCreate();
-        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(inactiveMedicine(medicineId)));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(inactiveMedicine(medicineId)));
 
         assertThrows(ValidationException.class, () -> service.create(command(List.of(item(medicineId)), List.of())));
 
@@ -154,8 +167,9 @@ class CreatePrescriptionServiceTest {
     }
 
     @Test
-    void rejectsAdministratorAccordingToPrescriptionBusinessRule() {
+    void rejectsCallerWithoutDoctorOrAdminRole() {
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
 
         assertThrows(AccessDeniedException.class,
                 () -> service.create(command(List.of(item(medicineId)), List.of())));
@@ -164,19 +178,28 @@ class CreatePrescriptionServiceTest {
     }
 
     @Test
-    void rejectsCallerWithoutDoctorRole() {
+    void allowsAdministratorRoleToCreatePrescription() {
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+        when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(medicalRecordId)).thenReturn(true);
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(activeMedicine(medicineId)));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        when(prescriptionCodeGenerator.generate()).thenReturn("RX000001");
+        when(prescriptionRepository.save(any(Prescription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThrows(AccessDeniedException.class, () -> service.create(command(List.of(item(medicineId)), List.of())));
+        var result = service.create(command(List.of(item(medicineId)), List.of()));
 
-        verify(prescriptionRepository, never()).save(any());
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any(Prescription.class));
     }
 
     private void prepareValidCreate() {
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
         when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(medicalRecordId)).thenReturn(true);
-        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(activeMedicine(medicineId)));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(activeMedicine(medicineId)));
     }
 
     private void preparePersistence() {
@@ -208,12 +231,12 @@ class CreatePrescriptionServiceTest {
 
     private Medicine activeMedicine(UUID id) {
         return Medicine.restore(id, "MED001", "Paracetamol", "Paracetamol", "500 mg", DosageForm.TABLET,
-                "tablet", AdministrationRoute.ORAL, true, NOW, null);
+                "tablet", AdministrationRoute.ORAL, true, NOW, null, 0, 20);
     }
 
     private Medicine inactiveMedicine(UUID id) {
         return Medicine.restore(id, "MED001", "Paracetamol", "Paracetamol", "500 mg", DosageForm.TABLET,
-                "tablet", AdministrationRoute.ORAL, false, NOW, null);
+                "tablet", AdministrationRoute.ORAL, false, NOW, null, 0, 20);
     }
 
     private DrugInteractionWarningResult warning(UUID firstMedicineId, UUID secondMedicineId) {

@@ -33,9 +33,12 @@ function ClinicalOrderPrintModal({ open, onClose, patient, recordCode, diagnosis
       render: (val) => (val ? <Tag color="red">CẤP CỨU</Tag> : <Tag color="blue">Thường</Tag>),
     },
     { title: 'Ghi chú chỉ định', dataIndex: 'note', width: 150, render: (val) => val || '---' },
-    { title: 'Đơn giá', dataIndex: 'price', width: 110, align: 'right', render: (val) => formatCurrency(val) },
+    { title: 'Đơn giá', dataIndex: 'price', width: 110, align: 'right', render: (val) => (val == null ? 'Chưa cập nhật' : formatCurrency(val)) },
   ]
 
+  const hasCompletePricing = orders.length > 0 && orders.every((item) =>
+    item.price !== null && item.price !== undefined && Number.isFinite(Number(item.price)),
+  )
   const totalFee = orders.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
 
   return (
@@ -158,7 +161,9 @@ function ClinicalOrderPrintModal({ open, onClose, patient, recordCode, diagnosis
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 16 }}>
           <div>
             <Text strong style={{ fontSize: 14 }}>
-              Tổng tiền chỉ định: <span style={{ color: '#DC2626' }}>{formatCurrency(totalFee)}</span>
+              {hasCompletePricing
+                ? <>Tổng tiền tạm tính: <span style={{ color: '#DC2626' }}>{formatCurrency(totalFee)}</span></>
+                : 'Bảng giá chưa được cập nhật đầy đủ'}
             </Text>
             <Paragraph style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
               * Bệnh nhân mang phiếu chỉ định này đến các phòng cận lâm sàng ghi trong danh mục để thực hiện.

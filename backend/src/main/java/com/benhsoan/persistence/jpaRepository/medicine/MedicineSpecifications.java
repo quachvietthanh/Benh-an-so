@@ -36,10 +36,14 @@ public final class MedicineSpecifications {
     public static Specification<MedicineEntity> hasMedicineCode(
             String medicineCode
     ) {
+        String normalizedMedicineCode = normalizeExactText(medicineCode);
+
         return (root, query, criteriaBuilder) ->
                 criteriaBuilder.equal(
-                        root.get("medicineCode"),
-                        medicineCode
+                        criteriaBuilder.lower(
+                                criteriaBuilder.trim(root.get("medicineCode"))
+                        ),
+                        normalizedMedicineCode
                 );
     }
 

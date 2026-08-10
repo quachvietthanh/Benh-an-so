@@ -45,6 +45,7 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
                 command.dosageForm(),
                 command.unit(),
                 command.defaultRoute(),
+                command.minStockThreshold(),
                 clockPort.now()
         );
         validateUniqueness(medicine);

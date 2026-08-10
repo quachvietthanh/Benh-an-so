@@ -1,58 +1,114 @@
 import React, { useEffect, useState } from 'react'
 import {
   Modal,
+  Button,
   Form,
   Select,
   Input,
-  Radio,
   Row,
   Col,
   message,
   Divider,
-  Typography,
   Space,
-  Tag,
 } from 'antd'
-import {
-  UserOutlined,
-  UserAddOutlined,
-  MedicineBoxOutlined,
-  ThunderboltOutlined,
-  ExperimentOutlined,
-} from '@ant-design/icons'
+import { ExperimentOutlined } from '@ant-design/icons'
 import ClinicalServiceSelector from './ClinicalServiceSelector'
-import { mergePatients } from '../../utils/storageHelpers'
+import { mergePatients, mergeQueues, saveStoredQueueItem } from '../../utils/storageHelpers'
 import patientApi from '../../api/patientApi'
+import queueApi from '../../api/queueApi'
+import medicalRecordApi from '../../api/medicalRecordApi'
+import { useAuthContext } from '../../context/AuthContext'
 
 const { Option } = Select
-const { TextArea } = Input
-const { Text } = Typography
 
 export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) => {
+  const { user } = useAuthContext()
   const [form] = Form.useForm()
   const [patients, setPatients] = useState([])
+  const [activeQueues, setActiveQueues] = useState([])
   const [selectedServices, setSelectedServices] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (visible) {
-      setPatients(mergePatients([]))
-      patientApi.getAll({ page: 0, size: 500 }).then((res) => {
-        const list = res.data?.content || (Array.isArray(res.data) ? res.data : [])
-        setPatients(mergePatients(list))
-      }).catch(() => {})
+    if (!visible) return undefined
+
+    let active = true
+    const loadFormData = async () => {
       setSelectedServices([])
       form.resetFields()
+
+      const normalizedRoles = (Array.isArray(user?.roles) ? user.roles : [user?.role])
+        .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
+      const useDoctorQueue = normalizedRoles.includes('doctor') && !normalizedRoles.includes('admin')
+      const [patientResult, queueResult] = await Promise.allSettled([
+        patientApi.getAll({ page: 0, size: 500 }),
+        useDoctorQueue ? queueApi.getMyQueue() : queueApi.getQueues(),
+      ])
+      if (!active) return
+
+      const apiPatients = patientResult.status === 'fulfilled'
+        ? (patientResult.value.data?.content || (Array.isArray(patientResult.value.data) ? patientResult.value.data : []))
+        : []
+      const apiQueues = queueResult.status === 'fulfilled'
+        ? (Array.isArray(queueResult.value.data) ? queueResult.value.data : (queueResult.value.data?.content || []))
+        : []
+      const isDemo = localStorage.getItem('token') === 'demo-token'
+      const doctorQueueIds = new Set(apiQueues.map((item) => String(item.id || item.queueItemId)))
+      const queues = useDoctorQueue && !isDemo
+        ? mergeQueues(apiQueues).filter((item) => doctorQueueIds.has(String(item.id || item.queueItemId)))
+        : mergeQueues(apiQueues)
+      const examiningQueueCandidates = queues.filter((item) =>
+        ['IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(item.status) && item.patientId
+      )
+      const recordChecks = isDemo
+        ? []
+        : await Promise.allSettled(examiningQueueCandidates.map((item) =>
+            item.visitId ? medicalRecordApi.getByVisit(item.visitId) : Promise.reject(new Error('missing-visit')),
+          ))
+      if (!active) return
+      const examiningQueues = isDemo
+        ? examiningQueueCandidates
+        : examiningQueueCandidates.filter((_, index) => {
+            const result = recordChecks[index]
+            const record = result?.status === 'fulfilled' ? result.value?.data : null
+            return Boolean(record?.medicalRecordId || record?.id) && record?.status !== 'LOCKED'
+          })
+      const activePatientIds = new Set(examiningQueues.map((item) => String(item.patientId)))
+      const mergedPatients = mergePatients(apiPatients)
+      const availablePatients = activePatientIds.size
+        ? mergedPatients.filter((patient) => activePatientIds.has(String(patient.id)))
+        : (isDemo ? mergedPatients : [])
+
+      setActiveQueues(examiningQueues)
+      setPatients(availablePatients)
+
+      const defaultQueue = examiningQueues[0]
+      const defaultPatient = defaultQueue
+        ? availablePatients.find((patient) => String(patient.id) === String(defaultQueue.patientId))
+        : availablePatients[0]
+
       form.setFieldsValue({
-        priority: 'NORMAL',
-        department: 'Khoa Nội tổng quát',
-        doctorName: 'BS. Phạm Hồng Anh',
+        department: user?.department || 'Khoa Nội tổng quát',
+        doctorName: user?.fullName || user?.username || 'Bác sĩ trực',
+        ...(defaultPatient ? {
+          patientId: defaultPatient.id,
+          patientCode: defaultPatient.patientCode,
+          patientName: defaultPatient.fullName,
+          gender: defaultPatient.gender || 'Nam',
+          age: defaultPatient.age || 30,
+          phone: defaultPatient.phone || defaultPatient.phoneNumber || '',
+          visitId: defaultQueue?.visitId || defaultPatient.visitId,
+        } : {}),
       })
     }
-  }, [visible, form])
+
+    loadFormData()
+    return () => { active = false }
+  }, [visible, form, user?.department, user?.fullName, user?.role, user?.roles, user?.username])
 
   const handlePatientSelect = (patientId) => {
     const found = patients.find((p) => String(p.id) === String(patientId))
+    const queueItem = activeQueues.find((item) => String(item.patientId) === String(patientId))
     if (found) {
       form.setFieldsValue({
         patientCode: found.patientCode,
@@ -60,51 +116,124 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
         gender: found.gender || 'Nam',
         age: found.age || 30,
         phone: found.phone || found.phoneNumber || '',
+        visitId: queueItem?.visitId || found.visitId,
       })
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (values) => {
     try {
-      const values = await form.validateFields()
-
       if (selectedServices.length === 0) {
-        message.warning('Vui lòng chọn ít nhất 1 dịch vụ cận lâm sàng!')
+        message.warning('Vui lòng chọn ít nhất một dịch vụ cận lâm sàng.')
         return
       }
 
       setLoading(true)
 
-      const totalAmount = selectedServices.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0)
-      const orderCode = `CD-${new Date().toISOString().replace(/\D/g, '').slice(0, 8)}-${Math.floor(100 + Math.random() * 900)}`
+      const hasCompletePricing = selectedServices.every((item) =>
+        item.price !== null && item.price !== undefined && Number.isFinite(Number(item.price)),
+      )
+      const totalAmount = hasCompletePricing
+        ? selectedServices.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity || 1)), 0)
+        : null
+      const fallbackOrderCode = `CD-${new Date().toISOString().replace(/\D/g, '').slice(0, 8)}-${Math.floor(100 + Math.random() * 900)}`
+      const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''))
+      const isDemo = localStorage.getItem('token') === 'demo-token'
+      const activeQueue = activeQueues.find((item) => String(item.patientId) === String(values.patientId))
+      const activeVisit = values.visitId || activeQueue?.visitId
+      const canCreateOnServer = isUuid(activeVisit) && selectedServices.every((item) => isUuid(item.serviceId || item.id))
+
+      if (!canCreateOnServer && !isDemo) {
+        message.error('Không thể tạo phiếu: lượt khám hoặc dịch vụ chưa được đồng bộ với hệ thống.')
+        return
+      }
+
+      let serverOrder = null
+      if (canCreateOnServer) {
+        try {
+          const response = await medicalRecordApi.createClinicalOrder(activeVisit, {
+            clinicalReason: values.diagnosis,
+            items: selectedServices.map((item) => ({
+              serviceId: item.serviceId || item.id,
+              instruction: item.note || '',
+            })),
+          })
+          serverOrder = response?.data || null
+          if (!serverOrder?.id) throw new Error('Máy chủ không trả về mã phiếu chỉ định.')
+        } catch (error) {
+          if (!isDemo) {
+            console.error(error)
+            message.error('Không thể tạo chỉ định cận lâm sàng. Vui lòng kiểm tra lượt khám và thử lại.')
+            return
+          }
+        }
+      }
+
+      let queueSynced = true
+      if (activeQueue?.status !== 'WAITING_FOR_RESULT') {
+        const queueItemId = activeQueue?.id || activeQueue?.queueItemId
+        if (!isDemo) {
+          if (!queueItemId) {
+            queueSynced = false
+          } else {
+            try {
+              await queueApi.updateStatus(queueItemId, { status: 'WAITING_FOR_RESULT' })
+            } catch (error) {
+              console.warn('Không thể đồng bộ trạng thái hàng đợi:', error)
+              queueSynced = false
+            }
+          }
+        }
+        if (queueSynced && activeQueue) {
+          saveStoredQueueItem({ ...activeQueue, status: 'WAITING_FOR_RESULT' })
+        }
+      }
+
+      const orderCode = serverOrder?.orderCode || fallbackOrderCode
+      const normalizedStatus = serverOrder?.status === 'ORDERED'
+        ? 'PENDING'
+        : serverOrder?.status === 'PARTIALLY_COMPLETED'
+          ? 'RESULTED'
+          : serverOrder?.status || 'PENDING'
 
       const newOrder = {
-        id: `ord-${Date.now()}`,
+        id: serverOrder?.id || `ord-${Date.now()}`,
         orderCode,
-        patientId: values.patientId,
+        visitId: serverOrder?.visitId || activeVisit,
+        patientId: serverOrder?.patientId || values.patientId,
         patientCode: values.patientCode,
         patientName: values.patientName,
         gender: values.gender,
         age: values.age,
         phone: values.phone,
-        doctorId: 'u3',
-        doctorName: values.doctorName || 'BS. Trực',
+        doctorId: serverOrder?.orderedBy || user?.id,
+        doctorName: values.doctorName || user?.fullName || 'Bác sĩ trực',
         department: values.department,
         diagnosis: values.diagnosis,
-        priority: values.priority,
-        status: 'PENDING',
-        items: selectedServices,
+        priority: 'NORMAL',
+        status: normalizedStatus,
+        items: selectedServices.map((item, index) => ({
+          ...item,
+          id: serverOrder?.items?.[index]?.id || item.id,
+          serviceCode: serverOrder?.items?.[index]?.serviceCode || item.serviceCode,
+          serviceName: serverOrder?.items?.[index]?.serviceName || item.serviceName,
+          status: serverOrder?.items?.[index]?.status || item.status,
+        })),
         totalAmount,
-        createdAt: new Date().toISOString(),
+        createdAt: serverOrder?.orderedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         resultSummary: null,
       }
 
       onCreateSuccess(newOrder)
       message.success(`Đã tạo phiếu chỉ định ${orderCode} thành công!`)
+      if (!queueSynced) {
+        message.warning('Phiếu chỉ định đã được tạo, nhưng trạng thái hàng đợi chưa cập nhật. Vui lòng thử lại tại màn hình hàng đợi.')
+      }
       onClose()
     } catch (err) {
       console.error(err)
+      message.error('Vui lòng kiểm tra lại các thông tin bắt buộc.')
     } finally {
       setLoading(false)
     }
@@ -115,66 +244,81 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
       title={
         <Space>
           <ExperimentOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-          <span style={{ fontSize: 18, fontWeight: 600 }}>Tạo phiếu chỉ định cận lâm sàng mới</span>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>Tạo chỉ định cận lâm sàng</span>
         </Space>
       }
       open={visible}
-      onCancel={onClose}
-      onOk={handleSubmit}
-      okText="Tạo phiếu chỉ định"
-      cancelText="Hủy bỏ"
-      confirmLoading={loading}
+      onCancel={() => !loading && onClose()}
+      footer={[
+        <Button key="cancel" onClick={onClose} disabled={loading}>
+          Hủy
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          htmlType="submit"
+          form="create-clinical-order-form"
+          loading={loading}
+        >
+          Tạo chỉ định cận lâm sàng
+        </Button>,
+      ]}
       width={1000}
       style={{ top: 20 }}
       destroyOnClose
     >
-      <Form form={form} layout="vertical" size="middle">
+      <Form
+        id="create-clinical-order-form"
+        form={form}
+        layout="vertical"
+        size="middle"
+        onFinish={handleSubmit}
+        scrollToFirstError
+      >
         <Row gutter={16}>
           {/* Patient Selection */}
           <Col xs={24} sm={12} md={8}>
             <Form.Item
               name="patientId"
-              label="Chọn Bệnh nhân"
+              label="Chọn bệnh nhân đang khám"
               rules={[{ required: true, message: 'Vui lòng chọn bệnh nhân' }]}
             >
               <Select
                 showSearch
-                placeholder="Tìm tên hoặc Mã BN..."
+                placeholder="Tìm tên hoặc mã bệnh nhân..."
                 onChange={handlePatientSelect}
                 filterOption={(input, option) =>
-                  (option?.children || '').toLowerCase().includes(input.toLowerCase())
+                  String(option?.children || '').toLowerCase().includes(input.toLowerCase())
                 }
+                notFoundContent="Chưa có bệnh nhân đang khám có bệnh án đang mở"
               >
-                {patients.map((p) => (
-                  <Option key={p.id} value={p.id}>
-                    [{p.patientCode}] {p.fullName} - {p.phone || p.phoneNumber || 'SĐT chưa có'}
-                  </Option>
-                ))}
+                {patients.map((p) => {
+                  const isExamining = activeQueues.some((q) => String(q.patientId) === String(p.id))
+                  return (
+                    <Option key={p.id} value={p.id}>
+                      {isExamining ? '[Đang khám] ' : ''}[{p.patientCode}] {p.fullName} - {p.phone || p.phoneNumber || 'Chưa có SĐT'}
+                    </Option>
+                  )
+                })}
               </Select>
             </Form.Item>
           </Col>
 
+          <Form.Item name="visitId" hidden><Input /></Form.Item>
           <Form.Item name="patientCode" hidden><Input /></Form.Item>
           <Form.Item name="patientName" hidden><Input /></Form.Item>
           <Form.Item name="gender" hidden><Input /></Form.Item>
           <Form.Item name="age" hidden><Input /></Form.Item>
           <Form.Item name="phone" hidden><Input /></Form.Item>
 
-          {/* Department */}
+          {/* Thông tin người tạo được lấy từ phiên đăng nhập để khớp dữ liệu máy chủ. */}
           <Col xs={12} sm={6} md={8}>
             <Form.Item
               name="department"
               label="Khoa / Phòng chỉ định"
               rules={[{ required: true, message: 'Vui lòng nhập khoa chỉ định' }]}
             >
-              <Select>
-                <Option value="Khoa Nội tổng quát">Khoa Nội tổng quát</Option>
-                <Option value="Khoa Ngoại khoa">Khoa Ngoại khoa</Option>
-                <Option value="Khoa Tim mạch">Khoa Tim mạch</Option>
-                <Option value="Khoa Nhi khoa">Khoa Nhi khoa</Option>
-                <Option value="Khoa Sản phụ khoa">Khoa Sản phụ khoa</Option>
-                <Option value="Khoa Tai Mũi Họng">Khoa Tai Mũi Họng</Option>
-              </Select>
+              <Input disabled />
             </Form.Item>
           </Col>
 
@@ -185,19 +329,14 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
               label="Bác sĩ chỉ định"
               rules={[{ required: true, message: 'Vui lòng chọn bác sĩ chỉ định' }]}
             >
-              <Select>
-                <Option value="BS. Phạm Hồng Anh">BS. Phạm Hồng Anh</Option>
-                <Option value="BS. Nguyễn Văn Minh">BS. Nguyễn Văn Minh</Option>
-                <Option value="BS. Trần Quang Huy">BS. Trần Quang Huy</Option>
-                <Option value="BS. Lê Thị Hoa">BS. Lê Thị Hoa</Option>
-              </Select>
+              <Input disabled />
             </Form.Item>
           </Col>
         </Row>
 
         <Row gutter={16}>
           {/* Clinical Diagnosis */}
-          <Col xs={24} sm={16}>
+          <Col span={24}>
             <Form.Item
               name="diagnosis"
               label="Chẩn đoán lâm sàng / Lý do chỉ định"
@@ -207,22 +346,9 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
             </Form.Item>
           </Col>
 
-          {/* Priority */}
-          <Col xs={24} sm={8}>
-            <Form.Item name="priority" label="Độ ưu tiên thực hiện">
-              <Radio.Group buttonStyle="solid" style={{ width: '100%' }}>
-                <Radio.Button value="NORMAL" style={{ width: '50%', textAlign: 'center' }}>
-                  Thường
-                </Radio.Button>
-                <Radio.Button value="URGENT" style={{ width: '50%', textAlign: 'center', color: '#ff4d4f' }}>
-                  <ThunderboltOutlined /> Khẩn cấp
-                </Radio.Button>
-              </Radio.Group>
-            </Form.Item>
-          </Col>
         </Row>
 
-        <Divider style={{ margin: '12px 0 16px' }}>Lựa chọn Dịch vụ Cận lâm sàng</Divider>
+        <Divider style={{ margin: '12px 0 16px' }}>Lựa chọn dịch vụ cận lâm sàng</Divider>
 
         {/* Embedded Service Selector */}
         <ClinicalServiceSelector

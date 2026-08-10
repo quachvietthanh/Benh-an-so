@@ -12,6 +12,7 @@ public record UpdateMedicineCommand(
         String strength,
         DosageForm dosageForm,
         String unit,
-        AdministrationRoute defaultRoute
+        AdministrationRoute defaultRoute,
+        int minStockThreshold
 ) {
 }

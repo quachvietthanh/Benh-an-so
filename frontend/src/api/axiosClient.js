@@ -8,11 +8,11 @@ const axiosClient = axios.create({
   },
 })
 
-// Request interceptor: thêm JWT token vào header nếu không phải demo-token
+// Request interceptor: thêm JWT token do backend cấp.
 axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
-    if (token && token !== 'demo-token') {
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -26,9 +26,7 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const token = localStorage.getItem('token')
-    // Nếu token là demo-token hoặc đang ở trang /login thì không ép hard-reload chuyển hướng
-    if (error.response?.status === 401 && token !== 'demo-token') {
+    if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       if (window.location.pathname !== '/login') {

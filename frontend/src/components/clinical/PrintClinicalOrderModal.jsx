@@ -1,6 +1,7 @@
 import React from 'react'
 import { Modal, Button, Typography, Divider, Row, Col } from 'antd'
 import { PrinterOutlined } from '@ant-design/icons'
+import { formatGender } from '../../utils/helpers'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -50,7 +51,7 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
           <Row>
             <Col span={16}>Họ và tên bệnh nhân: <b>{order.patientName?.toUpperCase()}</b></Col>
             <Col span={4}>Tuổi: <b>{order.age}</b></Col>
-            <Col span={4}>Giới tính: <b>{order.gender}</b></Col>
+            <Col span={4}>Giới tính: <b>{formatGender(order.gender)}</b></Col>
           </Row>
           <Row>
             <Col span={12}>Mã số bệnh nhân: <b>{order.patientCode}</b></Col>
@@ -82,7 +83,9 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
                 <td style={{ border: '1px solid #000', padding: 8, textAlign: 'center' }}>{item.serviceCode}</td>
                 <td style={{ border: '1px solid #000', padding: 8 }}>{item.serviceName}</td>
                 <td style={{ border: '1px solid #000', padding: 8, fontSize: 12 }}>{item.note || '-'}</td>
-                <td style={{ border: '1px solid #000', padding: 8, textAlign: 'right' }}>{Number(item.price || 0).toLocaleString('vi-VN')} đ</td>
+                <td style={{ border: '1px solid #000', padding: 8, textAlign: 'right' }}>
+                  {item.price == null ? 'Chưa cập nhật' : `${Number(item.price).toLocaleString('vi-VN')} đ`}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -92,7 +95,7 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
                 Tổng cộng chi phí:
               </td>
               <td style={{ border: '1px solid #000', padding: 8, textAlign: 'right', fontWeight: 'bold' }}>
-                {Number(order.totalAmount || 0).toLocaleString('vi-VN')} đ
+                {order.totalAmount == null ? 'Chưa cập nhật' : `${Number(order.totalAmount).toLocaleString('vi-VN')} đ`}
               </td>
             </tr>
           </tfoot>

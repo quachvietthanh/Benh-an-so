@@ -23,6 +23,12 @@ public class PrescriptionReadAccessValidator {
     private final MedicalRecordRepository medicalRecordRepository;
     private final VisitRepository visitRepository;
 
+    public void requireCanReadDispensingQueue() {
+        if (!currentUserPort.hasRole("ADMIN") && !currentUserPort.hasRole("PHARMACIST")) {
+            throw new AccessDeniedException("Only pharmacists and admins can view the dispensing queue.");
+        }
+    }
+
     public void requireCanRead(Prescription prescription) {
         if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("PHARMACIST")) {
             return;

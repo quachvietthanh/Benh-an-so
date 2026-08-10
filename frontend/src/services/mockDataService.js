@@ -1,5 +1,4 @@
 import {
-  demoUsers,
   demoPatients,
   demoAppointments,
   demoMedicalRecords,
@@ -47,7 +46,7 @@ export const getNavigationItems = (roles = []) => {
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'receptionist'] },
     { key: '/medical-records', label: 'Khám bệnh & bệnh án điện tử', icon: FileTextOutlined, roles: ['admin', 'manager', 'doctor'] },
     { key: '/prescriptions', label: 'Kê đơn thuốc & cảnh báo TT', icon: MedicineBoxOutlined, roles: ['admin', 'manager', 'doctor', 'pharmacist'] },
-    { key: '/clinical-orders', label: 'Chỉ định cận lâm sàng', icon: ExperimentOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
+    { key: '/clinical-orders', label: 'Chỉ định cận lâm sàng', icon: ExperimentOutlined, roles: ['admin', 'doctor', 'nurse'] },
     { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileDoneOutlined, roles: ['admin', 'manager', 'doctor', 'receptionist'] },
     { key: '/pharmacy', label: 'Quản lý kho thuốc & cấp phát', icon: MedicineBoxOutlined, roles: ['admin', 'manager', 'pharmacist'] },
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: DollarCircleOutlined, roles: ['admin', 'manager', 'receptionist'] },
@@ -59,18 +58,6 @@ export const getNavigationItems = (roles = []) => {
   if (!normalizedUserRoles.length) return allItems
 
   return allItems.filter((item) => item.roles.some((role) => normalizedUserRoles.includes(role)))
-}
-
-export const loginUser = ({ username, password }) => {
-  const found = demoUsers.find((user) => user.username === username && user.password === password)
-  if (!found) {
-    throw new Error('Tên đăng nhập hoặc mật khẩu không đúng')
-  }
-
-  return {
-    ...clone(found),
-    token: 'demo-token',
-  }
 }
 
 export const getDashboardStats = () => {

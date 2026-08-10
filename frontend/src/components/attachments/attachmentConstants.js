@@ -12,7 +12,7 @@ import axiosClient from '../../api/axiosClient'
 // Live Database Category Options Loader from Backend CSDL
 export const fetchDatabaseCategoryOptions = async () => {
   try {
-    const res = await axiosClient.get('/clinical-services', { params: { size: 200 } })
+    const res = await axiosClient.get('/clinical-services', { params: { size: 100 } })
     const items = res.data?.content || res.data || []
     if (Array.isArray(items) && items.length > 0) {
       const categoriesSet = new Set(items.map((item) => item.category || item.department || item.name))

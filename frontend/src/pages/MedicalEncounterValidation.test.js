@@ -8,11 +8,11 @@ export const isDoctorRole = (roles = []) => {
 }
 
 // Helper kiểm tra tính hợp lệ của Chẩn đoán y khoa (Diagnosis Validation)
-export const validateMedicalEncounter = (formValues, primaryIcd) => {
+export const validateMedicalEncounter = (visitId, formValues, primaryIcd) => {
   const errors = []
 
-  if (!formValues?.patientId) {
-    errors.push('Vui lòng chọn bệnh nhân')
+  if (!visitId) {
+    errors.push('Thiếu visitId của lượt khám')
   }
   if (!formValues?.symptoms || !formValues.symptoms.trim()) {
     errors.push('Vui lòng nhập triệu chứng lâm sàng')
@@ -37,33 +37,40 @@ export const calculateTotalOrderFee = (orders = []) => {
 test('1. Kiểm thử THIẾU CHẨN ĐOÁN (Missing Diagnosis Validation)', () => {
   // TH 1.1: Thiếu cả mã ICD-10 lẫn nội dung chẩn đoán
   const invalidInput = {
-    patientId: 'p1',
     symptoms: 'Ho, sốt nhẹ 38 độ',
     diagnosisText: '',
   }
-  const result1 = validateMedicalEncounter(invalidInput, null)
+  const result1 = validateMedicalEncounter('visit-1', invalidInput, null)
   assert.equal(result1.isValid, false)
   assert.ok(result1.errors.includes('Vui lòng chọn Mã bệnh ICD-10 hoặc nhập nội dung Chẩn đoán chính!'))
 
   // TH 1.2: Có mã ICD-10 chính (J00 - Viêm mũi họng cấp)
   const validInputWithIcd = {
-    patientId: 'p1',
     symptoms: 'Ho, sốt nhẹ 38 độ',
   }
   const primaryIcd = { code: 'J00', name: 'Viêm mũi họng cấp' }
-  const result2 = validateMedicalEncounter(validInputWithIcd, primaryIcd)
+  const result2 = validateMedicalEncounter('visit-1', validInputWithIcd, primaryIcd)
   assert.equal(result2.isValid, true)
   assert.equal(result2.errors.length, 0)
 
   // TH 1.3: Có văn bản chẩn đoán trực tiếp
   const validInputWithText = {
-    patientId: 'p1',
     symptoms: 'Đau thắt lưng',
     diagnosisText: 'Thoái hóa cột sống thắt lưng',
   }
-  const result3 = validateMedicalEncounter(validInputWithText, null)
+  const result3 = validateMedicalEncounter('visit-1', validInputWithText, null)
   assert.equal(result3.isValid, true)
   assert.equal(result3.errors.length, 0)
+})
+
+test('4. Không cho mở encounter chỉ bằng patientId', () => {
+  const result = validateMedicalEncounter(null, { patientId: 'patient-1', symptoms: 'Đau đầu' }, {
+    id: 'catalog-1',
+    code: 'R51',
+    name: 'Đau đầu',
+  })
+  assert.equal(result.isValid, false)
+  assert.ok(result.errors.includes('Thiếu visitId của lượt khám'))
 })
 
 test('2. Kiểm thử QUYỀN TRUY CẬP VÀI TRÒ (User Role Authorization Check)', () => {
