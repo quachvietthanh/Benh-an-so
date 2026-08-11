@@ -248,6 +248,31 @@ class MedicineApplicationServiceTest {
         ));
     }
 
+    @Test
+    void rejectsMedicineManagementForAdminWithoutPharmacistRole() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(false);
+
+        CreateMedicineService service = new CreateMedicineService(
+                medicineRepository,
+                authorizer,
+                resultMapper,
+                clockPort
+        );
+
+        assertThrows(AccessDeniedException.class, () -> service.create(
+                new CreateMedicineCommand(
+                        "MED-ADMIN-001",
+                        "Paracetamol",
+                        "Acetaminophen",
+                        "500 mg",
+                        DosageForm.TABLET,
+                        "vien",
+                        AdministrationRoute.ORAL,
+                        20
+                )
+        ));
+    }
+
     private Medicine activeMedicine(UUID id, String code, String name) {
         return Medicine.restore(
                 id,
