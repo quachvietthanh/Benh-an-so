@@ -5,11 +5,13 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.adapter.inbound.rest.request.inventory.CreateInventoryReceiptRequest;
 import com.benhsoan.adapter.inbound.rest.request.inventory.ReceiptItemRequest;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryReceiptResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryReceiptWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.ReceiptItemResponse;
 import com.benhsoan.port.dto.command.inventory.ReceiveStockCommand;
 import com.benhsoan.port.dto.command.inventory.ReceiveStockItemCommand;
 import com.benhsoan.port.dto.result.InventoryReceiptItemResult;
 import com.benhsoan.port.dto.result.InventoryReceiptResult;
+import com.benhsoan.port.dto.result.InventoryReceiptWarningResult;
 
 @Component
 public class InventoryReceiptRestMapper {
@@ -36,6 +38,9 @@ public class InventoryReceiptRestMapper {
         var items = result.items().stream()
                 .map(this::toItemResponse)
                 .toList();
+        var warnings = result.warnings().stream()
+                .map(this::toWarningResponse)
+                .toList();
 
         return new InventoryReceiptResponse(
                 result.id(),
@@ -43,7 +48,8 @@ public class InventoryReceiptRestMapper {
                 result.receivedAt(),
                 result.note(),
                 result.createdAt(),
-                items
+                items,
+                warnings
         );
     }
 
@@ -56,6 +62,15 @@ public class InventoryReceiptRestMapper {
                 result.quantity(),
                 result.importPrice(),
                 result.totalValue()
+        );
+    }
+
+    private InventoryReceiptWarningResponse toWarningResponse(InventoryReceiptWarningResult result) {
+        return new InventoryReceiptWarningResponse(
+                result.code(),
+                result.medicineId(),
+                result.batchNumber(),
+                result.message()
         );
     }
 }

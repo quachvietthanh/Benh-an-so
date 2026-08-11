@@ -5,9 +5,11 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryExpiryAlertResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.LowStockMedicineResponse;
 import com.benhsoan.port.dto.result.InventoryBatchResult;
+import com.benhsoan.port.dto.result.InventoryExpiryAlertResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
 import com.benhsoan.port.dto.result.LowStockMedicineResult;
 
@@ -29,6 +31,12 @@ public class InventoryRestMapper {
     public List<LowStockMedicineResponse> toLowStockResponses(List<LowStockMedicineResult> results) {
         return results.stream()
                 .map(this::toLowStockResponse)
+                .toList();
+    }
+
+    public List<InventoryExpiryAlertResponse> toExpiryAlertResponses(List<InventoryExpiryAlertResult> results) {
+        return results.stream()
+                .map(this::toExpiryAlertResponse)
                 .toList();
     }
 
@@ -74,6 +82,23 @@ public class InventoryRestMapper {
                 result.eligibleStockQuantity(),
                 result.minStockThreshold(),
                 result.shortageQuantity()
+        );
+    }
+
+    private InventoryExpiryAlertResponse toExpiryAlertResponse(InventoryExpiryAlertResult result) {
+        return new InventoryExpiryAlertResponse(
+                result.batchId(),
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.batchNumber(),
+                result.expiryDate(),
+                result.quantity(),
+                result.batchStatus(),
+                result.daysToExpiry(),
+                result.alertStatus(),
+                result.createdAt(),
+                result.updatedAt()
         );
     }
 }

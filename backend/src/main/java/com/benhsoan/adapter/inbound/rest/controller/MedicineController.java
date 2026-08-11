@@ -58,7 +58,7 @@ public class MedicineController {
     private final MedicineRestMapper restMapper;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    @PreAuthorize("hasRole('PHARMACIST')")
     public ResponseEntity<MedicineResponse> create(
             @Valid @RequestBody CreateMedicineRequest request
     ) {
@@ -75,7 +75,7 @@ public class MedicineController {
     }
 
     @PutMapping("/{medicineId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    @PreAuthorize("hasRole('PHARMACIST')")
     public ResponseEntity<MedicineResponse> update(
             @PathVariable UUID medicineId,
             @Valid @RequestBody UpdateMedicineRequest request
@@ -88,7 +88,7 @@ public class MedicineController {
     }
 
     @PatchMapping("/{medicineId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    @PreAuthorize("hasRole('PHARMACIST')")
     public ResponseEntity<MedicineResponse> updateStatus(
             @PathVariable UUID medicineId,
             @Valid @RequestBody UpdateMedicineStatusRequest request

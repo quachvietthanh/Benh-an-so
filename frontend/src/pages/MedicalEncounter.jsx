@@ -53,6 +53,30 @@ const getApiMessage = (error, fallback) =>
   error?.message ||
   fallback
 
+const loadRecentDiagnoses = () => {
+  try {
+    const saved = localStorage.getItem('recent_diagnoses')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {
+    // fallback
+  }
+  return commonIcd10List.filter((item) => item.isPopular).slice(0, 10)
+}
+
+const saveRecentDiagnosis = (icd) => {
+  if (!icd?.code) return
+  try {
+    const current = loadRecentDiagnoses()
+    const updated = [icd, ...current.filter((item) => item.code !== icd.code)].slice(0, 10)
+    localStorage.setItem('recent_diagnoses', JSON.stringify(updated))
+  } catch {
+    // ignore
+  }
+}
+
 const mapClinicalService = (item) => ({
   id: item.id,
   code: item.serviceCode,
@@ -278,6 +302,59 @@ function MedicalEncounter() {
     () => selectedOrders.reduce((sum, item) => sum + (Number(item.price) || 0), 0),
     [selectedOrders],
   )
+
+  const selectPrimaryDiagnosis = useCallback(
+    (icd) => {
+      if (!icd?.code) return
+      setPrimaryIcd(icd)
+      form.setFieldsValue({
+        diagnosisText: `[${icd.code}] ${icd.name}`,
+      })
+      saveRecentDiagnosis(icd)
+      setRecentIcds(loadRecentDiagnoses())
+    },
+    [form],
+  )
+
+  const clearPrimaryDiagnosis = useCallback(() => {
+    setPrimaryIcd(null)
+    form.setFieldsValue({
+      diagnosisText: '',
+    })
+  }, [form])
+
+  const addSecondaryDiagnosis = useCallback(
+    (icd) => {
+      if (!icd?.code) return
+      if (primaryIcd?.code === icd.code) {
+        message.warning('Mã này đã được chọn làm chẩn đoán chính.')
+        return
+      }
+      setSecondaryIcds((prev) => {
+        if (prev.some((item) => item.code === icd.code)) {
+          message.info('Mã chẩn đoán phụ này đã có trong danh sách.')
+          return prev
+        }
+        return [...prev, icd]
+      })
+      saveRecentDiagnosis(icd)
+      setRecentIcds(loadRecentDiagnoses())
+    },
+    [primaryIcd?.code],
+  )
+
+  const diagnosisSelectOptions = useMemo(() => {
+    const combined = new Map()
+    if (icdSearchQuery.trim()) {
+      filteredIcdList.forEach((item) => combined.set(item.code, item))
+    } else {
+      recentIcds.forEach((item) => combined.set(item.code, item))
+      commonIcd10List.forEach((item) => {
+        if (!combined.has(item.code)) combined.set(item.code, item)
+      })
+    }
+    return Array.from(combined.values())
+  }, [filteredIcdList, icdSearchQuery, recentIcds])
 
   const prescriptionBlockReason = getQueueInProgressBlockReason(
     encounter?.queueItem,
@@ -697,7 +774,7 @@ function MedicalEncounter() {
                 diagnosisOptions={diagnosisSelectOptions}
                 diagnosisSearching={icdSearching}
                 onDiagnosisSearch={setIcdSearchQuery}
-                setDiagnosisModalOpen={setDiagnosisModalVisibility}
+                setDiagnosisModalOpen={setDiagnosisModalOpen}
                 selectedOrders={selectedOrders}
                 orderCategory={orderCategory}
                 setOrderCategory={setOrderCategory}

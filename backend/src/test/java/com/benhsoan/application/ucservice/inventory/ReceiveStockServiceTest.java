@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.inventory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -108,6 +109,7 @@ class ReceiveStockServiceTest {
         assertEquals(USER_ID, result.receivedBy());
         assertEquals("Test receipt", result.note());
         assertEquals(1, result.items().size());
+        assertTrue(result.warnings().isEmpty());
         assertEquals(medicineId, result.items().get(0).medicineId());
         assertEquals(100, result.items().get(0).quantity());
         assertEquals(BigDecimal.valueOf(5.50), result.items().get(0).importPrice());
@@ -140,6 +142,7 @@ class ReceiveStockServiceTest {
         InventoryReceiptResult result = service.receiveStock(command);
         assertNotNull(result);
         assertEquals(1, result.items().size());
+        assertTrue(result.warnings().isEmpty());
     }
 
 
@@ -266,6 +269,13 @@ class ReceiveStockServiceTest {
 
         assertNotNull(result);
         assertEquals(1, result.items().size());
+        assertEquals(1, result.warnings().size());
+        assertEquals(
+                ReceiveStockService.MERGED_WITH_EXISTING_BATCH_WARNING_CODE,
+                result.warnings().get(0).code()
+        );
+        assertEquals(medicineId, result.warnings().get(0).medicineId());
+        assertEquals("BATCH-EXISTING", result.warnings().get(0).batchNumber());
         assertEquals(30, result.items().get(0).quantity());
         verify(medicineBatchRepository).addStockQuantity(batchId, 30);
         verify(medicineRepository).updateStockQuantity(medicineId, 30);

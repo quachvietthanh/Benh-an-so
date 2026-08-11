@@ -11,11 +11,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.InventoryRestMapper;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryExpiryAlertResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.LowStockMedicineResponse;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
+import com.benhsoan.domain.inventory.enums.InventoryExpiryAlertStatus;
 import com.benhsoan.port.dto.query.inventory.ListInventoryBatchesQuery;
+import com.benhsoan.port.dto.query.inventory.ListInventoryExpiryAlertsQuery;
 import com.benhsoan.port.dto.query.inventory.ListInventoryStocksQuery;
+import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
 import com.benhsoan.port.inbound.inventory.ListLowStockMedicinesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryStocksUseCase;
@@ -29,6 +33,7 @@ public class InventoryController {
 
     private final ListInventoryStocksUseCase listInventoryStocksUseCase;
     private final ListInventoryBatchesUseCase listInventoryBatchesUseCase;
+    private final ListInventoryExpiryAlertsUseCase listInventoryExpiryAlertsUseCase;
     private final ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
     private final InventoryRestMapper mapper;
 
@@ -61,6 +66,19 @@ public class InventoryController {
     public List<LowStockMedicineResponse> listLowStockMedicines() {
         return mapper.toLowStockResponses(
                 listLowStockMedicinesUseCase.list()
+        );
+    }
+
+    @GetMapping("/expiry-alerts")
+    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
+    public List<InventoryExpiryAlertResponse> listExpiryAlerts(
+            @RequestParam(required = false) UUID medicineId,
+            @RequestParam(required = false) InventoryExpiryAlertStatus status
+    ) {
+        return mapper.toExpiryAlertResponses(
+                listInventoryExpiryAlertsUseCase.list(
+                        new ListInventoryExpiryAlertsQuery(medicineId, status)
+                )
         );
     }
 }

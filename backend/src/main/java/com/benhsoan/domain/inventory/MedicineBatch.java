@@ -106,4 +106,22 @@ public class MedicineBatch {
                 && quantity > 0
                 && !expiryDate.isBefore(validatedToday);
     }
+
+    public boolean isExpiredOn(LocalDate today) {
+        LocalDate validatedToday = Guard.require(today, "Today");
+        return status == BatchStatus.ACTIVE
+                && quantity > 0
+                && expiryDate.isBefore(validatedToday);
+    }
+
+    public boolean isNearExpiryOn(LocalDate today, long alertDays) {
+        LocalDate validatedToday = Guard.require(today, "Today");
+        if (alertDays < 0) {
+            throw new ValidationException("Expiry alert days must not be negative.");
+        }
+        return status == BatchStatus.ACTIVE
+                && quantity > 0
+                && !expiryDate.isBefore(validatedToday)
+                && !expiryDate.isAfter(validatedToday.plusDays(alertDays));
+    }
 }
