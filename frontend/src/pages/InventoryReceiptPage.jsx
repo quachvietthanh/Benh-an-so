@@ -26,7 +26,7 @@ import {
   ShopOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
 
 const { Text, Title } = Typography
@@ -56,6 +56,7 @@ const getErrorMessage = (error, fallback) =>
 
 function InventoryReceiptPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [form] = Form.useForm()
   const [medicines, setMedicines] = useState([])
   const [batches, setBatches] = useState([])
@@ -83,6 +84,25 @@ function InventoryReceiptPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Tự động điền dòng thuốc nếu được chuyển đến từ danh sách cảnh báo thiếu tồn kho
+  useEffect(() => {
+    if (location.state?.prefillItem && medicines.length > 0) {
+      const { medicineId, quantity, medicineName } = location.state.prefillItem
+      form.setFieldsValue({
+        items: [
+          {
+            medicineId,
+            batchNumber: `LOT-${Date.now().toString().slice(-6)}`,
+            expiryDate: dayjs().add(1, 'year'),
+            quantity: Math.max(Number(quantity) || 1, 1),
+            importPrice: 0,
+          },
+        ],
+        note: `Phiếu nhập bổ sung cho ${medicineName || 'thuốc dưới ngưỡng tồn'}`,
+      })
+    }
+  }, [location.state, medicines, form])
 
   const medicineOptions = useMemo(
     () => medicines.map((medicine) => ({
