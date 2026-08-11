@@ -4,6 +4,19 @@ import { WarningOutlined, ExclamationCircleOutlined, CheckOutlined } from '@ant-
 
 const { Text, Paragraph } = Typography
 
+const SEVERITY_MAP = {
+  CONTRAINDICATED: { label: 'Chống chỉ định', color: 'red' },
+  SEVERE: { label: 'Nghiêm trọng', color: 'volcano' },
+  MODERATE: { label: 'Trung bình', color: 'orange' },
+  MILD: { label: 'Nhẹ', color: 'gold' },
+}
+
+const renderSeverityTag = (severity) => {
+  const item = SEVERITY_MAP[severity]
+  if (item) return <Tag color={item.color}>{item.label}</Tag>
+  return <Tag color="red">{severity || 'Cảnh báo'}</Tag>
+}
+
 function InteractionWarningModal({
   open,
   warnings = [],
@@ -89,9 +102,7 @@ function InteractionWarningModal({
                 <Text strong style={{ fontSize: 14, color: '#991B1B' }}>
                   Cặp tương tác #{idx + 1}: {w.drugNameA || w.drugIdA} + {w.drugNameB || w.drugIdB}
                 </Text>
-                <Tag color={String(w.severity).includes('Cao') || String(w.severity).includes('Nghiêm trọng') ? 'red' : 'orange'}>
-                  {w.severity || 'Cảnh báo'}
-                </Tag>
+                {renderSeverityTag(w.severity)}
               </div>
               <Paragraph style={{ margin: 0, color: '#374151' }}>
                 <strong>Mô tả:</strong> {w.description}

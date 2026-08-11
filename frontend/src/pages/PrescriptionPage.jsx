@@ -127,12 +127,14 @@ function PrescriptionPage() {
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
+  const [checkingInteractions, setCheckingInteractions] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [activeTab, setActiveTab] = useState('prescribe')
 
   const [detectedInteractions, setDetectedInteractions] = useState([])
   const [interactionModalOpen, setInteractionModalOpen] = useState(false)
   const [confirmedOverrides, setConfirmedOverrides] = useState([])
+  const [interactionCheckError, setInteractionCheckError] = useState('')
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
@@ -292,24 +294,38 @@ function PrescriptionPage() {
   }, [encounter?.queueItem?.id])
 
   const performInteractionCheck = useCallback(async (currentItems) => {
-    const medicineIds = [...new Set(currentItems.map((item) => item.medicineId).filter(Boolean))]
+    const medicineIds = [...new Set((currentItems || []).map((item) => item.medicineId).filter(Boolean))]
     if (medicineIds.length < 2) {
       setDetectedInteractions([])
+      setInteractionCheckError('')
       return []
     }
 
-    const response = await pharmacyApi.checkInteractions(medicineIds)
-    const warnings = (response.data || []).map((warning) => ({
-      ...warning,
-      drugNameA:
-        medicines.find((medicine) => String(medicine.id) === String(warning.drugIdA))?.medicineName ||
-        warning.drugIdA,
-      drugNameB:
-        medicines.find((medicine) => String(medicine.id) === String(warning.drugIdB))?.medicineName ||
-        warning.drugIdB,
-    }))
-    setDetectedInteractions(warnings)
-    return warnings
+    setCheckingInteractions(true)
+    setInteractionCheckError('')
+    try {
+      const response = await pharmacyApi.checkInteractions(medicineIds)
+      const warnings = (response.data || []).map((warning) => ({
+        ...warning,
+        drugNameA:
+          medicines.find((medicine) => String(medicine.id) === String(warning.drugIdA))?.medicineName ||
+          currentItems.find((item) => String(item.medicineId) === String(warning.drugIdA))?.medicineName ||
+          warning.drugIdA,
+        drugNameB:
+          medicines.find((medicine) => String(medicine.id) === String(warning.drugIdB))?.medicineName ||
+          currentItems.find((item) => String(item.medicineId) === String(warning.drugIdB))?.medicineName ||
+          warning.drugIdB,
+      }))
+      setDetectedInteractions(warnings)
+      return warnings
+    } catch (error) {
+      setDetectedInteractions([])
+      const errorMsg = 'Không thể kiểm tra tương tác thuốc. Vui lòng thử lại.'
+      setInteractionCheckError(errorMsg)
+      throw error
+    } finally {
+      setCheckingInteractions(false)
+    }
   }, [medicines])
 
   const handleItemChange = (clientId, field, value) => {
@@ -319,9 +335,7 @@ function PrescriptionPage() {
     setItems(nextItems)
     if (field === 'medicineId') {
       setConfirmedOverrides([])
-      performInteractionCheck(nextItems).catch((error) =>
-        message.error(getApiMessage(error, 'Không thể kiểm tra tương tác thuốc.')),
-      )
+      performInteractionCheck(nextItems).catch(() => {})
     }
   }
 
@@ -333,7 +347,7 @@ function PrescriptionPage() {
     const nextItems = items.filter((entry) => entry.clientId !== clientId)
     setItems(nextItems)
     setConfirmedOverrides([])
-    performInteractionCheck(nextItems).catch(() => { })
+    performInteractionCheck(nextItems).catch(() => {})
   }
 
   const validateForm = () => {
@@ -419,6 +433,7 @@ function PrescriptionPage() {
       setChangeReason('')
       setDetectedInteractions([])
       setConfirmedOverrides([])
+      setInteractionCheckError('')
       await loadData()
       setActiveTab('history')
     } catch (error) {
@@ -435,16 +450,24 @@ function PrescriptionPage() {
       return
     }
 
+    let warnings = []
     try {
-      const warnings = await performInteractionCheck(items)
-      if (warnings.length && !confirmedOverrides.length) {
+      warnings = await performInteractionCheck(items)
+    } catch (error) {
+      message.error(getApiMessage(error, 'Không thể kiểm tra tương tác thuốc. Vui lòng thử lại.'))
+      return
+    }
+
+    if (warnings.length > 0) {
+      const confirmedRuleIds = new Set(confirmedOverrides.map((o) => o.ruleId))
+      const hasUnconfirmed = warnings.some((w) => !confirmedRuleIds.has(w.ruleId))
+      if (hasUnconfirmed) {
         setInteractionModalOpen(true)
         return
       }
-      await executeSavePrescription(confirmedOverrides)
-    } catch (error) {
-      message.error(getApiMessage(error, 'Không thể kiểm tra tương tác thuốc.'))
     }
+
+    await executeSavePrescription(confirmedOverrides)
   }
 
   const handleConfirmInteractionOverrides = async (overrides) => {
@@ -474,21 +497,26 @@ function PrescriptionPage() {
     setEditingPrescription(prescription)
     setNote(prescription.note || '')
     setChangeReason('')
-    setItems(
-      (prescription.items || []).map((item) => ({
-        clientId: `prescription-item-${++localItemSequence}`,
-        medicineId: item.medicineId,
-        quantity: item.quantity,
-        dosage: item.dosage || '',
-        frequency: item.frequency || '',
-        route: item.route,
-        durationDays: item.durationDays || 1,
-        instructions: item.instructions || '',
-        isOriginal: true,
-      })),
-    )
+    const editedItems = (prescription.items || []).map((item) => ({
+      clientId: `prescription-item-${++localItemSequence}`,
+      medicineId: item.medicineId,
+      quantity: item.quantity,
+      dosage: item.dosage || '',
+      frequency: item.frequency || '',
+      route: item.route,
+      durationDays: item.durationDays || 1,
+      instructions: item.instructions || '',
+      isOriginal: true,
+    }))
+    setItems(editedItems)
+    setConfirmedOverrides([])
+    setDetectedInteractions([])
+    setInteractionCheckError('')
     setActiveTab('prescribe')
     message.info(`Đang mở chế độ điều chỉnh đơn thuốc ${prescription.prescriptionCode}.`)
+
+    // Call interaction check immediately upon opening edit mode if there are >= 2 medicines
+    performInteractionCheck(editedItems).catch(() => {})
   }
 
   const cancelEditMode = () => {
@@ -498,6 +526,7 @@ function PrescriptionPage() {
     setNote('')
     setDetectedInteractions([])
     setConfirmedOverrides([])
+    setInteractionCheckError('')
   }
 
   const handleCancelPrescription = (prescription) => {
@@ -1015,7 +1044,14 @@ function PrescriptionPage() {
             </Button>
           )}
           {canPrescribe && (
-            <Button type="primary" size="large" loading={saving} icon={<CheckCircleOutlined />} onClick={handleSaveClick}>
+            <Button
+              type="primary"
+              size="large"
+              loading={saving || checkingInteractions}
+              disabled={checkingInteractions}
+              icon={<CheckCircleOutlined />}
+              onClick={handleSaveClick}
+            >
               {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
             </Button>
           )}
@@ -1273,11 +1309,114 @@ function PrescriptionPage() {
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
-                      onClick={() => setItems((current) => [...current, createEmptyItem(false)])}
+                      disabled={checkingInteractions || saving}
+                      onClick={() => {
+                        const nextItems = [...items, createEmptyItem(false)]
+                        setItems(nextItems)
+                        setConfirmedOverrides([])
+                        if (nextItems.filter((i) => i.medicineId).length >= 2) {
+                          performInteractionCheck(nextItems).catch(() => {})
+                        }
+                      }}
                       style={{ width: '100%', marginTop: 8 }}
                     >
                       + Thêm thuốc mới vào đơn
                     </Button>
+                  )}
+
+                  {interactionCheckError && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        type="error"
+                        showIcon
+                        icon={<CloseCircleOutlined />}
+                        message="Không thể kiểm tra tương tác thuốc. Vui lòng thử lại."
+                        description="Đã xảy ra lỗi khi kết nối với hệ thống kiểm tra an toàn tương tác thuốc của Backend."
+                        action={
+                          <Button
+                            size="small"
+                            danger
+                            loading={checkingInteractions}
+                            onClick={() => performInteractionCheck(items).catch(() => {})}
+                          >
+                            Thử lại
+                          </Button>
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {detectedInteractions.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <Card
+                        size="small"
+                        style={{
+                          borderColor: '#fca5a5',
+                          backgroundColor: '#fff5f5',
+                          borderRadius: 8,
+                        }}
+                        title={
+                          <Space style={{ color: '#dc2626' }}>
+                            <WarningOutlined style={{ fontSize: 18 }} />
+                            <strong style={{ fontSize: 15 }}>
+                              CẢNH BÁO TƯƠNG TÁC THUỐC TRONG ĐƠN ({detectedInteractions.length} cặp thuốc tương tác)
+                            </strong>
+                          </Space>
+                        }
+                        extra={
+                          <Button
+                            type="primary"
+                            danger
+                            size="small"
+                            icon={<ExclamationCircleOutlined />}
+                            onClick={() => setInteractionModalOpen(true)}
+                          >
+                            Xem & Nhập lý do bỏ qua
+                          </Button>
+                        }
+                      >
+                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                          {detectedInteractions.map((w, idx) => {
+                            const severityMeta = {
+                              CONTRAINDICATED: { label: 'Chống chỉ định', color: 'red' },
+                              SEVERE: { label: 'Nghiêm trọng', color: 'volcano' },
+                              MODERATE: { label: 'Trung bình', color: 'orange' },
+                              MILD: { label: 'Nhẹ', color: 'gold' },
+                            }[w.severity] || { label: w.severity || 'Cảnh báo', color: 'red' }
+
+                            return (
+                              <Card
+                                key={w.ruleId || idx}
+                                size="small"
+                                type="inner"
+                                style={{
+                                  borderColor: '#fecdd3',
+                                  backgroundColor: '#ffffff',
+                                  borderRadius: 6,
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+                                  <Text strong style={{ fontSize: 14, color: '#991b1b' }}>
+                                    Cặp thuốc #{idx + 1}: <Tag color="blue" style={{ fontSize: 13, fontWeight: 600 }}>{w.drugNameA}</Tag> + <Tag color="blue" style={{ fontSize: 13, fontWeight: 600 }}>{w.drugNameB}</Tag>
+                                  </Text>
+                                  <Tag color={severityMeta.color} style={{ fontWeight: 600, padding: '2px 8px' }}>
+                                    Mức độ: {severityMeta.label}
+                                  </Tag>
+                                </div>
+                                <Paragraph style={{ margin: 0, color: '#374151', fontSize: 13 }}>
+                                  <strong>Nội dung cảnh báo:</strong> {w.description}
+                                </Paragraph>
+                                {w.clinicalRecommendation && (
+                                  <Paragraph style={{ marginTop: 4, marginBottom: 0, color: '#1e40af', fontSize: 13 }}>
+                                    <strong>Khuyến nghị lâm sàng:</strong> {w.clinicalRecommendation}
+                                  </Paragraph>
+                                )}
+                              </Card>
+                            )
+                          })}
+                        </Space>
+                      </Card>
+                    </div>
                   )}
 
                   <Divider style={{ margin: '16px 0' }} />
@@ -1285,7 +1424,7 @@ function PrescriptionPage() {
                   <Form.Item label="Ghi chú đơn thuốc (cho bệnh nhân & dược sĩ)">
                     <Input.TextArea
                       rows={2}
-                      disabled={!canPrescribe}
+                      disabled={!canPrescribe || checkingInteractions || saving}
                       value={note}
                       onChange={(event) => setNote(event.target.value)}
                       placeholder="Nhập dặn dò thêm cho bệnh nhân..."
@@ -1304,7 +1443,7 @@ function PrescriptionPage() {
                       >
                         <Input.TextArea
                           rows={2}
-                          disabled={!canPrescribe}
+                          disabled={!canPrescribe || checkingInteractions || saving}
                           value={changeReason}
                           onChange={(event) => setChangeReason(event.target.value)}
                           placeholder="Nhập lý do điều chỉnh đơn thuốc hoặc chọn nhanh từ danh sách bên dưới..."
@@ -1317,9 +1456,9 @@ function PrescriptionPage() {
                           <Tag
                             key={idx}
                             color="orange"
-                            style={{ cursor: canPrescribe ? 'pointer' : 'not-allowed', margin: '2px 0' }}
+                            style={{ cursor: canPrescribe && !checkingInteractions && !saving ? 'pointer' : 'not-allowed', margin: '2px 0' }}
                             onClick={() => {
-                              if (!canPrescribe) return
+                              if (!canPrescribe || checkingInteractions || saving) return
                               setChangeReason(preset)
                             }}
                           >
@@ -1330,27 +1469,16 @@ function PrescriptionPage() {
                     </div>
                   )}
 
-                  {detectedInteractions.length > 0 && (
-                    <div style={{ marginTop: 16 }}>
-                      <Alert
-                        type="error"
-                        showIcon
-                        icon={<WarningOutlined />}
-                        message={`Phát hiện ${detectedInteractions.length} tương tác thuốc`}
-                        description={detectedInteractions.map((warning) => warning.description).join('; ')}
-                      />
-                    </div>
-                  )}
-
                   <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     {editingPrescription && (
-                      <Button onClick={cancelEditMode}>Hủy điều chỉnh</Button>
+                      <Button disabled={checkingInteractions || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                     )}
                     {canPrescribe && (
                       <Button
                         type="primary"
                         size="large"
-                        loading={saving}
+                        loading={saving || checkingInteractions}
+                        disabled={checkingInteractions}
                         icon={<CheckCircleOutlined />}
                         onClick={handleSaveClick}
                       >
