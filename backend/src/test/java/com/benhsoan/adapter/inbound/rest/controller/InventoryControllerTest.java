@@ -21,10 +21,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.InventoryRestMapper;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
+import com.benhsoan.domain.inventory.enums.InventoryExpiryAlertStatus;
 import com.benhsoan.port.dto.result.InventoryBatchResult;
+import com.benhsoan.port.dto.result.InventoryExpiryAlertResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
 import com.benhsoan.port.dto.result.LowStockMedicineResult;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
+import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
 import com.benhsoan.port.inbound.inventory.ListLowStockMedicinesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryStocksUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -50,6 +53,9 @@ class InventoryControllerTest {
 
     @MockitoBean
     private ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
+
+    @MockitoBean
+    private ListInventoryExpiryAlertsUseCase listInventoryExpiryAlertsUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -165,5 +171,38 @@ class InventoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /inventory/expiry-alerts returns near expiry and expired batches")
+    void listExpiryAlertsReturnsAlerts() throws Exception {
+        UUID batchId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+
+        when(listInventoryExpiryAlertsUseCase.list(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(new InventoryExpiryAlertResult(
+                        batchId,
+                        medicineId,
+                        "MED-EXP-001",
+                        "Paracetamol",
+                        "BATCH-EXP-001",
+                        LocalDate.of(2026, 8, 20),
+                        15,
+                        BatchStatus.ACTIVE,
+                        9,
+                        InventoryExpiryAlertStatus.NEAR_EXPIRY,
+                        Instant.parse("2026-08-01T00:00:00Z"),
+                        Instant.parse("2026-08-07T00:00:00Z")
+                )));
+
+        mockMvc.perform(get("/inventory/expiry-alerts")
+                        .param("medicineId", medicineId.toString())
+                        .param("status", "NEAR_EXPIRY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].batchId").value(batchId.toString()))
+                .andExpect(jsonPath("$[0].medicineId").value(medicineId.toString()))
+                .andExpect(jsonPath("$[0].batchNumber").value("BATCH-EXP-001"))
+                .andExpect(jsonPath("$[0].daysToExpiry").value(9))
+                .andExpect(jsonPath("$[0].alertStatus").value("NEAR_EXPIRY"));
     }
 }

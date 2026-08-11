@@ -124,4 +124,34 @@ class MedicineBatchTest {
         assertFalse(expiredBatch.isEligibleForDispenseOn(LocalDate.of(2026, 8, 7)));
         assertFalse(depletedBatch.isEligibleForDispenseOn(LocalDate.of(2026, 8, 7)));
     }
+
+    @Test
+    @DisplayName("expiry helpers should classify active batches with stock")
+    void shouldClassifyExpiryAlerts() {
+        MedicineBatch expiredBatch = MedicineBatch.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "BATCH-007",
+                LocalDate.of(2026, 8, 6),
+                10,
+                BatchStatus.ACTIVE,
+                CREATED_AT,
+                null
+        );
+        MedicineBatch nearExpiryBatch = MedicineBatch.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "BATCH-008",
+                LocalDate.of(2026, 8, 20),
+                10,
+                BatchStatus.ACTIVE,
+                CREATED_AT,
+                null
+        );
+
+        assertTrue(expiredBatch.isExpiredOn(LocalDate.of(2026, 8, 7)));
+        assertFalse(expiredBatch.isNearExpiryOn(LocalDate.of(2026, 8, 7), 30));
+        assertFalse(nearExpiryBatch.isExpiredOn(LocalDate.of(2026, 8, 7)));
+        assertTrue(nearExpiryBatch.isNearExpiryOn(LocalDate.of(2026, 8, 7), 30));
+    }
 }
