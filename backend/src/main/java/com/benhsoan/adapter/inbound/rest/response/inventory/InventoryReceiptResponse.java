@@ -10,6 +10,7 @@ public record InventoryReceiptResponse(
         Instant receivedAt,
         String note,
         Instant createdAt,
-        List<ReceiptItemResponse> items
+        List<ReceiptItemResponse> items,
+        List<InventoryReceiptWarningResponse> warnings
 ) {
 }

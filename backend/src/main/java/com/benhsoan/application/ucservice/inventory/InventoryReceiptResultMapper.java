@@ -9,13 +9,15 @@ import com.benhsoan.domain.inventory.InventoryReceiptItem;
 import com.benhsoan.domain.inventory.MedicineBatch;
 import com.benhsoan.port.dto.result.InventoryReceiptItemResult;
 import com.benhsoan.port.dto.result.InventoryReceiptResult;
+import com.benhsoan.port.dto.result.InventoryReceiptWarningResult;
 
 @Component
 class InventoryReceiptResultMapper {
 
     InventoryReceiptResult toResult(
             InventoryReceipt receipt,
-            List<MedicineBatch> batches
+            List<MedicineBatch> batches,
+            List<InventoryReceiptWarningResult> warnings
     ) {
         List<InventoryReceiptItemResult> itemResults = receipt.getItems()
                 .stream()
@@ -28,7 +30,8 @@ class InventoryReceiptResultMapper {
                 receipt.getReceivedAt(),
                 receipt.getNote(),
                 receipt.getCreatedAt(),
-                itemResults
+                itemResults,
+                warnings
         );
     }
 

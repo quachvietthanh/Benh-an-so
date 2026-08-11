@@ -21,6 +21,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.inventory.ReceiveStockCommand;
 import com.benhsoan.port.dto.command.inventory.ReceiveStockItemCommand;
 import com.benhsoan.port.dto.result.InventoryReceiptResult;
+import com.benhsoan.port.dto.result.InventoryReceiptWarningResult;
 import com.benhsoan.port.inbound.inventory.ReceiveStockUseCase;
 import com.benhsoan.port.outbound.repository.inventory.InventoryReceiptRepository;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
@@ -34,6 +35,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class ReceiveStockService implements ReceiveStockUseCase {
+
+    static final String MERGED_WITH_EXISTING_BATCH_WARNING_CODE = "MERGED_WITH_EXISTING_BATCH";
 
     private final MedicineRepository medicineRepository;
     private final MedicineBatchRepository medicineBatchRepository;
@@ -63,6 +66,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
 
         List<MedicineBatch> batches = new ArrayList<>();
         List<InventoryReceiptItem> receiptItems = new ArrayList<>();
+        List<InventoryReceiptWarningResult> warnings = new ArrayList<>();
         Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>(
                 eligibleStockSnapshotService.snapshotEligibleStockQuantities(medicineIds, today)
         );
@@ -78,8 +82,17 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                     id -> new ArrayList<>(medicineBatchRepository.findByMedicineId(id))
             );
 
-            MedicineBatch batch = findOrCreateBatch(itemCommand, now, trackedBatches);
+            BatchResolution batchResolution = findOrCreateBatch(itemCommand, now, trackedBatches);
+            MedicineBatch batch = batchResolution.batch();
             batches.add(batch);
+            if (batchResolution.mergedIntoExistingBatch()) {
+                warnings.add(new InventoryReceiptWarningResult(
+                        MERGED_WITH_EXISTING_BATCH_WARNING_CODE,
+                        itemCommand.medicineId(),
+                        itemCommand.batchNumber().trim(),
+                        "Stock was merged into an existing batch with the same batch number and expiry date."
+                ));
+            }
 
             UUID batchId = batch.getId();
 
@@ -114,7 +127,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                 now
         );
 
-        return resultMapper.toResult(receipt, batches);
+        return resultMapper.toResult(receipt, batches, warnings);
     }
 
     private void validateItem(ReceiveStockItemCommand item, Instant now) {
@@ -143,7 +156,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                         "Medicine not found with id: " + item.medicineId()));
     }
 
-    private MedicineBatch findOrCreateBatch(
+    private BatchResolution findOrCreateBatch(
             ReceiveStockItemCommand item,
             Instant now,
             List<MedicineBatch> trackedBatches
@@ -154,7 +167,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                     validateBatchExpiryConsistency(existingBatch, item);
                     existingBatch.addStock(item.quantity(), now);
                     medicineBatchRepository.addStockQuantity(existingBatch.getId(), item.quantity());
-                    return existingBatch;
+                    return new BatchResolution(existingBatch, true);
                 })
                 .orElseGet(() -> {
                     MedicineBatch newBatch = MedicineBatch.create(
@@ -167,7 +180,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                     newBatch.addStock(item.quantity(), now);
                     MedicineBatch savedBatch = medicineBatchRepository.save(newBatch);
                     trackedBatches.add(savedBatch);
-                    return savedBatch;
+                    return new BatchResolution(savedBatch, false);
                 });
     }
 
@@ -207,5 +220,11 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                 }
             }
         }
+    }
+
+    private record BatchResolution(
+            MedicineBatch batch,
+            boolean mergedIntoExistingBatch
+    ) {
     }
 }
