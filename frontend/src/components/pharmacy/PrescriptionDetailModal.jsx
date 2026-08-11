@@ -34,10 +34,10 @@ const { Text, Paragraph, Title } = Typography
 const ROUTE_LABELS = {
   ORAL: 'Uống',
   TOPICAL: 'Bôi ngoài',
-  INHALATION: 'Hít/Xịt',
-  INTRAVENOUS: 'Tiêm IV',
-  INTRAMUSCULAR: 'Tiêm IM',
-  SUBCUTANEOUS: 'Tiêm SC',
+  INHALATION: 'Hít / Xịt',
+  INTRAVENOUS: 'Tiêm tĩnh mạch (IV)',
+  INTRAMUSCULAR: 'Tiêm bắp (IM)',
+  SUBCUTANEOUS: 'Tiêm dưới da (SC)',
   OTHER: 'Khác',
 }
 
@@ -86,10 +86,10 @@ function PrescriptionDetailModal({
       ),
     },
     {
-      title: 'Đường dùng',
+      title: 'Cách dùng',
       dataIndex: 'route',
       key: 'route',
-      width: 110,
+      width: 140,
       render: (route) => (
         <Tag color="cyan">{ROUTE_LABELS[route] || route || 'Mặc định'}</Tag>
       ),

@@ -73,10 +73,10 @@ const PRESET_CHANGE_REASONS = [
 const ROUTE_OPTIONS = [
   { value: 'ORAL', label: 'Uống' },
   { value: 'TOPICAL', label: 'Bôi ngoài' },
-  { value: 'INHALATION', label: 'Hít/Xịt' },
-  { value: 'INTRAVENOUS', label: 'Tiêm IV' },
-  { value: 'INTRAMUSCULAR', label: 'Tiêm IM' },
-  { value: 'SUBCUTANEOUS', label: 'Tiêm SC' },
+  { value: 'INHALATION', label: 'Hít / Xịt' },
+  { value: 'INTRAVENOUS', label: 'Tiêm tĩnh mạch (IV)' },
+  { value: 'INTRAMUSCULAR', label: 'Tiêm bắp (IM)' },
+  { value: 'SUBCUTANEOUS', label: 'Tiêm dưới da (SC)' },
   { value: 'OTHER', label: 'Khác' },
 ]
 
@@ -1122,7 +1122,7 @@ function PrescriptionPage() {
                         <Button size="small" onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                       </div>
                     }
-                    description="Bác sĩ có thể sửa liều lượng, tần suất, đường dùng, số lượng, hướng dẫn; bấm '+ Thêm thuốc mới' để bổ sung hoặc bấm biểu tượng thùng rác để bỏ thuốc không còn phù hợp khỏi đơn. Mọi thay đổi đều được hệ thống tự động lưu vết lịch sử (audit snapshot)."
+                    description="Bác sĩ có thể sửa liều lượng, tần suất, cách dùng, số lượng, hướng dẫn; bấm '+ Thêm thuốc mới' để bổ sung hoặc bấm biểu tượng thùng rác để bỏ thuốc không còn phù hợp khỏi đơn. Mọi thay đổi đều được hệ thống tự động lưu vết lịch sử (audit snapshot)."
                     style={{ marginBottom: 16, backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}
                   />
                 )}
@@ -1225,7 +1225,7 @@ function PrescriptionPage() {
                             />
                           </Form.Item>
 
-                          <Form.Item label="Đường dùng" style={{ marginBottom: 8, width: 160 }}>
+                          <Form.Item label="Cách dùng" style={{ marginBottom: 8, width: 220 }}>
                             <Select
                               allowClear
                               disabled={!canPrescribe}
@@ -1233,6 +1233,8 @@ function PrescriptionPage() {
                               onChange={(value) => handleItemChange(item.clientId, 'route', value)}
                               options={ROUTE_OPTIONS}
                               placeholder="Mặc định"
+                              popupMatchSelectWidth={false}
+                              style={{ width: '100%', minWidth: 140 }}
                             />
                           </Form.Item>
                         </Space>

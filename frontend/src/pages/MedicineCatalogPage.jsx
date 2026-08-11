@@ -388,7 +388,7 @@ function MedicineCatalogPage() {
       render: (v) => (v ? DOSAGE_FORM_LABELS[v] || v : '—'),
     },
     {
-      title: 'Đường dùng',
+      title: 'Cách dùng',
       dataIndex: 'defaultRoute',
       key: 'defaultRoute',
       width: 150,
@@ -651,11 +651,12 @@ function MedicineCatalogPage() {
 
             <Form.Item
               name="defaultRoute"
-              label="Đường dùng"
-              rules={[{ required: true, message: 'Vui lòng chọn đường dùng.' }]}
+              label="Cách dùng"
+              rules={[{ required: true, message: 'Vui lòng chọn cách dùng.' }]}
               style={{ flex: 1 }}
             >
               <Select
+                popupMatchSelectWidth={false}
                 options={Object.entries(ROUTE_LABELS).map(([key, val]) => ({
                   value: key,
                   label: val,

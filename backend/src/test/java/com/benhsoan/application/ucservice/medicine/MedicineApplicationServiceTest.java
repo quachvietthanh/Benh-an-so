@@ -66,7 +66,7 @@ class MedicineApplicationServiceTest {
                 " Acetaminophen ",
                 "500 mg",
                 DosageForm.TABLET,
-                "vien",
+                "viên",
                 AdministrationRoute.ORAL,
                 20
         ));
@@ -100,7 +100,7 @@ class MedicineApplicationServiceTest {
                         "Acetaminophen",
                         "500 mg",
                         DosageForm.TABLET,
-                        "vien",
+                        "viên",
                         AdministrationRoute.ORAL,
                         20
                 )
@@ -125,7 +125,7 @@ class MedicineApplicationServiceTest {
                         "Acetaminophen",
                         "500 mg",
                         DosageForm.TABLET,
-                        "vien",
+                        "viên",
                         AdministrationRoute.ORAL,
                         20
                 )
@@ -190,7 +190,7 @@ class MedicineApplicationServiceTest {
                         "Ibuprofen",
                         "400 mg",
                         DosageForm.TABLET,
-                        "vien",
+                        "viên",
                         AdministrationRoute.ORAL,
                         20
                 )
@@ -241,7 +241,7 @@ class MedicineApplicationServiceTest {
                         "Acetaminophen",
                         "500 mg",
                         DosageForm.TABLET,
-                        "vien",
+                        "viên",
                         AdministrationRoute.ORAL,
                         20
                 )
@@ -256,7 +256,7 @@ class MedicineApplicationServiceTest {
                 name,
                 "500 mg",
                 DosageForm.TABLET,
-                "vien",
+                "viên",
                 AdministrationRoute.ORAL,
                 true,
                 NOW.minusSeconds(60),
@@ -274,7 +274,7 @@ class MedicineApplicationServiceTest {
                 name,
                 "500 mg",
                 DosageForm.TABLET,
-                "vien",
+                "viên",
                 AdministrationRoute.ORAL,
                 false,
                 NOW.minusSeconds(60),

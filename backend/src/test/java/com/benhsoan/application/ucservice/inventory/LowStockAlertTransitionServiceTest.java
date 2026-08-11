@@ -160,7 +160,7 @@ class LowStockAlertTransitionServiceTest {
                 "Paracetamol",
                 "500 mg",
                 DosageForm.TABLET,
-                "vien",
+                "viên",
                 AdministrationRoute.ORAL,
                 true,
                 NOW.minusSeconds(3600),
