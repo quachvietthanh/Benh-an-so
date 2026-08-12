@@ -39,6 +39,7 @@ import {
   SaveOutlined,
   SearchOutlined,
   ShopOutlined,
+  UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -69,14 +70,17 @@ const normalizeBatch = (batch) => ({
 })
 
 const getErrorMessage = (error, fallback) =>
-  error?.response?.data?.message || error?.message || fallback
+  error?.response?.data?.message ||
+  Object.values(error?.response?.data?.errors || {})[0] ||
+  error?.message ||
+  fallback
 
 function InventoryReceiptPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuthContext()
 
-  // Phân quyền
+  // Phân quyền cho Dược sĩ / Admin theo permission hiện tại
   const roles = useMemo(() => {
     const values = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
     return values
@@ -90,10 +94,12 @@ function InventoryReceiptPage() {
   // State Tabs
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'create')
 
-  // State Dữ liệu
+  // State Dữ liệu từ Backend (Source of truth)
   const [medicines, setMedicines] = useState([])
+  const [stocks, setStocks] = useState([])
   const [batches, setBatches] = useState([])
   const [expiryAlerts, setExpiryAlerts] = useState([])
+  const [recentReceipts, setRecentReceipts] = useState([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -104,29 +110,33 @@ function InventoryReceiptPage() {
   const [batchEligibleFilter, setBatchEligibleFilter] = useState('ALL')
   const [batchExpiryFilter, setBatchExpiryFilter] = useState('ALL')
 
-  // Watch form items để tính tổng tiền theo thời gian thực
   const formItems = Form.useWatch('items', form) || []
   const totalReceiptAmount = useMemo(() => {
     return formItems.reduce((sum, item) => {
       const q = Number(item?.quantity || 0)
       const p = Number(item?.importPrice || 0)
-      return sum + q * p
+      return sum + (q > 0 ? q : 0) * (p > 0 ? p : 0)
     }, 0)
   }, [formItems])
 
+  // Tải dữ liệu thật từ Backend (Không cộng dồn local state)
   const loadData = useCallback(async () => {
     if (!canManageReceipts) return
     setLoading(true)
     setLoadError('')
     try {
-      const [medicineResponse, batchResponse, expiryResponse] = await Promise.allSettled([
+      const [medicineResponse, stockResponse, batchResponse, expiryResponse] = await Promise.allSettled([
         pharmacyApi.medicines({ active: true }),
+        pharmacyApi.stocks(),
         pharmacyApi.batches(),
         pharmacyApi.expiryAlerts(),
       ])
 
       if (medicineResponse.status === 'fulfilled') {
         setMedicines(toCollection(medicineResponse.value?.data).filter((item) => item?.active !== false))
+      }
+      if (stockResponse.status === 'fulfilled') {
+        setStocks(toCollection(stockResponse.value?.data))
       }
       if (batchResponse.status === 'fulfilled') {
         setBatches(toCollection(batchResponse.value?.data).map(normalizeBatch))
@@ -145,17 +155,16 @@ function InventoryReceiptPage() {
     loadData()
   }, [loadData])
 
-  // Tự động điền dòng thuốc nếu được chuyển đến từ danh sách cảnh báo thiếu tồn kho
   useEffect(() => {
     if (location.state?.prefillItem && medicines.length > 0) {
-      const { medicineId, quantity, medicineName } = location.state.prefillItem
+      const { medicineId, medicineName } = location.state.prefillItem
       form.setFieldsValue({
         items: [
           {
             medicineId,
-            batchNumber: `LOT-${dayjs().format('YYYYMM')}-${Math.floor(1000 + Math.random() * 9000)}`,
-            expiryDate: dayjs().add(1, 'year'),
-            quantity: Math.max(Number(quantity) || 1, 1),
+            batchNumber: '',
+            expiryDate: null,
+            quantity: 1,
             importPrice: 0,
           },
         ],
@@ -215,33 +224,49 @@ function InventoryReceiptPage() {
       return
     }
 
-    // Ràng buộc không trùng số lô cho cùng một thuốc trong một phiếu
-    const duplicateKeys = new Set()
+    const today = dayjs().startOf('day')
+
     for (let i = 0; i < rawItems.length; i++) {
       const item = rawItems[i]
+
+      // 1. Chưa chọn thuốc
       if (!item.medicineId) {
-        message.error(`Dòng thuốc số ${i + 1}: Vui lòng chọn loại thuốc cần nhập.`)
-        return
-      }
-      if (!String(item.batchNumber || '').trim()) {
-        message.error(`Dòng thuốc số ${i + 1}: Vui lòng nhập số lô.`)
-        return
-      }
-      if (!item.expiryDate || !item.expiryDate.isAfter(dayjs(), 'day')) {
-        message.error(`Dòng thuốc số ${i + 1}: Hạn sử dụng phải là ngày trong tương lai.`)
-        return
-      }
-      if (Number(item.quantity || 0) <= 0) {
-        message.error(`Dòng thuốc số ${i + 1}: Số lượng nhập phải lớn hơn 0.`)
+        message.error(`Dòng ${i + 1}: Vui lòng chọn thuốc.`)
         return
       }
 
-      const key = `${item.medicineId}-${String(item.batchNumber || '').trim().toUpperCase()}`
-      if (duplicateKeys.has(key)) {
-        message.error(`Dòng thuốc số ${i + 1}: Không thể nhập trùng cùng một số lô (${item.batchNumber}) cho cùng một loại thuốc trong một phiếu.`)
+      // 2. Thiếu số lô
+      if (!item.batchNumber || !String(item.batchNumber).trim()) {
+        message.error(`Dòng ${i + 1}: Vui lòng nhập số lô.`)
         return
       }
-      duplicateKeys.add(key)
+
+      // 5. Thiếu hạn dùng
+      if (!item.expiryDate) {
+        message.error(`Dòng ${i + 1}: Vui lòng chọn hạn dùng.`)
+        return
+      }
+
+      // 6. Hạn dùng trong quá khứ / không tương lai
+      const expDay = dayjs(item.expiryDate).startOf('day')
+      if (!expDay.isAfter(today)) {
+        message.error(`Dòng ${i + 1}: Hạn sử dụng phải là ngày trong tương lai.`)
+        return
+      }
+
+      // 3 & 4. Số lượng <= 0 hoặc không hợp lệ
+      const qty = Number(item.quantity)
+      if (item.quantity == null || isNaN(qty) || qty <= 0 || !Number.isInteger(qty)) {
+        message.error(`Dòng ${i + 1}: Số lượng nhập phải là số nguyên lớn hơn 0.`)
+        return
+      }
+
+      // Đơn giá nhập
+      const price = Number(item.importPrice)
+      if (item.importPrice == null || isNaN(price) || price < 0) {
+        message.error(`Dòng ${i + 1}: Đơn giá nhập không được âm.`)
+        return
+      }
     }
 
     const payload = {
@@ -258,32 +283,54 @@ function InventoryReceiptPage() {
     setSubmitting(true)
     try {
       const response = await pharmacyApi.receiveBatch(payload)
-      const receiptData = response.data
-      const receiptId = receiptData?.id
+      const receiptData = response?.data
 
-      // Xử lý thông báo cảnh báo gộp lô (nếu có)
+      message.success(
+        `Đã tạo phiếu nhập kho thành công${receiptData?.id ? ` (Mã phiếu: ${String(receiptData.id).slice(-8)})` : ''}.`
+      )
+
+      if (receiptData) {
+        setRecentReceipts((prev) => [receiptData, ...prev])
+      }
+
       const warnings = Array.isArray(receiptData?.warnings) ? receiptData.warnings : []
       if (warnings.length > 0) {
         notification.warning({
           message: 'Lưu ý gộp lô thuốc đã tồn tại',
           description: warnings.map((w, idx) => (
             <div key={idx} style={{ marginBottom: 4 }}>
-              Số lô <strong>{w.batchNumber}</strong> đã tồn tại trong kho và đã được gộp số lượng tồn thành công.
+              Số lô <strong>{w.batchNumber}</strong> đã có sẵn trong kho và đã được gộp số lượng tồn trên Backend.
             </div>
           )),
           duration: 6,
         })
-      } else {
-        message.success(`Đã tạo phiếu nhập kho thành công${receiptId ? ` (Mã: ${String(receiptId).slice(-8)})` : ''}.`)
       }
 
       form.resetFields()
       form.setFieldsValue({ items: [{ ...EMPTY_RECEIPT_ITEM }] })
+
+      // TẢI LẠI DỮ LIỆU TỒN KHO TỪ BACKEND
       await loadData()
       setActiveTab('batches')
     } catch (error) {
-      const msg = getErrorMessage(error, 'Không thể tạo phiếu nhập kho.')
-      message.error(msg)
+      const status = error?.response?.status
+      let errorMsg = getErrorMessage(error, 'Không thể tạo phiếu nhập kho.')
+
+      if (status === 400) {
+        errorMsg = `Dữ liệu không hợp lệ (400): ${errorMsg}`
+      } else if (status === 401) {
+        errorMsg = `Phiên làm việc hết hạn (401). Vui lòng đăng nhập lại.`
+      } else if (status === 403) {
+        errorMsg = `Bạn không có quyền thực hiện thao tác nhập kho (403).`
+      } else if (status === 404) {
+        errorMsg = `Thuốc hoặc lô không tồn tại trên hệ thống (404).`
+      } else if (status === 409) {
+        errorMsg = `Xung đột dữ liệu lô (409): ${errorMsg}`
+      } else if (status === 500) {
+        errorMsg = `Lỗi hệ thống máy chủ (500). Không thể tạo phiếu nhập kho.`
+      }
+
+      message.error(errorMsg)
     } finally {
       setSubmitting(false)
     }
@@ -293,7 +340,6 @@ function InventoryReceiptPage() {
   const filteredBatches = useMemo(() => {
     let list = Array.isArray(batches) ? batches : []
 
-    // Lọc theo từ khóa
     const kw = batchKeyword.trim().toLowerCase()
     if (kw) {
       list = list.filter((b) =>
@@ -303,19 +349,16 @@ function InventoryReceiptPage() {
       )
     }
 
-    // Lọc theo trạng thái
     if (batchStatusFilter !== 'ALL') {
       list = list.filter((b) => String(b.status).toUpperCase() === batchStatusFilter)
     }
 
-    // Lọc theo điều kiện cấp phát
     if (batchEligibleFilter === 'ELIGIBLE') {
       list = list.filter((b) => b.eligibleForDispense !== false && b.status !== 'EXPIRED' && b.quantity > 0)
     } else if (batchEligibleFilter === 'INELIGIBLE') {
       list = list.filter((b) => b.eligibleForDispense === false || b.status === 'EXPIRED' || b.quantity === 0)
     }
 
-    // Lọc theo hạn dùng
     if (batchExpiryFilter === 'EXPIRED') {
       list = list.filter((b) => b.expiryDate && dayjs(b.expiryDate).isBefore(dayjs(), 'day'))
     } else if (batchExpiryFilter === 'NEAR_30') {
@@ -456,7 +499,7 @@ function InventoryReceiptPage() {
     },
   ]
 
-  // Cột bảng Cảnh báo Hạn dùng
+  // Cột bảng Cảnh báo Hạn dùng (Map đúng DTO Backend InventoryExpiryAlertResponse)
   const alertColumns = [
     {
       title: 'Mã & Tên thuốc',
@@ -464,7 +507,7 @@ function InventoryReceiptPage() {
       render: (_, item) => (
         <Space direction="vertical" size={1}>
           <strong>{item.medicineName || '—'}</strong>
-          <Text code style={{ fontSize: 12 }}>{item.medicineId}</Text>
+          <Text code style={{ fontSize: 12 }}>{item.medicineCode || item.medicineId}</Text>
         </Space>
       ),
     },
@@ -484,25 +527,25 @@ function InventoryReceiptPage() {
     },
     {
       title: 'Thời hạn còn lại',
-      dataIndex: 'daysRemaining',
-      key: 'daysRemaining',
-      width: 160,
+      dataIndex: 'daysToExpiry',
+      key: 'daysToExpiry',
+      width: 170,
       render: (days, item) => {
         const d = Number(days ?? 0)
-        if (d < 0 || item.status === 'EXPIRED') {
-          return <Tag color="red">Đã quá hạn {Math.abs(d)} ngày</Tag>
+        if (item.alertStatus === 'EXPIRED' || d < 0) {
+          return <Tag color="red">🔴 Đã quá hạn {Math.abs(d)} ngày</Tag>
         }
-        if (d <= 30) {
-          return <Tag color="volcano" icon={<AlertOutlined />}>Còn {d} ngày</Tag>
+        if (d === 0) {
+          return <Tag color="volcano">⚠️ Hết hạn hôm nay</Tag>
         }
-        return <Tag color="warning" icon={<WarningOutlined />}>Còn {d} ngày</Tag>
+        return <Tag color="warning">🟡 Còn {d} ngày</Tag>
       },
     },
     {
-      title: 'Tồn hiện tại',
-      dataIndex: 'stockQuantity',
-      key: 'stockQuantity',
-      width: 120,
+      title: 'Số lượng còn',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      width: 130,
       align: 'right',
       render: (val) => (
         <span style={{ fontWeight: 700, color: Number(val || 0) > 0 ? '#dc2626' : '#94a3b8' }}>
@@ -511,21 +554,18 @@ function InventoryReceiptPage() {
       ),
     },
     {
-      title: 'Mức độ cảnh báo',
-      dataIndex: 'status',
-      key: 'status',
-      width: 170,
-      render: (status) => {
-        if (status === 'EXPIRED') {
-          return <Tag color="magenta">Đã hết hạn</Tag>
+      title: 'Trạng thái cảnh báo',
+      dataIndex: 'alertStatus',
+      key: 'alertStatus',
+      width: 280,
+      render: (alertStatus) => {
+        if (alertStatus === 'EXPIRED') {
+          return <Tag color="red" icon={<AlertOutlined />}>🔴 Lô thuốc đã hết hạn – Không được cấp phát</Tag>
         }
-        if (status === 'NEAR_EXPIRY_30_DAYS') {
-          return <Tag color="red">Khẩn cấp (≤ 30 ngày)</Tag>
+        if (alertStatus === 'NEAR_EXPIRY') {
+          return <Tag color="orange" icon={<WarningOutlined />}>🟡 Lô thuốc sắp hết hạn</Tag>
         }
-        if (status === 'NEAR_EXPIRY_90_DAYS') {
-          return <Tag color="orange">Cận hạn (≤ 90 ngày)</Tag>
-        }
-        return <Tag>{status}</Tag>
+        return <Tag>{alertStatus || '—'}</Tag>
       },
     },
     {
@@ -543,13 +583,13 @@ function InventoryReceiptPage() {
               items: [
                 {
                   medicineId: record.medicineId,
-                  batchNumber: `LOT-${dayjs().format('YYYYMM')}-${Math.floor(1000 + Math.random() * 9000)}`,
-                  expiryDate: dayjs().add(1, 'year'),
-                  quantity: Math.max(Number(record.stockQuantity) || 10, 10),
+                  batchNumber: '',
+                  expiryDate: null,
+                  quantity: Math.max(Number(record.quantity) || 10, 10),
                   importPrice: 0,
                 },
               ],
-              note: `Phiếu nhập thay thế lô ${record.batchNumber} sắp hết hạn`,
+              note: `Phiếu nhập thay thế lô ${record.batchNumber} sắp/đã hết hạn`,
             })
             setActiveTab('create')
           }}
@@ -559,6 +599,69 @@ function InventoryReceiptPage() {
       ),
     },
   ]
+
+  // Cột bảng Lịch sử phiếu nhập
+  const receiptHistoryColumns = [
+    {
+      title: 'Mã phiếu',
+      dataIndex: 'id',
+      key: 'id',
+      width: 160,
+      render: (val) => <Text code strong color="blue">{String(val || '—').slice(-8).toUpperCase()}</Text>,
+    },
+    {
+      title: 'Thời điểm nhập',
+      dataIndex: 'receivedAt',
+      key: 'receivedAt',
+      width: 180,
+      render: (val, row) => dayjs(val || row.createdAt).format('HH:mm DD/MM/YYYY'),
+    },
+    {
+      title: 'Người thực hiện nhập',
+      dataIndex: 'receivedBy',
+      key: 'receivedBy',
+      width: 220,
+      render: (val) => (
+        <Space>
+          <UserOutlined style={{ color: '#2563eb' }} />
+          <Text strong>{user?.fullName || user?.username || val || 'Dược sĩ'}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Số dòng thuốc',
+      dataIndex: 'items',
+      key: 'itemCount',
+      width: 120,
+      align: 'center',
+      render: (items) => <Badge count={items?.length || 0} showZero color="#2563eb" />,
+    },
+    {
+      title: 'Ghi chú phiếu',
+      dataIndex: 'note',
+      key: 'note',
+      render: (val) => val ? <Text type="secondary">{val}</Text> : '—',
+    },
+  ]
+
+  if (!canManageReceipts) {
+    return (
+      <Card style={{ marginTop: 24 }}>
+        <Alert
+          type="warning"
+          showIcon
+          icon={<WarningOutlined />}
+          message="Bạn không có quyền nhập kho"
+          description="Chức năng nhập kho theo lô và quản lý hạn dùng chỉ dành cho tài khoản có vai trò Dược sĩ (Pharmacist) hoặc Quản trị viên."
+          action={
+            <Button type="primary" onClick={() => navigate('/pharmacy')}>
+              Về màn hình Cấp phát thuốc
+            </Button>
+          }
+        />
+      </Card>
+    )
+  }
 
   return (
     <div style={{ paddingBottom: 40 }}>
@@ -600,14 +703,14 @@ function InventoryReceiptPage() {
         <Alert
           type="error"
           showIcon
-          message="Không tải được dữ liệu kho"
+          message="Không tải được dữ liệu kho từ máy chủ"
           description={loadError}
           action={<Button size="small" onClick={loadData}>Thử lại</Button>}
           style={{ marginBottom: 16 }}
         />
       )}
 
-      {/* Dashboard KPI Metric Cards */}
+      {/* KPI Metric Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         <Col xs={24} sm={12} md={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
@@ -683,8 +786,6 @@ function InventoryReceiptPage() {
                       items: [
                         {
                           ...EMPTY_RECEIPT_ITEM,
-                          batchNumber: `LOT-${dayjs().format('YYYYMM')}-${Math.floor(1000 + Math.random() * 9000)}`,
-                          expiryDate: dayjs().add(1, 'year'),
                         },
                       ],
                     }}
@@ -786,8 +887,8 @@ function InventoryReceiptPage() {
                                     <Form.Item
                                       {...field}
                                       name={[field.name, 'medicineId']}
-                                      label="Chọn loại thuốc cần nhập"
-                                      rules={[{ required: true, message: 'Vui lòng chọn thuốc' }]}
+                                      label="Chọn loại thuốc cần nhập *"
+                                      rules={[{ required: true, message: 'Vui lòng chọn thuốc.' }]}
                                     >
                                       <Select
                                         showSearch
@@ -802,31 +903,14 @@ function InventoryReceiptPage() {
                                     <Form.Item
                                       {...field}
                                       name={[field.name, 'batchNumber']}
-                                      label="Số lô sản xuất"
+                                      label="Số lô sản xuất *"
                                       rules={[
-                                        { required: true, whitespace: true, message: 'Vui lòng nhập số lô' },
-                                        { max: 100, message: 'Số lô không vượt quá 100 ký tự' },
+                                        { required: true, whitespace: true, message: 'Vui lòng nhập số lô.' },
+                                        { max: 100, message: 'Số lô không vượt quá 100 ký tự.' },
                                       ]}
                                     >
                                       <Input
-                                        placeholder="Ví dụ: LOT-2026-001"
-                                        addonAfter={
-                                          <Tooltip title="Tạo số lô ngẫu nhiên">
-                                            <Button
-                                              type="text"
-                                              size="small"
-                                              icon={<ReloadOutlined />}
-                                              onClick={() => {
-                                                const currentItems = form.getFieldValue('items') || []
-                                                currentItems[index] = {
-                                                  ...currentItems[index],
-                                                  batchNumber: `LOT-${dayjs().format('YYYYMM')}-${Math.floor(1000 + Math.random() * 9000)}`,
-                                                }
-                                                form.setFieldsValue({ items: currentItems })
-                                              }}
-                                            />
-                                          </Tooltip>
-                                        }
+                                        placeholder="Nhập số lô thực tế..."
                                       />
                                     </Form.Item>
                                   </Col>
@@ -835,13 +919,13 @@ function InventoryReceiptPage() {
                                     <Form.Item
                                       {...field}
                                       name={[field.name, 'expiryDate']}
-                                      label="Hạn sử dụng (Bắt buộc tương lai)"
-                                      rules={[{ required: true, message: 'Vui lòng chọn hạn dùng' }]}
+                                      label="Hạn sử dụng (Phải trong tương lai) *"
+                                      rules={[{ required: true, message: 'Vui lòng chọn hạn dùng.' }]}
                                     >
                                       <DatePicker
                                         style={{ width: '100%' }}
                                         format="DD/MM/YYYY"
-                                        placeholder="Chọn ngày hết hạn"
+                                        placeholder="Chọn hạn dùng"
                                         disabledDate={(current) => current && !current.isAfter(dayjs(), 'day')}
                                       />
                                     </Form.Item>
@@ -853,20 +937,20 @@ function InventoryReceiptPage() {
                                       name={[field.name, 'quantity']}
                                       label={
                                         <Space>
-                                          <span>Số lượng nhập</span>
+                                          <span>Số lượng nhập *</span>
                                           {selectedMed?.unit && (
                                             <Text type="secondary">(Đơn vị: {selectedMed.unit})</Text>
                                           )}
                                         </Space>
                                       }
-                                      rules={[{ required: true, message: 'Nhập số lượng' }]}
+                                      rules={[{ required: true, message: 'Vui lòng nhập số lượng.' }]}
                                     >
                                       <InputNumber
                                         min={1}
                                         max={1000000}
                                         precision={0}
                                         style={{ width: '100%' }}
-                                        placeholder="Nhập số lượng"
+                                        placeholder="Nhập số lượng lớn hơn 0..."
                                         addonAfter={selectedMed?.unit || 'Đơn vị'}
                                       />
                                     </Form.Item>
@@ -876,14 +960,14 @@ function InventoryReceiptPage() {
                                     <Form.Item
                                       {...field}
                                       name={[field.name, 'importPrice']}
-                                      label="Đơn giá nhập (VNĐ)"
-                                      rules={[{ required: true, message: 'Nhập đơn giá' }]}
+                                      label="Đơn giá nhập (VNĐ) *"
+                                      rules={[{ required: true, message: 'Vui lòng nhập đơn giá.' }]}
                                     >
                                       <InputNumber
                                         min={0}
                                         precision={2}
                                         style={{ width: '100%' }}
-                                        placeholder="Nhập giá nhập"
+                                        placeholder="Nhập đơn giá"
                                         addonAfter="₫"
                                         formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                                         parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
@@ -904,8 +988,6 @@ function InventoryReceiptPage() {
                             onClick={() =>
                               add({
                                 ...EMPTY_RECEIPT_ITEM,
-                                batchNumber: `LOT-${dayjs().format('YYYYMM')}-${Math.floor(1000 + Math.random() * 9000)}`,
-                                expiryDate: dayjs().add(1, 'year'),
                               })
                             }
                             style={{ height: 44, borderRadius: 8 }}
@@ -1013,7 +1095,7 @@ function InventoryReceiptPage() {
                     </Space>
 
                     <Button icon={<ReloadOutlined />} loading={loading} onClick={loadData}>
-                      Làm mới
+                      Làm mới dữ liệu từ Backend
                     </Button>
                   </div>
 
@@ -1030,6 +1112,27 @@ function InventoryReceiptPage() {
                     }}
                     scroll={{ x: 950 }}
                     locale={{ emptyText: <Empty description="Không tìm thấy lô thuốc nào phù hợp" /> }}
+                  />
+                </div>
+              ),
+            },
+            {
+              key: 'history',
+              label: (
+                <Space>
+                  <HistoryOutlined />
+                  <span>Phiếu nhập vừa tạo ({recentReceipts.length})</span>
+                </Space>
+              ),
+              children: (
+                <div>
+                  <Table
+                    rowKey="id"
+                    columns={receiptHistoryColumns}
+                    dataSource={recentReceipts}
+                    pagination={{ pageSize: 5 }}
+                    bordered
+                    locale={{ emptyText: <Empty description="Chưa có phiếu nhập nào trong phiên làm việc hiện tại" /> }}
                   />
                 </div>
               ),
@@ -1066,7 +1169,7 @@ function InventoryReceiptPage() {
                     locale={{
                       emptyText: (
                         <Empty
-                          description="Không có lô thuốc nào sắp hết hạn trong kho"
+                          description="Hiện không có lô thuốc nào cần cảnh báo hạn dùng."
                           image={Empty.PRESENTED_IMAGE_SIMPLE}
                         />
                       ),
@@ -1083,3 +1186,4 @@ function InventoryReceiptPage() {
 }
 
 export default InventoryReceiptPage
+

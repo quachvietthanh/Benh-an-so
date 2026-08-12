@@ -1,3 +1,5 @@
+import dayjs from 'dayjs'
+
 const compactText = (parts) => parts.filter(Boolean).join('; ')
 
 export const unwrapCollection = (payload) => {
@@ -110,7 +112,9 @@ export const buildFefoPreview = (prescriptionItems = [], batches = []) =>
         (batch) =>
           String(batch.medicineId) === String(item.medicineId) &&
           batch.eligibleForDispense !== false &&
-          Number(batch.quantity) > 0,
+          batch.status !== 'EXPIRED' &&
+          Number(batch.quantity) > 0 &&
+          (!batch.expiryDate || !dayjs(batch.expiryDate).isBefore(dayjs(), 'day')),
       )
       .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)))
 
