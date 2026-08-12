@@ -1,7 +1,11 @@
 import axiosClient from './axiosClient'
+
 export default {
-  getAll: () => axiosClient.get('/invoices'),
-  getPayable: () => axiosClient.get('/invoices/payable'),
+  getAll: (params) => axiosClient.get('/invoices', { params }),
+  getPayable: (params) => axiosClient.get('/invoices/payable', { params }),
+  getByVisit: (visitId) => axiosClient.get('/invoices', { params: { visitId } }),
+  getById: (invoiceId) => axiosClient.get(`/invoices/${invoiceId}`),
   pay: (data) => axiosClient.post('/invoices/payments', data),
-  adjust: (id, data) => axiosClient.post(`/invoices/${id}/adjustments`, data),
+  createInvoice: (data) => axiosClient.post('/invoices', data),
+  adjust: (invoiceId, data) => axiosClient.post(`/invoices/${invoiceId}/adjustments`, data),
 }
