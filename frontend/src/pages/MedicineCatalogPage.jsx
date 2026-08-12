@@ -1078,8 +1078,8 @@ function MedicineCatalogPage() {
 
             <Form.Item
               name="defaultRoute"
-              label="Đường dùng"
-              rules={[{ required: true, message: 'Vui lòng chọn đường dùng.' }]}
+              label="Cách dùng"
+              rules={[{ required: true, message: 'Vui lòng chọn cách dùng.' }]}
               style={{ flex: 1 }}
             >
               <Select

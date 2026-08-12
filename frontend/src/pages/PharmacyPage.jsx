@@ -27,6 +27,7 @@ import {
   MedicineBoxOutlined,
   ReloadOutlined,
   RightOutlined,
+  RollbackOutlined,
   SearchOutlined,
   ShopOutlined,
   WarningOutlined,
@@ -634,12 +635,42 @@ function PharmacyPage() {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Popconfirm
-                    title="Xác nhận cấp phát thuốc"
-                    description={`Cấp đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id} theo phân bổ FEFO đang hiển thị?`}
+                    title={
+                      <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
+                        Xác nhận cấp phát đơn thuốc
+                      </Text>
+                    }
+                    description={
+                      <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
+                        <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
+                          Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
+                          <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
+                            {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                          </Text>?
+                        </div>
+                        <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
+                          <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{selectedPrescription.patientName || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
+                          <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
+                        </div>
+                      </div>
+                    }
+                    icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
                     okText="Xác nhận cấp phát"
                     cancelText="Kiểm tra lại"
+                    okButtonProps={{
+                      type: 'primary',
+                      size: 'large',
+                      icon: <CheckCircleOutlined />,
+                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 600 },
+                    }}
+                    cancelButtonProps={{
+                      size: 'large',
+                      icon: <RollbackOutlined />,
+                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 500 },
+                    }}
                     onConfirm={handleDispense}
                     disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                    overlayStyle={{ maxWidth: 500 }}
                   >
                     <Button
                       type="primary"
@@ -658,6 +689,112 @@ function PharmacyPage() {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title={
+          <Space>
+            <FieldTimeOutlined style={{ color: '#d97706' }} />
+            <span>Danh sách cảnh báo hạn sử dụng thuốc</span>
+          </Space>
+        }
+        open={expiryModalOpen}
+        onCancel={() => setExpiryModalOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setExpiryModalOpen(false)}>
+            Đóng
+          </Button>,
+          <Button
+            key="receipts"
+            type="primary"
+            icon={<InboxOutlined />}
+            onClick={() => {
+              setExpiryModalOpen(false)
+              navigate('/pharmacy/receipts', { state: { tab: 'create' } })
+            }}
+          >
+            Nhập kho thay thế
+          </Button>,
+        ]}
+        width={850}
+        destroyOnClose
+      >
+        <Table
+          rowKey={(record, index) => record.batchId || record.id || index}
+          dataSource={expiryAlerts}
+          locale={{ emptyText: 'Hiện không có lô thuốc nào cần cảnh báo hạn dùng.' }}
+          pagination={{ pageSize: 10, hideOnSinglePage: true }}
+          size="small"
+          columns={[
+            {
+              title: 'Mã & Tên thuốc',
+              key: 'medicine',
+              render: (_, item) => (
+                <Space direction="vertical" size={1}>
+                  <strong>{item.medicineName || '—'}</strong>
+                  <Text code style={{ fontSize: 12 }}>{item.medicineCode || item.medicineId}</Text>
+                </Space>
+              ),
+            },
+            {
+              title: 'Số lô',
+              dataIndex: 'batchNumber',
+              key: 'batchNumber',
+              width: 140,
+              render: (val) => <Tag color="blue">{val}</Tag>,
+            },
+            {
+              title: 'Hạn sử dụng',
+              dataIndex: 'expiryDate',
+              key: 'expiryDate',
+              width: 130,
+              render: (val) => (val ? dayjs(val).format('DD/MM/YYYY') : '—'),
+            },
+            {
+              title: 'Số ngày còn lại',
+              dataIndex: 'daysToExpiry',
+              key: 'daysToExpiry',
+              width: 160,
+              render: (days, item) => {
+                const d = Number(days ?? 0)
+                if (item.alertStatus === 'EXPIRED' || d < 0) {
+                  return <Tag color="red">🔴 Quá hạn {Math.abs(d)} ngày</Tag>
+                }
+                if (d === 0) {
+                  return <Tag color="volcano">⚠️ Hết hạn hôm nay</Tag>
+                }
+                return <Tag color="warning">🟡 Còn {d} ngày</Tag>
+              },
+            },
+            {
+              title: 'Số lượng còn',
+              dataIndex: 'quantity',
+              key: 'quantity',
+              width: 120,
+              align: 'right',
+              render: (val) => (
+                <span style={{ fontWeight: 700, color: Number(val || 0) > 0 ? '#dc2626' : '#94a3b8' }}>
+                  {Number(val || 0).toLocaleString('vi-VN')}
+                </span>
+              ),
+            },
+            {
+              title: 'Trạng thái cảnh báo',
+              dataIndex: 'alertStatus',
+              key: 'alertStatus',
+              width: 280,
+              render: (alertStatus) => {
+                if (alertStatus === 'EXPIRED') {
+                  return <Tag color="red" icon={<AlertOutlined />}>🔴 Lô thuốc đã hết hạn – Không được cấp phát</Tag>
+                }
+                if (alertStatus === 'NEAR_EXPIRY') {
+                  return <Tag color="orange" icon={<WarningOutlined />}>🟡 Lô thuốc sắp hết hạn</Tag>
+                }
+                return <Tag>{alertStatus || '—'}</Tag>
+              },
+            },
+          ]}
+        />
+      </Modal>
     </div>
   )
 }

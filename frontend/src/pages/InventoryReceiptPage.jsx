@@ -557,13 +557,13 @@ function InventoryReceiptPage() {
       title: 'Trạng thái cảnh báo',
       dataIndex: 'alertStatus',
       key: 'alertStatus',
-      width: 180,
+      width: 280,
       render: (alertStatus) => {
         if (alertStatus === 'EXPIRED') {
-          return <Tag color="red" icon={<AlertOutlined />}>🔴 Đã hết hạn</Tag>
+          return <Tag color="red" icon={<AlertOutlined />}>🔴 Lô thuốc đã hết hạn – Không được cấp phát</Tag>
         }
         if (alertStatus === 'NEAR_EXPIRY') {
-          return <Tag color="orange" icon={<WarningOutlined />}>🟡 Gần hết hạn</Tag>
+          return <Tag color="orange" icon={<WarningOutlined />}>🟡 Lô thuốc sắp hết hạn</Tag>
         }
         return <Tag>{alertStatus || '—'}</Tag>
       },
