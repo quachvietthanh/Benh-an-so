@@ -107,3 +107,11 @@ INSERT INTO invoice_lines (
     -20000.00,
     '2026-08-20 03:40:00'
 );
+
+-- ===========================
+-- Invoice code sequences
+-- ===========================
+
+INSERT INTO invoice_code_sequences (code_prefix, `last_value`) VALUES
+('HD', 1),
+('HDDC', 1);

@@ -74,6 +74,18 @@ CREATE INDEX idx_payments_collected_by
     ON payments(collected_by);
 
 -- ===========================
+-- Invoice code sequences
+-- ===========================
+
+CREATE TABLE invoice_code_sequences (
+    code_prefix VARCHAR(10) NOT NULL,
+    `last_value` BIGINT NOT NULL,
+
+    CONSTRAINT pk_invoice_code_sequences PRIMARY KEY (code_prefix),
+    CONSTRAINT chk_invoice_code_sequences_last_value CHECK (`last_value` > 0)
+);
+
+-- ===========================
 -- Invoices
 -- ===========================
 
