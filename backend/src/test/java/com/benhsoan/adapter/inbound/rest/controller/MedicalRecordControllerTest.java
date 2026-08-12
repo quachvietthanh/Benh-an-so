@@ -17,16 +17,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
+import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
@@ -160,5 +164,40 @@ class MedicalRecordControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].medicalRecordId").value(recordId.toString()))
                 .andExpect(jsonPath("$[0].diagnosisType").value("PRIMARY"));
+    }
+
+    @Test
+    @DisplayName("GET /medical-records/access-logs - 200 OK with patient/time filters")
+    void getAccessLogsByPatientReturnsPage() throws Exception {
+        UUID accessedBy = UUID.randomUUID();
+        Instant from = Instant.parse("2026-08-01T00:00:00Z");
+        Instant to = Instant.parse("2026-08-12T23:59:59Z");
+        when(getMedicalRecordAccessLogsUseCase.getAccessLogs(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new PageImpl<>(
+                        List.of(new MedicalRecordAccessLogResult(
+                                UUID.randomUUID(),
+                                patientId,
+                                visitId,
+                                recordId,
+                                accessedBy,
+                                MedicalRecordAccessAction.VIEW,
+                                "Medical record viewed",
+                                now
+                        )),
+                        PageRequest.of(0, 20),
+                        1
+                ));
+
+        mockMvc.perform(get("/medical-records/access-logs")
+                        .param("patientId", patientId.toString())
+                        .param("from", from.toString())
+                        .param("to", to.toString())
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].patientId").value(patientId.toString()))
+                .andExpect(jsonPath("$.content[0].medicalRecordId").value(recordId.toString()))
+                .andExpect(jsonPath("$.content[0].action").value("VIEW"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 }

@@ -39,8 +39,17 @@ public class MedicalRecordRestMapper {
         return new AmendMedicalRecordCommand(request.content(), request.reason());
     }
 
-    public GetMedicalRecordAccessLogsQuery toQuery(UUID medicalRecordId, UUID patientId, Instant from, Instant to, int page, int size) {
-        return new GetMedicalRecordAccessLogsQuery(medicalRecordId, patientId, from, to, page, size);
+    public GetMedicalRecordAccessLogsQuery toQuery(
+            UUID accessedBy,
+            UUID patientId,
+            UUID medicalRecordId,
+            UUID visitId,
+            Instant from,
+            Instant to,
+            int page,
+            int size
+    ) {
+        return new GetMedicalRecordAccessLogsQuery(accessedBy, patientId, medicalRecordId, visitId, from, to, page, size);
     }
 
     public MedicalRecordResponse toResponse(MedicalRecordResult result) {

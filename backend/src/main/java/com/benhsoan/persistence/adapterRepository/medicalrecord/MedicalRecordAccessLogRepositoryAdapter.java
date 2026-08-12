@@ -1,8 +1,5 @@
 package com.benhsoan.persistence.adapterRepository.medicalrecord;
 
-import java.time.Instant;
-import java.util.UUID;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
@@ -10,7 +7,9 @@ import org.springframework.stereotype.Repository;
 import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordAccessLogEntity;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAccessLogRepository;
+import com.benhsoan.persistence.jpaRepository.medicalrecord.MedicalRecordAccessLogSpecification;
 import com.benhsoan.persistence.mapper.medicalrecord.MedicalRecordAccessLogPersistenceMapper;
+import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAccessLogRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -29,24 +28,11 @@ public class MedicalRecordAccessLogRepositoryAdapter implements MedicalRecordAcc
     }
 
     @Override
-    public Page<MedicalRecordAccessLog> findByMedicalRecordId(
-            UUID medicalRecordId,
-            Instant from,
-            Instant to,
+    public Page<MedicalRecordAccessLog> search(
+            GetMedicalRecordAccessLogsQuery query,
             Pageable pageable
     ) {
-        return jpaRepository.findByMedicalRecordId(medicalRecordId, from, to, pageable)
-                .map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<MedicalRecordAccessLog> findByPatientId(
-            UUID patientId,
-            Instant from,
-            Instant to,
-            Pageable pageable
-    ) {
-        return jpaRepository.findByPatientId(patientId, from, to, pageable)
+        return jpaRepository.findAll(MedicalRecordAccessLogSpecification.build(query), pageable)
                 .map(mapper::toDomain);
     }
 }

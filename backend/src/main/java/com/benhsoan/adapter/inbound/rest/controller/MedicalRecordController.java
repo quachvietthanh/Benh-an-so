@@ -30,6 +30,8 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAme
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDiagnosisResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
+import com.benhsoan.domain.auth.enums.Permission;
+import com.benhsoan.infrastructure.security.annotation.CheckPermission;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
@@ -122,7 +124,7 @@ public class MedicalRecordController {
     }
 
     @GetMapping("/{medicalRecordId}/access-logs")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @CheckPermission(Permission.AUDIT_READ)
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByRecord(
             @PathVariable UUID medicalRecordId,
             @RequestParam(required = false) Instant from,
@@ -131,12 +133,12 @@ public class MedicalRecordController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return mapper.toAccessLogResponse(getMedicalRecordAccessLogsUseCase.getAccessLogs(
-                mapper.toQuery(medicalRecordId, null, from, to, page, size)
+                mapper.toQuery(null, null, medicalRecordId, null, from, to, page, size)
         ));
     }
 
     @GetMapping("/access-logs")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @CheckPermission(Permission.AUDIT_READ)
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByPatient(
             @RequestParam UUID patientId,
             @RequestParam(required = false) Instant from,
@@ -145,7 +147,7 @@ public class MedicalRecordController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return mapper.toAccessLogResponse(getMedicalRecordAccessLogsUseCase.getAccessLogs(
-                mapper.toQuery(null, patientId, from, to, page, size)
+                mapper.toQuery(null, patientId, null, null, from, to, page, size)
         ));
     }
 }
