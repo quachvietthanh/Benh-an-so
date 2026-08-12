@@ -16,6 +16,7 @@ import {
   Statistic,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import {
@@ -273,32 +274,49 @@ function PharmacyPage() {
     {
       title: 'Thuốc',
       key: 'medicine',
-      width: 210,
-      render: (_, item) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{item.medicineName || item.medicineId}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {[item.activeIngredient, item.strength].filter(Boolean).join(' · ') || item.dosage || '—'}
-          </Text>
-        </Space>
-      ),
+      width: 230,
+      render: (_, item) => {
+        const isShortage = Number(item.shortageQuantity) > 0
+        return (
+          <Space direction="vertical" size={2}>
+            <Space wrap>
+              <Text strong style={{ color: isShortage ? '#cf1322' : 'inherit', fontSize: 14 }}>
+                {item.medicineName || item.medicineId}
+              </Text>
+              {isShortage && <Tag color="error" style={{ fontWeight: 600 }}>Không đủ thuốc</Tag>}
+            </Space>
+            <Text type={isShortage ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
+              {[item.activeIngredient, item.strength].filter(Boolean).join(' · ') || item.dosage || '—'}
+            </Text>
+          </Space>
+        )
+      },
     },
     {
       title: 'Cần cấp',
       dataIndex: 'requiredQuantity',
-      width: 90,
+      width: 95,
       align: 'center',
-      render: (quantity, item) => <Text strong>{quantity} {item.unit || ''}</Text>,
+      render: (quantity, item) => (
+        <Text strong style={{ color: Number(item.shortageQuantity) > 0 ? '#cf1322' : 'inherit', fontSize: 14 }}>
+          {quantity} {item.unit || ''}
+        </Text>
+      ),
     },
     {
       title: 'Tồn khả dụng',
       key: 'available',
-      width: 115,
+      width: 120,
       align: 'center',
       render: (_, item) => {
         const stock = stockByMedicineId.get(String(item.medicineId))
         const available = stock?.eligibleStockQuantity ?? item.availableQuantity
-        return <Tag color={Number(available) < Number(item.requiredQuantity) ? 'red' : 'green'}>{available}</Tag>
+        const isShortage = Number(available) < Number(item.requiredQuantity)
+        return (
+          <Tag color={isShortage ? 'error' : 'success'} style={{ fontWeight: 600, fontSize: 13, padding: '2px 8px' }}>
+            {available} {item.unit || ''}
+          </Tag>
+        )
       },
     },
     {
@@ -307,21 +325,29 @@ function PharmacyPage() {
       render: (_, item) => item.allocations.length ? (
         <Space direction="vertical" size={4}>
           {item.allocations.map((allocation) => (
-            <Tag key={`${allocation.batchId}-${allocation.quantity}`} color="blue">
-              {allocation.batchNumber} · HSD {dayjs(allocation.expiryDate).format('DD/MM/YYYY')} · x{allocation.quantity}
+            <Tag key={`${allocation.batchId}-${allocation.quantity}`} color="blue" style={{ fontSize: 12 }}>
+              <strong>Lô {allocation.batchNumber}</strong> · HSD {dayjs(allocation.expiryDate).format('DD/MM/YYYY')} · <strong>x{allocation.quantity}</strong>
             </Tag>
           ))}
         </Space>
-      ) : <Text type="danger">Không có lô đủ điều kiện</Text>,
+      ) : (
+        <Tag color="error" style={{ fontWeight: 600 }}>❌ Không có lô đủ điều kiện cấp phát</Tag>
+      ),
     },
     {
-      title: 'Kết quả',
+      title: 'Kết quả kiểm tra',
       key: 'result',
-      width: 105,
+      width: 150,
       align: 'center',
-      render: (_, item) => Number(item.shortageQuantity) > 0
-        ? <Tag color="red">Thiếu {item.shortageQuantity}</Tag>
-        : <Tag color="green">Đủ tồn</Tag>,
+      render: (_, item) => Number(item.shortageQuantity) > 0 ? (
+        <Tag color="error" style={{ fontWeight: 700, padding: '4px 10px', fontSize: 13 }}>
+          ⛔ THIẾU {item.shortageQuantity} {item.unit || ''}
+        </Tag>
+      ) : (
+        <Tag color="success" icon={<CheckCircleOutlined />} style={{ fontWeight: 600, padding: '4px 10px' }}>
+          Đủ tồn kho
+        </Tag>
+      ),
     },
   ]
 
@@ -535,8 +561,29 @@ function PharmacyPage() {
                   <Alert
                     type="error"
                     showIcon
-                    message="Không đủ tồn khả dụng để cấp toàn bộ đơn"
-                    description="Xem từng dòng thuốc bên dưới và nhập bổ sung trước khi cấp phát."
+                    message={
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#cf1322' }}>
+                        ⛔ KHÔNG ĐỦ THUỐC ĐỂ CẤP PHÁT (ĐÃ KHÓA NÚT CẤP PHÁT)
+                      </span>
+                    }
+                    description={
+                      <div style={{ marginTop: 4 }}>
+                        <span>
+                          Đơn thuốc có một hoặc nhiều loại thuốc <strong>không đủ tồn kho khả dụng</strong> (được bôi đỏ ở bảng bên dưới). Hệ thống đã vô hiệu hóa thao tác cấp phát để đảm bảo an toàn.
+                        </span>
+                        <div style={{ marginTop: 8 }}>
+                          <Button
+                            type="primary"
+                            danger
+                            size="small"
+                            icon={<InboxOutlined />}
+                            onClick={() => navigate('/pharmacy/receipts')}
+                          >
+                            Đi đến Nhập kho theo lô để bổ sung thuốc
+                          </Button>
+                        </div>
+                      </div>
+                    }
                   />
                 )}
 
@@ -545,8 +592,19 @@ function PharmacyPage() {
                   columns={previewColumns}
                   dataSource={fefoPreview}
                   pagination={false}
-                  size="small"
+                  size="middle"
                   scroll={{ x: 850 }}
+                  onRow={(record) => {
+                    const isShortage = Number(record.shortageQuantity) > 0
+                    return {
+                      style: isShortage
+                        ? {
+                            backgroundColor: '#fff1f0',
+                            borderLeft: '4px solid #ff4d4f',
+                          }
+                        : {},
+                    }
+                  }}
                 />
 
                 {shortageDetails.length > 0 && (
@@ -567,25 +625,48 @@ function PharmacyPage() {
                   />
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Popconfirm
-                    title="Xác nhận cấp phát thuốc"
-                    description={`Cấp đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id} theo phân bổ FEFO đang hiển thị?`}
-                    okText="Xác nhận cấp phát"
-                    cancelText="Kiểm tra lại"
-                    onConfirm={handleDispense}
-                    disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 8 }}>
+                  {hasPreviewShortage && (
+                    <Text type="danger" strong style={{ fontSize: 13 }}>
+                      ⚠️ Vui lòng bổ sung kho trước khi cấp phát
+                    </Text>
+                  )}
+                  <Tooltip
+                    title={
+                      hasPreviewShortage
+                        ? 'Không thể cấp phát: Đơn thuốc có thuốc bị thiếu tồn kho (dòng bôi đỏ).'
+                        : (!canDispense ? 'Tài khoản không có quyền cấp phát thuốc.' : '')
+                    }
                   >
-                    <Button
-                      type="primary"
-                      size="large"
-                      icon={<CheckCircleOutlined />}
-                      loading={dispensingId === selectedPrescription.id}
-                      disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
-                    >
-                      Xác nhận cấp phát theo FEFO
-                    </Button>
-                  </Popconfirm>
+                    <span>
+                      <Popconfirm
+                        title="Xác nhận cấp phát thuốc"
+                        description={`Cấp đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id} theo phân bổ FEFO đang hiển thị?`}
+                        okText="Xác nhận cấp phát"
+                        cancelText="Kiểm tra lại"
+                        onConfirm={handleDispense}
+                        disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                      >
+                        <Button
+                          type="primary"
+                          size="large"
+                          icon={<CheckCircleOutlined style={{ fontSize: 18 }} />}
+                          loading={dispensingId === selectedPrescription.id}
+                          disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                          style={{
+                            height: 48,
+                            minWidth: 260,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            borderRadius: 8,
+                            boxShadow: (hasPreviewShortage || !canDispense) ? 'none' : '0 4px 14px rgba(22, 119, 255, 0.4)',
+                          }}
+                        >
+                          Xác nhận cấp phát theo FEFO
+                        </Button>
+                      </Popconfirm>
+                    </span>
+                  </Tooltip>
                 </div>
                 {!canDispense && <Text type="danger">Tài khoản hiện tại không có quyền cấp phát thuốc.</Text>}
               </Space>

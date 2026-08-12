@@ -340,6 +340,15 @@ function PrescriptionPage() {
       if (!Number.isInteger(Number(item.durationDays)) || Number(item.durationDays) <= 0) {
         return `Dòng ${index + 1}: số ngày dùng phải là số nguyên dương.`
       }
+
+      const med = selectedMedicineMap.get(String(item.medicineId))
+      const availableStock = Number(med?.stockQuantity ?? med?.stock ?? 0)
+      if (availableStock <= 0) {
+        return `Dòng ${index + 1} (${med?.medicineName || 'Thuốc'}): Thuốc này hiện đã hết hàng trong kho. Vui lòng chọn loại thuốc khác.`
+      }
+      if (Number(item.quantity) > availableStock) {
+        return `Dòng ${index + 1} (${med?.medicineName || 'Thuốc'}): Không đủ số lượng trong kho để kê đơn (Số lượng kê: ${item.quantity} ${med?.unit || ''}, Tồn kho khả dụng: ${availableStock} ${med?.unit || ''}). Vui lòng giảm số lượng kê đơn.`
+      }
     }
 
     if (editingPrescription && !changeReason.trim()) {
@@ -768,6 +777,32 @@ function PrescriptionPage() {
 
   const selectedMedicineMap = new Map(medicines.map((m) => [String(m.id), m]))
 
+  const medicineSelectOptions = useMemo(
+    () =>
+      medicines.map((medicine) => {
+        const stock = Number(medicine.stockQuantity ?? medicine.stock ?? 0)
+        const isOutOfStock = stock <= 0
+        return {
+          value: medicine.id,
+          label: isOutOfStock
+            ? `⛔ ${medicine.medicineName} — ${medicine.strength || ''} [HẾT HÀNG - Tồn: 0 ${medicine.unit || ''}]`
+            : `${medicine.medicineName} — ${medicine.strength || ''} (Tồn khả dụng: ${stock} ${medicine.unit || ''})`,
+          disabled: isOutOfStock,
+        }
+      }),
+    [medicines],
+  )
+
+  const hasPrescriptionShortage = useMemo(() => {
+    return items.some((item) => {
+      if (!item.medicineId) return false
+      const med = selectedMedicineMap.get(String(item.medicineId))
+      if (!med) return false
+      const stock = Number(med.stockQuantity ?? med.stock ?? 0)
+      return stock <= 0 || Number(item.quantity) > stock
+    })
+  }, [items, selectedMedicineMap])
+
   const queueStatusLabel = {
     WAITING: 'Chờ khám',
     IN_PROGRESS: 'Đang khám',
@@ -805,9 +840,26 @@ function PrescriptionPage() {
             </Button>
           )}
           {canPrescribe && (
-            <Button type="primary" size="large" loading={saving} icon={<CheckCircleOutlined />} onClick={handleSaveClick}>
-              {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
-            </Button>
+            <Tooltip title={hasPrescriptionShortage ? 'Không thể lưu đơn: Có thuốc bị thiếu tồn kho (dòng bôi đỏ).' : ''}>
+              <span>
+                <Button
+                  type="primary"
+                  size="large"
+                  loading={saving}
+                  icon={<CheckCircleOutlined />}
+                  disabled={!canPrescribe || hasPrescriptionShortage}
+                  onClick={handleSaveClick}
+                  style={{
+                    height: 44,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    boxShadow: hasPrescriptionShortage ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.3)',
+                  }}
+                >
+                  {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
+                </Button>
+              </span>
+            </Tooltip>
           )}
           {isAssignedDoctor && prescriptions.length > 0 && !editingPrescription && (
             <Button
@@ -934,6 +986,9 @@ function PrescriptionPage() {
                 >
                   {items.map((item, index) => {
                     const selectedMed = selectedMedicineMap.get(String(item.medicineId))
+                    const availableStock = Number(selectedMed?.stockQuantity ?? selectedMed?.stock ?? 0)
+                    const isShortage = selectedMed && (availableStock <= 0 || Number(item.quantity) > availableStock)
+
                     return (
                       <Card
                         key={item.clientId}
@@ -941,13 +996,14 @@ function PrescriptionPage() {
                         style={{
                           marginBottom: 14,
                           borderRadius: 8,
-                          borderColor: item.isOriginal ? '#cbd5e1' : '#93c5fd',
-                          backgroundColor: item.isOriginal ? '#ffffff' : '#f0f9ff',
+                          borderColor: isShortage ? '#ff4d4f' : (item.isOriginal ? '#cbd5e1' : '#93c5fd'),
+                          borderWidth: isShortage ? 2 : 1,
+                          backgroundColor: isShortage ? '#fff1f0' : (item.isOriginal ? '#ffffff' : '#f0f9ff'),
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                          <Space>
-                            <Text strong style={{ fontSize: 15, color: '#1e40af' }}>
+                          <Space wrap>
+                            <Text strong style={{ fontSize: 15, color: isShortage ? '#cf1322' : '#1e40af' }}>
                               Thuốc #{index + 1}
                             </Text>
                             {editingPrescription && (
@@ -956,9 +1012,14 @@ function PrescriptionPage() {
                               </Tag>
                             )}
                             {selectedMed && (
-                              <Text type="secondary" style={{ fontSize: 13 }}>
-                                (Tồn kho: <strong>{selectedMed.stockQuantity}</strong> {selectedMed.unit || ''})
-                              </Text>
+                              <Tag color={isShortage ? 'error' : 'success'} style={{ fontWeight: 600 }}>
+                                Tồn kho khả dụng: {availableStock} {selectedMed.unit || ''}
+                              </Tag>
+                            )}
+                            {isShortage && (
+                              <Tag color="error" style={{ fontWeight: 700 }}>
+                                ⛔ KHÔNG ĐỦ TỒN: Kê {item.quantity} / Tồn {availableStock}
+                              </Tag>
                             )}
                           </Space>
 
@@ -975,18 +1036,25 @@ function PrescriptionPage() {
                           </Tooltip>
                         </div>
 
+                        {isShortage && (
+                          <Alert
+                            type="error"
+                            showIcon
+                            message="Không đủ số lượng thuốc trong kho để kê đơn"
+                            description={`Số lượng kê (${item.quantity} ${selectedMed?.unit || ''}) vượt quá số lượng tồn kho khả dụng hiện tại (${availableStock} ${selectedMed?.unit || ''}). Vui lòng giảm số lượng kê hoặc chọn loại thuốc khác.`}
+                            style={{ marginBottom: 12 }}
+                          />
+                        )}
+
                         <Space wrap align="start" style={{ width: '100%' }}>
-                          <Form.Item label="Chọn thuốc *" style={{ marginBottom: 8, width: 340 }}>
+                          <Form.Item label="Chọn thuốc *" style={{ marginBottom: 8, width: 360 }}>
                             <Select
                               showSearch
                               optionFilterProp="label"
                               disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.medicineId}
                               onChange={(value) => handleItemChange(item.clientId, 'medicineId', value)}
-                              options={medicines.map((medicine) => ({
-                                value: medicine.id,
-                                label: `${medicine.medicineName} — ${medicine.strength || ''} (tồn ${medicine.stockQuantity} ${medicine.unit || ''})`,
-                              }))}
+                              options={medicineSelectOptions}
                               placeholder="Tìm kiếm thuốc theo tên..."
                             />
                           </Form.Item>
@@ -999,6 +1067,7 @@ function PrescriptionPage() {
                               value={item.quantity}
                               onChange={(value) => handleItemChange(item.clientId, 'quantity', value)}
                               style={{ width: 110 }}
+                              status={isShortage ? 'error' : undefined}
                               addonAfter={selectedMed?.unit || 'ĐV'}
                             />
                           </Form.Item>
@@ -1158,21 +1227,36 @@ function PrescriptionPage() {
                     </div>
                   )}
 
-                  <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                  <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
+                    {hasPrescriptionShortage && (
+                      <Text type="danger" strong style={{ fontSize: 13 }}>
+                        ⚠️ Có thuốc không đủ tồn kho (được bôi đỏ). Vui lòng điều chỉnh trước khi lưu.
+                      </Text>
+                    )}
                     {editingPrescription && (
                       <Button disabled={checkingInteractions || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                     )}
                     {canPrescribe && (
-                      <Button
-                        type="primary"
-                        size="large"
-                        loading={saving || checkingInteractions}
-                        disabled={checkingInteractions}
-                        icon={<CheckCircleOutlined />}
-                        onClick={handleSaveClick}
-                      >
-                        {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
-                      </Button>
+                      <Tooltip title={hasPrescriptionShortage ? 'Không thể lưu đơn: Có thuốc bị thiếu tồn kho (dòng bôi đỏ).' : ''}>
+                        <span>
+                          <Button
+                            type="primary"
+                            size="large"
+                            loading={saving || checkingInteractions}
+                            disabled={checkingInteractions || hasPrescriptionShortage}
+                            icon={<CheckCircleOutlined />}
+                            onClick={handleSaveClick}
+                            style={{
+                              height: 44,
+                              fontSize: 15,
+                              fontWeight: 600,
+                              boxShadow: hasPrescriptionShortage ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.3)',
+                            }}
+                          >
+                            {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
+                          </Button>
+                        </span>
+                      </Tooltip>
                     )}
                   </div>
                 </Card>
