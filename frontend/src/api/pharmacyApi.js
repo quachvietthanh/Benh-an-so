@@ -17,6 +17,7 @@ const pharmacyApi = {
   updateMedicineStatus: (id, active) => axiosClient.patch(`/medicines/${id}/status`, { active }),
   receiveBatch: (data) => axiosClient.post('/inventory/receipts', data),
   dispense: (id) => axiosClient.post(`/prescriptions/${id}/dispense`),
+  expiryAlerts: (params) => axiosClient.get('/inventory/expiry-alerts', { params }),
 }
 
 export default pharmacyApi
