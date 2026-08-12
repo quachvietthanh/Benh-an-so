@@ -57,7 +57,7 @@ class CreateMedicalRecordServiceTest {
         ));
 
         assertEquals(visitId, result.visitId());
-        verify(accessAuditService).recordRecordAccess(patientId, visitId, result.id(), userId,
+        verify(accessAuditService).recordRecordAccessInCurrentTransaction(patientId, visitId, result.id(), userId,
                 MedicalRecordAccessAction.CREATE, "Medical record created", now);
     }
 }

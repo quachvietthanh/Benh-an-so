@@ -28,7 +28,7 @@ public class GetMedicineService implements GetMedicineUseCase {
         if (medicineId == null) {
             throw new ValidationException("Medicine id is required.");
         }
-        authorizer.requirePharmacist();
+        authorizer.requireReadAccess();
 
         return medicineRepository.findById(medicineId)
                 .map(resultMapper::toResult)

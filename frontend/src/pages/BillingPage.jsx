@@ -1,7 +1,39 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Col, Descriptions, Divider, Empty, Form, Input, List, message, Modal, Popconfirm, Row, Select, Space, Table, Tag, Typography } from 'antd'
-import { CheckCircleOutlined, ClockCircleOutlined, CreditCardOutlined, DollarCircleOutlined, FileTextOutlined, LockOutlined, PrinterOutlined, ReloadOutlined, RightOutlined, SearchOutlined, WarningOutlined } from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Divider,
+  Empty,
+  Form,
+  Input,
+  List,
+  message,
+  Modal,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CreditCardOutlined,
+  DollarCircleOutlined,
+  FileTextOutlined,
+  LockOutlined,
+  PrinterOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  SearchOutlined,
+  WarningOutlined,
+} from '@ant-design/icons'
 import billingApi from '../api/billingApi'
 import pharmacyApi from '../api/pharmacyApi'
 import queueApi from '../api/queueApi'
@@ -29,7 +61,7 @@ function BillingPage() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
 
-  // 1. Phân quyền Lễ tân (RECEPTIONIST) & Admin
+  // 1. Phân quyền vai trò Lễ tân (RECEPTIONIST) & Admin
   const userRoles = useMemo(() => {
     const raw = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
     return raw.map((r) => String(r || '').toLowerCase().replace(/^role_/, '')).filter(Boolean)
@@ -37,7 +69,7 @@ function BillingPage() {
 
   const canCollectPayment = userRoles.includes('receptionist') || userRoles.includes('admin')
 
-  // State lượt khám & thanh toán
+  // State quản lý danh sách & lượt khám
   const [visits, setVisits] = useState([])
   const [selectedVisitId, setSelectedVisitId] = useState(null)
   const [selectedVisitData, setSelectedVisitData] = useState(null)
@@ -50,7 +82,7 @@ function BillingPage() {
   const [apiError, setApiError] = useState('')
   const [viewingInvoiceModal, setViewingInvoiceModal] = useState(null)
 
-  // 2. Tải danh sách Lượt khám (Phân biệt rõ UUID visitId và String visitCode)
+  // 2. Tải danh sách lượt khám (Ưu tiên API /invoices/payable và /queues)
   const loadVisits = useCallback(async () => {
     setLoadingVisits(true)
     setApiError('')
@@ -73,30 +105,16 @@ function BillingPage() {
         queueList = Array.isArray(data) ? data : []
       }
 
+      // Hợp nhất danh sách ưu tiên lượt khám hoàn thành
       const mergedMap = new Map()
       queueList.forEach((q) => {
         const id = q.visitId || q.id
-        if (id) {
-          mergedMap.set(String(id), {
-            ...q,
-            visitId: id, // UUID thực sự
-            visitCode: q.visitCode || q.queueCode || '—',
-          })
-        }
+        mergedMap.set(String(id), { ...q, visitId: id })
       })
-
       payableList.forEach((p) => {
         const id = p.visitId || p.id
-        if (id) {
-          const existing = mergedMap.get(String(id)) || {}
-          mergedMap.set(String(id), {
-            ...existing,
-            ...p,
-            visitId: id, // UUID thực sự
-            visitCode: p.visitCode || existing.visitCode || '—',
-            status: 'COMPLETED',
-          })
-        }
+        const existing = mergedMap.get(String(id))
+        mergedMap.set(String(id), { ...existing, ...p, visitId: id, status: 'COMPLETED' })
       })
 
       const finalVisits = Array.from(mergedMap.values())
@@ -107,32 +125,29 @@ function BillingPage() {
       }
     } catch (err) {
       console.error('[BillingPage] Lỗi loadVisits:', err)
-      setApiError('Không thể tải danh sách lượt khám. Vui lòng thử lại.')
+      setApiError('Không thể tải thông tin thanh toán. Vui lòng thử lại.')
     } finally {
       setLoadingVisits(false)
     }
   }, [location.state])
 
-  // 3. Tải chi tiết khoản thu & đơn thuốc theo đúng contract Backend (Status-based prescription query)
-  const loadInvoiceData = useCallback(async (vUUID) => {
-    if (!vUUID) {
+  // 3. Tải dữ liệu Thu phí & Đơn thuốc từ Backend API
+  const loadInvoiceData = useCallback(async (visitId) => {
+    if (!visitId) {
       setSelectedVisitData(null)
       return
     }
     setLoadingData(true)
     setApiError('')
 
-    const matchedVisit = visits.find((v) => String(v.visitId) === String(vUUID) || String(v.id) === String(vUUID))
-    const visitUUID = matchedVisit?.visitId || vUUID
-    const visitCode = matchedVisit?.visitCode || matchedVisit?.queueCode || '—'
+    const matchedVisit = visits.find((v) => String(v.visitId || v.id) === String(visitId))
     const visitStatus = matchedVisit?.status || 'IN_PROGRESS'
     const isVisitCompleted = visitStatus === 'COMPLETED' || visitStatus === 'WAITING_FOR_PAYMENT'
 
     try {
-      const [invoiceRes, pendingRxRes, dispensedRxRes] = await Promise.allSettled([
-        billingApi.getByVisit(visitUUID),
-        pharmacyApi.prescriptions({ status: 'PENDING_DISPENSE', size: 100 }),
-        pharmacyApi.prescriptions({ status: 'DISPENSED', size: 100 }),
+      const [invoiceRes, visitRes] = await Promise.allSettled([
+        billingApi.getByVisit(visitId),
+        pharmacyApi.prescriptions({ visitId, size: 50 }),
       ])
 
       let invoiceData = null
@@ -142,49 +157,36 @@ function BillingPage() {
         invoiceData = list.find((i) => i && i.id) || null
       }
 
-      // Tổng hợp đơn thuốc của lượt khám này theo UUID visitId hoặc visitCode
-      let allPrescriptions = []
-      if (pendingRxRes.status === 'fulfilled') {
-        const raw = pendingRxRes.value?.data
-        const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
-        allPrescriptions.push(...list)
-      }
-      if (dispensedRxRes.status === 'fulfilled') {
-        const raw = dispensedRxRes.value?.data
-        const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
-        allPrescriptions.push(...list)
-      }
-
-      const matchingRx = allPrescriptions.filter((p) =>
-        String(p.visitId) === String(visitUUID) || String(p.visitCode) === String(visitCode),
-      )
-
       let prescriptionItems = []
       let prescriptionStatus = null
-      if (matchingRx.length > 0) {
-        prescriptionStatus = matchingRx[0].status
-        prescriptionItems = matchingRx.flatMap((p) => (Array.isArray(p.items) ? p.items : []))
+      if (visitRes.status === 'fulfilled') {
+        const raw = visitRes.value?.data
+        const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
+        if (list.length > 0) {
+          prescriptionStatus = list[0]?.status
+          prescriptionItems = list.flatMap((p) => (Array.isArray(p.items) ? p.items : []))
+        }
       }
 
       const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
 
-      const examFee = Number(invoiceData?.examFee || 100000)
-      const medicineFee = Number(
-        invoiceData?.medicineFee ||
-        prescriptionItems.reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || i.price || 0), 0),
+      // Tính tiền thuốc thực tế từ đơn thuốc đã cấp phát Backend
+      const medicineFee = prescriptionItems.reduce(
+        (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || item.price || 0)),
+        0,
       )
+      const examFee = Number(invoiceData?.examFee || 100000)
       const totalAmount = Number(invoiceData?.totalAmount || examFee + medicineFee)
 
       setSelectedVisitData({
-        visitId: visitUUID, // UUID chuẩn gửi Backend
+        visitId,
         paymentId: invoiceData?.paymentId || invoiceData?.id || null,
-        visitCode,
+        visitCode: matchedVisit?.visitCode || matchedVisit?.queueCode || invoiceData?.visitCode || visitId,
         patientName: matchedVisit?.patientName || invoiceData?.patientName || 'Bệnh nhân',
         patientCode: matchedVisit?.patientCode || invoiceData?.patientCode || '—',
         doctorName: matchedVisit?.doctorName || invoiceData?.doctorName || 'Bác sĩ khám',
         visitStatus,
         prescriptionStatus,
-        hasPrescription: matchingRx.length > 0,
         isVisitCompleted,
         isDispensingCompleted,
         isEligibleToPay: isVisitCompleted && isDispensingCompleted,
@@ -221,9 +223,9 @@ function BillingPage() {
     )
   }, [visits, searchKeyword])
 
-  // 4. Ghi nhận thanh toán (Gửi đúng RecordPaymentRequest DTO với UUID visitId)
+  // 4. Ghi nhận thanh toán (POST /invoices/payments) theo đúng RecordPaymentRequest DTO
   const handleConfirmPayment = async () => {
-    if (!selectedVisitData || !selectedVisitData.visitId) return
+    if (!selectedVisitData || !selectedVisitId) return
     if (!canCollectPayment) {
       message.error('Bạn không có quyền thực hiện thu phí.')
       return
@@ -237,7 +239,7 @@ function BillingPage() {
     setApiError('')
     try {
       const payload = {
-        visitId: selectedVisitData.visitId, // Bắt buộc UUID
+        visitId: selectedVisitId,
         examFee: selectedVisitData.examFee,
         medicineFee: selectedVisitData.medicineFee,
         amountPaid: selectedVisitData.totalAmount,
@@ -248,30 +250,27 @@ function BillingPage() {
       const paymentRes = res?.data
 
       message.success(`Đã thu thành công ${money(selectedVisitData.totalAmount)} cho lượt khám ${selectedVisitData.visitCode}!`)
-      await loadInvoiceData(selectedVisitData.visitId)
+      await loadInvoiceData(selectedVisitId)
       await loadVisits()
     } catch (err) {
       console.error('[BillingPage] Lỗi payment:', err?.config?.url, err?.response?.status, err?.response?.data)
       const status = err?.response?.status
       const msg = err?.response?.data?.message
 
-      if (status === 404) {
-        setApiError('Không tìm thấy dữ liệu thanh toán hoặc lượt khám không tồn tại trên hệ thống (404).')
-      } else if (status === 409) {
-        setApiError('Khoản thu đã được xử lý hoặc trạng thái lượt khám đã thay đổi (409).')
+      if (status === 403) setApiError('Bạn không có quyền thực hiện thu phí.')
+      else if (status === 409) {
+        setApiError('Khoản thu này đã được thanh toán.')
         message.warning('Khoản thu này đã được thanh toán.')
-        await loadInvoiceData(selectedVisitData.visitId)
-      } else if (status === 403) {
-        setApiError('Bạn không có quyền thực hiện thu phí.')
+        await loadInvoiceData(selectedVisitId)
       } else {
-        setApiError(msg || 'Không thể xử lý thanh toán. Vui lòng thử lại.')
+        setApiError(msg || 'Không thể tải thông tin thanh toán. Vui lòng thử lại.')
       }
     } finally {
       setSubmittingPayment(false)
     }
   }
 
-  // 5. Lập hóa đơn sau khi thanh toán PAID (Gửi CreateInvoiceRequest DTO)
+  // 5. Lập hóa đơn sau khi thanh toán thành công (POST /invoices) theo CreateInvoiceRequest DTO
   const handleCreateInvoice = async () => {
     if (!selectedVisitData) return
     if (selectedVisitData.paymentStatus !== 'PAID') {
@@ -298,7 +297,7 @@ function BillingPage() {
         setApiError('Lượt khám đã có hóa đơn.')
         message.warning('Lượt khám đã có hóa đơn.')
       } else {
-        setApiError('Không thể tạo hóa đơn điện tử. Vui lòng thử lại.')
+        setApiError('Không thể tải thông tin thanh toán. Vui lòng thử lại.')
       }
     } finally {
       setSubmittingInvoice(false)
@@ -314,7 +313,7 @@ function BillingPage() {
 
   const feeDataSource = selectedVisitData ? [
     { key: 'exam', name: 'Phí khám bệnh', quantity: 1, price: selectedVisitData.examFee, amount: selectedVisitData.examFee },
-    { key: 'med', name: selectedVisitData.hasPrescription ? `Tiền thuốc kê đơn (${selectedVisitData.prescriptionItems.length} loại)` : 'Tiền thuốc (Không có đơn thuốc)', quantity: selectedVisitData.prescriptionItems.length || 0, price: selectedVisitData.medicineFee, amount: selectedVisitData.medicineFee },
+    { key: 'med', name: `Tiền thuốc kê đơn (${selectedVisitData.prescriptionItems.length} loại)`, quantity: selectedVisitData.prescriptionItems.length || 0, price: selectedVisitData.medicineFee, amount: selectedVisitData.medicineFee },
   ] : []
 
   return (
@@ -337,7 +336,7 @@ function BillingPage() {
           showIcon
           icon={<LockOutlined />}
           message="Bạn không có quyền thực hiện thu phí."
-          description="Chức năng dành riêng cho tài khoản Lễ tân (RECEPTIONIST) hoặc Quản trị viên (ADMIN)."
+          description="Chức năng chỉ dành riêng cho tài khoản Lễ tân (RECEPTIONIST) hoặc Quản trị viên (ADMIN)."
           style={{ marginBottom: 16 }}
         />
       )}
@@ -346,7 +345,7 @@ function BillingPage() {
         <Alert
           type="error"
           showIcon
-          message="Thông báo từ hệ thống"
+          message="Không thể tải thông tin thanh toán. Vui lòng thử lại."
           description={apiError}
           action={<Button size="small" onClick={loadVisits}>Thử lại</Button>}
           style={{ marginBottom: 16 }}
@@ -391,9 +390,9 @@ function BillingPage() {
                     <List.Item.Meta
                       title={(
                         <Space wrap>
-                          <Text strong>{item.visitCode || item.queueCode || '—'}</Text>
+                          <Text strong>{item.visitCode || item.queueCode || vId}</Text>
                           {isCompleted ? (
-                            <Tag color="green">Đã khám xong</Tag>
+                            <Tag color="green">Đã hoàn thành khám</Tag>
                           ) : (
                             <Tag color="orange" icon={<WarningOutlined />}>Đang khám ({item.status})</Tag>
                           )}
@@ -422,14 +421,14 @@ function BillingPage() {
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
                 {/* 1. Thông tin lượt khám Read-Only */}
                 <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>1. Thông tin lượt khám (Read-only)</Title>
+                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>1. Thông tin lượt khám &amp; Trạng thái (Read-only)</Title>
                   <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
                     <Descriptions.Item label="Mã lượt khám"><Text strong>{selectedVisitData.visitCode}</Text></Descriptions.Item>
                     <Descriptions.Item label="Bệnh nhân"><Text strong style={{ color: '#1677ff' }}>{selectedVisitData.patientName}</Text> ({selectedVisitData.patientCode})</Descriptions.Item>
                     <Descriptions.Item label="Bác sĩ khám">{selectedVisitData.doctorName}</Descriptions.Item>
                     <Descriptions.Item label="Trạng thái lượt khám">
                       {selectedVisitData.isVisitCompleted ? (
-                        <Tag color="green">Đã khám xong ({selectedVisitData.visitStatus})</Tag>
+                        <Tag color="green">Đã hoàn thành khám ({selectedVisitData.visitStatus})</Tag>
                       ) : (
                         <Tag color="orange" icon={<WarningOutlined />}>Đang khám ({selectedVisitData.visitStatus})</Tag>
                       )}
@@ -453,16 +452,30 @@ function BillingPage() {
                   </Descriptions>
                 </div>
 
+                {/* Kiểm tra điều kiện nghiệp vụ Backend */}
                 {!selectedVisitData.isVisitCompleted && (
-                  <Alert type="warning" showIcon icon={<WarningOutlined />} message="Lượt khám chưa đủ điều kiện thanh toán." description="Lượt khám đang ở trạng thái IN_PROGRESS. Chỉ lượt khám COMPLETED mới được ghi nhận thanh toán." />
+                  <Alert
+                    type="warning"
+                    showIcon
+                    icon={<WarningOutlined />}
+                    message="Lượt khám chưa đủ điều kiện thanh toán."
+                    description="Lượt khám đang ở trạng thái IN_PROGRESS (chưa hoàn tất khám bệnh). Backend quy định chỉ các lượt khám COMPLETED mới được ghi nhận thanh toán."
+                  />
                 )}
 
                 {selectedVisitData.isVisitCompleted && !selectedVisitData.isDispensingCompleted && (
-                  <Alert type="warning" showIcon icon={<ClockCircleOutlined />} message="Thuốc chưa được cấp phát." description="Đơn thuốc đang ở trạng thái PENDING_DISPENSE. Dược sĩ cần xuất kho cấp thuốc trước khi Lễ tân thu phí." />
+                  <Alert
+                    type="warning"
+                    showIcon
+                    icon={<ClockCircleOutlined />}
+                    message="Thuốc chưa được cấp phát."
+                    description="Đơn thuốc của lượt khám này đang ở trạng thái PENDING_DISPENSE. Dược sĩ cần thực hiện xuất kho cấp thuốc trước khi Lễ tân thu phí."
+                  />
                 )}
 
                 <Divider style={{ margin: '4px 0' }} />
 
+                {/* 2. Chi tiết các khoản phải thu */}
                 <div>
                   <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>2. Chi tiết các khoản phải thu (Nguồn từ Backend)</Title>
                   <Table rowKey="key" columns={feeColumns} dataSource={feeDataSource} pagination={false} size="small" loading={loadingData} />
@@ -478,17 +491,30 @@ function BillingPage() {
 
                 <Divider style={{ margin: '4px 0' }} />
 
+                {/* 3. Ghi nhận thanh toán */}
                 <div>
                   <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>3. Ghi nhận thanh toán (NCL-07-CN-001)</Title>
                   {selectedVisitData.paymentStatus === 'PAID' ? (
-                    <Alert type="success" showIcon icon={<CheckCircleOutlined />} message="Khoản thu này đã được thanh toán thành công." description={`Mã HĐ/Thanh toán: ${selectedVisitData.invoiceCode || 'HD-PAID'} | Người thu: ${selectedVisitData.collectedBy} | Thời gian: ${formatDateTime(selectedVisitData.paidAt)}`} />
+                    <Alert
+                      type="success"
+                      showIcon
+                      icon={<CheckCircleOutlined />}
+                      message="Khoản thu này đã được thanh toán thành công."
+                      description={`Mã HĐ/Thanh toán: ${selectedVisitData.invoiceCode || 'HD-PAID'} | Người thu: ${selectedVisitData.collectedBy} | Thời gian: ${formatDateTime(selectedVisitData.paidAt)}`}
+                    />
                   ) : (
                     <Card style={{ backgroundColor: '#f0f7ff', borderColor: '#bae6fd' }}>
                       <Row gutter={[16, 16]} align="middle">
                         <Col xs={24} md={14}>
                           <Form layout="vertical">
                             <Form.Item label={<strong>Phương thức thanh toán *</strong>} style={{ marginBottom: 0 }}>
-                              <Select value={paymentMethod} onChange={setPaymentMethod} options={PAYMENT_METHODS} size="large" disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment} />
+                              <Select
+                                value={paymentMethod}
+                                onChange={setPaymentMethod}
+                                options={PAYMENT_METHODS}
+                                size="large"
+                                disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                              />
                             </Form.Item>
                           </Form>
                         </Col>
@@ -501,7 +527,14 @@ function BillingPage() {
                             onConfirm={handleConfirmPayment}
                             disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment || selectedVisitData.paymentStatus === 'PAID'}
                           >
-                            <Button type="primary" size="large" icon={<CreditCardOutlined />} loading={submittingPayment} disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment || selectedVisitData.paymentStatus === 'PAID'} style={{ height: 42, padding: '0 20px', fontWeight: 600 }}>
+                            <Button
+                              type="primary"
+                              size="large"
+                              icon={<CreditCardOutlined />}
+                              loading={submittingPayment}
+                              disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment || selectedVisitData.paymentStatus === 'PAID'}
+                              style={{ height: 42, padding: '0 20px', fontWeight: 600 }}
+                            >
                               Xác nhận thanh toán
                             </Button>
                           </Popconfirm>
@@ -513,6 +546,7 @@ function BillingPage() {
 
                 <Divider style={{ margin: '4px 0' }} />
 
+                {/* 4. Giao diện Hóa đơn điện tử */}
                 <div>
                   <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>4. Giao diện Hóa đơn điện tử (NCL-07-CN-002)</Title>
                   {selectedVisitData.paymentStatus !== 'PAID' ? (
@@ -520,11 +554,20 @@ function BillingPage() {
                   ) : (
                     <Space wrap>
                       {selectedVisitData.invoiceCode ? (
-                        <Button type="primary" icon={<FileTextOutlined />} onClick={() => setViewingInvoiceModal(selectedVisitData)}>
+                        <Button
+                          type="primary"
+                          icon={<FileTextOutlined />}
+                          onClick={() => setViewingInvoiceModal(selectedVisitData)}
+                        >
                           Xem &amp; In hóa đơn điện tử ({selectedVisitData.invoiceCode})
                         </Button>
                       ) : (
-                        <Button type="primary" icon={<FileTextOutlined />} loading={submittingInvoice} onClick={handleCreateInvoice}>
+                        <Button
+                          type="primary"
+                          icon={<FileTextOutlined />}
+                          loading={submittingInvoice}
+                          onClick={handleCreateInvoice}
+                        >
                           Lập hóa đơn điện tử
                         </Button>
                       )}
