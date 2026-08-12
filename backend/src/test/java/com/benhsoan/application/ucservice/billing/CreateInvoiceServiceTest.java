@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.billing.Invoice;
@@ -98,6 +99,49 @@ class CreateInvoiceServiceTest {
     }
 
     @Test
+    void createsOriginalInvoiceWithSingleNonZeroChargeLine() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
+        InvoiceCodeGenerator invoiceCodeGenerator = mock(InvoiceCodeGenerator.class);
+
+        CreateInvoiceService service = new CreateInvoiceService(
+                paymentRepository,
+                invoiceRepository,
+                invoiceCodeGenerator,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper()
+        );
+
+        UUID visitId = UUID.randomUUID();
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                visitId,
+                new BigDecimal("100000"),
+                BigDecimal.ZERO,
+                new BigDecimal("100000"),
+                new BigDecimal("100000"),
+                PaymentMethod.CASH,
+                PaymentStatus.SUCCESS,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-12T01:00:00Z"),
+                Instant.parse("2026-08-12T01:00:00Z")
+        );
+
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.of(payment));
+        when(invoiceRepository.findOriginalByVisitId(visitId)).thenReturn(Optional.empty());
+        when(invoiceCodeGenerator.generate()).thenReturn("HD000012");
+        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InvoiceResult result = service.create(new CreateInvoiceCommand(visitId, null));
+
+        assertEquals(1, result.lines().size());
+        assertEquals("EXAM_FEE", result.lines().get(0).lineType().name());
+        assertEquals(new BigDecimal("100000"), result.totalAmount());
+    }
+
+    @Test
     void rejectsWhenPaymentDoesNotExist() {
         PaymentRepository paymentRepository = mock(PaymentRepository.class);
         when(paymentRepository.findByVisitId(any())).thenReturn(Optional.empty());
@@ -145,6 +189,64 @@ class CreateInvoiceServiceTest {
     }
 
     @Test
+    void mapsDuplicateInvoicePersistenceConflictToBusinessConflict() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
+        InvoiceCodeGenerator invoiceCodeGenerator = mock(InvoiceCodeGenerator.class);
+
+        CreateInvoiceService service = new CreateInvoiceService(
+                paymentRepository,
+                invoiceRepository,
+                invoiceCodeGenerator,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper()
+        );
+
+        Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
+        when(paymentRepository.findById(payment.getId())).thenReturn(Optional.of(payment));
+        when(invoiceRepository.findOriginalByVisitId(payment.getVisitId())).thenReturn(Optional.empty());
+        when(invoiceCodeGenerator.generate()).thenReturn("HD000013");
+        when(invoiceRepository.save(any(Invoice.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key uk_invoices_payment"));
+
+        assertThrows(
+                InvoiceAlreadyIssuedException.class,
+                () -> service.create(new CreateInvoiceCommand(null, payment.getId()))
+        );
+    }
+
+    @Test
+    void rethrowsUnrelatedPersistenceIntegrityError() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
+        InvoiceCodeGenerator invoiceCodeGenerator = mock(InvoiceCodeGenerator.class);
+
+        CreateInvoiceService service = new CreateInvoiceService(
+                paymentRepository,
+                invoiceRepository,
+                invoiceCodeGenerator,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper()
+        );
+
+        Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
+        when(paymentRepository.findById(payment.getId())).thenReturn(Optional.of(payment));
+        when(invoiceRepository.findOriginalByVisitId(payment.getVisitId())).thenReturn(Optional.empty());
+        when(invoiceCodeGenerator.generate()).thenReturn("HD000014");
+        when(invoiceRepository.save(any(Invoice.class)))
+                .thenThrow(new DataIntegrityViolationException("fk_invoices_created_by"));
+
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> service.create(new CreateInvoiceCommand(null, payment.getId()))
+        );
+    }
+
+    @Test
     void rejectsInvalidCommandWithoutVisitOrPaymentId() {
         CreateInvoiceService service = new CreateInvoiceService(
                 mock(PaymentRepository.class),
@@ -159,6 +261,32 @@ class CreateInvoiceServiceTest {
         assertThrows(
                 ValidationException.class,
                 () -> service.create(new CreateInvoiceCommand(null, null))
+        );
+    }
+
+    @Test
+    void rejectsWhenVisitIdDoesNotMatchPaymentId() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
+        InvoiceCodeGenerator invoiceCodeGenerator = mock(InvoiceCodeGenerator.class);
+
+        CreateInvoiceService service = new CreateInvoiceService(
+                paymentRepository,
+                invoiceRepository,
+                invoiceCodeGenerator,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper()
+        );
+
+        UUID paymentVisitId = UUID.randomUUID();
+        Payment payment = payment(paymentVisitId, PaymentStatus.SUCCESS);
+        when(paymentRepository.findById(payment.getId())).thenReturn(Optional.of(payment));
+
+        assertThrows(
+                ValidationException.class,
+                () -> service.create(new CreateInvoiceCommand(UUID.randomUUID(), payment.getId()))
         );
     }
 

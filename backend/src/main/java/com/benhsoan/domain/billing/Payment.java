@@ -88,6 +88,9 @@ public class Payment {
         BigDecimal validatedExamFee = validateNonNegative(examFee, "Exam fee is required.");
         BigDecimal validatedMedicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
         BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee);
+        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidationException("Payment total amount must be greater than zero.");
+        }
 
         return new Payment(
                 id,

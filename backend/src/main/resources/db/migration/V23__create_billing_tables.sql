@@ -1,6 +1,9 @@
 -- =====================================================
 -- V23__create_billing_tables.sql
 -- Billing schema for payments and invoices
+-- Payment status constraint is intentionally aligned with
+-- PaymentStatus enum in code:
+-- RECORDED, SUCCESS, REFUNDED, CANCELLED
 -- =====================================================
 
 -- ===========================
@@ -61,7 +64,14 @@ CREATE TABLE payments (
         ),
 
     CONSTRAINT chk_payments_status
-        CHECK (status IN ('RECORDED', 'SUCCESS', 'REFUNDED', 'CANCELLED')),
+        CHECK (
+            status IN (
+                'RECORDED',
+                'SUCCESS',
+                'REFUNDED',
+                'CANCELLED'
+            )
+        ),
 
     CONSTRAINT chk_payments_created_at
         CHECK (created_at <= paid_at)

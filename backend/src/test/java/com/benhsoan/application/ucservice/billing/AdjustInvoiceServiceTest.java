@@ -211,6 +211,36 @@ class AdjustInvoiceServiceTest {
         );
     }
 
+    @Test
+    void rejectsWhenAdjustmentUnitPriceIsZero() {
+        InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
+        Invoice originalInvoice = originalInvoice();
+        when(invoiceRepository.findById(originalInvoice.getId())).thenReturn(Optional.of(originalInvoice));
+
+        AdjustInvoiceService service = new AdjustInvoiceService(
+                invoiceRepository,
+                mock(AdjustmentInvoiceCodeGenerator.class),
+                adminCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper()
+        );
+
+        assertThrows(
+                ValidationException.class,
+                () -> service.adjust(new AdjustInvoiceCommand(
+                        originalInvoice.getId(),
+                        "Ly do",
+                        List.of(new AdjustmentInvoiceLineCommand(
+                                "Dong loi",
+                                null,
+                                1,
+                                BigDecimal.ZERO
+                        ))
+                ))
+        );
+    }
+
     private static AdjustInvoiceCommand command(UUID originalInvoiceId, String reason) {
         return new AdjustInvoiceCommand(
                 originalInvoiceId,

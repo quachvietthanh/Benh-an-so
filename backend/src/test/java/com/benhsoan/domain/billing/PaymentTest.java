@@ -84,6 +84,26 @@ class PaymentTest {
     }
 
     @Test
+    @DisplayName("record should reject zero total payment")
+    void recordShouldRejectZeroTotalPayment() {
+        assertThrows(
+                ValidationException.class,
+                () -> Payment.record(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        PaymentMethod.CASH,
+                        UUID.randomUUID(),
+                        Instant.parse("2026-08-11T03:00:00Z"),
+                        VisitStatus.COMPLETED,
+                        true
+                )
+        );
+    }
+
+    @Test
     @DisplayName("refund should mark a recorded payment as refunded")
     void refundShouldMarkPaymentAsRefunded() {
         Payment payment = Payment.restore(

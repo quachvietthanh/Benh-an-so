@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,7 +82,15 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 true
         );
 
-        Payment saved = paymentRepository.save(payment);
+        Payment saved;
+        try {
+            saved = paymentRepository.save(payment);
+        } catch (DataIntegrityViolationException ex) {
+            if (isDuplicatePaymentConflict(ex)) {
+                throw new PaymentAlreadyExistsException(visit.getId());
+            }
+            throw ex;
+        }
 
         auditLogRepository.save(AuditLog.create(
                 actorId,
@@ -135,5 +144,24 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                     "Payment cannot be recorded before dispensing is completed."
             );
         }
+    }
+
+    private boolean isDuplicatePaymentConflict(DataIntegrityViolationException ex) {
+        String message = extractMessage(ex).toLowerCase();
+        return message.contains("uk_payments_visit")
+                || message.contains("duplicate entry")
+                && message.contains("visit_id");
+    }
+
+    private String extractMessage(Throwable throwable) {
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append(' ');
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
     }
 }

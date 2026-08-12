@@ -37,6 +37,14 @@ public interface JpaInvoiceRepository
             left join PaymentEntity payment on payment.visitId = visit.id
             where visit.status = com.benhsoan.domain.visit.enums.VisitStatus.COMPLETED
               and payment.id is null
+              and not exists (
+                  select 1
+                  from MedicalRecordEntity medicalRecord
+                  join PrescriptionEntity prescription
+                    on prescription.medicalRecordId = medicalRecord.id
+                  where medicalRecord.visitId = visit.id
+                    and prescription.status = com.benhsoan.domain.prescription.enums.PrescriptionStatus.PENDING_DISPENSE
+              )
             order by visit.completedAt desc
             """)
     Page<PayableEncounterProjection> findPayableEncounters(Pageable pageable);

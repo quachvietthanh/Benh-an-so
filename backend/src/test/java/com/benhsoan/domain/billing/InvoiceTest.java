@@ -18,6 +18,7 @@ import com.benhsoan.domain.billing.exception.InvoiceAdjustmentReasonRequiredExce
 import com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException;
 import com.benhsoan.domain.billing.exception.InvoiceUnauthorizedAdjustmentException;
 import com.benhsoan.domain.billing.exception.PaymentRequiredForInvoiceException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 
 @DisplayName("Invoice Domain Tests")
 class InvoiceTest {
@@ -150,6 +151,25 @@ class InvoiceTest {
                         Instant.parse("2026-08-11T04:00:00Z"),
                         List.of(line(invoiceId, InvoiceLineType.ADJUSTMENT, "Adjustment", 1, "50000")),
                         false
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("invoice line should reject zero unit price")
+    void invoiceLineShouldRejectZeroUnitPrice() {
+        assertThrows(
+                ValidationException.class,
+                () -> InvoiceLine.create(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        InvoiceLineType.ADJUSTMENT,
+                        "Adjustment",
+                        null,
+                        1,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        Instant.parse("2026-08-11T04:00:00Z")
                 )
         );
     }

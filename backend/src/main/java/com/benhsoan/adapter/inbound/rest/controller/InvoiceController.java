@@ -66,7 +66,7 @@ public class InvoiceController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
     @CheckPermission(Permission.INVOICE_CREATE)
-    public InvoiceResponse createInvoice(@RequestBody CreateInvoiceRequest request) {
+    public InvoiceResponse createInvoice(@Valid @RequestBody CreateInvoiceRequest request) {
         return mapper.toResponse(createInvoiceUseCase.create(mapper.toCommand(request)));
     }
 

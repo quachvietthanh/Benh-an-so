@@ -55,7 +55,7 @@ public class InvoiceLine {
         this.itemName = requireText(itemName, "Invoice line item name is required.");
         this.referenceId = referenceId;
         this.quantity = validateQuantity(quantity);
-        this.unitPrice = validateMoney(unitPrice, "Invoice line unit price is required.");
+        this.unitPrice = validateUnitPrice(unitPrice);
         this.amount = validateAmount(amount, this.unitPrice, this.quantity);
         this.createdAt = requireNonNull(createdAt, "Invoice line creation time is required.");
     }
@@ -109,6 +109,14 @@ public class InvoiceLine {
             throw new ValidationException(message);
         }
         return value;
+    }
+
+    private static BigDecimal validateUnitPrice(BigDecimal value) {
+        BigDecimal validated = validateMoney(value, "Invoice line unit price is required.");
+        if (validated.compareTo(BigDecimal.ZERO) == 0) {
+            throw new ValidationException("Invoice line unit price must not be zero.");
+        }
+        return validated;
     }
 
     private static String requireText(String value, String message) {

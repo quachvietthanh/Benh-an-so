@@ -1,12 +1,14 @@
 package com.benhsoan.application.ucservice.billing;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
@@ -46,45 +48,13 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
     @Override
     public InvoiceResult create(CreateInvoiceCommand command) {
         ensureAuthorized();
-        validateCommand(command);
-
         Payment payment = resolvePayment(command);
-
-        invoiceRepository.findOriginalByVisitId(payment.getVisitId())
-                .ifPresent(existing -> {
-                    throw new com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException(
-                            payment.getVisitId()
-                    );
-                });
 
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
         UUID invoiceId = UUID.randomUUID();
 
-        List<InvoiceLine> lines = List.of(
-                InvoiceLine.create(
-                        UUID.randomUUID(),
-                        invoiceId,
-                        InvoiceLineType.EXAM_FEE,
-                        "Phi kham",
-                        payment.getVisitId(),
-                        1,
-                        payment.getExamFee(),
-                        payment.getExamFee(),
-                        now
-                ),
-                InvoiceLine.create(
-                        UUID.randomUUID(),
-                        invoiceId,
-                        InvoiceLineType.MEDICINE_FEE,
-                        "Tien thuoc",
-                        payment.getId(),
-                        1,
-                        payment.getMedicineFee(),
-                        payment.getMedicineFee(),
-                        now
-                )
-        );
+        List<InvoiceLine> lines = buildInvoiceLines(payment, invoiceId, now);
 
         boolean paymentRecorded = payment.getStatus() == PaymentStatus.RECORDED
                 || payment.getStatus() == PaymentStatus.SUCCESS;
@@ -101,7 +71,17 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
                 false
         );
 
-        Invoice saved = invoiceRepository.save(invoice);
+        Invoice saved;
+        try {
+            saved = invoiceRepository.save(invoice);
+        } catch (DataIntegrityViolationException ex) {
+            if (isDuplicateOriginalInvoiceConflict(ex)) {
+                throw new com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException(
+                        payment.getVisitId()
+                );
+            }
+            throw ex;
+        }
 
         auditLogRepository.save(
                 AuditLog.create(
@@ -136,22 +116,103 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
         }
     }
 
-    private void validateCommand(CreateInvoiceCommand command) {
+    private Payment resolvePayment(CreateInvoiceCommand command) {
         boolean hasVisitId = command.visitId() != null;
         boolean hasPaymentId = command.paymentId() != null;
 
         if (!hasVisitId && !hasPaymentId) {
             throw new ValidationException("Either visit id or payment id is required.");
         }
-    }
 
-    private Payment resolvePayment(CreateInvoiceCommand command) {
         if (command.paymentId() != null) {
-            return paymentRepository.findById(command.paymentId())
+            Payment payment = paymentRepository.findById(command.paymentId())
                     .orElseThrow(() -> new PaymentNotFoundException(command.paymentId()));
+
+            if (hasVisitId && !payment.getVisitId().equals(command.visitId())) {
+                throw new ValidationException("visitId does not match paymentId.");
+            }
+
+            invoiceRepository.findOriginalByVisitId(payment.getVisitId())
+                    .ifPresent(existing -> {
+                        throw new com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException(
+                                payment.getVisitId()
+                        );
+                    });
+
+            return payment;
         }
 
-        return paymentRepository.findByVisitId(command.visitId())
+        Payment payment = paymentRepository.findByVisitId(command.visitId())
                 .orElseThrow(() -> new PaymentNotFoundException(command.visitId(), true));
+
+        invoiceRepository.findOriginalByVisitId(payment.getVisitId())
+                .ifPresent(existing -> {
+                    throw new com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException(
+                            payment.getVisitId()
+                    );
+                });
+
+        return payment;
+    }
+
+    private List<InvoiceLine> buildInvoiceLines(
+            Payment payment,
+            UUID invoiceId,
+            Instant now
+    ) {
+        List<InvoiceLine> lines = new ArrayList<>();
+
+        if (payment.getExamFee().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            lines.add(InvoiceLine.create(
+                    UUID.randomUUID(),
+                    invoiceId,
+                    InvoiceLineType.EXAM_FEE,
+                    "Phi kham",
+                    payment.getVisitId(),
+                    1,
+                    payment.getExamFee(),
+                    payment.getExamFee(),
+                    now
+            ));
+        }
+
+        if (payment.getMedicineFee().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            lines.add(InvoiceLine.create(
+                    UUID.randomUUID(),
+                    invoiceId,
+                    InvoiceLineType.MEDICINE_FEE,
+                    "Tien thuoc",
+                    payment.getId(),
+                    1,
+                    payment.getMedicineFee(),
+                    payment.getMedicineFee(),
+                    now
+            ));
+        }
+
+        if (lines.isEmpty()) {
+            throw new ValidationException("Invoice must contain at least one non-zero charge line.");
+        }
+
+        return List.copyOf(lines);
+    }
+
+    private boolean isDuplicateOriginalInvoiceConflict(DataIntegrityViolationException ex) {
+        String message = extractMessage(ex).toLowerCase();
+        return message.contains("uk_invoices_payment")
+                || message.contains("duplicate entry")
+                && message.contains("payment_id");
+    }
+
+    private String extractMessage(Throwable throwable) {
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append(' ');
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
     }
 }

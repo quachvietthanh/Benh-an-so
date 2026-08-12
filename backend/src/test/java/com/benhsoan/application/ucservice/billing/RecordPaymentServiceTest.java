@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.billing.Payment;
@@ -192,6 +193,60 @@ class RecordPaymentServiceTest {
     }
 
     @Test
+    void mapsDuplicatePaymentPersistenceConflictToBusinessConflict() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        UUID visitId = UUID.randomUUID();
+
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(completedVisit(visitId)));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key uk_payments_visit"));
+
+        RecordPaymentService service = service(
+                visitRepository,
+                mock(MedicalRecordRepository.class),
+                mock(PrescriptionRepository.class),
+                paymentRepository,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class)
+        );
+
+        assertThrows(
+                PaymentAlreadyExistsException.class,
+                () -> service.record(command(visitId, "100000", "150000", "250000"))
+        );
+    }
+
+    @Test
+    void rethrowsUnrelatedPaymentPersistenceIntegrityError() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        UUID visitId = UUID.randomUUID();
+
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(completedVisit(visitId)));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class)))
+                .thenThrow(new DataIntegrityViolationException("fk_payments_collected_by"));
+
+        RecordPaymentService service = service(
+                visitRepository,
+                mock(MedicalRecordRepository.class),
+                mock(PrescriptionRepository.class),
+                paymentRepository,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class)
+        );
+
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> service.record(command(visitId, "100000", "150000", "250000"))
+        );
+    }
+
+    @Test
     void rejectsAmountMismatch() {
         VisitRepository visitRepository = mock(VisitRepository.class);
         PaymentRepository paymentRepository = mock(PaymentRepository.class);
@@ -213,6 +268,31 @@ class RecordPaymentServiceTest {
         assertThrows(
                 PaymentAmountMismatchException.class,
                 () -> service.record(command(visitId, "100000", "150000", "200000"))
+        );
+    }
+
+    @Test
+    void rejectsZeroTotalAmount() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        UUID visitId = UUID.randomUUID();
+
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(completedVisit(visitId)));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+
+        RecordPaymentService service = service(
+                visitRepository,
+                mock(MedicalRecordRepository.class),
+                mock(PrescriptionRepository.class),
+                paymentRepository,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class)
+        );
+
+        assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> service.record(command(visitId, "0", "0", "0"))
         );
     }
 
