@@ -303,6 +303,11 @@ function MedicalEncounter() {
     [selectedOrders],
   )
 
+  const prescriptionBlockReason = getQueueInProgressBlockReason(
+    encounter?.queueItem,
+    'chuyển sang kê đơn',
+  )
+
   const selectPrimaryDiagnosis = useCallback(
     (icd) => {
       if (!icd?.code) return
@@ -355,11 +360,6 @@ function MedicalEncounter() {
     }
     return Array.from(combined.values())
   }, [filteredIcdList, icdSearchQuery, recentIcds])
-
-  const prescriptionBlockReason = getQueueInProgressBlockReason(
-    encounter?.queueItem,
-    'chuyển sang kê đơn',
-  )
 
   const handleAddOrder = (catalogItem) => {
     if (selectedOrders.some((item) => item.id === catalogItem.id)) {
