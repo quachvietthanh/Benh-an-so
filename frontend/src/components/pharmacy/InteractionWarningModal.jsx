@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Modal, Alert, List, Input, Form, Tag, Button, Typography, Space } from 'antd'
 import { WarningOutlined, ExclamationCircleOutlined, CheckOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { validateOverrideReason } from '../../utils/drugInteractionValidation'
 
 const { Text, Paragraph } = Typography
 
@@ -45,15 +46,15 @@ function InteractionWarningModal({
       return
     }
 
-    const trimmed = overrideReason.trim()
-    if (!trimmed) {
-      setErrorMsg('Vui lòng nhập lý do bỏ qua cảnh báo (không được để trống hoặc chỉ có khoảng trắng).')
+    const { valid, error, trimmedReason } = validateOverrideReason(overrideReason)
+    if (!valid) {
+      setErrorMsg(error)
       return
     }
 
     const overrides = warnings.map((w) => ({
       ruleId: w.ruleId,
-      overrideReason: trimmed,
+      overrideReason: trimmedReason,
     }))
 
     onConfirmOverride(overrides)

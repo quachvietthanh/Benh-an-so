@@ -67,8 +67,9 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       const message =
         error.response?.data?.message ||
-        error.message ||
-        'Tên đăng nhập hoặc mật khẩu không đúng'
+        (error.response?.status === 500
+          ? 'Máy chủ Backend đang bị lỗi hoặc chưa sẵn sàng kết nối (Lỗi 500)'
+          : error.message || 'Tên đăng nhập hoặc mật khẩu không đúng')
       return { success: false, message }
     }
   }
