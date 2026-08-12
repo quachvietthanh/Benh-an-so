@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,12 +21,15 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordAccessLogEntity;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAccessLogRepository;
 import com.benhsoan.persistence.mapper.medicalrecord.MedicalRecordAccessLogPersistenceMapper;
+import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
 
 @ExtendWith(MockitoExtension.class)
 class MedicalRecordAccessLogRepositoryAdapterTest {
@@ -58,21 +62,33 @@ class MedicalRecordAccessLogRepositoryAdapterTest {
     }
 
     @Test
-    void mapsAccessLogsFilteredByPatient() {
+    void mapsAccessLogsWithDynamicSearchFilters() {
+        UUID accessedBy = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
+        UUID medicalRecordId = UUID.randomUUID();
         Instant from = Instant.parse("2026-08-01T00:00:00Z");
         Instant to = Instant.parse("2026-08-31T23:59:59Z");
-        PageRequest pageable = PageRequest.of(0, 20);
+        PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Order.desc("accessedAt"), Sort.Order.desc("id")));
         MedicalRecordAccessLogEntity entity = MedicalRecordAccessLogEntity.builder()
-                .id(UUID.randomUUID()).patientId(patientId).accessedBy(UUID.randomUUID())
+                .id(UUID.randomUUID()).patientId(patientId).medicalRecordId(medicalRecordId).accessedBy(accessedBy)
                 .action(MedicalRecordAccessAction.VIEW_HISTORY).accessedAt(from.plusSeconds(1))
                 .build();
-        when(jpaRepository.findByPatientId(patientId, from, to, pageable))
+        GetMedicalRecordAccessLogsQuery query = new GetMedicalRecordAccessLogsQuery(
+                accessedBy, patientId, medicalRecordId, null, from, to, 0, 20
+        );
+        when(jpaRepository.findAll(
+                argThat((Specification<MedicalRecordAccessLogEntity> specification) -> specification != null),
+                any(PageRequest.class)
+        ))
                 .thenReturn(new PageImpl<>(List.of(entity)));
 
-        var result = adapter.findByPatientId(patientId, from, to, pageable);
+        var result = adapter.search(query, pageable);
 
         assertEquals(1, result.getTotalElements());
         assertEquals(MedicalRecordAccessAction.VIEW_HISTORY, result.getContent().getFirst().getAction());
+        verify(jpaRepository).findAll(
+                argThat((Specification<MedicalRecordAccessLogEntity> specification) -> specification != null),
+                any(PageRequest.class)
+        );
     }
 }

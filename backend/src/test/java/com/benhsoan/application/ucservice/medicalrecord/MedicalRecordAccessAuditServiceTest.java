@@ -44,4 +44,25 @@ class MedicalRecordAccessAuditServiceTest {
         assertEquals(accessedAt, logCaptor.getValue().getAccessedAt());
         assertNull(logCaptor.getValue().getIpAddress());
     }
+
+    @Test
+    void recordsCreateUpdateAmendLockThroughSameAccessLogRepository() {
+        UUID patientId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID recordId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant accessedAt = Instant.parse("2026-08-20T03:00:00Z");
+        when(medicalRecordAccessLogRepository.save(any(MedicalRecordAccessLog.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.recordRecordAccess(patientId, visitId, recordId, userId,
+                MedicalRecordAccessAction.UPDATE, "Medical record updated", accessedAt);
+
+        ArgumentCaptor<MedicalRecordAccessLog> logCaptor = ArgumentCaptor.forClass(MedicalRecordAccessLog.class);
+        verify(medicalRecordAccessLogRepository).save(logCaptor.capture());
+        assertEquals(MedicalRecordAccessAction.UPDATE, logCaptor.getValue().getAction());
+        assertEquals(recordId, logCaptor.getValue().getMedicalRecordId());
+        assertEquals(visitId, logCaptor.getValue().getVisitId());
+        assertEquals(patientId, logCaptor.getValue().getPatientId());
+    }
 }

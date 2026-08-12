@@ -7,22 +7,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
+import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
 
 public interface MedicalRecordAccessLogRepository {
 
     MedicalRecordAccessLog save(MedicalRecordAccessLog accessLog);
 
-    Page<MedicalRecordAccessLog> findByMedicalRecordId(
-            UUID medicalRecordId,
-            Instant from,
-            Instant to,
-            Pageable pageable
-    );
-
-    Page<MedicalRecordAccessLog> findByPatientId(
-            UUID patientId,
-            Instant from,
-            Instant to,
+    Page<MedicalRecordAccessLog> search(
+            GetMedicalRecordAccessLogsQuery query,
             Pageable pageable
     );
 }
