@@ -42,4 +42,19 @@ public class MedicalRecordAccessAuditService {
                 patientId, visitId, medicalRecordId, accessedBy, action, detail, accessedAt
         ));
     }
+
+    @Transactional
+    public void recordRecordAccessInCurrentTransaction(
+            UUID patientId,
+            UUID visitId,
+            UUID medicalRecordId,
+            UUID accessedBy,
+            MedicalRecordAccessAction action,
+            String detail,
+            Instant accessedAt
+    ) {
+        medicalRecordAccessLogRepository.save(MedicalRecordAccessLog.createRecordAccess(
+                patientId, visitId, medicalRecordId, accessedBy, action, detail, accessedAt
+        ));
+    }
 }

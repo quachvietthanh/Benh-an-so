@@ -40,7 +40,28 @@ INSERT INTO medicines (
 (UUID_TO_BIN('16000000-0000-0000-0000-000000000027'), 'MED-BISAC-5', 'Bisacodyl 5 mg', 'Bisacodyl', '5 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
 (UUID_TO_BIN('16000000-0000-0000-0000-000000000028'), 'MED-LEVO-500', 'Levofloxacin 500 mg', 'Levofloxacin', '500 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 35, '2026-08-01 01:00:00', NULL),
 (UUID_TO_BIN('16000000-0000-0000-0000-000000000029'), 'MED-WARF-2', 'Warfarin 2 mg', 'Warfarin', '2 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 25, '2026-08-01 01:00:00', NULL),
-(UUID_TO_BIN('16000000-0000-0000-0000-000000000030'), 'MED-ASP-81', 'Aspirin 81 mg', 'Acetylsalicylic acid', '81 mg', 'TABLET', 'vien', 'ORAL', FALSE, 0, 40, '2026-08-01 01:00:00', '2026-08-15 01:00:00');
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000030'), 'MED-ASP-81', 'Aspirin 81 mg', 'Aspirin', '81 mg', 'TABLET', 'vien', 'ORAL', FALSE, 0, 40, '2026-08-01 01:00:00', '2026-08-15 01:00:00'),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000031'), 'MED-CLARI-500', 'Clarithromycin 500 mg', 'Clarithromycin', '500 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 40, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000032'), 'MED-SIMVA-20', 'Simvastatin 20 mg', 'Simvastatin', '20 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 60, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000033'), 'MED-GEMFI-600', 'Gemfibrozil 600 mg', 'Gemfibrozil', '600 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000034'), 'MED-AMIOD-200', 'Amiodarone 200 mg', 'Amiodarone', '200 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000035'), 'MED-ISMN-60', 'Isosorbide Mononitrate 60 mg', 'Isosorbide Mononitrate', '60 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000036'), 'MED-SILD-50', 'Sildenafil 50 mg', 'Sildenafil', '50 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000037'), 'MED-MTX-2_5', 'Methotrexate 2.5 mg', 'Methotrexate', '2.5 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 20, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000038'), 'MED-TRIM-160', 'Trimethoprim 160 mg', 'Trimethoprim', '160 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000039'), 'MED-DIGO-0_25', 'Digoxin 0.25 mg', 'Digoxin', '0.25 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 20, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000040'), 'MED-FURO-40', 'Furosemide 40 mg', 'Furosemide', '40 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 40, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000041'), 'MED-CIPRO-500', 'Ciprofloxacin 500 mg', 'Ciprofloxacin', '500 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 40, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000042'), 'MED-TIZA-2', 'Tizanidine 2 mg', 'Tizanidine', '2 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 20, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000043'), 'MED-THEO-100', 'Theophylline 100 mg', 'Theophylline', '100 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 20, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000044'), 'MED-LITH-300', 'Lithium carbonate 300 mg', 'Lithium', '300 mg', 'CAPSULE', 'vien', 'ORAL', TRUE, 0, 20, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000045'), 'MED-LISI-10', 'Lisinopril 10 mg', 'Lisinopril', '10 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 40, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000046'), 'MED-KCL-600', 'Potassium Chloride 600 mg', 'Potassium Chloride', '600 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 20, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000047'), 'MED-FLUOX-20', 'Fluoxetine 20 mg', 'Fluoxetine', '20 mg', 'CAPSULE', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000048'), 'MED-TRAMA-50', 'Tramadol 50 mg', 'Tramadol', '50 mg', 'CAPSULE', 'vien', 'ORAL', TRUE, 0, 30, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000049'), 'MED-CLOPI-75', 'Clopidogrel 75 mg', 'Clopidogrel', '75 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 40, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000050'), 'MED-DIPHEN-25', 'Diphenhydramine 25 mg', 'Diphenhydramine', '25 mg', 'CAPSULE', 'vien', 'ORAL', TRUE, 0, 20, '2026-08-01 01:00:00', NULL),
+(UUID_TO_BIN('16000000-0000-0000-0000-000000000051'), 'MED-PANTO-40', 'Pantoprazole 40 mg', 'Pantoprazole', '40 mg', 'TABLET', 'vien', 'ORAL', TRUE, 0, 40, '2026-08-01 01:00:00', NULL);
 
 -- ===========================
 -- Drug interaction rules

@@ -49,7 +49,7 @@ public class CreateMedicalRecordService implements CreateMedicalRecordUseCase {
                 command.physicalExamination(), command.clinicalProgress(), command.treatmentPlan(),
                 command.doctorInstructions(), command.conclusion(), userId, now
         ));
-        accessAuditService.recordRecordAccess(visit.getPatientId(), visit.getId(), saved.getId(), userId,
+        accessAuditService.recordRecordAccessInCurrentTransaction(visit.getPatientId(), visit.getId(), saved.getId(), userId,
                 MedicalRecordAccessAction.CREATE, "Medical record created", now);
         return resultMapper.toResult(saved);
     }
