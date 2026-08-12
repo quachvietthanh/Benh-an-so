@@ -1,0 +1,139 @@
+{
+  "info": {
+    "name": "Benh So An - Billing",
+    "_postman_id": "2fbe07db-b84e-4f15-8556-4bf46e75d0bd",
+    "description": "Billing flow collection for payments, original invoices, invoice search, and adjustments.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "adminUsername", "value": "admin" },
+    { "key": "receptionistUsername", "value": "receptionist1" },
+    { "key": "seededPassword", "value": "password" },
+    { "key": "receptionistAccessToken", "value": "" },
+    { "key": "adminAccessToken", "value": "" },
+    { "key": "payableVisitId", "value": "" },
+    { "key": "createdPaymentId", "value": "" },
+    { "key": "createdInvoiceId", "value": "" },
+    { "key": "createdInvoiceCode", "value": "" },
+    { "key": "seededOriginalInvoiceId", "value": "23100000-0000-0000-0000-000000000001" },
+    { "key": "seededVisitId", "value": "d0000000-0000-0000-0000-000000000001" }
+  ],
+  "item": [
+    {
+      "name": "1. Login as Receptionist",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{receptionistUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Receptionist login succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.collectionVariables.set('receptionistAccessToken', pm.response.json().accessToken);"
+      ]}}]
+    },
+    {
+      "name": "2. Get Payable Encounters",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{receptionistAccessToken}}" }],
+        "url": "{{baseUrl}}/invoices/payable?page=0&size=20"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Payable encounters are returned', function () { pm.response.to.have.status(200); });",
+        "var body = pm.response.json();",
+        "if (body.content && body.content.length > 0) {",
+        "  pm.collectionVariables.set('payableVisitId', body.content[0].visitId);",
+        "}"
+      ]}}]
+    },
+    {
+      "name": "3. Record Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{receptionistAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"visitId\": \"{{payableVisitId}}\",\n  \"examFee\": 100000,\n  \"medicineFee\": 150000,\n  \"amountPaid\": 250000,\n  \"paymentMethod\": \"CASH\"\n}" },
+        "url": "{{baseUrl}}/invoices/payments"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Payment is recorded or already exists', function () { pm.expect([201,409]).to.include(pm.response.code); });",
+        "if (pm.response.code === 201) { pm.collectionVariables.set('createdPaymentId', pm.response.json().id); }"
+      ]}}]
+    },
+    {
+      "name": "4. Create Original Invoice",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{receptionistAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"visitId\": \"{{payableVisitId}}\"\n}" },
+        "url": "{{baseUrl}}/invoices"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Invoice is created or already exists', function () { pm.expect([201,409]).to.include(pm.response.code); });",
+        "if (pm.response.code === 201) {",
+        "  pm.collectionVariables.set('createdInvoiceId', pm.response.json().id);",
+        "  pm.collectionVariables.set('createdInvoiceCode', pm.response.json().invoiceCode);",
+        "}"
+      ]}}]
+    },
+    {
+      "name": "5. Search Invoices",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{receptionistAccessToken}}" }],
+        "url": "{{baseUrl}}/invoices?page=0&size=20"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Invoice page is returned', function () { pm.response.to.have.status(200); });"
+      ]}}]
+    },
+    {
+      "name": "6. Get Seeded Invoice Detail",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{receptionistAccessToken}}" }],
+        "url": "{{baseUrl}}/invoices/{{seededOriginalInvoiceId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Invoice detail is returned', function () { pm.response.to.have.status(200); });",
+        "pm.test('Seeded invoice is original', function () { pm.expect(pm.response.json().type).to.eql('ORIGINAL'); });"
+      ]}}]
+    },
+    {
+      "name": "7. Login as Admin",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Admin login succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.collectionVariables.set('adminAccessToken', pm.response.json().accessToken);"
+      ]}}]
+    },
+    {
+      "name": "8. Create Adjustment Invoice",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"adjustmentReason\": \"Dieu chinh giam tien thuoc\",\n  \"lines\": [\n    {\n      \"itemName\": \"Dieu chinh dong 1\",\n      \"quantity\": 1,\n      \"unitPrice\": -20000\n    }\n  ]\n}" },
+        "url": "{{baseUrl}}/invoices/{{seededOriginalInvoiceId}}/adjustments"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Adjustment invoice is created', function () { pm.response.to.have.status(201); });",
+        "pm.test('Adjustment invoice type is ADJUSTMENT', function () { pm.expect(pm.response.json().type).to.eql('ADJUSTMENT'); });"
+      ]}}]
+    }
+  ]
+}

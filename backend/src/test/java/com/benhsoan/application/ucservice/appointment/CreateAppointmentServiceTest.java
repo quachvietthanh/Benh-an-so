@@ -29,13 +29,16 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 class CreateAppointmentServiceTest {
 
+    private static final Instant APPOINTMENT_START = Instant.parse("2099-08-10T09:00:00Z");
+    private static final Instant APPOINTMENT_END = Instant.parse("2099-08-10T09:30:00Z");
+
     @Test
     void createsAppointmentAndWritesAuditLog() {
         UUID patientId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
         UUID actorId = UUID.randomUUID();
-        Instant startTime = Instant.parse("2026-08-10T09:00:00Z");
-        Instant endTime = Instant.parse("2026-08-10T09:30:00Z");
+        Instant startTime = APPOINTMENT_START;
+        Instant endTime = APPOINTMENT_END;
         PatientRepository patientRepository = mock(PatientRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
@@ -80,8 +83,8 @@ class CreateAppointmentServiceTest {
     void rejectsInactiveDoctor() {
         UUID patientId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
-        Instant startTime = Instant.parse("2026-08-10T09:00:00Z");
-        Instant endTime = Instant.parse("2026-08-10T09:30:00Z");
+        Instant startTime = APPOINTMENT_START;
+        Instant endTime = APPOINTMENT_END;
         PatientRepository patientRepository = mock(PatientRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
@@ -113,8 +116,8 @@ class CreateAppointmentServiceTest {
     void rejectsDoctorScheduleConflict() {
         UUID patientId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
-        Instant startTime = Instant.parse("2026-08-10T09:00:00Z");
-        Instant endTime = Instant.parse("2026-08-10T09:30:00Z");
+        Instant startTime = APPOINTMENT_START;
+        Instant endTime = APPOINTMENT_END;
         PatientRepository patientRepository = mock(PatientRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);

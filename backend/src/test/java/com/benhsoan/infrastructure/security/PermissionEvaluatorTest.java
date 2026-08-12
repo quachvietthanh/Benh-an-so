@@ -110,7 +110,7 @@ class PermissionEvaluatorTest {
         Role receptionistRole = Role.create("RECEPTIONIST", "Receptionist role", true, Set.of(
                 Permission.PATIENT_CREATE, Permission.PATIENT_READ, Permission.PATIENT_UPDATE,
                 Permission.APPOINTMENT_CREATE, Permission.APPOINTMENT_READ, Permission.APPOINTMENT_UPDATE, Permission.APPOINTMENT_DELETE,
-                Permission.INVOICE_CREATE, Permission.INVOICE_READ, Permission.INVOICE_UPDATE
+                Permission.INVOICE_CREATE, Permission.INVOICE_READ
         ));
         when(roleRepository.findByName("RECEPTIONIST")).thenReturn(Optional.of(receptionistRole));
 
