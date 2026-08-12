@@ -14,6 +14,7 @@ import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.domain.billing.exception.PaymentAmountMismatchException;
 import com.benhsoan.domain.billing.exception.PaymentNotAllowedException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 
 @DisplayName("Payment Domain Tests")
@@ -79,6 +80,74 @@ class PaymentTest {
                         VisitStatus.COMPLETED,
                         false
                 )
+        );
+    }
+
+    @Test
+    @DisplayName("refund should mark a recorded payment as refunded")
+    void refundShouldMarkPaymentAsRefunded() {
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("250000"),
+                new BigDecimal("250000"),
+                PaymentMethod.CASH,
+                PaymentStatus.RECORDED,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                Instant.parse("2026-08-11T03:00:00Z")
+        );
+
+        payment.refund("Patient cancelled after payment review", UUID.randomUUID());
+
+        assertEquals(PaymentStatus.REFUNDED, payment.getStatus());
+    }
+
+    @Test
+    @DisplayName("refund should require a reason")
+    void refundShouldRequireReason() {
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("250000"),
+                new BigDecimal("250000"),
+                PaymentMethod.CASH,
+                PaymentStatus.SUCCESS,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                Instant.parse("2026-08-11T03:00:00Z")
+        );
+
+        assertThrows(
+                ValidationException.class,
+                () -> payment.refund(" ", UUID.randomUUID())
+        );
+    }
+
+    @Test
+    @DisplayName("refund should reject non-refundable status")
+    void refundShouldRejectNonRefundableStatus() {
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("250000"),
+                new BigDecimal("250000"),
+                PaymentMethod.CASH,
+                PaymentStatus.CANCELLED,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                Instant.parse("2026-08-11T03:00:00Z")
+        );
+
+        assertThrows(
+                PaymentNotAllowedException.class,
+                () -> payment.refund("Cancel receipt before settlement", UUID.randomUUID())
         );
     }
 }

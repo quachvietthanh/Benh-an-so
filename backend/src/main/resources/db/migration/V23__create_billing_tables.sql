@@ -61,7 +61,7 @@ CREATE TABLE payments (
         ),
 
     CONSTRAINT chk_payments_status
-        CHECK (status IN ('RECORDED')),
+        CHECK (status IN ('RECORDED', 'SUCCESS', 'REFUNDED', 'CANCELLED')),
 
     CONSTRAINT chk_payments_created_at
         CHECK (created_at <= paid_at)

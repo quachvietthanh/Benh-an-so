@@ -136,6 +136,23 @@ public class Payment {
         return status == PaymentStatus.RECORDED;
     }
 
+    public boolean isRefunded() {
+        return status == PaymentStatus.REFUNDED;
+    }
+
+    public void refund(String reason, UUID refundedBy) {
+        requireText(reason, "Refund reason is required.");
+        requireNonNull(refundedBy, "Refunded by user id is required.");
+
+        if (status != PaymentStatus.RECORDED && status != PaymentStatus.SUCCESS) {
+            throw new PaymentNotAllowedException(
+                    "Only successful or recorded payments can be refunded."
+            );
+        }
+
+        this.status = PaymentStatus.REFUNDED;
+    }
+
     private static void validatePaymentEligibility(
             VisitStatus visitStatus,
             boolean dispensingCompleted
@@ -184,6 +201,13 @@ public class Payment {
             throw new ValidationException(message.replace("is required", "must not be negative"));
         }
         return value;
+    }
+
+    private static String requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new ValidationException(message);
+        }
+        return value.trim();
     }
 
     private static <T> T requireNonNull(T value, String message) {
