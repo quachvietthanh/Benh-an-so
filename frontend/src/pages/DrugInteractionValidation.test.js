@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-// Helper kiểm tra điều kiện cần gọi API checkInteractions
 export const shouldCheckInteractions = (items = []) => {
   const validItems = (items || []).filter((item) => Boolean(item && item.medicineId))
   const medicineIds = [...new Set(validItems.map((item) => item.medicineId))]
@@ -11,7 +10,6 @@ export const shouldCheckInteractions = (items = []) => {
   }
 }
 
-// Helper lọc và khử trùng lặp cảnh báo (Bỏ A-A, khử trùng A-B và B-A)
 export const filterAndDeduplicateWarnings = (rawWarnings = [], medicines = [], validItems = []) => {
   const seenPairs = new Set()
   const uniqueWarnings = []
@@ -20,10 +18,8 @@ export const filterAndDeduplicateWarnings = (rawWarnings = [], medicines = [], v
     const idA = String(warning?.drugIdA || '')
     const idB = String(warning?.drugIdB || '')
     
-    // Ràng buộc 1: Không kiểm tra A-A hoặc thiếu ID
     if (!idA || !idB || idA === idB) continue
 
-    // Ràng buộc 2: Khử trùng A-B và B-A (dùng key sắp xếp)
     const pairKey = [idA, idB].sort().join('_')
     if (!seenPairs.has(pairKey)) {
       seenPairs.add(pairKey)
@@ -41,7 +37,6 @@ export const filterAndDeduplicateWarnings = (rawWarnings = [], medicines = [], v
   return uniqueWarnings
 }
 
-// Helper kiểm tra lý do bỏ qua cảnh báo (Validation)
 export const validateOverrideReason = (overrideReason) => {
   if (!overrideReason || typeof overrideReason !== 'string' || !overrideReason.trim()) {
     return {
@@ -55,7 +50,6 @@ export const validateOverrideReason = (overrideReason) => {
   }
 }
 
-// Helper đóng gói payload interactionOverrides gửi lên Backend
 export const formatInteractionOverrides = (warnings = [], overrideReason = '') => {
   const validation = validateOverrideReason(overrideReason)
   if (!validation.isValid) {
@@ -67,8 +61,6 @@ export const formatInteractionOverrides = (warnings = [], overrideReason = '') =
     overrideReason: validation.trimmedReason,
   }))
 }
-
-// --- SUITE KIỂM THỬ TỰ ĐỘNG TƯƠNG TÁC THUỐC (NCL-05-CN-002-CV-03) ---
 
 test('1. Kiểm thử RÀNG BUỘC SỐ LƯỢNG THUỐC: 1 thuốc không kích hoạt kiểm tra tương tác', () => {
   const items1 = [{ medicineId: 'med-01', dosage: '1 viên' }]
@@ -126,17 +118,14 @@ test('4. Kiểm thử KHỬ TRÙNG LẶP CẶP TƯƠNG TÁC (A-B và B-A chỉ h
 })
 
 test('5. Kiểm thử VALIDATION LÝ DO BỎ QUA CẢNH BÁO: Bắt buộc nhập, từ chối chuỗi rỗng / khoảng trắng', () => {
-  // TH 5.1: Bỏ trống
   const v1 = validateOverrideReason('')
   assert.equal(v1.isValid, false)
   assert.ok(v1.errorMsg.includes('không được để trống'))
 
-  // TH 5.2: Chỉ có khoảng trắng
   const v2 = validateOverrideReason('   \n\t   ')
   assert.equal(v2.isValid, false)
   assert.ok(v2.errorMsg.includes('khoảng trắng'))
 
-  // TH 5.3: Lý do hợp lệ
   const validReasonText = '  Bệnh nhân được theo dõi chức năng gan sát sao và giảm liều.  '
   const v3 = validateOverrideReason(validReasonText)
   assert.equal(v3.isValid, true)

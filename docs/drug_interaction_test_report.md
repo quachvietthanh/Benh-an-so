@@ -2,7 +2,6 @@
 **Mã Task**: `NCL-05-CN-002-CV-03`  
 **Tên tính năng**: Hiển thị cảnh báo tương tác thuốc trên giao diện  
 **Hệ thống**: Bệnh án điện tử (Digital Medical Records System)  
-**Tác giả**: Antigravity Assistant & QA Team  
 **Ngày thực hiện**: 12/08/2026  
 
 ---
