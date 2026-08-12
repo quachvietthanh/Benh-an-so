@@ -7,6 +7,7 @@ import {
   CaretDownOutlined,
   DashboardOutlined,
   FileTextOutlined,
+  FormOutlined,
   InboxOutlined,
   LogoutOutlined,
   MedicineBoxOutlined,
@@ -16,6 +17,7 @@ import {
   SearchOutlined,
   SettingOutlined,
   ShopOutlined,
+  SolutionOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import patientApi from '../../api/patientApi'
@@ -34,7 +36,7 @@ const roleNames = {
 const navigationSections = [
   { key: 'overview', paths: ['/'] },
   { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments'] },
-  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/clinical-orders', '/clinical-results', '/results', '/prescriptions'] },
+  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/prescriptions', '/clinical-results', '/results'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
@@ -53,6 +55,8 @@ const getNavigationItems = (roles = []) => {
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'doctor', 'receptionist'] },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
+    { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, roles: ['admin', 'doctor'] },
+    { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, roles: ['admin', 'doctor'] },
     { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, roles: ['admin', 'doctor'] },
     { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, roles: ['admin', 'pharmacist'] },
     { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, roles: ['admin', 'pharmacist'] },
