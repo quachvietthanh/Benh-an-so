@@ -44,6 +44,9 @@ import com.benhsoan.port.inbound.appointment.SendAppointmentReminderManuallyUseC
 @Import(AppointmentRestMapper.class)
 class AppointmentControllerTest {
 
+    private static final Instant APPOINTMENT_START = Instant.parse("2099-08-10T09:00:00Z");
+    private static final Instant APPOINTMENT_END = Instant.parse("2099-08-10T09:30:00Z");
+
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private CreateAppointmentUseCase createAppointmentUseCase;
@@ -70,8 +73,8 @@ class AppointmentControllerTest {
                                 {
                                   "patientId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001",
                                   "doctorId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
-                                  "startTime":"2026-08-10T09:00:00Z",
-                                  "endTime":"2026-08-10T09:30:00Z",
+                                  "startTime":"2099-08-10T09:00:00Z",
+                                  "endTime":"2099-08-10T09:30:00Z",
                                   "reason":"Tai kham tong quat"
                                 }
                                 """))
@@ -89,8 +92,8 @@ class AppointmentControllerTest {
                                 {
                                   "patientId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001",
                                   "doctorId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
-                                  "startTime":"2026-08-10T09:00:00Z",
-                                  "endTime":"2026-08-10T09:30:00Z",
+                                  "startTime":"2099-08-10T09:00:00Z",
+                                  "endTime":"2099-08-10T09:30:00Z",
                                   "reason":" "
                                 }
                                 """))
@@ -192,8 +195,8 @@ class AppointmentControllerTest {
                 "APT000500",
                 UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001"),
                 UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
-                Instant.parse("2026-08-10T09:00:00Z"),
-                Instant.parse("2026-08-10T09:30:00Z"),
+                APPOINTMENT_START,
+                APPOINTMENT_END,
                 status,
                 "Tai kham tong quat",
                 status == AppointmentStatus.CANCELLED ? "Patient requested cancellation" : null,

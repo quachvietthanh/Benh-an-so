@@ -27,8 +27,8 @@ class SearchAppointmentsServiceTest {
                 null,
                 null,
                 AppointmentStatus.SCHEDULED,
-                Instant.parse("2026-08-10T00:00:00Z"),
-                Instant.parse("2026-08-11T00:00:00Z"),
+                Instant.parse("2099-08-10T00:00:00Z"),
+                Instant.parse("2099-08-11T00:00:00Z"),
                 PageRequest.of(0, 20)
         );
         Appointment appointment = Appointment.restore(
@@ -36,8 +36,8 @@ class SearchAppointmentsServiceTest {
                 "APT000201",
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                Instant.parse("2026-08-10T09:00:00Z"),
-                Instant.parse("2026-08-10T09:30:00Z"),
+                Instant.parse("2099-08-10T09:00:00Z"),
+                Instant.parse("2099-08-10T09:30:00Z"),
                 AppointmentStatus.SCHEDULED,
                 "Tai kham",
                 null,
