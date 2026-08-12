@@ -354,7 +354,7 @@ function PharmacyPage() {
             Nhập kho
           </Button>
           <Button icon={<ShopOutlined />} onClick={() => navigate('/medicines')}>
-            Danh mục thuốc
+            Danh mục & Ngưỡng tồn
           </Button>
           <Button icon={<ReloadOutlined />} loading={loading} onClick={loadData}>
             Làm mới
@@ -381,12 +381,16 @@ function PharmacyPage() {
           <Card><Statistic title="Lô đủ điều kiện FEFO" value={eligibleBatchCount} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
         <Col xs={24} md={8}>
-          <Card>
+          <Card
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/medicines', { state: { tab: 'alerts' } })}
+          >
             <Statistic
-              title="Thuốc dưới ngưỡng tồn"
+              title="Thuốc dưới ngưỡng tồn (Cảnh báo)"
               value={lowStockItems.length}
-              valueStyle={lowStockItems.length ? { color: '#cf1322' } : undefined}
+              valueStyle={lowStockItems.length ? { color: '#cf1322', fontWeight: 700 } : undefined}
               prefix={<WarningOutlined />}
+              suffix={<Text type="secondary" style={{ fontSize: 13, marginLeft: 6 }}>Xem →</Text>}
             />
           </Card>
         </Col>
@@ -396,11 +400,39 @@ function PharmacyPage() {
         <Alert
           type="warning"
           showIcon
-          message={`${lowStockItems.length} thuốc đang dưới ngưỡng tồn tối thiểu`}
-          description={lowStockItems
-            .slice(0, 5)
-            .map((item) => `${item.medicineName}: khả dụng ${item.eligibleStockQuantity}, thiếu ${item.shortageQuantity}`)
-            .join(' · ')}
+          message={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span>
+                <strong>Cảnh báo tồn kho:</strong> Có <strong>{lowStockItems.length} loại thuốc</strong> đang dưới ngưỡng tồn tối thiểu
+              </span>
+              <Space>
+                <Button
+                  size="small"
+                  type="primary"
+                  danger
+                  onClick={() => navigate('/medicines', { state: { tab: 'alerts' } })}
+                >
+                  Xem chi tiết thiếu hụt
+                </Button>
+                <Button
+                  size="small"
+                  icon={<ShopOutlined />}
+                  onClick={() => navigate('/medicines')}
+                >
+                  Điều chỉnh ngưỡng tồn
+                </Button>
+              </Space>
+            </div>
+          }
+          description={
+            <div style={{ marginTop: 4 }}>
+              {lowStockItems
+                .slice(0, 5)
+                .map((item) => `${item.medicineName}: khả dụng ${item.eligibleStockQuantity}, thiếu ${item.shortageQuantity} ${item.unit || ''}`)
+                .join(' · ')}
+              {lowStockItems.length > 5 && ` và ${lowStockItems.length - 5} thuốc khác...`}
+            </div>
+          }
           style={{ marginBottom: 16 }}
         />
       )}

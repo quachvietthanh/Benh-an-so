@@ -5,7 +5,6 @@ import {
   Badge,
   Button,
   Card,
-  Col,
   Descriptions,
   Divider,
   Dropdown,
@@ -15,7 +14,6 @@ import {
   message,
   Modal,
   Popconfirm,
-  Row,
   Select,
   Space,
   Spin,
@@ -26,9 +24,7 @@ import {
   Typography,
 } from 'antd'
 import {
-  CalendarOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   CloseCircleOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -41,7 +37,6 @@ import {
   MedicineBoxOutlined,
   PlusOutlined,
   RollbackOutlined,
-  SearchOutlined,
   StopOutlined,
   SwapOutlined,
   SyncOutlined,
@@ -131,14 +126,12 @@ function PrescriptionPage() {
   const [activeTab, setActiveTab] = useState('prescribe')
 
   const [detectedInteractions, setDetectedInteractions] = useState([])
+  const [checkingInteractions, setCheckingInteractions] = useState(false)
   const [interactionModalOpen, setInteractionModalOpen] = useState(false)
   const [confirmedOverrides, setConfirmedOverrides] = useState([])
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
-  const [queueItems, setQueueItems] = useState([])
-  const [loadingQueue, setLoadingQueue] = useState(false)
-  const [quickSearchId, setQuickSearchId] = useState('')
 
   const isDoctor = roles.includes('doctor') || roles.includes('admin')
   const isAssignedDoctor = Boolean(
@@ -233,41 +226,6 @@ function PrescriptionPage() {
     loadData()
   }, [loadData])
 
-  useEffect(() => {
-    if (medicalRecordId) return
-    let isMounted = true
-    setLoadingQueue(true)
-
-    const fetchQueue = async () => {
-      try {
-        const today = dayjs().format('YYYY-MM-DD')
-        let res
-        if (roles.includes('doctor')) {
-          try {
-            res = await queueApi.getMyQueue({ date: today })
-          } catch {
-            res = await queueApi.getQueues({ date: today })
-          }
-        } else {
-          res = await queueApi.getQueues({ date: today })
-        }
-        if (isMounted) {
-          const list = Array.isArray(res.data) ? res.data : []
-          setQueueItems(list)
-        }
-      } catch {
-        if (isMounted) setQueueItems([])
-      } finally {
-        if (isMounted) setLoadingQueue(false)
-      }
-    }
-
-    fetchQueue()
-    return () => {
-      isMounted = false
-    }
-  }, [medicalRecordId, roles])
-
   const requireLiveInProgressQueue = useCallback(async (action) => {
     const queueItemId = encounter?.queueItem?.id
     if (!queueItemId) {
@@ -292,24 +250,49 @@ function PrescriptionPage() {
   }, [encounter?.queueItem?.id])
 
   const performInteractionCheck = useCallback(async (currentItems) => {
-    const medicineIds = [...new Set(currentItems.map((item) => item.medicineId).filter(Boolean))]
+    const validItems = (currentItems || []).filter((item) => Boolean(item.medicineId))
+    const medicineIds = [...new Set(validItems.map((item) => item.medicineId))]
+
     if (medicineIds.length < 2) {
       setDetectedInteractions([])
       return []
     }
 
-    const response = await pharmacyApi.checkInteractions(medicineIds)
-    const warnings = (response.data || []).map((warning) => ({
-      ...warning,
-      drugNameA:
-        medicines.find((medicine) => String(medicine.id) === String(warning.drugIdA))?.medicineName ||
-        warning.drugIdA,
-      drugNameB:
-        medicines.find((medicine) => String(medicine.id) === String(warning.drugIdB))?.medicineName ||
-        warning.drugIdB,
-    }))
-    setDetectedInteractions(warnings)
-    return warnings
+    setCheckingInteractions(true)
+    try {
+      const response = await pharmacyApi.checkInteractions(medicineIds)
+      const rawWarnings = response?.data || []
+
+      const seenPairs = new Set()
+      const uniqueWarnings = []
+
+      for (const warning of rawWarnings) {
+        const idA = String(warning.drugIdA)
+        const idB = String(warning.drugIdB)
+        if (!idA || !idB || idA === idB) continue
+
+        const pairKey = [idA, idB].sort().join('_')
+        if (!seenPairs.has(pairKey)) {
+          seenPairs.add(pairKey)
+          const medA = medicines.find((m) => String(m.id) === idA) || validItems.find((i) => String(i.medicineId) === idA)
+          const medB = medicines.find((m) => String(m.id) === idB) || validItems.find((i) => String(i.medicineId) === idB)
+          uniqueWarnings.push({
+            ...warning,
+            drugNameA: medA?.medicineName || medA?.name || warning.drugIdA,
+            drugNameB: medB?.medicineName || medB?.name || warning.drugIdB,
+          })
+        }
+      }
+
+      setDetectedInteractions(uniqueWarnings)
+      return uniqueWarnings
+    } catch (error) {
+      const errorMsg = getApiMessage(error, 'Không thể kiểm tra tương tác thuốc từ Backend.')
+      message.error(errorMsg)
+      throw error
+    } finally {
+      setCheckingInteractions(false)
+    }
   }, [medicines])
 
   const handleItemChange = (clientId, field, value) => {
@@ -319,9 +302,7 @@ function PrescriptionPage() {
     setItems(nextItems)
     if (field === 'medicineId') {
       setConfirmedOverrides([])
-      performInteractionCheck(nextItems).catch((error) =>
-        message.error(getApiMessage(error, 'Không thể kiểm tra tương tác thuốc.')),
-      )
+      performInteractionCheck(nextItems).catch(() => {})
     }
   }
 
@@ -333,7 +314,7 @@ function PrescriptionPage() {
     const nextItems = items.filter((entry) => entry.clientId !== clientId)
     setItems(nextItems)
     setConfirmedOverrides([])
-    performInteractionCheck(nextItems).catch(() => { })
+    performInteractionCheck(nextItems).catch(() => {})
   }
 
   const validateForm = () => {
@@ -443,7 +424,7 @@ function PrescriptionPage() {
       }
       await executeSavePrescription(confirmedOverrides)
     } catch (error) {
-      message.error(getApiMessage(error, 'Không thể kiểm tra tương tác thuốc.'))
+      // Error is notified via performInteractionCheck catch block
     }
   }
 
@@ -737,207 +718,16 @@ function PrescriptionPage() {
   ]
 
   if (!medicalRecordId) {
-    const queueColumns = [
-      {
-        title: 'STT',
-        dataIndex: 'queueNumber',
-        width: 80,
-        render: (num) => (
-          <Tag color="blue" style={{ fontWeight: 700 }}>
-            #{num || '—'}
-          </Tag>
-        ),
-      },
-      {
-        title: 'Mã lượt khám',
-        dataIndex: 'visitCode',
-        render: (code, item) => (
-          <Text code>{code || item.visitId || '—'}</Text>
-        ),
-      },
-      {
-        title: 'Bệnh nhân',
-        dataIndex: 'patientName',
-        render: (name) => <Text strong>{name || 'Chưa có tên'}</Text>,
-      },
-      {
-        title: 'Bác sĩ phụ trách',
-        dataIndex: 'doctorName',
-        render: (name) => name || '—',
-      },
-      {
-        title: 'Trạng thái',
-        dataIndex: 'status',
-        render: (status) => {
-          const meta = {
-            IN_PROGRESS: { label: 'Đang khám', color: 'processing' },
-            WAITING_FOR_RESULT: { label: 'Chờ kết quả CĐLS', color: 'warning' },
-            WAITING: { label: 'Chờ gọi', color: 'default' },
-            COMPLETED: { label: 'Đã hoàn tất', color: 'success' },
-            SKIPPED: { label: 'Đã bỏ qua', color: 'error' },
-          }[status] || { label: status, color: 'default' }
-          return <Tag color={meta.color}>{meta.label}</Tag>
-        },
-      },
-      {
-        title: 'Thao tác',
-        key: 'action',
-        render: (_, item) => (
-          <Button
-            type="primary"
-            size="small"
-            icon={<MedicineBoxOutlined />}
-            onClick={() => {
-              if (item.visitId) {
-                navigate(`/medical-records/visits/${item.visitId}`)
-              } else {
-                navigate('/appointments')
-              }
-            }}
-          >
-            Khám & Kê đơn
-          </Button>
-        ),
-      },
-    ]
-
     return (
-      <div style={{ paddingBottom: 40 }}>
-        <div
-          className="page-header"
-          style={{
-            marginBottom: 16,
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 16,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <MedicineBoxOutlined style={{ color: '#2563eb' }} />
-              Kê đơn thuốc theo bệnh án
-            </Title>
-            <Text type="secondary">
-              Đơn thuốc được tạo và liên kết trực tiếp với bệnh án và lượt khám của bệnh nhân.
-            </Text>
-          </div>
-          <Button
-            type="primary"
-            icon={<CalendarOutlined />}
-            onClick={() => navigate('/appointments')}
-          >
-            Mở Danh sách Hàng đợi khám
-          </Button>
-        </div>
-
-        <Row gutter={[16, 16]}>
-          <Col xs={24} md={12}>
-            <Card
-              title={
-                <span>
-                  <SearchOutlined style={{ color: '#2563eb', marginRight: 8 }} />
-                  Mở nhanh theo Mã Bệnh án / Mã Lượt khám
-                </span>
-              }
-              bordered
-            >
-              <Paragraph type="secondary">
-                Nếu bạn đã có mã bệnh án hoặc mã lượt khám, hãy nhập trực tiếp để chuyển đến màn hình kê đơn:
-              </Paragraph>
-              <Space.Compact style={{ width: '100%' }}>
-                <Input
-                  placeholder="Nhập mã bệnh án (UUID) hoặc mã lượt khám..."
-                  value={quickSearchId}
-                  onChange={(e) => setQuickSearchId(e.target.value)}
-                  onPressEnter={() => {
-                    if (quickSearchId.trim()) {
-                      navigate(`/prescriptions/${quickSearchId.trim()}`)
-                    }
-                  }}
-                />
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    if (quickSearchId.trim()) {
-                      navigate(`/prescriptions/${quickSearchId.trim()}`)
-                    } else {
-                      message.warning('Vui lòng nhập mã bệnh án.')
-                    }
-                  }}
-                >
-                  Mở đơn thuốc
-                </Button>
-              </Space.Compact>
-            </Card>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Card
-              title={
-                <span>
-                  <InfoCircleOutlined style={{ color: '#16a34a', marginRight: 8 }} />
-                  Quy trình Kê đơn thuốc chuẩn
-                </span>
-              }
-              bordered
-            >
-              <Paragraph style={{ marginBottom: 6 }}>
-                <strong>1. Chọn lượt khám:</strong> Vào hàng đợi khám và bắt đầu lượt khám của bệnh nhân.
-              </Paragraph>
-              <Paragraph style={{ marginBottom: 6 }}>
-                <strong>2. Khám & Chẩn đoán:</strong> Nhập triệu chứng và chọn mã ICD-10 chính.
-              </Paragraph>
-              <Paragraph style={{ marginBottom: 0 }}>
-                <strong>3. Kê đơn thuốc:</strong> Lưu bệnh án và hệ thống sẽ tự động mở màn kê đơn thuốc tương ứng.
-              </Paragraph>
-            </Card>
-          </Col>
-
-          <Col xs={24}>
-            <Card
-              title={
-                <span>
-                  <MedicineBoxOutlined style={{ color: '#2563eb', marginRight: 8 }} />
-                  Danh sách lượt khám trong hàng đợi hôm nay ({queueItems.length})
-                </span>
-              }
-              bordered
-              extra={
-                <Button
-                  size="small"
-                  icon={<SyncOutlined />}
-                  loading={loadingQueue}
-                  onClick={() => {
-                    const today = dayjs().format('YYYY-MM-DD')
-                    setLoadingQueue(true)
-                    const fetcher = roles.includes('doctor')
-                      ? queueApi.getMyQueue({ date: today }).catch(() => queueApi.getQueues({ date: today }))
-                      : queueApi.getQueues({ date: today })
-                    fetcher
-                      .then((res) => setQueueItems(Array.isArray(res.data) ? res.data : []))
-                      .catch(() => setQueueItems([]))
-                      .finally(() => setLoadingQueue(false))
-                  }}
-                >
-                  Làm mới
-                </Button>
-              }
-            >
-              <Table
-                rowKey={(item) => item.id || item.visitId}
-                columns={queueColumns}
-                dataSource={queueItems}
-                loading={loadingQueue}
-                pagination={{ pageSize: 10 }}
-                locale={{
-                  emptyText: 'Hiện tại chưa có bệnh nhân nào trong hàng đợi hôm nay.',
-                }}
-              />
-            </Card>
-          </Col>
-        </Row>
-      </div>
+      <Card>
+        <Alert
+          type="warning"
+          showIcon
+          message="Chưa có bệnh án để kê đơn"
+          description="Màn kê đơn chỉ mở từ một lượt khám đã lưu và phải có mã bệnh án trên đường dẫn."
+          action={<Button onClick={() => navigate('/appointments')}>Về danh sách lượt khám</Button>}
+        />
+      </Card>
     )
   }
 
@@ -1177,7 +967,7 @@ function PrescriptionPage() {
                               danger
                               size="small"
                               icon={<DeleteOutlined />}
-                              disabled={!canPrescribe || items.length <= 1}
+                              disabled={!canPrescribe || items.length <= 1 || checkingInteractions || saving}
                               onClick={() => handleRemoveItem(item.clientId)}
                             >
                               Bỏ thuốc
@@ -1190,7 +980,7 @@ function PrescriptionPage() {
                             <Select
                               showSearch
                               optionFilterProp="label"
-                              disabled={!canPrescribe}
+                              disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.medicineId}
                               onChange={(value) => handleItemChange(item.clientId, 'medicineId', value)}
                               options={medicines.map((medicine) => ({
@@ -1205,7 +995,7 @@ function PrescriptionPage() {
                             <InputNumber
                               min={1}
                               precision={0}
-                              disabled={!canPrescribe}
+                              disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.quantity}
                               onChange={(value) => handleItemChange(item.clientId, 'quantity', value)}
                               style={{ width: 110 }}
@@ -1217,7 +1007,7 @@ function PrescriptionPage() {
                             <InputNumber
                               min={1}
                               precision={0}
-                              disabled={!canPrescribe}
+                              disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.durationDays}
                               onChange={(value) => handleItemChange(item.clientId, 'durationDays', value)}
                               style={{ width: 100 }}
@@ -1228,7 +1018,7 @@ function PrescriptionPage() {
                           <Form.Item label="Đường dùng" style={{ marginBottom: 8, width: 160 }}>
                             <Select
                               allowClear
-                              disabled={!canPrescribe}
+                              disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.route}
                               onChange={(value) => handleItemChange(item.clientId, 'route', value)}
                               options={ROUTE_OPTIONS}
@@ -1240,7 +1030,7 @@ function PrescriptionPage() {
                         <Space wrap style={{ width: '100%', marginTop: 4 }} align="start">
                           <Form.Item label="Liều dùng *" style={{ marginBottom: 0, flex: 1, minWidth: 260 }}>
                             <Input
-                              disabled={!canPrescribe}
+                              disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.dosage}
                               onChange={(event) => handleItemChange(item.clientId, 'dosage', event.target.value)}
                               placeholder="Ví dụ: 1 viên/lần, 5ml/lần..."
@@ -1248,7 +1038,7 @@ function PrescriptionPage() {
                           </Form.Item>
                           <Form.Item label="Tần suất *" style={{ marginBottom: 0, flex: 1, minWidth: 240 }}>
                             <Input
-                              disabled={!canPrescribe}
+                              disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.frequency}
                               onChange={(event) => handleItemChange(item.clientId, 'frequency', event.target.value)}
                               placeholder="Ví dụ: 2 lần/ngày, sáng - tối..."
@@ -1256,7 +1046,7 @@ function PrescriptionPage() {
                           </Form.Item>
                           <Form.Item label="Hướng dẫn dùng" style={{ marginBottom: 0, flex: 1, minWidth: 260 }}>
                             <Input
-                              disabled={!canPrescribe}
+                              disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.instructions}
                               onChange={(event) => handleItemChange(item.clientId, 'instructions', event.target.value)}
                               placeholder="Ví dụ: Uống sau khi ăn no..."
@@ -1271,7 +1061,11 @@ function PrescriptionPage() {
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
-                      onClick={() => setItems((current) => [...current, createEmptyItem(false)])}
+                      disabled={checkingInteractions || saving}
+                      onClick={() => {
+                        setConfirmedOverrides([])
+                        setItems((current) => [...current, createEmptyItem(false)])
+                      }}
                       style={{ width: '100%', marginTop: 8 }}
                     >
                       + Thêm thuốc mới vào đơn
@@ -1283,7 +1077,7 @@ function PrescriptionPage() {
                   <Form.Item label="Ghi chú đơn thuốc (cho bệnh nhân & dược sĩ)">
                     <Input.TextArea
                       rows={2}
-                      disabled={!canPrescribe}
+                      disabled={!canPrescribe || checkingInteractions || saving}
                       value={note}
                       onChange={(event) => setNote(event.target.value)}
                       placeholder="Nhập dặn dò thêm cho bệnh nhân..."
@@ -1302,7 +1096,7 @@ function PrescriptionPage() {
                       >
                         <Input.TextArea
                           rows={2}
-                          disabled={!canPrescribe}
+                          disabled={!canPrescribe || checkingInteractions || saving}
                           value={changeReason}
                           onChange={(event) => setChangeReason(event.target.value)}
                           placeholder="Nhập lý do điều chỉnh đơn thuốc hoặc chọn nhanh từ danh sách bên dưới..."
@@ -1315,9 +1109,9 @@ function PrescriptionPage() {
                           <Tag
                             key={idx}
                             color="orange"
-                            style={{ cursor: canPrescribe ? 'pointer' : 'not-allowed', margin: '2px 0' }}
+                            style={{ cursor: (canPrescribe && !checkingInteractions && !saving) ? 'pointer' : 'not-allowed', margin: '2px 0' }}
                             onClick={() => {
-                              if (!canPrescribe) return
+                              if (!canPrescribe || checkingInteractions || saving) return
                               setChangeReason(preset)
                             }}
                           >
@@ -1328,27 +1122,52 @@ function PrescriptionPage() {
                     </div>
                   )}
 
-                  {detectedInteractions.length > 0 && (
+                  {checkingInteractions && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        type="info"
+                        showIcon
+                        icon={<Spin size="small" />}
+                        message="Đang kiểm tra tương tác thuốc từ Backend..."
+                      />
+                    </div>
+                  )}
+
+                  {!checkingInteractions && detectedInteractions.length > 0 && (
                     <div style={{ marginTop: 16 }}>
                       <Alert
                         type="error"
                         showIcon
                         icon={<WarningOutlined />}
-                        message={`Phát hiện ${detectedInteractions.length} tương tác thuốc`}
-                        description={detectedInteractions.map((warning) => warning.description).join('; ')}
+                        message={`Phát hiện ${detectedInteractions.length} tương tác thuốc bất lợi`}
+                        description={
+                          <div>
+                            <ul style={{ margin: '4px 0 8px 0', paddingLeft: 20 }}>
+                              {detectedInteractions.map((w, idx) => (
+                                <li key={idx}>
+                                  <strong>{w.drugNameA}</strong> — <strong>{w.drugNameB}</strong>: {w.description}
+                                </li>
+                              ))}
+                            </ul>
+                            <Button size="small" danger onClick={() => setInteractionModalOpen(true)}>
+                              Xem cảnh báo & Bỏ qua
+                            </Button>
+                          </div>
+                        }
                       />
                     </div>
                   )}
 
                   <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     {editingPrescription && (
-                      <Button onClick={cancelEditMode}>Hủy điều chỉnh</Button>
+                      <Button disabled={checkingInteractions || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                     )}
                     {canPrescribe && (
                       <Button
                         type="primary"
                         size="large"
-                        loading={saving}
+                        loading={saving || checkingInteractions}
+                        disabled={checkingInteractions}
                         icon={<CheckCircleOutlined />}
                         onClick={handleSaveClick}
                       >
@@ -1385,7 +1204,6 @@ function PrescriptionPage() {
       <InteractionWarningModal
         open={interactionModalOpen}
         warnings={detectedInteractions}
-        currentUser={currentUser}
         onCancel={() => setInteractionModalOpen(false)}
         onConfirmOverride={handleConfirmInteractionOverrides}
       />
