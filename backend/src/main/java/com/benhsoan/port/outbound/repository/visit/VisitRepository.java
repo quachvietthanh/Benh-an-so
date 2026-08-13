@@ -33,4 +33,6 @@ public interface VisitRepository {
             Instant toExclusive
     );
 
+    List<Visit> findByVisitAtBetween(Instant fromInclusive, Instant toExclusive);
+
 }

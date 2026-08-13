@@ -81,4 +81,11 @@ public class VisitRepositoryAdapter implements VisitRepository {
                 toExclusive
         );
     }
+
+    @Override
+    public List<Visit> findByVisitAtBetween(Instant fromInclusive, Instant toExclusive) {
+        return jpaRepository.findByVisitAtBetween(fromInclusive, toExclusive).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
 }
