@@ -60,6 +60,12 @@ const medicalRecordApi = {
   getDiagnosisCatalog: (searchQuery) => {
     return axiosClient.get('/diagnosis-catalog', { params: { search: searchQuery } })
   },
+  getAccessLogsByPatient: (patientId, params = {}) => {
+    return axiosClient.get('/medical-records/access-logs', { params: { patientId, ...params } })
+  },
+  getAccessLogsByRecord: (medicalRecordId, params = {}) => {
+    return axiosClient.get(`/medical-records/${medicalRecordId}/access-logs`, { params })
+  },
 }
 
 export default medicalRecordApi
