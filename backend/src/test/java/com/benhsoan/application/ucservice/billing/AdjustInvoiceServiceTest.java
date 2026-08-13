@@ -37,7 +37,7 @@ class AdjustInvoiceServiceTest {
     void createsAdjustmentInvoiceLinkedToOriginalInvoice() {
         InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
         AdjustmentInvoiceCodeGenerator codeGenerator = mock(AdjustmentInvoiceCodeGenerator.class);
-        CurrentUserPort currentUserPort = adminCurrentUser();
+        CurrentUserPort currentUserPort = managerCurrentUser();
         ClockPort clockPort = fixedClock();
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
 
@@ -92,7 +92,7 @@ class AdjustInvoiceServiceTest {
         AdjustInvoiceService service = new AdjustInvoiceService(
                 invoiceRepository,
                 mock(AdjustmentInvoiceCodeGenerator.class),
-                adminCurrentUser(),
+                managerCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper()
@@ -136,7 +136,7 @@ class AdjustInvoiceServiceTest {
         AdjustInvoiceService service = new AdjustInvoiceService(
                 invoiceRepository,
                 mock(AdjustmentInvoiceCodeGenerator.class),
-                adminCurrentUser(),
+                managerCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper()
@@ -157,7 +157,7 @@ class AdjustInvoiceServiceTest {
         AdjustInvoiceService service = new AdjustInvoiceService(
                 invoiceRepository,
                 mock(AdjustmentInvoiceCodeGenerator.class),
-                adminCurrentUser(),
+                managerCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper()
@@ -172,7 +172,7 @@ class AdjustInvoiceServiceTest {
     @Test
     void rejectsUnauthorizedActor() {
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
-        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("MANAGER")).thenReturn(false);
         when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
 
         InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
@@ -199,7 +199,7 @@ class AdjustInvoiceServiceTest {
         AdjustInvoiceService service = new AdjustInvoiceService(
                 mock(InvoiceRepository.class),
                 mock(AdjustmentInvoiceCodeGenerator.class),
-                adminCurrentUser(),
+                managerCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper()
@@ -220,7 +220,7 @@ class AdjustInvoiceServiceTest {
         AdjustInvoiceService service = new AdjustInvoiceService(
                 invoiceRepository,
                 mock(AdjustmentInvoiceCodeGenerator.class),
-                adminCurrentUser(),
+                managerCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper()
@@ -254,9 +254,9 @@ class AdjustInvoiceServiceTest {
         );
     }
 
-    private static CurrentUserPort adminCurrentUser() {
+    private static CurrentUserPort managerCurrentUser() {
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
-        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+        when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
         return currentUserPort;
     }

@@ -35,6 +35,19 @@ public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {
 
     List<VisitEntity> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 
+    @Query("""
+            select visit
+            from VisitEntity visit
+            where visit.status = com.benhsoan.domain.visit.enums.VisitStatus.COMPLETED
+              and visit.completedAt >= :fromInclusive
+              and visit.completedAt < :toExclusive
+            order by visit.completedAt asc
+            """)
+    List<VisitEntity> findCompletedBetween(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive
+    );
+
     boolean existsByPatientIdAndStatusIn(UUID patientId, Collection<VisitStatus> statuses);
 
     boolean existsByPatientIdAndStatusInAndVisitAtBetween(
