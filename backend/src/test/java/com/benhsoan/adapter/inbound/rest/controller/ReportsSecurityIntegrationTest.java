@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -32,8 +34,10 @@ import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.PermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
+import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
+import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
@@ -63,6 +67,7 @@ class ReportsSecurityIntegrationTest {
 
     @MockitoBean private GetOperationalSummaryUseCase getOperationalSummaryUseCase;
     @MockitoBean private GetOperationalTimelineUseCase getOperationalTimelineUseCase;
+    @MockitoBean private GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
@@ -76,7 +81,7 @@ class ReportsSecurityIntegrationTest {
                 Role.create("MANAGER", "Clinic manager", true, Set.of(Permission.REPORT_VIEW, Permission.REPORT_EXPORT))
         ));
         when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(
-                Role.create("ADMIN", "Admin", true, Set.of(Permission.USER_READ))
+                Role.create("ADMIN", "Admin", true, Set.of(Permission.USER_READ, Permission.REPORT_VIEW, Permission.REPORT_EXPORT))
         ));
         when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(
                 Role.create("DOCTOR", "Doctor", true, Set.of(Permission.PATIENT_READ))
@@ -95,7 +100,7 @@ class ReportsSecurityIntegrationTest {
     }
 
     @Test
-    void forbidsAdminBecauseReportingBelongsToManagerRole() throws Exception {
+    void forbidsAdminFromOperationalSummaryEvenIfAdminHasReportingPermissions() throws Exception {
         mockMvc.perform(get("/reports/summary")
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-03")
@@ -129,5 +134,43 @@ class ReportsSecurityIntegrationTest {
                         .param("to", "2026-08-03")
                         .with(user("admin").roles("ADMIN")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsManagerToReadTopMedicinesReport() throws Exception {
+        when(getTopMedicinesReportUseCase.getTopMedicines(any(), any())).thenReturn(new TopMedicinesReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                Instant.parse("2026-08-03T08:00:00Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .with(user("manager").roles("MANAGER")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forbidsAdminFromReadingTopMedicinesReport() throws Exception {
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getTopMedicinesReportUseCase);
+    }
+
+    @Test
+    void forbidsDoctorFromReadingTopMedicinesReport() throws Exception {
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .with(user("doctor").roles("DOCTOR")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getTopMedicinesReportUseCase);
     }
 }

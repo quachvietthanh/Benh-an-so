@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
+import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
 
 class OperationalReportDataServiceTest {
 
@@ -45,5 +47,37 @@ class OperationalReportDataServiceTest {
         assertEquals(0L, reportData.timeline().items().get(1).visitCount());
         assertEquals(BigDecimal.ZERO, reportData.timeline().items().get(1).revenue());
         assertEquals(new BigDecimal("-20000"), reportData.timeline().items().get(2).revenue());
+    }
+
+    @Test
+    void returnsTopMedicinesGroupedByMedicineIdUsingDispensedAtRange() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        when(repository.findTopDispensedMedicines(any(), any())).thenReturn(List.of(
+                new TopMedicineSummary(
+                        java.util.UUID.fromString("16000000-0000-0000-0000-000000000003"),
+                        "MED-IBU-400",
+                        "Ibuprofen 400 mg",
+                        15L
+                ),
+                new TopMedicineSummary(
+                        java.util.UUID.fromString("16000000-0000-0000-0000-000000000001"),
+                        "MED-PARA-500",
+                        "Paracetamol 500 mg",
+                        9L
+                )
+        ));
+
+        OperationalReportDataService service = new OperationalReportDataService(repository);
+        var result = service.getTopMedicines(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+        assertEquals(LocalDate.of(2026, 8, 1), result.from());
+        assertEquals(LocalDate.of(2026, 8, 3), result.to());
+        assertNull(result.generatedAt());
+        assertEquals(2, result.items().size());
+        assertEquals(1, result.items().get(0).rank());
+        assertEquals("MED-IBU-400", result.items().get(0).medicineCode());
+        assertEquals(15L, result.items().get(0).totalDispensedQuantity());
+        assertEquals(2, result.items().get(1).rank());
+        assertEquals("MED-PARA-500", result.items().get(1).medicineCode());
     }
 }

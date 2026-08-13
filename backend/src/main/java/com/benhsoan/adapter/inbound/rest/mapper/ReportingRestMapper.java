@@ -8,6 +8,10 @@ import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineR
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
+import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicineItemResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
+import com.benhsoan.port.dto.result.TopMedicineItemResult;
+import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 
 @Component
 public class ReportingRestMapper {
@@ -30,11 +34,30 @@ public class ReportingRestMapper {
         );
     }
 
+    public TopMedicinesReportResponse toResponse(TopMedicinesReportResult result) {
+        return new TopMedicinesReportResponse(
+                result.from(),
+                result.to(),
+                result.generatedAt(),
+                result.items().stream().map(this::toResponse).toList()
+        );
+    }
+
     private OperationalTimelineItemResponse toResponse(OperationalTimelineItemResult result) {
         return new OperationalTimelineItemResponse(
                 result.date(),
                 result.visitCount(),
                 result.revenue()
+        );
+    }
+
+    private TopMedicineItemResponse toResponse(TopMedicineItemResult result) {
+        return new TopMedicineItemResponse(
+                result.rank(),
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.totalDispensedQuantity()
         );
     }
 }

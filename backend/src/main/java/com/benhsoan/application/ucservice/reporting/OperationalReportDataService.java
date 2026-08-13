@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.reporting;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
+import com.benhsoan.port.dto.result.TopMedicineItemResult;
+import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
@@ -53,6 +56,30 @@ public class OperationalReportDataService {
         return new OperationalReportData(
                 getSummary(from, to),
                 getTimeline(from, to)
+        );
+    }
+
+    public TopMedicinesReportResult getTopMedicines(LocalDate from, LocalDate to) {
+        ReportingTimeRange range = ReportingTimeRange.of(from, to);
+        List<TopMedicineItemResult> items = new ArrayList<>();
+        List<com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary> summaries =
+                operationalReportQueryRepository.findTopDispensedMedicines(range.fromInclusive(), range.toExclusive());
+
+        for (int index = 0; index < summaries.size(); index++) {
+            var item = summaries.get(index);
+            items.add(new TopMedicineItemResult(
+                    index + 1,
+                    item.medicineId(),
+                    item.medicineCode(),
+                    item.medicineName(),
+                    item.totalDispensedQuantity()));
+        }
+
+        return new TopMedicinesReportResult(
+                from,
+                to,
+                null,
+                items
         );
     }
 
