@@ -1,5 +1,7 @@
 package com.benhsoan.port.outbound.repository.billing;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +19,8 @@ public interface InvoiceRepository {
     Optional<Invoice> findOriginalByVisitId(UUID visitId);
 
     Optional<Invoice> findByPaymentId(UUID paymentId);
+
+    List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive);
 
     Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable);
 

@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.jpaRepository.billing;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +23,18 @@ public interface JpaInvoiceRepository
     );
 
     Optional<InvoiceEntity> findByPaymentId(UUID paymentId);
+
+    @Query("""
+            select invoice
+            from InvoiceEntity invoice
+            where invoice.createdAt >= :fromInclusive
+              and invoice.createdAt < :toExclusive
+            order by invoice.createdAt asc
+            """)
+    List<InvoiceEntity> findCreatedBetween(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive
+    );
 
     @Query("""
             select

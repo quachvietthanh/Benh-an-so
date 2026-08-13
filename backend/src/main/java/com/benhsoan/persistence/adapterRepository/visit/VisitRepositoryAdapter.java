@@ -56,6 +56,13 @@ public class VisitRepositoryAdapter implements VisitRepository {
     }
 
     @Override
+    public List<Visit> findCompletedBetween(Instant fromInclusive, Instant toExclusive) {
+        return jpaRepository.findCompletedBetween(fromInclusive, toExclusive).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public boolean existsByPatientIdAndStatusIn(UUID patientId, Collection<VisitStatus> statuses) {
         return jpaRepository.existsByPatientIdAndStatusIn(patientId, statuses);
     }
