@@ -15,6 +15,7 @@ import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
+import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -99,6 +100,33 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
                 .map(row -> new DailyRevenueSummary(
                         toLocalDate(row[0]),
                         row[1] == null ? BigDecimal.ZERO : (BigDecimal) row[1]
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<TopMedicineSummary> findTopDispensedMedicines(Instant fromInclusive, Instant toExclusive) {
+        return entityManager.createQuery("""
+                select dispense.medicineId,
+                       medicine.medicineCode,
+                       medicine.medicineName,
+                       sum(dispense.dispensedQuantity)
+                from PrescriptionDispenseItemEntity dispense
+                join MedicineEntity medicine on medicine.id = dispense.medicineId
+                where dispense.dispensedAt >= :fromInclusive
+                  and dispense.dispensedAt < :toExclusive
+                group by dispense.medicineId, medicine.medicineCode, medicine.medicineName
+                order by sum(dispense.dispensedQuantity) desc, medicine.medicineCode asc
+                """, Object[].class)
+                .setParameter("fromInclusive", fromInclusive)
+                .setParameter("toExclusive", toExclusive)
+                .getResultList()
+                .stream()
+                .map(row -> new TopMedicineSummary(
+                        (java.util.UUID) row[0],
+                        (String) row[1],
+                        (String) row[2],
+                        ((Number) row[3]).longValue()
                 ))
                 .toList();
     }

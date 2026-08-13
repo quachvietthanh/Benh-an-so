@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
+import com.benhsoan.port.dto.result.TopMedicineItemResult;
+import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
@@ -53,6 +55,23 @@ public class OperationalReportDataService {
         return new OperationalReportData(
                 getSummary(from, to),
                 getTimeline(from, to)
+        );
+    }
+
+    public TopMedicinesReportResult getTopMedicines(LocalDate from, LocalDate to) {
+        ReportingTimeRange range = ReportingTimeRange.of(from, to);
+
+        return new TopMedicinesReportResult(
+                from,
+                to,
+                operationalReportQueryRepository.findTopDispensedMedicines(range.fromInclusive(), range.toExclusive())
+                        .stream()
+                        .map(item -> new TopMedicineItemResult(
+                                item.medicineId(),
+                                item.medicineCode(),
+                                item.medicineName(),
+                                item.totalDispensedQuantity()))
+                        .toList()
         );
     }
 

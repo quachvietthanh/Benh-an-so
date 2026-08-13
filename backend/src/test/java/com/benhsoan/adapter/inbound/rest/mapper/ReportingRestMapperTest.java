@@ -13,6 +13,9 @@ import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineR
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
+import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
+import com.benhsoan.port.dto.result.TopMedicineItemResult;
+import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 
 class ReportingRestMapperTest {
 
@@ -55,5 +58,27 @@ class ReportingRestMapperTest {
         assertEquals(LocalDate.of(2026, 8, 2), response.items().get(1).date());
         assertEquals(0L, response.items().get(1).visitCount());
         assertEquals(BigDecimal.ZERO, response.items().get(1).revenue());
+    }
+
+    @Test
+    void mapsTopMedicinesResultToStableResponseContract() {
+        TopMedicinesReportResponse response = mapper.toResponse(new TopMedicinesReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                List.of(
+                        new TopMedicineItemResult(
+                                java.util.UUID.fromString("16000000-0000-0000-0000-000000000001"),
+                                "MED-PARA-500",
+                                "Paracetamol 500 mg",
+                                9L
+                        )
+                )
+        ));
+
+        assertEquals(LocalDate.of(2026, 8, 1), response.from());
+        assertEquals(LocalDate.of(2026, 8, 3), response.to());
+        assertEquals(1, response.items().size());
+        assertEquals("MED-PARA-500", response.items().get(0).medicineCode());
+        assertEquals(9L, response.items().get(0).totalDispensedQuantity());
     }
 }
