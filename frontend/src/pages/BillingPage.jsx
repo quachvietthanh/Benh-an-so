@@ -18,20 +18,32 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
   Typography,
 } from 'antd'
 import {
   CheckCircleOutlined,
+  CheckOutlined,
   ClockCircleOutlined,
   CreditCardOutlined,
   DollarCircleOutlined,
+  DollarOutlined,
+  EyeOutlined,
   FileTextOutlined,
+  HistoryOutlined,
+  IdcardOutlined,
+  InfoCircleOutlined,
   LockOutlined,
+  MedicineBoxOutlined,
+  PlusOutlined,
   PrinterOutlined,
   ReloadOutlined,
   RightOutlined,
+  SafetyCertificateOutlined,
   SearchOutlined,
+  TeamOutlined,
+  UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import billingApi from '../api/billingApi'
@@ -50,11 +62,19 @@ const formatDateTime = (val) => {
   return isNaN(date.getTime()) ? '—' : date.toLocaleString('vi-VN')
 }
 
+const formatDateVietnamese = (val) => {
+  const d = val ? new Date(val) : new Date()
+  if (isNaN(d.getTime())) return `Ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`
+  return `Ngày ${d.getDate()} tháng ${String(d.getMonth() + 1).padStart(2, '0')} năm ${d.getFullYear()}`
+}
+
+// Map chính xác theo PaymentMethod enum từ Backend Java: CASH, BANK_TRANSFER, CARD, QR_CODE, E_WALLET
 const PAYMENT_METHODS = [
   { value: 'CASH', label: '💵 Tiền mặt' },
   { value: 'BANK_TRANSFER', label: '🏦 Chuyển khoản' },
-  { value: 'CREDIT_CARD', label: '💳 Thẻ ngân hàng' },
-  { value: 'OTHER', label: '🌐 Phương thức khác' },
+  { value: 'CARD', label: '💳 Thẻ ngân hàng' },
+  { value: 'QR_CODE', label: '📱 QR Code' },
+  { value: 'E_WALLET', label: 'Ví điện tử' },
 ]
 
 function BillingPage() {
@@ -70,12 +90,15 @@ function BillingPage() {
 
   const canCollectPayment = userRoles.includes('receptionist') || userRoles.includes('admin')
 
-  // State quản lý danh sách & lượt khám
-  const [visits, setVisits] = useState([])
+  // State quản lý Tabs & Danh sách lượt khám / Lịch sử
+  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'history'
+  const [pendingVisits, setPendingVisits] = useState([])
+  const [historyInvoices, setHistoryInvoices] = useState([])
   const [selectedVisitId, setSelectedVisitId] = useState(null)
   const [selectedVisitData, setSelectedVisitData] = useState(null)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [loadingVisits, setLoadingVisits] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
@@ -83,56 +106,65 @@ function BillingPage() {
   const [apiError, setApiError] = useState('')
   const [viewingInvoiceModal, setViewingInvoiceModal] = useState(null)
 
-  // 2. Tải danh sách lượt khám (Ưu tiên API /invoices/payable và /queues)
-  const loadVisits = useCallback(async () => {
+  // 2A. Tải danh sách Lịch sử thanh toán từ Backend REST API (GET /invoices)
+  const loadHistoryInvoices = useCallback(async () => {
+    setLoadingHistory(true)
+    try {
+      const res = await billingApi.getAll({ page: 0, size: 50 })
+      const data = res?.data
+      const list = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
+      setHistoryInvoices(list)
+      return list
+    } catch (err) {
+      console.error('[BillingPage] Lỗi loadHistoryInvoices:', err)
+      return []
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [])
+
+  // 2B. Tải danh sách Chờ thanh toán từ Backend API (GET /invoices/payable)
+  const loadPendingVisits = useCallback(async (currentHistory = []) => {
     setLoadingVisits(true)
     setApiError('')
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const [payableRes, queueRes] = await Promise.allSettled([
-        billingApi.getPayable({ page: 0, size: 50 }),
-        queueApi.getQueues({ date: today }),
-      ])
+      const res = await billingApi.getPayable({ page: 0, size: 50 })
+      const data = res?.data
+      const payableList = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
 
-      let payableList = []
-      if (payableRes.status === 'fulfilled') {
-        const data = payableRes.value?.data
-        payableList = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
-      }
-
-      let queueList = []
-      if (queueRes.status === 'fulfilled') {
-        const data = queueRes.value?.data
-        queueList = Array.isArray(data) ? data : []
-      }
-
-      // Hợp nhất danh sách ưu tiên lượt khám hoàn thành
-      const mergedMap = new Map()
-      queueList.forEach((q) => {
-        const id = q.visitId || q.id
-        mergedMap.set(String(id), { ...q, visitId: id })
-      })
-      payableList.forEach((p) => {
-        const id = p.visitId || p.id
-        const existing = mergedMap.get(String(id))
-        mergedMap.set(String(id), { ...existing, ...p, visitId: id, status: 'COMPLETED' })
+      // Loại bỏ những lượt khám đã nằm trong Lịch sử Hóa đơn/Thanh toán Backend
+      const paidVisitIds = new Set(currentHistory.map((h) => String(h.visitId)).filter(Boolean))
+      const filteredPending = payableList.filter((p) => {
+        const id = String(p.visitId || p.id)
+        return !paidVisitIds.has(id)
       })
 
-      const finalVisits = Array.from(mergedMap.values())
-      setVisits(finalVisits)
+      setPendingVisits(filteredPending)
 
       if (location.state?.visitId) {
         setSelectedVisitId(location.state.visitId)
+      } else if (filteredPending.length > 0 && !selectedVisitId) {
+        setSelectedVisitId(filteredPending[0].visitId || filteredPending[0].id)
       }
     } catch (err) {
-      console.error('[BillingPage] Lỗi loadVisits:', err)
-      setApiError('Không thể tải thông tin thanh toán. Vui lòng thử lại.')
+      console.error('[BillingPage] Lỗi loadPendingVisits:', err)
+      setApiError('Không thể tải danh sách chờ thanh toán từ Backend. Vui lòng thử lại.')
     } finally {
       setLoadingVisits(false)
     }
-  }, [location.state])
+  }, [location.state, selectedVisitId])
 
-  // 3. Tải dữ liệu Thu phí & Đơn thuốc từ Backend API
+  // Tải đồng bộ cả 2 danh sách từ Backend
+  const refreshAllData = useCallback(async () => {
+    const historyList = await loadHistoryInvoices()
+    await loadPendingVisits(historyList)
+  }, [loadHistoryInvoices, loadPendingVisits])
+
+  useEffect(() => {
+    refreshAllData()
+  }, [])
+
+  // 3. Tải dữ liệu chi tiết của 1 Lượt khám từ Backend API
   const loadInvoiceData = useCallback(async (visitId) => {
     if (!visitId) {
       setSelectedVisitData(null)
@@ -141,27 +173,24 @@ function BillingPage() {
     setLoadingData(true)
     setApiError('')
 
-    const matchedVisit = visits.find((v) => String(v.visitId || v.id) === String(visitId))
-    const visitStatus = matchedVisit?.status || 'IN_PROGRESS'
+    const matchedVisit = pendingVisits.find((v) => String(v.visitId || v.id) === String(visitId))
+    const visitStatus = matchedVisit?.status || 'COMPLETED'
     const isVisitCompleted = visitStatus === 'COMPLETED' || visitStatus === 'WAITING_FOR_PAYMENT'
 
     try {
-      // A. Tải thông tin Hóa đơn / Payment theo visitId
+      // A. Tải thông tin Hóa đơn theo visitId từ Backend API (GET /invoices?visitId={visitId})
       let invoiceData = null
       try {
         const invoiceRes = await billingApi.getByVisit(visitId)
         const rawData = invoiceRes?.data
-        const list = Array.isArray(rawData?.content) ? rawData.content : Array.isArray(rawData) ? rawData : [rawData]
-        invoiceData = list.find((i) => i && i.id) || null
+        const list = Array.isArray(rawData?.content) ? rawData.content : Array.isArray(rawData) ? rawData : (rawData ? [rawData] : [])
+        invoiceData = list.find((i) => i && (i.id || i.invoiceCode)) || null
       } catch (e) {
         console.warn('[BillingPage] Lỗi getByVisit invoice:', e?.message)
       }
 
-      // B. Tải Đơn thuốc thuộc đúng visitId theo chuỗi liên kết Backend:
-      // Visit (visitId) -> MedicalRecord (medicalRecordId) -> Prescription -> PrescriptionItems
+      // B. Tải Đơn thuốc thuộc visitId
       let prescriptions = []
-
-      // B1: Tìm MedicalRecord theo visitId (/medical-records/visits/{visitId})
       try {
         const mrRes = await medicalRecordApi.getByVisit(visitId)
         const medicalRecordId = mrRes?.data?.id
@@ -173,7 +202,6 @@ function BillingPage() {
         console.warn('[BillingPage] Lỗi getByVisit medical record:', mrErr?.message)
       }
 
-      // B2 (Fallback): Nếu không lấy được qua MedicalRecord, tìm trong danh sách PENDING_DISPENSE & DISPENSED theo visitId/visitCode
       if (prescriptions.length === 0) {
         try {
           const [pendingRes, dispensedRes] = await Promise.allSettled([
@@ -214,69 +242,87 @@ function BillingPage() {
 
       const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
 
-      // Tính tiền thuốc thực tế từ đơn thuốc đã cấp phát Backend
+      // Tính chi phí
       const medicineFee = prescriptionItems.reduce(
         (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || item.price || 0)),
         0,
       )
-      const examFee = Number(invoiceData?.examFee || 100000)
-      const totalAmount = Number(invoiceData?.totalAmount || examFee + medicineFee)
+      const examFee = 100000
+      const totalAmount = invoiceData?.totalAmount ? Number(invoiceData.totalAmount) : (examFee + medicineFee)
 
-      setSelectedVisitData({
-        visitId,
-        paymentId: invoiceData?.paymentId || invoiceData?.id || null,
-        visitCode: matchedVisit?.visitCode || matchedVisit?.queueCode || invoiceData?.visitCode || visitId,
-        patientName: matchedVisit?.patientName || invoiceData?.patientName || 'Bệnh nhân',
-        patientCode: matchedVisit?.patientCode || invoiceData?.patientCode || '—',
-        doctorName: matchedVisit?.doctorName || invoiceData?.doctorName || 'Bác sĩ khám',
-        visitStatus,
-        prescriptionCode,
-        prescriptionStatus,
-        isVisitCompleted,
-        isDispensingCompleted,
-        isEligibleToPay: isVisitCompleted && isDispensingCompleted,
-        examFee,
-        medicineFee,
-        totalAmount,
-        paymentStatus: invoiceData?.status === 'PAID' || invoiceData?.status === 'COMPLETED' ? 'PAID' : 'UNPAID',
-        invoiceCode: invoiceData?.invoiceCode || invoiceData?.code || null,
-        paidAt: invoiceData?.paidAt || invoiceData?.createdAt || null,
-        paymentMethodLabel: invoiceData?.paymentMethod || 'Tiền mặt',
-        collectedBy: invoiceData?.collectedByName || user?.fullName || 'Lễ tân',
-        prescriptionItems,
+      const hasInvoice = !!(invoiceData && (invoiceData.id || invoiceData.invoiceCode))
+
+      setSelectedVisitData((prev) => {
+        const currentPaymentId = invoiceData?.paymentId || (prev?.visitId === visitId ? prev?.paymentId : null)
+        const isPaid = hasInvoice || !!currentPaymentId || (prev?.visitId === visitId && prev?.paymentStatus === 'PAID')
+
+        return {
+          visitId,
+          paymentId: currentPaymentId,
+          invoiceId: invoiceData?.id || (prev?.visitId === visitId ? prev?.invoiceId : null),
+          invoiceCode: invoiceData?.invoiceCode || (prev?.visitId === visitId ? prev?.invoiceCode : null),
+          invoiceType: invoiceData?.type || 'ORIGINAL',
+          invoiceLines: invoiceData?.lines || [],
+          invoiceCreatedAt: invoiceData?.createdAt || null,
+          visitCode: matchedVisit?.visitCode || matchedVisit?.queueCode || invoiceData?.visitCode || visitId,
+          patientName: matchedVisit?.patientName || invoiceData?.patientName || 'Bệnh nhân',
+          patientCode: matchedVisit?.patientCode || invoiceData?.patientCode || '—',
+          doctorName: matchedVisit?.doctorName || invoiceData?.doctorName || 'Bác sĩ khám',
+          visitStatus,
+          prescriptionCode,
+          prescriptionStatus,
+          isVisitCompleted,
+          isDispensingCompleted,
+          isEligibleToPay: isVisitCompleted && isDispensingCompleted,
+          examFee,
+          medicineFee,
+          totalAmount,
+          paymentStatus: isPaid ? 'PAID' : 'UNPAID',
+          paidAt: invoiceData?.paidAt || (prev?.visitId === visitId ? prev?.paidAt : null) || invoiceData?.createdAt || null,
+          paymentMethod: (prev?.visitId === visitId ? prev?.paymentMethod : null) || 'CASH',
+          collectedBy: invoiceData?.createdBy || (prev?.visitId === visitId ? prev?.collectedBy : null) || user?.fullName || 'Lễ tân',
+          prescriptionItems,
+        }
       })
     } catch (err) {
       console.error('[BillingPage] Lỗi loadInvoiceData:', err)
-      setApiError('Không thể tải thông tin thanh toán. Vui lòng thử lại.')
+      setApiError('Không thể tải thông tin chi tiết khoản thu từ Backend. Vui lòng thử lại.')
     } finally {
       setLoadingData(false)
     }
-  }, [user, visits])
-
-  useEffect(() => { loadVisits() }, [loadVisits])
+  }, [pendingVisits, user])
 
   useEffect(() => {
     if (selectedVisitId) loadInvoiceData(selectedVisitId)
   }, [selectedVisitId, loadInvoiceData])
 
-  const filteredVisits = useMemo(() => {
+  const filteredPendingVisits = useMemo(() => {
     const kw = searchKeyword.trim().toLowerCase()
-    if (!kw) return visits
-    return visits.filter((v) =>
+    if (!kw) return pendingVisits
+    return pendingVisits.filter((v) =>
       [v.patientName, v.patientCode, v.visitCode, v.queueCode]
         .some((val) => String(val || '').toLowerCase().includes(kw)),
     )
-  }, [visits, searchKeyword])
+  }, [pendingVisits, searchKeyword])
 
-  // 4. Ghi nhận thanh toán (POST /invoices/payments) theo đúng RecordPaymentRequest DTO
+  const filteredHistoryInvoices = useMemo(() => {
+    const kw = searchKeyword.trim().toLowerCase()
+    if (!kw) return historyInvoices
+    return historyInvoices.filter((i) =>
+      [i.invoiceCode, i.visitId, i.patientName, i.patientCode]
+        .some((val) => String(val || '').toLowerCase().includes(kw)),
+    )
+  }, [historyInvoices, searchKeyword])
+
+  // 4. Ghi nhận thanh toán (POST /invoices/payments) & Xử lý lỗi 409
   const handleConfirmPayment = async () => {
     if (!selectedVisitData || !selectedVisitId) return
     if (!canCollectPayment) {
       message.error('Bạn không có quyền thực hiện thu phí.')
       return
     }
-    if (!selectedVisitData.isEligibleToPay) {
-      message.warning('Lượt khám chưa đủ điều kiện thanh toán.')
+    if (selectedVisitData.paymentStatus === 'PAID') {
+      message.info('Khoản thu cho lượt khám này đã được thanh toán.')
       return
     }
 
@@ -294,32 +340,90 @@ function BillingPage() {
       const res = await billingApi.pay(payload)
       const paymentRes = res?.data
 
-      message.success(`Đã thu thành công ${money(selectedVisitData.totalAmount)} cho lượt khám ${selectedVisitData.visitCode}!`)
-      await loadInvoiceData(selectedVisitId)
-      await loadVisits()
+      if (!paymentRes || !paymentRes.id) {
+        throw new Error('Backend không trả về paymentId hợp lệ.')
+      }
+
+      const isPaidSuccess = paymentRes.status === 'RECORDED' || paymentRes.status === 'SUCCESS'
+
+      message.success(`✓ Đã thu thành công ${money(paymentRes.amountPaid || selectedVisitData.totalAmount)} cho lượt khám ${selectedVisitData.visitCode}!`)
+
+      // Cập nhật state chính xác từ PaymentResponse Backend
+      setSelectedVisitData((prev) => ({
+        ...prev,
+        paymentId: paymentRes.id,
+        paymentStatus: isPaidSuccess ? 'PAID' : 'UNPAID',
+        paymentMethod: paymentRes.paymentMethod || paymentMethod,
+        paidAt: paymentRes.paidAt || paymentRes.createdAt,
+        collectedBy: paymentRes.collectedBy || user?.fullName || 'Lễ tân',
+        totalAmount: Number(paymentRes.amountPaid || prev.totalAmount),
+      }))
+
+      // Xóa khỏi hàng đợi Chờ thanh toán và Tải lại Lịch sử từ Backend
+      setPendingVisits((prev) => prev.filter((v) => String(v.visitId || v.id) !== String(selectedVisitId)))
+      await loadHistoryInvoices()
+
     } catch (err) {
       console.error('[BillingPage] Lỗi payment:', err?.config?.url, err?.response?.status, err?.response?.data)
       const status = err?.response?.status
       const msg = err?.response?.data?.message
 
-      if (status === 403) setApiError('Bạn không có quyền thực hiện thu phí.')
-      else if (status === 409) {
-        setApiError('Khoản thu này đã được thanh toán.')
-        message.warning('Khoản thu này đã được thanh toán.')
-        await loadInvoiceData(selectedVisitId)
+      if (status === 409) {
+        // XỬ LÝ LỖI 409: Khoản thu đã được thanh toán trước đó trên Backend!
+        message.warning('Khoản thu này đã được ghi nhận thanh toán từ trước (409). Đang đồng bộ dữ liệu thực tế từ Backend...')
+        
+        try {
+          const invoiceRes = await billingApi.getByVisit(selectedVisitId)
+          const rawData = invoiceRes?.data
+          const list = Array.isArray(rawData?.content) ? rawData.content : Array.isArray(rawData) ? rawData : (rawData ? [rawData] : [])
+          const foundInvoice = list.find((i) => i && (i.id || i.invoiceCode))
+
+          setSelectedVisitData((prev) => ({
+            ...prev,
+            paymentStatus: 'PAID',
+            invoiceId: foundInvoice?.id || prev?.invoiceId || null,
+            invoiceCode: foundInvoice?.invoiceCode || prev?.invoiceCode || null,
+            invoiceLines: foundInvoice?.lines || prev?.invoiceLines || [],
+            invoiceCreatedAt: foundInvoice?.createdAt || prev?.invoiceCreatedAt || null,
+            paymentId: foundInvoice?.paymentId || prev?.paymentId || null,
+            paidAt: foundInvoice?.paidAt || foundInvoice?.createdAt || prev?.paidAt || new Date().toISOString(),
+          }))
+
+          // Xóa khỏi danh sách chờ thanh toán
+          setPendingVisits((prev) => prev.filter((v) => String(v.visitId || v.id) !== String(selectedVisitId)))
+          await loadHistoryInvoices()
+        } catch (getErr) {
+          console.error('[BillingPage] Lỗi GET lại thông tin sau 409:', getErr)
+        }
+      } else if (status === 400) {
+        setApiError(msg || 'Dữ liệu ghi nhận thanh toán không hợp lệ (400).')
+      } else if (status === 401) {
+        setApiError('Hết phiên làm việc. Vui lòng đăng nhập lại (401).')
+      } else if (status === 403) {
+        setApiError('Bạn không có quyền thực hiện thu phí (403).')
+      } else if (status === 404) {
+        setApiError('Không tìm thấy thông tin lượt khám trên hệ thống (404).')
       } else {
-        setApiError(msg || 'Không thể tải thông tin thanh toán. Vui lòng thử lại.')
+        setApiError(msg || 'Không thể ghi nhận thanh toán từ Backend. Vui lòng thử lại.')
       }
     } finally {
       setSubmittingPayment(false)
     }
   }
 
-  // 5. Lập hóa đơn sau khi thanh toán thành công (POST /invoices) theo CreateInvoiceRequest DTO
+  // 5. Lập hóa đơn điện tử (POST /invoices) theo CreateInvoiceRequest DTO { visitId, paymentId }
   const handleCreateInvoice = async () => {
     if (!selectedVisitData) return
+    if (!canCollectPayment) {
+      message.error('Bạn không có quyền lập hóa đơn.')
+      return
+    }
     if (selectedVisitData.paymentStatus !== 'PAID') {
       message.warning('Cần hoàn tất thu phí trước khi lập hóa đơn.')
+      return
+    }
+    if (selectedVisitData.invoiceCode || selectedVisitData.invoiceId) {
+      message.info('✓ Hóa đơn đã được lập cho lượt khám này.')
       return
     }
 
@@ -332,20 +436,92 @@ function BillingPage() {
       }
 
       const res = await billingApi.createInvoice(payload)
-      const invoiceData = res?.data
-      message.success(`Lập hóa đơn thành công! Mã HĐ: ${invoiceData?.invoiceCode || 'HD-NEW'}`)
-      await loadInvoiceData(selectedVisitData.visitId)
+      const invoiceRes = res?.data
+
+      if (!invoiceRes || (!invoiceRes.id && !invoiceRes.invoiceCode)) {
+        throw new Error('Backend trả về response không hợp lệ khi tạo Hóa đơn.')
+      }
+
+      message.success(`✓ Lập hóa đơn thành công! Mã HĐ: ${invoiceRes.invoiceCode}`)
+
+      let detailInvoice = invoiceRes
+      if (invoiceRes.id) {
+        try {
+          const detailRes = await billingApi.getById(invoiceRes.id)
+          if (detailRes?.data) detailInvoice = detailRes.data
+        } catch (getErr) {
+          console.warn('[BillingPage] Lỗi fetch getById after create:', getErr?.message)
+        }
+      }
+
+      setSelectedVisitData((prev) => ({
+        ...prev,
+        invoiceId: detailInvoice.id,
+        invoiceCode: detailInvoice.invoiceCode,
+        invoiceType: detailInvoice.type || 'ORIGINAL',
+        invoiceLines: detailInvoice.lines || [],
+        invoiceCreatedAt: detailInvoice.createdAt,
+        totalAmount: Number(detailInvoice.totalAmount || prev.totalAmount),
+        paymentStatus: 'PAID',
+      }))
+
+      // Tải lại Lịch sử thanh toán từ Backend
+      await loadHistoryInvoices()
+
     } catch (err) {
       console.error('[BillingPage] Lỗi createInvoice:', err?.config?.url, err?.response?.status, err?.response?.data)
       const status = err?.response?.status
+      const msg = err?.response?.data?.message
+
       if (status === 409) {
-        setApiError('Lượt khám đã có hóa đơn.')
-        message.warning('Lượt khám đã có hóa đơn.')
+        message.warning('Lượt khám này đã được lập hóa đơn trước đó (409). Đang tải hóa đơn từ Backend...')
+        await loadInvoiceData(selectedVisitData.visitId)
+        await loadHistoryInvoices()
+      } else if (status === 400) {
+        setApiError(msg || 'Dữ liệu tạo hóa đơn không hợp lệ (400).')
+      } else if (status === 401) {
+        setApiError('Hết phiên làm việc. Vui lòng đăng nhập lại (401).')
+      } else if (status === 403) {
+        setApiError('Bạn không có quyền lập hóa đơn (403).')
+      } else if (status === 404) {
+        setApiError('Không tìm thấy thông tin lượt khám / thanh toán (404).')
       } else {
-        setApiError('Không thể tải thông tin thanh toán. Vui lòng thử lại.')
+        setApiError(msg || 'Không thể lập hóa đơn điện tử từ Backend. Vui lòng thử lại.')
       }
     } finally {
       setSubmittingInvoice(false)
+    }
+  }
+
+  // 6. Xem hóa đơn điện tử từ Backend API GET /invoices/{invoiceId}
+  const handleViewInvoice = async (invoiceId) => {
+    const targetId = invoiceId || selectedVisitData?.invoiceId
+    if (targetId) {
+      try {
+        setLoadingData(true)
+        const res = await billingApi.getById(targetId)
+        if (res?.data) {
+          setViewingInvoiceModal(res.data)
+          return
+        }
+      } catch (err) {
+        console.warn('[BillingPage] Lỗi getById, fallback từ state:', err?.message)
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    if (selectedVisitData?.invoiceCode) {
+      setViewingInvoiceModal({
+        id: selectedVisitData.invoiceId,
+        invoiceCode: selectedVisitData.invoiceCode,
+        type: selectedVisitData.invoiceType || 'ORIGINAL',
+        visitId: selectedVisitData.visitId,
+        paymentId: selectedVisitData.paymentId,
+        totalAmount: selectedVisitData.totalAmount,
+        createdAt: selectedVisitData.invoiceCreatedAt || selectedVisitData.paidAt,
+        lines: selectedVisitData.invoiceLines || [],
+      })
     }
   }
 
@@ -361,6 +537,75 @@ function BillingPage() {
     { key: 'med', name: `Tiền thuốc kê đơn (${selectedVisitData.prescriptionItems.length} loại)`, quantity: selectedVisitData.prescriptionItems.length || 0, price: selectedVisitData.medicineFee, amount: selectedVisitData.medicineFee },
   ] : []
 
+  // Columns cho Tab Lịch sử thanh toán (Backend GET /invoices)
+  const historyColumns = [
+    {
+      title: 'Mã HĐ',
+      dataIndex: 'invoiceCode',
+      key: 'invoiceCode',
+      render: (v, r) => <Text code style={{ color: '#1e40af', fontWeight: 700 }}>{v || r.id?.substring(0, 8)}</Text>,
+    },
+    {
+      title: 'Mã lượt khám',
+      dataIndex: 'visitId',
+      key: 'visitId',
+      render: (v) => <Text strong>{v?.substring(0, 8)}...</Text>,
+    },
+    {
+      title: 'Số tiền',
+      dataIndex: 'totalAmount',
+      key: 'totalAmount',
+      align: 'right',
+      render: (v) => <Text strong style={{ color: '#dc2626' }}>{money(v)}</Text>,
+    },
+    {
+      title: 'Loại HĐ',
+      dataIndex: 'type',
+      key: 'type',
+      align: 'center',
+      render: (v) => <Tag color="blue">{v || 'ORIGINAL'}</Tag>,
+    },
+    {
+      title: 'Thời gian lập',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (v) => formatDateTime(v),
+    },
+    {
+      title: 'Trạng thái',
+      key: 'status',
+      align: 'center',
+      render: () => <Tag color="green" icon={<CheckCircleOutlined />}>ĐÃ LẬP HÓA ĐƠN</Tag>,
+    },
+    {
+      title: 'Thao tác',
+      key: 'actions',
+      align: 'center',
+      render: (_, r) => (
+        <Space size="small">
+          <Button
+            type="primary"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewInvoice(r.id)}
+          >
+            Xem HĐ
+          </Button>
+          <Button
+            size="small"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              handleViewInvoice(r.id)
+              setTimeout(() => window.print(), 300)
+            }}
+          >
+            In HĐ
+          </Button>
+        </Space>
+      ),
+    },
+  ]
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -370,8 +615,8 @@ function BillingPage() {
           </Title>
           <Text type="secondary">Quản lý thu tiền viện phí, thanh toán dịch vụ và lập hóa đơn điện tử.</Text>
         </div>
-        <Button icon={<ReloadOutlined />} loading={loadingVisits} onClick={loadVisits}>
-          Làm mới danh sách
+        <Button icon={<ReloadOutlined />} loading={loadingVisits || loadingHistory} onClick={refreshAllData}>
+          Làm mới dữ liệu
         </Button>
       </div>
 
@@ -390,281 +635,383 @@ function BillingPage() {
         <Alert
           type="error"
           showIcon
-          message="Không thể tải thông tin thanh toán. Vui lòng thử lại."
+          message="Thông báo từ hệ thống"
           description={apiError}
-          action={<Button size="small" onClick={loadVisits}>Thử lại</Button>}
+          action={<Button size="small" onClick={refreshAllData}>Thử lại</Button>}
           style={{ marginBottom: 16 }}
         />
       )}
 
-      <Row gutter={[16, 16]} align="stretch">
-        {/* Cột trái: Danh sách Lượt khám */}
-        <Col xs={24} xl={9}>
-          <Card title={`Danh sách lượt khám (${filteredVisits.length})`} styles={{ body: { padding: 12 } }} style={{ height: '100%' }}>
-            <Input
-              allowClear
-              prefix={<SearchOutlined />}
-              placeholder="Tìm tên BN, mã BN, mã lượt khám..."
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              style={{ marginBottom: 12 }}
-            />
-            <List
-              loading={loadingVisits}
-              dataSource={filteredVisits}
-              locale={{ emptyText: <Empty description="Không có lượt khám nào" /> }}
-              style={{ maxHeight: 620, overflowY: 'auto' }}
-              renderItem={(item) => {
-                const vId = item.visitId || item.id
-                const selected = String(vId) === String(selectedVisitId)
-                const isCompleted = item.status === 'COMPLETED' || item.status === 'WAITING_FOR_PAYMENT'
-                return (
-                  <List.Item
-                    key={vId}
-                    onClick={() => setSelectedVisitId(vId)}
-                    style={{
-                      cursor: 'pointer',
-                      border: selected ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                      background: selected ? '#eff6ff' : '#ffffff',
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      padding: 12,
-                      transition: 'all 0.2s ease',
-                    }}
-                    extra={<RightOutlined style={{ color: selected ? '#2563eb' : '#94a3b8' }} />}
-                  >
-                    <List.Item.Meta
-                      title={(
-                        <Space wrap>
-                          <Text strong style={{ color: selected ? '#1e40af' : '#0f172a' }}>
-                            {item.visitCode || item.queueCode || vId}
-                          </Text>
-                          {isCompleted ? (
-                            <Tag color="green">Đã hoàn thành</Tag>
-                          ) : (
-                            <Tag color="orange" icon={<WarningOutlined />}>Đang khám ({item.status})</Tag>
-                          )}
-                        </Space>
-                      )}
-                      description={(
-                        <Space direction="vertical" size={1}>
-                          <Text strong style={{ color: '#0f172a' }}>{item.patientName} ({item.patientCode || '—'})</Text>
-                          <Text type="secondary">Bác sĩ: {item.doctorName || '—'}</Text>
-                        </Space>
-                      )}
+      {/* 2 TABS CHUẨN FRONTEND: CHỜ THANH TOÁN vs LỊCH SỬ THANH TOÁN */}
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        type="card"
+        style={{ marginBottom: 16 }}
+        items={[
+          {
+            key: 'pending',
+            label: (
+              <span>
+                <ClockCircleOutlined style={{ color: '#d97706', marginRight: 6 }} />
+                Chờ thanh toán ({filteredPendingVisits.length})
+              </span>
+            ),
+            children: (
+              <Row gutter={[16, 16]} align="stretch">
+                {/* Cột trái: Danh sách Lượt khám Chờ thanh toán */}
+                <Col xs={24} xl={9}>
+                  <Card title={`Hàng đợi thanh toán (${filteredPendingVisits.length})`} styles={{ body: { padding: 12 } }} style={{ height: '100%' }}>
+                    <Input
+                      allowClear
+                      prefix={<SearchOutlined />}
+                      placeholder="Tìm tên BN, mã BN, mã lượt khám..."
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      style={{ marginBottom: 12 }}
                     />
-                  </List.Item>
-                )
-              }}
-            />
-          </Card>
-        </Col>
-
-        {/* Cột phải: Chi tiết Khoản Thu & Thanh Toán */}
-        <Col xs={24} xl={15}>
-          <Card title={selectedVisitData ? `Tổng hợp khoản thu: ${selectedVisitData.visitCode}` : 'Chi tiết khoản thu & Hóa đơn'} style={{ height: '100%' }}>
-            {!selectedVisitData ? (
-              <Empty description="Vui lòng chọn lượt khám ở danh sách bên trái" />
-            ) : (
-              <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                {/* 1. Thông tin lượt khám Read-Only */}
-                <div>
-                  <Title level={5} style={{ marginBottom: 10, color: '#1e3a8a' }}>1. Thông tin lượt khám &amp; Trạng thái</Title>
-                  <Descriptions
-                    bordered
-                    size="small"
-                    column={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2, xxl: 2 }}
-                    labelStyle={{ width: '120px', fontWeight: 600, color: '#475569', background: '#f8fafc' }}
-                    contentStyle={{ background: '#ffffff' }}
-                  >
-                    <Descriptions.Item label="Mã lượt khám">
-                      <Text code style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>{selectedVisitData.visitCode}</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Bệnh nhân">
-                      <Text strong style={{ color: '#2563eb' }}>{selectedVisitData.patientName}</Text>{' '}
-                      <Text type="secondary">({selectedVisitData.patientCode})</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Bác sĩ khám">
-                      <Text strong>{selectedVisitData.doctorName}</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Lượt khám">
-                      {selectedVisitData.isVisitCompleted ? (
-                        <Tag color="green" style={{ margin: 0 }}>Đã hoàn thành ({selectedVisitData.visitStatus})</Tag>
-                      ) : (
-                        <Tag color="orange" icon={<WarningOutlined />} style={{ margin: 0 }}>Đang khám ({selectedVisitData.visitStatus})</Tag>
-                      )}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Đơn thuốc">
-                      {selectedVisitData.prescriptionStatus === 'DISPENSED' ? (
-                        <Space wrap style={{ margin: 0 }}>
-                          <Tag color="green" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
-                            Đã cấp phát ({selectedVisitData.prescriptionCode || 'DISPENSED'})
-                          </Tag>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            ({selectedVisitData.prescriptionItems.length} loại thuốc)
-                          </Text>
-                        </Space>
-                      ) : selectedVisitData.prescriptionStatus === 'PENDING_DISPENSE' ? (
-                        <Space wrap style={{ margin: 0 }}>
-                          <Tag color="orange" icon={<ClockCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
-                            Có đơn - Chờ Dược sĩ cấp phát ({selectedVisitData.prescriptionCode || 'PENDING'})
-                          </Tag>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            ({selectedVisitData.prescriptionItems.length} loại thuốc)
-                          </Text>
-                        </Space>
-                      ) : selectedVisitData.prescriptionStatus ? (
-                        <Tag color="volcano" style={{ margin: 0 }}>{selectedVisitData.prescriptionStatus}</Tag>
-                      ) : (
-                        <Tag color="default" style={{ margin: 0 }}>Không có đơn thuốc</Tag>
-                      )}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Thanh toán">
-                      {selectedVisitData.paymentStatus === 'PAID' ? (
-                        <Tag color="green" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 700 }}>ĐÃ THANH TOÁN</Tag>
-                      ) : (
-                        <Tag color="volcano" icon={<WarningOutlined />} style={{ margin: 0, fontWeight: 700 }}>CHƯA THANH TOÁN</Tag>
-                      )}
-                    </Descriptions.Item>
-                  </Descriptions>
-                </div>
-
-                {/* Kiểm tra điều kiện nghiệp vụ Backend */}
-                {!selectedVisitData.isVisitCompleted && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    icon={<WarningOutlined />}
-                    message="Lượt khám chưa đủ điều kiện thanh toán."
-                    description="Lượt khám đang ở trạng thái IN_PROGRESS (chưa hoàn tất khám bệnh). Backend quy định chỉ các lượt khám COMPLETED mới được ghi nhận thanh toán."
-                  />
-                )}
-
-                {selectedVisitData.isVisitCompleted && !selectedVisitData.isDispensingCompleted && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    icon={<ClockCircleOutlined />}
-                    message="Thuốc chưa được cấp phát."
-                    description="Đơn thuốc của lượt khám này đang ở trạng thái PENDING_DISPENSE. Dược sĩ cần thực hiện xuất kho cấp thuốc trước khi Lễ tân thu phí."
-                  />
-                )}
-
-                <Divider style={{ margin: '4px 0' }} />
-
-                {/* 2. Chi tiết các khoản phải thu */}
-                <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>2. Chi tiết các khoản phải thu</Title>
-                  <Table rowKey="key" columns={feeColumns} dataSource={feeDataSource} pagination={false} size="small" loading={loadingData} scroll={{ x: 'max-content' }} />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                    <Card size="small" style={{ backgroundColor: '#f8fafc', minWidth: 300, borderColor: '#cbd5e1' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text strong style={{ fontSize: 15 }}>TỔNG PHẢI THU:</Text>
-                        <Text strong style={{ fontSize: 19, color: '#dc2626' }}>{money(selectedVisitData.totalAmount)}</Text>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-
-                <Divider style={{ margin: '4px 0' }} />
-
-                {/* 3. Ghi nhận thanh toán */}
-                <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>3. Ghi nhận thanh toán</Title>
-                  {selectedVisitData.paymentStatus === 'PAID' ? (
-                    <Alert
-                      type="success"
-                      showIcon
-                      icon={<CheckCircleOutlined />}
-                      message="Khoản thu này đã được thanh toán thành công."
-                      description={`Mã HĐ/Thanh toán: ${selectedVisitData.invoiceCode || 'HD-PAID'} | Người thu: ${selectedVisitData.collectedBy} | Thời gian: ${formatDateTime(selectedVisitData.paidAt)}`}
-                    />
-                  ) : (
-                    <Card style={{ backgroundColor: '#f0f7ff', borderColor: '#bae6fd' }}>
-                      <Row gutter={[16, 16]} align="middle">
-                        <Col xs={24} md={14}>
-                          <Form layout="vertical">
-                            <Form.Item label={<strong>Phương thức thanh toán *</strong>} style={{ marginBottom: 0 }}>
-                              <Select
-                                value={paymentMethod}
-                                onChange={setPaymentMethod}
-                                options={PAYMENT_METHODS}
-                                size="large"
-                                disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                              />
-                            </Form.Item>
-                          </Form>
-                        </Col>
-                        <Col xs={24} md={10} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                          <Popconfirm
-                            title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận ghi nhận thu phí</Text>}
-                            description={`Xác nhận thu ${money(selectedVisitData.totalAmount)} cho ${selectedVisitData.visitCode}?`}
-                            okText="Xác nhận thu tiền"
-                            cancelText="Hủy"
-                            onConfirm={handleConfirmPayment}
-                            disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment || selectedVisitData.paymentStatus === 'PAID'}
+                    <List
+                      loading={loadingVisits}
+                      dataSource={filteredPendingVisits}
+                      locale={{ emptyText: <Empty description="Không có lượt khám nào chờ thanh toán" /> }}
+                      style={{ maxHeight: 620, overflowY: 'auto' }}
+                      renderItem={(item) => {
+                        const vId = item.visitId || item.id
+                        const selected = String(vId) === String(selectedVisitId)
+                        return (
+                          <List.Item
+                            key={vId}
+                            onClick={() => setSelectedVisitId(vId)}
+                            style={{
+                              cursor: 'pointer',
+                              border: selected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                              background: selected ? '#eff6ff' : '#ffffff',
+                              borderRadius: 8,
+                              marginBottom: 8,
+                              padding: 12,
+                              transition: 'all 0.2s ease',
+                            }}
+                            extra={<RightOutlined style={{ color: selected ? '#2563eb' : '#94a3b8' }} />}
                           >
-                            <Button
-                              type="primary"
-                              size="large"
-                              icon={<CreditCardOutlined />}
-                              loading={submittingPayment}
-                              disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment || selectedVisitData.paymentStatus === 'PAID'}
-                              style={{ height: 42, padding: '0 20px', fontWeight: 600 }}
-                            >
-                              Xác nhận thanh toán
-                            </Button>
-                          </Popconfirm>
-                        </Col>
-                      </Row>
-                    </Card>
-                  )}
-                </div>
+                            <List.Item.Meta
+                              title={(
+                                <Space wrap>
+                                  <Text strong style={{ color: selected ? '#1e40af' : '#0f172a' }}>
+                                    {item.visitCode || item.queueCode || vId}
+                                  </Text>
+                                  <Tag color="orange">CHƯA THANH TOÁN</Tag>
+                                </Space>
+                              )}
+                              description={(
+                                <Space direction="vertical" size={1}>
+                                  <Text strong style={{ color: '#0f172a' }}>{item.patientName} ({item.patientCode || '—'})</Text>
+                                  <Text type="secondary">Bác sĩ: {item.doctorName || '—'}</Text>
+                                </Space>
+                              )}
+                            />
+                          </List.Item>
+                        )
+                      }}
+                    />
+                  </Card>
+                </Col>
 
-                <Divider style={{ margin: '4px 0' }} />
+                {/* Cột phải: Chi tiết Khoản Thu & Thanh Toán */}
+                <Col xs={24} xl={15}>
+                  <Card title={selectedVisitData ? `Tổng hợp khoản thu: ${selectedVisitData.visitCode}` : 'Chi tiết khoản thu & Hóa đơn'} style={{ height: '100%' }}>
+                    {!selectedVisitData ? (
+                      <Empty description="Vui lòng chọn lượt khám ở danh sách bên trái" />
+                    ) : (
+                      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                        {/* 1. Thông tin lượt khám Read-Only */}
+                        <div>
+                          <Title level={5} style={{ marginBottom: 10, color: '#1e3a8a' }}>1. Thông tin lượt khám &amp; Trạng thái</Title>
+                          <Descriptions
+                            bordered
+                            size="small"
+                            column={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2, xxl: 2 }}
+                            labelStyle={{ width: '120px', fontWeight: 600, color: '#475569', background: '#f8fafc' }}
+                            contentStyle={{ background: '#ffffff' }}
+                          >
+                            <Descriptions.Item label="Mã lượt khám">
+                              <Text code style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>{selectedVisitData.visitCode}</Text>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Bệnh nhân">
+                              <Text strong style={{ color: '#2563eb' }}>{selectedVisitData.patientName}</Text>{' '}
+                              <Text type="secondary">({selectedVisitData.patientCode})</Text>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Bác sĩ khám">
+                              <Text strong>{selectedVisitData.doctorName}</Text>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Lượt khám">
+                              {selectedVisitData.isVisitCompleted ? (
+                                <Tag color="green" style={{ margin: 0 }}>Đã hoàn thành ({selectedVisitData.visitStatus})</Tag>
+                              ) : (
+                                <Tag color="orange" icon={<WarningOutlined />} style={{ margin: 0 }}>Đang khám ({selectedVisitData.visitStatus})</Tag>
+                              )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Đơn thuốc">
+                              {selectedVisitData.prescriptionStatus === 'DISPENSED' ? (
+                                <Space wrap style={{ margin: 0 }}>
+                                  <Tag color="green" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
+                                    Đã cấp phát ({selectedVisitData.prescriptionCode || 'DISPENSED'})
+                                  </Tag>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    ({selectedVisitData.prescriptionItems.length} loại thuốc)
+                                  </Text>
+                                </Space>
+                              ) : selectedVisitData.prescriptionStatus === 'PENDING_DISPENSE' ? (
+                                <Space wrap style={{ margin: 0 }}>
+                                  <Tag color="orange" icon={<ClockCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
+                                    Có đơn - Chờ Dược sĩ cấp phát ({selectedVisitData.prescriptionCode || 'PENDING'})
+                                  </Tag>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    ({selectedVisitData.prescriptionItems.length} loại thuốc)
+                                  </Text>
+                                </Space>
+                              ) : selectedVisitData.prescriptionStatus ? (
+                                <Tag color="volcano" style={{ margin: 0 }}>{selectedVisitData.prescriptionStatus}</Tag>
+                              ) : (
+                                <Tag color="default" style={{ margin: 0 }}>Không có đơn thuốc</Tag>
+                              )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Thanh toán">
+                              {selectedVisitData.invoiceCode ? (
+                                <Tag color="green" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 700 }}>ĐÃ LẬP HÓA ĐƠN</Tag>
+                              ) : selectedVisitData.paymentStatus === 'PAID' ? (
+                                <Tag color="blue" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 700 }}>ĐÃ THANH TOÁN</Tag>
+                              ) : (
+                                <Tag color="volcano" icon={<WarningOutlined />} style={{ margin: 0, fontWeight: 700 }}>CHƯA THANH TOÁN</Tag>
+                              )}
+                            </Descriptions.Item>
+                          </Descriptions>
+                        </div>
 
-                {/* 4. Giao diện Hóa đơn điện tử */}
-                <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>4. Hóa đơn điện tử</Title>
-                  {selectedVisitData.paymentStatus !== 'PAID' ? (
-                    <Alert type="warning" showIcon message="Cần hoàn tất thu phí trước khi lập hóa đơn." />
-                  ) : (
-                    <Space wrap>
-                      {selectedVisitData.invoiceCode ? (
-                        <Button
-                          type="primary"
-                          icon={<FileTextOutlined />}
-                          onClick={() => setViewingInvoiceModal(selectedVisitData)}
-                        >
-                          Xem &amp; In hóa đơn điện tử ({selectedVisitData.invoiceCode})
-                        </Button>
-                      ) : (
-                        <Button
-                          type="primary"
-                          icon={<FileTextOutlined />}
-                          loading={submittingInvoice}
-                          onClick={handleCreateInvoice}
-                        >
-                          Lập hóa đơn điện tử
-                        </Button>
-                      )}
-                    </Space>
-                  )}
-                </div>
-              </Space>
-            )}
-          </Card>
-        </Col>
-      </Row>
+                        {/* Kiểm tra điều kiện nghiệp vụ Backend */}
+                        {!selectedVisitData.isVisitCompleted && (
+                          <Alert
+                            type="warning"
+                            showIcon
+                            icon={<WarningOutlined />}
+                            message="Lượt khám chưa đủ điều kiện thanh toán."
+                            description="Lượt khám đang ở trạng thái IN_PROGRESS (chưa hoàn tất khám bệnh). Backend quy định chỉ các lượt khám COMPLETED mới được ghi nhận thanh toán."
+                          />
+                        )}
 
-      {/* Modal Xem & In Hóa đơn */}
+                        {selectedVisitData.isVisitCompleted && !selectedVisitData.isDispensingCompleted && (
+                          <Alert
+                            type="warning"
+                            showIcon
+                            icon={<ClockCircleOutlined />}
+                            message="Thuốc chưa được cấp phát."
+                            description="Đơn thuốc của lượt khám này đang ở trạng thái PENDING_DISPENSE. Dược sĩ cần thực hiện xuất kho cấp thuốc trước khi Lễ tân thu phí."
+                          />
+                        )}
+
+                        <Divider style={{ margin: '4px 0' }} />
+
+                        {/* 2. Chi tiết các khoản phải thu */}
+                        <div>
+                          <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>2. Chi tiết các khoản phải thu</Title>
+                          <Table rowKey="key" columns={feeColumns} dataSource={feeDataSource} pagination={false} size="small" loading={loadingData} scroll={{ x: 'max-content' }} />
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                            <Card size="small" style={{ backgroundColor: '#f8fafc', minWidth: 300, borderColor: '#cbd5e1' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Text strong style={{ fontSize: 15 }}>TỔNG PHẢI THU:</Text>
+                                <Text strong style={{ fontSize: 19, color: '#dc2626' }}>{money(selectedVisitData.totalAmount)}</Text>
+                              </div>
+                            </Card>
+                          </div>
+                        </div>
+
+                        <Divider style={{ margin: '4px 0' }} />
+
+                        {/* 3. Ghi nhận thanh toán & Lập hóa đơn (Luồng 3 Trạng thái chuẩn) */}
+                        <div>
+                          <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>3. Ghi nhận thanh toán &amp; Hóa đơn điện tử</Title>
+
+                          {/* TRẠNG THÁI 3: ĐÃ CÓ HÓA ĐƠN */}
+                          {selectedVisitData.invoiceCode ? (
+                            <Alert
+                              type="success"
+                              showIcon
+                              icon={<CheckCircleOutlined />}
+                              message={<Text strong style={{ color: '#15803d', fontSize: 15 }}>✓ HÓA ĐƠN ĐÃ ĐƯỢC LẬP (Mã HĐ: {selectedVisitData.invoiceCode})</Text>}
+                              description={
+                                <Space direction="vertical" size={8} style={{ width: '100%', marginTop: 8 }}>
+                                  <div>
+                                    <Text>Mã Hóa đơn: <strong style={{ color: '#1e40af', fontSize: 15 }}>{selectedVisitData.invoiceCode}</strong></Text>
+                                    <Divider type="vertical" />
+                                    <Text>Người thu: <strong>{selectedVisitData.collectedBy}</strong></Text>
+                                    <Divider type="vertical" />
+                                    <Text>Thời gian: {formatDateTime(selectedVisitData.paidAt || selectedVisitData.invoiceCreatedAt)}</Text>
+                                  </div>
+                                  <Space wrap style={{ marginTop: 4 }}>
+                                    <Button
+                                      type="primary"
+                                      icon={<EyeOutlined />}
+                                      onClick={() => handleViewInvoice(selectedVisitData.invoiceId)}
+                                    >
+                                      Xem hóa đơn
+                                    </Button>
+                                    <Button
+                                      icon={<PrinterOutlined />}
+                                      onClick={() => {
+                                        handleViewInvoice(selectedVisitData.invoiceId)
+                                        setTimeout(() => window.print(), 300)
+                                      }}
+                                    >
+                                      In hóa đơn
+                                    </Button>
+                                  </Space>
+                                </Space>
+                              }
+                              style={{ border: '1px solid #bbf7d0', background: '#f0fdf4' }}
+                            />
+                          ) : selectedVisitData.paymentStatus === 'PAID' ? (
+                            /* TRẠNG THÁI 2: ĐÃ THANH TOÁN (Chờ lập hóa đơn) */
+                            <Alert
+                              type="info"
+                              showIcon
+                              icon={<CheckCircleOutlined />}
+                              message={
+                                <Text strong style={{ color: '#1e40af', fontSize: 15 }}>
+                                  {selectedVisitData.paymentMethod === 'CASH'
+                                    ? '✓ Đã thanh toán tiền mặt'
+                                    : selectedVisitData.paymentMethod === 'BANK_TRANSFER'
+                                    ? '✓ Đã thanh toán chuyển khoản'
+                                    : '✓ Thanh toán thành công'}
+                                </Text>
+                              }
+                              description={
+                                <Space direction="vertical" size={8} style={{ width: '100%', marginTop: 8 }}>
+                                  <div>
+                                    <Text>Số tiền đã thu: <strong style={{ color: '#dc2626', fontSize: 16 }}>{money(selectedVisitData.totalAmount)}</strong></Text>
+                                    <Divider type="vertical" />
+                                    <Text>Người thu: <strong>{selectedVisitData.collectedBy}</strong></Text>
+                                    <Divider type="vertical" />
+                                    <Text>Thời gian: {formatDateTime(selectedVisitData.paidAt)}</Text>
+                                  </div>
+                                  <div style={{ marginTop: 6 }}>
+                                    <Button
+                                      type="primary"
+                                      size="large"
+                                      icon={<FileTextOutlined />}
+                                      loading={submittingInvoice}
+                                      disabled={!canCollectPayment || submittingInvoice}
+                                      onClick={handleCreateInvoice}
+                                      style={{ fontWeight: 600 }}
+                                    >
+                                      Lập hóa đơn điện tử
+                                    </Button>
+                                  </div>
+                                </Space>
+                              }
+                              style={{ border: '1px solid #bfdbfe', background: '#eff6ff' }}
+                            />
+                          ) : (
+                            /* TRẠNG THÁI 1: CHƯA THANH TOÁN */
+                            <Card style={{ backgroundColor: '#f0f7ff', borderColor: '#bae6fd' }}>
+                              <Row gutter={[16, 16]} align="middle">
+                                <Col xs={24} md={14}>
+                                  <Form layout="vertical">
+                                    <Form.Item label={<strong>Phương thức thanh toán *</strong>} style={{ marginBottom: 0 }}>
+                                      <Select
+                                        value={paymentMethod}
+                                        onChange={setPaymentMethod}
+                                        options={PAYMENT_METHODS}
+                                        size="large"
+                                        disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                      />
+                                    </Form.Item>
+                                  </Form>
+                                </Col>
+                                <Col xs={24} md={10} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                  <Popconfirm
+                                    title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận ghi nhận thu phí</Text>}
+                                    description={`Xác nhận thu ${money(selectedVisitData.totalAmount)} cho ${selectedVisitData.visitCode}?`}
+                                    okText="Xác nhận thu tiền"
+                                    cancelText="Hủy"
+                                    onConfirm={handleConfirmPayment}
+                                    disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                  >
+                                    <Button
+                                      type="primary"
+                                      size="large"
+                                      icon={<CreditCardOutlined />}
+                                      loading={submittingPayment}
+                                      disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                      style={{ height: 42, padding: '0 20px', fontWeight: 600 }}
+                                    >
+                                      Xác nhận thanh toán
+                                    </Button>
+                                  </Popconfirm>
+                                </Col>
+                              </Row>
+                            </Card>
+                          )}
+                        </div>
+                      </Space>
+                    )}
+                  </Card>
+                </Col>
+              </Row>
+            ),
+          },
+          {
+            key: 'history',
+            label: (
+              <span>
+                <HistoryOutlined style={{ color: '#16a34a', marginRight: 6 }} />
+                Lịch sử thanh toán &amp; Hóa đơn ({filteredHistoryInvoices.length})
+              </span>
+            ),
+            children: (
+              <Card title={`Danh sách hóa đơn & giao dịch đã hoàn thành (${filteredHistoryInvoices.length})`}>
+                <Input
+                  allowClear
+                  prefix={<SearchOutlined />}
+                  placeholder="Tìm theo mã HĐ, mã lượt khám, tên BN..."
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  style={{ marginBottom: 16, maxWidth: 400 }}
+                />
+                <Table
+                  rowKey={(r) => r.id || r.invoiceCode}
+                  columns={historyColumns}
+                  dataSource={filteredHistoryInvoices}
+                  loading={loadingHistory}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                  size="middle"
+                  bordered
+                  locale={{ emptyText: <Empty description="Chưa có lịch sử thanh toán nào từ Backend" /> }}
+                />
+              </Card>
+            ),
+          },
+        ]}
+      />
+
+      {/* Modal Xem & In Hóa đơn Điện tử chuẩn giao diện HĐĐT (Matching User Template) */}
       <Modal
-        title={`HÓA ĐƠN ĐIỆN TỬ (${viewingInvoiceModal?.invoiceCode || 'CHÍNH THỨC'})`}
+        title={
+          <Space>
+            <FileTextOutlined style={{ color: '#008080' }} />
+            <span style={{ fontWeight: 700, color: '#008080' }}>HÓA ĐƠN ĐIỆN TỬ PHÒNG KHÁM</span>
+          </Space>
+        }
         open={!!viewingInvoiceModal}
         onCancel={() => setViewingInvoiceModal(null)}
-        width={680}
+        width={780}
+        style={{ top: 20 }}
         footer={[
-          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={() => window.print()}>
+          <Button
+            key="print"
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => window.print()}
+            style={{ background: '#008080', borderColor: '#008080', fontWeight: 600 }}
+          >
             In hóa đơn
           </Button>,
           <Button key="close" onClick={() => setViewingInvoiceModal(null)}>
@@ -673,22 +1020,249 @@ function BillingPage() {
         ]}
       >
         {viewingInvoiceModal && (
-          <div style={{ padding: 12, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-            <div style={{ textAlign: 'center', marginBottom: 12, borderBottom: '2px solid #0f172a', paddingBottom: 6 }}>
-              <Title level={4} style={{ margin: 0 }}>HÓA ĐƠN GIÁ TRỊ GIA TĂNG (HĐĐT)</Title>
-              <Text type="secondary">Mã HĐ: <strong>{viewingInvoiceModal.invoiceCode || 'HD-001'}</strong> | Ngày lập: {formatDateTime(viewingInvoiceModal.paidAt)}</Text>
+          <div className="printable-invoice-container" style={{ padding: 24, background: '#fff', borderRadius: 8, color: '#0f172a' }}>
+            
+            {/* 1. HEADER (Logo + Tên Cơ sở + Địa chỉ) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #008080', paddingBottom: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', border: '2.5px solid #008080', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#008080', fontSize: 24, background: '#f0fdfa' }}>
+                  <PlusOutlined style={{ color: '#008080' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#008080', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                    HÓA ĐƠN ĐIỆN TỬ PHÒNG KHÁM
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '1px 0' }}>
+                    HỆ THỐNG PHÒNG KHÁM BỆNH ÁN SỐ
+                  </div>
+                  <div style={{ fontSize: 12, color: '#475569' }}>
+                    📍 Địa chỉ: Chuyển đổi số CBYT, Hà Nội &nbsp;|&nbsp; 📞 Điện thoại: (024) 3825 9999
+                  </div>
+                </div>
+              </div>
             </div>
-            <Descriptions bordered size="small" column={2} style={{ marginBottom: 12 }}>
-              <Descriptions.Item label="Mã lượt khám">{viewingInvoiceModal.visitCode}</Descriptions.Item>
-              <Descriptions.Item label="Bệnh nhân"><strong>{viewingInvoiceModal.patientName}</strong> ({viewingInvoiceModal.patientCode})</Descriptions.Item>
-              <Descriptions.Item label="Người lập HĐ">{viewingInvoiceModal.collectedBy}</Descriptions.Item>
-              <Descriptions.Item label="Trạng thái HĐ"><Tag color="green">ĐÃ LẬP HÓA ĐƠN</Tag></Descriptions.Item>
-            </Descriptions>
-            <Table rowKey="key" columns={feeColumns} dataSource={feeDataSource} pagination={false} size="small" />
-            <div style={{ textAlign: 'right', marginTop: 12 }}>
-              <Text strong style={{ fontSize: 16 }}>TỔNG TIỀN HÓA ĐƠN: </Text>
-              <Text strong style={{ fontSize: 18, color: '#dc2626' }}>{money(viewingInvoiceModal.totalAmount)}</Text>
+
+            {/* 2. INVOICE TITLE & META */}
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 21, fontWeight: 800, color: '#004d40', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <span style={{ color: '#008080', fontSize: 14 }}>⟡</span>
+                HÓA ĐƠN GIÁ TRỊ GIA TĂNG (HĐĐT)
+                <span style={{ color: '#008080', fontSize: 14 }}>⟡</span>
+              </div>
+              <div style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
+                Mã HĐ: <strong style={{ color: '#0f172a' }}>{viewingInvoiceModal.invoiceCode || selectedVisitData?.invoiceCode || 'HD000004'}</strong> &nbsp;|&nbsp; Ngày lập: {formatDateTime(viewingInvoiceModal.createdAt || selectedVisitData?.paidAt)}
+              </div>
             </div>
+
+            {/* 3. GRID 6 Ô THÔNG TIN BỆNH NHÂN & LƯỢT KHÁM */}
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: 12, overflow: 'hidden', marginBottom: 20, background: '#ffffff' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                
+                {/* Row 1: Bệnh nhân | Mã lượt khám */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    <UserOutlined />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Bệnh nhân</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                      {selectedVisitData?.patientName || viewingInvoiceModal.patientName || 'Pham Ngoc Diep'} <span style={{ fontWeight: 400, color: '#64748b' }}>({selectedVisitData?.patientCode || 'BN000004'})</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    <IdcardOutlined />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Mã lượt khám</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#008080' }}>
+                      {selectedVisitData?.visitCode || 'VIS000011'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Bác sĩ khám | Người lập hóa đơn */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    <MedicineBoxOutlined />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Bác sĩ khám</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                      {selectedVisitData?.doctorName || 'Dr. Nguyen Minh Anh'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    <TeamOutlined />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Người lập hóa đơn</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                      {selectedVisitData?.collectedBy || user?.fullName || 'Lễ tân phòng khám'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Phương thức thanh toán | Trạng thái hóa đơn */}
+                <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    <DollarOutlined />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Phương thức thanh toán</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                      {selectedVisitData?.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : selectedVisitData?.paymentMethod === 'CARD' ? 'Thẻ ngân hàng' : selectedVisitData?.paymentMethod === 'QR_CODE' ? 'QR Code' : 'Tiền mặt'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    <FileTextOutlined />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>Trạng thái hóa đơn</div>
+                    <div>
+                      <Tag color="green" style={{ margin: 0, fontWeight: 700, borderRadius: 4, padding: '2px 8px' }}>
+                        ĐÃ LẬP HÓA ĐƠN ({viewingInvoiceModal.type || 'ORIGINAL'})
+                      </Tag>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* 4. BẢNG CHI TIẾT CÁC KHOẢN THU */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'inline-block', background: '#008080', color: '#ffffff', padding: '6px 16px', borderRadius: '8px 8px 0 0', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                CHI TIẾT CÁC KHOẢN THU
+              </div>
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '0 10px 10px 10px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#008080', color: '#ffffff', fontSize: 13, fontWeight: 700 }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'center', width: '60px', borderRight: '1px solid #0e7490' }}>STT</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', borderRight: '1px solid #0e7490' }}>Nội dung / Dịch vụ</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center', width: '100px', borderRight: '1px solid #0e7490' }}>Số lượng</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right', width: '140px', borderRight: '1px solid #0e7490' }}>Đơn giá</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right', width: '150px' }}>Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(Array.isArray(viewingInvoiceModal.lines) && viewingInvoiceModal.lines.length > 0
+                      ? viewingInvoiceModal.lines.map((l) => ({
+                          name: l.lineType === 'EXAM_FEE' ? 'Phí khám bệnh' : l.lineType === 'MEDICINE_FEE' ? 'Tiền thuốc kê đơn' : l.itemName,
+                          quantity: l.quantity,
+                          price: l.unitPrice,
+                          amount: l.amount,
+                        }))
+                      : feeDataSource
+                    ).map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', fontSize: '13.5px' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e2e8f0' }}>{idx + 1}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', borderRight: '1px solid #e2e8f0' }}>{item.name}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>{item.quantity}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', borderRight: '1px solid #e2e8f0' }}>{money(item.price)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>{money(item.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 5. TỔNG THANH TOÁN */}
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: 12, padding: '14px 20px', background: '#f0fdfa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #008080', color: '#008080', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, background: '#ffffff' }}>
+                  <CheckOutlined />
+                </div>
+                <span style={{ fontSize: 19, fontWeight: 800, color: '#0f172a', letterSpacing: '0.5px' }}>TỔNG THANH TOÁN:</span>
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: '#0284c7' }}>
+                {money(viewingInvoiceModal.totalAmount || selectedVisitData?.totalAmount)}
+              </div>
+            </div>
+
+            {/* 6. MÃ QR & CHỮ KÝ & GHI CHÚ */}
+            <div style={{ display: 'grid', gridTemplateColumns: '190px 1fr', gap: 16, marginBottom: 16 }}>
+              
+              {/* Box Mã QR */}
+              <div style={{ border: '1px solid #008080', borderRadius: 10, overflow: 'hidden', textAlign: 'center', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: '#008080', color: '#ffffff', padding: '6px', fontWeight: 800, fontSize: 13, letterSpacing: '1px' }}>
+                  MÃ QR
+                </div>
+                <div style={{ padding: '10px 8px', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(viewingInvoiceModal.invoiceCode || selectedVisitData?.invoiceCode || 'HD000004')}`}
+                    alt="QR Code"
+                    style={{ width: 125, height: 125, border: '1px solid #e2e8f0', borderRadius: 4 }}
+                  />
+                  <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 6, fontStyle: 'italic' }}>
+                    Quét mã QR để tra cứu hóa đơn điện tử
+                  </div>
+                </div>
+              </div>
+
+              {/* Box Bên phải: Thông tin ghi chú & Chữ ký */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
+                
+                {/* Note Box */}
+                <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', background: '#f8fafc', fontSize: 11, color: '#475569', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <InfoCircleOutlined style={{ fontSize: 18, color: '#008080', marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <div>Quý khách hàng vui lòng kiểm tra kỹ thông tin trên hóa đơn. Mọi thắc mắc hoặc cần hỗ trợ, xin liên hệ phòng khám.</div>
+                    <div style={{ borderTop: '1px dashed #cbd5e1', margin: '5px 0' }}></div>
+                    <div><strong>Lưu ý:</strong> Theo luật chế độ hóa đơn điện tử hiện hành, hóa đơn này có giá trị sử dụng trong ngày (trước 23h00). Quý khách vui lòng giữ hóa đơn để tra cứu HĐĐT.</div>
+                  </div>
+                </div>
+
+                {/* Signatures Box */}
+                <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '12px 8px', background: '#ffffff' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 12 }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>Người lập hóa đơn</div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>(Lễ tân phòng khám)</div>
+                      <div style={{ marginTop: 30, color: '#94a3b8' }}>...................................</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>Đề nghị của bác sĩ</div>
+                      <div style={{ height: 16 }}></div>
+                      <div style={{ marginTop: 30, color: '#94a3b8' }}>...................................</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>Người thu</div>
+                      <div style={{ height: 16 }}></div>
+                      <div style={{ marginTop: 30, color: '#94a3b8' }}>...................................</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date footer line */}
+                <div style={{ textAlign: 'right', fontSize: 12, color: '#475569', fontStyle: 'italic' }}>
+                  {formatDateVietnamese(viewingInvoiceModal.createdAt || selectedVisitData?.paidAt)}
+                </div>
+
+              </div>
+            </div>
+
+            {/* 7. FOOTER BANNER */}
+            <div style={{ borderTop: '2px solid #008080', paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: '#008080', fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <SafetyCertificateOutlined style={{ fontSize: 14 }} />
+                Hóa đơn điện tử chuyển đổi từ hệ thống quản lý bệnh án số.
+              </div>
+              <div style={{ letterSpacing: 1 }}>
+                ⚡ ∿∿∿ ♥
+              </div>
+            </div>
+
           </div>
         )}
       </Modal>
