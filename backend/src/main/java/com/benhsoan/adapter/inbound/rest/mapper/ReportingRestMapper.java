@@ -38,6 +38,7 @@ public class ReportingRestMapper {
         return new TopMedicinesReportResponse(
                 result.from(),
                 result.to(),
+                result.generatedAt(),
                 result.items().stream().map(this::toResponse).toList()
         );
     }
@@ -52,6 +53,7 @@ public class ReportingRestMapper {
 
     private TopMedicineItemResponse toResponse(TopMedicineItemResult result) {
         return new TopMedicineItemResponse(
+                result.rank(),
                 result.medicineId(),
                 result.medicineCode(),
                 result.medicineName(),

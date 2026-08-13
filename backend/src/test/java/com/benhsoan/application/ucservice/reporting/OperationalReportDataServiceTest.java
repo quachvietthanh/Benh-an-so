@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -71,9 +72,12 @@ class OperationalReportDataServiceTest {
 
         assertEquals(LocalDate.of(2026, 8, 1), result.from());
         assertEquals(LocalDate.of(2026, 8, 3), result.to());
+        assertNull(result.generatedAt());
         assertEquals(2, result.items().size());
+        assertEquals(1, result.items().get(0).rank());
         assertEquals("MED-IBU-400", result.items().get(0).medicineCode());
         assertEquals(15L, result.items().get(0).totalDispensedQuantity());
+        assertEquals(2, result.items().get(1).rank());
         assertEquals("MED-PARA-500", result.items().get(1).medicineCode());
     }
 }

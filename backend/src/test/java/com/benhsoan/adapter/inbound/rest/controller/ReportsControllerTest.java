@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -183,8 +184,10 @@ class ReportsControllerTest {
         when(getTopMedicinesReportUseCase.getTopMedicines(any(), any())).thenReturn(new TopMedicinesReportResult(
                 LocalDate.of(2026, 8, 1),
                 LocalDate.of(2026, 8, 3),
+                Instant.parse("2026-08-03T08:00:00Z"),
                 List.of(
                         new TopMedicineItemResult(
+                                1,
                                 java.util.UUID.fromString("16000000-0000-0000-0000-000000000001"),
                                 "MED-PARA-500",
                                 "Paracetamol 500 mg",
@@ -197,6 +200,8 @@ class ReportsControllerTest {
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-03"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-03T08:00:00Z"))
+                .andExpect(jsonPath("$.items[0].rank").value(1))
                 .andExpect(jsonPath("$.items[0].medicineCode").value("MED-PARA-500"))
                 .andExpect(jsonPath("$.items[0].medicineName").value("Paracetamol 500 mg"))
                 .andExpect(jsonPath("$.items[0].totalDispensedQuantity").value(9));
@@ -207,6 +212,7 @@ class ReportsControllerTest {
         when(getTopMedicinesReportUseCase.getTopMedicines(any(), any())).thenReturn(new TopMedicinesReportResult(
                 LocalDate.of(2026, 8, 1),
                 LocalDate.of(2026, 8, 3),
+                Instant.parse("2026-08-03T08:00:00Z"),
                 List.of()
         ));
 
@@ -216,6 +222,7 @@ class ReportsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.from").value("2026-08-01"))
                 .andExpect(jsonPath("$.to").value("2026-08-03"))
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-03T08:00:00Z"))
                 .andExpect(jsonPath("$.items").isArray())
                 .andExpect(jsonPath("$.items").isEmpty());
     }

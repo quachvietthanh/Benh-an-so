@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -140,6 +141,7 @@ class ReportsSecurityIntegrationTest {
         when(getTopMedicinesReportUseCase.getTopMedicines(any(), any())).thenReturn(new TopMedicinesReportResult(
                 LocalDate.of(2026, 8, 1),
                 LocalDate.of(2026, 8, 3),
+                Instant.parse("2026-08-03T08:00:00Z"),
                 List.of()
         ));
 

@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.reporting;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,18 +61,25 @@ public class OperationalReportDataService {
 
     public TopMedicinesReportResult getTopMedicines(LocalDate from, LocalDate to) {
         ReportingTimeRange range = ReportingTimeRange.of(from, to);
+        List<TopMedicineItemResult> items = new ArrayList<>();
+        List<com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary> summaries =
+                operationalReportQueryRepository.findTopDispensedMedicines(range.fromInclusive(), range.toExclusive());
+
+        for (int index = 0; index < summaries.size(); index++) {
+            var item = summaries.get(index);
+            items.add(new TopMedicineItemResult(
+                    index + 1,
+                    item.medicineId(),
+                    item.medicineCode(),
+                    item.medicineName(),
+                    item.totalDispensedQuantity()));
+        }
 
         return new TopMedicinesReportResult(
                 from,
                 to,
-                operationalReportQueryRepository.findTopDispensedMedicines(range.fromInclusive(), range.toExclusive())
-                        .stream()
-                        .map(item -> new TopMedicineItemResult(
-                                item.medicineId(),
-                                item.medicineCode(),
-                                item.medicineName(),
-                                item.totalDispensedQuantity()))
-                        .toList()
+                null,
+                items
         );
     }
 
