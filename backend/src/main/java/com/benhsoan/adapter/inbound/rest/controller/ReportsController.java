@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -17,12 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
 import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.CheckPermission;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
+import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
 
 import lombok.RequiredArgsConstructor;
@@ -34,9 +37,11 @@ import lombok.RequiredArgsConstructor;
 public class ReportsController {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final long MAX_REPORT_RANGE_DAYS = 366;
 
     private final GetOperationalSummaryUseCase getOperationalSummaryUseCase;
     private final GetOperationalTimelineUseCase getOperationalTimelineUseCase;
+    private final GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     private final ExportOperationalReportUseCase exportOperationalReportUseCase;
     private final ReportingRestMapper mapper;
 
@@ -66,6 +71,20 @@ public class ReportsController {
         validateRange(fromDate, toDate);
 
         return mapper.toResponse(getOperationalTimelineUseCase.getTimeline(fromDate, toDate));
+    }
+
+    @GetMapping("/top-medicines")
+    @PreAuthorize("hasRole('MANAGER')")
+    @CheckPermission(Permission.REPORT_VIEW)
+    public TopMedicinesReportResponse getTopMedicines(
+            @RequestParam String from,
+            @RequestParam String to
+    ) {
+        LocalDate fromDate = parseDate(from, "from");
+        LocalDate toDate = parseDate(to, "to");
+        validateRange(fromDate, toDate);
+
+        return mapper.toResponse(getTopMedicinesReportUseCase.getTopMedicines(fromDate, toDate));
     }
 
     @GetMapping("/export")
@@ -102,6 +121,10 @@ public class ReportsController {
     private void validateRange(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) {
             throw new ValidationException("from must be before or equal to to.");
+        }
+        long inclusiveDays = ChronoUnit.DAYS.between(from, to) + 1;
+        if (inclusiveDays > MAX_REPORT_RANGE_DAYS) {
+            throw new ValidationException("Date range must not exceed 366 days.");
         }
     }
 }

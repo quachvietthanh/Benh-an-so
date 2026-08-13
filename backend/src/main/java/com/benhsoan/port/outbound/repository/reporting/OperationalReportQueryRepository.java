@@ -13,4 +13,6 @@ public interface OperationalReportQueryRepository {
     BigDecimal sumNetRevenue(Instant fromInclusive, Instant toExclusive);
 
     List<DailyRevenueSummary> findDailyNetRevenue(Instant fromInclusive, Instant toExclusive);
+
+    List<TopMedicineSummary> findTopDispensedMedicines(Instant fromInclusive, Instant toExclusive);
 }
