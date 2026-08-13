@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.medicalrecord;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,11 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class GetMedicalRecordAccessLogsService implements GetMedicalRecordAccessLogsUseCase {
 
+    private static final Sort ACCESS_LOG_SORT = Sort.by(
+            Sort.Order.desc("accessedAt"),
+            Sort.Order.desc("id")
+    );
+
     private final MedicalRecordAccessLogRepository accessLogRepository;
     private final MedicalRecordRepository medicalRecordRepository;
     private final MedicalRecordAuthorizationService authorizationService;
@@ -26,15 +32,13 @@ public class GetMedicalRecordAccessLogsService implements GetMedicalRecordAccess
 
     @Override
     public Page<MedicalRecordAccessLogResult> getAccessLogs(GetMedicalRecordAccessLogsQuery query) {
-        authorizationService.requireReadAccess();
-        var pageable = PageRequest.of(query.page(), query.size());
+        authorizationService.requireAuditReadAccess();
         if (query.medicalRecordId() != null) {
             medicalRecordRepository.findById(query.medicalRecordId())
                     .orElseThrow(() -> new MedicalRecordNotFoundException(query.medicalRecordId()));
-            return accessLogRepository.findByMedicalRecordId(query.medicalRecordId(), query.from(), query.to(), pageable)
-                    .map(resultMapper::toResult);
         }
-        return accessLogRepository.findByPatientId(query.patientId(), query.from(), query.to(), pageable)
+        var pageable = PageRequest.of(query.page(), query.size(), ACCESS_LOG_SORT);
+        return accessLogRepository.search(query, pageable)
                 .map(resultMapper::toResult);
     }
 }

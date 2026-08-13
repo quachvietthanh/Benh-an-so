@@ -8,7 +8,7 @@ import {
   Empty,
   Input,
   List,
-  message,
+  Modal,
   Pagination,
   Popconfirm,
   Row,
@@ -17,13 +17,17 @@ import {
   Table,
   Tag,
   Typography,
+  message,
 } from 'antd'
 import {
+  AlertOutlined,
   CheckCircleOutlined,
+  FieldTimeOutlined,
   InboxOutlined,
   MedicineBoxOutlined,
   ReloadOutlined,
   RightOutlined,
+  RollbackOutlined,
   SearchOutlined,
   ShopOutlined,
   WarningOutlined,
@@ -84,6 +88,8 @@ function PharmacyPage() {
   const [batches, setBatches] = useState([])
   const [stocks, setStocks] = useState([])
   const [lowStockItems, setLowStockItems] = useState([])
+  const [expiryAlerts, setExpiryAlerts] = useState([])
+  const [expiryModalOpen, setExpiryModalOpen] = useState(false)
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [prescriptionLoading, setPrescriptionLoading] = useState(false)
@@ -164,18 +170,26 @@ function PharmacyPage() {
     setInventoryLoading(true)
     setInventoryLoadError('')
     try {
-      const [batchResponse, stockResponse, lowStockResponse] = await Promise.all([
+      const [batchResponse, stockResponse, lowStockResponse, expiryResponse] = await Promise.allSettled([
         pharmacyApi.batches(),
         pharmacyApi.stocks({ active: true }),
         pharmacyApi.lowStock(),
+        pharmacyApi.expiryAlerts(),
       ])
       if (requestId !== inventoryRequestIdRef.current) return
 
-      const nextBatches = toCollection(batchResponse.data).map(normalizeBatch)
-
-      setBatches(nextBatches)
-      setStocks(toCollection(stockResponse.data))
-      setLowStockItems(toCollection(lowStockResponse.data))
+      if (batchResponse.status === 'fulfilled') {
+        setBatches(toCollection(batchResponse.value?.data).map(normalizeBatch))
+      }
+      if (stockResponse.status === 'fulfilled') {
+        setStocks(toCollection(stockResponse.value?.data))
+      }
+      if (lowStockResponse.status === 'fulfilled') {
+        setLowStockItems(toCollection(lowStockResponse.value?.data))
+      }
+      if (expiryResponse.status === 'fulfilled') {
+        setExpiryAlerts(toCollection(expiryResponse.value?.data))
+      }
     } catch (error) {
       if (requestId === inventoryRequestIdRef.current) {
         setInventoryLoadError(getErrorMessage(error, 'Không thể tải dữ liệu tồn kho từ máy chủ.'))
@@ -338,7 +352,7 @@ function PharmacyPage() {
     },
   ]
 
-  const eligibleBatchCount = batches.filter((batch) => batch.eligibleForDispense !== false).length
+  const eligibleBatchCount = batches.filter((batch) => batch.eligibleForDispense !== false && batch.status !== 'EXPIRED').length
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -373,20 +387,21 @@ function PharmacyPage() {
         />
       )}
 
+      {/* Metric Cards KPI */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} md={8}>
+        <Col xs={24} sm={12} md={6}>
           <Card><Statistic title="Đơn chờ cấp phát" value={prescriptionTotal} prefix={<MedicineBoxOutlined />} /></Card>
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} sm={12} md={6}>
           <Card><Statistic title="Lô đủ điều kiện FEFO" value={eligibleBatchCount} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} sm={12} md={6}>
           <Card
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/medicines', { state: { tab: 'alerts' } })}
           >
             <Statistic
-              title="Thuốc dưới ngưỡng tồn (Cảnh báo)"
+              title="Thuốc dưới ngưỡng tồn"
               value={lowStockItems.length}
               valueStyle={lowStockItems.length ? { color: '#cf1322', fontWeight: 700 } : undefined}
               prefix={<WarningOutlined />}
@@ -394,7 +409,58 @@ function PharmacyPage() {
             />
           </Card>
         </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card
+            style={{
+              cursor: 'pointer',
+              borderLeft: expiryAlerts.length > 0 ? '4px solid #faad14' : undefined,
+            }}
+            onClick={() => setExpiryModalOpen(true)}
+          >
+            <Statistic
+              title="Cảnh báo Hạn sử dụng"
+              value={expiryAlerts.length}
+              valueStyle={expiryAlerts.length ? { color: '#d97706', fontWeight: 700 } : undefined}
+              prefix={<FieldTimeOutlined style={{ color: expiryAlerts.length > 0 ? '#faad14' : undefined }} />}
+              suffix={<Text type="secondary" style={{ fontSize: 13, marginLeft: 6 }}>Chi tiết →</Text>}
+            />
+          </Card>
+        </Col>
       </Row>
+
+      {/* Banner Cảnh báo Hạn dùng */}
+      {expiryAlerts.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          icon={<FieldTimeOutlined />}
+          message={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span>
+                <strong>Cảnh báo Hạn sử dụng thuốc:</strong> Có <strong>{expiryAlerts.length} lô thuốc</strong> cần chú ý ({expiryAlerts.filter((a) => a.alertStatus === 'EXPIRED').length} lô đã hết hạn, {expiryAlerts.filter((a) => a.alertStatus === 'NEAR_EXPIRY').length} lô gần hết hạn)
+              </span>
+              <Space>
+                <Button
+                  size="small"
+                  type="primary"
+                  danger
+                  onClick={() => setExpiryModalOpen(true)}
+                >
+                  Xem danh sách cảnh báo hạn dùng
+                </Button>
+                <Button
+                  size="small"
+                  icon={<InboxOutlined />}
+                  onClick={() => navigate('/pharmacy/receipts', { state: { tab: 'create' } })}
+                >
+                  Nhập kho thay thế
+                </Button>
+              </Space>
+            </div>
+          }
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {lowStockItems.length > 0 && (
         <Alert
@@ -569,12 +635,42 @@ function PharmacyPage() {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Popconfirm
-                    title="Xác nhận cấp phát thuốc"
-                    description={`Cấp đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id} theo phân bổ FEFO đang hiển thị?`}
+                    title={
+                      <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
+                        Xác nhận cấp phát đơn thuốc
+                      </Text>
+                    }
+                    description={
+                      <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
+                        <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
+                          Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
+                          <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
+                            {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                          </Text>?
+                        </div>
+                        <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
+                          <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{selectedPrescription.patientName || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
+                          <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
+                        </div>
+                      </div>
+                    }
+                    icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
                     okText="Xác nhận cấp phát"
                     cancelText="Kiểm tra lại"
+                    okButtonProps={{
+                      type: 'primary',
+                      size: 'large',
+                      icon: <CheckCircleOutlined />,
+                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 600 },
+                    }}
+                    cancelButtonProps={{
+                      size: 'large',
+                      icon: <RollbackOutlined />,
+                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 500 },
+                    }}
                     onConfirm={handleDispense}
                     disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                    overlayStyle={{ maxWidth: 500 }}
                   >
                     <Button
                       type="primary"
@@ -593,6 +689,112 @@ function PharmacyPage() {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title={
+          <Space>
+            <FieldTimeOutlined style={{ color: '#d97706' }} />
+            <span>Danh sách cảnh báo hạn sử dụng thuốc</span>
+          </Space>
+        }
+        open={expiryModalOpen}
+        onCancel={() => setExpiryModalOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setExpiryModalOpen(false)}>
+            Đóng
+          </Button>,
+          <Button
+            key="receipts"
+            type="primary"
+            icon={<InboxOutlined />}
+            onClick={() => {
+              setExpiryModalOpen(false)
+              navigate('/pharmacy/receipts', { state: { tab: 'create' } })
+            }}
+          >
+            Nhập kho thay thế
+          </Button>,
+        ]}
+        width={850}
+        destroyOnClose
+      >
+        <Table
+          rowKey={(record, index) => record.batchId || record.id || index}
+          dataSource={expiryAlerts}
+          locale={{ emptyText: 'Hiện không có lô thuốc nào cần cảnh báo hạn dùng.' }}
+          pagination={{ pageSize: 10, hideOnSinglePage: true }}
+          size="small"
+          columns={[
+            {
+              title: 'Mã & Tên thuốc',
+              key: 'medicine',
+              render: (_, item) => (
+                <Space direction="vertical" size={1}>
+                  <strong>{item.medicineName || '—'}</strong>
+                  <Text code style={{ fontSize: 12 }}>{item.medicineCode || item.medicineId}</Text>
+                </Space>
+              ),
+            },
+            {
+              title: 'Số lô',
+              dataIndex: 'batchNumber',
+              key: 'batchNumber',
+              width: 140,
+              render: (val) => <Tag color="blue">{val}</Tag>,
+            },
+            {
+              title: 'Hạn sử dụng',
+              dataIndex: 'expiryDate',
+              key: 'expiryDate',
+              width: 130,
+              render: (val) => (val ? dayjs(val).format('DD/MM/YYYY') : '—'),
+            },
+            {
+              title: 'Số ngày còn lại',
+              dataIndex: 'daysToExpiry',
+              key: 'daysToExpiry',
+              width: 160,
+              render: (days, item) => {
+                const d = Number(days ?? 0)
+                if (item.alertStatus === 'EXPIRED' || d < 0) {
+                  return <Tag color="red">🔴 Quá hạn {Math.abs(d)} ngày</Tag>
+                }
+                if (d === 0) {
+                  return <Tag color="volcano">⚠️ Hết hạn hôm nay</Tag>
+                }
+                return <Tag color="warning">🟡 Còn {d} ngày</Tag>
+              },
+            },
+            {
+              title: 'Số lượng còn',
+              dataIndex: 'quantity',
+              key: 'quantity',
+              width: 120,
+              align: 'right',
+              render: (val) => (
+                <span style={{ fontWeight: 700, color: Number(val || 0) > 0 ? '#dc2626' : '#94a3b8' }}>
+                  {Number(val || 0).toLocaleString('vi-VN')}
+                </span>
+              ),
+            },
+            {
+              title: 'Trạng thái cảnh báo',
+              dataIndex: 'alertStatus',
+              key: 'alertStatus',
+              width: 280,
+              render: (alertStatus) => {
+                if (alertStatus === 'EXPIRED') {
+                  return <Tag color="red" icon={<AlertOutlined />}>🔴 Lô thuốc đã hết hạn – Không được cấp phát</Tag>
+                }
+                if (alertStatus === 'NEAR_EXPIRY') {
+                  return <Tag color="orange" icon={<WarningOutlined />}>🟡 Lô thuốc sắp hết hạn</Tag>
+                }
+                return <Tag>{alertStatus || '—'}</Tag>
+              },
+            },
+          ]}
+        />
+      </Modal>
     </div>
   )
 }

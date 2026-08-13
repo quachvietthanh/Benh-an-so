@@ -6,12 +6,16 @@ import java.util.UUID;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
 public record GetMedicalRecordAccessLogsQuery(
-        UUID medicalRecordId, UUID patientId, Instant from, Instant to, int page, int size
+        UUID accessedBy,
+        UUID patientId,
+        UUID medicalRecordId,
+        UUID visitId,
+        Instant from,
+        Instant to,
+        int page,
+        int size
 ) {
     public GetMedicalRecordAccessLogsQuery {
-        if ((medicalRecordId == null) == (patientId == null)) {
-            throw new ValidationException("Exactly one of medical record id or patient id is required.");
-        }
         if (from != null && to != null && from.isAfter(to)) {
             throw new ValidationException("From time must not be after to time.");
         }

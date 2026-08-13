@@ -166,6 +166,29 @@ class MedicineApplicationServiceTest {
     }
 
     @Test
+    void searchesMedicinesWithPageableForDoctor() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        Medicine medicine = activeMedicine(UUID.randomUUID(), "MED-001", "Paracetamol");
+        var pageable = PageRequest.of(0, 20, Sort.by("medicineName", "medicineCode"));
+        when(medicineRepository.search(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(medicine), pageable, 1));
+        SearchMedicinesService service = new SearchMedicinesService(
+                medicineRepository,
+                authorizer,
+                resultMapper
+        );
+
+        var result = service.search(new SearchMedicinesQuery(
+                "para",
+                true,
+                pageable
+        ));
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals("MED-001", result.getContent().getFirst().medicineCode());
+    }
+
+    @Test
     void updatesMedicineAndRejectsDuplicateNameIngredient() {
         UUID medicineId = UUID.randomUUID();
         when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);

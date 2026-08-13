@@ -28,7 +28,7 @@ public class SearchMedicinesService implements SearchMedicinesUseCase {
     @Override
     public Page<MedicineResult> search(SearchMedicinesQuery query) {
         validateQuery(query);
-        authorizer.requirePharmacist();
+        authorizer.requireReadAccess();
 
         MedicineSearchCriteria criteria = new MedicineSearchCriteria(
                 query.keyword(),

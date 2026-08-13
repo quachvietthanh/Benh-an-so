@@ -86,7 +86,7 @@ function PrescriptionDetailModal({
       ),
     },
     {
-      title: 'Đường dùng',
+      title: 'Cách dùng',
       dataIndex: 'route',
       key: 'route',
       width: 110,

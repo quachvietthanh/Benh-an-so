@@ -913,7 +913,7 @@ function PrescriptionPage() {
                         <Button size="small" onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                       </div>
                     }
-                    description="Bác sĩ có thể sửa liều lượng, tần suất, đường dùng, số lượng, hướng dẫn; bấm '+ Thêm thuốc mới' để bổ sung hoặc bấm biểu tượng thùng rác để bỏ thuốc không còn phù hợp khỏi đơn. Mọi thay đổi đều được hệ thống tự động lưu vết lịch sử (audit snapshot)."
+                    description="Bác sĩ có thể sửa liều lượng, tần suất, cách dùng, số lượng, hướng dẫn; bấm '+ Thêm thuốc mới' để bổ sung hoặc bấm biểu tượng thùng rác để bỏ thuốc không còn phù hợp khỏi đơn. Mọi thay đổi đều được hệ thống tự động lưu vết lịch sử (audit snapshot)."
                     style={{ marginBottom: 16, backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}
                   />
                 )}
@@ -977,9 +977,10 @@ function PrescriptionPage() {
                         </div>
 
                         <Space wrap align="start" style={{ width: '100%' }}>
-                          <Form.Item label="Chọn thuốc *" style={{ marginBottom: 8, width: 340 }}>
+                          <Form.Item label="Chọn thuốc *" style={{ marginBottom: 8, flex: 3, minWidth: 420 }}>
                             <Select
                               showSearch
+                              style={{ width: '100%', minWidth: 320 }}
                               optionFilterProp="label"
                               disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.medicineId}
@@ -1016,14 +1017,15 @@ function PrescriptionPage() {
                             />
                           </Form.Item>
 
-                          <Form.Item label="Đường dùng" style={{ marginBottom: 8, width: 160 }}>
+                          <Form.Item label="Cách dùng" style={{ marginBottom: 8, flex: 1, minWidth: 200 }}>
                             <Select
                               allowClear
+                              style={{ width: '100%', minWidth: 140 }}
                               disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.route}
                               onChange={(value) => handleItemChange(item.clientId, 'route', value)}
                               options={ROUTE_OPTIONS}
-                              placeholder="Mặc định"
+                              placeholder="Chọn cách dùng"
                             />
                           </Form.Item>
                         </Space>
