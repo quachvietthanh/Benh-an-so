@@ -399,7 +399,7 @@ function BillingPage() {
 
       <Row gutter={[16, 16]} align="stretch">
         {/* Cột trái: Danh sách Lượt khám */}
-        <Col xs={24} xl={9}>
+        <Col xs={24} lg={10} xl={9}>
           <Card title={`Danh sách lượt khám (${filteredVisits.length})`} styles={{ body: { padding: 12 } }} style={{ height: '100%' }}>
             <Input
               allowClear
@@ -461,7 +461,7 @@ function BillingPage() {
         </Col>
 
         {/* Cột phải: Chi tiết Khoản Thu & Thanh Toán */}
-        <Col xs={24} xl={15}>
+        <Col xs={24} lg={14} xl={15}>
           <Card title={selectedVisitData ? `Tổng hợp khoản thu: ${selectedVisitData.visitCode}` : 'Chi tiết khoản thu & Hóa đơn'} style={{ height: '100%' }}>
             {!selectedVisitData ? (
               <Empty description="Vui lòng chọn lượt khám ở danh sách bên trái" />
@@ -473,19 +473,13 @@ function BillingPage() {
                   <Descriptions
                     bordered
                     size="small"
-                    column={{ xs: 1, sm: 1, md: 2 }}
-                    labelStyle={{ width: '130px', fontWeight: 600, color: '#475569', background: '#f8fafc' }}
+                    column={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 2, xxl: 2 }}
+                    labelStyle={{ width: '120px', minWidth: '110px', fontWeight: 600, color: '#475569', background: '#f8fafc' }}
                     contentStyle={{ background: '#ffffff' }}
+                    style={{ width: '100%', overflowX: 'auto' }}
                   >
                     <Descriptions.Item label="Mã lượt khám">
                       <Text code style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>{selectedVisitData.visitCode}</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Bệnh nhân">
-                      <Text strong style={{ color: '#2563eb' }}>{selectedVisitData.patientName}</Text>{' '}
-                      <Text type="secondary">({selectedVisitData.patientCode})</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Bác sĩ khám">
-                      <Text strong>{selectedVisitData.doctorName}</Text>
                     </Descriptions.Item>
                     <Descriptions.Item label="Lượt khám">
                       {selectedVisitData.isVisitCompleted ? (
@@ -493,6 +487,10 @@ function BillingPage() {
                       ) : (
                         <Tag color="orange" icon={<WarningOutlined />} style={{ margin: 0 }}>Đang khám ({selectedVisitData.visitStatus})</Tag>
                       )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Bệnh nhân">
+                      <Text strong style={{ color: '#2563eb' }}>{selectedVisitData.patientName}</Text>{' '}
+                      <Text type="secondary">({selectedVisitData.patientCode})</Text>
                     </Descriptions.Item>
                     <Descriptions.Item label="Đơn thuốc">
                       {selectedVisitData.prescriptionStatus === 'DISPENSED' ? (
@@ -518,6 +516,9 @@ function BillingPage() {
                       ) : (
                         <Tag color="default" style={{ margin: 0 }}>Không có đơn thuốc</Tag>
                       )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Bác sĩ khám">
+                      <Text strong>{selectedVisitData.doctorName}</Text>
                     </Descriptions.Item>
                     <Descriptions.Item label="Thanh toán">
                       {selectedVisitData.paymentStatus === 'PAID' ? (
