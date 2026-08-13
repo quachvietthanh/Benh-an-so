@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -28,7 +29,10 @@ import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
+import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
+import com.benhsoan.port.dto.result.TopMedicineItemResult;
+import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -44,6 +48,7 @@ class ReportsControllerTest {
 
     @MockitoBean private GetOperationalSummaryUseCase getOperationalSummaryUseCase;
     @MockitoBean private GetOperationalTimelineUseCase getOperationalTimelineUseCase;
+    @MockitoBean private GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
     @MockitoBean private UserRepository userRepository;
@@ -172,6 +177,87 @@ class ReportsControllerTest {
                 .andExpect(jsonPath("$.items[0].visitCount").value(0))
                 .andExpect(jsonPath("$.items[1].revenue").value(0))
                 .andExpect(jsonPath("$.items[2].visitCount").value(0));
+    }
+
+    @Test
+    void returnsTopMedicines() throws Exception {
+        when(getTopMedicinesReportUseCase.getTopMedicines(any(), any())).thenReturn(new TopMedicinesReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                Instant.parse("2026-08-03T08:00:00Z"),
+                List.of(
+                        new TopMedicineItemResult(
+                                1,
+                                java.util.UUID.fromString("16000000-0000-0000-0000-000000000001"),
+                                "MED-PARA-500",
+                                "Paracetamol 500 mg",
+                                9L
+                        )
+                )
+        ));
+
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-03T08:00:00Z"))
+                .andExpect(jsonPath("$.items[0].rank").value(1))
+                .andExpect(jsonPath("$.items[0].medicineCode").value("MED-PARA-500"))
+                .andExpect(jsonPath("$.items[0].medicineName").value("Paracetamol 500 mg"))
+                .andExpect(jsonPath("$.items[0].totalDispensedQuantity").value(9));
+    }
+
+    @Test
+    void returnsEmptyTopMedicinesWhenNoDataExists() throws Exception {
+        when(getTopMedicinesReportUseCase.getTopMedicines(any(), any())).thenReturn(new TopMedicinesReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                Instant.parse("2026-08-03T08:00:00Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("2026-08-01"))
+                .andExpect(jsonPath("$.to").value("2026-08-03"))
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-03T08:00:00Z"))
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
+    void rejectsInvalidDateFormatForTopMedicines() throws Exception {
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "01-08-2026")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be in yyyy-MM-dd format."));
+
+        verifyNoInteractions(getTopMedicinesReportUseCase);
+    }
+
+    @Test
+    void rejectsWhenFromIsAfterToForTopMedicines() throws Exception {
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "2026-08-04")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+
+        verifyNoInteractions(getTopMedicinesReportUseCase);
+    }
+
+    @Test
+    void rejectsWhenTopMedicinesDateRangeExceeds366Days() throws Exception {
+        mockMvc.perform(get("/reports/top-medicines")
+                        .param("from", "2025-01-01")
+                        .param("to", "2026-01-02"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
+
+        verifyNoInteractions(getTopMedicinesReportUseCase);
     }
 
     @Test

@@ -14,9 +14,13 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import com.benhsoan.domain.billing.enums.InvoiceType;
+import com.benhsoan.domain.medicine.enums.AdministrationRoute;
+import com.benhsoan.domain.medicine.enums.DosageForm;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.persistence.entity.billing.InvoiceEntity;
+import com.benhsoan.persistence.entity.medicine.MedicineEntity;
+import com.benhsoan.persistence.entity.prescription.PrescriptionDispenseItemEntity;
 import com.benhsoan.persistence.entity.visit.VisitEntity;
 import com.benhsoan.persistence.jpaRepository.billing.JpaInvoiceRepository;
 import com.benhsoan.persistence.jpaRepository.visit.JpaVisitRepository;
@@ -88,6 +92,47 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
         assertEquals(new BigDecimal("-20000.00"), timeline.get(2).revenue());
     }
 
+    @Test
+    void aggregatesTopMedicinesByMedicineIdWithinDispensedAtRange() {
+        UUID paracetamolId = UUID.fromString("16000000-0000-0000-0000-000000000001");
+        UUID ibuprofenId = UUID.fromString("16000000-0000-0000-0000-000000000003");
+        createMedicine(paracetamolId, "MED-PARA-500", "Paracetamol 500 mg");
+        createMedicine(ibuprofenId, "MED-IBU-400", "Ibuprofen 400 mg");
+
+        createDispenseItem(
+                UUID.fromString("18300000-0000-0000-0000-000000000001"),
+                paracetamolId,
+                4,
+                Instant.parse("2026-08-01T01:00:00Z"));
+        createDispenseItem(
+                UUID.fromString("18300000-0000-0000-0000-000000000002"),
+                paracetamolId,
+                5,
+                Instant.parse("2026-08-02T01:00:00Z"));
+        createDispenseItem(
+                UUID.fromString("18300000-0000-0000-0000-000000000003"),
+                ibuprofenId,
+                10,
+                Instant.parse("2026-08-02T03:00:00Z"));
+        createDispenseItem(
+                UUID.fromString("18300000-0000-0000-0000-000000000004"),
+                ibuprofenId,
+                3,
+                Instant.parse("2026-08-05T03:00:00Z"));
+
+        var items = repositoryAdapter.findTopDispensedMedicines(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-04T00:00:00Z")
+        );
+
+        assertEquals(2, items.size());
+        assertEquals(ibuprofenId, items.get(0).medicineId());
+        assertEquals("MED-IBU-400", items.get(0).medicineCode());
+        assertEquals(10L, items.get(0).totalDispensedQuantity());
+        assertEquals(paracetamolId, items.get(1).medicineId());
+        assertEquals(9L, items.get(1).totalDispensedQuantity());
+    }
+
     private void createVisit(String code, VisitStatus status, Instant completedAt) {
         visitRepository.save(VisitEntity.builder()
                 .id(UUID.randomUUID())
@@ -129,6 +174,37 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .totalAmount(amount)
                 .createdBy(UUID.randomUUID())
                 .createdAt(createdAt)
+                .build());
+    }
+
+    private void createMedicine(UUID id, String code, String name) {
+        entityManager.persist(MedicineEntity.builder()
+                .id(id)
+                .medicineCode(code)
+                .medicineName(name)
+                .activeIngredient(name)
+                .strength("500 mg")
+                .dosageForm(DosageForm.TABLET)
+                .unit("vien")
+                .defaultRoute(AdministrationRoute.ORAL)
+                .active(true)
+                .stockQuantity(100)
+                .minStockThreshold(10)
+                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .build());
+    }
+
+    private void createDispenseItem(UUID id, UUID medicineId, int quantity, Instant dispensedAt) {
+        entityManager.persist(PrescriptionDispenseItemEntity.builder()
+                .id(id)
+                .prescriptionId(UUID.randomUUID())
+                .prescriptionItemId(UUID.randomUUID())
+                .medicineId(medicineId)
+                .medicineBatchId(UUID.randomUUID())
+                .dispensedQuantity(quantity)
+                .dispensedBy(UUID.randomUUID())
+                .dispensedAt(dispensedAt)
+                .createdAt(dispensedAt)
                 .build());
     }
 }
