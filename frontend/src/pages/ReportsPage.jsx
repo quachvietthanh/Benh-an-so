@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Badge,
@@ -36,6 +37,7 @@ import {
   FireOutlined,
   InfoCircleOutlined,
   LineChartOutlined,
+  LogoutOutlined,
   MedicineBoxOutlined,
   PieChartOutlined,
   ReloadOutlined,
@@ -59,7 +61,8 @@ const formatCurrency = (val, currency = 'VND') => {
 const WEEKDAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
 function ReportsPage() {
-  const { user } = useAuthContext()
+  const navigate = useNavigate()
+  const { user, logout } = useAuthContext()
 
   // Phân quyền
   const roles = useMemo(() => {
@@ -68,13 +71,12 @@ function ReportsPage() {
       .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
       .filter(Boolean)
   }, [user])
-  const isManagerOrAdmin = roles.includes('manager') || roles.includes('admin')
+  const isManager = roles.includes('manager')
 
   // Mặc định khoảng thời gian: 30 ngày gần nhất
   const [range, setRange] = useState([dayjs().subtract(29, 'day'), dayjs()])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [activeTab, setActiveTab] = useState('visits')
   const [chartType, setChartType] = useState('line') // 'line' | 'bar'
   const [hoveredDay, setHoveredDay] = useState(null)
 
@@ -100,6 +102,12 @@ function ReportsPage() {
   const loadReports = useCallback(async () => {
     if (!fromStr || !toStr) return
 
+    // Nếu không phải quyền Manager, không gọi API để tránh lỗi 403 Access Denied
+    if (!isManager) {
+      setLoadError('PERMISSION_DENIED_NOT_MANAGER')
+      return
+    }
+
     setLoading(true)
     setLoadError('')
     try {
@@ -124,13 +132,18 @@ function ReportsPage() {
       }
     } catch (err) {
       console.error('Lỗi tải báo cáo vận hành:', err)
-      setLoadError(
-        err?.response?.data?.message || err?.message || 'Không thể tải báo cáo từ máy chủ.',
-      )
+      const status = err?.response?.status
+      if (status === 403) {
+        setLoadError('PERMISSION_DENIED_NOT_MANAGER')
+      } else {
+        setLoadError(
+          err?.response?.data?.message || err?.message || 'Không thể tải báo cáo từ máy chủ.',
+        )
+      }
     } finally {
       setLoading(false)
     }
-  }, [fromStr, toStr])
+  }, [fromStr, toStr, isManager])
 
   useEffect(() => {
     loadReports()
@@ -397,7 +410,58 @@ function ReportsPage() {
         </Space>
       </div>
 
-      {loadError && (
+      {loadError === 'PERMISSION_DENIED_NOT_MANAGER' ? (
+        <Card
+          style={{
+            borderRadius: 12,
+            marginBottom: 24,
+            border: '1px solid #fed7aa',
+            background: '#fffbeb',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: '#fef3c7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#d97706',
+                fontSize: 24,
+                flexShrink: 0,
+              }}
+            >
+              <TeamOutlined />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Title level={4} style={{ margin: '0 0 6px 0', color: '#92400e' }}>
+                Phân quyền Báo cáo vận hành: Dành riêng cho Quản lý phòng khám (Manager)
+              </Title>
+              <Paragraph style={{ margin: '0 0 12px 0', color: '#78350f', fontSize: 14 }}>
+                Theo chuẩn bảo mật và nghiệp vụ y tế, chức năng tổng hợp báo cáo lượt khám, phân tích tải khám và doanh thu được phân quyền riêng cho tài khoản <strong>Quản lý phòng khám (Clinic Manager)</strong>.
+                <br />
+                Tài khoản đang đăng nhập hiện tại là <strong>{user?.fullName || user?.username} ({roles.join(', ')})</strong>.
+              </Paragraph>
+              <Space wrap>
+                <Button
+                  type="primary"
+                  icon={<LogoutOutlined />}
+                  style={{ background: '#d97706', borderColor: '#d97706' }}
+                  onClick={() => {
+                    logout()
+                    navigate('/login')
+                  }}
+                >
+                  Đăng xuất để đăng nhập tài khoản Quản lý (`manager1`)
+                </Button>
+              </Space>
+            </div>
+          </div>
+        </Card>
+      ) : loadError ? (
         <Alert
           type="error"
           showIcon
@@ -406,7 +470,7 @@ function ReportsPage() {
           action={<Button size="small" onClick={loadReports}>Thử lại</Button>}
           style={{ marginBottom: 16 }}
         />
-      )}
+      ) : null}
 
       {/* KPI Cards: Khối lượng công việc & Tải khám */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
