@@ -20,6 +20,7 @@ import ServicesPage from '../pages/ServicesPage'
 import ResultPage from '../pages/ResultPage'
 import PublicLookupPage from '../pages/PublicLookupPage'
 import SystemManagementPage from '../pages/SystemManagementPage'
+import MedicalRecordAccessLogsPage from '../pages/MedicalRecordAccessLogsPage'
 import NotFound from '../pages/NotFound'
 
 const PrivateRoute = ({ children, allowedRoles = [] }) => {
@@ -83,6 +84,8 @@ function AppRoutes() {
         <Route path="billing" element={<PrivateRoute allowedRoles={['admin', 'manager', 'receptionist']}><BillingPage /></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedRoles={['admin', 'manager']}><ReportsPage /></PrivateRoute>} />
         <Route path="system-management" element={<PrivateRoute allowedRoles={['admin']}><SystemManagementPage /></PrivateRoute>} />
+        <Route path="audit-logs" element={<PrivateRoute allowedRoles={['admin']}><MedicalRecordAccessLogsPage /></PrivateRoute>} />
+        <Route path="medical-records/access-logs" element={<PrivateRoute allowedRoles={['admin']}><MedicalRecordAccessLogsPage /></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute allowedRoles={['admin']}><UsersPage /></PrivateRoute>} />
         <Route path="services" element={<PrivateRoute allowedRoles={['admin', 'manager']}><ServicesPage /></PrivateRoute>} />
       </Route>
