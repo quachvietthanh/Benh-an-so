@@ -148,7 +148,7 @@ class InvoiceSecurityIntegrationTest {
     }
 
     @Test
-    void onlyAllowsAdminToAdjustInvoices() throws Exception {
+    void onlyAllowsManagerToAdjustInvoices() throws Exception {
         UUID originalInvoiceId = UUID.fromString("23100000-0000-0000-0000-000000000001");
         UUID adjustmentInvoiceId = UUID.randomUUID();
         Instant now = Instant.parse("2026-08-12T03:00:00Z");
@@ -191,6 +191,12 @@ class InvoiceSecurityIntegrationTest {
 
         mockMvc.perform(post("/invoices/{invoiceId}/adjustments", "23100000-0000-0000-0000-000000000001")
                         .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/invoices/{invoiceId}/adjustments", "23100000-0000-0000-0000-000000000001")
+                        .with(user("manager").roles("MANAGER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());

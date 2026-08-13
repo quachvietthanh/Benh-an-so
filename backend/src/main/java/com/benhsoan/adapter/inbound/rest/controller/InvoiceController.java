@@ -132,7 +132,7 @@ public class InvoiceController {
 
     @PostMapping("/{invoiceId}/adjustments")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     @CheckPermission(Permission.INVOICE_UPDATE)
     public InvoiceResponse adjust(
             @PathVariable UUID invoiceId,

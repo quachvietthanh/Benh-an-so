@@ -11,31 +11,33 @@ import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
-import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
-import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional
 public class ExportOperationalReportService implements ExportOperationalReportUseCase {
 
     private static final String CSV_CONTENT_TYPE = "text/csv; charset=UTF-8";
 
-    private final GetOperationalSummaryUseCase getOperationalSummaryUseCase;
-    private final GetOperationalTimelineUseCase getOperationalTimelineUseCase;
+    private final OperationalReportDataService operationalReportDataService;
+    private final OperationalReportAuditService operationalReportAuditService;
 
     @Override
     public OperationalReportExportResult export(LocalDate from, LocalDate to) {
-        OperationalSummaryResult summary = getOperationalSummaryUseCase.getSummary(from, to);
-        OperationalTimelineResult timeline = getOperationalTimelineUseCase.getTimeline(from, to);
+        OperationalReportData reportData = operationalReportDataService.getReportData(from, to);
+        OperationalSummaryResult summary = reportData.summary();
+        OperationalTimelineResult timeline = reportData.timeline();
         String fileName = "operational-report-" + from + "-to-" + to + ".csv";
+        byte[] content = buildCsv(summary, timeline).getBytes(StandardCharsets.UTF_8);
+
+        operationalReportAuditService.logExport(from, to);
 
         return new OperationalReportExportResult(
                 fileName,
                 CSV_CONTENT_TYPE,
-                buildCsv(summary, timeline).getBytes(StandardCharsets.UTF_8)
+                content
         );
     }
 

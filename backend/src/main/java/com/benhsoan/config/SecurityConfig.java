@@ -169,12 +169,14 @@ public class SecurityConfig {
 
                                                 // ===== REPORTS =====
                                                 .requestMatchers(HttpMethod.GET, "/reports/**")
-                                                .hasAnyRole("ADMIN", "MANAGER")
+                                                .hasRole("MANAGER")
 
                                                 // ===== PHARMACY / INVOICES =====
                                                 .requestMatchers(HttpMethod.DELETE, "/inventory/**").hasRole("ADMIN")
                                                 .requestMatchers("/inventory/**")
                                                 .hasAnyRole("ADMIN", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.POST, "/invoices/*/adjustments")
+                                                .hasRole("MANAGER")
                                                 .requestMatchers("/invoices/**")
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
 

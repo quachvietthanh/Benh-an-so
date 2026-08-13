@@ -1,7 +1,5 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -19,7 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
+import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.infrastructure.security.annotation.CheckPermission;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
@@ -41,7 +41,8 @@ public class ReportsController {
     private final ReportingRestMapper mapper;
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasRole('MANAGER')")
+    @CheckPermission(Permission.REPORT_VIEW)
     public OperationalSummaryResponse getSummary(
             @RequestParam String from,
             @RequestParam String to
@@ -54,7 +55,8 @@ public class ReportsController {
     }
 
     @GetMapping("/visits-timeline")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasRole('MANAGER')")
+    @CheckPermission(Permission.REPORT_VIEW)
     public OperationalTimelineResponse getVisitsTimeline(
             @RequestParam String from,
             @RequestParam String to
@@ -67,7 +69,8 @@ public class ReportsController {
     }
 
     @GetMapping("/export")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasRole('MANAGER')")
+    @CheckPermission(Permission.REPORT_EXPORT)
     public ResponseEntity<ByteArrayResource> export(
             @RequestParam String from,
             @RequestParam String to
@@ -86,6 +89,9 @@ public class ReportsController {
     }
 
     private LocalDate parseDate(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new ValidationException(fieldName + " is required.");
+        }
         try {
             return LocalDate.parse(value, DATE_FORMATTER);
         } catch (RuntimeException ex) {
