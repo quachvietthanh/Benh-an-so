@@ -3,6 +3,7 @@ package com.benhsoan.persistence.adapterRepository.billing;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -70,6 +71,14 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     @Transactional(readOnly = true)
     public Optional<Invoice> findByPaymentId(UUID paymentId) {
         return jpaRepository.findByPaymentId(paymentId).map(this::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive) {
+        return jpaRepository.findCreatedBetween(fromInclusive, toExclusive).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override

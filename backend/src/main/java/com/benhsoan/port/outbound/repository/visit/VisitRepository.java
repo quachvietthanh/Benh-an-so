@@ -22,6 +22,8 @@ public interface VisitRepository {
 
     List<Visit> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 
+    List<Visit> findCompletedBetween(Instant fromInclusive, Instant toExclusive);
+
     boolean existsByPatientIdAndStatusIn(UUID patientId, Collection<VisitStatus> statuses);
 
     boolean existsByPatientIdAndStatusInAndVisitAtBetween(

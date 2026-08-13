@@ -64,6 +64,18 @@ public class AuditLog {
             String detail,
             String ipAddress
     ) {
+        return create(userId, actionType, resourceType, resourceId, detail, ipAddress, Instant.now());
+    }
+
+    public static AuditLog create(
+            UUID userId,
+            ActionType actionType,
+            ResourceType resourceType,
+            UUID resourceId,
+            String detail,
+            String ipAddress,
+            Instant createdAt
+    ) {
         return new AuditLog(
                 UUID.randomUUID(),
                 userId,
@@ -72,7 +84,7 @@ public class AuditLog {
                 resourceId,
                 detail,
                 ipAddress,
-                Instant.now()
+                createdAt
         );
     }
 
