@@ -66,4 +66,15 @@ public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {
             where visit.id = :visitId
             """)
     Optional<VisitEncounterProjection> findEncounterById(@Param("visitId") UUID visitId);
+
+    @Query("""
+            select visit
+            from VisitEntity visit
+            where visit.visitAt >= :fromInclusive
+              and visit.visitAt < :toExclusive
+            """)
+    List<VisitEntity> findByVisitAtBetween(
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive
+    );
 }
