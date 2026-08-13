@@ -28,5 +28,7 @@ public enum ResourceType {
 
     PAYMENT,
 
+    OPERATIONAL_REPORT,
+
     DRUG_INTERACTION
 }

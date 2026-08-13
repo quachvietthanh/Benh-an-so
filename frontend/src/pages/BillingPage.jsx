@@ -35,6 +35,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import billingApi from '../api/billingApi'
+import medicalRecordApi from '../api/medicalRecordApi'
 import pharmacyApi from '../api/pharmacyApi'
 import queueApi from '../api/queueApi'
 import { useAuthContext } from '../context/AuthContext'
@@ -145,27 +146,70 @@ function BillingPage() {
     const isVisitCompleted = visitStatus === 'COMPLETED' || visitStatus === 'WAITING_FOR_PAYMENT'
 
     try {
-      const [invoiceRes, visitRes] = await Promise.allSettled([
-        billingApi.getByVisit(visitId),
-        pharmacyApi.prescriptions({ visitId, size: 50 }),
-      ])
-
+      // A. Tải thông tin Hóa đơn / Payment theo visitId
       let invoiceData = null
-      if (invoiceRes.status === 'fulfilled') {
-        const rawData = invoiceRes.value?.data
+      try {
+        const invoiceRes = await billingApi.getByVisit(visitId)
+        const rawData = invoiceRes?.data
         const list = Array.isArray(rawData?.content) ? rawData.content : Array.isArray(rawData) ? rawData : [rawData]
         invoiceData = list.find((i) => i && i.id) || null
+      } catch (e) {
+        console.warn('[BillingPage] Lỗi getByVisit invoice:', e?.message)
+      }
+
+      // B. Tải Đơn thuốc thuộc đúng visitId theo chuỗi liên kết Backend:
+      // Visit (visitId) -> MedicalRecord (medicalRecordId) -> Prescription -> PrescriptionItems
+      let prescriptions = []
+
+      // B1: Tìm MedicalRecord theo visitId (/medical-records/visits/{visitId})
+      try {
+        const mrRes = await medicalRecordApi.getByVisit(visitId)
+        const medicalRecordId = mrRes?.data?.id
+        if (medicalRecordId) {
+          const presRes = await pharmacyApi.getByMedicalRecord(medicalRecordId)
+          prescriptions = Array.isArray(presRes?.data) ? presRes.data : (presRes?.data ? [presRes.data] : [])
+        }
+      } catch (mrErr) {
+        console.warn('[BillingPage] Lỗi getByVisit medical record:', mrErr?.message)
+      }
+
+      // B2 (Fallback): Nếu không lấy được qua MedicalRecord, tìm trong danh sách PENDING_DISPENSE & DISPENSED theo visitId/visitCode
+      if (prescriptions.length === 0) {
+        try {
+          const [pendingRes, dispensedRes] = await Promise.allSettled([
+            pharmacyApi.prescriptions({ status: 'PENDING_DISPENSE', size: 100 }),
+            pharmacyApi.prescriptions({ status: 'DISPENSED', size: 100 }),
+          ])
+
+          const pList = []
+          if (pendingRes.status === 'fulfilled') {
+            const raw = pendingRes.value?.data
+            const items = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
+            pList.push(...items)
+          }
+          if (dispensedRes.status === 'fulfilled') {
+            const raw = dispensedRes.value?.data
+            const items = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
+            pList.push(...items)
+          }
+
+          prescriptions = pList.filter(
+            (p) => String(p.visitId) === String(visitId) || String(p.visitCode) === String(matchedVisit?.visitCode)
+          )
+        } catch (fbErr) {
+          console.warn('[BillingPage] Lỗi search prescriptions fallback:', fbErr?.message)
+        }
       }
 
       let prescriptionItems = []
       let prescriptionStatus = null
-      if (visitRes.status === 'fulfilled') {
-        const raw = visitRes.value?.data
-        const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
-        if (list.length > 0) {
-          prescriptionStatus = list[0]?.status
-          prescriptionItems = list.flatMap((p) => (Array.isArray(p.items) ? p.items : []))
-        }
+      let prescriptionCode = null
+
+      if (prescriptions.length > 0) {
+        const mainPrescription = prescriptions[0]
+        prescriptionStatus = mainPrescription?.status || null
+        prescriptionCode = mainPrescription?.prescriptionCode || null
+        prescriptionItems = Array.isArray(mainPrescription?.items) ? mainPrescription.items : []
       }
 
       const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
@@ -186,6 +230,7 @@ function BillingPage() {
         patientCode: matchedVisit?.patientCode || invoiceData?.patientCode || '—',
         doctorName: matchedVisit?.doctorName || invoiceData?.doctorName || 'Bác sĩ khám',
         visitStatus,
+        prescriptionCode,
         prescriptionStatus,
         isVisitCompleted,
         isDispensingCompleted,
@@ -307,7 +352,7 @@ function BillingPage() {
   const feeColumns = [
     { title: 'Khoản thu / Dịch vụ', key: 'name', render: (_, r) => <strong>{r.name}</strong> },
     { title: 'Số lượng', dataIndex: 'quantity', key: 'quantity', width: 90, align: 'center' },
-    { title: 'Đơn giá Backend', dataIndex: 'price', key: 'price', width: 150, align: 'right', render: (v) => money(v) },
+    { title: 'Đơn giá', dataIndex: 'price', key: 'price', width: 150, align: 'right', render: (v) => money(v) },
     { title: 'Thành tiền', dataIndex: 'amount', key: 'amount', width: 160, align: 'right', render: (v) => <Text strong style={{ color: '#1677ff' }}>{money(v)}</Text> },
   ]
 
@@ -321,9 +366,9 @@ function BillingPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <Title level={2} style={{ margin: 0 }}>
-            <DollarCircleOutlined /> Thu phí &amp; Hóa đơn
+            <DollarCircleOutlined style={{ color: '#2563eb', marginRight: 8 }} /> Thu phí &amp; Hóa đơn
           </Title>
-          <Text type="secondary">NCL-07-CN-001 (Thu phí) &amp; NCL-07-CN-002 (Lập hóa đơn).</Text>
+          <Text type="secondary">Quản lý thu tiền viện phí, thanh toán dịch vụ và lập hóa đơn điện tử.</Text>
         </div>
         <Button icon={<ReloadOutlined />} loading={loadingVisits} onClick={loadVisits}>
           Làm mới danh sách
@@ -379,20 +424,23 @@ function BillingPage() {
                     onClick={() => setSelectedVisitId(vId)}
                     style={{
                       cursor: 'pointer',
-                      border: selected ? '1px solid #1677ff' : '1px solid #f0f0f0',
-                      background: selected ? '#e6f4ff' : '#fff',
+                      border: selected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                      background: selected ? '#eff6ff' : '#ffffff',
                       borderRadius: 8,
                       marginBottom: 8,
                       padding: 12,
+                      transition: 'all 0.2s ease',
                     }}
-                    extra={<RightOutlined style={{ color: selected ? '#1677ff' : '#bfbfbf' }} />}
+                    extra={<RightOutlined style={{ color: selected ? '#2563eb' : '#94a3b8' }} />}
                   >
                     <List.Item.Meta
                       title={(
                         <Space wrap>
-                          <Text strong>{item.visitCode || item.queueCode || vId}</Text>
+                          <Text strong style={{ color: selected ? '#1e40af' : '#0f172a' }}>
+                            {item.visitCode || item.queueCode || vId}
+                          </Text>
                           {isCompleted ? (
-                            <Tag color="green">Đã hoàn thành khám</Tag>
+                            <Tag color="green">Đã hoàn thành</Tag>
                           ) : (
                             <Tag color="orange" icon={<WarningOutlined />}>Đang khám ({item.status})</Tag>
                           )}
@@ -421,32 +469,61 @@ function BillingPage() {
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
                 {/* 1. Thông tin lượt khám Read-Only */}
                 <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>1. Thông tin lượt khám &amp; Trạng thái (Read-only)</Title>
-                  <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
-                    <Descriptions.Item label="Mã lượt khám"><Text strong>{selectedVisitData.visitCode}</Text></Descriptions.Item>
-                    <Descriptions.Item label="Bệnh nhân"><Text strong style={{ color: '#1677ff' }}>{selectedVisitData.patientName}</Text> ({selectedVisitData.patientCode})</Descriptions.Item>
-                    <Descriptions.Item label="Bác sĩ khám">{selectedVisitData.doctorName}</Descriptions.Item>
-                    <Descriptions.Item label="Trạng thái lượt khám">
+                  <Title level={5} style={{ marginBottom: 10, color: '#1e3a8a' }}>1. Thông tin lượt khám &amp; Trạng thái</Title>
+                  <Descriptions
+                    bordered
+                    size="small"
+                    column={{ xs: 1, sm: 1, md: 2 }}
+                    labelStyle={{ width: '130px', fontWeight: 600, color: '#475569', background: '#f8fafc' }}
+                    contentStyle={{ background: '#ffffff' }}
+                  >
+                    <Descriptions.Item label="Mã lượt khám">
+                      <Text code style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>{selectedVisitData.visitCode}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Bệnh nhân">
+                      <Text strong style={{ color: '#2563eb' }}>{selectedVisitData.patientName}</Text>{' '}
+                      <Text type="secondary">({selectedVisitData.patientCode})</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Bác sĩ khám">
+                      <Text strong>{selectedVisitData.doctorName}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Lượt khám">
                       {selectedVisitData.isVisitCompleted ? (
-                        <Tag color="green">Đã hoàn thành khám ({selectedVisitData.visitStatus})</Tag>
+                        <Tag color="green" style={{ margin: 0 }}>Đã hoàn thành ({selectedVisitData.visitStatus})</Tag>
                       ) : (
-                        <Tag color="orange" icon={<WarningOutlined />}>Đang khám ({selectedVisitData.visitStatus})</Tag>
+                        <Tag color="orange" icon={<WarningOutlined />} style={{ margin: 0 }}>Đang khám ({selectedVisitData.visitStatus})</Tag>
                       )}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Trạng thái đơn thuốc">
+                    <Descriptions.Item label="Đơn thuốc">
                       {selectedVisitData.prescriptionStatus === 'DISPENSED' ? (
-                        <Tag color="green">Đã xuất kho cấp thuốc (DISPENSED)</Tag>
+                        <Space wrap style={{ margin: 0 }}>
+                          <Tag color="green" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
+                            Đã cấp phát ({selectedVisitData.prescriptionCode || 'DISPENSED'})
+                          </Tag>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            ({selectedVisitData.prescriptionItems.length} loại thuốc)
+                          </Text>
+                        </Space>
                       ) : selectedVisitData.prescriptionStatus === 'PENDING_DISPENSE' ? (
-                        <Tag color="orange" icon={<ClockCircleOutlined />}>Chờ Dược sĩ cấp phát (PENDING_DISPENSE)</Tag>
+                        <Space wrap style={{ margin: 0 }}>
+                          <Tag color="orange" icon={<ClockCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
+                            Có đơn - Chờ Dược sĩ cấp phát ({selectedVisitData.prescriptionCode || 'PENDING'})
+                          </Tag>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            ({selectedVisitData.prescriptionItems.length} loại thuốc)
+                          </Text>
+                        </Space>
+                      ) : selectedVisitData.prescriptionStatus ? (
+                        <Tag color="volcano" style={{ margin: 0 }}>{selectedVisitData.prescriptionStatus}</Tag>
                       ) : (
-                        <Tag color="default">Không có đơn thuốc</Tag>
+                        <Tag color="default" style={{ margin: 0 }}>Không có đơn thuốc</Tag>
                       )}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Trạng thái thanh toán">
+                    <Descriptions.Item label="Thanh toán">
                       {selectedVisitData.paymentStatus === 'PAID' ? (
-                        <Tag color="green" icon={<CheckCircleOutlined />}>ĐÃ THANH TOÁN</Tag>
+                        <Tag color="green" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 700 }}>ĐÃ THANH TOÁN</Tag>
                       ) : (
-                        <Tag color="orange">CHƯA THANH TOÁN (PENDING)</Tag>
+                        <Tag color="volcano" icon={<WarningOutlined />} style={{ margin: 0, fontWeight: 700 }}>CHƯA THANH TOÁN</Tag>
                       )}
                     </Descriptions.Item>
                   </Descriptions>
@@ -477,7 +554,7 @@ function BillingPage() {
 
                 {/* 2. Chi tiết các khoản phải thu */}
                 <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>2. Chi tiết các khoản phải thu (Nguồn từ Backend)</Title>
+                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>2. Chi tiết các khoản phải thu</Title>
                   <Table rowKey="key" columns={feeColumns} dataSource={feeDataSource} pagination={false} size="small" loading={loadingData} />
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                     <Card size="small" style={{ backgroundColor: '#f8fafc', minWidth: 300, borderColor: '#cbd5e1' }}>
@@ -493,7 +570,7 @@ function BillingPage() {
 
                 {/* 3. Ghi nhận thanh toán */}
                 <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>3. Ghi nhận thanh toán (NCL-07-CN-001)</Title>
+                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>3. Ghi nhận thanh toán</Title>
                   {selectedVisitData.paymentStatus === 'PAID' ? (
                     <Alert
                       type="success"
@@ -548,7 +625,7 @@ function BillingPage() {
 
                 {/* 4. Giao diện Hóa đơn điện tử */}
                 <div>
-                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>4. Giao diện Hóa đơn điện tử (NCL-07-CN-002)</Title>
+                  <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>4. Hóa đơn điện tử</Title>
                   {selectedVisitData.paymentStatus !== 'PAID' ? (
                     <Alert type="warning" showIcon message="Cần hoàn tất thu phí trước khi lập hóa đơn." />
                   ) : (

@@ -10,6 +10,9 @@ public final class RoleConstants {
     public static final UUID ADMIN =
             UUID.fromString("11111111-1111-1111-1111-111111111111");
 
+    public static final UUID MANAGER =
+            UUID.fromString("66666666-6666-6666-6666-666666666666");
+
     public static final UUID DOCTOR =
             UUID.fromString("22222222-2222-2222-2222-222222222222");
 

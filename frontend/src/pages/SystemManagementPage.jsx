@@ -1,6 +1,7 @@
 import React from 'react'
-import { AppstoreOutlined, TeamOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
 import { Tabs, Typography } from 'antd'
+import MedicalRecordAccessLogsPage from './MedicalRecordAccessLogsPage'
 import ServicesPage from './ServicesPage'
 import UsersPage from './UsersPage'
 
@@ -10,8 +11,8 @@ function SystemManagementPage() {
   return (
     <div className="system-management-page">
       <div className="page-heading-block">
-        <Title level={3}>Quản trị hệ thống và danh mục dịch vụ</Title>
-        <Text type="secondary">Quản lý tài khoản, phân quyền và cấu hình bảng giá dịch vụ.</Text>
+        <Title level={3}>Quản trị hệ thống & Giám sát an toàn dữ liệu</Title>
+        <Text type="secondary">Quản lý tài khoản, phân quyền, cấu hình bảng giá và kiểm toán nhật ký truy cập bệnh án.</Text>
       </div>
       <Tabs
         className="system-tabs"
@@ -26,6 +27,11 @@ function SystemManagementPage() {
             key: 'services',
             label: <span><AppstoreOutlined /> Danh mục dịch vụ</span>,
             children: <ServicesPage />,
+          },
+          {
+            key: 'access-logs',
+            label: <span><SafetyCertificateOutlined /> Nhật ký truy cập bệnh án</span>,
+            children: <MedicalRecordAccessLogsPage />,
           },
         ]}
       />

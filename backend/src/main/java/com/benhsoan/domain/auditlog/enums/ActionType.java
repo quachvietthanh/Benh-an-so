@@ -28,5 +28,7 @@ public enum ActionType {
 
     DISPENSE,
 
+    EXPORT,
+
     OVERRIDE_DRUG_INTERACTION_WARNING
 }

@@ -384,14 +384,14 @@ function MedicalEncounter() {
 
   const resolveDiagnosis = async (diagnosis) => {
     if (diagnosis?.id) return diagnosis
-    if (!diagnosis?.code) throw new Error('Vui lòng chọn chẩn đoán ICD-10 từ danh mục backend.')
+    if (!diagnosis?.code) throw new Error('Vui lòng chọn chẩn đoán ICD-10 từ danh mục chuẩn.')
 
     const response = await medicalRecordApi.getDiagnosisCatalog(diagnosis.code)
     const exact = (response.data || []).find(
       (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase(),
     )
     if (!exact) {
-      throw new Error(`Mã ${diagnosis.code} chưa tồn tại trong danh mục chẩn đoán backend.`)
+      throw new Error(`Mã ${diagnosis.code} chưa tồn tại trong danh mục chẩn đoán chuẩn.`)
     }
     return { id: exact.id, code: exact.code, name: exact.name, note: diagnosis.note }
   }
@@ -807,7 +807,7 @@ function MedicalEncounter() {
       />
 
       <Modal
-        title="Tra cứu danh mục ICD-10 backend"
+        title="Tra cứu danh mục ICD-10"
         open={diagnosisModalOpen}
         onCancel={() => setDiagnosisModalOpen(false)}
         footer={<Button onClick={() => setDiagnosisModalOpen(false)}>Đóng</Button>}
@@ -816,7 +816,7 @@ function MedicalEncounter() {
         <Space style={{ width: '100%', marginBottom: 12 }} align="start">
           <Input
             prefix={<SearchOutlined />}
-            placeholder="Nhập mã hoặc tên bệnh để lấy UUID danh mục..."
+            placeholder="Nhập mã hoặc tên bệnh cần tra cứu..."
             value={icdSearchQuery}
             onChange={(event) => setIcdSearchQuery(event.target.value)}
             style={{ width: 480 }}
@@ -839,8 +839,12 @@ function MedicalEncounter() {
             { title: 'Tên chẩn đoán', dataIndex: 'name' },
             {
               title: 'Nguồn',
-              width: 100,
-              render: (_, item) => <Tag color={item.id ? 'green' : 'default'}>{item.id ? 'Backend' : 'Gợi ý'}</Tag>,
+              width: 130,
+              render: (_, item) => (
+                <Tag color={item.id ? 'green' : 'default'}>
+                  {item.id ? 'Danh mục chuẩn' : 'Gợi ý'}
+                </Tag>
+              ),
             },
             {
               title: '',

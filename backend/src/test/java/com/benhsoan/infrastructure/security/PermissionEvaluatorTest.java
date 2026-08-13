@@ -55,8 +55,34 @@ class PermissionEvaluatorTest {
         authenticateAs("admin", "ADMIN");
         assertTrue(evaluator.hasPermission(Permission.USER_CREATE));
         assertTrue(evaluator.hasPermission(Permission.AUDIT_READ));
+        assertTrue(evaluator.hasPermission(Permission.REPORT_VIEW));
+        assertTrue(evaluator.hasPermission(Permission.REPORT_EXPORT));
         assertTrue(evaluator.hasPermission(Permission.ROLE_CREATE));
         assertTrue(evaluator.hasPermission(Permission.PATIENT_CREATE));
+    }
+
+    @Test
+    @DisplayName("Manager should have reporting and invoice adjustment permissions only")
+    void managerHasReportingAndInvoiceAdjustmentPermissions() {
+        Role managerRole = Role.create("MANAGER", "Clinic manager role", true, Set.of(
+                Permission.INVOICE_READ,
+                Permission.INVOICE_UPDATE,
+                Permission.AUDIT_READ,
+                Permission.REPORT_VIEW,
+                Permission.REPORT_EXPORT
+        ));
+        when(roleRepository.findByName("MANAGER")).thenReturn(Optional.of(managerRole));
+
+        authenticateAs("manager", "MANAGER");
+        assertTrue(evaluator.hasPermission(Permission.INVOICE_READ));
+        assertTrue(evaluator.hasPermission(Permission.INVOICE_UPDATE));
+        assertTrue(evaluator.hasPermission(Permission.AUDIT_READ));
+        assertTrue(evaluator.hasPermission(Permission.REPORT_VIEW));
+        assertTrue(evaluator.hasPermission(Permission.REPORT_EXPORT));
+
+        assertFalse(evaluator.hasPermission(Permission.USER_CREATE));
+        assertFalse(evaluator.hasPermission(Permission.ROLE_CREATE));
+        assertFalse(evaluator.hasPermission(Permission.INVOICE_CREATE));
     }
 
     @Test

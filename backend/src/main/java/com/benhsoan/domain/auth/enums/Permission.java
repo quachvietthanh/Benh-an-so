@@ -67,6 +67,10 @@ public enum Permission {
     // Audit
     AUDIT_READ,
 
+    // Reporting
+    REPORT_VIEW,
+    REPORT_EXPORT,
+
     // Medical Queue
     QUEUE_CREATE,
     QUEUE_CALL_NEXT,

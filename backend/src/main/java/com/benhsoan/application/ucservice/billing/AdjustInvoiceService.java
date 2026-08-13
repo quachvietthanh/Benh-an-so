@@ -69,7 +69,7 @@ public class AdjustInvoiceService implements AdjustInvoiceUseCase {
                 actorId,
                 now,
                 lines,
-                currentUserPort.hasRole("ADMIN")
+                currentUserPort.hasRole("MANAGER")
         );
 
         Invoice saved = invoiceRepository.save(adjustmentInvoice);
