@@ -122,7 +122,7 @@ export function ClinicalOrdersPage() {
 
     // Log to Audit History
     logMedicalAccess({
-      userName: user?.fullName || 'BS. Phạm Hồng Anh',
+      userName: user?.fullName || 'Dr. Nguyen Minh Anh',
       patientName: orderToCancel.patientName,
       recordCode: orderToCancel.orderCode,
       action: `Hủy chỉ định CLS - Lý do: ${finalReason}`,

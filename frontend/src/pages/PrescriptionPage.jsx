@@ -58,6 +58,8 @@ import {
   areAllInteractionsHandled,
   getUnhandledInteractions,
 } from '../utils/drugInteractionValidation'
+import { saveStoredPrescription } from '../utils/storageHelpers'
+
 
 const { Text, Paragraph, Title } = Typography
 
@@ -388,7 +390,7 @@ function PrescriptionPage() {
   const executeSavePrescription = async (overrides = []) => {
     setSaving(true)
     try {
-      await requireLiveInProgressQueue(
+      const activeQueueItem = await requireLiveInProgressQueue(
         editingPrescription ? 'điều chỉnh đơn thuốc' : 'tạo đơn thuốc',
       )
 
@@ -415,6 +417,29 @@ function PrescriptionPage() {
       }
 
       const prescriptionCode = response.data?.prescriptionCode || editingPrescription?.prescriptionCode || ''
+      
+      const pData = response.data || {}
+      saveStoredPrescription({
+        id: pData.id || `presc-${Date.now()}`,
+        prescriptionCode: prescriptionCode || `DT-${Date.now().toString().slice(-6)}`,
+        visitId: encounter?.visitId || encounter?.visit?.id || activeQueueItem?.visitId || medicalRecordId,
+        visitCode: encounter?.visitCode || encounter?.visit?.visitCode || activeQueueItem?.visitCode || encounter?.queueItem?.visitCode,
+        patientId: encounter?.patientId || encounter?.patient?.id || activeQueueItem?.patientId,
+        patientCode: encounter?.patientCode || encounter?.patient?.patientCode || activeQueueItem?.patientCode,
+        patientName: encounter?.patientName || encounter?.patient?.fullName || activeQueueItem?.patientName,
+        medicalRecordId: medicalRecordId,
+        status: pData.status || 'PENDING_DISPENSE',
+        items: items.map((i) => ({
+          medicineId: i.medicineId,
+          medicineName: i.medicineName || i.name,
+          quantity: i.quantity,
+          dosage: i.dosage,
+          frequency: i.frequency,
+          unitPrice: i.unitPrice || i.price,
+        })),
+        createdAt: new Date().toISOString(),
+      })
+
       message.success(
         editingPrescription
           ? `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công.`

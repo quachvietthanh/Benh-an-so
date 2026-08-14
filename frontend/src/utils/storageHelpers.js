@@ -328,7 +328,7 @@ export const mergePrescriptions = (apiPrescriptions = []) => {
     const key = String(item.id || item.prescriptionCode)
     if (key && key !== 'undefined') {
       const existing = map.get(key)
-      map.set(key, existing ? { ...existing, ...item } : item)
+      map.set(key, existing ? { ...item, ...existing } : item)
     }
   })
 
