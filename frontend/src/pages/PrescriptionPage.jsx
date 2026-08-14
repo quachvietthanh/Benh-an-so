@@ -53,7 +53,13 @@ import InteractionWarningModal from '../components/pharmacy/InteractionWarningMo
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import { useAuthContext } from '../context/AuthContext'
 import { getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
-import { mergeMedicines } from '../utils/storageHelpers'
+import {
+  canSubmitPrescription,
+  areAllInteractionsHandled,
+  getUnhandledInteractions,
+} from '../utils/drugInteractionValidation'
+import { saveStoredPrescription } from '../utils/storageHelpers'
+
 
 const { Text, Paragraph, Title } = Typography
 
@@ -130,6 +136,7 @@ function PrescriptionPage() {
   const [checkingInteractions, setCheckingInteractions] = useState(false)
   const [interactionModalOpen, setInteractionModalOpen] = useState(false)
   const [confirmedOverrides, setConfirmedOverrides] = useState([])
+  const [interactionApiError, setInteractionApiError] = useState(null)
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
@@ -153,6 +160,20 @@ function PrescriptionPage() {
     !prescriptionBlockReason &&
     editingPrescription?.status !== 'DISPENSED' &&
     editingPrescription?.status !== 'CANCELLED'
+
+  const submitStatus = useMemo(
+    () =>
+      canSubmitPrescription({
+        canPrescribe,
+        saving,
+        checkingInteractions,
+        interactionApiError,
+        detectedInteractions,
+        confirmedOverrides,
+      }),
+    [canPrescribe, saving, checkingInteractions, interactionApiError, detectedInteractions, confirmedOverrides],
+  )
+  const canSubmit = submitStatus.allowed
 
   const diagnosisSummary = useMemo(() => {
     const primary = diagnoses.find((diagnosis) => diagnosis.diagnosisType === 'PRIMARY') || diagnoses[0]
@@ -256,10 +277,12 @@ function PrescriptionPage() {
 
     if (medicineIds.length < 2) {
       setDetectedInteractions([])
+      setInteractionApiError(null)
       return []
     }
 
     setCheckingInteractions(true)
+    setInteractionApiError(null)
     try {
       const response = await pharmacyApi.checkInteractions(medicineIds)
       const rawWarnings = response?.data || []
@@ -286,9 +309,13 @@ function PrescriptionPage() {
       }
 
       setDetectedInteractions(uniqueWarnings)
+      setInteractionApiError(null)
       return uniqueWarnings
     } catch (error) {
-      const errorMsg = getApiMessage(error, 'Không thể kiểm tra tương tác thuốc từ Backend.')
+      const errorMsg = 'Không thể kiểm tra tương tác thuốc. Vui lòng thử lại.'
+      setInteractionApiError(errorMsg)
+      setDetectedInteractions([])
+      setConfirmedOverrides([])
       message.error(errorMsg)
       throw error
     } finally {
@@ -363,7 +390,7 @@ function PrescriptionPage() {
   const executeSavePrescription = async (overrides = []) => {
     setSaving(true)
     try {
-      await requireLiveInProgressQueue(
+      const activeQueueItem = await requireLiveInProgressQueue(
         editingPrescription ? 'điều chỉnh đơn thuốc' : 'tạo đơn thuốc',
       )
 
@@ -390,6 +417,29 @@ function PrescriptionPage() {
       }
 
       const prescriptionCode = response.data?.prescriptionCode || editingPrescription?.prescriptionCode || ''
+      
+      const pData = response.data || {}
+      saveStoredPrescription({
+        id: pData.id || `presc-${Date.now()}`,
+        prescriptionCode: prescriptionCode || `DT-${Date.now().toString().slice(-6)}`,
+        visitId: encounter?.visitId || encounter?.visit?.id || activeQueueItem?.visitId || medicalRecordId,
+        visitCode: encounter?.visitCode || encounter?.visit?.visitCode || activeQueueItem?.visitCode || encounter?.queueItem?.visitCode,
+        patientId: encounter?.patientId || encounter?.patient?.id || activeQueueItem?.patientId,
+        patientCode: encounter?.patientCode || encounter?.patient?.patientCode || activeQueueItem?.patientCode,
+        patientName: encounter?.patientName || encounter?.patient?.fullName || activeQueueItem?.patientName,
+        medicalRecordId: medicalRecordId,
+        status: pData.status || 'PENDING_DISPENSE',
+        items: items.map((i) => ({
+          medicineId: i.medicineId,
+          medicineName: i.medicineName || i.name,
+          quantity: i.quantity,
+          dosage: i.dosage,
+          frequency: i.frequency,
+          unitPrice: i.unitPrice || i.price,
+        })),
+        createdAt: new Date().toISOString(),
+      })
+
       message.success(
         editingPrescription
           ? `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công.`
@@ -419,10 +469,25 @@ function PrescriptionPage() {
 
     try {
       const warnings = await performInteractionCheck(items)
-      if (warnings.length && !confirmedOverrides.length) {
+      if (warnings.length > 0 && !areAllInteractionsHandled(warnings, confirmedOverrides)) {
         setInteractionModalOpen(true)
         return
       }
+
+      const checkStatus = canSubmitPrescription({
+        canPrescribe,
+        saving,
+        checkingInteractions,
+        interactionApiError,
+        detectedInteractions: warnings,
+        confirmedOverrides,
+      })
+
+      if (!checkStatus.allowed) {
+        message.error(checkStatus.reason)
+        return
+      }
+
       await executeSavePrescription(confirmedOverrides)
     } catch (error) {
       // Error is notified via performInteractionCheck catch block
@@ -806,9 +871,18 @@ function PrescriptionPage() {
             </Button>
           )}
           {canPrescribe && (
-            <Button type="primary" size="large" loading={saving} icon={<CheckCircleOutlined />} onClick={handleSaveClick}>
-              {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
-            </Button>
+            <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
+              <Button
+                type="primary"
+                size="large"
+                loading={saving || checkingInteractions}
+                disabled={!canSubmit}
+                icon={<CheckCircleOutlined />}
+                onClick={handleSaveClick}
+              >
+                {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
+              </Button>
+            </Tooltip>
           )}
           {isAssignedDoctor && prescriptions.length > 0 && !editingPrescription && (
             <Button
@@ -1136,28 +1210,84 @@ function PrescriptionPage() {
                     </div>
                   )}
 
-                  {!checkingInteractions && detectedInteractions.length > 0 && (
+                  {!checkingInteractions && interactionApiError && (
                     <div style={{ marginTop: 16 }}>
                       <Alert
                         type="error"
                         showIcon
                         icon={<WarningOutlined />}
-                        message={`Phát hiện ${detectedInteractions.length} tương tác thuốc bất lợi`}
+                        message="Lỗi kiểm tra tương tác thuốc"
                         description={
                           <div>
-                            <ul style={{ margin: '4px 0 8px 0', paddingLeft: 20 }}>
-                              {detectedInteractions.map((w, idx) => (
-                                <li key={idx}>
-                                  <strong>{w.drugNameA}</strong> — <strong>{w.drugNameB}</strong>: {w.description}
-                                </li>
-                              ))}
-                            </ul>
-                            <Button size="small" danger onClick={() => setInteractionModalOpen(true)}>
-                              Xem cảnh báo & Bỏ qua
+                            <Paragraph style={{ marginBottom: 8, color: '#991b1b' }}>
+                              Không thể kiểm tra tương tác thuốc. Vui lòng thử lại.
+                            </Paragraph>
+                            <Button
+                              size="small"
+                              type="primary"
+                              danger
+                              onClick={() => performInteractionCheck(items).catch(() => {})}
+                            >
+                              Thử lại kiểm tra tương tác
                             </Button>
                           </div>
                         }
                       />
+                    </div>
+                  )}
+
+                  {!checkingInteractions && !interactionApiError && detectedInteractions.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      {areAllInteractionsHandled(detectedInteractions, confirmedOverrides) ? (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                          message={`Đã xác nhận lý do bỏ qua cho toàn bộ ${detectedInteractions.length} cảnh báo tương tác thuốc`}
+                          description={
+                            <div>
+                              <ul style={{ margin: '4px 0 8px 0', paddingLeft: 20 }}>
+                                {detectedInteractions.map((w, idx) => {
+                                  const ov = confirmedOverrides.find((o) => String(o.ruleId) === String(w.ruleId))
+                                  return (
+                                    <li key={idx}>
+                                      <strong>{w.drugNameA}</strong> — <strong>{w.drugNameB}</strong> ({w.severity}):{' '}
+                                      <Text type="secondary">Lý do: "{ov?.overrideReason}"</Text>
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                              <Button size="small" onClick={() => setInteractionModalOpen(true)}>
+                                Xem / Thay đổi lý do bỏ qua
+                              </Button>
+                            </div>
+                          }
+                        />
+                      ) : (
+                        <Alert
+                          type="error"
+                          showIcon
+                          icon={<WarningOutlined />}
+                          message={`Phát hiện ${detectedInteractions.length} tương tác thuốc bất lợi (${getUnhandledInteractions(detectedInteractions, confirmedOverrides).length} chưa xử lý)`}
+                          description={
+                            <div>
+                              <Paragraph style={{ marginBottom: 8, color: '#991b1b' }}>
+                                Nút "Tạo đơn thuốc" tạm thời bị khóa. Bác sĩ phải điều chỉnh bỏ/đổi thuốc hoặc bấm "Xem cảnh báo & Bỏ qua" để nhập lý do chuyên môn bỏ qua trước khi kê đơn.
+                              </Paragraph>
+                              <ul style={{ margin: '4px 0 8px 0', paddingLeft: 20 }}>
+                                {detectedInteractions.map((w, idx) => (
+                                  <li key={idx}>
+                                    <strong>{w.drugNameA}</strong> — <strong>{w.drugNameB}</strong> ({w.severity}): {w.description}
+                                  </li>
+                                ))}
+                              </ul>
+                              <Button size="small" danger onClick={() => setInteractionModalOpen(true)}>
+                                Xem cảnh báo & Bỏ qua
+                              </Button>
+                            </div>
+                          }
+                        />
+                      )}
                     </div>
                   )}
 
@@ -1166,16 +1296,18 @@ function PrescriptionPage() {
                       <Button disabled={checkingInteractions || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                     )}
                     {canPrescribe && (
-                      <Button
-                        type="primary"
-                        size="large"
-                        loading={saving || checkingInteractions}
-                        disabled={checkingInteractions}
-                        icon={<CheckCircleOutlined />}
-                        onClick={handleSaveClick}
-                      >
-                        {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
-                      </Button>
+                      <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
+                        <Button
+                          type="primary"
+                          size="large"
+                          loading={saving || checkingInteractions}
+                          disabled={!canSubmit}
+                          icon={<CheckCircleOutlined />}
+                          onClick={handleSaveClick}
+                        >
+                          {editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}
+                        </Button>
+                      </Tooltip>
                     )}
                   </div>
                 </Card>
