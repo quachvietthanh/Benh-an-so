@@ -472,46 +472,7 @@ function BillingPage() {
         }
       }
 
-      if (prescriptions.length === 0) {
-        const mockPrescs = getMockPrescriptionsByVisitOrRecord(visitId)
-        if (mockPrescs && mockPrescs.length > 0) {
-          prescriptions.push(...mockPrescs)
-        }
-      }
 
-      // Nếu đơn thuốc vẫn rỗng nhưng lượt khám hợp lệ (Lễ tân thu phí), nạp đơn thuốc mẫu để hiển thị tên & tính phí thuốc đầy đủ
-      if (prescriptions.length === 0 && matchedVisit) {
-        const fallbackItems = [
-          {
-            medicineId: '16000000-0000-0000-0000-000000000001',
-            medicineName: 'Paracetamol 500 mg',
-            unit: 'viên',
-            quantity: 20,
-            unitPrice: 1500,
-            price: 1500,
-            amount: 30000,
-            dosage: 'Sáng 1 viên, Tối 1 viên (10 ngày)',
-            frequency: '2 lần/ngày',
-          },
-          {
-            medicineId: '16000000-0000-0000-0000-000000000003',
-            medicineName: 'Amoxicillin 500 mg',
-            unit: 'viên',
-            quantity: 14,
-            unitPrice: 3500,
-            price: 3500,
-            amount: 49000,
-            dosage: 'Sáng 1 viên, Tối 1 viên (7 ngày)',
-            frequency: '2 lần/ngày',
-          },
-        ]
-        prescriptions.push({
-          id: `presc-fallback-${visitId}`,
-          prescriptionCode: `DT-${(matchedVisit.visitCode || '2026001').replace(/\D/g, '') || '2026001'}`,
-          status: 'DISPENSED',
-          items: fallbackItems,
-        })
-      }
 
 
       let prescriptionItems = []
