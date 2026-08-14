@@ -23,11 +23,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
+import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
+import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
@@ -49,6 +52,7 @@ class ReportsControllerTest {
     @MockitoBean private GetOperationalSummaryUseCase getOperationalSummaryUseCase;
     @MockitoBean private GetOperationalTimelineUseCase getOperationalTimelineUseCase;
     @MockitoBean private GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
+    @MockitoBean private GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
     @MockitoBean private UserRepository userRepository;
@@ -258,6 +262,76 @@ class ReportsControllerTest {
                 .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
 
         verifyNoInteractions(getTopMedicinesReportUseCase);
+    }
+
+    @Test
+    void returnsDoctorVisits() throws Exception {
+        when(getDoctorVisitsReportUseCase.getDoctorVisits(any(), any())).thenReturn(new DoctorVisitsReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T08:00:00Z"),
+                List.of(
+                        new DoctorVisitSummaryResult(
+                                1,
+                                java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
+                                "doctor1",
+                                "Nguyễn Văn A",
+                                25L
+                        )
+                )
+        ));
+
+        mockMvc.perform(get("/reports/doctor-visits")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-14"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("2026-08-01"))
+                .andExpect(jsonPath("$.to").value("2026-08-14"))
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-14T08:00:00Z"))
+                .andExpect(jsonPath("$.items[0].rank").value(1))
+                .andExpect(jsonPath("$.items[0].doctorId").value("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"))
+                .andExpect(jsonPath("$.items[0].doctorCode").value("doctor1"))
+                .andExpect(jsonPath("$.items[0].doctorName").value("Nguyễn Văn A"))
+                .andExpect(jsonPath("$.items[0].totalVisits").value(25));
+    }
+
+    @Test
+    void returnsEmptyDoctorVisitsWhenNoDataExists() throws Exception {
+        when(getDoctorVisitsReportUseCase.getDoctorVisits(any(), any())).thenReturn(new DoctorVisitsReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T08:00:00Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/doctor-visits")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-14"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
+    void rejectsInvalidDateFormatForDoctorVisits() throws Exception {
+        mockMvc.perform(get("/reports/doctor-visits")
+                        .param("from", "01-08-2026")
+                        .param("to", "2026-08-14"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be in yyyy-MM-dd format."));
+
+        verifyNoInteractions(getDoctorVisitsReportUseCase);
+    }
+
+    @Test
+    void rejectsWhenFromIsAfterToForDoctorVisits() throws Exception {
+        mockMvc.perform(get("/reports/doctor-visits")
+                        .param("from", "2026-08-15")
+                        .param("to", "2026-08-14"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+
+        verifyNoInteractions(getDoctorVisitsReportUseCase);
     }
 
     @Test

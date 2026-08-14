@@ -15,4 +15,6 @@ public interface OperationalReportQueryRepository {
     List<DailyRevenueSummary> findDailyNetRevenue(Instant fromInclusive, Instant toExclusive);
 
     List<TopMedicineSummary> findTopDispensedMedicines(Instant fromInclusive, Instant toExclusive);
+
+    List<DoctorVisitSummary> findDoctorVisitSummaries(Instant fromInclusive, Instant toExclusive);
 }
