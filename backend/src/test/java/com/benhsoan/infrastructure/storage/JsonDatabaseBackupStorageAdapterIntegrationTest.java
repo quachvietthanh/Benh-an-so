@@ -19,11 +19,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.benhsoan.port.outbound.backup.BackupSnapshot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-/**
- * Verifies the restore engine's two-phase foreign-key handling against a raw H2
- * schema with real foreign-key constraints. The JPA-entity based slice does not
- * emit the migration-defined foreign keys, so it cannot exercise this logic.
- */
 class JsonDatabaseBackupStorageAdapterIntegrationTest {
 
     private static final List<String> BACKUP_TABLES = List.of(
@@ -127,12 +122,9 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         assertEquals("BKP-FK-TEST.json", snapshot.fileName());
         assertTrue(snapshot.content().length > 0);
 
-        // Corrupt the data in place.
         jdbc.update("UPDATE medicines SET medicine_name = ? WHERE id = ?", "CORRUPTED", medicineId.toString());
         jdbc.update("UPDATE invoice_lines SET amount = ? WHERE id = ?", new BigDecimal("999.00"), lineId.toString());
 
-        // Restore must empty every table (child-first) and re-insert (parent-first)
-        // without violating any foreign key.
         adapter.restoreSnapshot("BKP-FK-TEST.json");
 
         assertEquals("Paracetamol 500 mg",

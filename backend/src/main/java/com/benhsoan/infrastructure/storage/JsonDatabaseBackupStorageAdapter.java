@@ -26,16 +26,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-/**
- * JSON snapshot implementation of {@link DatabaseBackupStoragePort}.
- *
- * Exports the configured operational tables into a self-describing JSON dump
- * (column names + JDBC types + string-encoded cell values).
- *
- * Restore runs in two phases to respect foreign-key constraints: first every
- * target table is emptied in CHILD-FIRST order, then rows are re-inserted in
- * PARENT-FIRST order.
- */
 public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePort {
 
     private static final String EXTENSION = ".json";
@@ -78,18 +68,17 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
     @Override
     public void restoreSnapshot(String fileName) {
         List<TableSnapshot> tables = readJson(readFile(fileName));
+        deleteAllChildFirst(tables);
+        for (TableSnapshot table : tables) {
+            insertTable(table);
+        }
+    }
 
-        // Phase 1 (Deletion): empty every target table in CHILD-FIRST (reverse)
-        // order so no foreign-key constraint is violated while removing rows.
+    private void deleteAllChildFirst(List<TableSnapshot> tables) {
         List<TableSnapshot> childFirst = new ArrayList<>(tables);
         Collections.reverse(childFirst);
         for (TableSnapshot table : childFirst) {
             deleteTable(table);
-        }
-
-        // Phase 2 (Insertion): re-insert rows in PARENT-FIRST (original) order.
-        for (TableSnapshot table : tables) {
-            insertTable(table);
         }
     }
 
@@ -115,6 +104,7 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
 
         return new TableSnapshot(tableName, columns, rows);
     }
+
     private void deleteTable(TableSnapshot table) {
         jdbcTemplate.update("DELETE FROM " + table.name());
     }
