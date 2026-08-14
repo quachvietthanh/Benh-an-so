@@ -42,12 +42,15 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import reportApi from '../api/reportApi'
+import billingApi from '../api/billingApi'
+import RevenueReportView from '../components/reporting/RevenueReportView'
 import {
   getStoredAuditLogs,
   getStoredInvoices,
   getStoredMedicalRecords,
   getStoredMedicines,
   getStoredPrescriptions,
+  mergeInvoices,
 } from '../utils/storageHelpers'
 
 const { RangePicker } = DatePicker
@@ -77,15 +80,20 @@ function ReportsPage() {
     setLoading(true)
     const params = getParams()
     try {
-      const [summaryRes, timelineRes, medicinesRes, auditRes] = await Promise.allSettled([
+      const [summaryRes, timelineRes, medicinesRes, auditRes, invoicesRes] = await Promise.allSettled([
         reportApi.summary(params),
         reportApi.timeline(params),
         reportApi.topMedicines(params),
         reportApi.audit(params),
+        billingApi.getAll(),
       ])
 
       const apiSummary = summaryRes.status === 'fulfilled' ? summaryRes.value.data : null
       const apiAudit = auditRes.status === 'fulfilled' ? auditRes.value.data : null
+      const apiInvoicesRaw = invoicesRes.status === 'fulfilled' ? invoicesRes.value.data : null
+      const apiInvoicesList = (apiInvoicesRaw && Array.isArray(apiInvoicesRaw.content))
+        ? apiInvoicesRaw.content
+        : (Array.isArray(apiInvoicesRaw) ? apiInvoicesRaw : [])
 
       // Get STRICT REAL RECORDED DATA from local persistence + API (No pre-set static offsets!)
       const storedRecords = getStoredMedicalRecords()
@@ -95,12 +103,12 @@ function ReportsPage() {
       const storedLogs = getStoredAuditLogs()
 
       const apiRecords = (apiSummary && Array.isArray(apiSummary.records)) ? apiSummary.records : []
-      const apiInvs = (apiSummary && Array.isArray(apiSummary.invoices)) ? apiSummary.invoices : []
+      const apiInvs = (apiSummary && Array.isArray(apiSummary.invoices)) ? apiSummary.invoices : apiInvoicesList
       const apiPrescs = (apiSummary && Array.isArray(apiSummary.prescriptions)) ? apiSummary.prescriptions : []
 
       // Merge ONLY real created items from user actions
       const realRecords = [...storedRecords, ...apiRecords]
-      const realInvoices = [...storedInvoices, ...apiInvs]
+      const realInvoices = mergeInvoices([...storedInvoices, ...apiInvs])
       const realPrescriptions = [...storedPrescriptions, ...apiPrescs]
       const realLogs = (apiAudit && Array.isArray(apiAudit)) ? [...storedLogs, ...apiAudit] : storedLogs
 
@@ -636,30 +644,13 @@ function ReportsPage() {
 
         {/* TAB 3: REVENUE */}
         {activeTab === 'revenue' && (
-          <Card style={{ borderRadius: 14, border: '1px solid #f1f5f9' }} title="Danh sách hóa đơn thanh toán thực tế">
-            <Table
-              rowKey="id"
-              dataSource={invoicesList}
-              loading={loading}
-              columns={[
-                { title: 'Mã hóa đơn', dataIndex: 'invoiceCode', key: 'invoiceCode', render: (v) => <strong>{v}</strong> },
-                { title: 'Tên bệnh nhân', dataIndex: 'patientName', key: 'patientName' },
-                {
-                  title: 'Loại hóa đơn',
-                  dataIndex: 'invoiceType',
-                  key: 'invoiceType',
-                  render: (v) => (
-                    <Tag color={v === 'ORIGINAL' ? 'green' : 'orange'}>
-                      {v === 'ORIGINAL' ? 'Hóa đơn gốc' : 'Hóa đơn điều chỉnh'}
-                    </Tag>
-                  ),
-                },
-                { title: 'Phương thức', dataIndex: 'paymentMethodLabel', key: 'paymentMethodLabel' },
-                { title: 'Số tiền', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => money(v) },
-                { title: 'Ngày lập', dataIndex: 'createdAt', key: 'createdAt', render: (v) => new Date(v).toLocaleString('vi-VN') },
-              ]}
-            />
-          </Card>
+          <RevenueReportView
+            range={range}
+            onRangeChange={setRange}
+            invoices={invoicesList}
+            loading={loading}
+            onRefresh={loadData}
+          />
         )}
 
         {/* TAB 4: MEDICINES */}
