@@ -36,6 +36,8 @@ import lombok.RequiredArgsConstructor;
 @Validated
 public class BackupController {
 
+    private static final String DEFAULT_DOWNLOAD_CONTENT_TYPE = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+
     private final CreateBackupUseCase createBackupUseCase;
     private final ListBackupsUseCase listBackupsUseCase;
     private final GetBackupByIdUseCase getBackupByIdUseCase;
@@ -73,9 +75,13 @@ public class BackupController {
     public ResponseEntity<byte[]> download(@PathVariable UUID id) {
         BackupDownloadResult result = downloadBackupUseCase.download(id);
 
+        String contentType = (result.contentType() == null || result.contentType().isBlank())
+                ? DEFAULT_DOWNLOAD_CONTENT_TYPE
+                : result.contentType();
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.fileName() + "\"")
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.parseMediaType(contentType))
                 .body(result.content());
     }
 }
