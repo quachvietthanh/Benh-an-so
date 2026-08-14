@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,6 +33,7 @@ import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
+import com.benhsoan.port.dto.result.PayableEncounterResult;
 import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
@@ -60,15 +64,55 @@ class InvoiceSecurityIntegrationTest {
     @MockitoBean private ClockPort clockPort;
 
     @Test
-    void allowsAdminsAndReceptionistsToReadInvoices() throws Exception {
+    void allowsAdminsReceptionistsAndManagersToReadInvoices() throws Exception {
         when(searchInvoicesUseCase.search(any())).thenReturn(Page.empty());
+        when(getPayableEncountersUseCase.get(any())).thenReturn(new PageImpl<>(
+                List.of(new PayableEncounterResult(
+                        UUID.randomUUID(),
+                        "VIS000001",
+                        UUID.randomUUID(),
+                        "BN000001",
+                        "Nguyen Van A",
+                        "Kham tong quat",
+                        Instant.parse("2026-08-12T02:00:00Z")
+                )),
+                PageRequest.of(0, 20),
+                1
+        ));
+        when(getInvoiceByIdUseCase.getById(any())).thenReturn(new InvoiceResult(
+                UUID.randomUUID(),
+                "HD000001",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                InvoiceType.ORIGINAL,
+                null,
+                null,
+                new BigDecimal("100000"),
+                UUID.randomUUID(),
+                Instant.parse("2026-08-12T02:00:00Z"),
+                List.of()
+        ));
 
-        for (String role : new String[] {"ADMIN", "RECEPTIONIST"}) {
+        for (String role : new String[] {"ADMIN", "RECEPTIONIST", "MANAGER"}) {
+            mockMvc.perform(get("/invoices/payable").with(user("tester").roles(role)))
+                    .andExpect(status().isOk());
+
             mockMvc.perform(get("/invoices").with(user("tester").roles(role)))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(get("/invoices/{invoiceId}", "23100000-0000-0000-0000-000000000001")
+                            .with(user("tester").roles(role)))
                     .andExpect(status().isOk());
         }
 
+        mockMvc.perform(get("/invoices/payable").with(user("doctor").roles("DOCTOR")))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(get("/invoices").with(user("doctor").roles("DOCTOR")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/invoices/{invoiceId}", "23100000-0000-0000-0000-000000000001")
+                        .with(user("doctor").roles("DOCTOR")))
                 .andExpect(status().isForbidden());
     }
 
@@ -138,6 +182,12 @@ class InvoiceSecurityIntegrationTest {
                         .content(paymentBody))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(post("/invoices/payments")
+                        .with(user("manager").roles("MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(paymentBody))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(post("/invoices")
                         .with(user("admin").roles("ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -145,6 +195,14 @@ class InvoiceSecurityIntegrationTest {
                                 {"visitId":"d0000000-0000-0000-0000-000000000001"}
                                 """))
                 .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/invoices")
+                        .with(user("manager").roles("MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"visitId":"d0000000-0000-0000-0000-000000000001"}
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     @Test
