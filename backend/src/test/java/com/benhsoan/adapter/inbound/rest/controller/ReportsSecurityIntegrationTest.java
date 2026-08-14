@@ -33,9 +33,11 @@ import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.PermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
+import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
@@ -68,6 +70,7 @@ class ReportsSecurityIntegrationTest {
     @MockitoBean private GetOperationalSummaryUseCase getOperationalSummaryUseCase;
     @MockitoBean private GetOperationalTimelineUseCase getOperationalTimelineUseCase;
     @MockitoBean private GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
+    @MockitoBean private GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
@@ -172,5 +175,43 @@ class ReportsSecurityIntegrationTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(getTopMedicinesReportUseCase);
+    }
+
+    @Test
+    void allowsManagerToReadDoctorVisitsReport() throws Exception {
+        when(getDoctorVisitsReportUseCase.getDoctorVisits(any(), any())).thenReturn(new DoctorVisitsReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T08:00:00Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/doctor-visits")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-14")
+                        .with(user("manager").roles("MANAGER")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forbidsAdminFromReadingDoctorVisitsReport() throws Exception {
+        mockMvc.perform(get("/reports/doctor-visits")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-14")
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDoctorVisitsReportUseCase);
+    }
+
+    @Test
+    void forbidsDoctorFromReadingDoctorVisitsReport() throws Exception {
+        mockMvc.perform(get("/reports/doctor-visits")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-14")
+                        .with(user("doctor").roles("DOCTOR")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDoctorVisitsReportUseCase);
     }
 }

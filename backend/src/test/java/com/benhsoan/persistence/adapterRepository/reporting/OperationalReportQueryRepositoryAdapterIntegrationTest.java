@@ -18,6 +18,7 @@ import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
+import com.benhsoan.persistence.entity.auth.UserEntity;
 import com.benhsoan.persistence.entity.billing.InvoiceEntity;
 import com.benhsoan.persistence.entity.medicine.MedicineEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionDispenseItemEntity;
@@ -131,6 +132,71 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
         assertEquals(10L, items.get(0).totalDispensedQuantity());
         assertEquals(paracetamolId, items.get(1).medicineId());
         assertEquals(9L, items.get(1).totalDispensedQuantity());
+    }
+
+    @Test
+    void aggregatesDoctorVisitsByDoctorWithinCompletedAtRange() {
+        UUID doctorA = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2");
+        UUID doctorB = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3");
+        UUID doctorC = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4");
+        createDoctor(doctorA, "doctor1", "Dr. Nguyen Minh Anh");
+        createDoctor(doctorB, "doctor2", "Dr. Tran Quang Huy");
+        createDoctor(doctorC, "doctor3", "Dr. Le Van Chau");
+
+        createCompletedVisitForDoctor("VIS-DOC-001", doctorA, Instant.parse("2026-08-01T02:00:00Z"));
+        createCompletedVisitForDoctor("VIS-DOC-002", doctorA, Instant.parse("2026-08-02T02:00:00Z"));
+        createCompletedVisitForDoctor("VIS-DOC-003", doctorB, Instant.parse("2026-08-01T03:00:00Z"));
+        createCompletedVisitForDoctor("VIS-DOC-004", doctorB, Instant.parse("2026-08-02T03:00:00Z"));
+        createCompletedVisitForDoctor("VIS-DOC-005", doctorB, Instant.parse("2026-08-03T03:00:00Z"));
+        createCompletedVisitForDoctor("VIS-DOC-006", doctorC, Instant.parse("2026-08-01T04:00:00Z"));
+        createCompletedVisitForDoctor("VIS-DOC-007", doctorC, Instant.parse("2026-08-02T04:00:00Z"));
+        // Out of range / non-completed visits must be excluded.
+        createCompletedVisitForDoctor("VIS-DOC-008", doctorB, Instant.parse("2026-08-04T00:00:00Z"));
+        createVisit("VIS-DOC-009", VisitStatus.IN_PROGRESS, null);
+
+        var items = repositoryAdapter.findDoctorVisitSummaries(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-04T00:00:00Z")
+        );
+
+        assertEquals(3, items.size());
+        assertEquals(doctorB, items.get(0).doctorId());
+        assertEquals("doctor2", items.get(0).doctorCode());
+        assertEquals(3L, items.get(0).totalVisits());
+        assertEquals(doctorC, items.get(1).doctorId());
+        assertEquals(2L, items.get(1).totalVisits());
+        assertEquals(doctorA, items.get(2).doctorId());
+        assertEquals(2L, items.get(2).totalVisits());
+    }
+
+    private void createDoctor(UUID id, String username, String fullName) {
+        entityManager.persist(UserEntity.builder()
+                .id(id)
+                .username(username)
+                .passwordHash("hash")
+                .fullName(fullName)
+                .email(username + "@benhsoan.com")
+                .roleId(UUID.fromString("22222222-2222-2222-2222-222222222222"))
+                .active(true)
+                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .build());
+    }
+
+    private void createCompletedVisitForDoctor(String code, UUID doctorId, Instant completedAt) {
+        visitRepository.save(VisitEntity.builder()
+                .id(UUID.randomUUID())
+                .visitCode(code)
+                .patientId(UUID.randomUUID())
+                .doctorId(doctorId)
+                .visitType(VisitType.WALK_IN)
+                .status(VisitStatus.COMPLETED)
+                .visitAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .startedAt(Instant.parse("2026-08-01T00:30:00Z"))
+                .completedAt(completedAt)
+                .reason("Kham tong quat")
+                .createdBy(UUID.randomUUID())
+                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .build());
     }
 
     private void createVisit(String code, VisitStatus status, Instant completedAt) {
