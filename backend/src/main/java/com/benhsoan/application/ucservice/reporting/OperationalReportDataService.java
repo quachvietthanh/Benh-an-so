@@ -10,6 +10,8 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
+import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
@@ -17,6 +19,7 @@ import com.benhsoan.port.dto.result.TopMedicineItemResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
+import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -76,6 +79,30 @@ public class OperationalReportDataService {
         }
 
         return new TopMedicinesReportResult(
+                from,
+                to,
+                null,
+                items
+        );
+    }
+
+    public DoctorVisitsReportResult getDoctorVisits(LocalDate from, LocalDate to) {
+        ReportingTimeRange range = ReportingTimeRange.of(from, to);
+        List<DoctorVisitSummaryResult> items = new ArrayList<>();
+        List<DoctorVisitSummary> summaries =
+                operationalReportQueryRepository.findDoctorVisitSummaries(range.fromInclusive(), range.toExclusive());
+
+        for (int index = 0; index < summaries.size(); index++) {
+            var item = summaries.get(index);
+            items.add(new DoctorVisitSummaryResult(
+                    index + 1,
+                    item.doctorId(),
+                    item.doctorCode(),
+                    item.doctorName(),
+                    item.totalVisits()));
+        }
+
+        return new DoctorVisitsReportResult(
                 from,
                 to,
                 null,

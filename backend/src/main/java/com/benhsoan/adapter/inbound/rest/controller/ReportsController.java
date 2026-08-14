@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
@@ -24,6 +25,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.CheckPermission;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
@@ -42,6 +44,7 @@ public class ReportsController {
     private final GetOperationalSummaryUseCase getOperationalSummaryUseCase;
     private final GetOperationalTimelineUseCase getOperationalTimelineUseCase;
     private final GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
+    private final GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
     private final ExportOperationalReportUseCase exportOperationalReportUseCase;
     private final ReportingRestMapper mapper;
 
@@ -85,6 +88,20 @@ public class ReportsController {
         validateRange(fromDate, toDate);
 
         return mapper.toResponse(getTopMedicinesReportUseCase.getTopMedicines(fromDate, toDate));
+    }
+
+    @GetMapping("/doctor-visits")
+    @PreAuthorize("hasRole('MANAGER')")
+    @CheckPermission(Permission.REPORT_VIEW)
+    public DoctorVisitsReportResponse getDoctorVisits(
+            @RequestParam String from,
+            @RequestParam String to
+    ) {
+        LocalDate fromDate = parseDate(from, "from");
+        LocalDate toDate = parseDate(to, "to");
+        validateRange(fromDate, toDate);
+
+        return mapper.toResponse(getDoctorVisitsReportUseCase.getDoctorVisits(fromDate, toDate));
     }
 
     @GetMapping("/export")

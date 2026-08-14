@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportResponse;
+import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
+import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
@@ -85,5 +88,33 @@ class ReportingRestMapperTest {
         assertEquals(1, response.items().get(0).rank());
         assertEquals("MED-PARA-500", response.items().get(0).medicineCode());
         assertEquals(9L, response.items().get(0).totalDispensedQuantity());
+    }
+
+    @Test
+    void mapsDoctorVisitsResultToStableResponseContract() {
+        DoctorVisitsReportResponse response = mapper.toResponse(new DoctorVisitsReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T08:00:00Z"),
+                List.of(
+                        new DoctorVisitSummaryResult(
+                                1,
+                                java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
+                                "doctor1",
+                                "Nguyễn Văn A",
+                                25L
+                        )
+                )
+        ));
+
+        assertEquals(LocalDate.of(2026, 8, 1), response.from());
+        assertEquals(LocalDate.of(2026, 8, 14), response.to());
+        assertEquals(Instant.parse("2026-08-14T08:00:00Z"), response.generatedAt());
+        assertEquals(1, response.items().size());
+        assertEquals(1, response.items().get(0).rank());
+        assertEquals(java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"), response.items().get(0).doctorId());
+        assertEquals("doctor1", response.items().get(0).doctorCode());
+        assertEquals("Nguyễn Văn A", response.items().get(0).doctorName());
+        assertEquals(25L, response.items().get(0).totalVisits());
     }
 }
