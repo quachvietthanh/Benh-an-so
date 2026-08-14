@@ -19,6 +19,7 @@ import {
   LineChartOutlined,
   MedicineBoxOutlined,
   ReloadOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import reportApi from '../api/reportApi'
@@ -28,6 +29,7 @@ import ReportStatCards from '../components/reporting/ReportStatCards'
 import ManagerPermissionAlert from '../components/reporting/ManagerPermissionAlert'
 import OverviewReportView from '../components/reporting/OverviewReportView'
 import VisitReportView from '../components/reporting/VisitReportView'
+import DoctorVisitsReportView from '../components/reporting/DoctorVisitsReportView'
 import RevenueReportView from '../components/reporting/RevenueReportView'
 import TopMedicinesReportView from '../components/reporting/TopMedicinesReportView'
 import AuditLogsReportView from '../components/reporting/AuditLogsReportView'
@@ -372,6 +374,14 @@ function ReportsPage() {
               ),
             },
             {
+              key: 'doctor-visits',
+              label: (
+                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                  <UserOutlined /> Lượt khám theo bác sĩ
+                </span>
+              ),
+            },
+            {
               key: 'revenue',
               label: (
                 <span style={{ fontWeight: 600, fontSize: 14 }}>
@@ -411,6 +421,10 @@ function ReportsPage() {
             summary={summary}
             loading={loading}
           />
+        )}
+
+        {activeTab === 'doctor-visits' && (
+          <DoctorVisitsReportView initialRange={range} />
         )}
 
         {activeTab === 'revenue' && (
