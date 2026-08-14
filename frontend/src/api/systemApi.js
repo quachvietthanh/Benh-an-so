@@ -1,2 +1,24 @@
 import axiosClient from './axiosClient'
-export default {services:()=>axiosClient.get('/system/services'),createService:d=>axiosClient.post('/system/services',d),updateService:(id,d)=>axiosClient.put(`/system/services/${id}`,d),clinic:()=>axiosClient.get('/system/clinic'),updateClinic:d=>axiosClient.put('/system/clinic',d)}
+
+const systemApi = {
+  services: () => axiosClient.get('/system/services'),
+  createService: (data) => axiosClient.post('/system/services', data),
+  updateService: (id, data) => axiosClient.put(`/system/services/${id}`, data),
+  clinic: () => axiosClient.get('/system/clinic'),
+  updateClinic: (data) => axiosClient.put('/system/clinic', data),
+
+  // Rooms management
+  getRooms: (params = {}) => axiosClient.get('/rooms', { params: { size: 100, ...params } }),
+  getRoomById: (roomId) => axiosClient.get(`/rooms/${roomId}`),
+  createRoom: (data) => axiosClient.post('/rooms', data),
+  updateRoom: (roomId, data) => axiosClient.put(`/rooms/${roomId}`, data),
+  activateRoom: (roomId) => axiosClient.patch(`/rooms/${roomId}/activate`),
+  deactivateRoom: (roomId) => axiosClient.patch(`/rooms/${roomId}/deactivate`),
+
+  // Doctor room assignments
+  getDoctorRoomAssignments: (params = {}) => axiosClient.get('/doctor-room-assignments', { params }),
+  assignDoctorRoom: (doctorId, roomId) => axiosClient.put(`/doctors/${doctorId}/room-assignment`, { roomId }),
+  removeDoctorRoomAssignment: (doctorId) => axiosClient.delete(`/doctors/${doctorId}/room-assignment`),
+}
+
+export default systemApi

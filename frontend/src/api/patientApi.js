@@ -4,6 +4,10 @@ const patientApi = {
   getAll: (params) => {
     return axiosClient.get('/patients', { params })
   },
+  search: (params) => {
+    return axiosClient.get('/patients', { params })
+  },
+
   getById: (id) => {
     return axiosClient.get(`/patients/${id}`)
   },

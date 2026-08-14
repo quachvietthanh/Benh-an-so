@@ -37,6 +37,8 @@ import { useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
 import { buildFefoPreview } from '../utils/workflowContract'
+import { saveStoredPrescription } from '../utils/storageHelpers'
+
 
 const { Text, Title } = Typography
 const PRESCRIPTION_PAGE_SIZE = 20
@@ -267,6 +269,9 @@ function PharmacyPage() {
     try {
       const response = await pharmacyApi.dispense(selectedPrescription.id)
       const allocationCount = Number(response.data?.allocationCount) || 0
+      
+      saveStoredPrescription({ ...selectedPrescription, status: 'DISPENSED' })
+
       message.success(
         `Đã cấp phát đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id}`
         + (allocationCount ? ` qua ${allocationCount} lượt phân bổ FEFO.` : '.'),

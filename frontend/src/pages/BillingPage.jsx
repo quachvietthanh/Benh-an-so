@@ -51,6 +51,8 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import pharmacyApi from '../api/pharmacyApi'
 import queueApi from '../api/queueApi'
 import { useAuthContext } from '../context/AuthContext'
+import { getStoredPrescriptions, mergeMedicines } from '../utils/storageHelpers'
+
 
 const { Text, Title } = Typography
 
@@ -68,13 +70,25 @@ const formatDateVietnamese = (val) => {
   return `Ngày ${d.getDate()} tháng ${String(d.getMonth() + 1).padStart(2, '0')} năm ${d.getFullYear()}`
 }
 
+const parsePrescriptionItems = (raw) => {
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+
 // Map chính xác theo PaymentMethod enum từ Backend Java: CASH, BANK_TRANSFER, CARD, QR_CODE, E_WALLET
 const PAYMENT_METHODS = [
   { value: 'CASH', label: '💵 Tiền mặt' },
   { value: 'BANK_TRANSFER', label: '🏦 Chuyển khoản' },
   { value: 'CARD', label: '💳 Thẻ ngân hàng' },
-  { value: 'QR_CODE', label: '📱 QR Code' },
-  { value: 'E_WALLET', label: 'Ví điện tử' },
 ]
 
 function BillingPage() {
@@ -164,7 +178,7 @@ function BillingPage() {
     refreshAllData()
   }, [])
 
-  // 3. Tải dữ liệu chi tiết của 1 Lượt khám từ Backend API
+  // 3. Tải dữ liệu chi tiết của 1 Lượt khám từ Backend API & Storage
   const loadInvoiceData = useCallback(async (visitId) => {
     if (!visitId) {
       setSelectedVisitData(null)
@@ -178,7 +192,26 @@ function BillingPage() {
     const isVisitCompleted = visitStatus === 'COMPLETED' || visitStatus === 'WAITING_FOR_PAYMENT'
 
     try {
-      // A. Tải thông tin Hóa đơn theo visitId từ Backend API (GET /invoices?visitId={visitId})
+      // 1. Tải danh mục thuốc để tra cứu đơn giá & tên thuốc
+      let medCatalog = []
+      try {
+        const medRes = await pharmacyApi.medicines({ size: 200 })
+        const rawMeds = medRes?.data?.content || medRes?.data || []
+        medCatalog = Array.isArray(rawMeds) ? rawMeds : []
+      } catch (e) {
+        console.warn('[BillingPage] Lỗi load medicines catalog:', e?.message)
+      }
+      if (medCatalog.length === 0) {
+        medCatalog = mergeMedicines([])
+      }
+      const medMap = new Map()
+      medCatalog.forEach((m) => {
+        if (m.id) medMap.set(String(m.id), m)
+        if (m.code) medMap.set(String(m.code), m)
+        if (m.medicineCode) medMap.set(String(m.medicineCode), m)
+      })
+
+      // 2A. Tải thông tin Hóa đơn theo visitId từ Backend API (GET /invoices?visitId={visitId})
       let invoiceData = null
       try {
         const invoiceRes = await billingApi.getByVisit(visitId)
@@ -189,14 +222,15 @@ function BillingPage() {
         console.warn('[BillingPage] Lỗi getByVisit invoice:', e?.message)
       }
 
-      // B. Tải Đơn thuốc thuộc visitId
+      // 2B. Tải Đơn thuốc thuộc visitId từ Backend API
       let prescriptions = []
       try {
         const mrRes = await medicalRecordApi.getByVisit(visitId)
         const medicalRecordId = mrRes?.data?.id
         if (medicalRecordId) {
           const presRes = await pharmacyApi.getByMedicalRecord(medicalRecordId)
-          prescriptions = Array.isArray(presRes?.data) ? presRes.data : (presRes?.data ? [presRes.data] : [])
+          const pData = presRes?.data
+          prescriptions = Array.isArray(pData) ? pData : (pData ? [pData] : [])
         }
       } catch (mrErr) {
         console.warn('[BillingPage] Lỗi getByVisit medical record:', mrErr?.message)
@@ -229,6 +263,28 @@ function BillingPage() {
         }
       }
 
+      // 3. Fallback lấy đơn thuốc từ Local Storage (nếu API bị 403 / rỗng / offline)
+      const localPrescriptions = getStoredPrescriptions()
+      if (localPrescriptions && localPrescriptions.length > 0) {
+        const matchedLocal = localPrescriptions.filter(
+          (p) =>
+            String(p.visitId) === String(visitId) ||
+            String(p.visitCode) === String(matchedVisit?.visitCode) ||
+            (matchedVisit?.patientCode && String(p.patientCode) === String(matchedVisit.patientCode)) ||
+            (matchedVisit?.patientName && String(p.patientName) === String(matchedVisit.patientName)) ||
+            (matchedVisit?.patientId && String(p.patientId) === String(matchedVisit.patientId))
+        )
+        if (matchedLocal.length > 0) {
+          const existingKeys = new Set(prescriptions.map((p) => String(p.id || p.prescriptionCode)))
+          matchedLocal.forEach((lp) => {
+            const key = String(lp.id || lp.prescriptionCode)
+            if (!existingKeys.has(key)) {
+              prescriptions.push(lp)
+            }
+          })
+        }
+      }
+
       let prescriptionItems = []
       let prescriptionStatus = null
       let prescriptionCode = null
@@ -236,17 +292,45 @@ function BillingPage() {
       if (prescriptions.length > 0) {
         const mainPrescription = prescriptions[0]
         prescriptionStatus = mainPrescription?.status || null
-        prescriptionCode = mainPrescription?.prescriptionCode || null
-        prescriptionItems = Array.isArray(mainPrescription?.items) ? mainPrescription.items : []
+        prescriptionCode = mainPrescription?.prescriptionCode || mainPrescription?.code || null
+        
+        const rawItems = mainPrescription?.items || mainPrescription?.details || mainPrescription?.prescriptionItems
+        const parsedItems = parsePrescriptionItems(rawItems)
+
+        prescriptionItems = parsedItems.map((item, idx) => {
+          const medIdStr = String(item.medicineId || item.id || '')
+          const matchedMed = medMap.get(medIdStr) || medCatalog.find((m) =>
+            String(m.medicineName || m.name || '').toLowerCase() === String(item.medicineName || '').toLowerCase()
+          )
+
+          const unitPrice = Number(
+            item.unitPrice || item.price || matchedMed?.price || matchedMed?.unitPrice || 5000
+          )
+          const qty = Number(item.quantity || 1)
+          const amount = qty * unitPrice
+          const name = item.medicineName || matchedMed?.medicineName || matchedMed?.name || `Thuốc ${idx + 1}`
+          const unit = item.unit || matchedMed?.unit || 'viên'
+          const dosageInfo = [item.dosage, item.frequency].filter(Boolean).join(' - ')
+
+          return {
+            ...item,
+            key: `med-item-${idx}`,
+            medicineId: item.medicineId || matchedMed?.id,
+            medicineName: name,
+            unit,
+            unitPrice,
+            price: unitPrice,
+            quantity: qty,
+            amount,
+            dosageInfo,
+          }
+        })
       }
 
       const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
 
       // Tính chi phí
-      const medicineFee = prescriptionItems.reduce(
-        (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || item.price || 0)),
-        0,
-      )
+      const medicineFee = prescriptionItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
       const examFee = 100000
       const totalAmount = invoiceData?.totalAmount ? Number(invoiceData.totalAmount) : (examFee + medicineFee)
 
@@ -532,10 +616,35 @@ function BillingPage() {
     { title: 'Thành tiền', dataIndex: 'amount', key: 'amount', width: 160, align: 'right', render: (v) => <Text strong style={{ color: '#1677ff' }}>{money(v)}</Text> },
   ]
 
-  const feeDataSource = selectedVisitData ? [
-    { key: 'exam', name: 'Phí khám bệnh', quantity: 1, price: selectedVisitData.examFee, amount: selectedVisitData.examFee },
-    { key: 'med', name: `Tiền thuốc kê đơn (${selectedVisitData.prescriptionItems.length} loại)`, quantity: selectedVisitData.prescriptionItems.length || 0, price: selectedVisitData.medicineFee, amount: selectedVisitData.medicineFee },
-  ] : []
+  const feeDataSource = useMemo(() => {
+    if (!selectedVisitData) return []
+    const items = [
+      { key: 'exam', name: 'Phí khám bệnh', quantity: 1, price: selectedVisitData.examFee, amount: selectedVisitData.examFee },
+    ]
+
+    if (Array.isArray(selectedVisitData.prescriptionItems) && selectedVisitData.prescriptionItems.length > 0) {
+      selectedVisitData.prescriptionItems.forEach((item, idx) => {
+        items.push({
+          key: `med-${idx}`,
+          name: `Thuốc: ${item.medicineName}${item.dosageInfo ? ` (${item.dosageInfo})` : ''}`,
+          quantity: item.quantity,
+          price: item.unitPrice || item.price,
+          amount: item.amount,
+        })
+      })
+    } else if (selectedVisitData.medicineFee > 0) {
+      items.push({
+        key: 'med-summary',
+        name: 'Tiền thuốc kê đơn',
+        quantity: 1,
+        price: selectedVisitData.medicineFee,
+        amount: selectedVisitData.medicineFee,
+      })
+    }
+
+    return items
+  }, [selectedVisitData])
+
 
   // Columns cho Tab Lịch sử thanh toán (Backend GET /invoices)
   const historyColumns = [
@@ -912,42 +1021,143 @@ function BillingPage() {
                           ) : (
                             /* TRẠNG THÁI 1: CHƯA THANH TOÁN */
                             <Card style={{ backgroundColor: '#f0f7ff', borderColor: '#bae6fd' }}>
-                              <Row gutter={[16, 16]} align="middle">
-                                <Col xs={24} md={14}>
-                                  <Form layout="vertical">
-                                    <Form.Item label={<strong>Phương thức thanh toán *</strong>} style={{ marginBottom: 0 }}>
-                                      <Select
-                                        value={paymentMethod}
-                                        onChange={setPaymentMethod}
-                                        options={PAYMENT_METHODS}
-                                        size="large"
-                                        disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                      />
-                                    </Form.Item>
-                                  </Form>
-                                </Col>
-                                <Col xs={24} md={10} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                  <Popconfirm
-                                    title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận ghi nhận thu phí</Text>}
-                                    description={`Xác nhận thu ${money(selectedVisitData.totalAmount)} cho ${selectedVisitData.visitCode}?`}
-                                    okText="Xác nhận thu tiền"
-                                    cancelText="Hủy"
-                                    onConfirm={handleConfirmPayment}
-                                    disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                  >
-                                    <Button
-                                      type="primary"
+                              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                                <Form layout="vertical">
+                                  <Form.Item label={<strong>Phương thức thanh toán *</strong>} style={{ marginBottom: 0 }}>
+                                    <Select
+                                      value={paymentMethod}
+                                      onChange={setPaymentMethod}
+                                      options={PAYMENT_METHODS}
                                       size="large"
-                                      icon={<CreditCardOutlined />}
-                                      loading={submittingPayment}
                                       disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                      style={{ height: 42, padding: '0 20px', fontWeight: 600 }}
-                                    >
-                                      Xác nhận thanh toán
-                                    </Button>
-                                  </Popconfirm>
-                                </Col>
-                              </Row>
+                                    />
+                                  </Form.Item>
+                                </Form>
+
+                                {/* 1. THANH TOÁN TIỀN MẶT */}
+                                {paymentMethod === 'CASH' && (
+                                  <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
+                                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                                      <Text strong style={{ color: '#0f172a', fontSize: 14 }}>THANH TOÁN TIỀN MẶT</Text>
+                                      <Text type="secondary">Thu tiền mặt trực tiếp từ bệnh nhân tại quầy Lễ tân.</Text>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                                        <Text>Tổng phải thu: <strong style={{ color: '#dc2626', fontSize: 17 }}>{money(selectedVisitData.totalAmount)}</strong></Text>
+                                        <Popconfirm
+                                          title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận ghi nhận thu tiền mặt</Text>}
+                                          description={`Xác nhận đã thu ${money(selectedVisitData.totalAmount)} tiền mặt cho ${selectedVisitData.visitCode}?`}
+                                          okText="Xác nhận đã thu tiền"
+                                          cancelText="Hủy"
+                                          onConfirm={handleConfirmPayment}
+                                          disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                        >
+                                          <Button
+                                            type="primary"
+                                            size="large"
+                                            icon={<DollarCircleOutlined />}
+                                            loading={submittingPayment}
+                                            disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                            style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 600 }}
+                                          >
+                                            Xác nhận đã thu tiền
+                                          </Button>
+                                        </Popconfirm>
+                                      </div>
+                                    </Space>
+                                  </div>
+                                )}
+
+                                {/* 2. THANH TOÁN CHUYỂN KHOẢN */}
+                                {paymentMethod === 'BANK_TRANSFER' && (
+                                  <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #93c5fd' }}>
+                                    <Title level={5} style={{ color: '#1e40af', marginTop: 0, marginBottom: 12 }}>
+                                      🏦 THANH TOÁN CHUYỂN KHOẢN NGÂN HÀNG
+                                    </Title>
+                                    <Row gutter={[16, 16]} align="middle">
+                                      <Col xs={24} sm={14}>
+                                        <Space direction="vertical" size={6} style={{ width: '100%', fontSize: 13 }}>
+                                          <div>Tổng tiền: <strong style={{ color: '#dc2626', fontSize: 16 }}>{money(selectedVisitData.totalAmount)}</strong></div>
+                                          <div>Ngân hàng: <strong>VietinBank (NH TMCP Công Thương VN)</strong></div>
+                                          <div>Chủ tài khoản: <strong>HỆ THỐNG PHÒNG KHÁM BỆNH ÁN SỐ</strong></div>
+                                          <div>Số tài khoản: <Text code style={{ fontSize: 14, fontWeight: 700, color: '#1e40af' }}>102800999999</Text></div>
+                                          <div>Nội dung CK: <Text code style={{ fontSize: 14, fontWeight: 700, color: '#d97706' }}>TT {selectedVisitData.visitCode}</Text></div>
+                                        </Space>
+                                      </Col>
+                                      <Col xs={24} sm={10} style={{ textAlign: 'center' }}>
+                                        <div style={{ border: '1px dashed #2563eb', padding: 8, borderRadius: 8, background: '#eff6ff', display: 'inline-block' }}>
+                                          <img
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`STK: 102800999999 | Ngan hang: VietinBank | So tien: ${selectedVisitData.totalAmount} | Noi dung: TT ${selectedVisitData.visitCode}`)}`}
+                                            alt="QR Thanh toán Chuyển khoản"
+                                            style={{ width: 130, height: 130, borderRadius: 4 }}
+                                          />
+                                          <div style={{ fontSize: 11, color: '#1e40af', marginTop: 4, fontWeight: 600 }}>
+                                            📱 QR Thanh toán chuyển khoản
+                                          </div>
+                                        </div>
+                                      </Col>
+                                    </Row>
+                                    <Divider style={{ margin: '12px 0' }} />
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                      <Popconfirm
+                                        title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận đã nhận chuyển khoản</Text>}
+                                        description={`Xác nhận đã kiểm tra tài khoản và nhận đủ ${money(selectedVisitData.totalAmount)} cho ${selectedVisitData.visitCode}?`}
+                                        okText="Xác nhận đã nhận chuyển khoản"
+                                        cancelText="Hủy"
+                                        onConfirm={handleConfirmPayment}
+                                        disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                      >
+                                        <Button
+                                          type="primary"
+                                          size="large"
+                                          icon={<CheckCircleOutlined />}
+                                          loading={submittingPayment}
+                                          disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                          style={{ background: '#2563eb', fontWeight: 600 }}
+                                        >
+                                          Xác nhận đã nhận chuyển khoản
+                                        </Button>
+                                      </Popconfirm>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 3. THANH TOÁN THẺ NGÂN HÀNG */}
+                                {paymentMethod === 'CARD' && (
+                                  <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
+                                    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                                      <Title level={5} style={{ color: '#0f172a', margin: 0 }}>
+                                        💳 THANH TOÁN THẺ NGÂN HÀNG
+                                      </Title>
+                                      <Text type="secondary" style={{ fontSize: 13 }}>
+                                        Thực hiện quẹt thẻ ATM / Thẻ ghi nợ / VISA / MasterCard trên thiết bị quẹt thẻ POS của phòng khám.
+                                      </Text>
+                                      <div style={{ fontSize: 14, margin: '6px 0' }}>
+                                        Tổng thanh toán: <strong style={{ color: '#dc2626', fontSize: 17 }}>{money(selectedVisitData.totalAmount)}</strong>
+                                      </div>
+                                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                                        <Popconfirm
+                                          title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận quẹt thẻ ngân hàng</Text>}
+                                          description={`Xác nhận đã quẹt thẻ thành công ${money(selectedVisitData.totalAmount)} cho ${selectedVisitData.visitCode}?`}
+                                          okText="Xác nhận quẹt thẻ thành công"
+                                          cancelText="Hủy"
+                                          onConfirm={handleConfirmPayment}
+                                          disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                        >
+                                          <Button
+                                            type="primary"
+                                            size="large"
+                                            icon={<CreditCardOutlined />}
+                                            loading={submittingPayment}
+                                            disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                            style={{ background: '#0284c7', borderColor: '#0284c7', fontWeight: 600 }}
+                                          >
+                                            Xác nhận quẹt thẻ thành công
+                                          </Button>
+                                        </Popconfirm>
+                                      </div>
+                                    </Space>
+                                  </div>
+                                )}
+                              </Space>
                             </Card>
                           )}
                         </div>
@@ -1155,15 +1365,18 @@ function BillingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(Array.isArray(viewingInvoiceModal.lines) && viewingInvoiceModal.lines.length > 0
-                      ? viewingInvoiceModal.lines.map((l) => ({
-                          name: l.lineType === 'EXAM_FEE' ? 'Phí khám bệnh' : l.lineType === 'MEDICINE_FEE' ? 'Tiền thuốc kê đơn' : l.itemName,
-                          quantity: l.quantity,
-                          price: l.unitPrice,
-                          amount: l.amount,
-                        }))
-                      : feeDataSource
+                    {(feeDataSource && feeDataSource.length > 0
+                      ? feeDataSource
+                      : (Array.isArray(viewingInvoiceModal.lines) && viewingInvoiceModal.lines.length > 0
+                        ? viewingInvoiceModal.lines.map((l) => ({
+                            name: l.lineType === 'EXAM_FEE' ? 'Phí khám bệnh' : l.lineType === 'MEDICINE_FEE' ? 'Tiền thuốc kê đơn' : (l.itemName || 'Dịch vụ'),
+                            quantity: l.quantity,
+                            price: l.unitPrice,
+                            amount: l.amount,
+                          }))
+                        : [])
                     ).map((item, idx) => (
+
                       <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', fontSize: '13.5px' }}>
                         <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e2e8f0' }}>{idx + 1}</td>
                         <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', borderRight: '1px solid #e2e8f0' }}>{item.name}</td>
