@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.adapterRepository.backup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -62,5 +63,17 @@ class BackupRecordRepositoryAdapterIntegrationTest {
         assertEquals("BKP-20260814-0002", list.get(0).getBackupCode());
 
         assertEquals("BKP-20260814-0002", adapter.findTopByOrderByBackupCodeDesc().orElseThrow().getBackupCode());
+    }
+
+    @Test
+    void persistsInProgressBackupBeforeItsFileExists() {
+        BackupRecord pending = BackupRecord.create(
+                "BKP-20260814-0001", BackupType.FULL, null, UUID.randomUUID(), Instant.now());
+
+        adapter.save(pending);
+
+        BackupRecord saved = adapter.findById(pending.getId()).orElseThrow();
+        assertEquals(BackupStatus.IN_PROGRESS, saved.getStatus());
+        assertNull(saved.getFileName());
     }
 }
