@@ -17,6 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -67,8 +68,9 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbc = new JdbcTemplate(MYSQL.getDataSource());
-        transactions = new TransactionTemplate(new DataSourceTransactionManager(MYSQL.getDataSource()));
+        DriverManagerDataSource dataSource = mysqlDataSource();
+        jdbc = new JdbcTemplate(dataSource);
+        transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         recreateSchema();
         adapter = new JsonDatabaseBackupStorageAdapter(jdbc, objectMapper, BACKUP_PLAN, tempDir);
     }
@@ -186,6 +188,10 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
 
     private String value(String sql, Object... arguments) {
         return jdbc.queryForObject(sql, String.class, arguments);
+    }
+
+    private DriverManagerDataSource mysqlDataSource() {
+        return new DriverManagerDataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
     }
 
     private void recreateSchema() {
