@@ -5,14 +5,13 @@ import {
   Card,
   Col,
   Descriptions,
-  Divider,
   Empty,
   Form,
   Input,
   message,
   Modal,
-  Popconfirm,
   Row,
+  Select,
   Space,
   Table,
   Tag,
@@ -22,16 +21,15 @@ import {
   CloudDownloadOutlined,
   CloudUploadOutlined,
   DatabaseOutlined,
+  DownloadOutlined,
   ExclamationCircleOutlined,
   EyeOutlined,
-  HistoryOutlined,
   LockOutlined,
   PlusOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
   SyncOutlined,
 } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import backupApi from '../api/backupApi'
 import { useAuthContext } from '../context/AuthContext'
 
@@ -50,55 +48,71 @@ const formatDateTime = (val) => {
   return `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`
 }
 
+const formatFileSize = (bytes) => {
+  if (bytes === null || bytes === undefined || isNaN(bytes) || bytes < 0) return '—'
+  if (bytes === 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
 function BackupRestorePage() {
   const { user } = useAuthContext()
 
-  // Phân quyền vai trò: Chỉ ADMIN mới được thực hiện Sao lưu & Phục hồi
+  // Phân quyền vai trò chuẩn hóa: Chỉ ADMIN mới được thực hiện Sao lưu & Phục hồi
   const userRoles = useMemo(() => {
     const raw = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
-    return raw.map((r) => String(r || '').toLowerCase().replace(/^role_/, '')).filter(Boolean)
+    return raw.map((r) => String(r || '').toUpperCase().replace(/^ROLE_/, '')).filter(Boolean)
   }, [user])
 
-  const isAdmin = userRoles.includes('admin')
+  const isAdmin = userRoles.includes('ADMIN')
 
-  // State danh sách & trạng thái
+  // State riêng biệt: backups, loading, loadError
   const [backups, setBackups] = useState([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [creating, setCreating] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [downloadingId, setDownloadingId] = useState(null)
   const [apiError, setApiError] = useState('')
   const [isBackendAvailable, setIsBackendAvailable] = useState(true)
 
   // State Modals
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [backupType, setBackupType] = useState('FULL')
   const [backupNote, setBackupNote] = useState('')
   const [restoreTargetBackup, setRestoreTargetBackup] = useState(null)
   const [detailModalBackup, setDetailModalBackup] = useState(null)
 
-  // 1. Tải danh sách bản sao lưu từ Backend REST API (GET /admin/backups)
+  // 1. Tải danh sách bản sao lưu từ Backend REST API (GET /backups)
   const loadBackups = useCallback(async () => {
     setLoading(true)
     setApiError('')
+    setLoadError(false)
     try {
-      const res = await backupApi.getAll({ page: 0, size: 50 })
+      const res = await backupApi.getAll()
       const data = res?.data
-      const list = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
+      const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : []
       setBackups(list)
       setIsBackendAvailable(true)
+      setLoadError(false)
     } catch (err) {
       console.error('[BackupRestorePage] Lỗi loadBackups:', err?.response?.status, err?.message)
       const status = err?.response?.status
       const msg = err?.response?.data?.message
 
+      setLoadError(true)
       if (status === 403) {
-        setApiError('Bạn không có quyền thực hiện chức năng này (403 Forbidden).')
+        setApiError('Bạn không có quyền thực hiện thao tác này (403 Forbidden).')
       } else if (status === 404) {
         setIsBackendAvailable(false)
-        setApiError('Hệ thống Backend hiện tại chưa triển khai REST Endpoint Sao lưu/Phục hồi (/admin/backups - 404 Not Found).')
+        setApiError('Hệ thống Backend hiện tại chưa tìm thấy REST Endpoint /backups (404 Not Found).')
+      } else if (status === 409) {
+        setApiError('Hệ thống đang thực hiện một tiến trình sao lưu/phục hồi khác (409 Conflict).')
       } else {
-        setApiError(msg || 'Không thể kết nối đến máy chủ Backend để tải danh sách bản sao lưu.')
+        setApiError('Không thể tải danh sách bản sao lưu từ hệ thống. Backend đang gặp lỗi xử lý.')
       }
-      setBackups([])
+      // Tuyệt đối không setBackups([]) ở đây để tránh biến lỗi API thành danh sách rỗng
     } finally {
       setLoading(false)
     }
@@ -108,10 +122,10 @@ function BackupRestorePage() {
     loadBackups()
   }, [loadBackups])
 
-  // 2. Tạo bản sao lưu mới (POST /admin/backups)
+  // 2. Tạo bản sao lưu mới (POST /backups)
   const handleConfirmCreateBackup = async () => {
     if (!isAdmin) {
-      message.error('Bạn không có quyền thực hiện chức năng này.')
+      message.error('Bạn không có quyền thực hiện thao tác này.')
       return
     }
 
@@ -119,16 +133,16 @@ function BackupRestorePage() {
     setApiError('')
     try {
       const payload = {
-        note: backupNote.trim() || undefined,
+        backupType: backupType || 'FULL',
+        description: backupNote.trim() || undefined,
       }
-      const res = await backupApi.createBackup(payload)
-      const newBackup = res?.data
+      await backupApi.createBackup(payload)
 
       message.success('Đã tạo bản sao lưu dữ liệu thành công!')
       setCreateModalOpen(false)
       setBackupNote('')
 
-      // Reload danh sách trực tiếp từ Backend
+      // Reload danh sách trực tiếp từ Backend khi 2xx
       await loadBackups()
     } catch (err) {
       console.error('[BackupRestorePage] Lỗi createBackup:', err?.response?.status, err?.message)
@@ -137,17 +151,22 @@ function BackupRestorePage() {
 
       if (status === 403) {
         setApiError('Bạn không có quyền tạo bản sao lưu dữ liệu (403 Forbidden).')
+        message.error('Bạn không có quyền tạo bản sao lưu dữ liệu (403 Forbidden).')
       } else if (status === 409) {
         setApiError('Hệ thống đang thực hiện một tiến trình sao lưu/phục hồi khác (409 Conflict).')
+        message.error('Hệ thống đang bận thực hiện sao lưu khác (409 Conflict).')
       } else {
-        setApiError(msg || 'Không thể tạo bản sao lưu từ Backend. Vui lòng thử lại.')
+        const errorMsg = msg || 'Không thể tạo bản sao lưu. Backend đang gặp lỗi xử lý.'
+        setApiError(errorMsg)
+        message.error(errorMsg)
       }
+      // Giữ nguyên modal, không tự đóng modal và không append backup giả
     } finally {
       setCreating(false)
     }
   }
 
-  // 3. Phục hồi dữ liệu từ bản sao lưu chỉ định (POST /admin/backups/{backupId}/restore)
+  // 3. Phục hồi dữ liệu từ bản sao lưu chỉ định (POST /backups/{id}/restore)
   const handleConfirmRestore = async () => {
     if (!restoreTargetBackup || !restoreTargetBackup.id) {
       message.error('Mã bản sao lưu không hợp lệ.')
@@ -163,11 +182,11 @@ function BackupRestorePage() {
     setApiError('')
 
     try {
-      const res = await backupApi.restoreBackup(backupId)
-      message.success(`Phục hồi dữ liệu thành công về thời điểm bản sao lưu!`)
+      await backupApi.restoreBackup(backupId)
+      message.success('Phục hồi dữ liệu thành công về thời điểm bản sao lưu!')
       setRestoreTargetBackup(null)
 
-      // Reload danh sách và dữ liệu Backend
+      // Reload danh sách và dữ liệu Backend khi 2xx
       await loadBackups()
     } catch (err) {
       console.error('[BackupRestorePage] Lỗi restoreBackup:', err?.response?.status, err?.message)
@@ -176,44 +195,84 @@ function BackupRestorePage() {
 
       if (status === 403) {
         setApiError('Bạn không có quyền phục hồi dữ liệu hệ thống (403 Forbidden).')
+        message.error('Bạn không có quyền phục hồi dữ liệu hệ thống (403 Forbidden).')
       } else if (status === 404) {
         setApiError('Không tìm thấy bản sao lưu trên Backend (404 Not Found).')
+        message.error('Không tìm thấy bản sao lưu trên Backend (404 Not Found).')
       } else if (status === 409) {
         setApiError('Hệ thống đang bận hoặc bản sao lưu không ở trạng thái sẵn sàng để phục hồi (409 Conflict).')
+        message.error('Bản sao lưu không ở trạng thái sẵn sàng để phục hồi (409 Conflict).')
       } else {
-        setApiError(msg || 'Phục hồi dữ liệu thất bại từ Backend. Vui lòng thử lại.')
+        const errorMsg = msg || 'Phục hồi dữ liệu thất bại từ Backend. Vui lòng thử lại.'
+        setApiError(errorMsg)
+        message.error(errorMsg)
       }
     } finally {
       setRestoring(false)
     }
   }
 
+  // 4. Tải file bản sao lưu (GET /backups/{id}/download)
+  const handleDownload = async (record) => {
+    if (!record || !record.id) return
+    setDownloadingId(record.id)
+    try {
+      const res = await backupApi.downloadBackup(record.id)
+      const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = record.fileName || `backup_${record.backupCode || record.id}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      message.success('Đã tải bản sao lưu thành công!')
+    } catch (err) {
+      console.error('[BackupRestorePage] Lỗi downloadBackup:', err)
+      const status = err?.response?.status
+      if (status === 403) {
+        message.error('Bạn không có quyền tải bản sao lưu.')
+      } else {
+        message.error('Tải file bản sao lưu thất bại.')
+      }
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
   // Thống kê dữ liệu
   const latestBackup = useMemo(() => {
-    if (!backups || backups.length === 0) return null
-    return [...backups].sort((a, b) => new Date(b.createdAt || b.backupTime || 0) - new Date(a.createdAt || a.backupTime || 0))[0]
-  }, [backups])
+    if (loadError || !backups || backups.length === 0) return null
+    return [...backups].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
+  }, [backups, loadError])
 
   // Cột bảng danh sách bản sao lưu chuẩn DTO Backend
   const columns = [
     {
-      title: 'Thời gian sao lưu',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      title: 'Mã bản sao',
+      dataIndex: 'backupCode',
+      key: 'backupCode',
       render: (val, record) => (
         <Space direction="vertical" size={0}>
-          <Text strong>{formatDateTime(val || record.backupTime || record.createdDate)}</Text>
+          <Text strong>{val || '—'}</Text>
           <Text type="secondary" style={{ fontSize: 11 }}>
-            ID: {record.id || record.backupId || '—'}
+            ID: {record.id || '—'}
           </Text>
         </Space>
       ),
     },
     {
-      title: 'Người tạo',
-      dataIndex: 'createdBy',
-      key: 'createdBy',
-      render: (val, record) => record.creatorName || val || record.creator || 'Hệ thống (ADMIN)',
+      title: 'Thời gian tạo',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (val) => formatDateTime(val),
+    },
+    {
+      title: 'Tên file',
+      dataIndex: 'fileName',
+      key: 'fileName',
+      render: (val) => <Text code style={{ fontSize: 12 }}>{val || '—'}</Text>,
     },
     {
       title: 'Trạng thái',
@@ -222,16 +281,16 @@ function BackupRestorePage() {
       align: 'center',
       render: (status) => {
         const st = String(status || '').toUpperCase()
-        if (st === 'COMPLETED' || st === 'SUCCESS') {
+        if (st === 'SUCCESS' || st === 'COMPLETED') {
           return <Tag color="green" icon={<SafetyCertificateOutlined />}>Hoàn thành</Tag>
         }
-        if (st === 'PROCESSING' || st === 'PENDING') {
+        if (st === 'IN_PROGRESS' || st === 'PROCESSING' || st === 'PENDING') {
           return <Tag color="processing" icon={<SyncOutlined spin />}>Đang xử lý</Tag>
         }
         if (st === 'FAILED' || st === 'ERROR') {
           return <Tag color="error" icon={<ExclamationCircleOutlined />}>Thất bại</Tag>
         }
-        return <Tag color="default">{status || 'COMPLETED'}</Tag>
+        return <Tag color="default">{status || '—'}</Tag>
       },
     },
     {
@@ -239,14 +298,20 @@ function BackupRestorePage() {
       dataIndex: 'fileSize',
       key: 'fileSize',
       align: 'right',
-      render: (val, record) => record.sizeDisplay || val || (record.size ? `${(record.size / (1024 * 1024)).toFixed(2)} MB` : '—'),
+      render: (val) => formatFileSize(val),
+    },
+    {
+      title: 'Ghi chú',
+      dataIndex: 'description',
+      key: 'description',
+      render: (val) => val || '—',
     },
     {
       title: 'Thao tác',
       key: 'actions',
       align: 'center',
       render: (_, record) => {
-        const isCompleted = String(record.status || 'COMPLETED').toUpperCase() === 'COMPLETED' || String(record.status || '').toUpperCase() === 'SUCCESS'
+        const isSuccess = String(record.status || '').toUpperCase() === 'SUCCESS' || String(record.status || '').toUpperCase() === 'COMPLETED'
         return (
           <Space size="small">
             <Button
@@ -254,14 +319,23 @@ function BackupRestorePage() {
               icon={<EyeOutlined />}
               onClick={() => setDetailModalBackup(record)}
             >
-              Xem chi tiết
+              Chi tiết
+            </Button>
+            <Button
+              size="small"
+              icon={<DownloadOutlined />}
+              disabled={!isAdmin || !isSuccess || downloadingId === record.id}
+              loading={downloadingId === record.id}
+              onClick={() => handleDownload(record)}
+            >
+              Tải file
             </Button>
             <Button
               size="small"
               type="primary"
               danger
               icon={<CloudDownloadOutlined />}
-              disabled={!isAdmin || !isCompleted || restoring || loading}
+              disabled={!isAdmin || !isSuccess || restoring || loading}
               onClick={() => setRestoreTargetBackup(record)}
             >
               Phục hồi
@@ -312,8 +386,23 @@ function BackupRestorePage() {
         />
       )}
 
-      {/* Cảnh báo Backend 404 / Lỗi API */}
-      {apiError && (
+      {/* Thông báo lỗi / Error State Alert khi API bị 500 hoặc lỗi mạng */}
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          message="Không thể tải danh sách bản sao lưu từ hệ thống."
+          description={apiError || 'Máy chủ Backend đang gặp sự cố xử lý (Internal Server Error).'}
+          action={
+            <Button size="small" type="primary" danger onClick={loadBackups}>
+              Thử kết nối lại
+            </Button>
+          }
+          style={{ marginBottom: 20 }}
+        />
+      )}
+
+      {!loadError && apiError && (
         <Alert
           type={isBackendAvailable ? 'warning' : 'info'}
           showIcon
@@ -324,21 +413,21 @@ function BackupRestorePage() {
         />
       )}
 
-      {/* Cards Thống kê */}
+      {/* Cards Thống kê: Không hiển thị "0 bản" khi loadError = true */}
       <Row gutter={16} style={{ marginBottom: 20 }}>
         <Col span={8}>
           <Card size="small" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>Tổng số bản sao lưu</Text>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#1e293b' }}>
-              {backups.length} bản
+            <div style={{ fontSize: 24, fontWeight: 700, color: loadError ? '#94a3b8' : '#1e293b' }}>
+              {loadError ? '—' : `${backups.length} bản`}
             </div>
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>Bản sao gần nhất</Text>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#2563eb' }}>
-              {latestBackup ? formatDateTime(latestBackup.createdAt || latestBackup.backupTime) : '— Chưa có'}
+            <div style={{ fontSize: 14, fontWeight: 600, color: loadError ? '#94a3b8' : '#2563eb' }}>
+              {loadError ? '—' : latestBackup ? formatDateTime(latestBackup.createdAt) : '— Chưa có'}
             </div>
           </Card>
         </Col>
@@ -346,9 +435,11 @@ function BackupRestorePage() {
           <Card size="small" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>Trạng thái gần nhất</Text>
             <div>
-              {latestBackup ? (
-                <Tag color="green" icon={<SafetyCertificateOutlined />}>
-                  {latestBackup.status || 'HOÀN THÀNH'}
+              {loadError ? (
+                <Text type="secondary">Không thể tải dữ liệu</Text>
+              ) : latestBackup ? (
+                <Tag color={String(latestBackup.status).toUpperCase() === 'SUCCESS' ? 'green' : 'red'} icon={<SafetyCertificateOutlined />}>
+                  {String(latestBackup.status).toUpperCase() === 'SUCCESS' ? 'Hoàn thành' : (latestBackup.status || '—')}
                 </Tag>
               ) : (
                 <Text type="secondary">—</Text>
@@ -361,18 +452,31 @@ function BackupRestorePage() {
       {/* Bảng Danh sách Bản sao lưu */}
       <Card title="Danh sách bản sao lưu hệ thống" styles={{ body: { padding: 0 } }}>
         <Table
-          rowKey={(r) => r.id || r.backupId || Math.random()}
+          rowKey={(r) => r.id || r.backupCode || Math.random()}
           columns={columns}
-          dataSource={backups}
+          dataSource={loadError ? [] : backups}
           loading={loading}
           pagination={{ pageSize: 10 }}
           locale={{
-            emptyText: (
+            emptyText: loadError ? (
+              <div style={{ padding: 32, textAlign: 'center' }}>
+                <ExclamationCircleOutlined style={{ fontSize: 32, color: '#ff4d4f', marginBottom: 12 }} />
+                <div style={{ color: '#cf1322', fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+                  Không thể tải danh sách bản sao lưu từ hệ thống.
+                </div>
+                <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 16 }}>
+                  Máy chủ Backend phản hồi lỗi xử lý nội bộ. Vui lòng kiểm tra lại kết nối.
+                </Text>
+                <Button type="primary" icon={<ReloadOutlined />} onClick={loadBackups}>
+                  Thử kết nối lại
+                </Button>
+              </div>
+            ) : (
               <Empty
                 description={
                   !isBackendAvailable
-                    ? 'Backend chưa triển khai REST Controller /admin/backups'
-                    : 'Chưa có bản sao lưu nào được tạo'
+                    ? 'Backend chưa kết nối được REST Controller /backups'
+                    : 'Chưa có bản sao lưu nào.'
                 }
               />
             ),
@@ -409,6 +513,12 @@ function BackupRestorePage() {
           Hệ thống sẽ tiến hành đóng gói và tạo một bản sao lưu toàn bộ dữ liệu CSDL tại thời điểm hiện tại.
         </Paragraph>
         <Form layout="vertical">
+          <Form.Item label="Loại bản sao lưu">
+            <Select value={backupType} onChange={(v) => setBackupType(v)}>
+              <Select.Option value="FULL">FULL (Toàn bộ CSDL vận hành)</Select.Option>
+              <Select.Option value="MANUAL">MANUAL (Sao lưu thủ công)</Select.Option>
+            </Select>
+          </Form.Item>
           <Form.Item label="Ghi chú bản sao lưu (Tùy chọn)">
             <Input.TextArea
               rows={2}
@@ -442,7 +552,7 @@ function BackupRestorePage() {
             disabled={!isAdmin || restoring}
             onClick={handleConfirmRestore}
           >
-            Phục hồi dữ liệu
+            Phục hồi
           </Button>,
         ]}
       >
@@ -451,19 +561,22 @@ function BackupRestorePage() {
             <Alert
               type="warning"
               showIcon
-              message="CẢNH BÁO PHỤC HỒI NGUY HIỂM"
-              description="Dữ liệu vận hành hệ thống hiện tại sẽ được khôi phục hoàn toàn về trạng thái tại thời điểm của bản sao lưu này. Các dữ liệu phát sinh sau thời điểm sao lưu có thể bị ghi đè."
+              message="CẢNH BÁO PHỤC HỒI DỮ LIỆU"
+              description="Dữ liệu hệ thống sẽ được phục hồi về trạng thái tại thời điểm của bản sao lưu này."
             />
             <Card size="small" style={{ background: '#f8fafc', marginTop: 12 }}>
               <Descriptions size="small" column={1} labelStyle={{ fontWeight: 600, width: 140 }}>
                 <Descriptions.Item label="Mã bản sao">
-                  <Text code>{restoreTargetBackup.id || restoreTargetBackup.backupId}</Text>
+                  <Text code>{restoreTargetBackup.backupCode || restoreTargetBackup.id}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tên file">
+                  {restoreTargetBackup.fileName || '—'}
                 </Descriptions.Item>
                 <Descriptions.Item label="Thời gian tạo">
-                  {formatDateTime(restoreTargetBackup.createdAt || restoreTargetBackup.backupTime)}
+                  {formatDateTime(restoreTargetBackup.createdAt)}
                 </Descriptions.Item>
-                <Descriptions.Item label="Người tạo">
-                  {restoreTargetBackup.createdBy || 'ADMIN'}
+                <Descriptions.Item label="Ghi chú">
+                  {restoreTargetBackup.description || 'Không có ghi chú'}
                 </Descriptions.Item>
               </Descriptions>
             </Card>
@@ -484,23 +597,41 @@ function BackupRestorePage() {
       >
         {detailModalBackup && (
           <Descriptions column={1} bordered size="small" labelStyle={{ fontWeight: 600, width: 160 }}>
-            <Descriptions.Item label="Mã bản sao ID">
-              <Text code>{detailModalBackup.id || detailModalBackup.backupId}</Text>
+            <Descriptions.Item label="ID bản sao">
+              <Text code>{detailModalBackup.id}</Text>
             </Descriptions.Item>
-            <Descriptions.Item label="Thời gian sao lưu">
-              {formatDateTime(detailModalBackup.createdAt || detailModalBackup.backupTime)}
+            <Descriptions.Item label="Mã bản sao lưu">
+              <Text strong>{detailModalBackup.backupCode || '—'}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Tên file">
+              <Text code>{detailModalBackup.fileName || '—'}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Loại bản sao">
+              {detailModalBackup.backupType || 'FULL'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Thời gian tạo">
+              {formatDateTime(detailModalBackup.createdAt)}
             </Descriptions.Item>
             <Descriptions.Item label="Người khởi tạo">
-              {detailModalBackup.createdBy || 'ADMIN'}
+              {detailModalBackup.createdBy || 'Hệ thống'}
             </Descriptions.Item>
             <Descriptions.Item label="Trạng thái">
-              <Tag color="green">{detailModalBackup.status || 'COMPLETED'}</Tag>
+              {String(detailModalBackup.status).toUpperCase() === 'SUCCESS' ? (
+                <Tag color="green">Hoàn thành</Tag>
+              ) : String(detailModalBackup.status).toUpperCase() === 'IN_PROGRESS' ? (
+                <Tag color="processing">Đang xử lý</Tag>
+              ) : (
+                <Tag color="red">Thất bại</Tag>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Dung lượng file">
-              {detailModalBackup.fileSize || detailModalBackup.sizeDisplay || '—'}
+              {formatFileSize(detailModalBackup.fileSize)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Phục hồi lần cuối">
+              {detailModalBackup.restoredAt ? formatDateTime(detailModalBackup.restoredAt) : 'Chưa phục hồi'}
             </Descriptions.Item>
             <Descriptions.Item label="Ghi chú">
-              {detailModalBackup.note || detailModalBackup.description || 'Không có ghi chú'}
+              {detailModalBackup.description || 'Không có ghi chú'}
             </Descriptions.Item>
           </Descriptions>
         )}
