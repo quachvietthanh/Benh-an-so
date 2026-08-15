@@ -67,8 +67,9 @@ function BackupRestorePage() {
 
   const isAdmin = userRoles.includes('ADMIN')
 
-  // State riêng biệt: backups, loading, loadError
-  const [backups, setBackups] = useState([])
+  // State riêng biệt:
+  // backups: null (chưa load / lỗi) vs [] (load 200 thành công nhưng danh sách rỗng)
+  const [backups, setBackups] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -96,12 +97,14 @@ function BackupRestorePage() {
       setBackups(list)
       setIsBackendAvailable(true)
       setLoadError(false)
+      setApiError('')
     } catch (err) {
       console.error('[BackupRestorePage] Lỗi loadBackups:', err?.response?.status, err?.message)
       const status = err?.response?.status
       const msg = err?.response?.data?.message
 
       setLoadError(true)
+      setBackups(null)
       if (status === 403) {
         setApiError('Bạn không có quyền thực hiện thao tác này (403 Forbidden).')
       } else if (status === 404) {
@@ -110,9 +113,8 @@ function BackupRestorePage() {
       } else if (status === 409) {
         setApiError('Hệ thống đang thực hiện một tiến trình sao lưu/phục hồi khác (409 Conflict).')
       } else {
-        setApiError('Không thể tải danh sách bản sao lưu từ hệ thống. Backend đang gặp lỗi xử lý.')
+        setApiError(msg || 'Không thể tải danh sách bản sao lưu từ hệ thống. Backend phản hồi lỗi xử lý.')
       }
-      // Tuyệt đối không setBackups([]) ở đây để tránh biến lỗi API thành danh sách rỗng
     } finally {
       setLoading(false)
     }
@@ -160,7 +162,6 @@ function BackupRestorePage() {
         setApiError(errorMsg)
         message.error(errorMsg)
       }
-      // Giữ nguyên modal, không tự đóng modal và không append backup giả
     } finally {
       setCreating(false)
     }
@@ -243,7 +244,7 @@ function BackupRestorePage() {
 
   // Thống kê dữ liệu
   const latestBackup = useMemo(() => {
-    if (loadError || !backups || backups.length === 0) return null
+    if (loadError || !backups || !Array.isArray(backups) || backups.length === 0) return null
     return [...backups].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
   }, [backups, loadError])
 
@@ -386,13 +387,13 @@ function BackupRestorePage() {
         />
       )}
 
-      {/* Thông báo lỗi / Error State Alert khi API bị 500 hoặc lỗi mạng */}
+      {/* Alert Error State khi API trả 500 hoặc lỗi kết nối */}
       {loadError && (
         <Alert
           type="error"
           showIcon
           message="Không thể tải danh sách bản sao lưu từ hệ thống."
-          description={apiError || 'Máy chủ Backend đang gặp sự cố xử lý (Internal Server Error).'}
+          description={apiError || 'Máy chủ Backend phản hồi lỗi xử lý nội bộ (Internal Server Error).'}
           action={
             <Button size="small" type="primary" danger onClick={loadBackups}>
               Thử kết nối lại
@@ -413,21 +414,21 @@ function BackupRestorePage() {
         />
       )}
 
-      {/* Cards Thống kê: Không hiển thị "0 bản" khi loadError = true */}
+      {/* Cards Thống kê: Hiển thị "—" khi loadError = true hoặc backups = null */}
       <Row gutter={16} style={{ marginBottom: 20 }}>
         <Col span={8}>
           <Card size="small" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>Tổng số bản sao lưu</Text>
-            <div style={{ fontSize: 24, fontWeight: 700, color: loadError ? '#94a3b8' : '#1e293b' }}>
-              {loadError ? '—' : `${backups.length} bản`}
+            <div style={{ fontSize: 24, fontWeight: 700, color: loadError || backups === null ? '#94a3b8' : '#1e293b' }}>
+              {loadError || backups === null ? '—' : `${backups.length} bản`}
             </div>
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>Bản sao gần nhất</Text>
-            <div style={{ fontSize: 14, fontWeight: 600, color: loadError ? '#94a3b8' : '#2563eb' }}>
-              {loadError ? '—' : latestBackup ? formatDateTime(latestBackup.createdAt) : '— Chưa có'}
+            <div style={{ fontSize: 14, fontWeight: 600, color: loadError || backups === null ? '#94a3b8' : '#2563eb' }}>
+              {loadError || backups === null ? '—' : latestBackup ? formatDateTime(latestBackup.createdAt) : '— Chưa có'}
             </div>
           </Card>
         </Col>
@@ -437,12 +438,12 @@ function BackupRestorePage() {
             <div>
               {loadError ? (
                 <Text type="secondary">Không thể tải dữ liệu</Text>
-              ) : latestBackup ? (
+              ) : backups === null || !latestBackup ? (
+                <Text type="secondary">—</Text>
+              ) : (
                 <Tag color={String(latestBackup.status).toUpperCase() === 'SUCCESS' ? 'green' : 'red'} icon={<SafetyCertificateOutlined />}>
                   {String(latestBackup.status).toUpperCase() === 'SUCCESS' ? 'Hoàn thành' : (latestBackup.status || '—')}
                 </Tag>
-              ) : (
-                <Text type="secondary">—</Text>
               )}
             </div>
           </Card>
@@ -454,7 +455,7 @@ function BackupRestorePage() {
         <Table
           rowKey={(r) => r.id || r.backupCode || Math.random()}
           columns={columns}
-          dataSource={loadError ? [] : backups}
+          dataSource={loadError || backups === null ? [] : backups}
           loading={loading}
           pagination={{ pageSize: 10 }}
           locale={{
