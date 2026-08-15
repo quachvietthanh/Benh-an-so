@@ -18,7 +18,7 @@ public class OperationalDashboardController {
     private final GetOperationalDashboardUseCase getOperationalDashboardUseCase;
 
     @GetMapping("/operational")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CLINIC_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CLINIC_MANAGER')")
     public OperationalDashboardResult getOperationalDashboard() {
         return getOperationalDashboardUseCase.get();
     }

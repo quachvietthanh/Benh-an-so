@@ -1,6 +1,7 @@
 import React from 'react'
-import { AppstoreOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, DatabaseOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons'
 import { Tabs, Typography } from 'antd'
+import BackupRestorePage from './BackupRestorePage'
 import MedicalRecordAccessLogsPage from './MedicalRecordAccessLogsPage'
 import ServicesPage from './ServicesPage'
 import UsersPage from './UsersPage'
@@ -12,7 +13,7 @@ function SystemManagementPage() {
     <div className="system-management-page">
       <div className="page-heading-block">
         <Title level={3}>Quản trị hệ thống & Giám sát an toàn dữ liệu</Title>
-        <Text type="secondary">Quản lý tài khoản, phân quyền, cấu hình bảng giá và kiểm toán nhật ký truy cập bệnh án.</Text>
+        <Text type="secondary">Quản lý tài khoản, phân quyền, cấu hình bảng giá, sao lưu dữ liệu và kiểm toán nhật ký truy cập bệnh án.</Text>
       </div>
       <Tabs
         className="system-tabs"
@@ -32,6 +33,11 @@ function SystemManagementPage() {
             key: 'access-logs',
             label: <span><SafetyCertificateOutlined /> Nhật ký truy cập bệnh án</span>,
             children: <MedicalRecordAccessLogsPage />,
+          },
+          {
+            key: 'backup-restore',
+            label: <span><DatabaseOutlined /> Sao lưu & Phục hồi</span>,
+            children: <BackupRestorePage />,
           },
         ]}
       />

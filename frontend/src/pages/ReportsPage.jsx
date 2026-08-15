@@ -1,93 +1,124 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
   Card,
-  Col,
   DatePicker,
-  Form,
-  Input,
-  message,
-  Row,
-  Select,
   Space,
-  Statistic,
-  Table,
   Tabs,
-  Tag,
   Typography,
+  message,
 } from 'antd'
 import {
-  AlertOutlined,
-  BarChartOutlined,
   CalendarOutlined,
-  CheckCircleOutlined,
   DashboardOutlined,
   DollarCircleOutlined,
   DownloadOutlined,
-  EyeOutlined,
   FileSearchOutlined,
   LineChartOutlined,
   MedicineBoxOutlined,
-  NodeIndexOutlined,
-  PlusOutlined,
-  PrinterOutlined,
-  QrcodeOutlined,
   ReloadOutlined,
-  SafetyCertificateOutlined,
-  SearchOutlined,
-  ShoppingOutlined,
   UserOutlined,
-  WalletOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import reportApi from '../api/reportApi'
+import billingApi from '../api/billingApi'
+import { useAuthContext } from '../context/AuthContext'
+import ReportStatCards from '../components/reporting/ReportStatCards'
+import ManagerPermissionAlert from '../components/reporting/ManagerPermissionAlert'
+import OverviewReportView from '../components/reporting/OverviewReportView'
+import VisitReportView from '../components/reporting/VisitReportView'
+import DoctorVisitsReportView from '../components/reporting/DoctorVisitsReportView'
+import RevenueReportView from '../components/reporting/RevenueReportView'
+import TopMedicinesReportView from '../components/reporting/TopMedicinesReportView'
+import AuditLogsReportView from '../components/reporting/AuditLogsReportView'
 import {
   getStoredAuditLogs,
   getStoredInvoices,
   getStoredMedicalRecords,
   getStoredMedicines,
   getStoredPrescriptions,
+  mergeInvoices,
 } from '../utils/storageHelpers'
 
 const { RangePicker } = DatePicker
-const { Text, Title } = Typography
-
-const money = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`
+const { Title, Paragraph } = Typography
 
 function ReportsPage() {
-  const [range, setRange] = useState([dayjs().subtract(6, 'day'), dayjs()])
-  const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('visits')
+  const navigate = useNavigate()
+  const { user, logout } = useAuthContext()
 
-  // Dynamic Data States (STRICTLY FROM RECORDED DATA)
-  const [summary, setSummary] = useState({ visitCount: 0, revenue: 0, dispensedCount: 0, auditCount: 0 })
+  // Phân quyền
+  const roles = useMemo(() => {
+    const values = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
+    return values
+      .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
+      .filter(Boolean)
+  }, [user])
+  const isManager = roles.includes('manager') || roles.includes('admin')
+
+  // Mặc định khoảng thời gian: 30 ngày gần nhất
+  const [range, setRange] = useState([dayjs().subtract(29, 'day'), dayjs()])
+  const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [activeTab, setActiveTab] = useState('visits')
+  const [loadError, setLoadError] = useState('')
+
+  // Dynamic Data States
+  const [summary, setSummary] = useState({
+    visitCount: 0,
+    revenue: 0,
+    dispensedCount: 0,
+    auditCount: 0,
+    currency: 'VND',
+  })
   const [timeline, setTimeline] = useState([])
   const [topMedicines, setTopMedicines] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
   const [invoicesList, setInvoicesList] = useState([])
-  const [logSearch, setLogSearch] = useState('')
+
+  const fromStr = useMemo(
+    () => (range?.[0] ? range[0].format('YYYY-MM-DD') : dayjs().subtract(29, 'day').format('YYYY-MM-DD')),
+    [range],
+  )
+  const toStr = useMemo(
+    () => (range?.[1] ? range[1].format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')),
+    [range],
+  )
 
   const getParams = useCallback(() => ({
-    from: range[0] ? range[0].format('YYYY-MM-DD') : dayjs().startOf('month').format('YYYY-MM-DD'),
-    to: range[1] ? range[1].format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
-  }), [range])
+    from: fromStr,
+    to: toStr,
+  }), [fromStr, toStr])
 
+  // Gọi API và hợp nhất dữ liệu thực tế
   const loadData = useCallback(async () => {
+    if (!fromStr || !toStr) return
+
     setLoading(true)
+    setLoadError('')
     const params = getParams()
+
     try {
-      const [summaryRes, timelineRes, medicinesRes, auditRes] = await Promise.allSettled([
+      const [summaryRes, timelineRes, medicinesRes, auditRes, invoicesRes] = await Promise.allSettled([
         reportApi.summary(params),
         reportApi.timeline(params),
         reportApi.topMedicines(params),
         reportApi.audit(params),
+        billingApi.getAll(),
       ])
 
       const apiSummary = summaryRes.status === 'fulfilled' ? summaryRes.value.data : null
+      const apiTimeline = timelineRes.status === 'fulfilled' ? timelineRes.value.data : null
+      const apiTopMedicines = medicinesRes.status === 'fulfilled' ? medicinesRes.value.data : null
       const apiAudit = auditRes.status === 'fulfilled' ? auditRes.value.data : null
+      const apiInvoicesRaw = invoicesRes.status === 'fulfilled' ? invoicesRes.value.data : null
+      const apiInvoicesList = (apiInvoicesRaw && Array.isArray(apiInvoicesRaw.content))
+        ? apiInvoicesRaw.content
+        : (Array.isArray(apiInvoicesRaw) ? apiInvoicesRaw : [])
 
-      // Get STRICT REAL RECORDED DATA from local persistence + API (No pre-set static offsets!)
+      // Get stored items from local persistence
       const storedRecords = getStoredMedicalRecords()
       const storedInvoices = getStoredInvoices()
       const storedPrescriptions = getStoredPrescriptions()
@@ -95,259 +126,230 @@ function ReportsPage() {
       const storedLogs = getStoredAuditLogs()
 
       const apiRecords = (apiSummary && Array.isArray(apiSummary.records)) ? apiSummary.records : []
-      const apiInvs = (apiSummary && Array.isArray(apiSummary.invoices)) ? apiSummary.invoices : []
+      const apiInvs = (apiSummary && Array.isArray(apiSummary.invoices)) ? apiSummary.invoices : apiInvoicesList
       const apiPrescs = (apiSummary && Array.isArray(apiSummary.prescriptions)) ? apiSummary.prescriptions : []
 
-      // Merge ONLY real created items from user actions
+      // Merge items
       const realRecords = [...storedRecords, ...apiRecords]
-      const realInvoices = [...storedInvoices, ...apiInvs]
+      const realInvoices = mergeInvoices([...storedInvoices, ...apiInvs])
       const realPrescriptions = [...storedPrescriptions, ...apiPrescs]
       const realLogs = (apiAudit && Array.isArray(apiAudit)) ? [...storedLogs, ...apiAudit] : storedLogs
 
       setInvoicesList(realInvoices)
 
-      // STRICT REAL STATS CALCULATION
-      const totalVisits = realRecords.length
-      const totalRevenue = realInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
+      // Calculate total visits and revenue
+      const totalVisits = apiSummary?.visitCount != null ? Number(apiSummary.visitCount) : realRecords.length
+      const totalRevenue = apiSummary?.revenue != null ? Number(apiSummary.revenue) : realInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
       const dispensedCount = realPrescriptions.filter((p) => p.status === 'DISPENSED' || p.status === 'COMPLETED').length
       const auditCount = realLogs.length
 
-      // STRICT REAL TIMELINE CALCULATION FOR SELECTED RANGE
-      const startDate = range[0] || dayjs().subtract(6, 'day')
-      const endDate = range[1] || dayjs()
-      const diffDays = Math.max(0, endDate.diff(startDate, 'day'))
-      const datesCount = Math.min(diffDays + 1, 31)
+      // Timeline mapping
+      let timelineList = []
+      if (apiTimeline && Array.isArray(apiTimeline.items) && apiTimeline.items.length > 0) {
+        timelineList = apiTimeline.items.map((item) => ({
+          date: item.date,
+          reportDate: dayjs(item.date).format('DD/MM/YYYY'),
+          visitCount: Number(item.visitCount || 0),
+          revenue: Number(item.revenue || 0),
+        }))
+      } else {
+        const startDate = range[0] || dayjs().subtract(29, 'day')
+        const endDate = range[1] || dayjs()
+        const diffDays = Math.max(0, endDate.diff(startDate, 'day'))
+        const datesCount = Math.min(diffDays + 1, 366)
 
-      const timelineList = []
-      for (let i = 0; i < datesCount; i++) {
-        const currentDate = startDate.add(i, 'day')
-        const formattedDate = currentDate.format('DD/MM/YYYY')
-        const dateISO = currentDate.format('YYYY-MM-DD')
+        for (let i = 0; i < datesCount; i++) {
+          const currentDate = startDate.add(i, 'day')
+          const formattedDate = currentDate.format('DD/MM/YYYY')
+          const dateISO = currentDate.format('YYYY-MM-DD')
 
-        // Count real records on this date
-        const dayVisits = realRecords.filter((r) => (
-          r.createdAt && dayjs(r.createdAt).format('YYYY-MM-DD') === dateISO
-        )).length
+          const dayVisits = realRecords.filter((r) => (
+            r.createdAt && dayjs(r.createdAt).format('YYYY-MM-DD') === dateISO
+          )).length
 
-        // Sum real invoice revenue on this date
-        const dayRevenue = realInvoices
-          .filter((inv) => inv.createdAt && dayjs(inv.createdAt).format('YYYY-MM-DD') === dateISO)
-          .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
+          const dayRevenue = realInvoices
+            .filter((inv) => inv.createdAt && dayjs(inv.createdAt).format('YYYY-MM-DD') === dateISO)
+            .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
 
-        timelineList.push({
-          reportDate: formattedDate,
-          visitCount: dayVisits,
-          revenue: dayRevenue,
-        })
+          timelineList.push({
+            date: dateISO,
+            reportDate: formattedDate,
+            visitCount: dayVisits,
+            revenue: dayRevenue,
+          })
+        }
       }
 
-      // STRICT REAL TOP MEDICINES RANKING
-      const medMap = new Map()
-      realPrescriptions.forEach((p) => {
-        let items = []
-        try {
-          items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || [])
-        } catch {
-          items = []
-        }
-        items.forEach((item) => {
-          const medName = storedMedicines.find((m) => m.id === item.medicineId)?.name || item.medicineId || 'Thuốc'
-          const currentQty = medMap.get(medName) || 0
-          medMap.set(medName, currentQty + Number(item.quantity || 1))
+      // Top medicines ranking
+      let rankedMeds = []
+      if (apiTopMedicines && Array.isArray(apiTopMedicines.items)) {
+        rankedMeds = apiTopMedicines.items.map((m) => ({
+          name: m.medicineName || m.name,
+          category: 'Dược phẩm',
+          dispensedQuantity: m.totalDispensedQuantity || m.dispensedQuantity || 0,
+        }))
+      } else {
+        const medMap = new Map()
+        realPrescriptions.forEach((p) => {
+          let items = []
+          try {
+            items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || [])
+          } catch {
+            items = []
+          }
+          items.forEach((item) => {
+            const medName = storedMedicines.find((m) => m.id === item.medicineId)?.name || item.medicineId || 'Thuốc'
+            const currentQty = medMap.get(medName) || 0
+            medMap.set(medName, currentQty + Number(item.quantity || 1))
+          })
         })
-      })
 
-      const rankedMeds = Array.from(medMap.entries())
-        .map(([name, dispensedQuantity]) => ({ name, category: 'Dược phẩm', dispensedQuantity }))
-        .sort((a, b) => b.dispensedQuantity - a.dispensedQuantity)
+        rankedMeds = Array.from(medMap.entries())
+          .map(([name, dispensedQuantity]) => ({ name, category: 'Dược phẩm', dispensedQuantity }))
+          .sort((a, b) => b.dispensedQuantity - a.dispensedQuantity)
+      }
 
       setSummary({
         visitCount: totalVisits,
         revenue: totalRevenue,
         dispensedCount,
         auditCount,
+        currency: apiSummary?.currency || 'VND',
       })
 
       setTimeline(timelineList)
       setTopMedicines(rankedMeds)
       setAuditLogs(realLogs)
-    } catch {
-      // ignore load error
+    } catch (err) {
+      console.error('Lỗi tải báo cáo vận hành:', err)
+      const status = err?.response?.status
+      if (status === 403) {
+        setLoadError('PERMISSION_DENIED_NOT_MANAGER')
+      } else {
+        setLoadError(err?.response?.data?.message || err?.message || 'Không thể tải báo cáo.')
+      }
     } finally {
       setLoading(false)
     }
-  }, [getParams, range])
+  }, [fromStr, toStr, getParams, range])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
-  const handleExportCSV = () => {
+  // Xuất file CSV báo cáo
+  const handleExportCSV = async () => {
+    setExporting(true)
     try {
-      const params = getParams()
-      const csvRows = [
-        ['BAO CAO VAN HANH VA NHAT KY TRUY CAP (DU LIEU THUC TE GHI NHAN)'],
-        [`Khoang thoi gian: ${params.from} - ${params.to}`],
-        [''],
-        ['1. TONG QUAN CHI SO THUC TE'],
-        [`Tong luot kham: ${summary.visitCount}`],
-        [`Doanh thu phong kham: ${summary.revenue} VND`],
-        [`Don thuoc da cap: ${summary.dispensedCount}`],
-        [`Nhat ky truy cap: ${summary.auditCount}`],
-        [''],
-        ['2. XU HUONG LUOT KHAM THEO NGAY'],
-        ['Ngay bao cao', 'So luot kham', 'Doanh thu phat sinh (VND)'],
-        ...timeline.map((t) => [t.reportDate, t.visitCount, t.revenue]),
-        [''],
-        ['3. TOP THUOC DUNG NHIEU'],
-        ['Ten thuoc', 'So luong cap phat'],
-        ...topMedicines.map((m) => [m.name, m.dispensedQuantity]),
-        [''],
-        ['4. NHAT KY TRUY CAP BENH AN'],
-        ['Nguoi dung', 'Benh nhan', 'Ma benh an', 'Hanh dong', 'Thoi gian'],
-        ...auditLogs.map((l) => [l.userName, l.patientName, l.recordCode, l.action, l.accessedAt]),
-      ]
-
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + csvRows.map((e) => e.join(',')).join('\n')
-      const encodedUri = encodeURI(csvContent)
+      const response = await reportApi.export({ from: fromStr, to: toStr })
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' })
+      const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.setAttribute('href', encodedUri)
-      link.setAttribute('download', `bao-cao-van-hanh-thuc-te-${params.from}-${params.to}.csv`)
+      link.href = url
+      link.setAttribute('download', `Bao-cao-van-hanh-${fromStr}-${toStr}.csv`)
       document.body.appendChild(link)
       link.click()
-      document.body.removeChild(link)
-      message.success('Đã xuất file báo cáo CSV thực tế thành công!')
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      message.success('Đã xuất báo cáo CSV thành công!')
     } catch {
       message.error('Không thể xuất báo cáo')
+    } finally {
+      setExporting(false)
     }
   }
 
-  // Calculated right side metrics strictly from recorded timeline
-  const totalVisitsTimeline = timeline.reduce((s, t) => s + Number(t.visitCount || 0), 0)
-  const averageVisitsPerDay = (totalVisitsTimeline / Math.max(timeline.length, 1)).toFixed(1).replace('.', ',')
-  const peakDayItem = timeline.reduce((max, item) => (Number(item.visitCount || 0) > Number(max.visitCount || 0) ? item : max), timeline[0] || {})
-  const periodRevenueTotal = timeline.reduce((s, t) => s + Number(t.revenue || 0), 0)
-
-  const filteredLogs = auditLogs.filter((log) => {
-    if (!logSearch.trim()) return true
-    const term = logSearch.toLowerCase()
-    return (
-      (log.userName && log.userName.toLowerCase().includes(term)) ||
-      (log.patientName && log.patientName.toLowerCase().includes(term)) ||
-      (log.recordCode && log.recordCode.toLowerCase().includes(term)) ||
-      (log.action && log.action.toLowerCase().includes(term))
-    )
-  })
-
-  const maxVisitsChart = Math.max(...timeline.map((t) => Number(t.visitCount || 0)), 10)
-
   return (
-    <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '16px 14px' }}>
+    <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '16px 20px', paddingBottom: 40 }}>
       {/* Header Section */}
-      <div className="reports-page-header">
-        <div className="reports-page-title-group">
-          <Title level={3} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-            Báo cáo vận hành và nhật ký truy cập
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <div>
+          <Title level={2} style={{ margin: 0, color: '#0f172a' }}>
+            <LineChartOutlined style={{ marginRight: 8, color: '#1677ff' }} />
+            Báo cáo Vận hành & Doanh thu
           </Title>
-          <Text type="secondary" style={{ fontSize: 13, color: '#64748b' }}>
-            Theo dõi số liệu khám bệnh, doanh thu, thuốc và lịch sử truy cập hệ thống (Dữ liệu ghi nhận thực tế)
-          </Text>
+          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+            Theo dõi số liệu khám bệnh, doanh thu tài chính, thuốc và nhật ký truy cập y tế theo thời gian thực.
+          </Paragraph>
         </div>
-        <Space size="middle" className="reports-page-actions">
+
+        <Space wrap size="middle">
           <RangePicker
             value={range}
             format="DD/MM/YYYY"
             onChange={(val) => val && setRange(val)}
             allowClear={false}
+            presets={[
+              { label: '7 ngày qua', value: [dayjs().subtract(6, 'day'), dayjs()] },
+              { label: '30 ngày qua', value: [dayjs().subtract(29, 'day'), dayjs()] },
+              { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+              {
+                label: 'Tháng trước',
+                value: [
+                  dayjs().subtract(1, 'month').startOf('month'),
+                  dayjs().subtract(1, 'month').endOf('month'),
+                ],
+              },
+              { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
+            ]}
             style={{ borderRadius: 8, padding: '6px 12px' }}
           />
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={loadData}
-            style={{ borderRadius: 8, height: 38 }}
-          >
+
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={loadData}>
             Làm mới
           </Button>
+
           <Button
             type="primary"
             icon={<DownloadOutlined />}
+            loading={exporting}
             onClick={handleExportCSV}
-            style={{ borderRadius: 8, height: 38, background: '#1677ff', border: 'none', fontWeight: 600 }}
+            style={{ borderRadius: 8, background: '#1677ff', fontWeight: 600 }}
           >
             Xuất báo cáo (CSV)
           </Button>
         </Space>
       </div>
 
-      {/* Top 4 Summary Cards */}
-      <Row gutter={[10, 10]} style={{ marginBottom: 16 }}>
-        {/* Card 1: Tổng lượt khám */}
-        <Col xs={12} sm={12} md={6}>
-          <div className="reports-stat-card">
-            <div className="reports-stat-icon blue">
-              <CalendarOutlined />
-            </div>
-            <div>
-              <div className="reports-stat-label">Tổng lượt khám</div>
-              <div className="reports-stat-value blue">
-                {summary.visitCount} lượt
-              </div>
-              <div className="reports-stat-sub">Ghi nhận từ bệnh án</div>
-            </div>
-          </div>
-        </Col>
+      {/* Permission Warning for non-managers */}
+      {loadError === 'PERMISSION_DENIED_NOT_MANAGER' ? (
+        <ManagerPermissionAlert
+          user={user}
+          roles={roles}
+          logout={logout}
+          navigate={navigate}
+        />
+      ) : loadError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Không tải được dữ liệu báo cáo"
+          description={loadError}
+          action={<Button size="small" onClick={loadData}>Thử lại</Button>}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
 
-        {/* Card 2: Doanh thu phòng khám */}
-        <Col xs={12} sm={12} md={6}>
-          <div className="reports-stat-card">
-            <div className="reports-stat-icon green">
-              <DollarCircleOutlined />
-            </div>
-            <div>
-              <div className="reports-stat-label">Doanh thu phòng khám</div>
-              <div className="reports-stat-value green">
-                {money(summary.revenue)}
-              </div>
-              <div className="reports-stat-sub">Ghi nhận từ hóa đơn</div>
-            </div>
-          </div>
-        </Col>
-
-        {/* Card 3: Đơn thuốc đã cấp */}
-        <Col xs={12} sm={12} md={6}>
-          <div className="reports-stat-card">
-            <div className="reports-stat-icon orange">
-              <MedicineBoxOutlined />
-            </div>
-            <div>
-              <div className="reports-stat-label">Đơn thuốc đã cấp</div>
-              <div className="reports-stat-value orange">
-                {summary.dispensedCount} đơn
-              </div>
-              <div className="reports-stat-sub">Ghi nhận từ kho thuốc</div>
-            </div>
-          </div>
-        </Col>
-
-        {/* Card 4: Nhật ký truy cập */}
-        <Col xs={12} sm={12} md={6}>
-          <div className="reports-stat-card">
-            <div className="reports-stat-icon purple">
-              <FileSearchOutlined />
-            </div>
-            <div>
-              <div className="reports-stat-label">Nhật ký truy cập</div>
-              <div className="reports-stat-value purple">
-                {summary.auditCount} lượt
-              </div>
-              <div className="reports-stat-sub">Ghi nhận truy cập y tế</div>
-            </div>
-          </div>
-        </Col>
-      </Row>
-
+      {/* 4 Top Summary Stat Cards */}
+      <ReportStatCards summary={summary} />
 
       {/* Tabs Header Navigation */}
       <Card
-        style={{ borderRadius: 14, boxShadow: '0 2px 10px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9' }}
+        style={{
+          borderRadius: 14,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+          border: '1px solid #f1f5f9',
+          marginBottom: 20,
+        }}
         bodyStyle={{ padding: 0 }}
       >
         <Tabs
@@ -368,6 +370,14 @@ function ReportsPage() {
               label: (
                 <span style={{ fontWeight: 600, fontSize: 14 }}>
                   <LineChartOutlined /> Báo cáo lượt khám
+                </span>
+              ),
+            },
+            {
+              key: 'doctor-visits',
+              label: (
+                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                  <UserOutlined /> Lượt khám theo bác sĩ
                 </span>
               ),
             },
@@ -399,316 +409,46 @@ function ReportsPage() {
         />
       </Card>
 
-      <div style={{ marginTop: 20 }}>
-        {/* TAB 2 / VISITS: Strict Real Data Chart and Breakdown Table */}
-        {activeTab === 'visits' && (
-          <Row gutter={20}>
-            {/* Left 75% Panel */}
-            <Col xs={24} lg={17}>
-              <Card
-                style={{ borderRadius: 14, border: '1px solid #f1f5f9', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}
-              >
-                <Title level={4} style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
-                  Biểu đồ phân tích lượt khám và xu hướng vận hành theo ngày
-                </Title>
-
-                <Alert
-                  type="info"
-                  showIcon
-                  message={<strong>Xu hướng vận hành thực tế</strong>}
-                  description="Dữ liệu biểu đồ và bảng chi tiết được tổng hợp trực tiếp từ các lượt khám bệnh và hóa đơn thực tế được ghi nhận trên hệ thống."
-                  style={{ marginBottom: 20, borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe' }}
-                />
-
-                {/* SVG Line Chart strictly mapping timeline entries */}
-                <div style={{ padding: '10px 0 20px 0' }}>
-                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Lượt khám (lượt)</div>
-                  <svg viewBox="0 0 700 210" style={{ width: '100%', maxHeight: 220 }}>
-                    {/* Horizontal Dotted Lines */}
-                    {[0, Math.ceil(maxVisitsChart * 0.25), Math.ceil(maxVisitsChart * 0.5), Math.ceil(maxVisitsChart * 0.75), maxVisitsChart].reverse().map((val, idx) => {
-                      const y = 30 + idx * 35
-                      return (
-                        <g key={idx}>
-                          <line x1="40" y1={y} x2="680" y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />
-                          <text x="10" y={y + 4} fontSize="11" fill="#94a3b8">{val}</text>
-                        </g>
-                      )
-                    })}
-
-                    {/* Blue Trend Line mapping real timeline points */}
-                    {timeline.length > 0 && (
-                      <>
-                        <polyline
-                          fill="none"
-                          stroke="#2563eb"
-                          strokeWidth="2.5"
-                          points={timeline.map((item, idx) => {
-                            const x = 70 + idx * Math.min(95, 590 / Math.max(timeline.length - 1, 1))
-                            const y = 170 - (Number(item.visitCount || 0) / Math.max(maxVisitsChart, 1)) * 130
-                            return `${x},${y}`
-                          }).join(' ')}
-                        />
-                        {timeline.map((item, idx) => {
-                          const x = 70 + idx * Math.min(95, 590 / Math.max(timeline.length - 1, 1))
-                          const y = 170 - (Number(item.visitCount || 0) / Math.max(maxVisitsChart, 1)) * 130
-                          return (
-                            <g key={idx}>
-                              <circle cx={x} cy={y} r="5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-                              <text x={x} y={y - 10} fontSize="12" fontWeight="bold" textAnchor="middle" fill="#1e40af">
-                                {item.visitCount}
-                              </text>
-                              <text x={x} y="198" fontSize="10" textAnchor="middle" fill="#64748b">
-                                {item.reportDate}
-                              </text>
-                            </g>
-                          )
-                        })}
-                      </>
-                    )}
-                  </svg>
-                </div>
-
-                {/* Daily Breakdown Table showing strict recorded data */}
-                <Table
-                  rowKey="reportDate"
-                  dataSource={timeline}
-                  pagination={false}
-                  loading={loading}
-                  size="middle"
-                  columns={[
-                    { title: 'Ngày báo cáo', dataIndex: 'reportDate', key: 'reportDate', render: (v) => <strong>{v}</strong> },
-                    {
-                      title: 'Số lượt khám',
-                      dataIndex: 'visitCount',
-                      key: 'visitCount',
-                      render: (v) => (
-                        <Tag style={{ borderRadius: 12, padding: '2px 12px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontWeight: 600 }}>
-                          {v} lượt
-                        </Tag>
-                      ),
-                    },
-                    { title: 'Doanh thu phát sinh', dataIndex: 'revenue', key: 'revenue', render: (v) => money(v) },
-                  ]}
-                />
-              </Card>
-            </Col>
-
-            {/* Right 25% Side Panel mapped strictly to recorded timeline */}
-            <Col xs={24} lg={7}>
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                {/* Side Card 1: Trung bình / ngày */}
-                <div
-                  style={{
-                    background: '#ffffff',
-                    borderRadius: 14,
-                    padding: '24px 20px',
-                    border: '1px solid #f1f5f9',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: '50%',
-                      background: '#eff6ff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 16,
-                      color: '#2563eb',
-                      fontSize: 22,
-                    }}
-                  >
-                    <LineChartOutlined />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Trung bình/ngày</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: '#2563eb', marginTop: 2 }}>
-                      {averageVisitsPerDay} lượt
-                    </div>
-                  </div>
-                </div>
-
-                {/* Side Card 2: Ngày cao nhất */}
-                <div
-                  style={{
-                    background: '#ffffff',
-                    borderRadius: 14,
-                    padding: '24px 20px',
-                    border: '1px solid #f1f5f9',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: '50%',
-                      background: '#f0fdf4',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 16,
-                      color: '#16a34a',
-                      fontSize: 22,
-                    }}
-                  >
-                    <CalendarOutlined />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Ngày cao nhất</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a', marginTop: 2 }}>
-                      {peakDayItem?.reportDate || dayjs().format('DD/MM/YYYY')}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Side Card 3: Doanh thu kỳ này */}
-                <div
-                  style={{
-                    background: '#ffffff',
-                    borderRadius: 14,
-                    padding: '24px 20px',
-                    border: '1px solid #f1f5f9',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: '50%',
-                      background: '#fff7ed',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 16,
-                      color: '#ea580c',
-                      fontSize: 22,
-                    }}
-                  >
-                    <WalletOutlined />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Doanh thu kỳ này</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#ea580c', marginTop: 2 }}>
-                      {money(periodRevenueTotal)}
-                    </div>
-                  </div>
-                </div>
-              </Space>
-            </Col>
-          </Row>
-        )}
-
-        {/* TAB 1: OVERVIEW */}
+      {/* Dynamic Tab Content Views */}
+      <div>
         {activeTab === 'overview' && (
-          <Card style={{ borderRadius: 14, border: '1px solid #f1f5f9' }}>
-            <Title level={4}>Tổng quan chỉ số vận hành ghi nhận thực tế</Title>
-            <Alert
-              type="success"
-              showIcon
-              message="Dữ liệu vận hành thực tế"
-              description="Toàn bộ chỉ số được tổng hợp trực tiếp từ các lượt khám, đơn thuốc đã cấp, hóa đơn đã thu và nhật ký truy cập."
-              style={{ marginBottom: 20 }}
-            />
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <Card title="Doanh thu thực tế đã thu" size="small">
-                  <Title level={3} style={{ color: '#16a34a' }}>{money(summary.revenue)}</Title>
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card title="Số lượt khám đã ghi nhận" size="small">
-                  <Title level={3} style={{ color: '#2563eb' }}>{summary.visitCount} lượt</Title>
-                </Card>
-              </Col>
-            </Row>
-          </Card>
+          <OverviewReportView summary={summary} />
         )}
 
-        {/* TAB 3: REVENUE */}
+        {activeTab === 'visits' && (
+          <VisitReportView
+            timeline={timeline}
+            summary={summary}
+            loading={loading}
+          />
+        )}
+
+        {activeTab === 'doctor-visits' && (
+          <DoctorVisitsReportView initialRange={range} />
+        )}
+
         {activeTab === 'revenue' && (
-          <Card style={{ borderRadius: 14, border: '1px solid #f1f5f9' }} title="Danh sách hóa đơn thanh toán thực tế">
-            <Table
-              rowKey="id"
-              dataSource={invoicesList}
-              loading={loading}
-              columns={[
-                { title: 'Mã hóa đơn', dataIndex: 'invoiceCode', key: 'invoiceCode', render: (v) => <strong>{v}</strong> },
-                { title: 'Tên bệnh nhân', dataIndex: 'patientName', key: 'patientName' },
-                {
-                  title: 'Loại hóa đơn',
-                  dataIndex: 'invoiceType',
-                  key: 'invoiceType',
-                  render: (v) => (
-                    <Tag color={v === 'ORIGINAL' ? 'green' : 'orange'}>
-                      {v === 'ORIGINAL' ? 'Hóa đơn gốc' : 'Hóa đơn điều chỉnh'}
-                    </Tag>
-                  ),
-                },
-                { title: 'Phương thức', dataIndex: 'paymentMethodLabel', key: 'paymentMethodLabel' },
-                { title: 'Số tiền', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => money(v) },
-                { title: 'Ngày lập', dataIndex: 'createdAt', key: 'createdAt', render: (v) => new Date(v).toLocaleString('vi-VN') },
-              ]}
-            />
-          </Card>
+          <RevenueReportView
+            range={range}
+            onRangeChange={setRange}
+            invoices={invoicesList}
+            loading={loading}
+            onRefresh={loadData}
+          />
         )}
 
-        {/* TAB 4: MEDICINES */}
         {activeTab === 'medicines' && (
-          <Card style={{ borderRadius: 14, border: '1px solid #f1f5f9' }} title="Báo cáo số lượng thuốc đã cấp phát thực tế">
-            <Table
-              rowKey="name"
-              dataSource={topMedicines}
-              loading={loading}
-              locale={{ emptyText: 'Chưa có dữ liệu cấp phát thuốc' }}
-              columns={[
-                { title: 'Thứ hạng', key: 'rank', render: (_, __, idx) => <Tag color={idx < 3 ? 'volcano' : 'blue'}>Top {idx + 1}</Tag> },
-                { title: 'Tên thuốc', dataIndex: 'name', key: 'name', render: (v) => <strong>{v}</strong> },
-                { title: 'Nhóm thuốc', dataIndex: 'category', key: 'category', render: (v) => v || 'Dược phẩm' },
-                { title: 'Số lượng đã cấp phát', dataIndex: 'dispensedQuantity', key: 'dispensedQuantity', render: (v) => <Text type="danger" strong>{v || 0} đơn vị</Text> },
-              ]}
-            />
-          </Card>
+          <TopMedicinesReportView
+            topMedicines={topMedicines}
+            loading={loading}
+          />
         )}
 
-        {/* TAB 5: AUDIT LOGS */}
         {activeTab === 'audit' && (
-          <Card
-            style={{ borderRadius: 14, border: '1px solid #f1f5f9' }}
-            title="Nhật ký truy cập và giám sát hồ sơ y tế thực tế"
-            extra={
-              <Input
-                placeholder="Tìm kiếm người dùng, bệnh nhân..."
-                prefix={<SearchOutlined />}
-                value={logSearch}
-                onChange={(e) => setLogSearch(e.target.value)}
-                style={{ width: 300, borderRadius: 8 }}
-              />
-            }
-          >
-            <Table
-              rowKey="id"
-              dataSource={filteredLogs}
-              loading={loading}
-              locale={{ emptyText: 'Chưa có nhật ký truy cập' }}
-              columns={[
-                { title: 'Người dùng', dataIndex: 'userName', key: 'userName', render: (v) => <Tag color="purple">{v}</Tag> },
-                { title: 'Bệnh nhân', dataIndex: 'patientName', key: 'patientName', render: (v) => <strong>{v}</strong> },
-                { title: 'Mã bệnh án', dataIndex: 'recordCode', key: 'recordCode', render: (v) => <Tag color="blue">{v}</Tag> },
-                { title: 'Hành động', dataIndex: 'action', key: 'action', render: (v) => <Tag color="cyan">{v}</Tag> },
-                { title: 'Thời gian', dataIndex: 'accessedAt', key: 'accessedAt', render: (v) => new Date(v).toLocaleString('vi-VN') },
-              ]}
-            />
-          </Card>
+          <AuditLogsReportView
+            auditLogs={auditLogs}
+            loading={loading}
+          />
         )}
       </div>
     </div>

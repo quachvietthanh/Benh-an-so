@@ -35,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 public class GetOperationalDashboardService implements GetOperationalDashboardUseCase {
 
     private static final String ADMIN_ROLE = "ADMIN";
+    private static final String MANAGER_ROLE = "MANAGER";
     private static final String CLINIC_MANAGER_ROLE = "CLINIC_MANAGER";
     private static final List<PaymentStatus> REVENUE_STATUSES =
             List.of(PaymentStatus.RECORDED, PaymentStatus.SUCCESS);
@@ -79,9 +80,11 @@ public class GetOperationalDashboardService implements GetOperationalDashboardUs
     }
 
     private void ensureAuthorized() {
-        if (!currentUserPort.hasRole(ADMIN_ROLE) && !currentUserPort.hasRole(CLINIC_MANAGER_ROLE)) {
+        if (!currentUserPort.hasRole(ADMIN_ROLE)
+                && !currentUserPort.hasRole(MANAGER_ROLE)
+                && !currentUserPort.hasRole(CLINIC_MANAGER_ROLE)) {
             throw new AccessDeniedException(
-                    "Only clinic managers or admins can view the operational dashboard."
+                    "Only managers or admins can view the operational dashboard."
             );
         }
     }

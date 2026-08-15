@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
+import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
 
@@ -123,6 +124,35 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
                 .getResultList()
                 .stream()
                 .map(row -> new TopMedicineSummary(
+                        (java.util.UUID) row[0],
+                        (String) row[1],
+                        (String) row[2],
+                        ((Number) row[3]).longValue()
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<DoctorVisitSummary> findDoctorVisitSummaries(Instant fromInclusive, Instant toExclusive) {
+        return entityManager.createQuery("""
+                select doctor.id,
+                       doctor.username,
+                       doctor.fullName,
+                       count(visit)
+                from VisitEntity visit
+                join UserEntity doctor on doctor.id = visit.doctorId
+                where visit.status = :completedStatus
+                  and visit.completedAt >= :fromInclusive
+                  and visit.completedAt < :toExclusive
+                group by doctor.id, doctor.username, doctor.fullName
+                order by count(visit) desc, doctor.fullName asc
+                """, Object[].class)
+                .setParameter("completedStatus", VisitStatus.COMPLETED)
+                .setParameter("fromInclusive", fromInclusive)
+                .setParameter("toExclusive", toExclusive)
+                .getResultList()
+                .stream()
+                .map(row -> new DoctorVisitSummary(
                         (java.util.UUID) row[0],
                         (String) row[1],
                         (String) row[2],

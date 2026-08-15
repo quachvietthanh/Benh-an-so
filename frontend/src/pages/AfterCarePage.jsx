@@ -432,7 +432,7 @@ function AfterCarePage() {
                 key: 'reminders',
                 label: (
                   <span>
-                    <CalendarOutlined /> Danh sách nhắc tái khám (NCL-10-CN-001){' '}
+                    <CalendarOutlined /> Danh sách nhắc tái khám{' '}
                     {dueCount > 0 && <Badge count={dueCount} overflowCount={99} style={{ backgroundColor: '#ff4d4f' }} />}
                   </span>
                 ),
@@ -451,7 +451,7 @@ function AfterCarePage() {
                 key: 'notes',
                 label: (
                   <span>
-                    <HistoryOutlined /> Nhật ký chăm sóc sau khám (NCL-10-CN-002)
+                    <HistoryOutlined /> Nhật ký chăm sóc sau khám
                   </span>
                 ),
                 children: (
@@ -470,9 +470,9 @@ function AfterCarePage() {
         </Card>
       </Space>
 
-      {/* Modal 1: Tạo lịch nhắc tái khám (NCL-10-CN-001) */}
+      {/* Modal 1: Tạo lịch nhắc tái khám */}
       <Modal
-        title="Tạo lịch nhắc tái khám mới (NCL-10-CN-001)"
+        title="Tạo lịch nhắc tái khám mới"
         open={createReminderOpen}
         onCancel={() => setCreateReminderOpen(false)}
         onOk={() => reminderForm.submit()}

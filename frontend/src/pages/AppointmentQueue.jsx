@@ -1218,7 +1218,7 @@ function AppointmentQueue() {
               <div>
                 <Title level={4} style={{ margin: 0 }}>Quản Lý Lịch Hẹn & Hàng Đợi Khám Bệnh</Title>
                 <Text type="secondary">
-                  Đồng bộ chuẩn hóa với Đăng ký bệnh nhân | Tự động khớp danh sách Bác sĩ & Bệnh nhân
+                  Theo dõi và điều phối danh sách khám bệnh theo thời gian thực.
                 </Text>
               </div>
             </Space>
@@ -1650,7 +1650,7 @@ function AppointmentQueue() {
 
       {/* Modal 1: Đặt lịch hẹn khám */}
       <Modal
-        title="Đặt Lịch Hẹn Khám Bệnh Mới (NCL-03-CN-001)"
+        title="Đặt Lịch Hẹn Khám Bệnh Mới"
         open={bookModalOpen}
         onCancel={() => setBookModalOpen(false)}
         footer={null}
@@ -1830,7 +1830,7 @@ function AppointmentQueue() {
 
       {/* Modal 3: Hủy Lịch Hẹn */}
       <Modal
-        title="Hủy Lịch Hẹn Khám (NCL-03-CN-002)"
+        title="Hủy Lịch Hẹn Khám"
         open={!!cancelModalItem}
         onCancel={() => setCancelModalItem(null)}
         footer={null}

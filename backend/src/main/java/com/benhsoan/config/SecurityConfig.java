@@ -83,7 +83,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/patients/me/**")
                                                 .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.GET, "/patients/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST", "MANAGER")
                                                 .requestMatchers(HttpMethod.POST, "/patients/**")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.PUT, "/patients/**")
@@ -177,6 +177,10 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "PHARMACIST")
                                                 .requestMatchers(HttpMethod.POST, "/invoices/*/adjustments")
                                                 .hasRole("MANAGER")
+                                                .requestMatchers(HttpMethod.GET, "/invoices")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST", "MANAGER")
+                                                .requestMatchers(HttpMethod.GET, "/invoices/*")
+                                                .hasAnyRole("ADMIN", "RECEPTIONIST", "MANAGER")
                                                 .requestMatchers("/invoices/**")
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
 
@@ -184,7 +188,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/queues/me")
                                                 .hasRole("DOCTOR")
                                                 .requestMatchers(HttpMethod.GET, "/queues")
-                                                .hasAnyRole("ADMIN", "NURSE", "RECEPTIONIST")
+                                                .hasAnyRole("ADMIN", "NURSE", "RECEPTIONIST", "MANAGER")
                                                 .requestMatchers(HttpMethod.POST, "/queues/*/call-next")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
                                                 .requestMatchers(HttpMethod.POST, "/queue-items/walk-in")
@@ -196,7 +200,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.PATCH, "/queue-items/*/status")
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
                                                 .requestMatchers(HttpMethod.GET, "/queue-items/*")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST")
+                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST", "MANAGER")
 
                                                 // ===== ROOMS =====
                                                 .requestMatchers(HttpMethod.GET, "/rooms", "/rooms/**")

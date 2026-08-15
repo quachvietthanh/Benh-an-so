@@ -5,6 +5,10 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitItemResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportResponse;
+import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
+import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
@@ -43,6 +47,15 @@ public class ReportingRestMapper {
         );
     }
 
+    public DoctorVisitsReportResponse toResponse(DoctorVisitsReportResult result) {
+        return new DoctorVisitsReportResponse(
+                result.from(),
+                result.to(),
+                result.generatedAt(),
+                result.items().stream().map(this::toResponse).toList()
+        );
+    }
+
     private OperationalTimelineItemResponse toResponse(OperationalTimelineItemResult result) {
         return new OperationalTimelineItemResponse(
                 result.date(),
@@ -58,6 +71,16 @@ public class ReportingRestMapper {
                 result.medicineCode(),
                 result.medicineName(),
                 result.totalDispensedQuantity()
+        );
+    }
+
+    private DoctorVisitItemResponse toResponse(DoctorVisitSummaryResult result) {
+        return new DoctorVisitItemResponse(
+                result.rank(),
+                result.doctorId(),
+                result.doctorCode(),
+                result.doctorName(),
+                result.totalVisits()
         );
     }
 }

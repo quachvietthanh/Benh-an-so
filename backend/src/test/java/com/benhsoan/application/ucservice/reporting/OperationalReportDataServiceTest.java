@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
+import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
 
@@ -79,5 +80,49 @@ class OperationalReportDataServiceTest {
         assertEquals(15L, result.items().get(0).totalDispensedQuantity());
         assertEquals(2, result.items().get(1).rank());
         assertEquals("MED-PARA-500", result.items().get(1).medicineCode());
+    }
+
+    @Test
+    void returnsDoctorVisitsGroupedByDoctorWithSequentialRank() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        when(repository.findDoctorVisitSummaries(any(), any())).thenReturn(List.of(
+                new DoctorVisitSummary(
+                        java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3"),
+                        "doctor2",
+                        "Dr. Tran Quang Huy",
+                        18L
+                ),
+                new DoctorVisitSummary(
+                        java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
+                        "doctor1",
+                        "Dr. Nguyen Minh Anh",
+                        9L
+                )
+        ));
+
+        OperationalReportDataService service = new OperationalReportDataService(repository);
+        var result = service.getDoctorVisits(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 14));
+
+        assertEquals(LocalDate.of(2026, 8, 1), result.from());
+        assertEquals(LocalDate.of(2026, 8, 14), result.to());
+        assertNull(result.generatedAt());
+        assertEquals(2, result.items().size());
+        assertEquals(1, result.items().get(0).rank());
+        assertEquals("doctor2", result.items().get(0).doctorCode());
+        assertEquals(18L, result.items().get(0).totalVisits());
+        assertEquals(2, result.items().get(1).rank());
+        assertEquals("doctor1", result.items().get(1).doctorCode());
+        assertEquals(9L, result.items().get(1).totalVisits());
+    }
+
+    @Test
+    void returnsEmptyDoctorVisitsWhenNoCompletedVisitsExist() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        when(repository.findDoctorVisitSummaries(any(), any())).thenReturn(List.of());
+
+        OperationalReportDataService service = new OperationalReportDataService(repository);
+        var result = service.getDoctorVisits(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 14));
+
+        assertEquals(0, result.items().size());
     }
 }

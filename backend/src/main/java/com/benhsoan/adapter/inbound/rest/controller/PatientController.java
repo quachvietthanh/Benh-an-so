@@ -61,7 +61,7 @@ public class PatientController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
     public Page<PatientResponse> search(
         SearchPatientRequest request,
         Pageable pageable ) {
@@ -76,13 +76,13 @@ public class PatientController {
         }
 
     @GetMapping("/code/{code}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
     public PatientResponse getByCode(@PathVariable String code) {
         return patientRestMapper.toResponse(getPatientByCodeUseCase.getByCode(code));
     }
 
     @GetMapping("/{patientId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
     public PatientResponse getById(@PathVariable UUID patientId) {
         return patientRestMapper.toResponse(getPatientByIdUseCase.getById(patientId));
     }

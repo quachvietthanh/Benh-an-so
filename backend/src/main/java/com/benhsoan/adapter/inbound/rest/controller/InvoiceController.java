@@ -71,7 +71,7 @@ public class InvoiceController {
     }
 
     @GetMapping("/payable")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'MANAGER')")
     @CheckPermission(Permission.INVOICE_READ)
     public Page<PayableEncounterResponse> getPayableEncounters(
             @RequestParam(defaultValue = "0") int page,
@@ -89,7 +89,7 @@ public class InvoiceController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'MANAGER')")
     @CheckPermission(Permission.INVOICE_READ)
     public Page<InvoiceResponse> search(
             @RequestParam(required = false) String invoiceCode,
@@ -124,7 +124,7 @@ public class InvoiceController {
     }
 
     @GetMapping("/{invoiceId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'MANAGER')")
     @CheckPermission(Permission.INVOICE_READ)
     public InvoiceResponse getById(@PathVariable UUID invoiceId) {
         return mapper.toResponse(getInvoiceByIdUseCase.getById(invoiceId));
