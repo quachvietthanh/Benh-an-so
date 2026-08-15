@@ -9,6 +9,7 @@ const reportApi = {
       responseType: 'blob',
     }),
   topMedicines: (params) => axiosClient.get('/reports/top-medicines', { params }),
+  doctorVisits: (params) => axiosClient.get('/reports/doctor-visits', { params }),
   audit: (params) => axiosClient.get('/reports/audit-logs', { params }),
   dashboard: () => axiosClient.get('/reports/dashboard'),
 }
