@@ -120,36 +120,39 @@ function Dashboard() {
 
     try {
       let nextSnapshot = null
+      const todayStr = dayjs().format('YYYY-MM-DD')
+      const storedRecords = getStoredMedicalRecords()
+      const storedInvoices = getStoredInvoices()
+      const storedMedicines = getStoredMedicines()
+      const storedBatches = getStoredBatches()
+
       try {
         const response = await dashboardApi.getOperational()
         nextSnapshot = normalizeOperationalDashboard(response.data)
       } catch (apiError) {
         const status = apiError?.response?.status
-        if (status === 403 || status === 404) {
-          const todayStr = dayjs().format('YYYY-MM-DD')
-          const [summaryRes, timelineRes] = await Promise.allSettled([
-            reportApi.summary({ from: todayStr, to: todayStr }),
-            reportApi.timeline({ from: todayStr, to: todayStr }),
-          ])
 
-          if (summaryRes.status === 'fulfilled' && summaryRes.value?.data) {
-            const storedRecords = getStoredMedicalRecords()
-            const storedInvoices = getStoredInvoices()
-            const storedMedicines = getStoredMedicines()
-            const storedBatches = getStoredBatches()
+        // Thử lấy dữ liệu từ reportApi (summary & timeline)
+        const [summaryRes, timelineRes] = await Promise.allSettled([
+          reportApi.summary({ from: todayStr, to: todayStr }),
+          reportApi.timeline({ from: todayStr, to: todayStr }),
+        ])
 
-            nextSnapshot = buildOperationalSnapshotFromReports({
-              summary: summaryRes.value.data,
-              timeline: timelineRes.status === 'fulfilled' ? timelineRes.value.data : null,
-              records: storedRecords,
-              invoices: storedInvoices,
-              medicines: storedMedicines,
-              batches: storedBatches,
-              todayStr,
-            })
-          } else {
-            throw apiError
-          }
+        const summaryData = summaryRes.status === 'fulfilled' ? summaryRes.value?.data : null
+        const timelineData = timelineRes.status === 'fulfilled' ? timelineRes.value?.data : null
+
+        if (summaryData || storedRecords.length > 0 || storedInvoices.length > 0 || storedMedicines.length > 0) {
+          nextSnapshot = buildOperationalSnapshotFromReports({
+            summary: summaryData,
+            timeline: timelineData,
+            records: storedRecords,
+            invoices: storedInvoices,
+            medicines: storedMedicines,
+            batches: storedBatches,
+            todayStr,
+          })
+        } else if (status === 403) {
+          throw apiError
         } else {
           throw apiError
         }
