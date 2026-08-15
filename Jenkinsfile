@@ -53,6 +53,7 @@ pipeline {
                           --name "$TEST_CONTAINER" \
                           -w /app \
                           -v ${MAVEN_CACHE_VOLUME}:/root/.m2 \
+                          -v /var/run/docker.sock:/var/run/docker.sock \
                           ${MAVEN_IMAGE} \
                           sh -c 'mvn -B -ntp clean test'
 

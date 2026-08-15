@@ -10,8 +10,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -26,8 +24,6 @@ import com.benhsoan.domain.backup.exception.BackupExecutionException;
 import com.benhsoan.port.dto.command.backup.CreateBackupCommand;
 import com.benhsoan.port.dto.result.BackupResult;
 import com.benhsoan.port.outbound.backup.BackupSnapshot;
-import com.benhsoan.port.outbound.backup.DatabaseBackupStoragePort;
-import com.benhsoan.port.outbound.repository.backup.BackupRecordRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -36,8 +32,8 @@ class CreateBackupServiceTest {
     private static final Instant NOW = Instant.parse("2026-08-14T08:00:00Z");
     private static final UUID ACTOR = UUID.randomUUID();
 
-    private final BackupRecordRepository backupRecordRepository = mock(BackupRecordRepository.class);
-    private final DatabaseBackupStoragePort storagePort = mock(DatabaseBackupStoragePort.class);
+    private final BackupRecordLifecycleService lifecycleService = mock(BackupRecordLifecycleService.class);
+    private final BackupSnapshotExportService snapshotExportService = mock(BackupSnapshotExportService.class);
     private final BackupCodeGenerator backupCodeGenerator = mock(BackupCodeGenerator.class);
     private final BackupAuditLogWriter auditLogWriter = mock(BackupAuditLogWriter.class);
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
@@ -47,12 +43,13 @@ class CreateBackupServiceTest {
     private final BackupResultMapper resultMapper = new BackupResultMapper();
 
     private CreateBackupService service;
+    private BackupRecord createdRecord;
 
     @BeforeEach
     void setUp() {
         service = new CreateBackupService(
-                backupRecordRepository,
-                storagePort,
+                lifecycleService,
+                snapshotExportService,
                 backupCodeGenerator,
                 auditLogWriter,
                 resultMapper,
@@ -65,18 +62,28 @@ class CreateBackupServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR);
         when(clockPort.now()).thenReturn(NOW);
         when(backupCodeGenerator.generate()).thenReturn("BKP-20260814-0001");
+        when(lifecycleService.createInProgress(any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    createdRecord = BackupRecord.create(
+                            invocation.getArgument(0),
+                            invocation.getArgument(1),
+                            invocation.getArgument(2),
+                            invocation.getArgument(3),
+                            invocation.getArgument(4)
+                    );
+                    return createdRecord;
+                });
+        when(lifecycleService.markSuccess(any(UUID.class), any(BackupSnapshot.class)))
+                .thenAnswer(invocation -> {
+                    BackupSnapshot snapshot = invocation.getArgument(1);
+                    createdRecord.markSuccess(snapshot.fileName(), snapshot.content().length);
+                    return createdRecord;
+                });
     }
 
     @Test
     void createsSuccessfulBackupAndWritesAuditLog() {
-        List<BackupRecord> saved = new ArrayList<>();
-        when(backupRecordRepository.save(any(BackupRecord.class)))
-                .thenAnswer(invocation -> {
-                    BackupRecord record = invocation.getArgument(0);
-                    saved.add(record);
-                    return record;
-                });
-        when(storagePort.exportSnapshot("BKP-20260814-0001"))
+        when(snapshotExportService.export("BKP-20260814-0001"))
                 .thenReturn(new BackupSnapshot("BKP-20260814-0001.json", new byte[]{1, 2, 3}));
 
         BackupResult result = service.create(new CreateBackupCommand(BackupType.MANUAL, "Daily backup"));
@@ -93,9 +100,7 @@ class CreateBackupServiceTest {
 
     @Test
     void defaultsBackupTypeToFullWhenMissing() {
-        when(backupRecordRepository.save(any(BackupRecord.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(storagePort.exportSnapshot("BKP-20260814-0001"))
+        when(snapshotExportService.export("BKP-20260814-0001"))
                 .thenReturn(new BackupSnapshot("BKP-20260814-0001.json", new byte[]{1}));
 
         BackupResult result = service.create(new CreateBackupCommand(null, null));
@@ -105,21 +110,13 @@ class CreateBackupServiceTest {
 
     @Test
     void marksFailedAndThrowsWhenExportFails() {
-        List<BackupRecord> saved = new ArrayList<>();
-        when(backupRecordRepository.save(any(BackupRecord.class)))
-                .thenAnswer(invocation -> {
-                    BackupRecord record = invocation.getArgument(0);
-                    saved.add(record);
-                    return record;
-                });
-        when(storagePort.exportSnapshot("BKP-20260814-0001"))
+        when(snapshotExportService.export("BKP-20260814-0001"))
                 .thenThrow(new RuntimeException("disk full"));
 
         assertThrows(BackupExecutionException.class,
                 () -> service.create(new CreateBackupCommand(BackupType.FULL, null)));
 
-        BackupRecord last = saved.get(saved.size() - 1);
-        assertEquals(BackupStatus.FAILED, last.getStatus());
+        verify(lifecycleService).markFailed(any(UUID.class));
         verify(auditLogWriter, never()).write(any(), any(), any(), any());
     }
 
@@ -130,6 +127,6 @@ class CreateBackupServiceTest {
         assertThrows(AccessDeniedException.class,
                 () -> service.create(new CreateBackupCommand(BackupType.FULL, null)));
 
-        verify(storagePort, never()).exportSnapshot(any());
+        verify(snapshotExportService, never()).export(any());
     }
 }

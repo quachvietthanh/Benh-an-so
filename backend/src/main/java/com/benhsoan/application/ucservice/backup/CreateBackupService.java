@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.backup.BackupRecord;
@@ -14,8 +13,6 @@ import com.benhsoan.port.dto.command.backup.CreateBackupCommand;
 import com.benhsoan.port.dto.result.BackupResult;
 import com.benhsoan.port.inbound.backup.CreateBackupUseCase;
 import com.benhsoan.port.outbound.backup.BackupSnapshot;
-import com.benhsoan.port.outbound.backup.DatabaseBackupStoragePort;
-import com.benhsoan.port.outbound.repository.backup.BackupRecordRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -23,11 +20,10 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class CreateBackupService implements CreateBackupUseCase {
 
-    private final BackupRecordRepository backupRecordRepository;
-    private final DatabaseBackupStoragePort storagePort;
+    private final BackupRecordLifecycleService lifecycleService;
+    private final BackupSnapshotExportService snapshotExportService;
     private final BackupCodeGenerator backupCodeGenerator;
     private final BackupAuditLogWriter auditLogWriter;
     private final BackupResultMapper resultMapper;
@@ -47,19 +43,16 @@ public class CreateBackupService implements CreateBackupUseCase {
         String description = command == null ? null : command.description();
 
         String backupCode = backupCodeGenerator.generate();
-        BackupRecord record = BackupRecord.create(backupCode, type, description, actorId, now);
-        record = backupRecordRepository.save(record);
+        BackupRecord record = lifecycleService.createInProgress(backupCode, type, description, actorId, now);
 
         try {
-            BackupSnapshot snapshot = storagePort.exportSnapshot(backupCode);
-            record.markSuccess(snapshot.fileName(), snapshot.content().length);
+            BackupSnapshot snapshot = snapshotExportService.export(backupCode);
+            record = lifecycleService.markSuccess(record.getId(), snapshot);
         } catch (RuntimeException ex) {
-            record.markFailed();
-            backupRecordRepository.save(record);
+            lifecycleService.markFailed(record.getId());
             throw new BackupExecutionException("Failed to create backup snapshot: " + ex.getMessage());
         }
 
-        record = backupRecordRepository.save(record);
         auditLogWriter.write(actorId, ActionType.BACKUP, record.getId(), toDetail(record));
 
         return resultMapper.toResult(record);
