@@ -14,37 +14,39 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Configuration
 public class BackupStorageConfiguration {
 
-    /**
-     * Operational tables included in a backup, ordered parents-first so that a
-     * restore can re-insert them in this order and delete in reverse order.
-     */
     private static final List<String> OPERATIONAL_TABLES = List.of(
+            "rooms",
+            "medicines",
             "patients",
             "appointments",
             "appointment_notification_logs",
+            "medical_queues",
+            "doctor_room_assignments",
+            "queue_items",
             "visits",
             "medical_records",
             "medical_record_diagnoses",
             "medical_record_amendments",
             "medical_record_access_logs",
-            "medical_attachments",
             "clinical_orders",
             "clinical_order_items",
             "clinical_results",
             "clinical_result_histories",
+            "medical_attachments",
             "prescriptions",
             "prescription_items",
+            "medicine_batches",
             "prescription_dispense_items",
             "prescription_amendments",
             "prescription_warning_logs",
             "inventory_receipts",
             "inventory_receipt_items",
-            "medicine_batches",
             "stock_movements",
             "inventory_alert_logs",
-            "payments",
             "invoices",
-            "invoice_lines"
+            "invoice_lines",
+            "payments",
+            "patient_change_logs"
     );
 
     @Bean

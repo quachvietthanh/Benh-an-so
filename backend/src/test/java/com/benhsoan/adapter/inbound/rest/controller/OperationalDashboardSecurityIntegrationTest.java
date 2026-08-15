@@ -47,7 +47,7 @@ class OperationalDashboardSecurityIntegrationTest {
     private ClockPort clockPort;
 
     @Test
-    void onlyAdminsAndClinicManagersCanReadOperationalDashboard() throws Exception {
+    void onlyAdminsAndManagersCanReadOperationalDashboard() throws Exception {
         when(getOperationalDashboardUseCase.get())
                 .thenReturn(new OperationalDashboardResult(
                         new OperationalDashboardResult.VisitSummary(0, 0, 0, 0, 0),
@@ -57,6 +57,8 @@ class OperationalDashboardSecurityIntegrationTest {
                 ));
 
         mockMvc.perform(get("/dashboard/operational").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/dashboard/operational").with(user("manager").roles("MANAGER")))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/dashboard/operational").with(user("manager").roles("CLINIC_MANAGER")))
                 .andExpect(status().isOk());

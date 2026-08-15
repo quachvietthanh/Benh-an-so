@@ -26,13 +26,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-/**
- * JSON snapshot implementation of {@link DatabaseBackupStoragePort}.
- *
- * Exports the configured operational tables into a self-describing JSON dump
- * (column names + JDBC types + string-encoded cell values) and restores them by
- * deleting and re-inserting rows in reverse FK-safe order.
- */
 public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePort {
 
     private static final String EXTENSION = ".json";
@@ -75,10 +68,17 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
     @Override
     public void restoreSnapshot(String fileName) {
         List<TableSnapshot> tables = readJson(readFile(fileName));
-        List<TableSnapshot> reverseOrder = new ArrayList<>(tables);
-        Collections.reverse(reverseOrder);
-        for (TableSnapshot table : reverseOrder) {
-            restoreTable(table);
+        deleteAllChildFirst(tables);
+        for (TableSnapshot table : tables) {
+            insertTable(table);
+        }
+    }
+
+    private void deleteAllChildFirst(List<TableSnapshot> tables) {
+        List<TableSnapshot> childFirst = new ArrayList<>(tables);
+        Collections.reverse(childFirst);
+        for (TableSnapshot table : childFirst) {
+            deleteTable(table);
         }
     }
 
@@ -104,8 +104,12 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
 
         return new TableSnapshot(tableName, columns, rows);
     }
-    private void restoreTable(TableSnapshot table) {
+
+    private void deleteTable(TableSnapshot table) {
         jdbcTemplate.update("DELETE FROM " + table.name());
+    }
+
+    private void insertTable(TableSnapshot table) {
         if (table.rows().isEmpty()) {
             return;
         }
