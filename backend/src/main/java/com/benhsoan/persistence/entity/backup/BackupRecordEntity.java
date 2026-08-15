@@ -34,7 +34,7 @@ public class BackupRecordEntity {
     @Column(name = "backup_code", nullable = false, unique = true, length = 30)
     private String backupCode;
 
-    @Column(name = "file_name", nullable = false, length = 255)
+    @Column(name = "file_name", length = 255)
     private String fileName;
 
     @Column(name = "file_size", nullable = false)
