@@ -30,5 +30,7 @@ public enum ResourceType {
 
     OPERATIONAL_REPORT,
 
-    DRUG_INTERACTION
+    DRUG_INTERACTION,
+
+    SYSTEM_BACKUP
 }
