@@ -28,6 +28,7 @@ const { Header, Sider, Content } = Layout
 const roleNames = {
   admin: 'Quản trị viên',
   manager: 'Quản lý',
+  clinic_manager: 'Quản lý phòng khám',
   doctor: 'Bác sĩ',
   receptionist: 'Lễ tân',
   pharmacist: 'Dược sĩ',

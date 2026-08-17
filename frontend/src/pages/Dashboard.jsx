@@ -1,360 +1,517 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Spin } from 'antd'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import {
-  ArrowUpOutlined,
+  AlertOutlined,
+  BarChartOutlined,
   CalendarOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
   DollarCircleOutlined,
+  ExclamationCircleOutlined,
   MedicineBoxOutlined,
+  ReloadOutlined,
   RightOutlined,
+  SyncOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import appointmentApi from '../api/appointmentApi'
-import patientApi from '../api/patientApi'
-import pharmacyApi from '../api/pharmacyApi'
+import dashboardApi from '../api/dashboardApi'
 import reportApi from '../api/reportApi'
-import { useAuthContext } from '../context/AuthContext'
 import {
-  getAppointments,
-  getDashboardStats,
-  getInvoices,
-  getMedicines,
-  getPatients,
-} from '../services/mockDataService'
+  buildOperationalSnapshotFromReports,
+  getActiveQueueCount,
+  getVisitPercentage,
+  normalizeOperationalDashboard,
+} from '../utils/operationalDashboard'
 import {
-  mergeAppointments,
-  mergeInvoices,
-  mergeMedicines,
-  mergePatients,
+  getStoredBatches,
+  getStoredInvoices,
+  getStoredMedicalRecords,
+  getStoredMedicines,
 } from '../utils/storageHelpers'
 
-const appointmentStatus = {
-  SCHEDULED: { label: 'Đã xác nhận', tone: 'blue' },
-  CHECKED_IN: { label: 'Đã đến', tone: 'green' },
-  CALLED: { label: 'Đang gọi', tone: 'orange' },
-  COMPLETED: { label: 'Hoàn tất', tone: 'green' },
-  CANCELLED: { label: 'Đã hủy', tone: 'gray' },
-  NO_SHOW: { label: 'Không đến', tone: 'orange' },
+const AUTO_REFRESH_MS = 60_000
+
+const currencyFormatter = new Intl.NumberFormat('vi-VN', {
+  style: 'currency',
+  currency: 'VND',
+  maximumFractionDigits: 0,
+})
+
+const numberFormatter = new Intl.NumberFormat('vi-VN')
+
+const formatToday = () => {
+  const label = new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date())
+
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-const readSettledData = (result, fallback) => (
-  result?.status === 'fulfilled' ? result.value.data : fallback
-)
+const formatUpdatedAt = (value) => {
+  if (!value || !dayjs(value).isValid()) return 'Chưa xác định'
+  const updatedAt = dayjs(value)
+  return updatedAt.isSame(dayjs(), 'day')
+    ? updatedAt.format('HH:mm:ss')
+    : updatedAt.format('HH:mm:ss · DD/MM/YYYY')
+}
+
+const getDashboardError = (error) => {
+  const status = error?.response?.status
+
+  if (status === 403) {
+    return {
+      title: 'Tài khoản chưa có quyền xem tổng quan vận hành',
+      description: 'Dashboard này dành cho quản trị viên và quản lý phòng khám. Vui lòng kiểm tra lại vai trò được cấp.',
+    }
+  }
+
+  if (status === 404) {
+    return {
+      title: 'Chưa tìm thấy API tổng quan vận hành',
+      description: 'Không thể kết nối tới nguồn dữ liệu dashboard. Vui lòng kiểm tra cấu hình phiên bản backend.',
+    }
+  }
+
+  return {
+    title: 'Chưa thể cập nhật dữ liệu vận hành',
+    description: 'Dữ liệu gần nhất chưa tải được. Hãy kiểm tra kết nối và thử làm mới lại.',
+  }
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="ops-dashboard ops-dashboard-skeleton" aria-busy="true" aria-label="Đang tải tổng quan vận hành">
+      <div className="ops-skeleton-heading">
+        <span className="ops-skeleton-block skeleton-title" />
+        <span className="ops-skeleton-block skeleton-action" />
+      </div>
+      <div className="ops-kpi-grid">
+        {[0, 1, 2, 3].map((item) => <span className="ops-skeleton-block skeleton-kpi" key={item} />)}
+      </div>
+      <div className="ops-main-grid">
+        <span className="ops-skeleton-block skeleton-panel skeleton-panel-wide" />
+        <span className="ops-skeleton-block skeleton-panel" />
+      </div>
+    </div>
+  )
+}
 
 function Dashboard() {
   const navigate = useNavigate()
-  const { user } = useAuthContext()
+  const mountedRef = useRef(true)
+  const requestInFlightRef = useRef(false)
+  const snapshotRef = useRef(null)
+  const [snapshot, setSnapshot] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState(() => getDashboardStats())
-  const [appointments, setAppointments] = useState(() => mergeAppointments([]))
-  const [patients, setPatients] = useState(() => mergePatients([]))
-  const [medicines, setMedicines] = useState(() => mergeMedicines([]))
-  const [invoices, setInvoices] = useState(() => mergeInvoices([]))
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState(null)
+
+  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+    if (requestInFlightRef.current) return
+
+    requestInFlightRef.current = true
+    if (silent && snapshotRef.current) setRefreshing(true)
+    if (!snapshotRef.current) setLoading(true)
+
+    try {
+      let nextSnapshot = null
+      const todayStr = dayjs().format('YYYY-MM-DD')
+      const storedRecords = getStoredMedicalRecords()
+      const storedInvoices = getStoredInvoices()
+      const storedMedicines = getStoredMedicines()
+      const storedBatches = getStoredBatches()
+
+      try {
+        const response = await dashboardApi.getOperational()
+        nextSnapshot = normalizeOperationalDashboard(response.data)
+      } catch (apiError) {
+        const status = apiError?.response?.status
+
+        // Thử lấy dữ liệu từ reportApi (summary & timeline)
+        const [summaryRes, timelineRes] = await Promise.allSettled([
+          reportApi.summary({ from: todayStr, to: todayStr }),
+          reportApi.timeline({ from: todayStr, to: todayStr }),
+        ])
+
+        const summaryData = summaryRes.status === 'fulfilled' ? summaryRes.value?.data : null
+        const timelineData = timelineRes.status === 'fulfilled' ? timelineRes.value?.data : null
+
+        if (summaryData || storedRecords.length > 0 || storedInvoices.length > 0 || storedMedicines.length > 0) {
+          nextSnapshot = buildOperationalSnapshotFromReports({
+            summary: summaryData,
+            timeline: timelineData,
+            records: storedRecords,
+            invoices: storedInvoices,
+            medicines: storedMedicines,
+            batches: storedBatches,
+            todayStr,
+          })
+        } else if (status === 403) {
+          throw apiError
+        } else {
+          throw apiError
+        }
+      }
+
+      if (!mountedRef.current) return
+      snapshotRef.current = nextSnapshot
+      setSnapshot(nextSnapshot)
+      setError(null)
+    } catch (requestError) {
+      if (mountedRef.current) setError(getDashboardError(requestError))
+    } finally {
+      requestInFlightRef.current = false
+      if (mountedRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    }
+  }, [])
 
   useEffect(() => {
-    let mounted = true
-
-    const loadDashboard = async () => {
-      setLoading(true)
-      const roles = Array.isArray(user?.roles) ? user.roles.map((r) => String(r).toLowerCase()) : []
-      const isAdmin = roles.includes('admin')
-      const canReadAppointments = roles.some((role) => ['admin', 'doctor', 'receptionist'].includes(role))
-      const canReadPatients = roles.some((role) => ['admin', 'doctor', 'receptionist'].includes(role))
-      const canReadPharmacy = roles.some((role) => ['admin', 'manager', 'pharmacist'].includes(role))
-
-      const fallbackStats = getDashboardStats()
-      const fallbackAppointments = getAppointments()
-      const fallbackPatients = getPatients()
-
-      const results = await Promise.allSettled([
-        isAdmin ? reportApi.dashboard() : Promise.resolve({ data: fallbackStats }),
-        canReadAppointments ? appointmentApi.getAll() : Promise.resolve({ data: fallbackAppointments }),
-        canReadPatients ? patientApi.getAll({ page: 0, size: 20 }) : Promise.resolve({ data: { content: fallbackPatients } }),
-        canReadPharmacy ? pharmacyApi.medicines() : Promise.resolve({ data: [] }),
-      ])
-
-      if (!mounted) return
-
-      const appointmentData = readSettledData(results[1], null)
-      const rawApps = appointmentData?.content || appointmentData || []
-      const safeApps = Array.isArray(rawApps) ? rawApps : []
-      const mergedApps = mergeAppointments(safeApps)
-
-      const patientData = readSettledData(results[2], null)
-      const rawPatients = patientData?.content || patientData || []
-      const safePatients = Array.isArray(rawPatients) ? rawPatients : []
-      const mergedPatients = mergePatients(safePatients)
-
-      const medData = readSettledData(results[3], null)
-      const rawMeds = medData?.content || medData || []
-      const safeMeds = Array.isArray(rawMeds) ? rawMeds : []
-      const mergedMeds = mergeMedicines(safeMeds)
-
-      const mergedInvoices = mergeInvoices([])
-
-      setStats(readSettledData(results[0], fallbackStats) || fallbackStats)
-      setAppointments(mergedApps)
-      setPatients(mergedPatients)
-      setMedicines(mergedMeds)
-      setInvoices(mergedInvoices)
-      setLoading(false)
-    }
-
+    mountedRef.current = true
     loadDashboard()
-    return () => { mounted = false }
-  }, [user])
 
-  const patientMap = useMemo(() => {
-    const map = new Map()
-    patients.forEach((p) => {
-      if (p.id) map.set(String(p.id), p)
-      if (p.patientCode) map.set(String(p.patientCode), p)
-    })
-    return map
-  }, [patients])
+    const refreshInterval = setInterval(() => {
+      loadDashboard({ silent: true })
+    }, AUTO_REFRESH_MS)
 
-  const todayStr = dayjs().format('YYYY-MM-DD')
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadDashboard({ silent: true })
+    }
+    document.addEventListener('visibilitychange', refreshWhenVisible)
 
-  const todayAppointments = useMemo(() => {
-    return appointments.filter((app) => {
-      const appDate = app.date || (app.appointmentAt ? dayjs(app.appointmentAt).format('YYYY-MM-DD') : null)
-      return !appDate || appDate === todayStr
-    })
-  }, [appointments, todayStr])
+    return () => {
+      mountedRef.current = false
+      clearInterval(refreshInterval)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [loadDashboard])
 
-  const todayRevenue = useMemo(() => {
-    const todayInvs = invoices.filter((inv) => inv.createdAt && dayjs(inv.createdAt).format('YYYY-MM-DD') === todayStr)
-    const totalToday = todayInvs.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
-    if (totalToday > 0) return totalToday
-    const totalAll = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
-    return totalAll || 4500000
-  }, [invoices, todayStr])
+  const visitSummary = snapshot?.visitSummary
+  const revenueSummary = snapshot?.revenueSummary
+  const inventorySummary = snapshot?.inventoryAlertSummary
 
-  const lowStockMedicines = useMemo(
-    () =>
-      medicines.filter((m) => {
-        const stock = m.stockQuantity ?? m.stock
-        const minStock = m.minStockQuantity ?? m.minStock
-        if (stock === undefined || minStock === undefined) return false
-        return m.active !== false && Number(stock) <= Number(minStock)
-      }),
-    [medicines],
-  )
+  const completionRate = getVisitPercentage(visitSummary?.completed, visitSummary?.total)
+  const activeQueueCount = getActiveQueueCount(visitSummary)
 
-  const lowStockCount = useMemo(() => {
-    return lowStockMedicines.length
-  }, [lowStockMedicines])
-
-  const statCards = [
+  const statusItems = useMemo(() => [
     {
-      key: 'patients',
-      label: 'Tổng bệnh nhân',
-      value: Number(patients.length).toLocaleString('vi-VN'),
-      note: '+18 so với tháng trước',
-      icon: TeamOutlined,
-      tone: 'blue',
-      route: '/patients',
+      key: 'waiting',
+      label: 'Đang chờ',
+      description: 'Chờ được tiếp nhận khám',
+      value: visitSummary?.waiting || 0,
+      tone: 'amber',
+      icon: ClockCircleOutlined,
     },
     {
-      key: 'appointments',
-      label: 'Lịch hẹn hôm nay',
-      value: Number(todayAppointments.length || appointments.length).toLocaleString('vi-VN'),
-      note: '+5 so với hôm qua',
-      icon: CalendarOutlined,
+      key: 'inProgress',
+      label: 'Đang khám',
+      description: 'Gồm cả lượt chờ kết quả',
+      value: visitSummary?.inProgress || 0,
+      tone: 'blue',
+      icon: SyncOutlined,
+    },
+    {
+      key: 'completed',
+      label: 'Hoàn tất',
+      description: 'Đã kết thúc quy trình khám',
+      value: visitSummary?.completed || 0,
       tone: 'green',
-      route: '/appointments',
+      icon: CheckCircleOutlined,
+    },
+    {
+      key: 'cancelled',
+      label: 'Đã hủy',
+      description: 'Không tiếp tục lượt khám',
+      value: visitSummary?.cancelled || 0,
+      tone: 'slate',
+      icon: CloseCircleOutlined,
+    },
+  ], [visitSummary])
+
+  const kpis = useMemo(() => [
+    {
+      key: 'visits',
+      label: 'Lượt khám hôm nay',
+      value: numberFormatter.format(visitSummary?.total || 0),
+      note: `${numberFormatter.format(visitSummary?.completed || 0)} lượt đã hoàn tất`,
+      tone: 'blue',
+      icon: TeamOutlined,
+    },
+    {
+      key: 'waiting',
+      label: 'Đang chờ',
+      value: numberFormatter.format(visitSummary?.waiting || 0),
+      note: activeQueueCount
+        ? `${numberFormatter.format(activeQueueCount)} lượt đang trong quy trình`
+        : 'Hàng đợi hiện đang trống',
+      tone: 'amber',
+      icon: ClockCircleOutlined,
+    },
+    {
+      key: 'progress',
+      label: 'Đang khám',
+      value: numberFormatter.format(visitSummary?.inProgress || 0),
+      note: 'Bao gồm lượt đang chờ kết quả',
+      tone: 'teal',
+      icon: SyncOutlined,
     },
     {
       key: 'revenue',
       label: 'Doanh thu hôm nay',
-      value: `${Number(todayRevenue).toLocaleString('vi-VN')} đ`,
-      note: '+8% so với hôm qua',
+      value: currencyFormatter.format(revenueSummary?.totalRevenueToday || 0),
+      note: 'Khoản thu đã được ghi nhận',
+      tone: 'violet',
       icon: DollarCircleOutlined,
-      tone: 'orange',
-      route: '/billing',
     },
-    {
-      key: 'medicine',
-      label: 'Thuốc sắp hết',
-      value: lowStockCount,
-      note: 'Xem chi tiết',
-      icon: MedicineBoxOutlined,
-      tone: 'purple',
-      route: '/pharmacy',
-    },
-  ]
+  ], [activeQueueCount, revenueSummary, visitSummary])
 
-  const chartData = useMemo(() => {
-    const days = []
-    for (let i = 6; i >= 0; i--) {
-      const d = dayjs().subtract(i, 'day')
-      const dateStr = d.format('YYYY-MM-DD')
-      const label = d.format('DD/MM')
-      const dayRev = invoices
-        .filter((inv) => inv.createdAt && dayjs(inv.createdAt).format('YYYY-MM-DD') === dateStr)
-        .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
-      days.push({ label, amount: dayRev })
-    }
+  if (loading && !snapshot) return <DashboardSkeleton />
 
-    const mockAmounts = [5000000, 8000000, 9000000, 15000000, 9500000, 8800000, 11000000]
-    days.forEach((day, idx) => {
-      if (!day.amount) day.amount = mockAmounts[idx]
-    })
-
-    const maxVal = Math.max(...days.map((d) => d.amount), 20000000)
-    const points = days.map((d, idx) => {
-      const x = 70 + idx * 102
-      const y = Math.max(38, Math.min(238, 238 - (d.amount / maxVal) * 180))
-      return { x, y, label: d.label, amount: d.amount }
-    })
-
-    const polylineStr = points.map((p) => `${p.x},${p.y}`).join(' ')
-    const pathAreaStr = `M70 190 ${points.map((p) => `L${p.x} ${p.y}`).join(' ')} L682 238 L70 238 Z`
-
-    return { points, polylineStr, pathAreaStr }
-  }, [invoices])
-
-  if (loading) {
-    return <div className="dashboard-loading"><Spin size="large" /></div>
+  if (!snapshot) {
+    return (
+      <div className="ops-dashboard">
+        <header className="ops-dashboard-heading">
+          <div>
+            <span className="ops-live-pill"><i /> Dữ liệu trong ngày</span>
+            <h1>Tổng quan vận hành</h1>
+            <p>{formatToday()}</p>
+          </div>
+        </header>
+        <section className="ops-full-error" role="alert">
+          <span className="ops-error-icon"><ExclamationCircleOutlined /></span>
+          <h2>{error?.title || 'Chưa thể tải dashboard'}</h2>
+          <p>{error?.description || 'Vui lòng thử lại sau ít phút.'}</p>
+          <button type="button" className="ops-primary-button" onClick={() => loadDashboard()}>
+            <ReloadOutlined /> Thử lại
+          </button>
+        </section>
+      </div>
+    )
   }
 
   return (
-    <div className="compact-dashboard">
-      <h1 className="dashboard-title">Tổng quan phòng khám</h1>
+    <div className="ops-dashboard">
+      <header className="ops-dashboard-heading">
+        <div className="ops-heading-copy">
+          <span className="ops-live-pill"><i /> Dữ liệu trong ngày</span>
+          <h1>Tổng quan vận hành</h1>
+          <p>{formatToday()} · Theo dõi lượt khám, hàng đợi và doanh thu</p>
+        </div>
 
-      <section className="compact-stats" aria-label="Tổng quan phòng khám">
-        {statCards.map((card) => {
-          const Icon = card.icon
+        <div className="ops-sync-actions">
+          <div className="ops-sync-meta" aria-live="polite">
+            <SyncOutlined spin={refreshing} />
+            <span>
+              <small>Cập nhật gần nhất</small>
+              <strong>{formatUpdatedAt(snapshot.asOf)}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            className="ops-refresh-button"
+            onClick={() => loadDashboard({ silent: true })}
+            disabled={refreshing}
+          >
+            <ReloadOutlined spin={refreshing} />
+            <span>{refreshing ? 'Đang cập nhật' : 'Làm mới'}</span>
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="ops-sync-warning" role="alert">
+          <ExclamationCircleOutlined />
+          <span><strong>{error.title}.</strong> Đang hiển thị dữ liệu cập nhật lúc {formatUpdatedAt(snapshot.asOf)}.</span>
+          <button type="button" onClick={() => loadDashboard({ silent: true })}>Thử lại</button>
+        </div>
+      )}
+
+      <section className="ops-kpi-grid" aria-label="Các chỉ số vận hành chính">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon
           return (
-            <button type="button" className={'compact-stat-card stat-' + card.tone} key={card.key} onClick={() => navigate(card.route)}>
-              <span className="compact-stat-icon"><Icon /></span>
-              <span className="compact-stat-copy">
-                <small>{card.label}</small>
-                <strong>{card.value}</strong>
-                <em className={card.key === 'medicine' ? 'stat-detail' : ''}>
-                  {card.key !== 'medicine' && <ArrowUpOutlined />}{card.note}
-                </em>
-              </span>
-            </button>
+            <article className={`ops-kpi-card ops-tone-${kpi.tone}`} key={kpi.key}>
+              <div className="ops-kpi-topline">
+                <span className="ops-kpi-icon"><Icon /></span>
+                <span className="ops-kpi-label">{kpi.label}</span>
+              </div>
+              <strong className="ops-kpi-value">{kpi.value}</strong>
+              <span className="ops-kpi-note">{kpi.note}</span>
+            </article>
           )
         })}
       </section>
 
-      <section className="compact-dashboard-grid">
-        <article className="compact-panel revenue-chart-panel">
-          <div className="compact-panel-header">
-            <h2>Doanh thu 7 ngày qua</h2>
-            <button type="button" className="compact-filter">7 ngày qua</button>
-          </div>
-          <div className="chart-area">
-            <svg viewBox="0 0 750 260" role="img" aria-label="Biểu đồ doanh thu bảy ngày qua">
-              <defs>
-                <linearGradient id="compactRevenueArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2477f3" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#2477f3" stopOpacity="0.03" />
-                </linearGradient>
-              </defs>
-              {[38, 88, 138, 188, 238].map((y, index) => (
-                <g key={y}>
-                  <line x1="70" x2="682" y1={y} y2={y} className="compact-grid-line" />
-                  <text x="5" y={y + 4} className="compact-axis-label">{20 - index * 5}.000.000 đ</text>
-                </g>
-              ))}
-              {chartData.points.map((point) => (
-                <line key={'vertical-' + point.x} x1={point.x} x2={point.x} y1="38" y2="238" className="compact-grid-line vertical" />
-              ))}
-              <path d={chartData.pathAreaStr} fill="url(#compactRevenueArea)" />
-              <polyline points={chartData.polylineStr} className="compact-chart-line" />
-              {chartData.points.map((point) => (
-                <g key={point.label}>
-                  <circle cx={point.x} cy={point.y} r="4.5" className="compact-chart-point" />
-                  <text x={point.x} y="256" textAnchor="middle" className="compact-date-label">{point.label}</text>
-                </g>
-              ))}
-            </svg>
-          </div>
-        </article>
+      <section className="ops-main-grid">
+        <article className="ops-card ops-flow-card">
+          <header className="ops-card-header">
+            <div>
+              <span className="ops-section-icon blue"><BarChartOutlined /></span>
+              <div>
+                <h2>Tiến độ lượt khám</h2>
+                <p>Phân bổ trạng thái tính đến thời điểm hiện tại</p>
+              </div>
+            </div>
+            <span className="ops-rate-badge">{completionRate}% hoàn tất</span>
+          </header>
 
-        <article className="compact-panel appointments-panel">
-          <div className="compact-panel-header">
-            <h2>Lịch hẹn hôm nay</h2>
-            <button type="button" className="compact-link" onClick={() => navigate('/appointments')}>Xem tất cả</button>
+          <div className="ops-flow-summary">
+            <span>
+              <small>Tổng lượt trong ngày</small>
+              <strong>{numberFormatter.format(visitSummary.total)}</strong>
+            </span>
+            <span>
+              <small>Còn trong quy trình</small>
+              <strong>{numberFormatter.format(activeQueueCount)}</strong>
+            </span>
           </div>
-          <div className="compact-appointment-list">
-            {(Array.isArray(appointments) ? appointments : []).slice(0, 5).map((appointment, index) => {
-              const status = appointmentStatus[appointment.status] || appointmentStatus.SCHEDULED
-              const appointmentTime = appointment.appointmentAt ? dayjs(appointment.appointmentAt).format('HH:mm') : (appointment.slot || '08:30')
-              const matchedPatient = patientMap.get(String(appointment.patientId)) || patientMap.get(String(appointment.patientCode))
-              const resolvedName = appointment.patientName || appointment.fullName || matchedPatient?.fullName || `Bệnh nhân #${index + 1}`
-              const initial = resolvedName.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase() || 'B'
-              const doctorName = appointment.doctorName || matchedPatient?.doctorName || 'Phòng khám tổng quát'
 
+          {visitSummary.total > 0 ? (
+            <div
+              className="ops-status-track"
+              role="img"
+              aria-label={`Trong ${visitSummary.total} lượt khám: ${visitSummary.waiting} đang chờ, ${visitSummary.inProgress} đang khám, ${visitSummary.completed} hoàn tất và ${visitSummary.cancelled} đã hủy`}
+            >
+              {statusItems.filter((item) => item.value > 0).map((item) => (
+                <span
+                  className={`ops-track-segment segment-${item.tone}`}
+                  style={{ width: `${getVisitPercentage(item.value, visitSummary.total)}%` }}
+                  key={item.key}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="ops-empty-track">Chưa có lượt khám nào được ghi nhận hôm nay</div>
+          )}
+
+          <div className="ops-status-list">
+            {statusItems.map((item) => {
+              const Icon = item.icon
               return (
-                <button type="button" className="compact-appointment-row" key={appointment.id || index} onClick={() => navigate('/appointments')}>
-                  <time>{appointmentTime}</time>
-                  <span className={'mini-avatar avatar-' + (index % 4)}>{initial}</span>
-                  <span className="appointment-copy">
-                    <strong>{resolvedName}</strong>
-                    <small>{doctorName}</small>
+                <div className="ops-status-item" key={item.key}>
+                  <span className={`ops-status-icon status-${item.tone}`}><Icon /></span>
+                  <span className="ops-status-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.description}</small>
                   </span>
-                  <span className={'dashboard-status status-' + status.tone}>{status.label}</span>
-                </button>
+                  <span className="ops-status-number">
+                    <strong>{numberFormatter.format(item.value)}</strong>
+                    <small>{getVisitPercentage(item.value, visitSummary.total)}%</small>
+                  </span>
+                </div>
               )
             })}
-            {!(Array.isArray(appointments) && appointments.length) && <div className="dashboard-empty">Chưa có lịch hẹn hôm nay</div>}
           </div>
         </article>
 
-        <article className="compact-panel patients-panel">
-          <div className="compact-panel-header">
-            <h2>Bệnh nhân mới</h2>
-            <button type="button" className="compact-link" onClick={() => navigate('/patients')}>Xem tất cả</button>
+        <aside className="ops-card ops-queue-card">
+          <header className="ops-card-header compact">
+            <div>
+              <span className="ops-section-icon amber"><ClockCircleOutlined /></span>
+              <div>
+                <h2>Hàng đợi hiện tại</h2>
+                <p>Khối lượng cần điều phối</p>
+              </div>
+            </div>
+          </header>
+
+          <div className={`ops-queue-focus ${visitSummary.waiting === 0 ? 'is-clear' : ''}`}>
+            <span className="ops-queue-pulse"><i /></span>
+            <strong>{numberFormatter.format(visitSummary.waiting)}</strong>
+            <span>{visitSummary.waiting === 0 ? 'Không có lượt đang chờ' : 'Lượt đang chờ khám'}</span>
           </div>
-          <div className="dashboard-table-wrap">
-            <table className="dashboard-patient-table">
-              <thead>
-                <tr><th>Mã BN</th><th>Họ và tên</th><th>SĐT</th><th>Ngày sinh</th><th>Giới tính</th><th>Đăng ký lúc</th></tr>
-              </thead>
-              <tbody>
-                {(Array.isArray(patients) ? patients : []).slice(0, 5).map((patient) => (
-                  <tr key={patient.id} onClick={() => navigate(`/patients/${patient.id}`)}>
-                    <td>{patient.patientCode}</td>
-                    <td><strong>{patient.fullName}</strong></td>
-                    <td>{patient.phone || patient.phoneNumber || '—'}</td>
-                    <td>{patient.dateOfBirth ? dayjs(patient.dateOfBirth).format('DD/MM/YYYY') : '—'}</td>
-                    <td>{patient.gender === 'FEMALE' ? 'Nữ' : patient.gender === 'MALE' ? 'Nam' : 'Khác'}</td>
-                    <td>{patient.createdAt ? dayjs(patient.createdAt).format('DD/MM/YYYY HH:mm') : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="ops-queue-details">
+            <div>
+              <span><SyncOutlined /> Đang khám</span>
+              <strong>{numberFormatter.format(visitSummary.inProgress)}</strong>
+            </div>
+            <div>
+              <span><TeamOutlined /> Đang trong quy trình</span>
+              <strong>{numberFormatter.format(activeQueueCount)}</strong>
+            </div>
+          </div>
+
+          <div className="ops-queue-note">
+            <CalendarOutlined />
+            <span>Số liệu được làm mới tự động mỗi 60 giây.</span>
+          </div>
+        </aside>
+      </section>
+
+      <section className="ops-secondary-grid">
+        <article className="ops-card ops-alerts-card">
+          <header className="ops-card-header compact">
+            <div>
+              <span className="ops-section-icon rose"><AlertOutlined /></span>
+              <div>
+                <h2>Cảnh báo cần chú ý</h2>
+                <p>Tồn kho thuốc trong ngày</p>
+              </div>
+            </div>
+          </header>
+
+          <div className="ops-alert-list">
+            <div className={`ops-alert-item ${inventorySummary.lowStockCount > 0 ? 'has-alert' : 'is-safe'}`}>
+              <span className="ops-alert-item-icon"><MedicineBoxOutlined /></span>
+              <span>
+                <small>Thuốc tồn kho thấp</small>
+                <strong>{numberFormatter.format(inventorySummary.lowStockCount)}</strong>
+              </span>
+            </div>
+            <div className={`ops-alert-item ${inventorySummary.expiryAlertCount > 0 ? 'has-alert' : 'is-safe'}`}>
+              <span className="ops-alert-item-icon"><ExclamationCircleOutlined /></span>
+              <span>
+                <small>Lô sắp hoặc đã hết hạn</small>
+                <strong>{numberFormatter.format(inventorySummary.expiryAlertCount)}</strong>
+              </span>
+            </div>
           </div>
         </article>
 
-        <article className="compact-panel medicine-panel">
-          <div className="compact-panel-header">
-            <h2>Thuốc sắp hết</h2>
-            <button type="button" className="compact-link" onClick={() => navigate('/pharmacy')}>Xem tất cả</button>
+        <article className="ops-card ops-outcome-card">
+          <header className="ops-card-header compact">
+            <div>
+              <span className="ops-section-icon green"><CheckCircleOutlined /></span>
+              <div>
+                <h2>Kết quả trong ngày</h2>
+                <p>Theo dõi tiến độ xử lý lượt khám</p>
+              </div>
+            </div>
+          </header>
+
+          <div className="ops-outcome-list">
+            <div>
+              <span className="outcome-dot green" />
+              <span><small>Đã hoàn tất</small><strong>{numberFormatter.format(visitSummary.completed)} lượt</strong></span>
+            </div>
+            <div>
+              <span className="outcome-dot slate" />
+              <span><small>Đã hủy</small><strong>{numberFormatter.format(visitSummary.cancelled)} lượt</strong></span>
+            </div>
           </div>
-          <div className="compact-medicine-list">
-            {(Array.isArray(lowStockMedicines) ? lowStockMedicines : []).map((medicine, index) => {
-              const medStock = medicine.stockQuantity ?? medicine.stock ?? 0
-              const medMin = medicine.minStockQuantity ?? medicine.minStock ?? 0
-              const isLow = Number(medStock) <= Number(medMin)
-              return (
-                <button type="button" className="compact-medicine-row" key={medicine.id || index} onClick={() => navigate('/pharmacy')}>
-                  <span className={'medicine-capsule capsule-' + (index % 4)}><MedicineBoxOutlined /></span>
-                  <span><strong>{medicine.medicineName || medicine.name}</strong><small>Số lượng: {medStock}</small></span>
-                  <em>{isLow ? 'Sắp hết' : 'Theo dõi'}</em>
-                </button>
-              )
-            })}
-            {!(Array.isArray(lowStockMedicines) && lowStockMedicines.length) && <div className="dashboard-empty">Kho thuốc ổn định (Không có thuốc tồn thấp)</div>}
+
+          <div className="ops-card-actions">
+            <button type="button" onClick={() => navigate('/reports')}>
+              Xem báo cáo <RightOutlined />
+            </button>
+            <button type="button" onClick={() => navigate('/billing')}>
+              Mở thu phí <RightOutlined />
+            </button>
           </div>
-          <button type="button" className="medicine-more" onClick={() => navigate('/pharmacy')}>Quản lý kho thuốc <RightOutlined /></button>
         </article>
       </section>
+
+      <footer className="ops-dashboard-footnote">
+        <SyncOutlined /> Dữ liệu được tổng hợp từ hoạt động khám và các khoản thu đã ghi nhận đến {formatUpdatedAt(snapshot.asOf)}.
+      </footer>
     </div>
   )
 }

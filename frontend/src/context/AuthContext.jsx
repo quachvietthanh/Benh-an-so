@@ -13,6 +13,10 @@ const normalizeRoles = (rawRoles) => {
     const clean = str.replace(/^role_/, '')
     normalized.add(clean)
     normalized.add(`role_${clean}`)
+    if (clean === 'clinic_manager') {
+      normalized.add('manager')
+      normalized.add('role_manager')
+    }
   })
   return Array.from(normalized)
 }
