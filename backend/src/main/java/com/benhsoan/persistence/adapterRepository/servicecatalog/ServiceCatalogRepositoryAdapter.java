@@ -6,6 +6,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
@@ -45,6 +47,13 @@ public class ServiceCatalogRepositoryAdapter implements ServiceCatalogRepository
         return jpaRepository.findAllByOrderByServiceNameAscServiceCodeAsc().stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Page<ServiceCatalog> search(String keyword, Boolean active, Pageable pageable) {
+        Objects.requireNonNull(pageable, "Service catalog pageable must not be null.");
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        return jpaRepository.search(normalizedKeyword, active, pageable).map(mapper::toDomain);
     }
 
     @Override
