@@ -15,10 +15,17 @@ public interface PaymentRepository {
 
     Optional<Payment> findById(UUID id);
 
+    Optional<Payment> findByIdForUpdate(UUID id);
+
     Optional<Payment> findByVisitId(UUID visitId);
 
     BigDecimal sumAmountPaidByStatusInAndPaidAtBetween(
             Collection<PaymentStatus> statuses,
+            Instant fromInclusive,
+            Instant toExclusive
+    );
+
+    BigDecimal sumRefundedAmountByRefundedAtBetween(
             Instant fromInclusive,
             Instant toExclusive
     );

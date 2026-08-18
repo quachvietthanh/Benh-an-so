@@ -38,6 +38,12 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     @Override
+    @Transactional
+    public Optional<Payment> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<Payment> findByVisitId(UUID visitId) {
         return jpaRepository.findByVisitId(visitId).map(mapper::toDomain);
@@ -51,6 +57,16 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
             Instant toExclusive
     ) {
         BigDecimal sum = jpaRepository.sumAmountPaidBetween(statuses, fromInclusive, toExclusive);
+        return sum == null ? BigDecimal.ZERO : sum;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal sumRefundedAmountByRefundedAtBetween(
+            Instant fromInclusive,
+            Instant toExclusive
+    ) {
+        BigDecimal sum = jpaRepository.sumRefundedAmountBetween(fromInclusive, toExclusive);
         return sum == null ? BigDecimal.ZERO : sum;
     }
 }

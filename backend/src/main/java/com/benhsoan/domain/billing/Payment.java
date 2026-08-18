@@ -44,6 +44,12 @@ public class Payment {
 
     private Instant paidAt;
 
+    private String refundReason;
+
+    private UUID refundedBy;
+
+    private Instant refundedAt;
+
     private Instant createdAt;
 
     private Payment(
@@ -57,6 +63,9 @@ public class Payment {
             PaymentStatus status,
             UUID collectedBy,
             Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
             Instant createdAt
     ) {
         this.id = requireNonNull(id, "Payment id is required.");
@@ -69,6 +78,9 @@ public class Payment {
         this.status = requireNonNull(status, "Payment status is required.");
         this.collectedBy = requireNonNull(collectedBy, "Collector id is required.");
         this.paidAt = requireNonNull(paidAt, "Payment time is required.");
+        this.refundReason = refundReason;
+        this.refundedBy = refundedBy;
+        this.refundedAt = refundedAt;
         this.createdAt = requireNonNull(createdAt, "Payment creation time is required.");
     }
 
@@ -103,6 +115,9 @@ public class Payment {
                 PaymentStatus.RECORDED,
                 collectedBy,
                 paidAt,
+                null,
+                null,
+                null,
                 paidAt
         );
     }
@@ -120,6 +135,40 @@ public class Payment {
             Instant paidAt,
             Instant createdAt
     ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                null,
+                null,
+                null,
+                createdAt
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt
+    ) {
         return new Payment(
                 id,
                 visitId,
@@ -131,6 +180,9 @@ public class Payment {
                 status,
                 collectedBy,
                 paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
                 createdAt
         );
     }

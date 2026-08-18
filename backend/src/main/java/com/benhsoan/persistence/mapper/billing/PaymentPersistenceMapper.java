@@ -24,6 +24,9 @@ public class PaymentPersistenceMapper {
                 entity.getStatus(),
                 entity.getCollectedBy(),
                 entity.getPaidAt(),
+                entity.getRefundReason(),
+                entity.getRefundedBy(),
+                entity.getRefundedAt(),
                 entity.getCreatedAt()
         );
     }
@@ -44,6 +47,9 @@ public class PaymentPersistenceMapper {
                 .status(domain.getStatus())
                 .collectedBy(domain.getCollectedBy())
                 .paidAt(domain.getPaidAt())
+                .refundReason(domain.getRefundReason())
+                .refundedBy(domain.getRefundedBy())
+                .refundedAt(domain.getRefundedAt())
                 .createdAt(domain.getCreatedAt())
                 .build();
     }
