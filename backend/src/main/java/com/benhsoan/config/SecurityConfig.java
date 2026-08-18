@@ -175,6 +175,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.DELETE, "/inventory/**").hasRole("ADMIN")
                                                 .requestMatchers("/inventory/**")
                                                 .hasAnyRole("ADMIN", "PHARMACIST")
+                                                .requestMatchers(HttpMethod.POST, "/invoices/payments/*/refund")
+                                                .hasRole("MANAGER")
                                                 .requestMatchers(HttpMethod.POST, "/invoices/*/adjustments")
                                                 .hasRole("MANAGER")
                                                 .requestMatchers(HttpMethod.GET, "/invoices")

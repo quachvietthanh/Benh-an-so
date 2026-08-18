@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.billing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -74,6 +75,7 @@ class RefundPaymentServiceTest {
         assertEquals(REFUNDED_AT, result.refundedAt());
         assertEquals(InvoiceType.ADJUSTMENT, result.adjustmentInvoice().type());
         assertEquals(fixture.originalInvoice.getId(), result.adjustmentInvoice().originalInvoiceId());
+        assertEquals(REFUNDED_AT, result.adjustmentInvoice().createdAt());
         assertEquals(new BigDecimal("-250000"), result.adjustmentInvoice().totalAmount());
         assertEquals(2, result.adjustmentInvoice().lines().size());
         assertEquals(new BigDecimal("-100000"), result.adjustmentInvoice().lines().get(0).amount());
@@ -91,8 +93,15 @@ class RefundPaymentServiceTest {
         assertEquals(ResourceType.PAYMENT, audits.get(0).getResourceType());
         assertEquals(ActionType.CREATE, audits.get(1).getActionType());
         assertEquals(ResourceType.INVOICE, audits.get(1).getResourceType());
+        assertEquals(fixture.actorId, audits.get(0).getUserId());
+        assertEquals(fixture.actorId, audits.get(1).getUserId());
+        assertEquals(fixture.payment.getId(), audits.get(0).getResourceId());
+        assertEquals(result.adjustmentInvoice().id(), audits.get(1).getResourceId());
         assertEquals(REFUNDED_AT, audits.get(0).getCreatedAt());
         assertEquals(REFUNDED_AT, audits.get(1).getCreatedAt());
+        assertTrue(audits.get(0).getDetail().contains("\"refundReason\":\"Patient cancelled\""));
+        assertTrue(audits.get(0).getDetail().contains("\"refundedAt\":\"" + REFUNDED_AT + "\""));
+        assertTrue(audits.get(1).getDetail().contains("\"adjustmentReason\":\"Patient cancelled\""));
     }
 
     @Test
@@ -188,6 +197,18 @@ class RefundPaymentServiceTest {
     @Test
     void rejectsNonRefundablePaymentStatusWithoutWrites() {
         Fixture fixture = fixture(PaymentStatus.CANCELLED);
+
+        assertThrows(
+                PaymentNotAllowedException.class,
+                () -> fixture.service.refund(command(fixture.payment.getId()))
+        );
+
+        verifyNoWrites(fixture);
+    }
+
+    @Test
+    void rejectsAlreadyRefundedPaymentWithoutWrites() {
+        Fixture fixture = fixture(PaymentStatus.REFUNDED);
 
         assertThrows(
                 PaymentNotAllowedException.class,
