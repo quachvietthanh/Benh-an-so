@@ -35,11 +35,13 @@ import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
 import com.benhsoan.port.dto.result.PaymentResult;
+import com.benhsoan.port.dto.result.PaymentQuoteResult;
 import com.benhsoan.port.dto.result.RefundPaymentResult;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.GetInvoiceByIdUseCase;
 import com.benhsoan.port.inbound.billing.GetPayableEncountersUseCase;
+import com.benhsoan.port.inbound.billing.GetPaymentQuoteUseCase;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.inbound.billing.RefundPaymentUseCase;
 import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
@@ -59,6 +61,7 @@ class InvoiceSecurityIntegrationTest {
     @MockitoBean private AdjustInvoiceUseCase adjustInvoiceUseCase;
     @MockitoBean private RefundPaymentUseCase refundPaymentUseCase;
     @MockitoBean private GetPayableEncountersUseCase getPayableEncountersUseCase;
+    @MockitoBean private GetPaymentQuoteUseCase getPaymentQuoteUseCase;
     @MockitoBean private SearchInvoicesUseCase searchInvoicesUseCase;
     @MockitoBean private GetInvoiceByIdUseCase getInvoiceByIdUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
@@ -163,6 +166,15 @@ class InvoiceSecurityIntegrationTest {
                         now
                 ))
         ));
+        when(getPaymentQuoteUseCase.quote(any())).thenReturn(new PaymentQuoteResult(
+                visitId,
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("250000"),
+                List.of(),
+                now
+        ));
 
         String paymentBody = """
                 {
@@ -190,6 +202,28 @@ class InvoiceSecurityIntegrationTest {
                         .with(user("manager").roles("MANAGER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(paymentBody))
+                .andExpect(status().isForbidden());
+
+        String quoteBody = """
+                {
+                  "visitId":"d0000000-0000-0000-0000-000000000001",
+                  "examFee":100000,
+                  "medicineFee":150000
+                }
+                """;
+
+        for (String role : new String[] {"ADMIN", "RECEPTIONIST"}) {
+            mockMvc.perform(post("/invoices/payment-quotes")
+                            .with(user("tester").roles(role))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(quoteBody))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(post("/invoices/payment-quotes")
+                        .with(user("manager").roles("MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(quoteBody))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/invoices")

@@ -37,11 +37,14 @@ import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
 import com.benhsoan.port.dto.result.PaymentResult;
+import com.benhsoan.port.dto.result.PaymentQuoteResult;
+import com.benhsoan.port.dto.result.PaymentServiceFeeQuoteResult;
 import com.benhsoan.port.dto.result.RefundPaymentResult;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.GetInvoiceByIdUseCase;
 import com.benhsoan.port.inbound.billing.GetPayableEncountersUseCase;
+import com.benhsoan.port.inbound.billing.GetPaymentQuoteUseCase;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.inbound.billing.RefundPaymentUseCase;
 import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
@@ -63,6 +66,7 @@ class InvoiceControllerTest {
     @MockitoBean private AdjustInvoiceUseCase adjustInvoiceUseCase;
     @MockitoBean private RefundPaymentUseCase refundPaymentUseCase;
     @MockitoBean private GetPayableEncountersUseCase getPayableEncountersUseCase;
+    @MockitoBean private GetPaymentQuoteUseCase getPaymentQuoteUseCase;
     @MockitoBean private SearchInvoicesUseCase searchInvoicesUseCase;
     @MockitoBean private GetInvoiceByIdUseCase getInvoiceByIdUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
@@ -104,6 +108,36 @@ class InvoiceControllerTest {
                 .andExpect(jsonPath("$.visitId").value(visitId.toString()))
                 .andExpect(jsonPath("$.totalAmount").value(250000))
                 .andExpect(jsonPath("$.status").value("RECORDED"));
+    }
+
+    @Test
+    void returnsPaymentQuoteWithClinicalServiceFees() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        when(getPaymentQuoteUseCase.quote(any())).thenReturn(new PaymentQuoteResult(
+                visitId,
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("95000"),
+                new BigDecimal("345000"),
+                List.of(new PaymentServiceFeeQuoteResult(
+                        UUID.randomUUID(), "Blood test", new BigDecimal("95000")
+                )),
+                Instant.parse("2026-08-18T08:00:00Z")
+        ));
+
+        mockMvc.perform(post("/invoices/payment-quotes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "visitId":"%s",
+                                  "examFee":100000,
+                                  "medicineFee":150000
+                                }
+                                """.formatted(visitId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.serviceFee").value(95000))
+                .andExpect(jsonPath("$.totalAmount").value(345000))
+                .andExpect(jsonPath("$.serviceFees[0].serviceName").value("Blood test"));
     }
 
     @Test

@@ -21,11 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.BillingRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.billing.AdjustInvoiceRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.CreateInvoiceRequest;
+import com.benhsoan.adapter.inbound.rest.request.billing.GetPaymentQuoteRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RecordPaymentRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RefundPaymentRequest;
 import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PayableEncounterResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentResponse;
+import com.benhsoan.adapter.inbound.rest.response.billing.PaymentQuoteResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.RefundPaymentResponse;
 import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.billing.enums.InvoiceType;
@@ -36,6 +38,7 @@ import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.GetInvoiceByIdUseCase;
 import com.benhsoan.port.inbound.billing.GetPayableEncountersUseCase;
+import com.benhsoan.port.inbound.billing.GetPaymentQuoteUseCase;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.inbound.billing.RefundPaymentUseCase;
 import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
@@ -54,6 +57,7 @@ public class InvoiceController {
     private final AdjustInvoiceUseCase adjustInvoiceUseCase;
     private final RefundPaymentUseCase refundPaymentUseCase;
     private final GetPayableEncountersUseCase getPayableEncountersUseCase;
+    private final GetPaymentQuoteUseCase getPaymentQuoteUseCase;
     private final SearchInvoicesUseCase searchInvoicesUseCase;
     private final GetInvoiceByIdUseCase getInvoiceByIdUseCase;
     private final BillingRestMapper mapper;
@@ -64,6 +68,13 @@ public class InvoiceController {
     @CheckPermission(Permission.INVOICE_CREATE)
     public PaymentResponse recordPayment(@Valid @RequestBody RecordPaymentRequest request) {
         return mapper.toResponse(recordPaymentUseCase.record(mapper.toCommand(request)));
+    }
+
+    @PostMapping("/payment-quotes")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @CheckPermission(Permission.INVOICE_CREATE)
+    public PaymentQuoteResponse quotePayment(@Valid @RequestBody GetPaymentQuoteRequest request) {
+        return mapper.toResponse(getPaymentQuoteUseCase.quote(mapper.toCommand(request)));
     }
 
     @PostMapping("/payments/{paymentId}/refund")

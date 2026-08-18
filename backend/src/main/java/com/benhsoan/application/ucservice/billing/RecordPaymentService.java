@@ -13,6 +13,7 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.billing.Payment;
+import com.benhsoan.domain.billing.PaymentServiceFee;
 import com.benhsoan.domain.billing.exception.PaymentAlreadyExistsException;
 import com.benhsoan.domain.billing.exception.PaymentNotAllowedException;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
@@ -26,6 +27,7 @@ import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
+import com.benhsoan.port.outbound.repository.billing.PaymentServiceFeeRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
@@ -48,6 +50,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
     private final AuditLogRepository auditLogRepository;
     private final PaymentResultMapper resultMapper;
     private final ClinicalServiceFeeCalculator clinicalServiceFeeCalculator;
+    private final PaymentServiceFeeRepository paymentServiceFeeRepository;
 
     @Override
     public PaymentResult record(RecordPaymentCommand command) {
@@ -96,6 +99,16 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             }
             throw ex;
         }
+        paymentServiceFeeRepository.saveAll(serviceCharges.stream()
+                .map(charge -> PaymentServiceFee.create(
+                        UUID.randomUUID(),
+                        saved.getId(),
+                        charge.clinicalOrderItemId(),
+                        charge.serviceName(),
+                        charge.price(),
+                        now
+                ))
+                .toList());
 
         auditLogRepository.save(AuditLog.create(
                 actorId,

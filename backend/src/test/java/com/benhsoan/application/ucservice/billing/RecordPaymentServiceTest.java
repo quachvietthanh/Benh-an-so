@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
+import org.mockito.ArgumentCaptor;
 
 import com.benhsoan.domain.billing.Payment;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
@@ -35,6 +36,7 @@ import com.benhsoan.port.dto.command.billing.RecordPaymentCommand;
 import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
+import com.benhsoan.port.outbound.repository.billing.PaymentServiceFeeRepository;
 import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
@@ -51,6 +53,7 @@ class RecordPaymentServiceTest {
         MedicalRecordRepository medicalRecordRepository = mock(MedicalRecordRepository.class);
         PrescriptionRepository prescriptionRepository = mock(PrescriptionRepository.class);
         PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentServiceFeeRepository paymentServiceFeeRepository = mock(PaymentServiceFeeRepository.class);
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
         ClockPort clockPort = mock(ClockPort.class);
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
@@ -64,7 +67,8 @@ class RecordPaymentServiceTest {
                 clockPort,
                 auditLogRepository,
                 new PaymentResultMapper(),
-                feeCalculator
+                feeCalculator,
+                paymentServiceFeeRepository
         );
 
         UUID visitId = UUID.randomUUID();
@@ -98,6 +102,10 @@ class RecordPaymentServiceTest {
         assertEquals(new BigDecimal("345000"), result.totalAmount());
         assertEquals(actorId, result.collectedBy());
         verify(paymentRepository).save(any(Payment.class));
+        ArgumentCaptor<List<com.benhsoan.domain.billing.PaymentServiceFee>> snapshotCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(paymentServiceFeeRepository).saveAll(snapshotCaptor.capture());
+        assertEquals(new BigDecimal("95000"), snapshotCaptor.getValue().getFirst().getAmount());
         verify(auditLogRepository).save(any());
     }
 
@@ -374,7 +382,8 @@ class RecordPaymentServiceTest {
                 clockPort,
                 auditLogRepository,
                 new PaymentResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(PaymentServiceFeeRepository.class)
         );
     }
 

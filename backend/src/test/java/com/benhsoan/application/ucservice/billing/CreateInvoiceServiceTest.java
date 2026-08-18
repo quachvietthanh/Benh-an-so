@@ -19,6 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.billing.Invoice;
 import com.benhsoan.domain.billing.Payment;
+import com.benhsoan.domain.billing.PaymentServiceFee;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.domain.billing.enums.InvoiceLineType;
@@ -31,8 +32,7 @@ import com.benhsoan.port.outbound.generator.InvoiceCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.InvoiceRepository;
 import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
-import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
-import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
+import com.benhsoan.port.outbound.repository.billing.PaymentServiceFeeRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -43,7 +43,7 @@ class CreateInvoiceServiceTest {
         PaymentRepository paymentRepository = mock(PaymentRepository.class);
         InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
         InvoiceCodeGenerator invoiceCodeGenerator = mock(InvoiceCodeGenerator.class);
-        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
+        PaymentServiceFeeRepository paymentServiceFeeRepository = mock(PaymentServiceFeeRepository.class);
         UUID visitId = UUID.randomUUID();
         UUID clinicalItemId = UUID.randomUUID();
         Payment payment = Payment.restore(
@@ -60,15 +60,16 @@ class CreateInvoiceServiceTest {
                 Instant.parse("2026-08-12T01:00:00Z"),
                 Instant.parse("2026-08-12T01:00:00Z")
         );
-        List<ClinicalServiceCharge> charges = List.of(
-                new ClinicalServiceCharge(clinicalItemId, "Blood test", new BigDecimal("95000"))
+        List<PaymentServiceFee> fees = List.of(
+                PaymentServiceFee.create(
+                        UUID.randomUUID(), payment.getId(), clinicalItemId, "Blood test",
+                        new BigDecimal("95000"), Instant.parse("2026-08-12T01:00:00Z")
+                )
         );
         when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.of(payment));
         when(invoiceRepository.findOriginalByVisitId(visitId)).thenReturn(Optional.empty());
         when(invoiceCodeGenerator.generate()).thenReturn("HD000009");
-        when(feeCalculator.calculate(visitId, Instant.parse("2026-08-12T02:00:00Z")))
-                .thenReturn(charges);
-        when(feeCalculator.total(charges)).thenReturn(new BigDecimal("95000"));
+        when(paymentServiceFeeRepository.findAllByPaymentId(payment.getId())).thenReturn(fees);
         when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> invocation.getArgument(0));
         CreateInvoiceService service = new CreateInvoiceService(
                 paymentRepository,
@@ -78,7 +79,7 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                feeCalculator
+                paymentServiceFeeRepository
         );
 
         InvoiceResult result = service.create(new CreateInvoiceCommand(visitId, null));
@@ -385,11 +386,10 @@ class CreateInvoiceServiceTest {
         return currentUserPort;
     }
 
-    private static ClinicalServiceFeeCalculator noServiceFees() {
-        return new ClinicalServiceFeeCalculator(
-                mock(ClinicalOrderItemRepository.class),
-                mock(ServicePriceRepository.class)
-        );
+    private static PaymentServiceFeeRepository noServiceFees() {
+        PaymentServiceFeeRepository repository = mock(PaymentServiceFeeRepository.class);
+        when(repository.findAllByPaymentId(any())).thenReturn(List.of());
+        return repository;
     }
 
     private static ClockPort fixedClock() {

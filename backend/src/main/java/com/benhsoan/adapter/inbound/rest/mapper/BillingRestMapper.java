@@ -9,22 +9,27 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.adapter.inbound.rest.request.billing.AdjustInvoiceRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.AdjustmentInvoiceLineRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.CreateInvoiceRequest;
+import com.benhsoan.adapter.inbound.rest.request.billing.GetPaymentQuoteRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RecordPaymentRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RefundPaymentRequest;
 import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceLineResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PayableEncounterResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentResponse;
+import com.benhsoan.adapter.inbound.rest.response.billing.PaymentQuoteResponse;
+import com.benhsoan.adapter.inbound.rest.response.billing.PaymentServiceFeeQuoteResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.RefundPaymentResponse;
 import com.benhsoan.port.dto.command.billing.AdjustInvoiceCommand;
 import com.benhsoan.port.dto.command.billing.AdjustmentInvoiceLineCommand;
 import com.benhsoan.port.dto.command.billing.CreateInvoiceCommand;
+import com.benhsoan.port.dto.command.billing.GetPaymentQuoteCommand;
 import com.benhsoan.port.dto.command.billing.RecordPaymentCommand;
 import com.benhsoan.port.dto.command.billing.RefundPaymentCommand;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
 import com.benhsoan.port.dto.result.PaymentResult;
+import com.benhsoan.port.dto.result.PaymentQuoteResult;
 import com.benhsoan.port.dto.result.RefundPaymentResult;
 
 @Component
@@ -45,6 +50,10 @@ public class BillingRestMapper {
                 .visitId(request.visitId())
                 .paymentId(request.paymentId())
                 .build();
+    }
+
+    public GetPaymentQuoteCommand toCommand(GetPaymentQuoteRequest request) {
+        return new GetPaymentQuoteCommand(request.visitId(), request.examFee(), request.medicineFee());
     }
 
     public AdjustInvoiceCommand toCommand(UUID originalInvoiceId, AdjustInvoiceRequest request) {
@@ -73,6 +82,22 @@ public class BillingRestMapper {
                 result.collectedBy(),
                 result.paidAt(),
                 result.createdAt()
+        );
+    }
+
+    public PaymentQuoteResponse toResponse(PaymentQuoteResult result) {
+        return new PaymentQuoteResponse(
+                result.visitId(),
+                result.examFee(),
+                result.medicineFee(),
+                result.serviceFee(),
+                result.totalAmount(),
+                result.serviceFees().stream()
+                        .map(fee -> new PaymentServiceFeeQuoteResponse(
+                                fee.clinicalOrderItemId(), fee.serviceName(), fee.amount()
+                        ))
+                        .toList(),
+                result.calculatedAt()
         );
     }
 

@@ -28,7 +28,7 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     @Override
     @Transactional
     public Payment save(Payment payment) {
-        return mapper.toDomain(jpaRepository.save(mapper.toEntity(payment)));
+        return mapper.toDomain(jpaRepository.saveAndFlush(mapper.toEntity(payment)));
     }
 
     @Override
