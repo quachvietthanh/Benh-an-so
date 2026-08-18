@@ -195,9 +195,16 @@ public class Payment {
         return status == PaymentStatus.REFUNDED;
     }
 
-    public void refund(String reason, UUID refundedBy) {
-        requireText(reason, "Refund reason is required.");
-        requireNonNull(refundedBy, "Refunded by user id is required.");
+    public void refund(String reason, UUID refundedBy, Instant refundedAt) {
+        String validatedReason = requireText(reason, "Refund reason is required.");
+        UUID validatedRefundedBy = requireNonNull(
+                refundedBy,
+                "Refunded by user id is required."
+        );
+        Instant validatedRefundedAt = requireNonNull(
+                refundedAt,
+                "Refund time is required."
+        );
 
         if (status != PaymentStatus.RECORDED && status != PaymentStatus.SUCCESS) {
             throw new PaymentNotAllowedException(
@@ -206,6 +213,9 @@ public class Payment {
         }
 
         this.status = PaymentStatus.REFUNDED;
+        this.refundReason = validatedReason;
+        this.refundedBy = validatedRefundedBy;
+        this.refundedAt = validatedRefundedAt;
     }
 
     private static void validatePaymentEligibility(

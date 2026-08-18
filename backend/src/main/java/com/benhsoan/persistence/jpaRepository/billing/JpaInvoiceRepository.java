@@ -24,6 +24,8 @@ public interface JpaInvoiceRepository
 
     Optional<InvoiceEntity> findByPaymentId(UUID paymentId);
 
+    boolean existsByOriginalInvoiceId(UUID originalInvoiceId);
+
     @Query("""
             select invoice
             from InvoiceEntity invoice

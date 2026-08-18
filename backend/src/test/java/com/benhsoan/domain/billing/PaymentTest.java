@@ -106,6 +106,8 @@ class PaymentTest {
     @Test
     @DisplayName("refund should mark a recorded payment as refunded")
     void refundShouldMarkPaymentAsRefunded() {
+        UUID refundedBy = UUID.randomUUID();
+        Instant refundedAt = Instant.parse("2026-08-12T03:00:00Z");
         Payment payment = Payment.restore(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -120,9 +122,16 @@ class PaymentTest {
                 Instant.parse("2026-08-11T03:00:00Z")
         );
 
-        payment.refund("Patient cancelled after payment review", UUID.randomUUID());
+        payment.refund(
+                "  Patient cancelled after payment review  ",
+                refundedBy,
+                refundedAt
+        );
 
         assertEquals(PaymentStatus.REFUNDED, payment.getStatus());
+        assertEquals("Patient cancelled after payment review", payment.getRefundReason());
+        assertEquals(refundedBy, payment.getRefundedBy());
+        assertEquals(refundedAt, payment.getRefundedAt());
     }
 
     @Test
@@ -144,7 +153,7 @@ class PaymentTest {
 
         assertThrows(
                 ValidationException.class,
-                () -> payment.refund(" ", UUID.randomUUID())
+                () -> payment.refund(" ", UUID.randomUUID(), Instant.now())
         );
     }
 
@@ -167,7 +176,34 @@ class PaymentTest {
 
         assertThrows(
                 PaymentNotAllowedException.class,
-                () -> payment.refund("Cancel receipt before settlement", UUID.randomUUID())
+                () -> payment.refund(
+                        "Cancel receipt before settlement",
+                        UUID.randomUUID(),
+                        Instant.now()
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("refund should require refund time")
+    void refundShouldRequireRefundTime() {
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                BigDecimal.ZERO,
+                new BigDecimal("100000"),
+                new BigDecimal("100000"),
+                PaymentMethod.CASH,
+                PaymentStatus.SUCCESS,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                Instant.parse("2026-08-11T03:00:00Z")
+        );
+
+        assertThrows(
+                ValidationException.class,
+                () -> payment.refund("Patient cancelled", UUID.randomUUID(), null)
         );
     }
 }

@@ -75,6 +75,12 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean existsByOriginalInvoiceId(UUID originalInvoiceId) {
+        return jpaRepository.existsByOriginalInvoiceId(originalInvoiceId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive) {
         return jpaRepository.findCreatedBetween(fromInclusive, toExclusive).stream()
                 .map(this::toDomain)

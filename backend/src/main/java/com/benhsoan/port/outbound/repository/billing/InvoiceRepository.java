@@ -20,6 +20,8 @@ public interface InvoiceRepository {
 
     Optional<Invoice> findByPaymentId(UUID paymentId);
 
+    boolean existsByOriginalInvoiceId(UUID originalInvoiceId);
+
     List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive);
 
     Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable);
