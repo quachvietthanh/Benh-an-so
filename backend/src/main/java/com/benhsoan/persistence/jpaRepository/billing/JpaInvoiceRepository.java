@@ -50,7 +50,7 @@ public interface JpaInvoiceRepository
             from VisitEntity visit
             join PatientEntity patient on patient.id = visit.patientId
             left join PaymentEntity payment on payment.visitId = visit.id
-            where visit.status = com.benhsoan.domain.visit.enums.VisitStatus.COMPLETED
+            where visit.status <> com.benhsoan.domain.visit.enums.VisitStatus.CANCELLED
               and payment.id is null
               and not exists (
                   select 1

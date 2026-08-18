@@ -21,8 +21,8 @@ import com.benhsoan.domain.visit.enums.VisitStatus;
 class PaymentTest {
 
     @Test
-    @DisplayName("record should create payment when visit is completed and dispensing is done")
-    void recordShouldSucceedForEligibleVisit() {
+    @DisplayName("record should create payment before the visit is completed")
+    void recordShouldSucceedForWaitingVisit() {
         Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
 
         Payment payment = Payment.record(
@@ -34,7 +34,7 @@ class PaymentTest {
                 PaymentMethod.CASH,
                 UUID.randomUUID(),
                 paidAt,
-                VisitStatus.COMPLETED,
+                VisitStatus.WAITING,
                 true
         );
 
@@ -57,7 +57,7 @@ class PaymentTest {
                         PaymentMethod.CASH,
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T03:00:00Z"),
-                        VisitStatus.COMPLETED,
+                        VisitStatus.WAITING,
                         true
                 )
         );
@@ -77,8 +77,28 @@ class PaymentTest {
                         PaymentMethod.CARD,
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T03:00:00Z"),
-                        VisitStatus.COMPLETED,
+                        VisitStatus.WAITING,
                         false
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("record should reject payment for a cancelled visit")
+    void recordShouldRejectCancelledVisit() {
+        assertThrows(
+                PaymentNotAllowedException.class,
+                () -> Payment.record(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        new BigDecimal("100000"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("100000"),
+                        PaymentMethod.CASH,
+                        UUID.randomUUID(),
+                        Instant.parse("2026-08-11T03:00:00Z"),
+                        VisitStatus.CANCELLED,
+                        true
                 )
         );
     }

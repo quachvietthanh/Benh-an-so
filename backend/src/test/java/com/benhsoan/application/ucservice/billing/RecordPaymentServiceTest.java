@@ -115,9 +115,37 @@ class RecordPaymentServiceTest {
     }
 
     @Test
-    void rejectsPaymentWhenVisitIsNotCompleted() {
+    void recordsPaymentWhenVisitIsWaiting() {
         VisitRepository visitRepository = mock(VisitRepository.class);
-        when(visitRepository.findByIdForUpdate(any())).thenReturn(Optional.of(waitingVisit()));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        UUID visitId = UUID.randomUUID();
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(waitingVisit(visitId)));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RecordPaymentService service = service(
+                visitRepository,
+                mock(MedicalRecordRepository.class),
+                mock(PrescriptionRepository.class),
+                paymentRepository,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class)
+        );
+
+        PaymentResult result = service.record(
+                command(visitId, "100000", "0", "100000")
+        );
+
+        assertEquals(visitId, result.visitId());
+        assertEquals(new BigDecimal("100000"), result.totalAmount());
+    }
+
+    @Test
+    void rejectsPaymentWhenVisitIsCancelled() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        UUID visitId = UUID.randomUUID();
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(cancelledVisit(visitId)));
 
         RecordPaymentService service = service(
                 visitRepository,
@@ -131,7 +159,7 @@ class RecordPaymentServiceTest {
 
         assertThrows(
                 PaymentNotAllowedException.class,
-                () -> service.record(command(UUID.randomUUID(), "100000", "150000", "250000"))
+                () -> service.record(command(visitId, "100000", "0", "100000"))
         );
     }
 
@@ -390,9 +418,9 @@ class RecordPaymentServiceTest {
         );
     }
 
-    private static Visit waitingVisit() {
+    private static Visit waitingVisit(UUID visitId) {
         return Visit.restore(
-                UUID.randomUUID(),
+                visitId,
                 "VIS-002",
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -400,6 +428,27 @@ class RecordPaymentServiceTest {
                 null,
                 VisitType.WALK_IN,
                 VisitStatus.WAITING,
+                Instant.parse("2026-08-12T00:00:00Z"),
+                null,
+                null,
+                "Checkup",
+                null,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-12T00:00:00Z"),
+                null
+        );
+    }
+
+    private static Visit cancelledVisit(UUID visitId) {
+        return Visit.restore(
+                visitId,
+                "VIS-003",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null,
+                null,
+                VisitType.WALK_IN,
+                VisitStatus.CANCELLED,
                 Instant.parse("2026-08-12T00:00:00Z"),
                 null,
                 null,

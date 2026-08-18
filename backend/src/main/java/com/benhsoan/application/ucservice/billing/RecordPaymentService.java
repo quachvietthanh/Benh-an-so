@@ -19,6 +19,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.billing.RecordPaymentCommand;
 import com.benhsoan.port.dto.result.PaymentResult;
@@ -54,9 +55,9 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         Visit visit = visitRepository.findByIdForUpdate(command.visitId())
                 .orElseThrow(() -> new VisitNotFoundException(command.visitId()));
 
-        if (!visit.isCompleted()) {
+        if (visit.getStatus() == VisitStatus.CANCELLED) {
             throw new PaymentNotAllowedException(
-                    "Payment can only be recorded for completed visits."
+                    "Payment cannot be recorded for cancelled visits."
             );
         }
 

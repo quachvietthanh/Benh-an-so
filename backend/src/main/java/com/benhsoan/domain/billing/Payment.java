@@ -222,9 +222,9 @@ public class Payment {
             VisitStatus visitStatus,
             boolean dispensingCompleted
     ) {
-        if (visitStatus != VisitStatus.COMPLETED) {
+        if (visitStatus == VisitStatus.CANCELLED) {
             throw new PaymentNotAllowedException(
-                    "Payment can only be recorded after the visit is completed."
+                    "Payment cannot be recorded for cancelled visits."
             );
         }
         if (!dispensingCompleted) {
