@@ -1,5 +1,5 @@
 -- =====================================================
--- V12 - Seed Visit, Medical Record and Clinical Data
+-- V14 - Seed Visit, Medical Record and Clinical Data
 -- =====================================================
 
 -- Patient BN000001 has two visits for medical-history API testing.
@@ -101,17 +101,19 @@ INSERT INTO medical_record_diagnoses (
 );
 
 INSERT INTO clinical_service_catalog (
-    id, service_code, service_name, service_type, result_data_type,
+    id, service_catalog_id, service_code, service_name, service_type, result_data_type,
     unit, reference_range, description, active, created_at, updated_at
 ) VALUES
 (
     UUID_TO_BIN('f0000000-0000-0000-0000-000000000001'),
+    UUID_TO_BIN('c1000000-0000-0000-0000-000000000001'),
     'LAB-GLU', 'Blood glucose', 'LAB_TEST', 'NUMBER',
     'mmol/L', '3.9-5.5', 'Fasting blood glucose', TRUE,
     '2026-08-20 02:20:00', NULL
 ),
 (
     UUID_TO_BIN('f0000000-0000-0000-0000-000000000002'),
+    UUID_TO_BIN('c1000000-0000-0000-0000-000000000002'),
     'IMG-CTH', 'Head CT scan', 'IMAGING', 'TEXT',
     NULL, NULL, 'Non-contrast head CT', TRUE,
     '2026-08-20 02:20:00', NULL

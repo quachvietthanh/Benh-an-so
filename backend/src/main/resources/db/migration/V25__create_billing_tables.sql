@@ -1,5 +1,5 @@
 -- =====================================================
--- V23__create_billing_tables.sql
+-- V25__create_billing_tables.sql
 -- Billing schema for payments and invoices
 -- Payment status constraint is intentionally aligned with
 -- PaymentStatus enum in code:

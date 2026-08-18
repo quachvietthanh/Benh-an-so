@@ -1,5 +1,5 @@
 -- =====================================================
--- V28__create_backup_records_table.sql
+-- V30__create_backup_records_table.sql
 -- Backup & restore metadata for NCL-09-CN-005.
 -- =====================================================
 

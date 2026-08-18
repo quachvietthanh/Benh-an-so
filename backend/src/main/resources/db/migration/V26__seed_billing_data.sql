@@ -1,10 +1,10 @@
 -- =====================================================
--- V24__seed_billing_data.sql
+-- V26__seed_billing_data.sql
 -- Seed payment and invoice data for billing flows
--- Depends on V12 medical record/visit seed data,
--- V17 prescription data and V20 inventory seed data.
+-- Depends on V14 medical record/visit seed data,
+-- V19 prescription data and V22 inventory seed data.
 -- Current seed keeps the historical sample payment in RECORDED
--- status; V23 schema already supports SUCCESS/REFUNDED/CANCELLED
+-- status; V25 schema already supports SUCCESS/REFUNDED/CANCELLED
 -- for follow-up stories such as refund/cancel receipt.
 -- =====================================================
 

@@ -1,5 +1,5 @@
 -- =====================================================
--- V19__create_dispense_allocation_and_stock_movements.sql
+-- V21__create_dispense_allocation_and_stock_movements.sql
 -- Dispense allocation / cấp phát theo lô và nhật ký biến động kho
 -- MySQL 8.x
 -- =====================================================

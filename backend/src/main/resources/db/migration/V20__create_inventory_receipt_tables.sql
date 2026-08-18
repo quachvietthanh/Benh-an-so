@@ -1,5 +1,5 @@
 -- =====================================================
--- V18__create_inventory_receipt_tables.sql
+-- V20__create_inventory_receipt_tables.sql
 -- Stock receipt / nhập kho thuốc: medicine batches,
 -- inventory receipts and receipt items
 -- MySQL 8.x

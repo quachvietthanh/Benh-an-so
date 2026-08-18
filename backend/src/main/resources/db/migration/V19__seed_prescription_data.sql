@@ -1,6 +1,6 @@
 -- =====================================================
--- V17 - Seed medicine, drug interaction rule and prescription data
--- Requires V3 users and V12 medical record seed data.
+-- V19 - Seed medicine, drug interaction rule and prescription data
+-- Requires V3 users and V14 medical record seed data.
 -- =====================================================
 
 -- ===========================

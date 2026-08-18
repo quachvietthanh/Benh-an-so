@@ -1,5 +1,5 @@
 -- =====================================================
--- V11 - Clinical Orders, Results and Attachments
+-- V13 - Clinical Orders, Results and Attachments
 -- =====================================================
 
 -- ===========================
@@ -8,6 +8,7 @@
 
 CREATE TABLE clinical_service_catalog (
     id BINARY(16) NOT NULL,
+    service_catalog_id BINARY(16) NOT NULL,
 
     service_code VARCHAR(30) NOT NULL,
     service_name VARCHAR(150) NOT NULL,
@@ -27,8 +28,15 @@ CREATE TABLE clinical_service_catalog (
         PRIMARY KEY (id),
 
     CONSTRAINT uk_clinical_service_code
-        UNIQUE (service_code)
+        UNIQUE (service_code),
+
+    CONSTRAINT fk_clinical_service_catalog_service
+        FOREIGN KEY (service_catalog_id)
+        REFERENCES service_catalog(id)
 );
+
+CREATE INDEX idx_clinical_service_catalog_service
+    ON clinical_service_catalog(service_catalog_id);
 
 CREATE INDEX idx_clinical_service_name
     ON clinical_service_catalog(service_name);

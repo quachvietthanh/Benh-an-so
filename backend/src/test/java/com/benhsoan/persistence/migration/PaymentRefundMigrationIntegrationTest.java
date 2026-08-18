@@ -31,7 +31,7 @@ class PaymentRefundMigrationIntegrationTest {
         jdbcTemplate.execute("create table payments (id BINARY(16) primary key)");
         new ResourceDatabasePopulator(
                 new ClassPathResource(
-                        "db/migration/V30__add_payment_refund_metadata.sql"
+                        "db/migration/V32__add_payment_refund_metadata.sql"
                 )
         ).execute(dataSource);
 

@@ -1,5 +1,5 @@
 -- =====================================================
--- V13 - Seed ICD-10 Diagnosis Catalog
+-- V15 - Seed ICD-10 Diagnosis Catalog
 -- =====================================================
 
 -- Common ICD-10 diagnosis codes for outpatient clinic
@@ -103,7 +103,7 @@ INSERT INTO diagnosis_catalog (id, code, name, description, active, created_at, 
 (UUID_TO_BIN('a1000000-0000-0000-0000-000000000046'), 'R52.9', 'Đau', 'Đau, không xác định', TRUE, NOW(), NULL),
 (UUID_TO_BIN('a1000000-0000-0000-0000-000000000047'), 'R53', 'Mệt mỏi', 'Mệt mỏi, suy nhược', TRUE, NOW(), NULL),
 (UUID_TO_BIN('a1000000-0000-0000-0000-000000000048'), 'R55', 'Ngất', 'Ngất', TRUE, NOW(), NULL),
--- R51.9 (Headache) already seeded in V12, skipping.
+-- R51.9 (Headache) already seeded in V14, skipping.
 
 -- Injury & Poisoning
 (UUID_TO_BIN('a1000000-0000-0000-0000-00000000004a'), 'S06.0', 'Chấn động não', 'Chấn động não', TRUE, NOW(), NULL),
