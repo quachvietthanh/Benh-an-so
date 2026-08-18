@@ -59,6 +59,12 @@ import {
   getUnhandledInteractions,
 } from '../utils/drugInteractionValidation'
 import { saveStoredPrescription } from '../utils/storageHelpers'
+import {
+  getAvailableStock,
+  sortMedicinesByStockAvailability,
+  validateItemStock,
+  validatePrescriptionStock,
+} from '../utils/prescriptionInventoryValidation'
 
 
 const { Text, Paragraph, Title } = Typography
@@ -161,17 +167,36 @@ function PrescriptionPage() {
     editingPrescription?.status !== 'DISPENSED' &&
     editingPrescription?.status !== 'CANCELLED'
 
+  const sortedMedicines = useMemo(
+    () => sortMedicinesByStockAvailability(medicines),
+    [medicines],
+  )
+
+  const stockValidationStatus = useMemo(
+    () => validatePrescriptionStock(items, medicines),
+    [items, medicines],
+  )
+
   const submitStatus = useMemo(
-    () =>
-      canSubmitPrescription({
+    () => {
+      const baseStatus = canSubmitPrescription({
         canPrescribe,
         saving,
         checkingInteractions,
         interactionApiError,
         detectedInteractions,
         confirmedOverrides,
-      }),
-    [canPrescribe, saving, checkingInteractions, interactionApiError, detectedInteractions, confirmedOverrides],
+      })
+      if (!baseStatus.allowed) return baseStatus
+      if (!stockValidationStatus.isValid) {
+        return {
+          allowed: false,
+          reason: stockValidationStatus.errors[0] || 'Vui lòng kiểm tra lại tồn kho thuốc trong đơn.',
+        }
+      }
+      return { allowed: true, reason: '' }
+    },
+    [canPrescribe, saving, checkingInteractions, interactionApiError, detectedInteractions, confirmedOverrides, stockValidationStatus],
   )
   const canSubmit = submitStatus.allowed
 
@@ -210,12 +235,16 @@ function PrescriptionPage() {
       if (!loadedMeds || loadedMeds.length === 0) {
         loadedMeds = mergeMedicines([])
       }
-      const normalizedMeds = loadedMeds.map((m) => ({
-        ...m,
-        medicineName: m.medicineName || m.name || 'Thuốc',
-        stockQuantity: m.stockQuantity ?? m.stock ?? 100,
-        unit: m.unit || 'viên',
-      }))
+      const normalizedMeds = loadedMeds.map((m) => {
+        const avail = getAvailableStock(m)
+        return {
+          ...m,
+          medicineName: m.medicineName || m.name || 'Thuốc',
+          stockQuantity: avail,
+          availableStock: avail,
+          unit: m.unit || 'viên',
+        }
+      })
       setMedicines(normalizedMeds)
 
       if (!recordData?.visitId) throw new Error('Medical record không có visitId.')
@@ -368,6 +397,11 @@ function PrescriptionPage() {
       if (!Number.isInteger(Number(item.durationDays)) || Number(item.durationDays) <= 0) {
         return `Dòng ${index + 1}: số ngày dùng phải là số nguyên dương.`
       }
+
+      const itemStockRes = validateItemStock(item, selectedMedicineMap)
+      if (!itemStockRes.isValid) {
+        return `Dòng ${index + 1}: ${itemStockRes.error}`
+      }
     }
 
     if (editingPrescription && !changeReason.trim()) {
@@ -393,6 +427,53 @@ function PrescriptionPage() {
       const activeQueueItem = await requireLiveInProgressQueue(
         editingPrescription ? 'điều chỉnh đơn thuốc' : 'tạo đơn thuốc',
       )
+
+      // Re-fetch fresh medicine data to verify live stock before calling Create API
+      let freshMeds = []
+      try {
+        const medicineResponse = await pharmacyApi.medicines({ active: true })
+        freshMeds = unwrapCollection(medicineResponse.data)
+      } catch {
+        freshMeds = medicines
+      }
+      if (!freshMeds || freshMeds.length === 0) {
+        freshMeds = medicines
+      }
+
+      const normalizedFreshMeds = freshMeds.map((m) => {
+        const avail = getAvailableStock(m)
+        return {
+          ...m,
+          medicineName: m.medicineName || m.name || 'Thuốc',
+          stockQuantity: avail,
+          availableStock: avail,
+          unit: m.unit || 'viên',
+        }
+      })
+      setMedicines(normalizedFreshMeds)
+
+      const liveStockValidation = validatePrescriptionStock(items, normalizedFreshMeds)
+      if (!liveStockValidation.isValid) {
+        Modal.error({
+          title: 'Không thể tạo/lưu đơn thuốc do tồn kho thay đổi',
+          content: (
+            <div>
+              <Paragraph style={{ color: '#dc2626', marginBottom: 8 }}>
+                Dữ liệu tồn kho khả dụng mới nhất từ Backend không đủ cho đơn thuốc này:
+              </Paragraph>
+              <ul style={{ paddingLeft: 20, color: '#b91c1c', marginBottom: 8 }}>
+                {liveStockValidation.errors.map((err, idx) => (
+                  <li key={idx}><strong>{err}</strong></li>
+                ))}
+              </ul>
+              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                Vui lòng chọn lại thuốc khác hoặc giảm số lượng kê phù hợp với tồn khả dụng hiện tại.
+              </Paragraph>
+            </div>
+          ),
+        })
+        return
+      }
 
       const payload = {
         note: note.trim(),
@@ -1030,11 +1111,28 @@ function PrescriptionPage() {
                                 {item.isOriginal ? 'Thuốc trong đơn gốc' : 'Thuốc thêm mới'}
                               </Tag>
                             )}
-                            {selectedMed && (
-                              <Text type="secondary" style={{ fontSize: 13 }}>
-                                (Tồn kho: <strong>{selectedMed.stockQuantity}</strong> {selectedMed.unit || ''})
-                              </Text>
-                            )}
+                            {selectedMed && (() => {
+                              const avail = getAvailableStock(selectedMed)
+                              if (avail <= 0) {
+                                return (
+                                  <Tag color="red" icon={<CloseCircleOutlined />}>
+                                    HẾT HÀNG (Tồn khả dụng: 0 {selectedMed.unit || 'viên'})
+                                  </Tag>
+                                )
+                              }
+                              if (item.quantity > avail) {
+                                return (
+                                  <Tag color="volcano" icon={<WarningOutlined />}>
+                                    Vượt quá tồn kho (Còn {avail} {selectedMed.unit || 'viên'})
+                                  </Tag>
+                                )
+                              }
+                              return (
+                                <Text type="secondary" style={{ fontSize: 13 }}>
+                                  (Còn <strong style={{ color: '#16a34a' }}>{avail}</strong> {selectedMed.unit || 'viên'})
+                                </Text>
+                              )
+                            })()}
                           </Space>
 
                           <Tooltip title={items.length <= 1 ? 'Đơn thuốc phải có ít nhất 1 thuốc' : 'Bỏ thuốc này khỏi đơn'}>
@@ -1059,10 +1157,17 @@ function PrescriptionPage() {
                               disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.medicineId}
                               onChange={(value) => handleItemChange(item.clientId, 'medicineId', value)}
-                              options={medicines.map((medicine) => ({
-                                value: medicine.id,
-                                label: `${medicine.medicineName} — ${medicine.strength || ''} (tồn ${medicine.stockQuantity} ${medicine.unit || ''})`,
-                              }))}
+                              options={sortedMedicines.map((medicine) => {
+                                const availStock = getAvailableStock(medicine)
+                                const isOut = availStock <= 0
+                                return {
+                                  value: medicine.id,
+                                  disabled: isOut,
+                                  label: isOut
+                                    ? `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Hết hàng`
+                                    : `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
+                                }
+                              })}
                               placeholder="Tìm kiếm thuốc theo tên..."
                             />
                           </Form.Item>
@@ -1130,6 +1235,33 @@ function PrescriptionPage() {
                             />
                           </Form.Item>
                         </Space>
+
+                        {selectedMed && (() => {
+                          const avail = getAvailableStock(selectedMed)
+                          if (avail <= 0) {
+                            return (
+                              <Alert
+                                type="error"
+                                showIcon
+                                icon={<StopOutlined />}
+                                message={`Thuốc "${selectedMed.medicineName}" hiện đã HẾT HÀNG (tồn khả dụng = 0). Vui lòng đổi sang thuốc khác.`}
+                                style={{ marginTop: 10 }}
+                              />
+                            )
+                          }
+                          if (item.quantity > avail) {
+                            return (
+                              <Alert
+                                type="error"
+                                showIcon
+                                icon={<WarningOutlined />}
+                                message={`Số lượng kê (${item.quantity} ${selectedMed.unit || 'viên'}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${selectedMed.unit || 'viên'}).`}
+                                style={{ marginTop: 10 }}
+                              />
+                            )
+                          }
+                          return null
+                        })()}
                       </Card>
                     )
                   })}

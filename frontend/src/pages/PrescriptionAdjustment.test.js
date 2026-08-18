@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { validateItemStock } from '../utils/prescriptionInventoryValidation.js'
 
 // Helper kiểm tra điều kiện được phép điều chỉnh đơn thuốc
 export const canAdjustPrescription = ({
@@ -37,6 +38,7 @@ export const validatePrescriptionAdjustmentForm = ({
   medicalRecordId,
   diagnoses = [],
   items = [],
+  medicines = [],
   changeReason = '',
   isEditing = true,
 }) => {
@@ -68,6 +70,13 @@ export const validatePrescriptionAdjustmentForm = ({
     }
     if (!Number.isInteger(Number(item.durationDays)) || Number(item.durationDays) <= 0) {
       errors.push(`Dòng ${i + 1}: số ngày dùng phải là số nguyên dương.`)
+    }
+
+    if (medicines && medicines.length > 0 && item.medicineId) {
+      const stockRes = validateItemStock(item, medicines)
+      if (!stockRes.isValid) {
+        errors.push(`Dòng ${i + 1}: ${stockRes.error}`)
+      }
     }
   }
 
