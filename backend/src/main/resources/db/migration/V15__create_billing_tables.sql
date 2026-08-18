@@ -1,4 +1,4 @@
--- =====================================================
+﻿-- =====================================================
 -- V25__create_billing_tables.sql
 -- Billing schema for payments and invoices
 -- Payment status constraint is intentionally aligned with
@@ -15,6 +15,7 @@ CREATE TABLE payments (
     visit_id BINARY(16) NOT NULL,
     exam_fee DECIMAL(15, 2) NOT NULL,
     medicine_fee DECIMAL(15, 2) NOT NULL,
+    service_fee DECIMAL(15, 2) NOT NULL DEFAULT 0,
     total_amount DECIMAL(15, 2) NOT NULL,
     amount_paid DECIMAL(15, 2) NOT NULL,
     payment_method VARCHAR(30) NOT NULL,
@@ -22,6 +23,9 @@ CREATE TABLE payments (
     collected_by BINARY(16) NOT NULL,
     paid_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP NOT NULL,
+    refund_reason TEXT NULL,
+    refunded_by BINARY(16) NULL,
+    refunded_at TIMESTAMP NULL,
 
     CONSTRAINT pk_payments PRIMARY KEY (id),
     CONSTRAINT uk_payments_visit UNIQUE (visit_id),
@@ -34,11 +38,18 @@ CREATE TABLE payments (
         FOREIGN KEY (collected_by)
         REFERENCES users(id),
 
+    CONSTRAINT fk_payments_refunded_by
+        FOREIGN KEY (refunded_by)
+        REFERENCES users(id),
+
     CONSTRAINT chk_payments_exam_fee
         CHECK (exam_fee >= 0),
 
     CONSTRAINT chk_payments_medicine_fee
         CHECK (medicine_fee >= 0),
+
+    CONSTRAINT chk_payments_service_fee
+        CHECK (service_fee >= 0),
 
     CONSTRAINT chk_payments_total_amount
         CHECK (total_amount >= 0),
@@ -47,7 +58,7 @@ CREATE TABLE payments (
         CHECK (amount_paid >= 0),
 
     CONSTRAINT chk_payments_total_formula
-        CHECK (total_amount = exam_fee + medicine_fee),
+        CHECK (total_amount = exam_fee + medicine_fee + service_fee),
 
     CONSTRAINT chk_payments_amount_match
         CHECK (amount_paid = total_amount),
@@ -82,6 +93,9 @@ CREATE INDEX idx_payments_paid_at
 
 CREATE INDEX idx_payments_collected_by
     ON payments(collected_by);
+
+CREATE INDEX idx_payments_refunded_at
+    ON payments(refunded_at);
 
 -- ===========================
 -- Invoice code sequences
@@ -187,7 +201,7 @@ CREATE TABLE invoice_lines (
         ON DELETE CASCADE,
 
     CONSTRAINT chk_invoice_lines_type
-        CHECK (line_type IN ('EXAM_FEE', 'MEDICINE_FEE', 'ADJUSTMENT')),
+        CHECK (line_type IN ('EXAM_FEE', 'MEDICINE_FEE', 'SERVICE_FEE', 'ADJUSTMENT')),
 
     CONSTRAINT chk_invoice_lines_quantity
         CHECK (quantity > 0),
@@ -204,3 +218,24 @@ CREATE INDEX idx_invoice_lines_invoice
 
 CREATE INDEX idx_invoice_lines_type
     ON invoice_lines(line_type);
+
+
+CREATE TABLE payment_service_fees (
+    id BINARY(16) NOT NULL,
+    payment_id BINARY(16) NOT NULL,
+    clinical_order_item_id BINARY(16) NOT NULL,
+    service_name VARCHAR(150) NOT NULL,
+    amount DECIMAL(15, 2) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+
+    CONSTRAINT pk_payment_service_fees PRIMARY KEY (id),
+    CONSTRAINT uk_payment_service_fee_item UNIQUE (payment_id, clinical_order_item_id),
+    CONSTRAINT fk_payment_service_fee_payment
+        FOREIGN KEY (payment_id) REFERENCES payments(id),
+    CONSTRAINT fk_payment_service_fee_clinical_item
+        FOREIGN KEY (clinical_order_item_id) REFERENCES clinical_order_items(id),
+    CONSTRAINT chk_payment_service_fee_amount CHECK (amount >= 0)
+);
+
+CREATE INDEX idx_payment_service_fees_payment
+    ON payment_service_fees(payment_id);

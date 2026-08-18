@@ -1,4 +1,4 @@
--- =====================================================
+﻿-- =====================================================
 -- V18__create_prescription_tables.sql
 -- Medicine catalog, prescriptions and drug interaction rules
 -- Includes the warning-log rule_id and severity alignment
@@ -325,3 +325,7 @@ CREATE INDEX idx_prescription_amendments_amended_by
 
 CREATE INDEX idx_prescription_amendments_amended_at
     ON prescription_amendments(amended_at);
+
+
+CREATE INDEX idx_prescriptions_status_prescribed_at
+    ON prescriptions(status, prescribed_at);

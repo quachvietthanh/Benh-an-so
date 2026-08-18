@@ -1,4 +1,4 @@
-CREATE TABLE patients (
+﻿CREATE TABLE patients (
     id BINARY(16) NOT NULL,
     patient_code VARCHAR(30) NOT NULL,
     full_name VARCHAR(100) NOT NULL,

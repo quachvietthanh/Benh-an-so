@@ -1,3 +1,139 @@
+﻿CREATE TABLE appointments (
+    id BINARY(16) NOT NULL,
+    appointment_code VARCHAR(30) NOT NULL,
+    patient_id BINARY(16) NOT NULL,
+    doctor_id BINARY(16) NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    reason VARCHAR(500) NOT NULL,
+    cancel_reason VARCHAR(500),
+    checked_in_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    created_by BINARY(16) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_appointments PRIMARY KEY (id),
+    CONSTRAINT uk_appointments_code UNIQUE (appointment_code),
+    CONSTRAINT fk_appointments_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
+    CONSTRAINT fk_appointments_doctor FOREIGN KEY (doctor_id) REFERENCES users(id),
+    CONSTRAINT fk_appointments_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT ck_appointments_time_range CHECK (end_time > start_time)
+);
+
+CREATE INDEX idx_appointments_patient ON appointments(patient_id);
+CREATE INDEX idx_appointments_created_by ON appointments(created_by);
+CREATE INDEX idx_appointments_end_time ON appointments(end_time);
+CREATE INDEX idx_appointments_status_start_time ON appointments(status, start_time);
+CREATE INDEX idx_appointments_doctor_status_start_time ON appointments(doctor_id, status, start_time);
+
+
+CREATE TABLE rooms (
+    id BINARY(16) NOT NULL,
+    room_code VARCHAR(30) NOT NULL,
+    room_name VARCHAR(100) NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NULL,
+    CONSTRAINT pk_rooms PRIMARY KEY (id),
+    CONSTRAINT uk_rooms_code UNIQUE (room_code),
+    CONSTRAINT ck_rooms_code_not_blank CHECK (CHAR_LENGTH(TRIM(room_code)) BETWEEN 1 AND 30),
+    CONSTRAINT ck_rooms_name_not_blank CHECK (CHAR_LENGTH(TRIM(room_name)) BETWEEN 1 AND 100)
+);
+
+CREATE TABLE doctor_room_assignments (
+    id BINARY(16) NOT NULL,
+    doctor_id BINARY(16) NOT NULL,
+    room_id BINARY(16) NOT NULL,
+    assigned_by BINARY(16) NOT NULL,
+    assigned_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_doctor_room_assignments PRIMARY KEY (id),
+    CONSTRAINT uk_doctor_room_assignments_doctor UNIQUE (doctor_id),
+    CONSTRAINT uk_doctor_room_assignments_room UNIQUE (room_id),
+    CONSTRAINT fk_doctor_room_assignments_doctor FOREIGN KEY (doctor_id) REFERENCES users(id),
+    CONSTRAINT fk_doctor_room_assignments_room FOREIGN KEY (room_id) REFERENCES rooms(id),
+    CONSTRAINT fk_doctor_room_assignments_assigned_by FOREIGN KEY (assigned_by) REFERENCES users(id)
+);
+
+CREATE TABLE medical_queues (
+    id BINARY(16) NOT NULL,
+    doctor_id BINARY(16) NOT NULL,
+    room_id BINARY(16) NOT NULL,
+    queue_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_medical_queues PRIMARY KEY (id),
+    CONSTRAINT uk_medical_queues_doctor_date UNIQUE (doctor_id, queue_date),
+    CONSTRAINT fk_medical_queues_doctor FOREIGN KEY (doctor_id) REFERENCES users(id),
+    CONSTRAINT fk_medical_queues_room FOREIGN KEY (room_id) REFERENCES rooms(id),
+    CONSTRAINT ck_medical_queues_status CHECK (status IN ('OPEN', 'CLOSED'))
+);
+
+CREATE TABLE queue_items (
+    id BINARY(16) NOT NULL,
+    medical_queue_id BINARY(16) NOT NULL,
+    patient_id BINARY(16) NOT NULL,
+    appointment_id BINARY(16) NULL,
+    visit_id BINARY(16) NOT NULL,
+    source_type VARCHAR(20) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    queue_number INT NOT NULL,
+    queue_date DATE NOT NULL,
+    checked_in_at TIMESTAMP NOT NULL,
+    called_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    cancelled_at TIMESTAMP NULL,
+    cancel_reason VARCHAR(500) NULL,
+    skipped_at TIMESTAMP NULL,
+    skip_reason VARCHAR(500) NULL,
+    created_by BINARY(16) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_queue_items PRIMARY KEY (id),
+    CONSTRAINT uk_queue_items_appointment UNIQUE (appointment_id),
+    CONSTRAINT uk_queue_items_visit UNIQUE (visit_id),
+    CONSTRAINT uk_queue_items_queue_number UNIQUE (medical_queue_id, queue_number),
+    CONSTRAINT fk_queue_items_queue FOREIGN KEY (medical_queue_id) REFERENCES medical_queues(id),
+    CONSTRAINT fk_queue_items_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
+    CONSTRAINT fk_queue_items_appointment FOREIGN KEY (appointment_id) REFERENCES appointments(id),
+    CONSTRAINT fk_queue_items_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT ck_queue_items_source_type CHECK (source_type IN ('APPOINTMENT', 'WALK_IN')),
+    CONSTRAINT ck_queue_items_status CHECK (status IN ('WAITING', 'IN_PROGRESS', 'WAITING_FOR_RESULT', 'COMPLETED', 'CANCELLED', 'SKIPPED'))
+);
+
+CREATE INDEX idx_rooms_active ON rooms(active);
+CREATE INDEX idx_medical_queues_room_date ON medical_queues(room_id, queue_date);
+CREATE INDEX idx_queue_items_queue_status_number ON queue_items(medical_queue_id, status, queue_number);
+CREATE INDEX idx_queue_items_patient_date_status ON queue_items(patient_id, queue_date, status);
+CREATE INDEX idx_queue_items_visit ON queue_items(visit_id);
+
+
+
+CREATE TABLE appointment_notification_logs (
+    id BINARY(16) NOT NULL,
+    appointment_id BINARY(16) NOT NULL,
+    patient_id BINARY(16) NOT NULL,
+    notification_type VARCHAR(50) NOT NULL,
+    channel VARCHAR(30) NOT NULL,
+    content TEXT NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    attempted_at TIMESTAMP NOT NULL,
+    sent_at TIMESTAMP NULL,
+    failure_reason VARCHAR(500) NULL,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_appointment_notification_logs PRIMARY KEY (id),
+    CONSTRAINT fk_appointment_notification_logs_appointment
+        FOREIGN KEY (appointment_id) REFERENCES appointments(id),
+    CONSTRAINT fk_appointment_notification_logs_patient
+        FOREIGN KEY (patient_id) REFERENCES patients(id)
+);
+
+CREATE INDEX idx_appointment_notification_logs_lookup
+    ON appointment_notification_logs(appointment_id, notification_type, status);
+CREATE INDEX idx_appointment_notification_logs_attempted_at
+    ON appointment_notification_logs(attempted_at);
+
+
 -- =====================================================
 -- V10 - Medical Visit and Medical Record
 -- =====================================================
@@ -302,3 +438,13 @@ CREATE INDEX idx_diagnoses_catalog
 
 CREATE INDEX idx_diagnoses_type
     ON medical_record_diagnoses(diagnosis_type);
+
+
+CREATE INDEX idx_access_user
+    ON medical_record_access_logs(accessed_by);
+
+CREATE INDEX idx_access_time
+    ON medical_record_access_logs(accessed_at);
+
+CREATE INDEX idx_access_user_time
+    ON medical_record_access_logs(accessed_by, accessed_at);

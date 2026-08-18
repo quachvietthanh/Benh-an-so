@@ -1,4 +1,4 @@
--- =====================================================
+﻿-- =====================================================
 -- V26__seed_billing_data.sql
 -- Seed payment and invoice data for billing flows
 -- Depends on V14 medical record/visit seed data,
