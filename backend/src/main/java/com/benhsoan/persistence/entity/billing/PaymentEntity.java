@@ -41,6 +41,9 @@ public class PaymentEntity {
     @Column(name = "medicine_fee", nullable = false, precision = 15, scale = 2)
     private BigDecimal medicineFee;
 
+    @Column(name = "service_fee", nullable = false, precision = 15, scale = 2)
+    private BigDecimal serviceFee;
+
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalAmount;
 

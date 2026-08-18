@@ -131,6 +131,7 @@ class InvoiceSecurityIntegrationTest {
                 visitId,
                 new BigDecimal("100000"),
                 new BigDecimal("150000"),
+                BigDecimal.ZERO,
                 new BigDecimal("250000"),
                 new BigDecimal("250000"),
                 PaymentMethod.CASH,

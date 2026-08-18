@@ -12,6 +12,7 @@ public record PaymentResult(
         UUID visitId,
         BigDecimal examFee,
         BigDecimal medicineFee,
+        BigDecimal serviceFee,
         BigDecimal totalAmount,
         BigDecimal amountPaid,
         PaymentMethod paymentMethod,

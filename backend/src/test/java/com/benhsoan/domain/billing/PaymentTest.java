@@ -21,6 +21,26 @@ import com.benhsoan.domain.visit.enums.VisitStatus;
 class PaymentTest {
 
     @Test
+    void recordIncludesClinicalServiceFeeInTotal() {
+        Payment payment = Payment.record(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("95000"),
+                new BigDecimal("345000"),
+                PaymentMethod.CASH,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                VisitStatus.COMPLETED,
+                true
+        );
+
+        assertEquals(new BigDecimal("95000"), payment.getServiceFee());
+        assertEquals(new BigDecimal("345000"), payment.getTotalAmount());
+    }
+
+    @Test
     @DisplayName("record should create payment before the visit is completed")
     void recordShouldSucceedForWaitingVisit() {
         Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");

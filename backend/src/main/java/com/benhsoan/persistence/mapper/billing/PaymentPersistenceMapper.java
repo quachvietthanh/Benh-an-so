@@ -18,6 +18,7 @@ public class PaymentPersistenceMapper {
                 entity.getVisitId(),
                 entity.getExamFee(),
                 entity.getMedicineFee(),
+                entity.getServiceFee(),
                 entity.getTotalAmount(),
                 entity.getAmountPaid(),
                 entity.getPaymentMethod(),
@@ -41,6 +42,7 @@ public class PaymentPersistenceMapper {
                 .visitId(domain.getVisitId())
                 .examFee(domain.getExamFee())
                 .medicineFee(domain.getMedicineFee())
+                .serviceFee(domain.getServiceFee())
                 .totalAmount(domain.getTotalAmount())
                 .amountPaid(domain.getAmountPaid())
                 .paymentMethod(domain.getPaymentMethod())

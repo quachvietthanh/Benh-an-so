@@ -6,5 +6,7 @@ public enum InvoiceLineType {
 
     MEDICINE_FEE,
 
+    SERVICE_FEE,
+
     ADJUSTMENT
 }

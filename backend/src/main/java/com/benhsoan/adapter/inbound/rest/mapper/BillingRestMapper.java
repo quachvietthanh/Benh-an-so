@@ -65,6 +65,7 @@ public class BillingRestMapper {
                 result.visitId(),
                 result.examFee(),
                 result.medicineFee(),
+                result.serviceFee(),
                 result.totalAmount(),
                 result.amountPaid(),
                 result.paymentMethod(),

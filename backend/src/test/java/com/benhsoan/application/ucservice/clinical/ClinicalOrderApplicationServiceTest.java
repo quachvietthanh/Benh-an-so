@@ -71,7 +71,7 @@ class ClinicalOrderApplicationServiceTest {
         UUID serviceId = UUID.randomUUID();
         Visit visit = activeVisit(visitId, patientId, actorId);
         MedicalRecord record = editableMedicalRecord(visitId, actorId);
-        ClinicalServiceCatalog catalog = ClinicalServiceCatalog.restore(serviceId, "LAB-GLU", "Blood glucose",
+        ClinicalServiceCatalog catalog = ClinicalServiceCatalog.restore(serviceId, UUID.randomUUID(), "LAB-GLU", "Blood glucose",
                 ClinicalServiceType.LAB_TEST, ClinicalResultDataType.NUMBER, "mmol/L", null, null, true, NOW, null);
         when(authorizationService.requireWriteAccess()).thenReturn(actorId);
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
@@ -178,7 +178,7 @@ class ClinicalOrderApplicationServiceTest {
     @Test
     void searchesOnlyActiveCatalogServices() {
         UUID actorId = UUID.randomUUID();
-        ClinicalServiceCatalog catalog = ClinicalServiceCatalog.restore(UUID.randomUUID(), "LAB-GLU", "Blood glucose",
+        ClinicalServiceCatalog catalog = ClinicalServiceCatalog.restore(UUID.randomUUID(), UUID.randomUUID(), "LAB-GLU", "Blood glucose",
                 ClinicalServiceType.LAB_TEST, ClinicalResultDataType.NUMBER, "mmol/L", null, null, true, NOW, null);
         when(authorizationService.requireReadAccess()).thenReturn(actorId);
         when(clinicalServiceCatalogRepository.findActiveByKeyword("glucose", PageRequest.of(0, 20)))

@@ -35,9 +35,11 @@ import com.benhsoan.port.dto.command.billing.RecordPaymentCommand;
 import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -52,6 +54,7 @@ class RecordPaymentServiceTest {
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
         ClockPort clockPort = mock(ClockPort.class);
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
         RecordPaymentService service = new RecordPaymentService(
                 visitRepository,
                 medicalRecordRepository,
@@ -60,7 +63,8 @@ class RecordPaymentServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                new PaymentResultMapper()
+                new PaymentResultMapper(),
+                feeCalculator
         );
 
         UUID visitId = UUID.randomUUID();
@@ -75,18 +79,23 @@ class RecordPaymentServiceTest {
         when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(visit));
         when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
         when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(feeCalculator.calculate(visitId, now)).thenReturn(List.of(
+                new ClinicalServiceCharge(UUID.randomUUID(), "Blood test", new BigDecimal("95000"))
+        ));
+        when(feeCalculator.total(any())).thenReturn(new BigDecimal("95000"));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentResult result = service.record(new RecordPaymentCommand(
                 visitId,
                 new BigDecimal("100000"),
                 new BigDecimal("150000"),
-                new BigDecimal("250000"),
+                new BigDecimal("345000"),
                 PaymentMethod.CASH
         ));
 
         assertEquals(visitId, result.visitId());
-        assertEquals(new BigDecimal("250000"), result.totalAmount());
+        assertEquals(new BigDecimal("95000"), result.serviceFee());
+        assertEquals(new BigDecimal("345000"), result.totalAmount());
         assertEquals(actorId, result.collectedBy());
         verify(paymentRepository).save(any(Payment.class));
         verify(auditLogRepository).save(any());
@@ -364,7 +373,15 @@ class RecordPaymentServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                new PaymentResultMapper()
+                new PaymentResultMapper(),
+                noServiceFees()
+        );
+    }
+
+    private static ClinicalServiceFeeCalculator noServiceFees() {
+        return new ClinicalServiceFeeCalculator(
+                mock(ClinicalOrderItemRepository.class),
+                mock(ServicePriceRepository.class)
         );
     }
 

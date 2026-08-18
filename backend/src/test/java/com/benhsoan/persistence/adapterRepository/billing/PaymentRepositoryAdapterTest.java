@@ -64,6 +64,7 @@ class PaymentRepositoryAdapterTest {
                 .visitId(UUID.randomUUID())
                 .examFee(new BigDecimal("100000"))
                 .medicineFee(BigDecimal.ZERO)
+                .serviceFee(BigDecimal.ZERO)
                 .totalAmount(new BigDecimal("100000"))
                 .amountPaid(new BigDecimal("100000"))
                 .paymentMethod(PaymentMethod.CASH)

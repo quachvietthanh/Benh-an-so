@@ -32,6 +32,8 @@ public class Payment {
 
     private BigDecimal medicineFee;
 
+    private BigDecimal serviceFee;
+
     private BigDecimal totalAmount;
 
     private BigDecimal amountPaid;
@@ -57,6 +59,7 @@ public class Payment {
             UUID visitId,
             BigDecimal examFee,
             BigDecimal medicineFee,
+            BigDecimal serviceFee,
             BigDecimal totalAmount,
             BigDecimal amountPaid,
             PaymentMethod paymentMethod,
@@ -72,7 +75,13 @@ public class Payment {
         this.visitId = requireNonNull(visitId, "Visit id is required.");
         this.examFee = validateNonNegative(examFee, "Exam fee is required.");
         this.medicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
-        this.totalAmount = validateTotalAmount(totalAmount, this.examFee, this.medicineFee);
+        this.serviceFee = validateNonNegative(serviceFee, "Service fee is required.");
+        this.totalAmount = validateTotalAmount(
+                totalAmount,
+                this.examFee,
+                this.medicineFee,
+                this.serviceFee
+        );
         this.amountPaid = validateAmountPaid(amountPaid, this.totalAmount);
         this.paymentMethod = requireNonNull(paymentMethod, "Payment method is required.");
         this.status = requireNonNull(status, "Payment status is required.");
@@ -89,6 +98,7 @@ public class Payment {
             UUID visitId,
             BigDecimal examFee,
             BigDecimal medicineFee,
+            BigDecimal serviceFee,
             BigDecimal amountPaid,
             PaymentMethod paymentMethod,
             UUID collectedBy,
@@ -99,7 +109,8 @@ public class Payment {
         validatePaymentEligibility(visitStatus, dispensingCompleted);
         BigDecimal validatedExamFee = validateNonNegative(examFee, "Exam fee is required.");
         BigDecimal validatedMedicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
-        BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee);
+        BigDecimal validatedServiceFee = validateNonNegative(serviceFee, "Service fee is required.");
+        BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee).add(validatedServiceFee);
         if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ValidationException("Payment total amount must be greater than zero.");
         }
@@ -109,6 +120,7 @@ public class Payment {
                 visitId,
                 validatedExamFee,
                 validatedMedicineFee,
+                validatedServiceFee,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -119,6 +131,33 @@ public class Payment {
                 null,
                 null,
                 paidAt
+        );
+    }
+
+    public static Payment record(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            UUID collectedBy,
+            Instant paidAt,
+            VisitStatus visitStatus,
+            boolean dispensingCompleted
+    ) {
+        return record(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                BigDecimal.ZERO,
+                amountPaid,
+                paymentMethod,
+                collectedBy,
+                paidAt,
+                visitStatus,
+                dispensingCompleted
         );
     }
 
@@ -140,6 +179,40 @@ public class Payment {
                 visitId,
                 examFee,
                 medicineFee,
+                BigDecimal.ZERO,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                null,
+                null,
+                null,
+                createdAt
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            Instant createdAt
+    ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -174,6 +247,43 @@ public class Payment {
                 visitId,
                 examFee,
                 medicineFee,
+                BigDecimal.ZERO,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt
+    ) {
+        return new Payment(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -237,12 +347,15 @@ public class Payment {
     private static BigDecimal validateTotalAmount(
             BigDecimal totalAmount,
             BigDecimal examFee,
-            BigDecimal medicineFee
+            BigDecimal medicineFee,
+            BigDecimal serviceFee
     ) {
         BigDecimal validatedTotal = validateNonNegative(totalAmount, "Total amount is required.");
-        BigDecimal expectedTotal = examFee.add(medicineFee);
+        BigDecimal expectedTotal = examFee.add(medicineFee).add(serviceFee);
         if (validatedTotal.compareTo(expectedTotal) != 0) {
-            throw new ValidationException("Total amount must equal exam fee plus medicine fee.");
+            throw new ValidationException(
+                    "Total amount must equal exam fee plus medicine fee plus service fee."
+            );
         }
         return validatedTotal;
     }

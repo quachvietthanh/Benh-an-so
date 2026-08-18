@@ -123,6 +123,7 @@ class PaymentRepositoryJpaIntegrationTest {
                 .visitId(UUID.randomUUID())
                 .examFee(amount)
                 .medicineFee(BigDecimal.ZERO)
+                .serviceFee(BigDecimal.ZERO)
                 .totalAmount(amount)
                 .amountPaid(amount)
                 .paymentMethod(PaymentMethod.CASH)

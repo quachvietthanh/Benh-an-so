@@ -47,6 +47,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final PaymentResultMapper resultMapper;
+    private final ClinicalServiceFeeCalculator clinicalServiceFeeCalculator;
 
     @Override
     public PaymentResult record(RecordPaymentCommand command) {
@@ -69,12 +70,15 @@ public class RecordPaymentService implements RecordPaymentUseCase {
 
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
+        List<ClinicalServiceCharge> serviceCharges = clinicalServiceFeeCalculator
+                .calculate(visit.getId(), now);
 
         Payment payment = Payment.record(
                 UUID.randomUUID(),
                 visit.getId(),
                 command.examFee(),
                 command.medicineFee(),
+                clinicalServiceFeeCalculator.total(serviceCharges),
                 command.amountPaid(),
                 command.paymentMethod(),
                 actorId,
@@ -103,6 +107,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 "visitId":"%s",
                 "examFee":"%s",
                 "medicineFee":"%s",
+                "serviceFee":"%s",
                 "totalAmount":"%s",
                 "paymentMethod":"%s"
                 }
@@ -110,6 +115,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                         saved.getVisitId(),
                         saved.getExamFee(),
                         saved.getMedicineFee(),
+                        saved.getServiceFee(),
                         saved.getTotalAmount(),
                         saved.getPaymentMethod()
                 ),

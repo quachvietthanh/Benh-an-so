@@ -218,6 +218,7 @@ class RefundPaymentTransactionIntegrationTest {
                 .visitId(visitId)
                 .examFee(new BigDecimal("100000"))
                 .medicineFee(new BigDecimal("150000"))
+                .serviceFee(BigDecimal.ZERO)
                 .totalAmount(new BigDecimal("250000"))
                 .amountPaid(new BigDecimal("250000"))
                 .paymentMethod(PaymentMethod.CASH)

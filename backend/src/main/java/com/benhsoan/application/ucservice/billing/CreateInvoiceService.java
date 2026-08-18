@@ -44,6 +44,7 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final InvoiceResultMapper resultMapper;
+    private final ClinicalServiceFeeCalculator clinicalServiceFeeCalculator;
 
     @Override
     public InvoiceResult create(CreateInvoiceCommand command) {
@@ -53,8 +54,11 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
         UUID invoiceId = UUID.randomUUID();
+        List<ClinicalServiceCharge> serviceCharges = clinicalServiceFeeCalculator
+                .calculate(payment.getVisitId(), now);
+        validateCollectedServiceFee(payment, serviceCharges);
 
-        List<InvoiceLine> lines = buildInvoiceLines(payment, invoiceId, now);
+        List<InvoiceLine> lines = buildInvoiceLines(payment, invoiceId, now, serviceCharges);
 
         boolean paymentRecorded = payment.getStatus() == PaymentStatus.RECORDED
                 || payment.getStatus() == PaymentStatus.SUCCESS;
@@ -158,7 +162,8 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
     private List<InvoiceLine> buildInvoiceLines(
             Payment payment,
             UUID invoiceId,
-            Instant now
+            Instant now,
+            List<ClinicalServiceCharge> serviceCharges
     ) {
         List<InvoiceLine> lines = new ArrayList<>();
 
@@ -190,11 +195,39 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
             ));
         }
 
+        serviceCharges.stream()
+                .filter(charge -> charge.price().compareTo(java.math.BigDecimal.ZERO) > 0)
+                .map(charge -> InvoiceLine.create(
+                        UUID.randomUUID(),
+                        invoiceId,
+                        InvoiceLineType.SERVICE_FEE,
+                        charge.serviceName(),
+                        charge.clinicalOrderItemId(),
+                        1,
+                        charge.price(),
+                        charge.price(),
+                        now
+                ))
+                .forEach(lines::add);
+
         if (lines.isEmpty()) {
             throw new ValidationException("Invoice must contain at least one non-zero charge line.");
         }
 
         return List.copyOf(lines);
+    }
+
+    private void validateCollectedServiceFee(
+            Payment payment,
+            List<ClinicalServiceCharge> serviceCharges
+    ) {
+        if (payment.getServiceFee().compareTo(
+                clinicalServiceFeeCalculator.total(serviceCharges)
+        ) != 0) {
+            throw new ValidationException(
+                    "Clinical service fees changed after payment was recorded."
+            );
+        }
     }
 
     private boolean isDuplicateOriginalInvoiceConflict(DataIntegrityViolationException ex) {

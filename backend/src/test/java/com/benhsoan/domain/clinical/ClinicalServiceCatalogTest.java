@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +16,7 @@ class ClinicalServiceCatalogTest {
     @Test
     void updatesAndReactivatesService() {
         ClinicalServiceCatalog service = ClinicalServiceCatalog.create(
-                "LAB-001", "Blood glucose", ClinicalServiceType.LAB_TEST,
+                UUID.randomUUID(), "LAB-001", "Blood glucose", ClinicalServiceType.LAB_TEST,
                 ClinicalResultDataType.NUMBER, "mmol/L", "3.9-5.5", null,
                 Instant.parse("2026-08-20T01:00:00Z")
         );

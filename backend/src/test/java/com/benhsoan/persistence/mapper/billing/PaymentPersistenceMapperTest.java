@@ -25,8 +25,9 @@ class PaymentPersistenceMapperTest {
                 UUID.randomUUID(),
                 new BigDecimal("100000"),
                 new BigDecimal("50000"),
-                new BigDecimal("150000"),
-                new BigDecimal("150000"),
+                new BigDecimal("75000"),
+                new BigDecimal("225000"),
+                new BigDecimal("225000"),
                 PaymentMethod.CASH,
                 PaymentStatus.REFUNDED,
                 UUID.randomUUID(),
@@ -42,5 +43,6 @@ class PaymentPersistenceMapperTest {
         assertEquals("Patient cancelled the remaining services", restored.getRefundReason());
         assertEquals(refundedBy, restored.getRefundedBy());
         assertEquals(refundedAt, restored.getRefundedAt());
+        assertEquals(new BigDecimal("75000"), restored.getServiceFee());
     }
 }

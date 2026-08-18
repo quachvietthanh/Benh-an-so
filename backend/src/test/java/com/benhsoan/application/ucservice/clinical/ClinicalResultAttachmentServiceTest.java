@@ -209,7 +209,7 @@ class ClinicalResultAttachmentServiceTest {
                 null, ClinicalResultAbnormalFlag.UNKNOWN, null, actorId, NOW);
         ClinicalOrderItem item = ClinicalOrderItem.restore(itemId, UUID.randomUUID(), serviceId, "LAB-PDF",
                 "PDF result", null, ClinicalOrderItemStatus.PENDING, NOW, null);
-        ClinicalServiceCatalog service = ClinicalServiceCatalog.restore(serviceId, "LAB-PDF", "PDF result",
+        ClinicalServiceCatalog service = ClinicalServiceCatalog.restore(serviceId, UUID.randomUUID(), "LAB-PDF", "PDF result",
                 ClinicalServiceType.LAB_TEST, com.benhsoan.domain.clinical.enums.ClinicalResultDataType.FILE,
                 null, null, null, true, NOW, null);
         return new Fixture(actorId, visit, record, result, item, service);

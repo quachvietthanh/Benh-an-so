@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,7 @@ import com.benhsoan.domain.billing.Invoice;
 import com.benhsoan.domain.billing.Payment;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
+import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException;
 import com.benhsoan.domain.billing.exception.PaymentNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -29,10 +31,63 @@ import com.benhsoan.port.outbound.generator.InvoiceCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.InvoiceRepository;
 import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
+import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 class CreateInvoiceServiceTest {
+
+    @Test
+    void createsOneServiceFeeLinePerCompletedClinicalItem() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
+        InvoiceCodeGenerator invoiceCodeGenerator = mock(InvoiceCodeGenerator.class);
+        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
+        UUID visitId = UUID.randomUUID();
+        UUID clinicalItemId = UUID.randomUUID();
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                visitId,
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("95000"),
+                new BigDecimal("345000"),
+                new BigDecimal("345000"),
+                PaymentMethod.CASH,
+                PaymentStatus.RECORDED,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-12T01:00:00Z"),
+                Instant.parse("2026-08-12T01:00:00Z")
+        );
+        List<ClinicalServiceCharge> charges = List.of(
+                new ClinicalServiceCharge(clinicalItemId, "Blood test", new BigDecimal("95000"))
+        );
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.of(payment));
+        when(invoiceRepository.findOriginalByVisitId(visitId)).thenReturn(Optional.empty());
+        when(invoiceCodeGenerator.generate()).thenReturn("HD000009");
+        when(feeCalculator.calculate(visitId, Instant.parse("2026-08-12T02:00:00Z")))
+                .thenReturn(charges);
+        when(feeCalculator.total(charges)).thenReturn(new BigDecimal("95000"));
+        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        CreateInvoiceService service = new CreateInvoiceService(
+                paymentRepository,
+                invoiceRepository,
+                invoiceCodeGenerator,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper(),
+                feeCalculator
+        );
+
+        InvoiceResult result = service.create(new CreateInvoiceCommand(visitId, null));
+
+        assertEquals(new BigDecimal("345000"), result.totalAmount());
+        assertEquals(3, result.lines().size());
+        assertEquals(InvoiceLineType.SERVICE_FEE, result.lines().get(2).lineType());
+        assertEquals(clinicalItemId, result.lines().get(2).referenceId());
+    }
 
     @Test
     void createsOriginalInvoiceFromVisitPayment() {
@@ -50,7 +105,8 @@ class CreateInvoiceServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         UUID visitId = UUID.randomUUID();
@@ -83,7 +139,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
@@ -111,7 +168,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         UUID visitId = UUID.randomUUID();
@@ -153,7 +211,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         assertThrows(
@@ -179,7 +238,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         assertThrows(
@@ -201,7 +261,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
@@ -230,7 +291,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
@@ -255,7 +317,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         assertThrows(
@@ -277,7 +340,8 @@ class CreateInvoiceServiceTest {
                 authorizedCurrentUser(),
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         UUID paymentVisitId = UUID.randomUUID();
@@ -303,7 +367,8 @@ class CreateInvoiceServiceTest {
                 currentUserPort,
                 fixedClock(),
                 mock(AuditLogRepository.class),
-                new InvoiceResultMapper()
+                new InvoiceResultMapper(),
+                noServiceFees()
         );
 
         assertThrows(
@@ -318,6 +383,13 @@ class CreateInvoiceServiceTest {
         when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
         return currentUserPort;
+    }
+
+    private static ClinicalServiceFeeCalculator noServiceFees() {
+        return new ClinicalServiceFeeCalculator(
+                mock(ClinicalOrderItemRepository.class),
+                mock(ServicePriceRepository.class)
+        );
     }
 
     private static ClockPort fixedClock() {
