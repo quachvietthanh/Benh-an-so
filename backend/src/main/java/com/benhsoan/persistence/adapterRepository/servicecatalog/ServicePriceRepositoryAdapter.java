@@ -25,7 +25,7 @@ public class ServicePriceRepositoryAdapter implements ServicePriceRepository {
     @Override
     public ServicePrice save(ServicePrice servicePrice) {
         Objects.requireNonNull(servicePrice, "Service price must not be null.");
-        return mapper.toDomain(jpaRepository.save(mapper.toEntity(servicePrice)));
+        return mapper.toDomain(jpaRepository.saveAndFlush(mapper.toEntity(servicePrice)));
     }
 
     @Override

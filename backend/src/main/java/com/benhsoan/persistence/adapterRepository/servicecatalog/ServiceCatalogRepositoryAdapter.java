@@ -27,7 +27,7 @@ public class ServiceCatalogRepositoryAdapter implements ServiceCatalogRepository
     @Override
     public ServiceCatalog save(ServiceCatalog serviceCatalog) {
         Objects.requireNonNull(serviceCatalog, "Service catalog must not be null.");
-        return mapper.toDomain(jpaRepository.save(mapper.toEntity(serviceCatalog)));
+        return mapper.toDomain(jpaRepository.saveAndFlush(mapper.toEntity(serviceCatalog)));
     }
 
     @Override

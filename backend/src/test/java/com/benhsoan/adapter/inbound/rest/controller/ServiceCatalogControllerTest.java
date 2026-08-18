@@ -267,6 +267,26 @@ class ServiceCatalogControllerTest {
         );
     }
 
+    @Test
+    void rejectsUnauthenticatedRequests() throws Exception {
+        mockMvc.perform(get("/system/services"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/system/services")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody()))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(
+                createServiceCatalogUseCase,
+                updateServiceCatalogUseCase,
+                updateServiceCatalogStatusUseCase,
+                getServiceCatalogUseCase,
+                searchServiceCatalogUseCase,
+                getServicePriceHistoryUseCase
+        );
+    }
+
     private String createRequestBody() {
         return """
                 {
