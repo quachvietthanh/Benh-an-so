@@ -77,6 +77,10 @@ public class SecurityConfig {
                                                 .requestMatchers("/roles/**", "/permissions/**").authenticated()
                                                 .requestMatchers("/system/services/**").authenticated()
                                                 .requestMatchers("/system/clinic/**").authenticated()
+                                                .requestMatchers("/backups/**").authenticated()
+                                                .requestMatchers("/follow-up-reminders/**").authenticated()
+                                                .requestMatchers("/care-logs/**").authenticated()
+                                                .requestMatchers("/dashboard/**").authenticated()
 
                                                 // ===== PATIENTS =====
                                                 .requestMatchers("/patients/**").authenticated()

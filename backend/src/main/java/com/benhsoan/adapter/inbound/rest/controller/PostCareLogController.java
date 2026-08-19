@@ -8,7 +8,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +23,7 @@ import com.benhsoan.adapter.inbound.rest.request.carelog.CreatePostCareLogReques
 import com.benhsoan.adapter.inbound.rest.response.carelog.PostCareLogResponse;
 import com.benhsoan.domain.carelog.enums.ContactChannel;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.carelog.SearchPostCareLogsQuery;
 import com.benhsoan.port.inbound.carelog.CreatePostCareLogUseCase;
 import com.benhsoan.port.inbound.carelog.GetPatientCareLogsUseCase;
@@ -45,19 +45,19 @@ public class PostCareLogController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'DOCTOR')")
+    @RequirePermission("CARE_LOG_CREATE")
     public PostCareLogResponse create(@Valid @RequestBody CreatePostCareLogRequest request) {
         return mapper.toResponse(createPostCareLogUseCase.create(mapper.toCommand(request)));
     }
 
     @GetMapping("/patient/{patientId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'DOCTOR')")
+    @RequirePermission("CARE_LOG_READ")
     public List<PostCareLogResponse> getForPatient(@PathVariable UUID patientId) {
         return mapper.toResponse(getPatientCareLogsUseCase.getForPatient(patientId));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'DOCTOR')")
+    @RequirePermission("CARE_LOG_READ")
     public Page<PostCareLogResponse> search(
             @RequestParam(required = false) ContactChannel channel,
             @RequestParam(required = false) Instant from,
