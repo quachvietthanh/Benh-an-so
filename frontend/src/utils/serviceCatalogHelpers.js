@@ -1,281 +1,184 @@
-/**
- * Tiện ích và hàm hỗ trợ nghiệp vụ Quản lý Danh mục Dịch vụ và Bảng giá
- */
+import dayjs from 'dayjs'
 
 /**
- * Kiểm tra quyền quản lý dịch vụ và bảng giá
- * Cho phép ADMIN và MANAGER
+ * Format số tiền VND sang chuỗi hiển thị
  */
-export function checkServiceManagePermission(roles) {
-  const rList = (Array.isArray(roles) ? roles : [roles])
-    .map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
-    .filter(Boolean)
-  return rList.includes('admin') || rList.includes('manager')
-}
-
-/**
- * Khắc phục lỗi encoding tiếng Việt (Mojibake UTF-8 bị đọc nhầm theo ISO-8859-1/Windows-1252)
- */
-export function fixVietnameseEncoding(str) {
-  if (!str || typeof str !== 'string') return str
-  // Kiểm tra các ký tự dấu hiệu của mojibake như Ä, Å, Æ, Ã...
-  if (!/[ÃÄÅÆÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞß]/.test(str)) {
-    return str
-  }
-
-  try {
-    const bytes = new Uint8Array([...str].map((c) => c.charCodeAt(0) & 0xff))
-    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
-    if (decoded && !decoded.includes('\ufffd') && decoded !== str) {
-      return decoded
-    }
-  } catch {
-    // fallback nếu có lỗi giải mã
-  }
-
-  return str
-}
-
-/**
- * Chuẩn hóa một bản ghi dịch vụ, giải mã tiếng Việt chuẩn xác
- */
-export function normalizeServiceItem(service) {
-  if (!service || typeof service !== 'object') return service
-  return {
-    ...service,
-    name: fixVietnameseEncoding(service.name || ''),
-    serviceCode: service.serviceCode || '',
-  }
-}
-
-/**
- * Định dạng tiền tệ theo chuẩn Việt Nam (VND)
- */
-export function formatMoney(value) {
+export const formatVND = (value) => {
   const num = Number(value || 0)
-  if (Number.isNaN(num)) return '0 ₫'
   return `${num.toLocaleString('vi-VN')} ₫`
 }
 
 /**
- * Định dạng ngày YYYY-MM-DD sang DD/MM/YYYY
+ * Kiểm tra quyền quản lý danh mục dịch vụ và bảng giá (Admin và Manager)
  */
-export function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  const parts = String(dateStr).split('T')[0].split('-')
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`
-  }
-  return dateStr
+export const checkServiceManagementPermission = (roles) => {
+  if (!roles) return false
+  const roleList = (Array.isArray(roles) ? roles : [roles])
+    .map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    .filter(Boolean)
+  return roleList.includes('admin') || roleList.includes('manager')
 }
 
 /**
- * Lấy chuỗi ngày hôm nay YYYY-MM-DD theo giờ địa phương
+ * Chuẩn hóa dữ liệu trả về từ API (hỗ trợ cả Spring Data Page { content: [...] } lẫn mảng thuần)
  */
-export function getTodayDateString(refDate = new Date()) {
-  const d = new Date(refDate)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+export const normalizeServiceList = (data) => {
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.content)) return data.content
+  if (Array.isArray(data.items)) return data.items
+  return []
 }
 
 /**
- * Validate dữ liệu dịch vụ trước khi gửi API
+ * Validate dữ liệu tạo dịch vụ mới
  */
-export function validateServicePayload(payload, isEditing = false) {
-  if (!payload) {
-    return { valid: false, error: 'Dữ liệu dịch vụ không hợp lệ.' }
+export const validateCreateServicePayload = (values) => {
+  const errors = {}
+  const serviceCode = String(values?.serviceCode || '').trim()
+  const name = String(values?.name || '').trim()
+  const price = values?.price
+  const effectiveFrom = values?.effectiveFrom
+
+  if (!serviceCode) {
+    errors.serviceCode = 'Vui lòng nhập mã dịch vụ'
+  } else if (serviceCode.length > 50) {
+    errors.serviceCode = 'Mã dịch vụ không được vượt quá 50 ký tự'
   }
 
-  const { serviceCode, name, price, effectiveFrom } = payload
-
-  // 1. Kiểm tra mã dịch vụ (chỉ bắt buộc khi tạo mới)
-  if (!isEditing) {
-    if (!serviceCode || typeof serviceCode !== 'string' || !serviceCode.trim()) {
-      return { valid: false, error: 'Mã dịch vụ không được để trống.' }
-    }
-    if (serviceCode.trim().length > 50) {
-      return { valid: false, error: 'Mã dịch vụ không được vượt quá 50 ký tự.' }
-    }
+  if (!name) {
+    errors.name = 'Vui lòng nhập tên dịch vụ'
+  } else if (name.length > 255) {
+    errors.name = 'Tên dịch vụ không được vượt quá 255 ký tự'
   }
 
-  // 2. Kiểm tra tên dịch vụ
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return { valid: false, error: 'Tên dịch vụ không được để trống.' }
-  }
-  if (name.trim().length > 255) {
-    return { valid: false, error: 'Tên dịch vụ không được vượt quá 255 ký tự.' }
-  }
-
-  // 3. Kiểm tra đơn giá
   if (price === undefined || price === null || price === '') {
-    return { valid: false, error: 'Đơn giá dịch vụ không được để trống.' }
-  }
-  const numericPrice = Number(price)
-  if (Number.isNaN(numericPrice)) {
-    return { valid: false, error: 'Đơn giá dịch vụ phải là chữ số.' }
-  }
-  if (numericPrice < 0) {
-    return { valid: false, error: 'Đơn giá dịch vụ phải lớn hơn hoặc bằng 0.' }
+    errors.price = 'Vui lòng nhập đơn giá'
+  } else if (Number(price) < 0 || isNaN(Number(price))) {
+    errors.price = 'Đơn giá phải lớn hơn hoặc bằng 0'
   }
 
-  // 4. Kiểm tra ngày hiệu lực
   if (!effectiveFrom) {
-    return { valid: false, error: 'Ngày hiệu lực của giá không được để trống.' }
-  }
-
-  let formattedDate = effectiveFrom
-  if (typeof effectiveFrom === 'object' && typeof effectiveFrom.format === 'function') {
-    formattedDate = effectiveFrom.format('YYYY-MM-DD')
-  } else if (typeof effectiveFrom === 'string') {
-    formattedDate = effectiveFrom.split('T')[0]
-  }
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(formattedDate)) {
-    return { valid: false, error: 'Định dạng ngày hiệu lực không hợp lệ (YYYY-MM-DD).' }
+    errors.effectiveFrom = 'Vui lòng chọn ngày bắt đầu hiệu lực'
   }
 
   return {
-    valid: true,
-    sanitizedData: {
-      ...(isEditing ? {} : { serviceCode: serviceCode.trim().toUpperCase() }),
-      name: name.trim().replace(/\s+/g, ' '),
-      price: numericPrice,
-      effectiveFrom: formattedDate,
-      ...(isEditing ? { active: payload.active !== undefined ? Boolean(payload.active) : true } : {}),
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    payload: {
+      serviceCode,
+      name,
+      price: Number(price || 0),
+      effectiveFrom: effectiveFrom ? (dayjs.isDayjs(effectiveFrom) ? effectiveFrom.format('YYYY-MM-DD') : String(effectiveFrom)) : '',
     },
   }
 }
 
 /**
- * Xử lý danh sách lịch sử bảng giá (Price History)
- * - Sắp xếp theo effectiveFrom giảm dần
- * - Xác định phiên bản đang áp dụng (CURRENT_ACTIVE), sắp áp dụng (FUTURE_SCHEDULED), hoặc lịch sử (SUPERSEDED)
- * - Tính chênh lệch giá với phiên bản trước đó
+ * Validate dữ liệu cập nhật dịch vụ
  */
-export function processPriceHistory(rawPrices = [], referenceDateStr = null) {
-  if (!Array.isArray(rawPrices) || rawPrices.length === 0) {
-    return []
+export const validateUpdateServicePayload = (values) => {
+  const errors = {}
+  const name = String(values?.name || '').trim()
+  const price = values?.price
+  const effectiveFrom = values?.effectiveFrom
+  const active = values?.active !== undefined ? Boolean(values?.active) : true
+
+  if (!name) {
+    errors.name = 'Vui lòng nhập tên dịch vụ'
+  } else if (name.length > 255) {
+    errors.name = 'Tên dịch vụ không được vượt quá 255 ký tự'
   }
 
-  const todayStr = referenceDateStr || getTodayDateString()
+  if (price === undefined || price === null || price === '') {
+    errors.price = 'Vui lòng nhập đơn giá'
+  } else if (Number(price) < 0 || isNaN(Number(price))) {
+    errors.price = 'Đơn giá phải lớn hơn hoặc bằng 0'
+  }
 
-  // Sắp xếp theo effectiveFrom giảm dần; nếu cùng ngày thì theo createdAt giảm dần
-  const sorted = [...rawPrices].sort((a, b) => {
-    const dateA = String(a.effectiveFrom || '')
-    const dateB = String(b.effectiveFrom || '')
-    if (dateA !== dateB) {
-      return dateB.localeCompare(dateA)
-    }
-    const createA = String(a.createdAt || '')
-    const createB = String(b.createdAt || '')
-    return createB.localeCompare(createA)
+  if (!effectiveFrom) {
+    errors.effectiveFrom = 'Vui lòng chọn ngày bắt đầu hiệu lực'
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    payload: {
+      name,
+      active,
+      price: Number(price || 0),
+      effectiveFrom: effectiveFrom ? (dayjs.isDayjs(effectiveFrom) ? effectiveFrom.format('YYYY-MM-DD') : String(effectiveFrom)) : '',
+    },
+  }
+}
+
+/**
+ * Phân loại các mốc giá trong lịch sử theo thời điểm hiện tại:
+ * - CURRENT: Giá đang áp dụng hiện hành (mốc có effectiveFrom gần nhất <= today)
+ * - UPCOMING: Giá có hiệu lực trong tương lai (effectiveFrom > today)
+ * - PAST: Giá đã qua trong lịch sử
+ */
+export const categorizePriceHistory = (prices = [], referenceDate = dayjs()) => {
+  if (!Array.isArray(prices) || prices.length === 0) return []
+
+  const ref = dayjs(referenceDate).startOf('day')
+
+  // Sắp xếp giảm dần theo effectiveFrom (mới nhất lên đầu)
+  const sorted = [...prices].sort((a, b) => {
+    return dayjs(b.effectiveFrom).diff(dayjs(a.effectiveFrom))
   })
 
-  // Tìm phiên bản đang áp dụng: phiên bản mới nhất có effectiveFrom <= today
-  let currentActiveIndex = -1
-  for (let i = 0; i < sorted.length; i++) {
-    const effDate = String(sorted[i].effectiveFrom || '')
-    if (effDate <= todayStr) {
-      currentActiveIndex = i
-      break
-    }
-  }
+  // Tìm index của mốc giá hiện hành (mốc đầu tiên có effectiveFrom <= ref)
+  const currentIdx = sorted.findIndex((item) => {
+    const itemDate = dayjs(item.effectiveFrom).startOf('day')
+    return itemDate.isSame(ref) || itemDate.isBefore(ref)
+  })
 
   return sorted.map((item, index) => {
-    const effDate = String(item.effectiveFrom || '')
-    let status = 'SUPERSEDED'
+    const itemDate = dayjs(item.effectiveFrom).startOf('day')
+    let status = 'PAST'
     let statusLabel = 'Lịch sử'
-    let statusColor = 'default'
+    let badgeColor = 'default'
 
-    if (effDate > todayStr) {
-      status = 'FUTURE_SCHEDULED'
+    if (itemDate.isAfter(ref)) {
+      status = 'UPCOMING'
       statusLabel = 'Sắp áp dụng'
-      statusColor = 'processing'
-    } else if (index === currentActiveIndex) {
-      status = 'CURRENT_ACTIVE'
+      badgeColor = 'warning'
+    } else if (index === currentIdx) {
+      status = 'CURRENT'
       statusLabel = 'Đang áp dụng'
-      statusColor = 'success'
-    }
-
-    // Tính chênh lệch với phiên bản trước đó theo thời gian (là phần tử index + 1)
-    const prevItem = sorted[index + 1]
-    let diffAmount = null
-    let diffPercent = null
-
-    if (prevItem && prevItem.price !== undefined && prevItem.price !== null) {
-      const currentPrice = Number(item.price || 0)
-      const prevPrice = Number(prevItem.price || 0)
-      diffAmount = currentPrice - prevPrice
-      if (prevPrice > 0) {
-        diffPercent = Number(((diffAmount / prevPrice) * 100).toFixed(1))
-      }
+      badgeColor = 'success'
     }
 
     return {
       ...item,
       status,
       statusLabel,
-      statusColor,
-      isCurrentActive: status === 'CURRENT_ACTIVE',
-      diffAmount,
-      diffPercent,
+      badgeColor,
     }
   })
 }
 
 /**
- * Tính toán số liệu thống kê KPI từ danh sách dịch vụ
+ * Tính toán thống kê nhanh danh mục
  */
-export function calculateServiceStats(services = []) {
-  const list = Array.isArray(services) ? services : []
-  const total = list.length
-  const activeCount = list.filter((s) => s.active !== false).length
+export const calculateServiceStats = (services = []) => {
+  const total = services.length
+  const activeCount = services.filter((s) => Boolean(s.active)).length
   const inactiveCount = total - activeCount
-
-  const prices = list
-    .map((s) => Number(s.price))
-    .filter((p) => !Number.isNaN(p) && p >= 0)
-
-  const avgPrice = prices.length > 0
-    ? Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length)
-    : 0
-
-  const minPrice = prices.length > 0 ? Math.min(...prices) : 0
-  const maxPrice = prices.length > 0 ? Math.max(...prices) : 0
+  const activeServices = services.filter((s) => Boolean(s.active))
+  const avgPrice =
+    activeServices.length > 0
+      ? Math.round(
+          activeServices.reduce((sum, s) => sum + Number(s.price || 0), 0) /
+            activeServices.length
+        )
+      : 0
 
   return {
     total,
     activeCount,
     inactiveCount,
     avgPrice,
-    minPrice,
-    maxPrice,
   }
-}
-
-/**
- * Chuyển đổi mã lỗi Backend thành thông báo tiếng Việt dễ hiểu
- */
-export function translateServiceErrorMessage(error, defaultMessage = 'Có lỗi xảy ra khi xử lý dịch vụ.') {
-  const backendMsg = error?.response?.data?.message || error?.message || ''
-
-  if (/service code already exists/i.test(backendMsg)) {
-    return 'Mã dịch vụ đã tồn tại trong hệ thống. Vui lòng nhập mã khác.'
-  }
-  if (/service name already exists/i.test(backendMsg)) {
-    return 'Tên dịch vụ đã tồn tại trong hệ thống. Vui lòng chọn tên khác.'
-  }
-  if (/different service price already exists for this effective date/i.test(backendMsg)) {
-    return 'Đã tồn tại một mức giá khác cho ngày hiệu lực này. Vui lòng chọn ngày khác hoặc giữ nguyên giá.'
-  }
-  if (/service catalog not found/i.test(backendMsg)) {
-    return 'Không tìm thấy dịch vụ tương ứng trên hệ thống.'
-  }
-  if (/access is denied|forbidden/i.test(backendMsg) || error?.response?.status === 403) {
-    return 'Bạn không có quyền thực hiện thao tác quản lý dịch vụ/bảng giá.'
-  }
-
-  return backendMsg || defaultMessage
 }

@@ -89,7 +89,7 @@ function AppRoutes() {
         <Route path="audit-logs" element={<PrivateRoute allowedRoles={['admin']}><MedicalRecordAccessLogsPage /></PrivateRoute>} />
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedRoles={['admin']}><MedicalRecordAccessLogsPage /></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute allowedRoles={['admin']}><UsersPage /></PrivateRoute>} />
-        <Route path="services" element={<PrivateRoute allowedRoles={['admin', 'manager', 'clinic_manager']}><ServicesPage /></PrivateRoute>} />
+        <Route path="services" element={<PrivateRoute allowedRoles={['admin', 'manager']}><ServicesPage /></PrivateRoute>} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

@@ -1,16 +1,19 @@
 import axiosClient from './axiosClient'
 
 const systemApi = {
-  services: (params = {}) => axiosClient.get('/system/services', { params }),
+  // Quản lý danh mục dịch vụ & bảng giá
+  services: (params) => axiosClient.get('/system/services', { params }),
   getServiceById: (id) => axiosClient.get(`/system/services/${id}`),
   createService: (data) => axiosClient.post('/system/services', data),
   updateService: (id, data) => axiosClient.put(`/system/services/${id}`, data),
-  updateServiceStatus: (id, active) => axiosClient.patch(`/system/services/${id}/status`, { active }),
+  updateServiceStatus: (id, data) => axiosClient.patch(`/system/services/${id}/status`, data),
   getServicePriceHistory: (id) => axiosClient.get(`/system/services/${id}/prices`),
+
+  // Cấu hình phòng khám
   clinic: () => axiosClient.get('/system/clinic'),
   updateClinic: (data) => axiosClient.put('/system/clinic', data),
 
-  // Rooms management
+  // Quản lý phòng khám
   getRooms: (params = {}) => axiosClient.get('/rooms', { params: { size: 100, ...params } }),
   getRoomById: (roomId) => axiosClient.get(`/rooms/${roomId}`),
   createRoom: (data) => axiosClient.post('/rooms', data),
@@ -18,7 +21,7 @@ const systemApi = {
   activateRoom: (roomId) => axiosClient.patch(`/rooms/${roomId}/activate`),
   deactivateRoom: (roomId) => axiosClient.patch(`/rooms/${roomId}/deactivate`),
 
-  // Doctor room assignments
+  // Phân bổ bác sĩ vào phòng
   getDoctorRoomAssignments: (params = {}) => axiosClient.get('/doctor-room-assignments', { params }),
   assignDoctorRoom: (doctorId, roomId) => axiosClient.put(`/doctors/${doctorId}/room-assignment`, { roomId }),
   removeDoctorRoomAssignment: (doctorId) => axiosClient.delete(`/doctors/${doctorId}/room-assignment`),
