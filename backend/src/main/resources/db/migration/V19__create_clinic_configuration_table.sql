@@ -4,7 +4,7 @@
 -- =====================================================
 
 CREATE TABLE clinic_configuration (
-    id TINYINT NOT NULL,
+    id INT NOT NULL,
     clinic_name VARCHAR(150) NOT NULL,
     address VARCHAR(500) NULL,
     phone VARCHAR(30) NULL,
