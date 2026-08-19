@@ -28,6 +28,7 @@ import {
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 import systemApi from '../api/systemApi'
+import ClinicConfigurationPage from './ClinicConfigurationPage'
 
 dayjs.extend(customParseFormat)
 
@@ -388,8 +389,7 @@ function ServicesPage() {
           {
             key: 'clinic',
             label: 'Cấu hình phòng khám',
-            forceRender: true,
-            children: clinicConfiguration,
+            children: <ClinicConfigurationPage />,
           },
         ]}
       />
