@@ -1,7 +1,3 @@
-/**
- * Helper utility module for drug interaction warnings and override validation logic.
- */
-
 export function validateOverrideReason(reason) {
   if (typeof reason !== 'string') {
     return {

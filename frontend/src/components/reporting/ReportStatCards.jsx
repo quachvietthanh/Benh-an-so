@@ -12,7 +12,6 @@ const formatMoney = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`
 export default function ReportStatCards({ summary = {} }) {
   return (
     <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-      {/* Card 1: Tổng lượt khám */}
       <Col xs={12} sm={12} md={6}>
         <div className="reports-stat-card">
           <div className="reports-stat-icon blue">
@@ -28,7 +27,6 @@ export default function ReportStatCards({ summary = {} }) {
         </div>
       </Col>
 
-      {/* Card 2: Doanh thu phòng khám */}
       <Col xs={12} sm={12} md={6}>
         <div className="reports-stat-card">
           <div className="reports-stat-icon green">
@@ -44,7 +42,6 @@ export default function ReportStatCards({ summary = {} }) {
         </div>
       </Col>
 
-      {/* Card 3: Đơn thuốc đã cấp */}
       <Col xs={12} sm={12} md={6}>
         <div className="reports-stat-card">
           <div className="reports-stat-icon orange">
@@ -60,7 +57,6 @@ export default function ReportStatCards({ summary = {} }) {
         </div>
       </Col>
 
-      {/* Card 4: Nhật ký truy cập */}
       <Col xs={12} sm={12} md={6}>
         <div className="reports-stat-card">
           <div className="reports-stat-icon purple">

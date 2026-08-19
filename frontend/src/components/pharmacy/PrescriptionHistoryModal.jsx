@@ -1,5 +1,5 @@
 import React from 'react'
-import { Modal, Timeline, Tag, Card, Typography, List, Button, Empty } from 'antd'
+import { Modal, Timeline, Tag, Card, Typography, List, Button, Empty, Space } from 'antd'
 import { HistoryOutlined, FileTextOutlined, EditOutlined, PlusCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
@@ -94,8 +94,5 @@ function PrescriptionHistoryModal({
     </Modal>
   )
 }
-
-// Internal Space component import fallback
-import { Space } from 'antd'
 
 export default PrescriptionHistoryModal

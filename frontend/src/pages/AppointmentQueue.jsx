@@ -133,10 +133,8 @@ function AppointmentQueue() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
 
-  // Phân quyền theo vai trò (Bác sĩ, Lễ tân, Điều dưỡng, Admin)
   const permissions = useMemo(() => checkQueuePermissions(user?.roles || []), [user?.roles])
 
-  // State quản lý danh sách & bộ lọc
   const [activeMainTab, setActiveMainTab] = useState(() =>
     permissions.isDoctorOnly ? 'doctor_queue' : 'appointments',
   )
@@ -144,7 +142,6 @@ function AppointmentQueue() {
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // Sub-data states
   const [appointments, setAppointments] = useState([])
   const [queues, setQueues] = useState([])
   const [myQueueData, setMyQueueData] = useState(null)
@@ -153,19 +150,16 @@ function AppointmentQueue() {
   const [appointmentLogs, setAppointmentLogs] = useState([])
   const [notificationLogs, setNotificationLogs] = useState([])
 
-  // Filters for Appointments
   const [appStatusFilter, setAppStatusFilter] = useState('ALL')
   const [appDoctorFilter, setAppDoctorFilter] = useState('ALL')
   const [appKeyword, setAppKeyword] = useState('')
 
-  // Filters for Queue Board
   const [queueDoctorFilter, setQueueDoctorFilter] = useState('ALL')
   const [queueRoomFilter, setQueueRoomFilter] = useState('ALL')
   const [queueStatusFilter, setQueueStatusFilter] = useState('ALL')
   const [queueSourceFilter, setQueueSourceFilter] = useState('ALL')
   const [queueKeyword, setQueueKeyword] = useState('')
 
-  // Modals & Drawers
   const [bookModalOpen, setBookModalOpen] = useState(false)
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
   const [skipModalItem, setSkipModalItem] = useState(null)
@@ -175,14 +169,12 @@ function AppointmentQueue() {
   const [quickPatientSaving, setQuickPatientSaving] = useState(false)
   const [logsDrawerOpen, setLogsDrawerOpen] = useState(false)
 
-  // Forms
   const [bookForm] = Form.useForm()
   const [walkInForm] = Form.useForm()
   const [skipForm] = Form.useForm()
   const [cancelForm] = Form.useForm()
   const [quickPatientForm] = Form.useForm()
 
-  // Helper tra cứu thông tin Bác sĩ từ doctorId hoặc seed UUID
   const getDoctorInfo = useCallback((doctorId, fallbackName, fallbackDept) => {
     const cleanId = String(doctorId || '').toLowerCase().replace(/-/g, '')
     const doc = doctors.find((d) => {
@@ -198,7 +190,6 @@ function AppointmentQueue() {
     return { name: fallbackName || 'Bác sĩ chưa xác định', department: fallbackDept || '—' }
   }, [doctors])
 
-  // Helper tra cứu thông tin Bệnh nhân từ patientId hoặc seed UUID
   const getPatientInfo = useCallback((patientId, fallbackName, fallbackCode, fallbackPhone) => {
     const cleanId = String(patientId || '').toLowerCase().replace(/-/g, '')
     const pat = patients.find((p) => {
@@ -215,13 +206,11 @@ function AppointmentQueue() {
     return { name: fallbackName || 'Bệnh nhân', code: fallbackCode || '—', phone: fallbackPhone || '' }
   }, [patients])
 
-  // Queue và danh mục bệnh nhân đều dùng UUID backend.
   const isSamePatient = useCallback((id1, id2) => {
     if (!id1 || !id2) return false
     return String(id1) === String(id2)
   }, [])
 
-  // Load Bệnh nhân & Bác sĩ đồng bộ với Đăng ký bệnh nhân
   const loadDirectories = useCallback(async () => {
     try {
       const [patientRes, doctorRes] = await Promise.allSettled([
@@ -247,7 +236,6 @@ function AppointmentQueue() {
     }
   }, [])
 
-  // Tải danh sách Lịch hẹn (Xử lý chuẩn hóa startTime từ Backend API)
   const loadAppointments = useCallback(async () => {
     try {
       const res = await appointmentApi.getAll({
@@ -270,7 +258,6 @@ function AppointmentQueue() {
     }
   }, [selectedDate])
 
-  // Tải danh sách Queue Board
   const loadQueues = useCallback(async () => {
     try {
       const params = {
@@ -286,7 +273,6 @@ function AppointmentQueue() {
     }
   }, [selectedDate, queueDoctorFilter, queueRoomFilter])
 
-  // Tải Queue riêng của Bác sĩ (/queues/me) - Theo QueueController chỉ DOCTOR mới được gọi
   const loadMyQueue = useCallback(async () => {
     if (!permissions.canViewMyQueue) {
       setMyQueueData([])
@@ -301,13 +287,11 @@ function AppointmentQueue() {
     }
   }, [selectedDate, permissions.canViewMyQueue])
 
-  // Tải Nhật ký
   const loadLogs = useCallback(() => {
     setAppointmentLogs(getStoredAppointmentLogs())
     setNotificationLogs(getStoredNotificationLogs())
   }, [])
 
-  // Reload tất cả dữ liệu
   const refreshAllData = useCallback(async () => {
     setLoading(true)
     try {
@@ -332,7 +316,6 @@ function AppointmentQueue() {
     refreshAllData()
   }, [loadDirectories, refreshAllData])
 
-  // Tự động mở Modal Đặt lịch nếu được chuyển từ Đăng ký bệnh nhân
   useEffect(() => {
     if (location.state?.patientId) {
       setBookModalOpen(true)
@@ -342,7 +325,6 @@ function AppointmentQueue() {
     }
   }, [location.state, bookForm])
 
-  // Polling tự động mỗi 20 giây
   useEffect(() => {
     const timer = setInterval(() => {
       if (!permissions.isDoctorOnly) loadQueues()
@@ -351,7 +333,6 @@ function AppointmentQueue() {
     return () => clearInterval(timer)
   }, [loadQueues, loadMyQueue, permissions.canViewMyQueue, permissions.isDoctorOnly])
 
-  // Trích xuất danh sách Phòng khám từ Queue
   const extractedRooms = useMemo(() => {
     const map = new Map()
     queues.forEach((q) => {
@@ -367,7 +348,6 @@ function AppointmentQueue() {
     return Array.from(map.values())
   }, [queues])
 
-  // Bệnh nhân được lọc cho Tab Lịch hẹn
   const filteredAppointments = useMemo(() => {
     const kw = appKeyword.trim().toLowerCase()
     return appointments.filter((app) => {
@@ -386,7 +366,6 @@ function AppointmentQueue() {
     })
   }, [appointments, selectedDate, appDoctorFilter, appStatusFilter, appKeyword, getPatientInfo, getDoctorInfo, permissions.isDoctorOnly, user?.id])
 
-  // Bộ lọc UI chạy trên danh sách queue item thật mà backend trả về.
   const filteredQueues = useMemo(() => {
     const kw = queueKeyword.trim().toLowerCase()
 
@@ -402,13 +381,11 @@ function AppointmentQueue() {
       return textMatch
     })
 
-    // Giữ từng queue item độc lập; cùng một bệnh nhân có thể có nhiều lượt khám.
     return validItems.sort((first, second) =>
       Number(first.queueNumber || 999999) - Number(second.queueNumber || 999999),
     )
   }, [queues, queueKeyword, queueStatusFilter, queueSourceFilter, getPatientInfo, getDoctorInfo, permissions.isDoctorOnly, user?.id])
 
-  // Nhóm bệnh nhân cho Queue Bác sĩ
   const doctorQueueGroups = useMemo(() => {
     let items = []
     if (permissions.isDoctorOnly) {
@@ -427,7 +404,6 @@ function AppointmentQueue() {
     }
   }, [permissions.isDoctorOnly, myQueueData, queues, user?.id, queueDoctorFilter])
 
-  // NCL-03-CN-001: Đặt lịch hẹn mới
   const handleCreateAppointmentSubmit = async (values) => {
     setActionLoading(true)
     try {
@@ -435,14 +411,12 @@ function AppointmentQueue() {
         ? dayjs(values.appointmentAt)
         : dayjs(`${values.appointmentDate.format('YYYY-MM-DD')} ${values.appointmentTime.format('HH:mm')}`)
 
-      // 1. Kiểm tra khung giờ ở quá khứ
       if (appointmentTime.isBefore(dayjs().subtract(5, 'minute'))) {
         message.error('Hệ thống không cho đặt vào thời điểm đã qua (Khung giờ ở quá khứ)!')
         setActionLoading(false)
         return
       }
 
-      // 2. Kiểm tra Bác sĩ đã có lịch trong cùng khung giờ
       const doctorId = values.doctorId
       const isDoctorBusy = appointments.some((app) => {
         if (['CANCELLED', 'NO_SHOW'].includes(app.status)) return false
@@ -491,7 +465,6 @@ function AppointmentQueue() {
     }
   }
 
-  // NCL-03-CN-002: Hủy lịch hẹn
   const handleCancelAppointmentSubmit = async (values) => {
     if (!cancelModalItem) return
     const app = cancelModalItem
@@ -525,7 +498,6 @@ function AppointmentQueue() {
     }
   }
 
-  // NCL-03-CN-003: Xử lý bệnh nhân không đến (Đã quá 15 phút từ giờ hẹn)
   const handleMarkNoShow = async (record) => {
     const isAlreadyCheckedIn = record.status === 'CHECKED_IN' || queues.some((q) => String(q.patientId) === String(record.patientId) && ['WAITING', 'IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(q.status))
 
@@ -573,7 +545,6 @@ function AppointmentQueue() {
     })
   }
 
-  // NCL-03-CN-004: Tiếp nhận vào hàng đợi
   const handleCheckInAppointment = async (appId) => {
     const app = appointments.find((a) => String(a.id) === String(appId))
     const isAlreadyInQueue = queues.some((q) => isSamePatient(q.patientId, app?.patientId) && ['WAITING', 'IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(q.status))
@@ -593,7 +564,6 @@ function AppointmentQueue() {
         throw new Error('Backend did not return queueItemId and visitId after check-in.')
       }
 
-      // Tạo Queue Item đưa bệnh nhân vào Hàng Đợi Khám
       const newQueueItem = {
         ...backendItem,
         id: backendItem.id,
@@ -627,7 +597,6 @@ function AppointmentQueue() {
     }
   }
 
-  // Tiếp nhận tự đến (Tiếp nhận tự đến -> Tạo Lịch hẹn & Hàng đợi)
   const handleCheckInWalkInSubmit = async (values) => {
     const isAlreadyInQueue = queues.some((q) => isSamePatient(q.patientId, values.patientId) && ['WAITING', 'IN_PROGRESS', 'WAITING_FOR_RESULT'].includes(q.status))
 
@@ -654,7 +623,6 @@ function AppointmentQueue() {
       const pInfo = getPatientInfo(values.patientId)
       const dInfo = getDoctorInfo(values.doctorId)
 
-      // Tự động thêm bệnh nhân Walk-in vào Hàng đợi khám (Queue)
       const walkInQueueItem = {
         ...backendItem,
         id: backendItem.id,
@@ -690,7 +658,6 @@ function AppointmentQueue() {
     }
   }
 
-  // Call Next (Bác sĩ / Lễ tân gọi khám)
   const handleCallNext = async (queueId) => {
     const myQueueList = permissions.isDoctorOnly
       ? (Array.isArray(myQueueData) ? myQueueData : myQueueData?.items || myQueueData?.content) || queues.filter((q) => String(q.doctorId) === String(user?.id))
@@ -733,7 +700,6 @@ function AppointmentQueue() {
     }
   }
 
-  // NCL-03-CN-005: Nhắc lịch hẹn
   const handleSendReminder = async (record) => {
     if (record.status === 'CANCELLED') {
       message.error('Hệ thống không gửi nhắc: Lịch hẹn đã ở trạng thái ĐÃ HỦY!')
@@ -768,7 +734,6 @@ function AppointmentQueue() {
     }
   }
 
-  // Đăng ký nhanh bệnh nhân mới
   const handleQuickRegisterPatientSubmit = async (values) => {
     setQuickPatientSaving(true)
     try {
@@ -804,7 +769,6 @@ function AppointmentQueue() {
     }
   }
 
-  // Skip & Change Status & Complete
   const handleSkipSubmit = async (values) => {
     if (!skipModalItem) return
     setActionLoading(true)
@@ -891,7 +855,6 @@ function AppointmentQueue() {
     }
   }
 
-  // Render Cột Bảng Lịch Hẹn
   const appointmentColumns = [
     {
       title: 'Mã lịch hẹn',
@@ -1040,7 +1003,6 @@ function AppointmentQueue() {
     },
   ]
 
-  // Render Cột Bảng Queue Board Lễ Tân
   const queueBoardColumns = [
     {
       title: 'STT',
@@ -1209,7 +1171,6 @@ function AppointmentQueue() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
-      {/* Header */}
       <Card style={{ marginBottom: 24, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <Row justify="space-between" align="middle" gutter={[16, 16]}>
           <Col>
@@ -1262,7 +1223,6 @@ function AppointmentQueue() {
         </Row>
       </Card>
 
-      {/* Main Tabs Navigation */}
       <Tabs
         activeKey={activeMainTab}
         onChange={setActiveMainTab}
@@ -1648,7 +1608,6 @@ function AppointmentQueue() {
         })}
       />
 
-      {/* Modal 1: Đặt lịch hẹn khám */}
       <Modal
         title="Đặt Lịch Hẹn Khám Bệnh Mới"
         open={bookModalOpen}
@@ -1754,7 +1713,6 @@ function AppointmentQueue() {
         </Form>
       </Modal>
 
-      {/* Modal 2: Tiếp nhận tự đến */}
       <Modal
         title="Tiếp nhận Bệnh nhân Tự đến"
         open={walkInModalOpen}
@@ -1828,7 +1786,6 @@ function AppointmentQueue() {
         </Form>
       </Modal>
 
-      {/* Modal 3: Hủy Lịch Hẹn */}
       <Modal
         title="Hủy Lịch Hẹn Khám"
         open={!!cancelModalItem}
@@ -1872,7 +1829,6 @@ function AppointmentQueue() {
         </Form>
       </Modal>
 
-      {/* Modal 4: Đăng ký nhanh Bệnh nhân mới */}
       <Modal
         title="Đăng Ký Nhanh Bệnh Nhân Mới (Đồng bộ Đăng ký bệnh nhân)"
         open={quickPatientModalOpen}
@@ -1936,7 +1892,6 @@ function AppointmentQueue() {
         </Form>
       </Modal>
 
-      {/* Modal 5: Bỏ qua lượt khám */}
       <Modal
         title="Xác nhận bỏ qua lượt khám"
         open={!!skipModalItem}
@@ -1971,7 +1926,6 @@ function AppointmentQueue() {
         </Form>
       </Modal>
 
-      {/* Drawer: Xem Nhật ký Lịch hẹn & Thông báo */}
       <Drawer
         title="Nhật ký lịch hẹn & thông báo"
         width={650}
@@ -2028,7 +1982,6 @@ function AppointmentQueue() {
         />
       </Drawer>
 
-      {/* Modal 6: Xem Chi Tiết */}
       <Modal
         title="Chi Tiết Lịch Hẹn & Hàng Đợi"
         open={!!detailItem}

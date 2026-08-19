@@ -46,7 +46,7 @@ test('TC07 & TC08 & XVII — Map Response DTO Backend & giữ đúng doctorId (k
         rank: 2,
         doctorId: 'doc-uuid-002',
         doctorCode: 'DOC002',
-        doctorName: 'Bác sĩ Nguyễn Văn A', // Trùng tên nhưng doctorId khác
+        doctorName: 'Bác sĩ Nguyễn Văn A',
         totalVisits: 12,
       },
       {
@@ -62,11 +62,9 @@ test('TC07 & TC08 & XVII — Map Response DTO Backend & giữ đúng doctorId (k
   const mapped = mapDoctorVisitResponse(mockBackendResponse)
 
   assert.equal(mapped.items.length, 3)
-  // Sắp xếp mặc định: totalVisits giảm dần -> #1 là doc-uuid-003 (25 lượt)
   assert.equal(mapped.items[0].doctorId, 'doc-uuid-003')
   assert.equal(mapped.items[0].totalVisits, 25)
 
-  // 2 bác sĩ trùng tên giữ nguyên 2 records riêng biệt với doctorId khác nhau
   const sameNameDoctors = mapped.items.filter(
     (item) => item.doctorName === 'Bác sĩ Nguyễn Văn A',
   )
@@ -101,13 +99,9 @@ test('XI — Tính toán Thống kê Tổng quan (Tổng lượt, Số bác sĩ,
 
   const stats = calculateDoctorVisitStats(items)
 
-  // Tổng lượt = 20 + 10 + 30 = 60
   assert.equal(stats.totalVisitsAll, 60)
-  // Số bác sĩ = 3
   assert.equal(stats.doctorCount, 3)
-  // Trung bình = 60 / 3 = 20.0
   assert.equal(stats.avgVisits, '20.0')
-  // Bác sĩ có nhiều lượt nhất = Dr C (30 lượt)
   assert.equal(stats.topDoctor.doctorId, 'd3')
   assert.equal(stats.topDoctor.totalVisits, 30)
 })

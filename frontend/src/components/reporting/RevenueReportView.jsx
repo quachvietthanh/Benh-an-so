@@ -31,7 +31,7 @@ export default function RevenueReportView({
   onRefresh,
 }) {
   const [activePreset, setActivePreset] = useState('7days')
-  const [chartMode, setChartMode] = useState('trend') // 'trend' | 'comparison'
+  const [chartMode, setChartMode] = useState('trend')
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('ALL')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [detailTab, setDetailTab] = useState('timeline')
@@ -41,7 +41,6 @@ export default function RevenueReportView({
   const endDate = range[1] || dayjs()
   const daysDiff = Math.max(1, endDate.diff(startDate, 'day') + 1)
 
-  // Filter invoices strictly within selected date range
   const periodInvoices = useMemo(() => {
     const startStr = startDate.format('YYYY-MM-DD')
     const endStr = endDate.format('YYYY-MM-DD')
@@ -52,22 +51,18 @@ export default function RevenueReportView({
     })
   }, [invoices, startDate, endDate])
 
-  // Financial Metrics
   const metrics = useMemo(() => {
     return calculateFinancialMetrics(periodInvoices, [], daysDiff)
   }, [periodInvoices, daysDiff])
 
-  // Daily Timeline
   const dailyTimeline = useMemo(() => {
     return aggregateDailyTimeline(periodInvoices, startDate, endDate)
   }, [periodInvoices, startDate, endDate])
 
-  // Payment Breakdown
   const paymentBreakdown = useMemo(() => {
     return aggregatePaymentMethods(periodInvoices)
   }, [periodInvoices])
 
-  // Quick Preset Selection
   const handlePresetSelect = (presetKey) => {
     setActivePreset(presetKey)
     const newRange = getPresetDateRange(presetKey)
@@ -78,7 +73,6 @@ export default function RevenueReportView({
 
   return (
     <div className="revenue-report-container">
-      {/* Top Filter Toolbar */}
       <div className="revenue-filter-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Space wrap size="small">
@@ -143,7 +137,6 @@ export default function RevenueReportView({
         )}
       </div>
 
-      {/* Info notice about adjustments deduction */}
       <Alert
         type="info"
         showIcon
@@ -153,10 +146,8 @@ export default function RevenueReportView({
         style={{ borderRadius: 10, marginBottom: 20 }}
       />
 
-      {/* 1. 5 KPI Summary Cards */}
       <RevenueKPICards metrics={metrics} daysDiff={daysDiff} />
 
-      {/* 2. Interactive SVG Trend & Comparison Chart */}
       <RevenueInteractiveChart
         dailyTimeline={dailyTimeline}
         metrics={metrics}
@@ -167,10 +158,8 @@ export default function RevenueReportView({
         setHoveredPoint={setHoveredPoint}
       />
 
-      {/* 3. Payment Methods Breakdown */}
       <RevenuePaymentBreakdown paymentBreakdown={paymentBreakdown} netRevenue={metrics.netRevenue} />
 
-      {/* 4. Detailed Data Tables */}
       <RevenueDetailTables
         dailyTimeline={dailyTimeline}
         periodInvoices={periodInvoices}

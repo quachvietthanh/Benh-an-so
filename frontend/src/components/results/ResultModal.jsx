@@ -173,7 +173,6 @@ export const ResultModal = ({
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
-        {/* Patient Demographics & Order Metadata Header */}
         <Card
           size="small"
           style={{
@@ -244,7 +243,6 @@ export const ResultModal = ({
           />
         )}
 
-        {/* Input Form */}
         <ResultForm
           form={form}
           fileList={fileList}

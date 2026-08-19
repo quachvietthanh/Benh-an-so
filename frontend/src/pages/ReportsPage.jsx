@@ -49,7 +49,6 @@ function ReportsPage() {
   const navigate = useNavigate()
   const { user, logout } = useAuthContext()
 
-  // Phân quyền
   const roles = useMemo(() => {
     const values = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
     return values
@@ -58,14 +57,12 @@ function ReportsPage() {
   }, [user])
   const isManager = roles.includes('manager') || roles.includes('admin')
 
-  // Mặc định khoảng thời gian: 30 ngày gần nhất
   const [range, setRange] = useState([dayjs().subtract(29, 'day'), dayjs()])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [activeTab, setActiveTab] = useState('visits')
   const [loadError, setLoadError] = useState('')
 
-  // Dynamic Data States
   const [summary, setSummary] = useState({
     visitCount: 0,
     revenue: 0,
@@ -92,7 +89,6 @@ function ReportsPage() {
     to: toStr,
   }), [fromStr, toStr])
 
-  // Gọi API và hợp nhất dữ liệu thực tế
   const loadData = useCallback(async () => {
     if (!fromStr || !toStr) return
 
@@ -118,7 +114,6 @@ function ReportsPage() {
         ? apiInvoicesRaw.content
         : (Array.isArray(apiInvoicesRaw) ? apiInvoicesRaw : [])
 
-      // Get stored items from local persistence
       const storedRecords = getStoredMedicalRecords()
       const storedInvoices = getStoredInvoices()
       const storedPrescriptions = getStoredPrescriptions()
@@ -129,7 +124,6 @@ function ReportsPage() {
       const apiInvs = (apiSummary && Array.isArray(apiSummary.invoices)) ? apiSummary.invoices : apiInvoicesList
       const apiPrescs = (apiSummary && Array.isArray(apiSummary.prescriptions)) ? apiSummary.prescriptions : []
 
-      // Merge items
       const realRecords = [...storedRecords, ...apiRecords]
       const realInvoices = mergeInvoices([...storedInvoices, ...apiInvs])
       const realPrescriptions = [...storedPrescriptions, ...apiPrescs]
@@ -137,13 +131,11 @@ function ReportsPage() {
 
       setInvoicesList(realInvoices)
 
-      // Calculate total visits and revenue
       const totalVisits = apiSummary?.visitCount != null ? Number(apiSummary.visitCount) : realRecords.length
       const totalRevenue = apiSummary?.revenue != null ? Number(apiSummary.revenue) : realInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0)
       const dispensedCount = realPrescriptions.filter((p) => p.status === 'DISPENSED' || p.status === 'COMPLETED').length
       const auditCount = realLogs.length
 
-      // Timeline mapping
       let timelineList = []
       if (apiTimeline && Array.isArray(apiTimeline.items) && apiTimeline.items.length > 0) {
         timelineList = apiTimeline.items.map((item) => ({
@@ -180,7 +172,6 @@ function ReportsPage() {
         }
       }
 
-      // Top medicines ranking
       let rankedMeds = []
       if (apiTopMedicines && Array.isArray(apiTopMedicines.items)) {
         rankedMeds = apiTopMedicines.items.map((m) => ({
@@ -237,7 +228,6 @@ function ReportsPage() {
     loadData()
   }, [loadData])
 
-  // Xuất file CSV báo cáo
   const handleExportCSV = async () => {
     setExporting(true)
     try {
@@ -261,7 +251,6 @@ function ReportsPage() {
 
   return (
     <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '16px 20px', paddingBottom: 40 }}>
-      {/* Header Section */}
       <div
         style={{
           display: 'flex',
@@ -320,7 +309,6 @@ function ReportsPage() {
         </Space>
       </div>
 
-      {/* Permission Warning for non-managers */}
       {loadError === 'PERMISSION_DENIED_NOT_MANAGER' ? (
         <ManagerPermissionAlert
           user={user}
@@ -339,10 +327,8 @@ function ReportsPage() {
         />
       ) : null}
 
-      {/* 4 Top Summary Stat Cards */}
       <ReportStatCards summary={summary} />
 
-      {/* Tabs Header Navigation */}
       <Card
         style={{
           borderRadius: 14,
@@ -409,7 +395,6 @@ function ReportsPage() {
         />
       </Card>
 
-      {/* Dynamic Tab Content Views */}
       <div>
         {activeTab === 'overview' && (
           <OverviewReportView summary={summary} />

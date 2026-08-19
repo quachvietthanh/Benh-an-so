@@ -9,7 +9,6 @@ import {
 } from '@ant-design/icons'
 import axiosClient from '../../api/axiosClient'
 
-// Live Database Category Options Loader from Backend CSDL
 export const fetchDatabaseCategoryOptions = async () => {
   try {
     const res = await axiosClient.get('/clinical-services', { params: { size: 100 } })

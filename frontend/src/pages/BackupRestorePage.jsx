@@ -59,7 +59,6 @@ const formatFileSize = (bytes) => {
 function BackupRestorePage() {
   const { user } = useAuthContext()
 
-  // Phân quyền vai trò chuẩn hóa: Chỉ ADMIN mới được thực hiện Sao lưu & Phục hồi
   const userRoles = useMemo(() => {
     const raw = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
     return raw.map((r) => String(r || '').toUpperCase().replace(/^ROLE_/, '')).filter(Boolean)
@@ -67,8 +66,6 @@ function BackupRestorePage() {
 
   const isAdmin = userRoles.includes('ADMIN')
 
-  // State riêng biệt:
-  // backups: null (chưa load / lỗi) vs [] (load 200 thành công nhưng danh sách rỗng)
   const [backups, setBackups] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -78,14 +75,12 @@ function BackupRestorePage() {
   const [apiError, setApiError] = useState('')
   const [isBackendAvailable, setIsBackendAvailable] = useState(true)
 
-  // State Modals
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [backupType, setBackupType] = useState('FULL')
   const [backupNote, setBackupNote] = useState('')
   const [restoreTargetBackup, setRestoreTargetBackup] = useState(null)
   const [detailModalBackup, setDetailModalBackup] = useState(null)
 
-  // 1. Tải danh sách bản sao lưu từ Backend REST API (GET /backups)
   const loadBackups = useCallback(async () => {
     setLoading(true)
     setApiError('')
@@ -124,7 +119,6 @@ function BackupRestorePage() {
     loadBackups()
   }, [loadBackups])
 
-  // 2. Tạo bản sao lưu mới (POST /backups)
   const handleConfirmCreateBackup = async () => {
     if (!isAdmin) {
       message.error('Bạn không có quyền thực hiện thao tác này.')
@@ -144,7 +138,6 @@ function BackupRestorePage() {
       setCreateModalOpen(false)
       setBackupNote('')
 
-      // Reload danh sách trực tiếp từ Backend khi 2xx
       await loadBackups()
     } catch (err) {
       console.error('[BackupRestorePage] Lỗi createBackup:', err?.response?.status, err?.message)
@@ -167,7 +160,6 @@ function BackupRestorePage() {
     }
   }
 
-  // 3. Phục hồi dữ liệu từ bản sao lưu chỉ định (POST /backups/{id}/restore)
   const handleConfirmRestore = async () => {
     if (!restoreTargetBackup || !restoreTargetBackup.id) {
       message.error('Mã bản sao lưu không hợp lệ.')
@@ -187,7 +179,6 @@ function BackupRestorePage() {
       message.success('Phục hồi dữ liệu thành công về thời điểm bản sao lưu!')
       setRestoreTargetBackup(null)
 
-      // Reload danh sách và dữ liệu Backend khi 2xx
       await loadBackups()
     } catch (err) {
       console.error('[BackupRestorePage] Lỗi restoreBackup:', err?.response?.status, err?.message)
@@ -213,7 +204,6 @@ function BackupRestorePage() {
     }
   }
 
-  // 4. Tải file bản sao lưu (GET /backups/{id}/download)
   const handleDownload = async (record) => {
     if (!record || !record.id) return
     setDownloadingId(record.id)
@@ -242,13 +232,11 @@ function BackupRestorePage() {
     }
   }
 
-  // Thống kê dữ liệu
   const latestBackup = useMemo(() => {
     if (loadError || !backups || !Array.isArray(backups) || backups.length === 0) return null
     return [...backups].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
   }, [backups, loadError])
 
-  // Cột bảng danh sách bản sao lưu chuẩn DTO Backend
   const columns = [
     {
       title: 'Mã bản sao',
@@ -349,7 +337,6 @@ function BackupRestorePage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <Title level={3} style={{ margin: 0, color: '#0f172a' }}>
@@ -375,7 +362,6 @@ function BackupRestorePage() {
         </Space>
       </div>
 
-      {/* Kiểm tra Role ADMIN */}
       {!isAdmin && (
         <Alert
           type="error"
@@ -387,7 +373,6 @@ function BackupRestorePage() {
         />
       )}
 
-      {/* Alert Error State khi API trả 500 hoặc lỗi kết nối */}
       {loadError && (
         <Alert
           type="error"
@@ -414,7 +399,6 @@ function BackupRestorePage() {
         />
       )}
 
-      {/* Cards Thống kê: Hiển thị "—" khi loadError = true hoặc backups = null */}
       <Row gutter={16} style={{ marginBottom: 20 }}>
         <Col span={8}>
           <Card size="small" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
@@ -450,7 +434,6 @@ function BackupRestorePage() {
         </Col>
       </Row>
 
-      {/* Bảng Danh sách Bản sao lưu */}
       <Card title="Danh sách bản sao lưu hệ thống" styles={{ body: { padding: 0 } }}>
         <Table
           rowKey={(r) => r.id || r.backupCode || Math.random()}
@@ -485,7 +468,6 @@ function BackupRestorePage() {
         />
       </Card>
 
-      {/* Modal Xác nhận Tạo bản sao lưu */}
       <Modal
         title={
           <Space>
@@ -531,7 +513,6 @@ function BackupRestorePage() {
         </Form>
       </Modal>
 
-      {/* Modal Xác nhận Phục hồi Dữ liệu */}
       <Modal
         title={
           <Space>
@@ -585,7 +566,6 @@ function BackupRestorePage() {
         )}
       </Modal>
 
-      {/* Modal Xem chi tiết bản sao lưu */}
       <Modal
         title="Chi tiết bản sao lưu"
         open={!!detailModalBackup}

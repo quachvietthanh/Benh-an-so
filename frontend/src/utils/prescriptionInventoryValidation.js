@@ -1,12 +1,3 @@
-/**
- * Utility functions for validating medicine inventory stock in Prescription creation / editing.
- */
-
-/**
- * Extracts the real available stock quantity from a medicine object returned by Backend.
- * Backend MedicineResponse field is `stockQuantity`.
- * Fallbacks to availableStock, availableQuantity, stock or 0 if missing.
- */
 export const getAvailableStock = (med) => {
   if (!med) return 0
   const stock = med.availableStock ?? med.stockQuantity ?? med.availableQuantity ?? med.stock
@@ -14,12 +5,6 @@ export const getAvailableStock = (med) => {
   return !isNaN(num) && num >= 0 ? num : 0
 }
 
-/**
- * Sorts medicines array:
- * 1. Available medicines (availableStock > 0) first
- * 2. Out-of-stock medicines (availableStock <= 0) second
- * Within each group, sort alphabetically by medicineName.
- */
 export const sortMedicinesByStockAvailability = (medicines = []) => {
   if (!Array.isArray(medicines)) return []
   return [...medicines].sort((a, b) => {
@@ -29,7 +14,7 @@ export const sortMedicinesByStockAvailability = (medicines = []) => {
     const isAvailB = stockB > 0 ? 1 : 0
 
     if (isAvailA !== isAvailB) {
-      return isAvailB - isAvailA // Available items first (1 before 0)
+      return isAvailB - isAvailA
     }
 
     const nameA = String(a.medicineName || a.name || '').toLowerCase()
@@ -38,12 +23,6 @@ export const sortMedicinesByStockAvailability = (medicines = []) => {
   })
 }
 
-/**
- * Validates a single prescription item against medicine stock data.
- * @param {Object} item - { medicineId, quantity, ... }
- * @param {Map|Array} medicinesData - Map or Array of medicine objects
- * @returns {Object} { isValid, error, availableStock, medicineName }
- */
 export const validateItemStock = (item, medicinesData) => {
   if (!item || !item.medicineId) {
     return { isValid: true, error: null, availableStock: 0, medicineName: '' }
@@ -92,12 +71,6 @@ export const validateItemStock = (item, medicinesData) => {
   return { isValid: true, error: null, availableStock, medicineName: name }
 }
 
-/**
- * Validates entire prescription items array against current medicine stock list.
- * @param {Array} items - List of prescription items
- * @param {Array|Map} medicinesData - Medicine list or map from backend
- * @returns {Object} { isValid, errors, outOfStockItems, insufficientStockItems }
- */
 export const validatePrescriptionStock = (items = [], medicinesData = []) => {
   const errors = []
   const outOfStockItems = []

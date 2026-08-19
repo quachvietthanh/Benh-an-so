@@ -130,7 +130,6 @@ export const ResultUpload = ({ fileList = [], onChange, error, disabled = false 
         </div>
       )}
 
-      {/* File List & Preview Area */}
       {fileList.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <Text style={{ fontWeight: 600, color: '#475569', fontSize: 13 }}>

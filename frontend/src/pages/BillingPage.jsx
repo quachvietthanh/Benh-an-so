@@ -59,9 +59,6 @@ import { useAuthContext } from '../context/AuthContext'
 import { getStoredPrescriptions, mergeMedicines } from '../utils/storageHelpers'
 import { getMockPrescriptionsByVisitOrRecord } from '../services/prescriptionMockRepository'
 
-
-
-
 const { Text, Title } = Typography
 
 const money = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`
@@ -93,13 +90,11 @@ const SEEDED_VISIT_PATIENT_MAP = {
 const normalizePaymentHistoryItem = (item, payableList = [], patientList = [], allInvoices = [], queueList = [], pendingVisits = []) => {
   if (!item) return null
 
-  // 1. Tìm thông tin visit từ GET /invoices/payable, pendingVisits, hoặc GET /queues
   const visitIdStr = String(item.visitId || item.id || '')
   const matchedPayable = payableList.find((p) => String(p.visitId || p.id) === visitIdStr)
   const matchedPending = pendingVisits.find((v) => String(v.visitId || v.id) === visitIdStr)
   const matchedQueue = queueList.find((q) => String(q.visitId) === visitIdStr)
 
-  // 2. Lấy patientId chuẩn từ dữ liệu Backend (bao gồm cả mảng seed trong CSDL)
   const seededPatientId = SEEDED_VISIT_PATIENT_MAP[visitIdStr]
   const patientIdStr = String(
     item.patientId ||
@@ -110,10 +105,8 @@ const normalizePaymentHistoryItem = (item, payableList = [], patientList = [], a
     ''
   )
 
-  // 3. Join với Backend GET /patients (PatientResponse DTO) theo patientId
   const matchedPatient = patientList.find((pt) => String(pt.id) === patientIdStr)
 
-  // 4. Tên bệnh nhân chuẩn DTO Backend
   const patientName =
     item.patientName ||
     matchedPayable?.patientName ||
@@ -124,7 +117,6 @@ const normalizePaymentHistoryItem = (item, payableList = [], patientList = [], a
     matchedPatient?.name ||
     null
 
-  // 5. Mã bệnh nhân chuẩn DTO Backend
   const patientCode =
     item.patientCode ||
     matchedPayable?.patientCode ||
@@ -133,7 +125,6 @@ const normalizePaymentHistoryItem = (item, payableList = [], patientList = [], a
     matchedPatient?.patientCode ||
     null
 
-  // 6. Mã lượt khám từ DTO Backend
   const visitCode =
     matchedPayable?.visitCode ||
     matchedPending?.visitCode ||
@@ -141,7 +132,6 @@ const normalizePaymentHistoryItem = (item, payableList = [], patientList = [], a
     item.visitCode ||
     (item.visitId ? formatVisitCode(item.visitId) : null)
 
-  // 7. Mã hóa đơn gốc nếu đây là Hóa đơn điều chỉnh (ADJUSTMENT)
   let originalInvoiceCode = item.originalInvoiceCode || null
   if (!originalInvoiceCode && item.originalInvoiceId) {
     const orig = allInvoices.find((inv) => String(inv.id) === String(item.originalInvoiceId))
@@ -150,7 +140,6 @@ const normalizePaymentHistoryItem = (item, payableList = [], patientList = [], a
     }
   }
 
-  // 8. Thời gian lập: Dùng đúng field createdAt/paidAt/issuedAt/invoiceDate từ Backend
   const createdAt = item.createdAt || item.paidAt || item.issuedAt || item.invoiceDate || null
 
   return {
@@ -227,9 +216,6 @@ const getPaymentMethodForVisit = (visitId) => {
   }
 }
 
-
-
-
 const parsePrescriptionItems = (raw) => {
   if (Array.isArray(raw)) return raw
   if (typeof raw === 'string') {
@@ -243,8 +229,6 @@ const parsePrescriptionItems = (raw) => {
   return []
 }
 
-
-// Map chính xác theo PaymentMethod enum từ Backend Java: CASH, BANK_TRANSFER, CARD, QR_CODE, E_WALLET
 const PAYMENT_METHODS = [
   { value: 'CASH', label: '💵 Tiền mặt' },
   { value: 'BANK_TRANSFER', label: '🏦 Chuyển khoản' },
@@ -256,7 +240,6 @@ function BillingPage() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
 
-  // 1. Phân quyền vai trò Lễ tân (RECEPTIONIST) & Admin
   const userRoles = useMemo(() => {
     const raw = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
     return raw.map((r) => String(r || '').toLowerCase().replace(/^role_/, '')).filter(Boolean)
@@ -266,7 +249,6 @@ function BillingPage() {
   const canAdjustInvoice = userRoles.includes('manager') || userRoles.includes('clinic_manager') || userRoles.includes('admin')
   const hasBillingAccess = canCollectPayment || canAdjustInvoice
 
-  // State quản lý Tabs & Danh sách lượt khám / Lịch sử (Manager tự động vào Tab history)
   const [activeTab, setActiveTab] = useState(canAdjustInvoice && !canCollectPayment ? 'history' : 'pending')
   const [pendingVisits, setPendingVisits] = useState([])
   const [historyInvoices, setHistoryInvoices] = useState([])
@@ -282,19 +264,16 @@ function BillingPage() {
   const [apiError, setApiError] = useState('')
   const [viewingInvoiceModal, setViewingInvoiceModal] = useState(null)
 
-  // State cho Modal Điều chỉnh Hóa đơn (Role MANAGER)
   const [adjustingInvoiceModal, setAdjustingInvoiceModal] = useState(null)
   const [submittingAdjustment, setSubmittingAdjustment] = useState(false)
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [adjustmentItemName, setAdjustmentItemName] = useState('Điều chỉnh giảm khoản thu')
   const [adjustmentAmount, setAdjustmentAmount] = useState(-20000)
 
-  // State cho Modal Hoàn tiền Thanh toán (Role MANAGER)
   const [refundingPaymentModal, setRefundingPaymentModal] = useState(null)
   const [submittingRefund, setSubmittingRefund] = useState(false)
   const [refundReason, setRefundReason] = useState('')
 
-  // 2A. Tải danh sách Lịch sử thanh toán từ Backend REST API (GET /invoices)
   const loadHistoryInvoices = useCallback(async () => {
     setLoadingHistory(true)
     try {
@@ -331,7 +310,6 @@ function BillingPage() {
     }
   }, [])
 
-  // 2B. Tải danh sách Chờ thanh toán từ Backend API (GET /invoices/payable)
   const loadPendingVisits = useCallback(async (currentHistory = []) => {
     setLoadingVisits(true)
     setApiError('')
@@ -340,7 +318,6 @@ function BillingPage() {
       const data = res?.data
       const payableList = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
 
-      // Loại bỏ những lượt khám đã nằm trong Lịch sử Hóa đơn/Thanh toán Backend
       const paidVisitIds = new Set(currentHistory.map((h) => String(h.visitId)).filter(Boolean))
       const filteredPending = payableList.filter((p) => {
         const id = String(p.visitId || p.id)
@@ -362,7 +339,6 @@ function BillingPage() {
     }
   }, [location.state])
 
-  // Tải đồng bộ cả 2 danh sách từ Backend
   const refreshAllData = useCallback(async () => {
     const historyList = await loadHistoryInvoices()
     await loadPendingVisits(historyList)
@@ -372,7 +348,6 @@ function BillingPage() {
     refreshAllData()
   }, [])
 
-  // 3. Tải dữ liệu chi tiết của 1 Lượt khám từ Backend API & Storage
   const loadInvoiceData = useCallback(async (visitId) => {
     if (!visitId) {
       setSelectedVisitData(null)
@@ -386,7 +361,6 @@ function BillingPage() {
     const isVisitCompleted = visitStatus === 'COMPLETED' || visitStatus === 'WAITING_FOR_PAYMENT'
 
     try {
-      // 1. Tải danh mục thuốc để tra cứu đơn giá & tên thuốc
       let medCatalog = []
       try {
         const medRes = await pharmacyApi.medicines({ size: 200 })
@@ -398,6 +372,7 @@ function BillingPage() {
       if (medCatalog.length === 0) {
         medCatalog = mergeMedicines([])
       }
+
       const medMap = new Map()
       medCatalog.forEach((m) => {
         if (m.id) medMap.set(String(m.id), m)
@@ -405,7 +380,6 @@ function BillingPage() {
         if (m.medicineCode) medMap.set(String(m.medicineCode), m)
       })
 
-      // 2A. Tải thông tin Hóa đơn theo visitId từ Backend API (GET /invoices?visitId={visitId})
       let invoiceData = null
       try {
         const invoiceRes = await billingApi.getByVisit(visitId)
@@ -416,7 +390,6 @@ function BillingPage() {
         console.warn('[BillingPage] Lỗi getByVisit invoice:', e?.message)
       }
 
-      // 2B. Tải Đơn thuốc thuộc visitId từ Backend API
       let prescriptions = []
       try {
         const mrRes = await medicalRecordApi.getByVisit(visitId)
@@ -457,7 +430,6 @@ function BillingPage() {
         }
       }
 
-      // 3. Fallback lấy đơn thuốc từ Local Storage & Mock Repository (nếu API bị 403 / rỗng / offline)
       const localPrescriptions = getStoredPrescriptions()
       if (localPrescriptions && localPrescriptions.length > 0) {
         const matchedLocal = localPrescriptions.filter(
@@ -478,9 +450,6 @@ function BillingPage() {
           })
         }
       }
-
-
-
 
       let prescriptionItems = []
       let prescriptionStatus = null
@@ -526,7 +495,6 @@ function BillingPage() {
 
       const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
 
-      // Tính chi phí & Gọi Backend Payment Quote (POST /invoices/payment-quotes)
       const medicineFee = prescriptionItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
       const examFee = 100000
 
@@ -623,7 +591,6 @@ function BillingPage() {
     )
   }, [historyInvoices, searchKeyword])
 
-  // 4. Ghi nhận thanh toán (POST /invoices/payments) & Xử lý lỗi 409
   const handleConfirmPayment = async () => {
     if (!selectedVisitData || !selectedVisitId) return
     if (!canCollectPayment) {
@@ -662,7 +629,6 @@ function BillingPage() {
       if (selectedVisitData?.visitCode) savePaymentMethodForVisit(selectedVisitData.visitCode, finalMethod)
       if (paymentRes?.id) savePaymentMethodForVisit(paymentRes.id, finalMethod)
 
-      // Cập nhật state chính xác từ PaymentResponse Backend
       setSelectedVisitData((prev) => ({
         ...prev,
         paymentId: paymentRes.id,
@@ -673,7 +639,6 @@ function BillingPage() {
         totalAmount: Number(paymentRes.amountPaid || prev.totalAmount),
       }))
 
-      // Xóa khỏi hàng đợi Chờ thanh toán và Tải lại Lịch sử từ Backend
       setPendingVisits((prev) => prev.filter((v) => String(v.visitId || v.id) !== String(selectedVisitId)))
       await loadHistoryInvoices()
 
@@ -683,7 +648,6 @@ function BillingPage() {
       const msg = err?.response?.data?.message
 
       if (status === 409) {
-        // XỬ LÝ LỖI 409: Khoản thu đã được thanh toán trước đó trên Backend!
         message.warning('Khoản thu này đã được ghi nhận thanh toán từ trước (409). Đang đồng bộ dữ liệu thực tế từ Backend...')
         
         try {
@@ -703,7 +667,6 @@ function BillingPage() {
             paidAt: foundInvoice?.paidAt || foundInvoice?.createdAt || prev?.paidAt || new Date().toISOString(),
           }))
 
-          // Xóa khỏi danh sách chờ thanh toán
           setPendingVisits((prev) => prev.filter((v) => String(v.visitId || v.id) !== String(selectedVisitId)))
           await loadHistoryInvoices()
         } catch (getErr) {
@@ -725,7 +688,6 @@ function BillingPage() {
     }
   }
 
-  // 5. Lập hóa đơn điện tử (POST /invoices) theo CreateInvoiceRequest DTO { visitId, paymentId }
   const handleCreateInvoice = async () => {
     if (!selectedVisitData) return
     if (!canCollectPayment) {
@@ -786,7 +748,6 @@ function BillingPage() {
         paymentMethod: activeMethod,
       }))
 
-      // Tải lại Lịch sử thanh toán từ Backend
       await loadHistoryInvoices()
 
     } catch (err) {
@@ -814,7 +775,6 @@ function BillingPage() {
     }
   }
 
-  // 6. Xem hóa đơn điện tử từ Backend API GET /invoices/{invoiceId}
   const handleViewInvoice = async (invoiceId) => {
     const targetId = invoiceId || selectedVisitData?.invoiceId
     let invoiceData = null
@@ -881,7 +841,6 @@ function BillingPage() {
     setViewingInvoiceModal(modalPayload)
   }
 
-  // 7. Xử lý Lập hóa đơn điều chỉnh từ Backend API POST /invoices/{invoiceId}/adjustments (Role MANAGER)
   const handleConfirmAdjustment = async () => {
     if (!adjustingInvoiceModal) return
     if (!canAdjustInvoice) {
@@ -938,7 +897,6 @@ function BillingPage() {
     }
   }
 
-  // 8. Xử lý Hoàn tiền (POST /invoices/payments/{paymentId}/refund) (Role MANAGER)
   const handleConfirmRefund = async () => {
     if (!refundingPaymentModal) return
     if (!canAdjustInvoice) {
@@ -998,6 +956,7 @@ function BillingPage() {
 
   const feeDataSource = useMemo(() => {
     if (!selectedVisitData) return []
+
     const items = [
       { key: 'exam', name: 'Phí khám bệnh', quantity: 1, price: selectedVisitData.examFee, amount: selectedVisitData.examFee },
     ]
@@ -1045,8 +1004,6 @@ function BillingPage() {
     return items
   }, [selectedVisitData])
 
-
-  // Columns cho Tab Lịch sử thanh toán (Backend GET /invoices)
   const historyColumns = [
     {
       title: 'Mã HĐ',
@@ -1290,7 +1247,6 @@ function BillingPage() {
         />
       )}
 
-      {/* 2 TABS CHUẨN FRONTEND: CHỜ THANH TOÁN vs LỊCH SỬ THANH TOÁN */}
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
@@ -1307,7 +1263,6 @@ function BillingPage() {
             ),
             children: (
               <Row gutter={[16, 16]} align="stretch">
-                {/* Cột trái: Danh sách Lượt khám Chờ thanh toán */}
                 <Col xs={24} xl={9}>
                   <Card title={`Hàng đợi thanh toán (${filteredPendingVisits.length})`} styles={{ body: { padding: 12 } }} style={{ height: '100%' }}>
                     <Input
@@ -1364,14 +1319,12 @@ function BillingPage() {
                   </Card>
                 </Col>
 
-                {/* Cột phải: Chi tiết Khoản Thu & Thanh Toán */}
                 <Col xs={24} xl={15}>
                   <Card title={selectedVisitData ? `Tổng hợp khoản thu: ${selectedVisitData.visitCode}` : 'Chi tiết khoản thu & Hóa đơn'} style={{ height: '100%' }}>
                     {!selectedVisitData ? (
                       <Empty description="Vui lòng chọn lượt khám ở danh sách bên trái" />
                     ) : (
                       <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                        {/* 1. Thông tin lượt khám Read-Only */}
                         <div>
                           <Title level={5} style={{ marginBottom: 10, color: '#1e3a8a' }}>1. Thông tin lượt khám &amp; Trạng thái</Title>
                           <Descriptions
@@ -1435,7 +1388,6 @@ function BillingPage() {
                           </Descriptions>
                         </div>
 
-                        {/* Kiểm tra điều kiện nghiệp vụ Backend */}
                         {!selectedVisitData.isVisitCompleted && (
                           <Alert
                             type="warning"
@@ -1458,7 +1410,6 @@ function BillingPage() {
 
                         <Divider style={{ margin: '4px 0' }} />
 
-                        {/* 2. Chi tiết các khoản phải thu */}
                         <div>
                           <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>2. Chi tiết các khoản phải thu</Title>
                           <Table rowKey="key" columns={feeColumns} dataSource={feeDataSource} pagination={false} size="small" loading={loadingData} scroll={{ x: 'max-content' }} />
@@ -1474,11 +1425,9 @@ function BillingPage() {
 
                         <Divider style={{ margin: '4px 0' }} />
 
-                        {/* 3. Ghi nhận thanh toán & Lập hóa đơn (Luồng 3 Trạng thái chuẩn) */}
                         <div>
                           <Title level={5} style={{ marginBottom: 8, color: '#1e3a8a' }}>3. Ghi nhận thanh toán &amp; Hóa đơn điện tử</Title>
 
-                          {/* TRẠNG THÁI 3: ĐÃ CÓ HÓA ĐƠN */}
                           {selectedVisitData.invoiceCode ? (
                             <Alert
                               type="success"
@@ -1517,7 +1466,6 @@ function BillingPage() {
                               style={{ border: '1px solid #bbf7d0', background: '#f0fdf4' }}
                             />
                           ) : selectedVisitData.paymentStatus === 'PAID' ? (
-                            /* TRẠNG THÁI 2: ĐÃ THANH TOÁN (Chờ lập hóa đơn) */
                             <Alert
                               type="info"
                               showIcon
@@ -1558,7 +1506,6 @@ function BillingPage() {
                               style={{ border: '1px solid #bfdbfe', background: '#eff6ff' }}
                             />
                           ) : (
-                            /* TRẠNG THÁI 1: CHƯA THANH TOÁN */
                             <Card style={{ backgroundColor: '#f0f7ff', borderColor: '#bae6fd' }}>
                               <Space direction="vertical" size="middle" style={{ width: '100%' }}>
                                 <Form layout="vertical">
@@ -1573,7 +1520,6 @@ function BillingPage() {
                                   </Form.Item>
                                 </Form>
 
-                                {/* 1. THANH TOÁN TIỀN MẶT */}
                                 {paymentMethod === 'CASH' && (
                                   <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
                                     <Space direction="vertical" size={4} style={{ width: '100%' }}>
@@ -1605,7 +1551,6 @@ function BillingPage() {
                                   </div>
                                 )}
 
-                                {/* 2. THANH TOÁN CHUYỂN KHOẢN */}
                                 {paymentMethod === 'BANK_TRANSFER' && (
                                   <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #93c5fd' }}>
                                     <Title level={5} style={{ color: '#1e40af', marginTop: 0, marginBottom: 12 }}>
@@ -1659,7 +1604,6 @@ function BillingPage() {
                                   </div>
                                 )}
 
-                                {/* 3. THANH TOÁN THẺ NGÂN HÀNG */}
                                 {paymentMethod === 'CARD' && (
                                   <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
                                     <Space direction="vertical" size={6} style={{ width: '100%' }}>
@@ -1741,7 +1685,6 @@ function BillingPage() {
         ]}
       />
 
-      {/* Modal Xem & In Hóa đơn Điện tử chuẩn giao diện HĐĐT (Matching User Template) */}
       <Modal
         title={
           <Space>
@@ -1770,8 +1713,6 @@ function BillingPage() {
       >
         {viewingInvoiceModal && (
           <div className="printable-invoice-container" style={{ padding: 24, background: '#fff', borderRadius: 8, color: '#0f172a' }}>
-            
-            {/* 1. HEADER (Logo + Tên Cơ sở + Địa chỉ) */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #008080', paddingBottom: 12, marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{ width: 48, height: 48, borderRadius: '50%', border: '2.5px solid #008080', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#008080', fontSize: 24, background: '#f0fdfa' }}>
@@ -1791,7 +1732,6 @@ function BillingPage() {
               </div>
             </div>
 
-            {/* 2. INVOICE TITLE & META */}
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 21, fontWeight: 800, color: viewingInvoiceModal.type === 'ADJUSTMENT' ? '#6b21a8' : '#004d40', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <span style={{ color: viewingInvoiceModal.type === 'ADJUSTMENT' ? '#7e22ce' : '#008080', fontSize: 14 }}>⟡</span>
@@ -1813,11 +1753,8 @@ function BillingPage() {
               </div>
             </div>
 
-            {/* 3. GRID 6 Ô THÔNG TIN BỆNH NHÂN & LƯỢT KHÁM */}
             <div style={{ border: '1px solid #cbd5e1', borderRadius: 12, overflow: 'hidden', marginBottom: 20, background: '#ffffff' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                
-                {/* Row 1: Bệnh nhân | Mã lượt khám */}
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
                     <UserOutlined />
@@ -1845,7 +1782,6 @@ function BillingPage() {
                   </div>
                 </div>
 
-                {/* Row 2: Bác sĩ khám | Người lập hóa đơn */}
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
                     <MedicineBoxOutlined />
@@ -1870,7 +1806,6 @@ function BillingPage() {
                   </div>
                 </div>
 
-                {/* Row 3: Phương thức thanh toán | Trạng thái hóa đơn */}
                 <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
                     <DollarOutlined />
@@ -1906,7 +1841,6 @@ function BillingPage() {
               </div>
             </div>
 
-            {/* 4. BẢNG CHI TIẾT CÁC KHOẢN THU */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'inline-block', background: '#008080', color: '#ffffff', padding: '6px 16px', borderRadius: '8px 8px 0 0', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 CHI TIẾT CÁC KHOẢN THU
@@ -1948,7 +1882,6 @@ function BillingPage() {
               </div>
             </div>
 
-            {/* 5. TỔNG THANH TOÁN */}
             <div style={{ border: '1px solid #cbd5e1', borderRadius: 12, padding: '14px 20px', background: '#f0fdfa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #008080', color: '#008080', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, background: '#ffffff' }}>
@@ -1961,10 +1894,7 @@ function BillingPage() {
               </div>
             </div>
 
-            {/* 6. MÃ QR & CHỮ KÝ & GHI CHÚ */}
             <div style={{ display: 'grid', gridTemplateColumns: '190px 1fr', gap: 16, marginBottom: 16 }}>
-              
-              {/* Box Mã QR */}
               <div style={{ border: '1px solid #008080', borderRadius: 10, overflow: 'hidden', textAlign: 'center', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ background: '#008080', color: '#ffffff', padding: '6px', fontWeight: 800, fontSize: 13, letterSpacing: '1px' }}>
                   MÃ QR
@@ -1981,10 +1911,7 @@ function BillingPage() {
                 </div>
               </div>
 
-              {/* Box Bên phải: Thông tin ghi chú & Chữ ký */}
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
-                
-                {/* Note Box */}
                 <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', background: '#f8fafc', fontSize: 11, color: '#475569', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                   <InfoCircleOutlined style={{ fontSize: 18, color: '#008080', marginTop: 2, flexShrink: 0 }} />
                   <div>
@@ -1994,7 +1921,6 @@ function BillingPage() {
                   </div>
                 </div>
 
-                {/* Signatures Box */}
                 <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '12px 8px', background: '#ffffff' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 12 }}>
                     <div style={{ textAlign: 'center' }}>
@@ -2015,7 +1941,6 @@ function BillingPage() {
                   </div>
                 </div>
 
-                {/* Date footer line */}
                 <div style={{ textAlign: 'right', fontSize: 12, color: '#475569', fontStyle: 'italic' }}>
                   {formatDateVietnamese(viewingInvoiceModal.createdAt || selectedVisitData?.paidAt)}
                 </div>
@@ -2023,7 +1948,6 @@ function BillingPage() {
               </div>
             </div>
 
-            {/* 7. FOOTER BANNER */}
             <div style={{ borderTop: '2px solid #008080', paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: '#008080', fontWeight: 600 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <SafetyCertificateOutlined style={{ fontSize: 14 }} />
@@ -2038,7 +1962,6 @@ function BillingPage() {
         )}
       </Modal>
 
-      {/* Modal Form Điều chỉnh Hóa đơn (Role MANAGER) */}
       <Modal
         title={
           <Space>
@@ -2076,7 +1999,6 @@ function BillingPage() {
               />
             )}
 
-            {/* Read-Only Thông tin Hóa đơn gốc */}
             <Card size="small" style={{ background: '#f8fafc', borderColor: '#cbd5e1' }}>
               <Descriptions size="small" column={1} labelStyle={{ fontWeight: 600, color: '#475569', width: 140 }}>
                 <Descriptions.Item label="Mã HĐ gốc">
@@ -2097,7 +2019,6 @@ function BillingPage() {
               </Descriptions>
             </Card>
 
-            {/* Input Form Điều chỉnh chuẩn DTO AdjustInvoiceRequest */}
             <Form layout="vertical">
               <Form.Item label={<strong>Lý do điều chỉnh (Bắt buộc) *</strong>} required>
                 <Input.TextArea
@@ -2134,7 +2055,6 @@ function BillingPage() {
         )}
       </Modal>
 
-      {/* Modal Form Hoàn Tiền (Role MANAGER) */}
       <Modal
         title={
           <Space>
@@ -2172,7 +2092,6 @@ function BillingPage() {
               />
             )}
 
-            {/* Read-Only Thông tin Giao dịch / Thanh toán */}
             <Card size="small" style={{ background: '#fffbe6', borderColor: '#ffe58f' }}>
               <Descriptions size="small" column={1} labelStyle={{ fontWeight: 600, color: '#475569', width: 150 }}>
                 <Descriptions.Item label="Bệnh nhân">
@@ -2196,7 +2115,6 @@ function BillingPage() {
               </Descriptions>
             </Card>
 
-            {/* Input Form Lý do hoàn tiền (RefundPaymentRequest) */}
             <Form layout="vertical">
               <Form.Item label={<strong>Lý do hoàn tiền (Bắt buộc) *</strong>} required>
                 <Input.TextArea

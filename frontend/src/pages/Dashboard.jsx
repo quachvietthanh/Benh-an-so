@@ -132,7 +132,6 @@ function Dashboard() {
       } catch (apiError) {
         const status = apiError?.response?.status
 
-        // Thử lấy dữ liệu từ reportApi (summary & timeline)
         const [summaryRes, timelineRes] = await Promise.allSettled([
           reportApi.summary({ from: todayStr, to: todayStr }),
           reportApi.timeline({ from: todayStr, to: todayStr }),

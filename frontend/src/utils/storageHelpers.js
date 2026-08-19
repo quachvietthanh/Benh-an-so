@@ -101,7 +101,6 @@ export const mergeQueues = (apiQueues = []) => {
     const key = String(item.id || item.medicalQueueId)
     if (key && key !== 'undefined') {
       const existing = map.get(key)
-      // Dữ liệu API là nguồn chính thức; bản local chỉ bổ sung các trường giao diện còn thiếu.
       map.set(key, existing ? { ...item, ...existing } : item)
     }
   })
@@ -149,7 +148,7 @@ export const mergePatients = (apiPatients = []) => {
       map.set(String(item.id), existing ? { ...existing, ...item } : item)
     }
   })
-  // Tự động đồng bộ toàn bộ bệnh nhân từ Hàng đợi (Queue) vào danh sách Bệnh nhân
+
   const queues = getStoredQueueItems()
   queues.forEach((q) => {
     if (q.patientId && q.patientName) {
@@ -191,18 +190,13 @@ export const mergePatients = (apiPatients = []) => {
   return mergedList
 }
 
-
 export const getStoredMedicalRecords = () => {
   try {
     const raw = localStorage.getItem(MEDICAL_RECORDS_KEY)
     if (!raw) return []
     const list = JSON.parse(raw)
     if (!Array.isArray(list)) return []
-    const validList = list.filter((r) => r && (r.recordCode || r.patientName || (r.status && r.status !== 'DRAFT')))
-    if (validList.length !== list.length) {
-      localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify(validList))
-    }
-    return validList
+    return list
   } catch {
     return []
   }
@@ -496,7 +490,6 @@ export const getPayableItems = () => {
 
   const payableList = []
 
-  // Add prescriptions awaiting payment
   prescriptions.forEach((p) => {
     if (!paidPrescriptionIds.has(p.id)) {
       payableList.push({
@@ -512,7 +505,6 @@ export const getPayableItems = () => {
     }
   })
 
-  // Add medical records awaiting payment
   records.forEach((r) => {
     if (!paidRecordIds.has(r.id) && !payableList.some((p) => p.medicalRecordId === r.id)) {
       payableList.push({
@@ -584,7 +576,6 @@ export const adjustInvoiceHelper = (originalInvoice, { adjustmentAmount, reason 
   return newInvoice
 }
 
-// Audit Logs Helpers
 export const getStoredAuditLogs = () => {
   try {
     const raw = localStorage.getItem(AUDIT_LOGS_KEY)
@@ -671,7 +662,6 @@ export const mergeClinicalOrders = (defaultOrders = []) => {
     localOrders.forEach((item) => {
       if (item.id) {
         const existing = map.get(String(item.id))
-        // Dữ liệu máy chủ là nguồn chính thức; bản local chỉ bổ sung thông tin hiển thị.
         map.set(String(item.id), existing ? { ...item, ...existing } : item)
       }
     })
@@ -762,4 +752,3 @@ export const saveNotificationLog = (notifData) => {
     return []
   }
 }
-

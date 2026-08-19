@@ -26,15 +26,12 @@ export default function RevenueDetailTables({
     return Math.max(...dailyTimeline.map((d) => d.netRevenue || 0), 1)
   }, [dailyTimeline])
 
-  // Filtered invoices
   const filteredInvoices = useMemo(() => {
     return periodInvoices.filter((inv) => {
-      // Filter by type
       if (invoiceTypeFilter !== 'ALL') {
         const type = inv.invoiceType || inv.type || 'ORIGINAL'
         if (type !== invoiceTypeFilter) return false
       }
-      // Filter by keyword
       if (searchKeyword.trim()) {
         const kw = searchKeyword.toLowerCase()
         const codeMatch = (inv.invoiceCode || inv.code || inv.id || '').toLowerCase().includes(kw)
@@ -46,7 +43,6 @@ export default function RevenueDetailTables({
     })
   }, [periodInvoices, invoiceTypeFilter, searchKeyword])
 
-  // Columns for daily timeline table
   const timelineColumns = [
     {
       title: 'Ngày báo cáo',
@@ -110,7 +106,6 @@ export default function RevenueDetailTables({
     },
   ]
 
-  // Columns for detailed invoices table
   const invoiceColumns = [
     {
       title: 'Mã HĐ',

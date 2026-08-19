@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import dayjs from 'dayjs'
 import { buildFefoPreview } from '../utils/workflowContract.js'
 
-// Mock Helper functions matching Frontend implementation
 function validateReceiptItem(item, today = dayjs().startOf('day')) {
   if (!item.medicineId) {
     return { valid: false, error: 'Vui lòng chọn thuốc.' }
@@ -67,10 +66,6 @@ function checkUserPermission(roles) {
   return rList.includes('pharmacist') || rList.includes('admin')
 }
 
-// ==========================================
-// TEST SUITE 1: TƯƠNG TÁC THUỐC (NCL-05-CN-002-CV-03)
-// ==========================================
-
 test('1.1. Bắt buộc nhập lý do bỏ qua cảnh báo tương tác thuốc (không trống hoặc chỉ có whitespace)', () => {
   assert.equal(validateOverrideReason('').valid, false)
   assert.equal(validateOverrideReason('   ').valid, false)
@@ -96,10 +91,6 @@ test('1.2. Đóng gói interactionOverrides gửi lên Backend khi kê đơn thu
   assert.deepEqual(overridesPayload[0], { ruleId: 'rule-uuid-1', overrideReason: 'Theo dõi sát phản ứng lâm sàng' })
   assert.deepEqual(overridesPayload[1], { ruleId: 'rule-uuid-2', overrideReason: 'Theo dõi sát phản ứng lâm sàng' })
 })
-
-// ==========================================
-// TEST SUITE 2: NHẬP KHO THEO LÔ VÀ HẠN DÙNG (NCL-06-CN-005-CV-04)
-// ==========================================
 
 test('2.1. Validate chưa chọn thuốc -> Vui lòng chọn thuốc.', () => {
   const item = { medicineId: undefined, batchNumber: 'LOT-001', expiryDate: dayjs().add(1, 'year'), quantity: 10, importPrice: 1000 }
@@ -177,10 +168,6 @@ test('2.7. Phân quyền truy cập chức năng nhập kho (Chỉ Dược sĩ v
   assert.equal(checkUserPermission(['doctor']), false)
   assert.equal(checkUserPermission(['receptionist']), false)
 })
-
-// ==========================================
-// TEST SUITE 3: CẢNH BÁO HẠN DÙNG THUỐC (NCL-06-CN-006-CV-04)
-// ==========================================
 
 test('3.1. Map đúng DTO InventoryExpiryAlertResponse từ Backend', () => {
   const backendAlert = {

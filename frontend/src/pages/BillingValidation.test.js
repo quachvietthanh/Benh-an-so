@@ -41,10 +41,6 @@ function validatePaymentSubmission({ visitId, visitStatus, totalAmount, paymentS
   return { valid: true }
 }
 
-// ==========================================
-// TEST SUITE: THU PHÍ LƯỢT KHÁM (NCL-07-CN-001)
-// ==========================================
-
 test('1. Phân quyền thu phí: Chỉ Lễ tân (RECEPTIONIST) và Admin mới được thao tác', () => {
   assert.equal(checkPaymentPermission(['ROLE_RECEPTIONIST']), true)
   assert.equal(checkPaymentPermission(['receptionist']), true)

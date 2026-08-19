@@ -17,7 +17,6 @@ function PublicQueueDisplay() {
         setQueueItems(res.data)
       }
     } catch {
-      // Keep existing items if refresh fails
     }
   }
 
@@ -35,7 +34,6 @@ function PublicQueueDisplay() {
 
   return (
     <div style={{ background: '#0f172a', minHeight: '100vh', padding: 24, color: '#fff' }}>
-      {/* Header bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid #334155' }}>
         <div>
           <Title level={2} style={{ color: '#38bdf8', margin: 0 }}>
@@ -55,7 +53,6 @@ function PublicQueueDisplay() {
       </div>
 
       <Row gutter={[24, 24]}>
-        {/* Main calling section */}
         <Col span={16}>
           <Card title={<span style={{ color: '#38bdf8', fontSize: 20, fontWeight: 700 }}><BellOutlined /> ĐANG KHÁM VÀ GỌI SỐ</span>} style={{ background: '#1e293b', borderColor: '#334155' }}>
             {currentCalling.length === 0 ? (
@@ -85,7 +82,6 @@ function PublicQueueDisplay() {
           </Card>
         </Col>
 
-        {/* Waiting queue column */}
         <Col span={8}>
           <Card title={<span style={{ color: '#f59e0b', fontSize: 20, fontWeight: 700 }}>DANH SÁCH CHỜ TIẾP THEO</span>} style={{ background: '#1e293b', borderColor: '#334155' }}>
             {waitingList.length === 0 ? (

@@ -1,14 +1,9 @@
-/* ==========================================================================
-   REPORTS & REVENUE DASHBOARD STYLES
-   ========================================================================== */
-
 .revenue-report-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* Preset Buttons Bar */
 .revenue-preset-bar {
   display: flex;
   flex-wrap: wrap;
@@ -55,7 +50,6 @@
   font-weight: 600;
 }
 
-/* KPI Cards Grid */
 .revenue-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -201,7 +195,6 @@
   color: #0369a1;
 }
 
-/* Chart Container & Toolbar */
 .revenue-chart-card {
   background: #ffffff;
   border-radius: 16px;
@@ -255,7 +248,6 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-/* Legend items */
 .revenue-chart-legend {
   display: flex;
   align-items: center;
@@ -282,7 +274,6 @@
   background: #f97316;
 }
 
-/* SVG Chart Styles */
 .revenue-svg-wrapper {
   position: relative;
   width: 100%;
@@ -342,7 +333,6 @@
   margin: 3px 0;
 }
 
-/* Payment Breakdown Section */
 .revenue-payment-card {
   background: #ffffff;
   border-radius: 16px;
@@ -384,7 +374,6 @@
   transition: width 0.4s ease;
 }
 
-/* Table Card Styles */
 .revenue-table-card {
   background: #ffffff;
   border-radius: 16px;
@@ -403,7 +392,6 @@
   border-bottom: 1px solid #f1f5f9;
 }
 
-/* Adjustment Note Alert */
 .revenue-adjustment-alert {
   background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
   border: 1px solid #a7f3d0;
@@ -434,7 +422,6 @@
   color: #047857;
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .revenue-preset-bar {
     flex-direction: column;

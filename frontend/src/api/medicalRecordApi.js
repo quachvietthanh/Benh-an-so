@@ -16,7 +16,6 @@ const medicalRecordApi = {
   update: (id, data) => {
     return axiosClient.put(`/medical-records/${id}`, data)
   },
-  // Diagnosis & Clinical Orders endpoints connected to Backend
   recordDiagnosis: (recordId, data) => {
     const secondarySource = data.secondaryDiagnoses || data.secondaryIcds || data.secondaryIcdCodes || []
     const secondaryDiagnoses = Array.isArray(secondarySource)

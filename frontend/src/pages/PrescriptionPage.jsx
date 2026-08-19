@@ -224,7 +224,6 @@ function PrescriptionPage() {
       setDiagnoses(Array.isArray(diagnosisResult.data) ? diagnosisResult.data : [])
       setPrescriptions(Array.isArray(prescriptionResult.data) ? prescriptionResult.data : [])
 
-      // Load medicines: try backend API first, if restricted by backend authorizer, use mergeMedicines
       let loadedMeds = []
       try {
         const medicineResponse = await pharmacyApi.medicines({ active: true })
@@ -428,7 +427,6 @@ function PrescriptionPage() {
         editingPrescription ? 'điều chỉnh đơn thuốc' : 'tạo đơn thuốc',
       )
 
-      // Re-fetch fresh medicine data to verify live stock before calling Create API
       let freshMeds = []
       try {
         const medicineResponse = await pharmacyApi.medicines({ active: true })
@@ -571,7 +569,6 @@ function PrescriptionPage() {
 
       await executeSavePrescription(confirmedOverrides)
     } catch (error) {
-      // Error is notified via performInteractionCheck catch block
     }
   }
 

@@ -1,17 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-/**
- * 1. Helper kiểm tra quyền xem bệnh án theo Vai trò người dùng (Role Authorization)
- */
 export const canViewMedicalRecord = (roles = []) => {
   const allowedRoles = ['admin', 'doctor', 'nurse', 'role_admin', 'role_doctor', 'role_nurse']
   return roles.some((role) => allowedRoles.includes(String(role).toLowerCase()))
 }
 
-/**
- * 2. Helper định dạng & ghi nhật ký truy cập hồ sơ bệnh án (Audit Log / Access Logging)
- */
 export const createAccessLog = ({ userName, patientName, recordCode, action = 'Xem thông tin hồ sơ bệnh án điện tử' }) => {
   if (!userName || !recordCode) {
     throw new Error('Thiếu thông tin người truy cập hoặc mã bệnh án')
@@ -26,9 +20,6 @@ export const createAccessLog = ({ userName, patientName, recordCode, action = 'X
   }
 }
 
-/**
- * 3. Helper kiểm tra tính toàn vẹn thông tin chi tiết bệnh án khi xem
- */
 export const validateMedicalRecordDetail = (record) => {
   const errors = []
   if (!record?.medicalRecordId && !record?.id) errors.push('Thiếu medicalRecordId')
@@ -42,18 +33,12 @@ export const validateMedicalRecordDetail = (record) => {
   }
 }
 
-// =========================================================================
-// --- BỘ KIỂM THỬ TỰ ĐỘNG KIỂM THỬ XEM BỆNH ÁN VÀ GHI NHẬT KÝ (AUTOMATED SUITE) ---
-// =========================================================================
-
 test('1. KIỂM THỬ QUYỀN XEM BỆNH ÁN (Role-Based Authorization Test)', () => {
-  // TH 1.1: Bác sĩ, Quản trị viên và Điều dưỡng CÓ QUYỀN xem bệnh án
   assert.equal(canViewMedicalRecord(['doctor']), true)
   assert.equal(canViewMedicalRecord(['ADMIN']), true)
   assert.equal(canViewMedicalRecord(['Nurse']), true)
   assert.equal(canViewMedicalRecord(['ROLE_DOCTOR']), true)
 
-  // TH 1.2: Vai trò không đủ thẩm quyền -> BỊ TỪ CHỐI xem
   assert.equal(canViewMedicalRecord(['pharmacist']), false)
   assert.equal(canViewMedicalRecord(['guest']), false)
   assert.equal(canViewMedicalRecord([]), false)
@@ -88,7 +73,6 @@ test('3. KIỂM THỬ TỰ ĐỘNG GHI NHẬT KÝ TRUY CẬP HỒ SƠ (Audit Log
     action: 'Xem thông tin hồ sơ bệnh án điện tử',
   })
 
-  // Kiểm tra thông tin nhật ký ghi nhận đầy đủ
   assert.ok(logEntry.id.startsWith('log-'))
   assert.equal(logEntry.userName, 'BS. Phạm Hồng Anh')
   assert.equal(logEntry.patientName, 'Nguyễn Văn An')

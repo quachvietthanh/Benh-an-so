@@ -1,22 +1,13 @@
-/**
- * Format date to Vietnamese locale
- */
 export const formatDate = (date) => {
   if (!date) return ''
   return new Date(date).toLocaleDateString('vi-VN')
 }
 
-/**
- * Format date time to Vietnamese locale
- */
 export const formatDateTime = (date) => {
   if (!date) return ''
   return new Date(date).toLocaleString('vi-VN')
 }
 
-/**
- * Format gender
- */
 export const formatGender = (gender) => {
   const map = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' }
   if (map[gender]) return map[gender]
@@ -24,9 +15,6 @@ export const formatGender = (gender) => {
   return 'Không xác định'
 }
 
-/**
- * Format record status with badge color
- */
 export const formatRecordStatus = (status) => {
   const map = {
     NEW: { label: 'Mới', color: 'blue' },
@@ -37,9 +25,6 @@ export const formatRecordStatus = (status) => {
   return map[status] || { label: 'Không xác định', color: 'default' }
 }
 
-/**
- * Generate a random color from a string
- */
 export const stringToColor = (str) => {
   let hash = 0
   for (let i = 0; i < str.length; i++) {

@@ -1,18 +1,14 @@
-// ===== API =====
 export const API_TIMEOUT = 30000
 
-// ===== Pagination =====
 export const DEFAULT_PAGE_SIZE = 10
 export const PAGE_SIZE_OPTIONS = [5, 10, 20, 50]
 
-// ===== Gender =====
 export const GENDER_OPTIONS = [
   { value: 'MALE', label: 'Nam' },
   { value: 'FEMALE', label: 'Nữ' },
   { value: 'OTHER', label: 'Khác' },
 ]
 
-// ===== Record Status =====
 export const RECORD_STATUS_OPTIONS = [
   { value: 'NEW', label: 'Mới', color: 'blue' },
   { value: 'IN_PROGRESS', label: 'Đang xử lý', color: 'orange' },
@@ -20,7 +16,6 @@ export const RECORD_STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Đã hủy', color: 'red' },
 ]
 
-// ===== User Roles =====
 export const ROLE_OPTIONS = [
   { value: 'ADMIN', label: 'Quản trị viên' },
   { value: 'DOCTOR', label: 'Bác sĩ' },
@@ -30,7 +25,6 @@ export const ROLE_OPTIONS = [
   { value: 'STAFF', label: 'Nhân viên' },
 ]
 
-// ===== Role Colors for UI =====
 export const ROLE_COLORS = {
   ADMIN: '#f5222d',
   DOCTOR: '#1890ff',
@@ -40,7 +34,6 @@ export const ROLE_COLORS = {
   STAFF: '#8c8c8c',
 }
 
-// ===== Permission Display Names =====
 export const PERMISSION_LABELS = {
   USER_CREATE: 'Tạo người dùng',
   USER_READ: 'Xem người dùng',
@@ -87,5 +80,4 @@ export const PERMISSION_LABELS = {
   PERMISSION_READ: 'Xem quyền',
 }
 
-// ===== Blood Types =====
 export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']

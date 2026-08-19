@@ -48,14 +48,12 @@ import LowStockAlertTable from '../components/pharmacy/LowStockAlertTable'
 
 const { Title, Text, Paragraph } = Typography
 
-// Helper chuẩn hóa văn bản để so sánh trùng lắp
 const normalizeText = (value) =>
   String(value ?? '')
     .trim()
     .toLocaleLowerCase('vi-VN')
     .replace(/\s+/g, ' ')
 
-// Nhãn hiển thị tiếng Việt cho DosageForm
 const DOSAGE_FORM_LABELS = {
   TABLET: 'Viên nén',
   CAPSULE: 'Viên nang',
@@ -74,7 +72,6 @@ const DOSAGE_FORM_LABELS = {
   OTHER: 'Khác',
 }
 
-// Nhãn hiển thị tiếng Việt cho AdministrationRoute
 const ROUTE_LABELS = {
   ORAL: 'Uống',
   SUBLINGUAL: 'Ngậm dưới lưỡi',
@@ -98,8 +95,6 @@ function MedicineCatalogPage() {
   const location = useLocation()
   const { user: currentUser } = useAuthContext()
 
-  // Phân quyền theo chuẩn Acceptance Criteria:
-  // CHỈ PHARMACIST hoặc ADMIN mới có quyền mở và quản lý danh mục thuốc & ngưỡng tồn
   const userRoles = Array.isArray(currentUser?.roles)
     ? currentUser.roles
     : currentUser?.role
@@ -112,22 +107,18 @@ function MedicineCatalogPage() {
   const canManageMedicineCatalog =
     normalizedRoles.includes('PHARMACIST') || normalizedRoles.includes('ADMIN')
 
-  // Tab điều hướng
   const [activeTab, setActiveTab] = useState(
     location.state?.tab || 'catalog'
   )
 
-  // State danh sách thuốc
   const [medicines, setMedicines] = useState([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState(null)
 
-  // State cảnh báo thiếu tồn kho từ /inventory/low-stock
   const [lowStockList, setLowStockList] = useState([])
   const [lowStockLoading, setLowStockLoading] = useState(false)
 
-  // State bộ lọc và phân trang
   const [searchKeyword, setSearchKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [stockStatusFilter, setStockStatusFilter] = useState('ALL')
@@ -135,23 +126,19 @@ function MedicineCatalogPage() {
   const [pageSize, setPageSize] = useState(20)
   const [totalElements, setTotalElements] = useState(0)
 
-  // State Modal Thêm / Sửa thuốc
   const [modalOpen, setModalOpen] = useState(false)
   const [editingMedicine, setEditingMedicine] = useState(null)
   const [deactivatingMedicine, setDeactivatingMedicine] = useState(null)
 
-  // State Modal Thiết lập Ngưỡng tồn
   const [thresholdModalOpen, setThresholdModalOpen] = useState(false)
   const [thresholdMedicine, setThresholdMedicine] = useState(null)
 
-  // State Inline Quick Edit ngưỡng tồn
   const [inlineEditingId, setInlineEditingId] = useState(null)
   const [inlineValue, setInlineValue] = useState(0)
   const [inlineSaving, setInlineSaving] = useState(false)
 
   const [form] = Form.useForm()
 
-  // Hàm tải danh sách cảnh báo thiếu hàng từ Backend API
   const loadLowStockAlerts = useCallback(async () => {
     if (!canManageMedicineCatalog) return
     setLowStockLoading(true)
@@ -166,7 +153,6 @@ function MedicineCatalogPage() {
     }
   }, [canManageMedicineCatalog])
 
-  // Hàm tải danh sách thuốc từ Backend API
   const loadMedicines = useCallback(async () => {
     if (!canManageMedicineCatalog) return
 
@@ -229,7 +215,6 @@ function MedicineCatalogPage() {
     loadLowStockAlerts()
   }, [loadLowStockAlerts])
 
-  // Xử lý mở Modal Thêm thuốc
   const openAddModal = () => {
     if (!canManageMedicineCatalog) {
       message.error('Bạn không có quyền quản lý danh mục thuốc.')
@@ -247,7 +232,6 @@ function MedicineCatalogPage() {
     setModalOpen(true)
   }
 
-  // Xử lý mở Modal Sửa thuốc
   const openEditModal = (record) => {
     if (!canManageMedicineCatalog) {
       message.error('Bạn không có quyền quản lý danh mục thuốc.')
@@ -267,13 +251,11 @@ function MedicineCatalogPage() {
     setModalOpen(true)
   }
 
-  // Xử lý mở Modal Thiết lập Ngưỡng tồn
   const openThresholdModal = (record) => {
     setThresholdMedicine(record)
     setThresholdModalOpen(true)
   }
 
-  // Xử lý Lưu form Thêm / Sửa thuốc
   const handleSaveMedicine = async (values) => {
     if (!canManageMedicineCatalog) {
       message.error('Bạn không có quyền quản lý danh mục thuốc.')
@@ -289,7 +271,6 @@ function MedicineCatalogPage() {
     const defaultRouteVal = values.defaultRoute
     const thresholdVal = Number(values.minStockThreshold ?? 0)
 
-    // Validations bắt buộc
     if (!trimmedName) {
       message.error('Vui lòng nhập tên thuốc.')
       return
@@ -311,7 +292,6 @@ function MedicineCatalogPage() {
       return
     }
 
-    // Kiểm tra trùng lắp ở Frontend (Tên thuốc + Hoạt chất)
     const targetKey =
       normalizeText(trimmedName) + '_' + normalizeText(trimmedActive)
 
@@ -378,7 +358,6 @@ function MedicineCatalogPage() {
     }
   }
 
-  // Xử lý Inline Quick Edit Ngưỡng tồn
   const startInlineEdit = (record) => {
     setInlineEditingId(record.id)
     setInlineValue(Number(record.minStockThreshold ?? 0))
@@ -418,7 +397,6 @@ function MedicineCatalogPage() {
     }
   }
 
-  // Xử lý Ngừng sử dụng / Kích hoạt lại thuốc
   const handleToggleStatus = async (record, targetActiveState) => {
     if (!canManageMedicineCatalog) {
       message.error('Bạn không có quyền quản lý danh mục thuốc.')
@@ -443,7 +421,6 @@ function MedicineCatalogPage() {
     }
   }
 
-  // Lọc thuốc theo trạng thái tồn kho ở Frontend (cho trang hiện tại)
   const filteredMedicines = useMemo(() => {
     let list = Array.isArray(medicines) ? medicines : []
 
@@ -468,7 +445,6 @@ function MedicineCatalogPage() {
     return list
   }, [medicines, stockStatusFilter])
 
-  // Thống kê nhanh
   const stats = useMemo(() => {
     const total = totalElements || medicines.length
     const lowStockCount = lowStockList.length
@@ -480,7 +456,6 @@ function MedicineCatalogPage() {
     return { total, lowStockCount, outOfStockCount, safeCount }
   }, [totalElements, medicines, lowStockList])
 
-  // Chặn tài khoản không thuộc workspace dược
   if (!canManageMedicineCatalog) {
     return (
       <div style={{ padding: 24 }}>
@@ -694,7 +669,6 @@ function MedicineCatalogPage() {
 
   return (
     <div style={{ padding: 24, paddingBottom: 40 }}>
-      {/* Tiêu đề & Mô tả */}
       <div
         className="page-header"
         style={{
@@ -740,7 +714,6 @@ function MedicineCatalogPage() {
         </Space>
       </div>
 
-      {/* Hiển thị lỗi API nếu có */}
       {errorMessage && (
         <Alert
           type="error"
@@ -761,7 +734,6 @@ function MedicineCatalogPage() {
         />
       )}
 
-      {/* Dashboard KPI Metric Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         <Col xs={24} sm={12} md={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
@@ -828,7 +800,6 @@ function MedicineCatalogPage() {
         </Col>
       </Row>
 
-      {/* Tabs điều hướng */}
       <Card styles={{ body: { padding: '16px 20px' } }}>
         <Tabs
           activeKey={activeTab}
@@ -844,7 +815,6 @@ function MedicineCatalogPage() {
               ),
               children: (
                 <div>
-                  {/* Bộ lọc & Tìm kiếm */}
                   <div
                     style={{
                       display: 'flex',
@@ -903,7 +873,6 @@ function MedicineCatalogPage() {
                     </Space>
                   </div>
 
-                  {/* Bảng Danh mục & Ngưỡng tồn */}
                   <Table
                     rowKey="id"
                     columns={columns}
@@ -981,7 +950,6 @@ function MedicineCatalogPage() {
         />
       </Card>
 
-      {/* Modal Thiết lập Ngưỡng tồn chuyên biệt */}
       <StockThresholdModal
         open={thresholdModalOpen}
         medicine={thresholdMedicine}
@@ -994,7 +962,6 @@ function MedicineCatalogPage() {
         }}
       />
 
-      {/* Modal Thêm / Sửa thuốc đầy đủ */}
       <Modal
         title={
           editingMedicine
@@ -1121,7 +1088,6 @@ function MedicineCatalogPage() {
         </Form>
       </Modal>
 
-      {/* Modal Xác nhận Ngừng sử dụng thuốc */}
       <Modal
         title="Xác nhận ngừng sử dụng thuốc"
         open={!!deactivatingMedicine}

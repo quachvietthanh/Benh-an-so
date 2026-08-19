@@ -36,7 +36,6 @@ export const ResultForm = ({
           background: disabled ? '#fafafa' : '#ffffff',
         }}
       >
-        {/* Result Detailed Values */}
         <Form.Item
           name="resultValues"
           label={
@@ -57,7 +56,6 @@ export const ResultForm = ({
           />
         </Form.Item>
 
-        {/* Conclusion */}
         <Form.Item
           name="conclusion"
           label={
@@ -78,7 +76,6 @@ export const ResultForm = ({
           />
         </Form.Item>
 
-        {/* Additional Notes */}
         <Form.Item
           name="notes"
           label={
@@ -97,7 +94,6 @@ export const ResultForm = ({
         </Form.Item>
       </Card>
 
-      {/* File Upload Section */}
       <Card
         title={
           <Text style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>
