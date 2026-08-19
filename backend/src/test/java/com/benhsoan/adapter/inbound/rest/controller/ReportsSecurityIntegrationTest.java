@@ -39,6 +39,7 @@ import com.benhsoan.application.ucservice.auth.RefreshTokenService;
 import com.benhsoan.application.ucservice.role.RolePermissionsResultMapper;
 import com.benhsoan.application.ucservice.role.UpdateRolePermissionsService;
 import com.benhsoan.config.SecurityConfig;
+import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
@@ -148,18 +149,22 @@ class ReportsSecurityIntegrationTest {
     @Test
     void forbidsAnyRoleWithoutReportExportSnapshot() throws Exception {
         mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-03")
-                        .with(permission("ADMIN", "REPORT_VIEW")))
+                .with(permission("ADMIN", "REPORT_VIEW")))
                 .andExpect(status().isForbidden());
+
+        verifyNoInteractions(exportOperationalReportUseCase);
     }
 
     @Test
     void allowsExportRegardlessOfRoleNameWhenSnapshotContainsReportExport() throws Exception {
-        when(exportOperationalReportUseCase.export(any(), any())).thenReturn(new OperationalReportExportResult(
-                "operational-report.csv", "text/csv", "report".getBytes(StandardCharsets.UTF_8)));
+        when(exportOperationalReportUseCase.export(any(), any(), any())).thenReturn(new OperationalReportExportResult(
+                ReportType.OPERATIONAL_REPORT, "operational-report.csv", "text/csv", "report".getBytes(StandardCharsets.UTF_8)));
 
         mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-03")
                         .with(permission("DOCTOR", "REPORT_EXPORT")))
@@ -301,10 +306,11 @@ class ReportsSecurityIntegrationTest {
                 auditLogRepository, clockPort);
         String oldAccessToken = loginService.login(new LoginCommand("doctor", "password")).accessToken();
         assertEquals(Set.of("REPORT_VIEW", "REPORT_EXPORT"), tokenPermissions.get(oldAccessToken));
-        when(exportOperationalReportUseCase.export(any(), any())).thenReturn(new OperationalReportExportResult(
-                "report.csv", "text/csv", "report".getBytes(StandardCharsets.UTF_8)));
+        when(exportOperationalReportUseCase.export(any(), any(), any())).thenReturn(new OperationalReportExportResult(
+                ReportType.OPERATIONAL_REPORT, "report.csv", "text/csv", "report".getBytes(StandardCharsets.UTF_8)));
 
-        mockMvc.perform(get("/reports/export").param("from", "2026-08-01").param("to", "2026-08-03")
+        mockMvc.perform(get("/reports/export").param("reportType", "OPERATIONAL_REPORT")
+                        .param("from", "2026-08-01").param("to", "2026-08-03")
                         .header("Authorization", "Bearer " + oldAccessToken))
                 .andExpect(status().isOk());
 
@@ -314,7 +320,8 @@ class ReportsSecurityIntegrationTest {
                 auditLogRepository, new RolePermissionsResultMapper())
                 .updateRolePermissions(new UpdateRolePermissionsCommand(doctorRoleId, List.of("REPORT_VIEW")));
 
-        mockMvc.perform(get("/reports/export").param("from", "2026-08-01").param("to", "2026-08-03")
+        mockMvc.perform(get("/reports/export").param("reportType", "OPERATIONAL_REPORT")
+                        .param("from", "2026-08-01").param("to", "2026-08-03")
                         .header("Authorization", "Bearer " + oldAccessToken))
                 .andExpect(status().isOk());
 
@@ -323,7 +330,8 @@ class ReportsSecurityIntegrationTest {
                 .refreshToken(new RefreshTokenCommand("refresh-old")).accessToken();
         assertEquals(Set.of("REPORT_VIEW"), tokenPermissions.get(refreshedAccessToken));
 
-        mockMvc.perform(get("/reports/export").param("from", "2026-08-01").param("to", "2026-08-03")
+        mockMvc.perform(get("/reports/export").param("reportType", "OPERATIONAL_REPORT")
+                        .param("from", "2026-08-01").param("to", "2026-08-03")
                         .header("Authorization", "Bearer " + refreshedAccessToken))
                 .andExpect(status().isForbidden());
     }

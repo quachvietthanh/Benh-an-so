@@ -1,0 +1,119 @@
+{
+  "info": {
+    "name": "Benh So An - Reporting Export",
+    "_postman_id": "7d81c4d7-b2e6-4f65-94db-53ba2ffaf85c",
+    "description": "Set reportingFrom/reportingTo to a period containing seeded completed visits and invoices. Set zeroNetFrom/zeroNetTo to a period containing invoices whose net revenue is zero before running request 5.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "adminUsername", "value": "admin" },
+    { "key": "receptionistUsername", "value": "receptionist1" },
+    { "key": "seededPassword", "value": "password" },
+    { "key": "reportingFrom", "value": "2026-08-01" },
+    { "key": "reportingTo", "value": "2026-08-31" },
+    { "key": "zeroNetFrom", "value": "2026-08-01" },
+    { "key": "zeroNetTo", "value": "2026-08-01" },
+    { "key": "adminAccessToken", "value": "" },
+    { "key": "receptionistAccessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Login as Admin with REPORT_EXPORT",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Login succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.collectionVariables.set('adminAccessToken', pm.response.json().accessToken);"
+      ]}}]
+    },
+    {
+      "name": "2. Export Visit Report",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+        "url": "{{baseUrl}}/reports/export?reportType=VISIT_REPORT&from={{reportingFrom}}&to={{reportingTo}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Visit CSV is downloaded', function () { pm.response.to.have.status(200); });",
+        "pm.test('Visit filename is returned', function () { pm.expect(pm.response.headers.get('Content-Disposition')).to.include('visit-report-'); });"
+      ]}}]
+    },
+    {
+      "name": "3. Export Revenue Report",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+        "url": "{{baseUrl}}/reports/export?reportType=REVENUE_REPORT&from={{reportingFrom}}&to={{reportingTo}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Revenue CSV is downloaded', function () { pm.response.to.have.status(200); });",
+        "pm.test('Revenue filename is returned', function () { pm.expect(pm.response.headers.get('Content-Disposition')).to.include('revenue-report-'); });"
+      ]}}]
+    },
+    {
+      "name": "4. Export Operational Report",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+        "url": "{{baseUrl}}/reports/export?reportType=OPERATIONAL_REPORT&from={{reportingFrom}}&to={{reportingTo}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Operational CSV is downloaded', function () { pm.response.to.have.status(200); });",
+        "pm.test('Operational filename is returned', function () { pm.expect(pm.response.headers.get('Content-Disposition')).to.include('operational-report-'); });"
+      ]}}]
+    },
+    {
+      "name": "5. Export Revenue Report When Net Revenue Is Zero",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+        "url": "{{baseUrl}}/reports/export?reportType=REVENUE_REPORT&from={{zeroNetFrom}}&to={{zeroNetTo}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Invoices with zero net revenue remain exportable', function () { pm.response.to.have.status(200); });",
+        "pm.test('Revenue filename is returned', function () { pm.expect(pm.response.headers.get('Content-Disposition')).to.include('revenue-report-'); });"
+      ]}}]
+    },
+    {
+      "name": "6. Reject Invalid Date Range",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+        "url": "{{baseUrl}}/reports/export?reportType=VISIT_REPORT&from=2026-08-02&to=2026-08-01"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Invalid date range is rejected', function () { pm.response.to.have.status(400); });",
+        "pm.test('Validation message is returned', function () { pm.expect(pm.response.json().message).to.eql('from must be before or equal to to.'); });"
+      ]}}]
+    },
+    {
+      "name": "7. Login as User without REPORT_EXPORT",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{receptionistUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Login succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.collectionVariables.set('receptionistAccessToken', pm.response.json().accessToken);"
+      ]}}]
+    },
+    {
+      "name": "8. Reject Export without REPORT_EXPORT",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{receptionistAccessToken}}" }],
+        "url": "{{baseUrl}}/reports/export?reportType=OPERATIONAL_REPORT&from={{reportingFrom}}&to={{reportingTo}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Export permission is required', function () { pm.response.to.have.status(403); });"
+      ]}}]
+    }
+  ]
+}

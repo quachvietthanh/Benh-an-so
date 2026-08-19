@@ -19,6 +19,7 @@ import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportRe
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
+import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
@@ -101,14 +102,16 @@ public class ReportsController {
     @GetMapping("/export")
     @RequirePermission("REPORT_EXPORT")
     public ResponseEntity<ByteArrayResource> export(
+            @RequestParam String reportType,
             @RequestParam String from,
             @RequestParam String to
     ) {
+        ReportType selectedReportType = parseReportType(reportType);
         LocalDate fromDate = parseDate(from, "from");
         LocalDate toDate = parseDate(to, "to");
         validateRange(fromDate, toDate);
 
-        OperationalReportExportResult exportResult = exportOperationalReportUseCase.export(fromDate, toDate);
+        OperationalReportExportResult exportResult = exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + exportResult.fileName() + "\"")
@@ -125,6 +128,17 @@ public class ReportsController {
             return LocalDate.parse(value, DATE_FORMATTER);
         } catch (RuntimeException ex) {
             throw new ValidationException(fieldName + " must be in yyyy-MM-dd format.");
+        }
+    }
+
+    private ReportType parseReportType(String value) {
+        if (value == null || value.isBlank()) {
+            throw new ValidationException("reportType is required.");
+        }
+        try {
+            return ReportType.valueOf(value);
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT.");
         }
     }
 

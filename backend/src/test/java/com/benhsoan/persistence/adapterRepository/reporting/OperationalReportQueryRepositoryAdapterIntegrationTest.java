@@ -1,6 +1,8 @@
 package com.benhsoan.persistence.adapterRepository.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -62,6 +64,57 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
         );
 
         assertEquals(2L, count);
+    }
+
+    @Test
+    void detectsCompletedVisitsIndependentlyFromInvoices() {
+        createVisit("VIS000001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"));
+        createVisit("VIS000002", VisitStatus.IN_PROGRESS, null);
+
+        assertTrue(repositoryAdapter.hasCompletedVisits(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        ));
+        assertFalse(repositoryAdapter.hasInvoices(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        ));
+    }
+
+    @Test
+    void detectsInvoicesWhenNetRevenueIsZero() {
+        UUID visitId = UUID.randomUUID();
+        createOriginalInvoice("HD000001", visitId, new BigDecimal("100000"), Instant.parse("2026-08-01T01:00:00Z"));
+        createAdjustmentInvoice("HDDC000001", visitId, new BigDecimal("-100000"), Instant.parse("2026-08-01T02:00:00Z"));
+
+        assertEquals(0, repositoryAdapter.sumNetRevenue(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        ).compareTo(BigDecimal.ZERO));
+        assertTrue(repositoryAdapter.hasInvoices(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        ));
+        assertFalse(repositoryAdapter.hasCompletedVisits(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        ));
+    }
+
+    @Test
+    void reportsNoCompletedVisitsOrInvoicesWhenOnlyOutOfRangeOrIncompleteRecordsExist() {
+        createVisit("VIS000001", VisitStatus.IN_PROGRESS, null);
+        createVisit("VIS000002", VisitStatus.COMPLETED, Instant.parse("2026-08-02T00:00:00Z"));
+        createOriginalInvoice("HD000001", UUID.randomUUID(), new BigDecimal("100000"), Instant.parse("2026-08-02T01:00:00Z"));
+
+        assertFalse(repositoryAdapter.hasCompletedVisits(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        ));
+        assertFalse(repositoryAdapter.hasInvoices(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        ));
     }
 
     @Test
