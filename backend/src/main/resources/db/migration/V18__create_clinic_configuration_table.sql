@@ -23,8 +23,8 @@ INSERT INTO clinic_configuration (
 ) VALUES (
     1,
     'Phong kham Benh So An',
-    'Thanh pho Ho Chi Minh',
-    '0900000000',
+    'Thai Nguyen',
+    '0345678910',
     '08:00:00',
     '17:00:00',
     '2026-08-01 08:00:00',
