@@ -42,6 +42,14 @@ public class RoleRepositoryAdapter implements RoleRepository {
     }
 
     @Override
+    public List<Role> findAllSystemRoles() {
+        return jpaRepository.findAllByIsSystemTrueOrderByNameAsc()
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Role save(Role role) {
         RoleEntity entity = mapper.toEntity(role);
         RoleEntity saved = jpaRepository.save(entity);
