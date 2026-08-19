@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AutoComplete, Avatar, Badge, Drawer, Dropdown, Input, Layout, Menu, Tooltip } from 'antd'
 import {
+  AppstoreOutlined,
   BellOutlined,
   CalendarOutlined,
   CaretDownOutlined,
@@ -41,7 +42,7 @@ const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
-  { key: 'system', label: 'Hệ thống', paths: ['/system-management'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system-management'] },
   { key: 'lookup', label: 'Tra cứu', paths: ['/public-lookup'] },
 ]
 
@@ -53,7 +54,7 @@ const getNavigationItems = (roles = []) => {
   if (!normalizedRoles.length) return []
 
   const items = [
-    { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
+    { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'clinic_manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'doctor', 'receptionist'] },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
     { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, roles: ['admin', 'doctor'] },
@@ -62,10 +63,11 @@ const getNavigationItems = (roles = []) => {
     { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, roles: ['admin', 'pharmacist'] },
     { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, roles: ['admin', 'pharmacist'] },
     { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, roles: ['admin', 'pharmacist'] },
-    { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, roles: ['admin', 'manager', 'receptionist'] },
-    { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, roles: ['admin', 'manager'] },
+    { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, roles: ['admin', 'manager', 'clinic_manager', 'receptionist'] },
+    { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, roles: ['admin', 'manager', 'clinic_manager'] },
+    { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, roles: ['admin', 'manager', 'clinic_manager'] },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, roles: ['admin'] },
-    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SearchOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
+    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SearchOutlined, roles: ['admin', 'manager', 'clinic_manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
   ]
 
   return items.filter((item) => item.roles.some((role) => normalizedRoles.includes(role)))
