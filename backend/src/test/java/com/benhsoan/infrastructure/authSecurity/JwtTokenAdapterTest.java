@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,12 +26,14 @@ class JwtTokenAdapterTest {
         UUID sessionId = UUID.randomUUID();
         Instant beforeGeneration = Instant.now();
 
-        String token = jwtTokenAdapter.generateToken(userId, sessionId, "admin", "ADMIN");
+        Set<String> permissions = Set.of("ROLE_READ", "REPORT_EXPORT");
+        String token = jwtTokenAdapter.generateToken(userId, sessionId, "admin", "ADMIN", permissions);
 
         assertTrue(jwtTokenAdapter.validate(token));
         assertEquals(userId, jwtTokenAdapter.getUserId(token));
         assertEquals(sessionId, jwtTokenAdapter.getSessionId(token));
         assertEquals("ADMIN", jwtTokenAdapter.getRole(token));
+        assertEquals(permissions, jwtTokenAdapter.getPermissions(token));
         assertFalse(jwtTokenAdapter.getExpiredAt(token).isAfter(
                 beforeGeneration.plus(Duration.ofMinutes(15).plusSeconds(1))));
     }

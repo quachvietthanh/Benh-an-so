@@ -34,5 +34,7 @@ public enum ActionType {
 
     BACKUP,
 
-    RESTORE
+    RESTORE,
+
+    ACCESS_DENIED
 }

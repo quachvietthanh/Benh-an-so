@@ -71,7 +71,7 @@ class RefreshTokenServiceTest {
         when(roleRepository.findById(ROLE_ID)).thenReturn(Optional.of(role));
         when(refreshTokenGeneratorPort.generate()).thenReturn("next-token");
         when(tokenHashPort.hash("next-token")).thenReturn("next-hash");
-        when(jwtTokenPort.generateToken(USER_ID, session.getId(), "admin", "ADMIN")).thenReturn("access-token");
+        when(jwtTokenPort.generateToken(USER_ID, session.getId(), "admin", "ADMIN", Set.of())).thenReturn("access-token");
         when(jwtTokenPort.getExpiredAt("access-token")).thenReturn(NOW.plus(Duration.ofMinutes(15)));
         when(userSessionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 

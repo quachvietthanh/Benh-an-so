@@ -2,6 +2,7 @@ package com.benhsoan.port.outbound.authSecurity;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Set;
 
 public interface JwtTokenPort {
 
@@ -9,7 +10,8 @@ public interface JwtTokenPort {
             UUID userId,
             UUID sessionId,
             String username,
-            String role
+            String role,
+            Set<String> permissions
     );
 
     UUID getUserId(String token);
@@ -17,6 +19,8 @@ public interface JwtTokenPort {
     String getUsername(String token);
 
     String getRole(String token);
+
+    Set<String> getPermissions(String token);
 
     UUID getSessionId(String token);
 

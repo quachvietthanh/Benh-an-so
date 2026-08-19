@@ -62,6 +62,21 @@ public class PermissionEvaluator {
         return getCurrentUserPermissions().contains(permission);
     }
 
+    public boolean hasPermission(String permissionCode) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.isAuthenticated() && auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> authority.equals("PERMISSION_" + permissionCode));
+    }
+
+    public boolean hasAnyPermission(String... permissionCodes) {
+        return Arrays.stream(permissionCodes).anyMatch(this::hasPermission);
+    }
+
+    public boolean hasAllPermissions(String... permissionCodes) {
+        return Arrays.stream(permissionCodes).allMatch(this::hasPermission);
+    }
+
     public boolean hasAnyPermission(Permission... permissions) {
         Set<Permission> userPermissions = getCurrentUserPermissions();
         return Arrays.stream(permissions).anyMatch(userPermissions::contains);

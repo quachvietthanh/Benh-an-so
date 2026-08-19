@@ -13,6 +13,7 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Permission;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.auth.exception.LastAdministratorPermissionException;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.role.UpdateRolePermissionsCommand;
@@ -74,7 +75,7 @@ public class UpdateRolePermissionsService implements UpdateRolePermissionsUseCas
     private void ensureActorRetainsRoleManagement(User actor, Role targetRole, Set<String> requestedCodes) {
         if (!actor.getRoleId().equals(targetRole.getId()) || userRepository.countActiveByRoleId(targetRole.getId()) != 1) return;
         if (!requestedCodes.containsAll(ROLE_MANAGEMENT_PERMISSIONS)) {
-            throw new ValidationException("The only active administrator cannot remove their role management permissions.");
+            throw new LastAdministratorPermissionException();
         }
     }
 
