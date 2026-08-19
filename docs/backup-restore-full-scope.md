@@ -31,7 +31,7 @@ prescription or invoice code to collide with restored data.
 
 | Group | Tables |
 | --- | --- |
-| Operational reference data | `rooms`, `medicines`, `diagnosis_catalog`, `clinical_service_catalog`, `drug_interaction_rules`, `prescription_code_sequences`, `invoice_code_sequences` |
+| Operational reference data | `clinic_configuration`, `rooms`, `medicines`, `diagnosis_catalog`, `clinical_service_catalog`, `drug_interaction_rules`, `prescription_code_sequences`, `invoice_code_sequences` |
 | Patient and appointment | `patients`, `patient_change_logs`, `appointments`, `appointment_notification_logs` |
 | Queue and visit | `doctor_room_assignments`, `medical_queues`, `queue_items`, `visits` |
 | Medical record | `medical_records`, `medical_record_diagnoses`, `medical_record_amendments`, `medical_record_access_logs` |
