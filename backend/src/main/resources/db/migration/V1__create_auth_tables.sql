@@ -20,19 +20,42 @@ CREATE TABLE roles (
 );
 
 -- ===========================
+-- Permissions
+-- ===========================
+
+CREATE TABLE permissions (
+    id BINARY(16) NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    module VARCHAR(100) NOT NULL,
+    description VARCHAR(500),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+
+    CONSTRAINT pk_permissions PRIMARY KEY (id),
+    CONSTRAINT uk_permissions_code UNIQUE (code)
+);
+
+-- ===========================
 -- Role Permissions
 -- ===========================
 
 CREATE TABLE role_permissions (
     role_id BINARY(16) NOT NULL,
-    permission VARCHAR(100) NOT NULL,
+    permission_id BINARY(16) NOT NULL,
 
     CONSTRAINT pk_role_permissions
-        PRIMARY KEY (role_id, permission),
+        PRIMARY KEY (role_id, permission_id),
 
     CONSTRAINT fk_role_permissions_role
         FOREIGN KEY (role_id)
         REFERENCES roles(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_role_permissions_permission
+        FOREIGN KEY (permission_id)
+        REFERENCES permissions(id)
         ON DELETE CASCADE
 );
 
@@ -121,7 +144,7 @@ CREATE INDEX idx_users_role
     ON users(role_id);
 
 CREATE INDEX idx_role_permissions_permission
-    ON role_permissions(permission);
+    ON role_permissions(permission_id);
 
 CREATE UNIQUE INDEX uk_user_sessions_refresh_token_hash
     ON user_sessions(refresh_token_hash);

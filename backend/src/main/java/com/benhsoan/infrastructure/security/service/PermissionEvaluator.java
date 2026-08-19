@@ -41,6 +41,7 @@ public class PermissionEvaluator {
                 .map(Optional::get)
                 .map(Role::getPermissions)
                 .flatMap(Collection::stream)
+                .map(permission -> Permission.valueOf(permission.getCode()))
                 .collect(Collectors.toSet());
     }
 
