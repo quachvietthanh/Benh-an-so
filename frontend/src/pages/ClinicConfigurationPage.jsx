@@ -9,7 +9,6 @@ import {
   Popconfirm,
   Space,
   Spin,
-  Switch,
   Table,
   Tag,
   TimePicker,
@@ -35,7 +34,7 @@ import { useClinicConfig } from '../context/ClinicConfigurationContext'
 
 dayjs.extend(customParseFormat)
 
-const { Title, Text } = Typography
+const { Text } = Typography
 
 function ClinicConfigurationPage() {
   const [form] = Form.useForm()
@@ -43,24 +42,20 @@ function ClinicConfigurationPage() {
   const { user } = useAuthContext()
   const { refreshClinicConfig } = useClinicConfig()
 
-  // State Cấu hình chung phòng khám
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
   const [lastFetchedConfig, setLastFetchedConfig] = useState(null)
   const [configErrorMsg, setConfigErrorMsg] = useState('')
 
-  // State Quản lý các phòng khám bệnh (Rooms)
   const [rooms, setRooms] = useState([])
   const [loadingRooms, setLoadingRooms] = useState(false)
   const [roomModalOpen, setRoomModalOpen] = useState(false)
   const [editingRoom, setEditingRoom] = useState(null)
   const [savingRoom, setSavingRoom] = useState(false)
 
-  // Phân quyền ADMIN
   const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const isAdmin = userRoles.includes('admin')
 
-  // 1. Tải thông tin Cấu hình chung từ Backend (GET /api/v1/system/clinic)
   const fetchConfig = useCallback(async () => {
     setLoadingConfig(true)
     setConfigErrorMsg('')
@@ -90,7 +85,6 @@ function ClinicConfigurationPage() {
     }
   }, [form])
 
-  // 2. Tải danh sách các phòng khám bệnh từ Backend (GET /api/v1/rooms)
   const fetchRooms = useCallback(async () => {
     setLoadingRooms(true)
     try {
@@ -111,7 +105,6 @@ function ClinicConfigurationPage() {
     }
   }, [isAdmin, fetchConfig, fetchRooms])
 
-  // Hủy thay đổi form cấu hình chung -> Reset về dữ liệu Backend gần nhất
   const handleResetConfig = () => {
     if (lastFetchedConfig) {
       form.setFieldsValue({
@@ -127,7 +120,6 @@ function ClinicConfigurationPage() {
     }
   }
 
-  // Lưu cấu hình chung phòng khám (PUT /api/v1/system/clinic)
   const handleSubmitConfig = async (values) => {
     if (!isAdmin) {
       message.error('Bạn không có quyền cập nhật cấu hình phòng khám.')
@@ -164,7 +156,6 @@ function ClinicConfigurationPage() {
       return
     }
 
-    // Validate closingTime > openingTime
     const openTimeDayjs = dayjs.isDayjs(values.openingTime) ? values.openingTime : dayjs(values.openingTime, ['HH:mm:ss', 'HH:mm'])
     const closeTimeDayjs = dayjs.isDayjs(values.closingTime) ? values.closingTime : dayjs(values.closingTime, ['HH:mm:ss', 'HH:mm'])
 
@@ -206,7 +197,6 @@ function ClinicConfigurationPage() {
     }
   }
 
-  // Quản lý phòng khám: Thêm / Sửa phòng
   const openCreateRoomModal = () => {
     setEditingRoom(null)
     roomForm.resetFields()
@@ -226,11 +216,9 @@ function ClinicConfigurationPage() {
     setSavingRoom(true)
     try {
       if (editingRoom) {
-        // PUT /api/v1/rooms/{roomId}
         await systemApi.updateRoom(editingRoom.id, { name: values.name.trim() })
         message.success('Đã cập nhật tên phòng khám thành công.')
       } else {
-        // POST /api/v1/rooms
         await systemApi.createRoom({
           code: values.code.trim(),
           name: values.name.trim(),
@@ -247,7 +235,6 @@ function ClinicConfigurationPage() {
     }
   }
 
-  // Kích hoạt / Tắt kích hoạt phòng khám (PATCH /api/v1/rooms/{id}/activate | deactivate)
   const handleToggleRoomStatus = async (room) => {
     try {
       if (room.active) {
@@ -264,7 +251,6 @@ function ClinicConfigurationPage() {
     }
   }
 
-  // Phân quyền
   if (!isAdmin) {
     return (
       <Card style={{ marginTop: 16 }}>
@@ -279,7 +265,6 @@ function ClinicConfigurationPage() {
     )
   }
 
-  // Cấu hình cột bảng phòng khám bệnh
   const roomColumns = [
     {
       title: 'Mã phòng',
@@ -346,7 +331,6 @@ function ClinicConfigurationPage() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', paddingTop: 8 }} className="clinic-config-container">
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        {/* KHU VỰC 1: CẤU HÌNH THÔNG TIN CHUNG PHÒNG KHÁM */}
         <Card
           title={
             <Space>
@@ -495,7 +479,6 @@ function ClinicConfigurationPage() {
           </Spin>
         </Card>
 
-        {/* KHU VỰC 2: CÁC PHÒNG KHÁM BỆNH (ROOMS MANAGEMENT) */}
         <Card
           title={
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -527,7 +510,6 @@ function ClinicConfigurationPage() {
         </Card>
       </Space>
 
-      {/* MODAL THÊM / SỬA PHÒNG KHÁM */}
       <Modal
         title={editingRoom ? 'CHỈNH SỬA PHÒNG KHÁM' : 'THÊM PHÒNG KHÁM MỚI'}
         open={roomModalOpen}

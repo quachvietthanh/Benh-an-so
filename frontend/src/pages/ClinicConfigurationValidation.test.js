@@ -111,18 +111,14 @@ test('LUỒNG 1 & 2 - KỊCH BẢN TEST 1: Backend = "nguuu", sửa = "Ha Noi" c
   let lastFetchedConfig = { ...backendDatabaseState }
   let formState = { ...lastFetchedConfig }
 
-  // A. Backend address = "nguuu"
   assert.equal(formState.address, 'nguuu')
 
-  // B. Sửa form thành "Ha Noi", KHÔNG lưu
   formState.address = 'Ha Noi'
   assert.equal(formState.address, 'Ha Noi')
-  assert.equal(backendDatabaseState.address, 'nguuu') // Backend DB chưa đổi
+  assert.equal(backendDatabaseState.address, 'nguuu')
 
-  // C. Bấm Hủy (handleResetConfig) -> reset form về lastFetchedConfig
   formState = { ...lastFetchedConfig }
 
-  // Expected: quay lại "nguuu", không gọi PUT
   assert.equal(formState.address, 'nguuu')
 })
 
@@ -138,26 +134,20 @@ test('LUỒNG 1 & 2 - KỊCH BẢN TEST 2: Sửa "Ha Noi" -> Lưu (PUT 2xx + GET
   let lastFetchedConfig = { ...backendDatabaseState }
   let formState = { ...lastFetchedConfig }
 
-  // A. Sửa thành "Ha Noi"
   formState.address = 'Ha Noi'
 
-  // B. Bấm Lưu -> PUT /api/v1/system/clinic -> Backend lưu "Ha Noi"
   backendDatabaseState.address = formState.address
 
-  // C. GET lại /api/v1/system/clinic -> Cập nhật lastFetchedConfig và Form
   lastFetchedConfig = { ...backendDatabaseState }
   formState = { ...lastFetchedConfig }
   assert.equal(formState.address, 'Ha Noi')
 
-  // D. Sửa tiếp thành "Da Nang", KHÔNG lưu
   formState.address = 'Da Nang'
   assert.equal(formState.address, 'Da Nang')
-  assert.equal(backendDatabaseState.address, 'Ha Noi') // Backend vẫn giữ "Ha Noi"
+  assert.equal(backendDatabaseState.address, 'Ha Noi')
 
-  // E. Bấm Hủy (handleResetConfig) -> reset form về lastFetchedConfig
   formState = { ...lastFetchedConfig }
 
-  // Expected: quay lại "Ha Noi" (dữ liệu Backend gần nhất), KHÔNG quay về "nguuu", KHÔNG gọi PUT khi bấm Hủy
   assert.equal(formState.address, 'Ha Noi')
 })
 
