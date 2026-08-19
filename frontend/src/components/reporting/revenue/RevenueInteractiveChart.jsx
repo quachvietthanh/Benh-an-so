@@ -86,7 +86,6 @@ export default function RevenueInteractiveChart({
           <Empty description="Không có dữ liệu hóa đơn trong khoảng thời gian đã chọn" />
         ) : (
           <div>
-            {/* SVG Chart */}
             <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }}>
               <svg viewBox="0 0 760 220" style={{ width: '100%', minWidth: 600, maxHeight: 260, display: 'block' }}>
                 <defs>
@@ -104,7 +103,6 @@ export default function RevenueInteractiveChart({
                   </linearGradient>
                 </defs>
 
-                {/* Horizontal reference lines */}
                 {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
                   const val = Math.round(maxRevenueVal * ratio)
                   const y = 185 - ratio * 165
@@ -118,7 +116,6 @@ export default function RevenueInteractiveChart({
                   )
                 })}
 
-                {/* Average line */}
                 {metrics.averageDaily > 0 && (
                   <g>
                     <line
@@ -142,7 +139,6 @@ export default function RevenueInteractiveChart({
                   </g>
                 )}
 
-                {/* TREND MODE: AREA + LINE */}
                 {chartMode === 'trend' && (
                   <g>
                     {chartPoints.length > 1 && (
@@ -195,7 +191,6 @@ export default function RevenueInteractiveChart({
                   </g>
                 )}
 
-                {/* COMPARISON MODE: BARS */}
                 {chartMode === 'comparison' && (
                   <g>
                     {chartPoints.map((item, idx) => {
@@ -212,7 +207,6 @@ export default function RevenueInteractiveChart({
                           onMouseLeave={() => setHoveredPoint(null)}
                           style={{ cursor: 'pointer' }}
                         >
-                          {/* Gross bar (Blue) */}
                           <rect
                             x={item.x - groupWidth / 2}
                             y={185 - grossH}
@@ -222,7 +216,6 @@ export default function RevenueInteractiveChart({
                             fill="url(#grossBarGrad)"
                             opacity={hoveredPoint && !isHovered ? 0.35 : 0.85}
                           />
-                          {/* Net bar (Green) */}
                           <rect
                             x={item.x - groupWidth / 2 + barW + 2}
                             y={185 - netH}
@@ -245,7 +238,6 @@ export default function RevenueInteractiveChart({
               </svg>
             </div>
 
-            {/* Hover Tooltip / Detail Card */}
             {hoveredPoint && (
               <div
                 style={{

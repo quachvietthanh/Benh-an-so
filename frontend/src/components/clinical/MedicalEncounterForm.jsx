@@ -71,7 +71,6 @@ function MedicalEncounterForm({
   return (
     <Form form={form} layout="vertical" disabled={!isDoctor}>
       <Row gutter={[16, 16]}>
-        {/* Left Column: Visit context & Vital Signs */}
         <Col xs={24} lg={8}>
           <Card
             title={<span style={{ color: '#1E3A8A' }}><UserOutlined /> Thông tin lượt khám</span>}
@@ -129,7 +128,6 @@ function MedicalEncounterForm({
             )}
           </Card>
 
-          {/* Vital Signs Card */}
           <Card
             title={<span style={{ color: '#047857' }}><HeartOutlined /> Chỉ Số Sinh Hiệu Bệnh Nhân</span>}
             bordered
@@ -202,7 +200,6 @@ function MedicalEncounterForm({
           </Card>
         </Col>
 
-        {/* Right Column: Symptoms & ICD Diagnosis */}
         <Col xs={24} lg={16}>
           <Card
             title={<span style={{ color: '#1E3A8A' }}><MedicineBoxOutlined /> Khám lâm sàng</span>}
@@ -228,7 +225,6 @@ function MedicalEncounterForm({
             </Form.Item>
           </Card>
 
-          {/* Diagnosis Module */}
           <Card
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -246,7 +242,6 @@ function MedicalEncounterForm({
             style={{ marginBottom: 16 }}
             bordered
           >
-            {/* Diagnostic Type */}
             <Form.Item label="Loại chẩn đoán y khoa">
               <Select
                 value={diagnosisType}
@@ -259,7 +254,6 @@ function MedicalEncounterForm({
               />
             </Form.Item>
 
-            {/* Primary Diagnosis */}
             <Form.Item label="Chẩn đoán chính (Mã ICD-10)" required>
               {primaryIcd ? (
                 <div style={{ background: '#EFF6FF', padding: 12, borderRadius: 8, border: '1px solid #BFDBFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -284,7 +278,6 @@ function MedicalEncounterForm({
                     />
                   </Form.Item>
 
-                  {/* Popular ICD quick picker */}
                   <div style={{ marginTop: 10 }}>
                     <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
                       10 chẩn đoán gần đây hoặc thường dùng:
@@ -306,7 +299,6 @@ function MedicalEncounterForm({
               )}
             </Form.Item>
 
-            {/* Secondary / Accompanying Diagnoses */}
             <Form.Item label="Chẩn đoán kèm theo / Bệnh phụ (Mã ICD-10 phụ)">
               <div>
                 <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${primaryIcd ? '#BFDBFE' : '#FDE68A'}`, background: primaryIcd ? '#EFF6FF' : '#FFFBEB' }}>
@@ -373,7 +365,6 @@ function MedicalEncounterForm({
         </Col>
       </Row>
 
-      {/* Section 2: Clinical Orders Section */}
       <Card
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -394,7 +385,6 @@ function MedicalEncounterForm({
           </div>
         )}
         <Row gutter={[16, 16]}>
-          {/* Left catalog selector */}
           <Col xs={24} lg={10} style={{ display: 'flex' }}>
             <Card
               size="small"
@@ -462,7 +452,6 @@ function MedicalEncounterForm({
             </Card>
           </Col>
 
-          {/* Right selected orders list */}
           <Col xs={24} lg={14} style={{ display: 'flex' }}>
             <Card
               size="small"

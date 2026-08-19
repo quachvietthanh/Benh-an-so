@@ -10,7 +10,6 @@ const axiosClient = axios.create({
   },
 })
 
-// Request interceptor: thêm JWT token do backend cấp.
 axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -24,7 +23,6 @@ axiosClient.interceptors.request.use(
   }
 )
 
-// Response interceptor: xử lý lỗi chung
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -40,4 +38,3 @@ axiosClient.interceptors.response.use(
 )
 
 export default axiosClient
-

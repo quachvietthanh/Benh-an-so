@@ -1,10 +1,5 @@
 import dayjs from 'dayjs'
 
-/**
- * Validate khoảng thời gian báo cáo lượt khám theo bác sĩ
- * - fromDate & toDate là bắt buộc
- * - fromDate <= toDate
- */
 export function validateDateRange(fromDate, toDate) {
   if (!fromDate || !toDate) {
     return {
@@ -36,11 +31,6 @@ export function validateDateRange(fromDate, toDate) {
   }
 }
 
-/**
- * Map response DTO từ Backend:
- * DoctorVisitsReportResponse = { from, to, generatedAt, items: [...] }
- * DoctorVisitItemResponse = { rank, doctorId, doctorCode, doctorName, totalVisits }
- */
 export function mapDoctorVisitResponse(data) {
   if (!data || !Array.isArray(data.items)) {
     return {
@@ -51,7 +41,6 @@ export function mapDoctorVisitResponse(data) {
     }
   }
 
-  // Sắp xếp mặc định: số lượt khám giảm dần, giữ đúng doctorId
   const items = data.items.map((item, idx) => ({
     rank: item.rank || idx + 1,
     doctorId: item.doctorId,
@@ -68,9 +57,6 @@ export function mapDoctorVisitResponse(data) {
   }
 }
 
-/**
- * Tính toán các chỉ số thống kê tổng quan từ danh sách response bác sĩ
- */
 export function calculateDoctorVisitStats(items = []) {
   const safeItems = Array.isArray(items) ? items : []
   const totalVisitsAll = safeItems.reduce(
@@ -100,9 +86,6 @@ export function calculateDoctorVisitStats(items = []) {
   }
 }
 
-/**
- * Tính tỷ lệ % đóng góp lượt khám
- */
 export function calculateDoctorContributionPercentage(totalVisits, totalVisitsAll) {
   const count = Number(totalVisits || 0)
   const total = Number(totalVisitsAll || 0)

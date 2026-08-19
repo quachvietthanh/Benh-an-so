@@ -61,7 +61,6 @@ const loadRecentDiagnoses = () => {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed
     }
   } catch {
-    // fallback
   }
   return commonIcd10List.filter((item) => item.isPopular).slice(0, 10)
 }
@@ -73,7 +72,6 @@ const saveRecentDiagnosis = (icd) => {
     const updated = [icd, ...current.filter((item) => item.code !== icd.code)].slice(0, 10)
     localStorage.setItem('recent_diagnoses', JSON.stringify(updated))
   } catch {
-    // ignore
   }
 }
 

@@ -150,12 +150,10 @@ export function ResultPage() {
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])
 
-  // Search & Filters state
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
 
-  // Modal state
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
 
@@ -296,11 +294,9 @@ export function ResultPage() {
     loadData()
   }, [loadData])
 
-  // Filtered orders calculation
   const filteredOrders = useMemo(() => {
     const kw = searchText.trim().toLowerCase()
     return orders.filter((order) => {
-      // Ignore cancelled orders from result entry table
       if (order.status === 'CANCELLED') return false
 
       const matchesKw =
@@ -330,7 +326,6 @@ export function ResultPage() {
     })
   }, [orders, searchText, statusFilter, categoryFilter])
 
-  // Stats calculation
   const stats = useMemo(() => {
     const total = orders.filter((o) => o.status !== 'CANCELLED').length
     const pending = orders.filter((o) => o.status === 'PENDING').length
@@ -352,7 +347,6 @@ export function ResultPage() {
   }
 
   const handleSaveResultSuccess = async (updatedOrder) => {
-    // Resolve every server operation before ResultModal is allowed to show success.
     if (!['RESULTED', 'CONFIRMED'].includes(updatedOrder.status)) {
       throw new Error(`Trạng thái kết quả không được hỗ trợ: ${updatedOrder.status}.`)
     }
@@ -383,8 +377,6 @@ export function ResultPage() {
         await clinicalResultApi.getById(updatedOrder.clinicalResultId)
       )
 
-      // A retry remains safe if finalization succeeded but resuming the queue
-      // failed in a later request.
       if (currentResult.status === 'FINAL') {
         if (!shouldFinalize) {
           throw new Error('Kết quả đã được xác nhận và không thể chỉnh sửa.')
@@ -412,8 +404,6 @@ export function ResultPage() {
       )
     }
 
-    // Keep the server-issued resultId in state even if a later attachment,
-    // finalize, or queue request fails; the next attempt can safely resume.
     reflectServerResult(persistedResult)
 
     if (persistedResult.status !== 'FINAL' && newAttachments.length) {
@@ -486,7 +476,6 @@ export function ResultPage() {
 
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '4px 0 24px' }}>
-      {/* Header Section */}
       <div
         style={{
           display: 'flex',
@@ -518,7 +507,6 @@ export function ResultPage() {
         </Space>
       </div>
 
-      {/* Summary Statistics Cards */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={8} md={4} lg={4.8}>
           <Card
@@ -611,7 +599,6 @@ export function ResultPage() {
         </Col>
       </Row>
 
-      {/* Toolbar: Search & Filter */}
       <Card
         size="small"
         style={{
@@ -638,14 +625,12 @@ export function ResultPage() {
         </Row>
       </Card>
 
-      {/* Table Component */}
       <ResultTable
         dataSource={filteredOrders}
         loading={loading}
         onOpenModal={handleOpenModal}
       />
 
-      {/* Entry Modal */}
       <ResultModal
         visible={modalVisible}
         order={selectedOrder}

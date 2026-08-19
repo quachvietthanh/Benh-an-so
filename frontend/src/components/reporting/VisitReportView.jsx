@@ -37,10 +37,9 @@ export default function VisitReportView({
   summary = {},
   loading = false,
 }) {
-  const [chartType, setChartType] = useState('line') // 'line' | 'bar'
+  const [chartType, setChartType] = useState('line')
   const [hoveredDay, setHoveredDay] = useState(null)
 
-  // Phân tích các chỉ số vận hành và tải khám (từ timeline)
   const analytics = useMemo(() => {
     const totalVisits = summary.visitCount || 0
     const totalDays = Math.max(timeline.length, 1)
@@ -60,7 +59,6 @@ export default function VisitReportView({
       }
     })
 
-    // Đánh giá mức độ tải khám và gợi ý nhân sự
     let workloadStatus = 'STABLE'
     let workloadTitle = 'Tải khám ổn định'
     let workloadColor = '#16a34a'
@@ -97,7 +95,6 @@ export default function VisitReportView({
     }
   }, [summary, timeline])
 
-  // Chuẩn bị dữ liệu vẽ biểu đồ SVG lượt khám
   const maxVisitsInChart = useMemo(() => {
     const maxVal = Math.max(...timeline.map((d) => Number(d.visitCount || 0)), 10)
     return Math.ceil(maxVal / 5) * 5
@@ -132,7 +129,6 @@ export default function VisitReportView({
     })
   }, [timeline, maxVisitsInChart])
 
-  // Cột bảng chi tiết lượt khám từng ngày
   const visitTableColumns = [
     {
       title: 'Ngày khám',
@@ -223,7 +219,6 @@ export default function VisitReportView({
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      {/* Khung Gợi ý Điều phối Nhân sự Dựa trên Tải khám */}
       <Alert
         type={analytics.workloadStatus === 'OVERLOAD' ? 'error' : analytics.workloadStatus === 'HIGH' ? 'warning' : 'info'}
         showIcon
@@ -244,7 +239,6 @@ export default function VisitReportView({
         style={{ borderRadius: 10 }}
       />
 
-      {/* Biểu đồ Trực quan Lượt khám theo thời gian */}
       <Card
         style={{ borderRadius: 14, border: '1px solid #f1f5f9', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}
         title={
@@ -275,7 +269,6 @@ export default function VisitReportView({
             <Empty description="Không có dữ liệu lượt khám trong khoảng thời gian đã chọn" />
           ) : (
             <div>
-              {/* Vùng vẽ biểu đồ SVG Interactive */}
               <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }}>
                 <svg
                   viewBox="0 0 760 220"
@@ -292,7 +285,6 @@ export default function VisitReportView({
                     </linearGradient>
                   </defs>
 
-                  {/* Lưới ngang tham chiếu */}
                   {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
                     const val = Math.round(maxVisitsInChart * ratio)
                     const y = 180 - ratio * 155
@@ -319,7 +311,6 @@ export default function VisitReportView({
                     )
                   })}
 
-                  {/* Đường mức trung bình */}
                   {analytics.avgPerDay > 0 && (
                     <g>
                       <line
@@ -343,7 +334,6 @@ export default function VisitReportView({
                     </g>
                   )}
 
-                  {/* DẠNG BIỂU ĐỒ CỘT (BAR CHART) */}
                   {chartType === 'bar' && (
                     <g>
                       {chartPoints.map((item, idx) => {
@@ -400,7 +390,6 @@ export default function VisitReportView({
                     </g>
                   )}
 
-                  {/* DẠNG BIỂU ĐỒ ĐƯỜNG (LINE & AREA CHART) */}
                   {chartType === 'line' && (
                     <g>
                       {chartPoints.length > 1 && (
@@ -473,7 +462,6 @@ export default function VisitReportView({
                 </svg>
               </div>
 
-              {/* Tooltip hover */}
               {hoveredDay && (
                 <div
                   style={{
@@ -508,7 +496,6 @@ export default function VisitReportView({
         </Spin>
       </Card>
 
-      {/* Bảng Dữ liệu Chi tiết Từng Ngày */}
       <Card
         style={{ borderRadius: 14, boxShadow: '0 2px 10px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9' }}
         title={

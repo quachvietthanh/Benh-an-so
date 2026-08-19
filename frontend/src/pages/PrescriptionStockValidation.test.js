@@ -7,7 +7,6 @@ import {
   validatePrescriptionStock,
 } from '../utils/prescriptionInventoryValidation.js'
 
-// Sample medicines dynamic dataset (simulating Backend GET /medicines response)
 const mockBackendMedicines = [
   { id: 'med-01', medicineName: 'Paracetamol 500 mg', strength: '500 mg', unit: 'viên', stockQuantity: 100, active: true },
   { id: 'med-02', medicineName: 'Ambroxol 30 mg', strength: '30 mg', unit: 'viên', stockQuantity: 45, active: true },
@@ -51,14 +50,12 @@ test('TC04: Tồn = 20, kê 30 -> Bị chặn với thông báo lỗi tồn kho 
 })
 
 test('TC05: Tồn thay đổi từ 10 -> 0 trước khi lưu -> Re-check/refresh -> Bị chặn', () => {
-  // Initial state: stock = 10
   const initialMedicines = [
     { id: 'med-05', medicineName: 'Ibuprofen 400 mg', stockQuantity: 10, unit: 'viên', active: true },
   ]
   const initialCheck = validateItemStock({ medicineId: 'med-05', quantity: 5 }, initialMedicines)
   assert.equal(initialCheck.isValid, true)
 
-  // Pharmacist dispenses to another patient, live re-fetch from Backend returns stockQuantity = 0
   const updatedMedicines = [
     { id: 'med-05', medicineName: 'Ibuprofen 400 mg', stockQuantity: 0, unit: 'viên', active: true },
   ]
@@ -69,8 +66,8 @@ test('TC05: Tồn thay đổi từ 10 -> 0 trước khi lưu -> Re-check/refresh
 
 test('TC06: Có 2 thuốc, 1 thuốc không đủ tồn -> Không tạo toàn bộ đơn', () => {
   const prescriptionItems = [
-    { medicineId: 'med-01', quantity: 10 }, // Paracetamol: stock 100 -> OK
-    { medicineId: 'med-05', quantity: 30 }, // Ibuprofen: stock 20, qty 30 -> FAIL
+    { medicineId: 'med-01', quantity: 10 },
+    { medicineId: 'med-05', quantity: 30 },
   ]
 
   const validation = validatePrescriptionStock(prescriptionItems, mockBackendMedicines)
@@ -87,14 +84,12 @@ test('TC07: Không được gọi Create Prescription API khi validation tồn k
   }
 
   const invalidItems = [
-    { medicineId: 'med-03', quantity: 5 }, // Stock = 0
+    { medicineId: 'med-03', quantity: 5 },
   ]
 
   const validation = validatePrescriptionStock(invalidItems, mockBackendMedicines)
 
-  // Simulated logic before calling API
   if (!validation.isValid) {
-    // API is NOT called
   } else {
     fakeCreatePrescriptionApi()
   }
@@ -107,12 +102,10 @@ test('TC08: Thuốc hết hàng không bị xóa khỏi danh mục dropdown (sor
 
   assert.equal(sortedMeds.length, mockBackendMedicines.length)
 
-  // First items should have stock > 0
   assert.ok(getAvailableStock(sortedMeds[0]) > 0)
   assert.ok(getAvailableStock(sortedMeds[1]) > 0)
   assert.ok(getAvailableStock(sortedMeds[2]) > 0)
 
-  // Last items should be stock <= 0
   assert.equal(getAvailableStock(sortedMeds[sortedMeds.length - 2]), 0)
   assert.equal(getAvailableStock(sortedMeds[sortedMeds.length - 1]), 0)
 })

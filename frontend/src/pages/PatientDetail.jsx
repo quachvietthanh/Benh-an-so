@@ -39,7 +39,6 @@ function PatientDetail() {
         }
       }
     } catch {
-      // Backend GET /patients/{id} endpoint may not exist
     }
 
     if (!foundPatient) {
@@ -58,7 +57,6 @@ function PatientDetail() {
             String(p.patientCode || '').toLowerCase() === String(id).toLowerCase()
           ) || null
         } catch {
-          // ignore
         }
       }
     }

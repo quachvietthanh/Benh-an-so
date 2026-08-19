@@ -113,7 +113,6 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
       style={{ top: 20 }}
     >
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
-        {/* Timeline Status */}
         <ClinicalOrderStatusTimeline
           status={order.status}
           createdAt={order.createdAt}
@@ -122,7 +121,6 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
           cancelReason={order.cancelReason}
         />
 
-        {/* Patient Demographics & Order Metadata */}
         <Card size="small" style={{ background: '#fafafa', borderRadius: 8 }}>
           <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} bordered>
             <Descriptions.Item label="Mã bệnh nhân">
@@ -151,7 +149,6 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
           </Descriptions>
         </Card>
 
-        {/* Services Table */}
         <div>
           <Title level={5} style={{ marginBottom: 12 }}>Danh sách dịch vụ chỉ định ({order.items?.length || 0})</Title>
           <Table
@@ -164,7 +161,6 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
           />
         </div>
 
-        {/* Results Summary Section (if available) */}
         {order.resultSummary && (
           <Card size="small" style={{ background: '#f6ffed', borderColor: '#b7eb8f', borderRadius: 8 }}>
             <Title level={5} style={{ color: '#389e0d', marginTop: 0, marginBottom: 8 }}>
@@ -176,8 +172,7 @@ export const ClinicalOrderDetailModal = ({ visible, order, onClose, onPrintOrder
           </Card>
         )}
 
-        {/* Order Fee Summary */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', background: '#fff1f0', padding: '12px 16px', borderRadius: 6, border: '1px solid #ffa39e' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff1f0', padding: '12px 16px', borderRadius: 6, border: '1px solid #ffa39e' }}>
           <Text style={{ fontSize: 15, marginRight: 16 }}>Tổng phí dịch vụ cận lâm sàng:</Text>
           <Title level={3} style={{ color: '#cf1322', margin: 0 }}>
             {order.totalAmount == null ? 'Chưa cập nhật' : `${Number(order.totalAmount).toLocaleString('vi-VN')} đ`}

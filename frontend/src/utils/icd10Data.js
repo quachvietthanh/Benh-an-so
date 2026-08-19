@@ -1,5 +1,3 @@
-// Danh mục mã bệnh tiêu chuẩn ICD-10 phục vụ chẩn đoán y khoa
-
 export const icd10Categories = [
   { key: 'ALL', label: 'Tất cả nhóm bệnh' },
   { key: 'CIRCULATORY', label: 'Tim mạch - Mạch máu (I00-I99)' },

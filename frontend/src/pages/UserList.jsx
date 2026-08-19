@@ -13,7 +13,6 @@ function UserList() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(10)
 
-  // ---- Fetch danh sách người dùng ----
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     try {
@@ -35,13 +34,12 @@ function UserList() {
     fetchUsers()
   }, [fetchUsers])
 
-  // ---- Khóa / Mở khóa tài khoản ----
   const handleToggleLock = async (user, locked) => {
     try {
       const action = locked ? 'khóa' : 'mở khóa'
       await userApi.updateStatus(user.id, locked)
       message.success(`Đã ${action} tài khoản "${user.username}" thành công`)
-      fetchUsers() // Tải lại danh sách
+      fetchUsers()
     } catch (error) {
       console.error('Failed to update user status:', error)
       const errMsg =
@@ -50,7 +48,6 @@ function UserList() {
     }
   }
 
-  // ---- Cấu hình cột ----
   const columns = [
     {
       title: 'Tên đăng nhập',

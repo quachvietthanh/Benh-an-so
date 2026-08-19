@@ -4,9 +4,6 @@ import { getStoredPrescriptions, saveStoredPrescription, getStoredMedicalRecords
 const PRESCRIPTION_HISTORY_KEY = 'app_prescription_history'
 const deepClone = (data) => JSON.parse(JSON.stringify(data))
 
-/**
- * Get all prescriptions from local storage / mock data
- */
 export const getMockPrescriptions = () => {
   const stored = getStoredPrescriptions()
   if (stored && stored.length > 0) {
@@ -15,17 +12,11 @@ export const getMockPrescriptions = () => {
   return deepClone(demoPrescriptions)
 }
 
-/**
- * Get prescription by ID
- */
 export const getMockPrescriptionById = (id) => {
   const all = getMockPrescriptions()
   return all.find((p) => String(p.id) === String(id) || String(p.prescriptionCode) === String(id)) || null
 }
 
-/**
- * Get prescriptions by Medical Record ID / Visit ID
- */
 export const getMockPrescriptionsByVisitOrRecord = (recordIdOrVisitId) => {
   const all = getMockPrescriptions()
   return all.filter((p) => 
@@ -34,9 +25,6 @@ export const getMockPrescriptionsByVisitOrRecord = (recordIdOrVisitId) => {
   )
 }
 
-/**
- * Get history logs for a prescription
- */
 export const getMockPrescriptionHistory = (prescriptionId) => {
   try {
     const raw = localStorage.getItem(PRESCRIPTION_HISTORY_KEY)
@@ -47,9 +35,6 @@ export const getMockPrescriptionHistory = (prescriptionId) => {
   }
 }
 
-/**
- * Save history log for a prescription
- */
 export const saveMockPrescriptionHistory = (historyLog) => {
   try {
     const raw = localStorage.getItem(PRESCRIPTION_HISTORY_KEY)
@@ -62,10 +47,6 @@ export const saveMockPrescriptionHistory = (historyLog) => {
   }
 }
 
-/**
- * Check drug interactions for a list of medicine IDs
- * Evaluates all unique pairs (A+B, A+C, B+C)
- */
 export const checkMockDrugInteractions = (medicineIds = []) => {
   const cleanIds = [...new Set(medicineIds.filter(Boolean).map(String))]
   if (cleanIds.length < 2) return []
@@ -82,7 +63,6 @@ export const checkMockDrugInteractions = (medicineIds = []) => {
       const medAObj = allMeds.find((m) => String(m.id) === drugA)
       const medBObj = allMeds.find((m) => String(m.id) === drugB)
 
-      // Match against rules in mockData by drug ID or Active Ingredient
       const matchedRule = rules.find((rule) => {
         const ruleDrugs = (rule.drugs || []).map(String)
         const hasIdMatch = (ruleDrugs.includes(drugA) && ruleDrugs.includes(drugB))
@@ -121,9 +101,6 @@ export const checkMockDrugInteractions = (medicineIds = []) => {
   return detected
 }
 
-/**
- * Save new prescription in mock mode
- */
 export const saveMockPrescription = (data, currentUser) => {
   const now = new Date().toISOString()
   const newPrescription = {
@@ -135,7 +112,7 @@ export const saveMockPrescription = (data, currentUser) => {
     patientName: data.patientName || 'Bệnh nhân',
     doctorId: data.doctorId || currentUser?.id,
     doctorName: data.doctorName || currentUser?.fullName || currentUser?.username || 'Bác sĩ',
-    status: 'PENDING_DISPENSE', // Enum chờ cấp phát
+    status: 'PENDING_DISPENSE',
     note: data.note || '',
     items: deepClone(data.items || []),
     interactionOverrides: deepClone(data.interactionOverrides || []),
@@ -145,10 +122,8 @@ export const saveMockPrescription = (data, currentUser) => {
     updatedBy: currentUser?.username || currentUser?.fullName || 'Doctor',
   }
 
-  // Save prescription
   saveStoredPrescription(newPrescription)
 
-  // Save audit history event: CREATE
   saveMockPrescriptionHistory({
     id: `hist-${Date.now()}`,
     prescriptionId: newPrescription.id,
@@ -163,9 +138,6 @@ export const saveMockPrescription = (data, currentUser) => {
   return newPrescription
 }
 
-/**
- * Update existing prescription in mock mode
- */
 export const updateMockPrescription = (id, data, currentUser) => {
   const existing = getMockPrescriptionById(id)
   if (!existing) {
@@ -190,7 +162,6 @@ export const updateMockPrescription = (id, data, currentUser) => {
 
   saveStoredPrescription(updatedPrescription)
 
-  // Save audit history event: UPDATE
   saveMockPrescriptionHistory({
     id: `hist-${Date.now()}`,
     prescriptionId: updatedPrescription.id,

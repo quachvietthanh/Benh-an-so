@@ -10,7 +10,6 @@ function Login() {
   const navigate = useNavigate()
   const { login, isAuthenticated } = useAuthContext()
 
-  // Redirect if already logged in
   if (isAuthenticated) {
     return <Navigate to="/" replace />
   }

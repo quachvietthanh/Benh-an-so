@@ -1,8 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-// Helper logic matching Frontend Billing & Invoice implementation
-
 export function validatePaymentEligibility(visit) {
   if (!visit) {
     return { eligible: false, error: 'Không tìm thấy lượt khám.' }
@@ -65,10 +63,6 @@ export function validateInvoiceAdjustment(payload, canAdjust = false) {
   return { valid: true }
 }
 
-// ==========================================
-// TEST SUITE: BILLING & INVOICE VALIDATION
-// ==========================================
-
 test('TC-PAY-01: Chặn thanh toán cho lượt khám đang IN_PROGRESS', () => {
   const visit = { visitId: 'v-1', status: 'IN_PROGRESS' }
   const result = validatePaymentEligibility(visit)
@@ -92,8 +86,8 @@ test('TC-PAY-04 & 05: Cho phép thanh toán khi lượt khám COMPLETED và đơ
 test('TC-PAY-TOTAL: Tính toán tổng tiền phí khám + tiền thuốc chuẩn xác', () => {
   const examFee = 100000
   const items = [
-    { quantity: 20, unitPrice: 1500 }, // 30.000 ₫
-    { quantity: 14, unitPrice: 3500 }, // 49.000 ₫
+    { quantity: 20, unitPrice: 1500 },
+    { quantity: 14, unitPrice: 3500 },
   ]
   const summary = calculateBillingTotal(examFee, items)
   assert.strictEqual(summary.examFee, 100000)

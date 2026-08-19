@@ -111,9 +111,6 @@ textarea {
   border-radius: 99px;
 }
 
-/* ==========================================================
- * Mobile Responsive Optimizations for Doctors (NCL-10-CN-004)
- * ========================================================== */
 @media (max-width: 768px) {
   .page-header {
     flex-direction: column;
@@ -152,7 +149,6 @@ textarea {
   }
 }
 
-/* Billing Table Compact Action Buttons */
 .billing-action-btn.ant-btn {
   height: 30px !important;
   padding: 0 10px !important;
@@ -165,9 +161,6 @@ textarea {
   font-size: 13px !important;
 }
 
-/* ==========================================================
- * Print Styles for Electronic Invoices (NCL-07-CN-002)
- * ========================================================== */
 @media print {
   body * {
     visibility: hidden !important;
@@ -197,5 +190,3 @@ textarea {
     display: none !important;
   }
 }
-
-

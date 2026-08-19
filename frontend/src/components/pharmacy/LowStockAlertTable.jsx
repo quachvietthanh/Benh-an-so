@@ -43,7 +43,6 @@ function LowStockAlertTable({
   })
 
   const handleCreateReceipt = (record) => {
-    // Điều hướng sang trang Nhập kho kèm dữ liệu thuốc và số lượng đề xuất
     navigate('/pharmacy/receipts', {
       state: {
         prefillItem: {

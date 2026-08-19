@@ -1,4 +1,3 @@
-/* Main CSS Entry - Split into domain-specific modules */
 @import './styles/layout.css';
 @import './styles/dashboard.css';
 @import './styles/patients.css';

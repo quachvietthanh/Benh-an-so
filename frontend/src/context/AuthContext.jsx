@@ -45,7 +45,6 @@ export const AuthProvider = ({ children }) => {
       try {
         const payload = getJwtPayload(storedToken)
         if (payload && payload.exp && payload.exp * 1000 < Date.now()) {
-          // Token expired -> reset session
           localStorage.removeItem('user')
           localStorage.removeItem('token')
           setUser(null)
@@ -72,7 +71,6 @@ export const AuthProvider = ({ children }) => {
         setUser(null)
       }
     } else if (storedToken && !storedUser) {
-      // If token exists but user object is missing, reconstruct from JWT payload
       const payload = getJwtPayload(storedToken)
       if (payload && (payload.role || payload.sub)) {
         const reconstructedUser = {
@@ -126,7 +124,6 @@ export const AuthProvider = ({ children }) => {
     setUser(null)
   }
 
-  // TC-03: không thao tác gì quá 15 phút -> tự động hết phiên
   useEffect(() => {
     if (!user) return undefined
     const TIMEOUT = 15 * 60 * 1000
