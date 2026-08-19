@@ -79,15 +79,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/system/clinic/**").authenticated()
 
                                                 // ===== PATIENTS =====
-                                                .requestMatchers(HttpMethod.GET, "/patients/me/**")
-                                                .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.GET, "/patients/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST", "MANAGER")
-                                                .requestMatchers(HttpMethod.POST, "/patients/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.PUT, "/patients/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.DELETE, "/patients/**").hasRole("ADMIN")
+                                                .requestMatchers("/patients/**").authenticated()
 
                                                 // ===== MEDICAL RECORDS =====
                                                 .requestMatchers(HttpMethod.GET, "/medical-history/**")
@@ -147,24 +139,7 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "DOCTOR", "NURSE")
 
                                                 // ===== APPOINTMENTS =====
-                                                .requestMatchers(HttpMethod.POST, "/appointments/*/check-in")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.GET, "/appointments/me/**")
-                                                .hasAnyRole("DOCTOR", "NURSE", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.PATCH, "/appointments/*/cancel")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.PATCH, "/appointments/*/no-show")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.POST, "/appointments/*/reminder")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.GET, "/appointments/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.POST, "/appointments/**")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.PUT, "/appointments/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.DELETE, "/appointments/**")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
+                                                .requestMatchers("/appointments/**").authenticated()
 
                                                 // ===== REPORTS =====
                                                 .requestMatchers("/reports/**").authenticated()
