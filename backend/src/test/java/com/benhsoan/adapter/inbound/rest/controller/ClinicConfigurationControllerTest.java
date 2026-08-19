@@ -14,9 +14,13 @@ import java.time.LocalTime;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +28,8 @@ import com.benhsoan.adapter.inbound.rest.mapper.ClinicConfigurationRestMapper;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
+import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
+import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.command.clinic.UpdateClinicConfigurationCommand;
 import com.benhsoan.port.dto.result.clinic.ClinicConfigurationResult;
 import com.benhsoan.port.inbound.clinic.GetClinicConfigurationUseCase;
@@ -31,16 +37,28 @@ import com.benhsoan.port.inbound.clinic.UpdateClinicConfigurationUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = ClinicConfigurationController.class)
 @Import({
+        AopAutoConfiguration.class,
+        ClinicConfigurationControllerTest.AspectTestConfig.class,
         ClinicConfigurationRestMapper.class,
         GlobalExceptionHandler.class,
         SecurityConfig.class,
-        JwtAuthenticationFilter.class
+        JwtAuthenticationFilter.class,
+        RequirePermissionAspect.class,
+        PermissionEvaluator.class
 })
 class ClinicConfigurationControllerTest {
+
+    @TestConfiguration
+    @EnableAspectJAutoProxy(proxyTargetClass = true)
+    static class AspectTestConfig {
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -56,6 +74,12 @@ class ClinicConfigurationControllerTest {
     @MockitoBean
     private UserSessionRepository userSessionRepository;
     @MockitoBean
+    private RoleRepository roleRepository;
+    @MockitoBean
+    private AuditLogRepository auditLogRepository;
+    @MockitoBean
+    private CurrentUserPort currentUserPort;
+    @MockitoBean
     private ClockPort clockPort;
 
     @Test
@@ -64,13 +88,13 @@ class ClinicConfigurationControllerTest {
         when(updateClinicConfigurationUseCase.update(any())).thenReturn(result());
 
         mockMvc.perform(get("/system/clinic")
-                        .with(user("admin").roles("ADMIN")))
+                        .with(user("admin").authorities(new SimpleGrantedAuthority("PERMISSION_CLINIC_CONFIGURATION_READ"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clinicName").value("Phong kham Benh So An"))
                 .andExpect(jsonPath("$.openingTime").value("08:00:00"));
 
         mockMvc.perform(put("/system/clinic")
-                        .with(user("admin").roles("ADMIN"))
+                        .with(user("admin").authorities(new SimpleGrantedAuthority("PERMISSION_CLINIC_CONFIGURATION_UPDATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody()))
                 .andExpect(status().isOk())
@@ -82,7 +106,7 @@ class ClinicConfigurationControllerTest {
     @Test
     void rejectsARequestWithoutClinicName() throws Exception {
         mockMvc.perform(put("/system/clinic")
-                        .with(user("admin").roles("ADMIN"))
+                        .with(user("admin").authorities(new SimpleGrantedAuthority("PERMISSION_CLINIC_CONFIGURATION_UPDATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"clinicName":" ","openingTime":"08:00:00","closingTime":"17:00:00"}

@@ -17,8 +17,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -34,16 +33,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ServiceCatalogRestMapper;
 import com.benhsoan.config.SecurityConfig;
-import com.benhsoan.domain.auth.Role;
-import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
-import com.benhsoan.infrastructure.security.annotation.PermissionAspect;
+import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.command.servicecatalog.CreateServiceCatalogCommand;
 import com.benhsoan.port.dto.command.servicecatalog.UpdateServiceCatalogCommand;
@@ -59,6 +57,8 @@ import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = ServiceCatalogController.class)
@@ -69,7 +69,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
         GlobalExceptionHandler.class,
         SecurityConfig.class,
         JwtAuthenticationFilter.class,
-        PermissionAspect.class,
+        RequirePermissionAspect.class,
         PermissionEvaluator.class
 })
 class ServiceCatalogControllerTest {
@@ -99,32 +99,8 @@ class ServiceCatalogControllerTest {
     @MockitoBean private UserSessionRepository userSessionRepository;
     @MockitoBean private ClockPort clockPort;
 
-    @BeforeEach
-    void configureRolePermissions() {
-        when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(Role.create(
-                "ADMIN",
-                "Administrator",
-                true,
-                Set.of(
-                        Permission.SERVICE_CATALOG_READ,
-                        Permission.SERVICE_CATALOG_CREATE,
-                        Permission.SERVICE_CATALOG_UPDATE,
-                        Permission.SERVICE_PRICE_MANAGE
-                )
-        )));
-        when(roleRepository.findByName("MANAGER")).thenReturn(Optional.of(Role.create(
-                "MANAGER",
-                "Clinic manager",
-                true,
-                Set.of(
-                        Permission.REPORT_VIEW,
-                        Permission.SERVICE_CATALOG_READ,
-                        Permission.SERVICE_CATALOG_CREATE,
-                        Permission.SERVICE_CATALOG_UPDATE,
-                        Permission.SERVICE_PRICE_MANAGE
-                )
-        )));
-    }
+    @MockitoBean private AuditLogRepository auditLogRepository;
+    @MockitoBean private CurrentUserPort currentUserPort;
 
     @Test
     void searchesWithFrontendCompatibleResponse() throws Exception {
@@ -137,7 +113,7 @@ class ServiceCatalogControllerTest {
         mockMvc.perform(get("/system/services")
                         .param("keyword", "blood")
                         .param("active", "true")
-                        .with(user("admin").roles("ADMIN")))
+                        .with(withPermissions("SERVICE_CATALOG_READ")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(SERVICE_ID.toString()))
                 .andExpect(jsonPath("$.content[0].serviceCode").value("LAB-CBC"))
@@ -163,12 +139,12 @@ class ServiceCatalogControllerTest {
         ));
 
         mockMvc.perform(get("/system/services/{id}", SERVICE_ID)
-                        .with(user("admin").roles("ADMIN")))
+                        .with(withPermissions("SERVICE_CATALOG_READ")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Complete blood count"));
 
         mockMvc.perform(get("/system/services/{id}/prices", SERVICE_ID)
-                        .with(user("admin").roles("ADMIN")))
+                        .with(withPermissions("SERVICE_CATALOG_READ")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(PRICE_ID.toString()))
                 .andExpect(jsonPath("$[0].price").value(95000.00))
@@ -180,7 +156,7 @@ class ServiceCatalogControllerTest {
         when(createServiceCatalogUseCase.create(any())).thenReturn(result(true));
 
         mockMvc.perform(post("/system/services")
-                        .with(user("admin").roles("ADMIN"))
+                        .with(withPermissions("SERVICE_CATALOG_CREATE", "SERVICE_PRICE_MANAGE"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -206,7 +182,7 @@ class ServiceCatalogControllerTest {
         when(updateServiceCatalogStatusUseCase.updateStatus(SERVICE_ID, false)).thenReturn(result(false));
 
         mockMvc.perform(put("/system/services/{id}", SERVICE_ID)
-                        .with(user("admin").roles("ADMIN"))
+                        .with(withPermissions("SERVICE_CATALOG_UPDATE", "SERVICE_PRICE_MANAGE"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -225,7 +201,7 @@ class ServiceCatalogControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(SERVICE_ID, captor.getValue().serviceCatalogId());
 
         mockMvc.perform(patch("/system/services/{id}/status", SERVICE_ID)
-                        .with(user("admin").roles("ADMIN"))
+                        .with(withPermissions("SERVICE_CATALOG_UPDATE"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"active\":false}"))
                 .andExpect(status().isOk())
@@ -233,7 +209,7 @@ class ServiceCatalogControllerTest {
     }
 
     @Test
-    void allowsManagerToManageServiceCatalogAndPrices() throws Exception {
+    void allowsAnyRoleWithTheRequiredPermissionsToManageServiceCatalogAndPrices() throws Exception {
         when(searchServiceCatalogUseCase.search(any())).thenReturn(Page.empty());
         when(getServiceCatalogUseCase.getById(SERVICE_ID)).thenReturn(result(true));
         when(getServicePriceHistoryUseCase.getHistory(SERVICE_ID)).thenReturn(List.of());
@@ -242,31 +218,31 @@ class ServiceCatalogControllerTest {
         when(updateServiceCatalogStatusUseCase.updateStatus(SERVICE_ID, false)).thenReturn(result(false));
 
         mockMvc.perform(get("/system/services")
-                        .with(user("manager").roles("MANAGER")))
+                        .with(withPermissions("SERVICE_CATALOG_READ")))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/system/services/{id}", SERVICE_ID)
-                        .with(user("manager").roles("MANAGER")))
+                        .with(withPermissions("SERVICE_CATALOG_READ")))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/system/services/{id}/prices", SERVICE_ID)
-                        .with(user("manager").roles("MANAGER")))
+                        .with(withPermissions("SERVICE_CATALOG_READ")))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/system/services")
-                        .with(user("manager").roles("MANAGER"))
+                        .with(withPermissions("SERVICE_CATALOG_CREATE", "SERVICE_PRICE_MANAGE"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createRequestBody()))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(put("/system/services/{id}", SERVICE_ID)
-                        .with(user("manager").roles("MANAGER"))
+                        .with(withPermissions("SERVICE_CATALOG_UPDATE", "SERVICE_PRICE_MANAGE"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequestBody()))
                 .andExpect(status().isOk());
 
         mockMvc.perform(patch("/system/services/{id}/status", SERVICE_ID)
-                        .with(user("manager").roles("MANAGER"))
+                        .with(withPermissions("SERVICE_CATALOG_UPDATE"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"active\":false}"))
                 .andExpect(status().isOk());
@@ -290,6 +266,30 @@ class ServiceCatalogControllerTest {
                 searchServiceCatalogUseCase,
                 getServicePriceHistoryUseCase
         );
+    }
+
+    @Test
+    void rejectsRequestsMissingTheRequiredPermission() throws Exception {
+        mockMvc.perform(get("/system/services").with(withPermissions("SERVICE_CATALOG_UPDATE")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/system/services")
+                        .with(withPermissions("SERVICE_CATALOG_CREATE"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/system/services/{id}", SERVICE_ID)
+                        .with(withPermissions("SERVICE_CATALOG_UPDATE"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateRequestBody()))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(searchServiceCatalogUseCase, createServiceCatalogUseCase, updateServiceCatalogUseCase);
+    }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor withPermissions(String... permissions) {
+        return user("snapshot-user").authorities(Arrays.stream(permissions)
+                .map(permission -> new SimpleGrantedAuthority("PERMISSION_" + permission))
+                .toArray(SimpleGrantedAuthority[]::new));
     }
 
     private String createRequestBody() {

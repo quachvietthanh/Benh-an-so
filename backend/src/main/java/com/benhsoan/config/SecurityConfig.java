@@ -72,11 +72,11 @@ public class SecurityConfig {
 
                                                 // ===== ADMIN / USER MANAGEMENT =====
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                                                .requestMatchers(HttpMethod.GET, "/users/doctors")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers("/users/**").hasRole("ADMIN")
+                                                .requestMatchers("/users/**").authenticated()
                                                 .requestMatchers("/audit-logs/**").hasRole("ADMIN")
                                                 .requestMatchers("/roles/**", "/permissions/**").authenticated()
+                                                .requestMatchers("/system/services/**").authenticated()
+                                                .requestMatchers("/system/clinic/**").authenticated()
 
                                                 // ===== PATIENTS =====
                                                 .requestMatchers(HttpMethod.GET, "/patients/me/**")
@@ -167,8 +167,7 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "RECEPTIONIST")
 
                                                 // ===== REPORTS =====
-                                                .requestMatchers(HttpMethod.GET, "/reports/**")
-                                                .hasAnyRole("ADMIN", "MANAGER")
+                                                .requestMatchers("/reports/**").authenticated()
 
                                                 // ===== PHARMACY / INVOICES =====
                                                 .requestMatchers(HttpMethod.DELETE, "/inventory/**").hasRole("ADMIN")
