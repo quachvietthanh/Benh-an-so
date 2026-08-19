@@ -37,7 +37,7 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
             .withPassword("backup_test");
 
     private static final BackupRestorePlan BACKUP_PLAN = new BackupRestorePlan(
-            List.of("rooms", "diagnosis_catalog", "clinical_service_catalog", "invoice_lines", "invoices",
+            List.of("clinic_configuration", "rooms", "diagnosis_catalog", "clinical_service_catalog", "invoice_lines", "invoices",
                     "payments", "prescription_dispense_items", "prescriptions", "medicine_batches", "medicines",
                     "queue_items", "visits"),
             Set.of(),
@@ -87,6 +87,7 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         Fixture fixture = seedFixture();
         adapter.exportSnapshot("BKP-MYSQL-FK");
 
+        jdbc.update("UPDATE clinic_configuration SET clinic_name = ? WHERE id = 1", "CORRUPTED");
         jdbc.update("UPDATE medicines SET medicine_name = ? WHERE id = ?", "CORRUPTED", fixture.medicineId());
         jdbc.update("UPDATE invoice_lines SET amount = ? WHERE id = ?", new BigDecimal("999.00"), fixture.lineId());
         jdbc.update("DELETE FROM diagnosis_catalog");
@@ -95,6 +96,7 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
 
         transactions.executeWithoutResult(status -> adapter.restoreSnapshot("BKP-MYSQL-FK.json"));
 
+        assertEquals("Clinic configuration", value("SELECT clinic_name FROM clinic_configuration WHERE id = 1"));
         assertEquals("Paracetamol 500 mg", value("SELECT medicine_name FROM medicines WHERE id = ?", fixture.medicineId()));
         assertEquals("D-001", value("SELECT diagnosis_code FROM diagnosis_catalog"));
         assertEquals(0, new BigDecimal("100.00").compareTo(jdbc.queryForObject(
@@ -203,6 +205,8 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         jdbc.execute("SET FOREIGN_KEY_CHECKS = 1");
         jdbc.execute("CREATE TABLE flyway_schema_history (installed_rank INT PRIMARY KEY, version VARCHAR(50), success BOOLEAN NOT NULL) ENGINE=InnoDB");
         jdbc.update("INSERT INTO flyway_schema_history VALUES (?, ?, ?)", 1, "test-schema-1", true);
+        jdbc.execute("CREATE TABLE clinic_configuration (id TINYINT PRIMARY KEY, clinic_name VARCHAR(150) NOT NULL) ENGINE=InnoDB");
+        jdbc.update("INSERT INTO clinic_configuration VALUES (?, ?)", 1, "Clinic configuration");
         jdbc.execute("CREATE TABLE rooms (id VARCHAR(36) PRIMARY KEY, room_code VARCHAR(30) NOT NULL) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE diagnosis_catalog (id VARCHAR(36) PRIMARY KEY, diagnosis_code VARCHAR(30) NOT NULL) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE clinical_service_catalog (id VARCHAR(36) PRIMARY KEY, service_code VARCHAR(30) NOT NULL) ENGINE=InnoDB");

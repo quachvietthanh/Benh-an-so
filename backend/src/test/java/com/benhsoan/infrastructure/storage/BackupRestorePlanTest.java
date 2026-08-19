@@ -21,7 +21,7 @@ class BackupRestorePlanTest {
         BackupRestorePlan plan = new BackupStorageConfiguration().fullBackupRestorePlan();
 
         assertTrue(plan.allowedTables().containsAll(List.of(
-                "diagnosis_catalog", "service_catalog", "service_price", "clinical_service_catalog",
+                "clinic_configuration", "diagnosis_catalog", "service_catalog", "service_price", "clinical_service_catalog",
                 "drug_interaction_rules", "prescription_code_sequences", "invoice_code_sequences",
                 "payments", "payment_service_fees"
         )));
@@ -29,6 +29,16 @@ class BackupRestorePlanTest {
         assertTrue(plan.dependencies().stream().allMatch(dependency ->
                 plan.allowedTables().contains(dependency.childTable())
                         && plan.allowedTables().contains(dependency.parentTable())));
+    }
+
+    @Test
+    void clinicConfigurationIsIncludedWithoutForeignKeyDependencies() {
+        BackupRestorePlan plan = new BackupStorageConfiguration().fullBackupRestorePlan();
+
+        assertTrue(plan.snapshotTables().contains("clinic_configuration"));
+        assertTrue(plan.dependencies().stream().noneMatch(dependency ->
+                "clinic_configuration".equals(dependency.childTable())
+                        || "clinic_configuration".equals(dependency.parentTable())));
     }
 
     @Test

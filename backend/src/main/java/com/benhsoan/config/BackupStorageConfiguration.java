@@ -22,7 +22,7 @@ public class BackupStorageConfiguration {
     public BackupRestorePlan fullBackupRestorePlan() {
         return new BackupRestorePlan(
                 List.of(
-                        "rooms", "medicines", "diagnosis_catalog", "service_catalog", "service_price",
+                        "clinic_configuration", "rooms", "medicines", "diagnosis_catalog", "service_catalog", "service_price",
                         "clinical_service_catalog",
                         "drug_interaction_rules", "prescription_code_sequences", "invoice_code_sequences",
                         "patients", "patient_change_logs", "appointments", "appointment_notification_logs",
