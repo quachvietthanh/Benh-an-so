@@ -13,7 +13,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -34,7 +33,7 @@ class MedicalRecordAuthorizationServiceTest {
     @DisplayName("audit log access is allowed when current user has AUDIT_READ")
     void allowsAuditReadPermission() {
         UUID userId = UUID.randomUUID();
-        when(permissionEvaluator.hasPermission(Permission.AUDIT_READ)).thenReturn(true);
+        when(permissionEvaluator.hasPermission("AUDIT_READ")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
 
         assertEquals(userId, service.requireAuditReadAccess());
@@ -43,7 +42,7 @@ class MedicalRecordAuthorizationServiceTest {
     @Test
     @DisplayName("audit log access is denied without AUDIT_READ")
     void deniesWithoutAuditReadPermission() {
-        when(permissionEvaluator.hasPermission(Permission.AUDIT_READ)).thenReturn(false);
+        when(permissionEvaluator.hasPermission("AUDIT_READ")).thenReturn(false);
 
         assertThrows(MedicalRecordAccessDeniedException.class, () -> service.requireAuditReadAccess());
     }

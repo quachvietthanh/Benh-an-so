@@ -31,12 +31,10 @@ import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
-import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 @ExtendWith(MockitoExtension.class)
 class RequirePermissionAspectTest {
-    @Mock RoleRepository roleRepository;
     @Mock AuditLogRepository auditLogRepository;
     @Mock CurrentUserPort currentUserPort;
     @Mock ProceedingJoinPoint joinPoint;
@@ -76,7 +74,7 @@ class RequirePermissionAspectTest {
     }
 
     private RequirePermissionAspect aspect() {
-        return new RequirePermissionAspect(new PermissionEvaluator(roleRepository), auditLogRepository, currentUserPort);
+        return new RequirePermissionAspect(new PermissionEvaluator(), auditLogRepository, currentUserPort);
     }
 
     private void authenticate(String authority) {
