@@ -1,16 +1,10 @@
 import dayjs from 'dayjs'
 
-/**
- * Format số tiền VND sang chuỗi hiển thị
- */
 export const formatVND = (value) => {
   const num = Number(value || 0)
   return `${num.toLocaleString('vi-VN')} ₫`
 }
 
-/**
- * Kiểm tra quyền quản lý danh mục dịch vụ và bảng giá (Admin và Manager)
- */
 export const checkServiceManagementPermission = (roles) => {
   if (!roles) return false
   const roleList = (Array.isArray(roles) ? roles : [roles])
@@ -19,9 +13,6 @@ export const checkServiceManagementPermission = (roles) => {
   return roleList.includes('admin') || roleList.includes('manager')
 }
 
-/**
- * Chuẩn hóa dữ liệu trả về từ API (hỗ trợ cả Spring Data Page { content: [...] } lẫn mảng thuần)
- */
 export const normalizeServiceList = (data) => {
   if (!data) return []
   if (Array.isArray(data)) return data
@@ -30,9 +21,6 @@ export const normalizeServiceList = (data) => {
   return []
 }
 
-/**
- * Validate dữ liệu tạo dịch vụ mới
- */
 export const validateCreateServicePayload = (values) => {
   const errors = {}
   const serviceCode = String(values?.serviceCode || '').trim()
@@ -74,9 +62,6 @@ export const validateCreateServicePayload = (values) => {
   }
 }
 
-/**
- * Validate dữ liệu cập nhật dịch vụ
- */
 export const validateUpdateServicePayload = (values) => {
   const errors = {}
   const name = String(values?.name || '').trim()
@@ -112,23 +97,15 @@ export const validateUpdateServicePayload = (values) => {
   }
 }
 
-/**
- * Phân loại các mốc giá trong lịch sử theo thời điểm hiện tại:
- * - CURRENT: Giá đang áp dụng hiện hành (mốc có effectiveFrom gần nhất <= today)
- * - UPCOMING: Giá có hiệu lực trong tương lai (effectiveFrom > today)
- * - PAST: Giá đã qua trong lịch sử
- */
 export const categorizePriceHistory = (prices = [], referenceDate = dayjs()) => {
   if (!Array.isArray(prices) || prices.length === 0) return []
 
   const ref = dayjs(referenceDate).startOf('day')
 
-  // Sắp xếp giảm dần theo effectiveFrom (mới nhất lên đầu)
   const sorted = [...prices].sort((a, b) => {
     return dayjs(b.effectiveFrom).diff(dayjs(a.effectiveFrom))
   })
 
-  // Tìm index của mốc giá hiện hành (mốc đầu tiên có effectiveFrom <= ref)
   const currentIdx = sorted.findIndex((item) => {
     const itemDate = dayjs(item.effectiveFrom).startOf('day')
     return itemDate.isSame(ref) || itemDate.isBefore(ref)
@@ -159,9 +136,6 @@ export const categorizePriceHistory = (prices = [], referenceDate = dayjs()) => 
   })
 }
 
-/**
- * Tính toán thống kê nhanh danh mục
- */
 export const calculateServiceStats = (services = []) => {
   const total = services.length
   const activeCount = services.filter((s) => Boolean(s.active)).length

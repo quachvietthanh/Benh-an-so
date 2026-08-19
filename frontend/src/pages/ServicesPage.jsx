@@ -73,29 +73,23 @@ function ServicesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Modals state
-  const [modalType, setModalType] = useState(null) // 'create' | 'edit' | null
+  const [modalType, setModalType] = useState(null)
   const [editingService, setEditingService] = useState(null)
   const [savingService, setSavingService] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
 
-  // Price history drawer state
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false)
   const [selectedServiceForHistory, setSelectedServiceForHistory] = useState(null)
   const [priceHistory, setPriceHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
-  // Clinic config state
   const [savingClinic, setSavingClinic] = useState(false)
 
   const [serviceForm] = Form.useForm()
   const [clinicForm] = Form.useForm()
 
-  // Load services & clinic config from backend
   const loadData = useCallback(async () => {
     setLoading(true)
-    
-    // 1. Tải danh mục dịch vụ (Dành cho cả ADMIN và MANAGER)
     try {
       const serviceResponse = await systemApi.services({ size: 200 })
       const rawServices = serviceResponse?.data
@@ -108,7 +102,6 @@ function ServicesPage() {
       setLoading(false)
     }
 
-    // 2. Tải cấu hình phòng khám (Chỉ khi tài khoản là ADMIN)
     if (isAdmin) {
       try {
         const clinicResponse = await systemApi.clinic()
@@ -131,18 +124,15 @@ function ServicesPage() {
     loadData()
   }, [loadData])
 
-  // Filtered services
   const filteredServices = useMemo(() => {
     let result = services
 
-    // Filter by status
     if (statusFilter === 'active') {
       result = result.filter((s) => Boolean(s.active))
     } else if (statusFilter === 'inactive') {
       result = result.filter((s) => !Boolean(s.active))
     }
 
-    // Filter by search keyword
     const keyword = searchTerm.trim().toLowerCase()
     if (keyword) {
       result = result.filter((s) => {
@@ -155,10 +145,8 @@ function ServicesPage() {
     return result
   }, [services, statusFilter, searchTerm])
 
-  // Summary statistics
   const stats = useMemo(() => calculateServiceStats(services), [services])
 
-  // Open Create Modal
   const openCreateModal = () => {
     setEditingService(null)
     serviceForm.resetFields()
@@ -171,7 +159,6 @@ function ServicesPage() {
     setModalType('create')
   }
 
-  // Open Edit Modal
   const openEditModal = (service) => {
     setEditingService(service)
     serviceForm.resetFields()
@@ -191,7 +178,6 @@ function ServicesPage() {
     serviceForm.resetFields()
   }
 
-  // Open Price History Drawer
   const openPriceHistory = async (service) => {
     setSelectedServiceForHistory(service)
     setHistoryDrawerOpen(true)
@@ -202,7 +188,6 @@ function ServicesPage() {
       setPriceHistory(categorizePriceHistory(data))
     } catch (err) {
       console.error('Failed to load price history:', err)
-      // Fallback with current service price if history API errors
       setPriceHistory(
         categorizePriceHistory([
           {
@@ -218,7 +203,6 @@ function ServicesPage() {
     }
   }
 
-  // Handle Save (Create or Update Service)
   const handleSaveService = async (values) => {
     setSavingService(true)
     try {
@@ -231,7 +215,7 @@ function ServicesPage() {
           return
         }
 
-        const res = await systemApi.createService(validation.payload)
+        await systemApi.createService(validation.payload)
         message.success(`Đã thêm dịch vụ "${validation.payload.name}" thành công`)
         closeModal()
         await loadData()
@@ -263,7 +247,6 @@ function ServicesPage() {
     }
   }
 
-  // Handle Status Toggle Switch
   const handleToggleStatus = async (service, nextActive) => {
     setTogglingId(service.id)
     try {
@@ -284,7 +267,6 @@ function ServicesPage() {
     }
   }
 
-  // Handle Save Clinic Configuration
   const handleSaveClinic = async (values) => {
     setSavingClinic(true)
     try {
@@ -313,7 +295,6 @@ function ServicesPage() {
     }
   }
 
-  // Table Columns Definition
   const columns = [
     {
       title: 'Mã dịch vụ',
@@ -452,10 +433,8 @@ function ServicesPage() {
     },
   ]
 
-  // Tab: Service Catalog & Price Management
   const serviceCatalogContent = (
     <div className="service-catalog-container">
-      {/* KPI Header Stats */}
       <div className="service-kpi-grid">
         <Card className="service-kpi-card kpi-total" bordered={false}>
           <div className="service-kpi-inner">
@@ -510,7 +489,6 @@ function ServicesPage() {
         </Card>
       </div>
 
-      {/* Main Data Card */}
       <Card className="services-data-card" bordered={false}>
         <div className="service-toolbar-row">
           <div className="service-toolbar-left">
@@ -588,7 +566,6 @@ function ServicesPage() {
     </div>
   )
 
-  // Tab: Clinic Configuration
   const clinicConfigurationContent = (
     <section className="clinic-config-shell">
       <Card className="clinic-config-card" bordered={false}>
@@ -683,7 +660,6 @@ function ServicesPage() {
 
   return (
     <div className="services-admin-page">
-      {/* Page Header */}
       <div className="service-page-heading">
         <div className="service-heading-copy">
           <span className="service-section-eyebrow">
@@ -696,7 +672,6 @@ function ServicesPage() {
         </div>
       </div>
 
-      {/* Main Tabs */}
       {isAdmin ? (
         <Tabs
           className="service-main-tabs"
@@ -726,7 +701,6 @@ function ServicesPage() {
         serviceCatalogContent
       )}
 
-      {/* Modal: Create & Edit Service */}
       <Modal
         className="service-form-modal"
         width={640}
@@ -865,7 +839,6 @@ function ServicesPage() {
         </Form>
       </Modal>
 
-      {/* Drawer: Price History */}
       <Drawer
         title={
           <div className="price-history-drawer-header">
@@ -892,7 +865,6 @@ function ServicesPage() {
           </div>
         ) : (
           <div className="price-history-content">
-            {/* Service quick info */}
             <Card className="price-history-summary-card" size="small">
               <Descriptions column={2} size="small">
                 <Descriptions.Item label="Mã dịch vụ">

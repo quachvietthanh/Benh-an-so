@@ -11,19 +11,13 @@ import {
   validateUpdateServicePayload,
 } from '../utils/serviceCatalogHelpers.js'
 
-// =========================================================================
-// TEST SUITE: QUẢN LÝ DANH MỤC DỊCH VỤ VÀ BẢNG GIÁ (SERVICE PRICE MANAGEMENT)
-// =========================================================================
-
 test('1. Phân quyền quản trị: Chỉ ADMIN và MANAGER có quyền quản lý dịch vụ và bảng giá', () => {
-  // Admin & Manager được phép
   assert.equal(checkServiceManagementPermission(['ROLE_ADMIN']), true)
   assert.equal(checkServiceManagementPermission(['admin']), true)
   assert.equal(checkServiceManagementPermission(['ROLE_MANAGER']), true)
   assert.equal(checkServiceManagementPermission(['manager']), true)
   assert.equal(checkServiceManagementPermission(['admin', 'doctor']), true)
 
-  // Các vai trò khác không được phép
   assert.equal(checkServiceManagementPermission(['doctor']), false)
   assert.equal(checkServiceManagementPermission(['ROLE_DOCTOR']), false)
   assert.equal(checkServiceManagementPermission(['nurse']), false)
@@ -58,7 +52,6 @@ test('2. Chuẩn hóa dữ liệu danh mục: Hỗ trợ Spring Data Page và m�
 })
 
 test('3. Validate tạo dịch vụ mới: Bắt buộc mã dịch vụ, tên, đơn giá >= 0 và ngày hiệu lực', () => {
-  // Case 1: Hợp lệ
   const validPayload = {
     serviceCode: 'KHAM-NOI',
     name: 'Khám chuyên khoa nội',
@@ -71,7 +64,6 @@ test('3. Validate tạo dịch vụ mới: Bắt buộc mã dịch vụ, tên, �
   assert.equal(result1.payload.price, 120000)
   assert.equal(result1.payload.effectiveFrom, '2026-08-01')
 
-  // Case 2: Thiếu mã dịch vụ
   const missingCode = validateCreateServicePayload({
     serviceCode: '   ',
     name: 'Khám nội',
@@ -81,7 +73,6 @@ test('3. Validate tạo dịch vụ mới: Bắt buộc mã dịch vụ, tên, �
   assert.equal(missingCode.isValid, false)
   assert.equal(missingCode.errors.serviceCode, 'Vui lòng nhập mã dịch vụ')
 
-  // Case 3: Mã dịch vụ quá 50 ký tự
   const longCode = validateCreateServicePayload({
     serviceCode: 'A'.repeat(51),
     name: 'Khám nội',
@@ -91,7 +82,6 @@ test('3. Validate tạo dịch vụ mới: Bắt buộc mã dịch vụ, tên, �
   assert.equal(longCode.isValid, false)
   assert.equal(longCode.errors.serviceCode, 'Mã dịch vụ không được vượt quá 50 ký tự')
 
-  // Case 4: Thiếu tên dịch vụ
   const missingName = validateCreateServicePayload({
     serviceCode: 'KHAM-01',
     name: '',
@@ -101,7 +91,6 @@ test('3. Validate tạo dịch vụ mới: Bắt buộc mã dịch vụ, tên, �
   assert.equal(missingName.isValid, false)
   assert.equal(missingName.errors.name, 'Vui lòng nhập tên dịch vụ')
 
-  // Case 5: Đơn giá âm hoặc không hợp lệ
   const negativePrice = validateCreateServicePayload({
     serviceCode: 'KHAM-01',
     name: 'Khám nhi',
@@ -111,7 +100,6 @@ test('3. Validate tạo dịch vụ mới: Bắt buộc mã dịch vụ, tên, �
   assert.equal(negativePrice.isValid, false)
   assert.equal(negativePrice.errors.price, 'Đơn giá phải lớn hơn hoặc bằng 0')
 
-  // Case 6: Thiếu ngày hiệu lực
   const missingDate = validateCreateServicePayload({
     serviceCode: 'KHAM-01',
     name: 'Khám nhi',
@@ -123,7 +111,6 @@ test('3. Validate tạo dịch vụ mới: Bắt buộc mã dịch vụ, tên, �
 })
 
 test('4. Validate cập nhật dịch vụ và giá: Tên, đơn giá, ngày hiệu lực và trạng thái', () => {
-  // Case 1: Cập nhật hợp lệ
   const validUpdate = {
     name: 'Khám chuyên khoa nội tổng quát (cập nhật)',
     price: 150000,
@@ -137,7 +124,6 @@ test('4. Validate cập nhật dịch vụ và giá: Tên, đơn giá, ngày hi�
   assert.equal(res1.payload.effectiveFrom, '2026-09-01')
   assert.equal(res1.payload.active, true)
 
-  // Case 2: Tên quá dài
   const longName = validateUpdateServicePayload({
     name: 'B'.repeat(256),
     price: 150000,
@@ -146,7 +132,6 @@ test('4. Validate cập nhật dịch vụ và giá: Tên, đơn giá, ngày hi�
   assert.equal(longName.isValid, false)
   assert.equal(longName.errors.name, 'Tên dịch vụ không được vượt quá 255 ký tự')
 
-  // Case 3: Đơn giá 0 đồng (miễn phí) là hợp lệ
   const freePrice = validateUpdateServicePayload({
     name: 'Tư vấn sức khỏe định kỳ',
     price: 0,
@@ -183,7 +168,7 @@ test('6. Phân loại lịch sử giá theo thời điểm: Hiện hành (CURREN
     {
       id: 'p3',
       price: 200000,
-      effectiveFrom: '2026-09-01', // Tương lai
+      effectiveFrom: '2026-09-01',
       createdAt: '2026-08-15T09:00:00Z',
     },
   ]
@@ -192,19 +177,16 @@ test('6. Phân loại lịch sử giá theo thời điểm: Hiện hành (CURREN
 
   assert.equal(categorized.length, 3)
 
-  // Mốc 2026-09-01 (tương lai) -> UPCOMING
   const upcoming = categorized.find((p) => p.effectiveFrom === '2026-09-01')
   assert.equal(upcoming.status, 'UPCOMING')
   assert.equal(upcoming.statusLabel, 'Sắp áp dụng')
   assert.equal(upcoming.badgeColor, 'warning')
 
-  // Mốc 2026-08-01 (gần nhất trước hôm nay) -> CURRENT
   const current = categorized.find((p) => p.effectiveFrom === '2026-08-01')
   assert.equal(current.status, 'CURRENT')
   assert.equal(current.statusLabel, 'Đang áp dụng')
   assert.equal(current.badgeColor, 'success')
 
-  // Mốc 2026-01-01 (cũ hơn) -> PAST
   const past = categorized.find((p) => p.effectiveFrom === '2026-01-01')
   assert.equal(past.status, 'PAST')
   assert.equal(past.statusLabel, 'Lịch sử')
@@ -223,10 +205,8 @@ test('7. Tính toán thống kê KPI danh mục dịch vụ chính xác', () => 
   assert.equal(stats.total, 4)
   assert.equal(stats.activeCount, 3)
   assert.equal(stats.inactiveCount, 1)
-  // Giá trung bình các dịch vụ đang hiệu lực: (100k + 200k + 300k) / 3 = 200k
   assert.equal(stats.avgPrice, 200000)
 
-  // Danh sách rỗng
   const emptyStats = calculateServiceStats([])
   assert.equal(emptyStats.total, 0)
   assert.equal(emptyStats.activeCount, 0)
