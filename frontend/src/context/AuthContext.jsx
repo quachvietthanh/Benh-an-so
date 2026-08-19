@@ -21,6 +21,19 @@ const normalizeRoles = (rawRoles) => {
   return Array.from(normalized)
 }
 
+const getJwtPayload = (token) => {
+  if (!token || typeof token !== 'string') return null
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(payloadBase64)
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -30,20 +43,46 @@ export const AuthProvider = ({ children }) => {
     const storedToken = localStorage.getItem('token')
     if (storedUser && storedToken) {
       try {
-        const parsed = JSON.parse(storedUser)
-        if (parsed && typeof parsed === 'object') {
-          const raw = parsed.roles || parsed.role || []
-          parsed.roles = normalizeRoles(raw)
-          setUser(parsed)
-        } else {
+        const payload = getJwtPayload(storedToken)
+        if (payload && payload.exp && payload.exp * 1000 < Date.now()) {
+          // Token expired -> reset session
           localStorage.removeItem('user')
           localStorage.removeItem('token')
+          setUser(null)
+        } else {
+          const parsed = JSON.parse(storedUser)
+          if (parsed && typeof parsed === 'object') {
+            const tokenRole = payload?.role || payload?.roles || parsed.roles || parsed.role
+            const tokenUsername = payload?.username || parsed.username
+            parsed.username = tokenUsername || parsed.username
+            parsed.fullName = tokenUsername || parsed.fullName || parsed.username
+            parsed.roles = normalizeRoles(tokenRole)
+            localStorage.setItem('user', JSON.stringify(parsed))
+            setUser(parsed)
+          } else {
+            localStorage.removeItem('user')
+            localStorage.removeItem('token')
+            setUser(null)
+          }
         }
       } catch (e) {
         console.warn('Invalid user data in localStorage, resetting...', e)
         localStorage.removeItem('user')
         localStorage.removeItem('token')
         setUser(null)
+      }
+    } else if (storedToken && !storedUser) {
+      // If token exists but user object is missing, reconstruct from JWT payload
+      const payload = getJwtPayload(storedToken)
+      if (payload && (payload.role || payload.sub)) {
+        const reconstructedUser = {
+          id: payload.userId || payload.sub,
+          username: payload.username || 'User',
+          fullName: payload.username || 'User',
+          roles: normalizeRoles(payload.role),
+        }
+        localStorage.setItem('user', JSON.stringify(reconstructedUser))
+        setUser(reconstructedUser)
       }
     }
     setLoading(false)
@@ -54,11 +93,14 @@ export const AuthProvider = ({ children }) => {
       const response = await authApi.login(credentials)
       const data = response.data
 
-      const rawRoles = data.roles || (data.role ? [data.role] : [])
+      const payload = getJwtPayload(data.accessToken)
+      const rawRoles = payload?.role || data.roles || (data.role ? [data.role] : [])
+      const username = payload?.username || data.username || credentials.username
+
       const normalizedUser = {
-        id: data.userId || data.id,
-        username: data.username,
-        fullName: data.username,
+        id: data.userId || data.id || payload?.userId || payload?.sub,
+        username: username,
+        fullName: username,
         roles: normalizeRoles(rawRoles),
         expiredAt: data.expiredAt,
       }

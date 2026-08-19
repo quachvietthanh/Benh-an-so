@@ -21,6 +21,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import {
@@ -263,9 +264,10 @@ function BillingPage() {
 
   const canCollectPayment = userRoles.includes('receptionist') || userRoles.includes('admin')
   const canAdjustInvoice = userRoles.includes('manager') || userRoles.includes('clinic_manager') || userRoles.includes('admin')
+  const hasBillingAccess = canCollectPayment || canAdjustInvoice
 
-  // State quản lý Tabs & Danh sách lượt khám / Lịch sử
-  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'history'
+  // State quản lý Tabs & Danh sách lượt khám / Lịch sử (Manager tự động vào Tab history)
+  const [activeTab, setActiveTab] = useState(canAdjustInvoice && !canCollectPayment ? 'history' : 'pending')
   const [pendingVisits, setPendingVisits] = useState([])
   const [historyInvoices, setHistoryInvoices] = useState([])
   const [selectedVisitId, setSelectedVisitId] = useState(null)
@@ -286,6 +288,11 @@ function BillingPage() {
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [adjustmentItemName, setAdjustmentItemName] = useState('Điều chỉnh giảm khoản thu')
   const [adjustmentAmount, setAdjustmentAmount] = useState(-20000)
+
+  // State cho Modal Hoàn tiền Thanh toán (Role MANAGER)
+  const [refundingPaymentModal, setRefundingPaymentModal] = useState(null)
+  const [submittingRefund, setSubmittingRefund] = useState(false)
+  const [refundReason, setRefundReason] = useState('')
 
   // 2A. Tải danh sách Lịch sử thanh toán từ Backend REST API (GET /invoices)
   const loadHistoryInvoices = useCallback(async () => {
@@ -519,10 +526,31 @@ function BillingPage() {
 
       const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
 
-      // Tính chi phí
+      // Tính chi phí & Gọi Backend Payment Quote (POST /invoices/payment-quotes)
       const medicineFee = prescriptionItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
       const examFee = 100000
-      const totalAmount = invoiceData?.totalAmount ? Number(invoiceData.totalAmount) : (examFee + medicineFee)
+
+      let quoteData = null
+      try {
+        const quoteRes = await billingApi.quotePayment({
+          visitId,
+          examFee,
+          medicineFee,
+        })
+        if (quoteRes?.data) {
+          quoteData = quoteRes.data
+        }
+      } catch (quoteErr) {
+        console.warn('[BillingPage] Lỗi quotePayment:', quoteErr?.message)
+      }
+
+      const serviceFee = Number(quoteData?.serviceFee || 0)
+      const serviceFeesList = Array.isArray(quoteData?.serviceFees) ? quoteData.serviceFees : []
+      const calculatedTotal = quoteData?.totalAmount != null
+        ? Number(quoteData.totalAmount)
+        : (examFee + medicineFee + serviceFee)
+
+      const totalAmount = invoiceData?.totalAmount ? Number(invoiceData.totalAmount) : calculatedTotal
 
       const hasInvoice = !!(invoiceData && (invoiceData.id || invoiceData.invoiceCode))
 
@@ -550,6 +578,8 @@ function BillingPage() {
           isEligibleToPay: isVisitCompleted && isDispensingCompleted,
           examFee,
           medicineFee,
+          serviceFee,
+          serviceFeesList,
           totalAmount,
           paymentStatus: isPaid ? 'PAID' : 'UNPAID',
           paidAt: invoiceData?.paidAt || (prev?.visitId === visitId ? prev?.paidAt : null) || invoiceData?.createdAt || null,
@@ -908,6 +938,57 @@ function BillingPage() {
     }
   }
 
+  // 8. Xử lý Hoàn tiền (POST /invoices/payments/{paymentId}/refund) (Role MANAGER)
+  const handleConfirmRefund = async () => {
+    if (!refundingPaymentModal) return
+    if (!canAdjustInvoice) {
+      message.error('Bạn không có quyền hoàn tiền. Chức năng chỉ dành cho Quản lý phòng khám (MANAGER).')
+      return
+    }
+
+    const reason = refundReason.trim()
+    if (!reason) {
+      message.error('Vui lòng nhập lý do hoàn tiền (bắt buộc).')
+      return
+    }
+
+    const paymentId = refundingPaymentModal.paymentId || refundingPaymentModal.id
+    if (!paymentId) {
+      message.error('Không tìm thấy paymentId hợp lệ để thực hiện hoàn tiền.')
+      return
+    }
+
+    setSubmittingRefund(true)
+    setApiError('')
+    try {
+      const res = await billingApi.refundPayment(paymentId, { reason })
+      const refundRes = res?.data
+
+      if (refundRes) {
+        message.success(`✓ Đã hoàn tiền thành công số tiền ${money(refundRes.amountRefunded || refundingPaymentModal.totalAmount)}!`)
+        setRefundingPaymentModal(null)
+        setRefundReason('')
+        await refreshAllData()
+      }
+    } catch (err) {
+      console.error('[BillingPage] Lỗi refund payment:', err)
+      const status = err?.response?.status
+      const msg = err?.response?.data?.message
+
+      if (status === 403) {
+        message.error('Bạn không có quyền thực hiện hoàn tiền. Vui lòng đăng nhập lại bằng tài khoản có quyền Quản lý.')
+      } else if (status === 409) {
+        message.error(msg || 'Xung đột trạng thái (409): Giao dịch đã hoàn tiền hoặc đơn thuốc đã xuất kho.')
+      } else if (status === 400) {
+        message.error(msg || 'Dữ liệu lý do hoàn tiền không hợp lệ (400).')
+      } else {
+        message.error(msg || 'Không thể thực hiện hoàn tiền từ Backend. Vui lòng thử lại.')
+      }
+    } finally {
+      setSubmittingRefund(false)
+    }
+  }
+
   const feeColumns = [
     { title: 'Khoản thu / Dịch vụ', key: 'name', render: (_, r) => <Text strong style={{ color: '#0f172a' }}>{r.name}</Text> },
     { title: 'Số lượng', dataIndex: 'quantity', key: 'quantity', width: 100, align: 'center', render: (v) => <Tag color="blue" style={{ minWidth: 28, textAlign: 'center', fontWeight: 600 }}>{v}</Tag> },
@@ -938,6 +1019,26 @@ function BillingPage() {
         quantity: 1,
         price: selectedVisitData.medicineFee,
         amount: selectedVisitData.medicineFee,
+      })
+    }
+
+    if (Array.isArray(selectedVisitData.serviceFeesList) && selectedVisitData.serviceFeesList.length > 0) {
+      selectedVisitData.serviceFeesList.forEach((feeItem, idx) => {
+        items.push({
+          key: `service-${idx}`,
+          name: `Dịch vụ lâm sàng: ${feeItem.serviceName}`,
+          quantity: 1,
+          price: Number(feeItem.amount || 0),
+          amount: Number(feeItem.amount || 0),
+        })
+      })
+    } else if (selectedVisitData.serviceFee > 0) {
+      items.push({
+        key: 'service-summary',
+        name: 'Phí dịch vụ lâm sàng',
+        quantity: 1,
+        price: selectedVisitData.serviceFee,
+        amount: selectedVisitData.serviceFee,
       })
     }
 
@@ -1021,6 +1122,20 @@ function BillingPage() {
       },
     },
     {
+      title: 'Trạng thái',
+      key: 'status',
+      align: 'center',
+      render: (_, r) => {
+        if (r.status === 'REFUNDED') {
+          return <Tag color="purple" icon={<ReloadOutlined />}>Đã hoàn tiền</Tag>
+        }
+        if (r.type === 'ADJUSTMENT') {
+          return <Tag color="magenta">Điều chỉnh</Tag>
+        }
+        return <Tag color="green" icon={<CheckCircleOutlined />}>Thành công</Tag>
+      },
+    },
+    {
       title: 'Thời gian lập',
       dataIndex: 'createdAt',
       key: 'createdAt',
@@ -1031,69 +1146,111 @@ function BillingPage() {
       key: 'actions',
       align: 'center',
       width: 100,
-      render: (_, r) => (
-        <Dropdown
-          menu={{
-            items: [
-              {
-                key: 'view',
-                icon: <EyeOutlined style={{ color: '#2563eb' }} />,
-                label: 'Xem hóa đơn',
-                onClick: () => handleViewInvoice(r.id),
-              },
-              {
-                key: 'print',
-                icon: <PrinterOutlined style={{ color: '#475569' }} />,
-                label: 'In hóa đơn',
-                onClick: () => {
-                  handleViewInvoice(r.id)
-                  setTimeout(() => window.print(), 300)
+      render: (_, r) => {
+        const hasAdjustment = historyInvoices.some(
+          (inv) =>
+            inv.type === 'ADJUSTMENT' &&
+            ((inv.originalInvoiceId && String(inv.originalInvoiceId) === String(r.id)) ||
+             (inv.originalInvoiceCode && String(inv.originalInvoiceCode) === String(r.invoiceCode)))
+        )
+
+        const isRefundDisabled = !canAdjustInvoice || hasAdjustment || r.status === 'REFUNDED' || r.type === 'ADJUSTMENT'
+
+        let refundTooltipTitle = ''
+        if (hasAdjustment) {
+          refundTooltipTitle = 'Không thể hoàn tiền vì hóa đơn này đã phát sinh điều chỉnh.'
+        } else if (!canAdjustInvoice) {
+          refundTooltipTitle = 'Chức năng hoàn tiền chỉ dành cho Quản lý phòng khám (MANAGER).'
+        } else if (r.status === 'REFUNDED') {
+          refundTooltipTitle = 'Giao dịch đã được hoàn tiền.'
+        } else if (r.type === 'ADJUSTMENT') {
+          refundTooltipTitle = 'Hóa đơn điều chỉnh không thể hoàn tiền.'
+        }
+
+        return (
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: 'view',
+                  icon: <EyeOutlined style={{ color: '#2563eb' }} />,
+                  label: 'Xem hóa đơn',
+                  onClick: () => handleViewInvoice(r.id),
                 },
-              },
-              ...((r.type === 'ORIGINAL' || !r.type)
-                ? [
-                    {
-                      type: 'divider',
-                    },
-                    {
-                      key: 'adjust',
-                      icon: <WarningOutlined style={{ color: '#dc2626' }} />,
-                      label: <span style={{ color: '#dc2626' }}>Điều chỉnh hóa đơn</span>,
-                      onClick: () => {
-                        if (!canAdjustInvoice) {
-                          message.warning('Bạn không có quyền điều chỉnh hóa đơn. Chức năng chỉ dành cho Quản lý phòng khám (MANAGER).')
-                          return
-                        }
-                        setAdjustingInvoiceModal(r)
-                        setAdjustmentReason('')
-                        setAdjustmentItemName('Điều chỉnh giảm khoản thu')
-                        setAdjustmentAmount(-20000)
+                {
+                  key: 'print',
+                  icon: <PrinterOutlined style={{ color: '#475569' }} />,
+                  label: 'In hóa đơn',
+                  onClick: () => {
+                    handleViewInvoice(r.id)
+                    setTimeout(() => window.print(), 300)
+                  },
+                },
+                {
+                  type: 'divider',
+                },
+                {
+                  key: 'refund',
+                  disabled: isRefundDisabled,
+                  icon: <DollarCircleOutlined style={{ color: isRefundDisabled ? '#94a3b8' : '#d97706' }} />,
+                  label: isRefundDisabled && refundTooltipTitle ? (
+                    <Tooltip title={refundTooltipTitle} placement="left">
+                      <span style={{ color: '#94a3b8' }}>Hoàn tiền thanh toán</span>
+                    </Tooltip>
+                  ) : (
+                    <span style={{ color: '#d97706', fontWeight: 600 }}>Hoàn tiền thanh toán</span>
+                  ),
+                  onClick: () => {
+                    if (isRefundDisabled) {
+                      if (refundTooltipTitle) message.warning(refundTooltipTitle)
+                      return
+                    }
+                    setRefundingPaymentModal(r)
+                    setRefundReason('')
+                  },
+                },
+                ...((r.type === 'ORIGINAL' || !r.type) && !hasAdjustment
+                  ? [
+                      {
+                        key: 'adjust',
+                        icon: <WarningOutlined style={{ color: '#dc2626' }} />,
+                        label: <span style={{ color: '#dc2626' }}>Điều chỉnh hóa đơn</span>,
+                        onClick: () => {
+                          if (!canAdjustInvoice) {
+                            message.warning('Bạn không có quyền điều chỉnh hóa đơn. Chức năng chỉ dành cho Quản lý phòng khám (MANAGER).')
+                            return
+                          }
+                          setAdjustingInvoiceModal(r)
+                          setAdjustmentReason('')
+                          setAdjustmentItemName('Điều chỉnh giảm khoản thu')
+                          setAdjustmentAmount(-20000)
+                        },
                       },
-                    },
-                  ]
-                : []),
-            ],
-          }}
-          trigger={['click']}
-          placement="bottomRight"
-        >
-          <Button
-            style={{
-              borderRadius: 8,
-              borderColor: '#93c5fd',
-              color: '#2563eb',
-              width: 36,
-              height: 36,
-              padding: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    ]
+                  : []),
+              ],
             }}
-            icon={<MoreOutlined style={{ fontSize: 18, color: '#2563eb' }} />}
-          />
-        </Dropdown>
-      ),
+            trigger={['click']}
+            placement="bottomRight"
+          >
+            <Button
+              style={{
+                borderRadius: 8,
+                borderColor: '#93c5fd',
+                color: '#2563eb',
+                width: 36,
+                height: 36,
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              }}
+              icon={<MoreOutlined style={{ fontSize: 18, color: '#2563eb' }} />}
+            />
+          </Dropdown>
+        )
+      },
     },
   ]
 
@@ -1111,13 +1268,13 @@ function BillingPage() {
         </Button>
       </div>
 
-      {!canCollectPayment && (
+      {!hasBillingAccess && (
         <Alert
           type="error"
           showIcon
           icon={<LockOutlined />}
-          message="Bạn không có quyền thực hiện thu phí."
-          description="Chức năng chỉ dành riêng cho tài khoản Lễ tân (RECEPTIONIST) hoặc Quản trị viên (ADMIN)."
+          message="Bạn không có quyền thao tác trên trang Thu phí & Hóa đơn."
+          description="Chức năng yêu cầu vai trò Lễ tân (RECEPTIONIST), Quản lý (MANAGER) hoặc Quản trị viên (ADMIN)."
           style={{ marginBottom: 16 }}
         />
       )}
@@ -1972,6 +2129,83 @@ function BillingPage() {
                   </Form.Item>
                 </Col>
               </Row>
+            </Form>
+          </Space>
+        )}
+      </Modal>
+
+      {/* Modal Form Hoàn Tiền (Role MANAGER) */}
+      <Modal
+        title={
+          <Space>
+            <DollarCircleOutlined style={{ color: '#d97706' }} />
+            <span style={{ fontWeight: 700, color: '#92400e' }}>XÁC NHẬN HOÀN TIỀN THANH TOÁN</span>
+          </Space>
+        }
+        open={!!refundingPaymentModal}
+        onCancel={() => setRefundingPaymentModal(null)}
+        footer={[
+          <Button key="cancel" onClick={() => setRefundingPaymentModal(null)}>
+            Hủy
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            danger
+            loading={submittingRefund}
+            disabled={!canAdjustInvoice || submittingRefund}
+            onClick={handleConfirmRefund}
+          >
+            Xác nhận hoàn tiền
+          </Button>,
+        ]}
+      >
+        {refundingPaymentModal && (
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            {!canAdjustInvoice && (
+              <Alert
+                type="error"
+                showIcon
+                icon={<LockOutlined />}
+                message="Bạn không có quyền thực hiện hoàn tiền."
+                description="Chức năng này yêu cầu vai trò Quản lý phòng khám (MANAGER)."
+              />
+            )}
+
+            {/* Read-Only Thông tin Giao dịch / Thanh toán */}
+            <Card size="small" style={{ background: '#fffbe6', borderColor: '#ffe58f' }}>
+              <Descriptions size="small" column={1} labelStyle={{ fontWeight: 600, color: '#475569', width: 150 }}>
+                <Descriptions.Item label="Bệnh nhân">
+                  <Text strong>{refundingPaymentModal.patientName || '—'}</Text> {refundingPaymentModal.patientCode ? `(${refundingPaymentModal.patientCode})` : ''}
+                </Descriptions.Item>
+                <Descriptions.Item label="Mã lượt khám">
+                  <Tag color="geekblue">{refundingPaymentModal.visitCode}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Mã thanh toán / HĐ">
+                  <Text code style={{ color: '#1e40af', fontWeight: 700 }}>{refundingPaymentModal.invoiceCode || refundingPaymentModal.paymentId || refundingPaymentModal.id}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Số tiền đã thu">
+                  <Text strong style={{ color: '#dc2626', fontSize: 16 }}>{money(refundingPaymentModal.totalAmount || refundingPaymentModal.amountPaid)}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Phương thức TT">
+                  {refundingPaymentModal.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : refundingPaymentModal.paymentMethod === 'CARD' ? 'Thẻ ngân hàng' : 'Tiền mặt'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Thời gian thanh toán">
+                  {formatDateTime(refundingPaymentModal.createdAt || refundingPaymentModal.paidAt)}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* Input Form Lý do hoàn tiền (RefundPaymentRequest) */}
+            <Form layout="vertical">
+              <Form.Item label={<strong>Lý do hoàn tiền (Bắt buộc) *</strong>} required>
+                <Input.TextArea
+                  rows={3}
+                  placeholder="Nhập chi tiết lý do hoàn tiền (vd: Bệnh nhân hủy khám, nhập sai thông tin thanh toán...)"
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                />
+              </Form.Item>
             </Form>
           </Space>
         )}
