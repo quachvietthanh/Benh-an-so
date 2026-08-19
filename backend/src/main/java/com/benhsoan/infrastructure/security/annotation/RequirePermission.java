@@ -5,18 +5,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import com.benhsoan.domain.auth.enums.Permission;
-
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface CheckPermission {
-
-    Permission[] value() default {};
-
+public @interface RequirePermission {
+    String[] value();
     Operator operator() default Operator.ANY;
-
-    enum Operator {
-        ANY,
-        ALL
-    }
+    enum Operator { ANY, ALL }
 }

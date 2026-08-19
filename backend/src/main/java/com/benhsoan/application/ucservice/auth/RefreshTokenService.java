@@ -87,7 +87,8 @@ public class RefreshTokenService implements RefreshTokenUseCase {
         String refreshToken = refreshTokenGeneratorPort.generate();
         session.rotateRefreshToken(tokenHashPort.hash(refreshToken), now.plus(SESSION_TIMEOUT), now);
         userSessionRepository.save(session);
-        String newToken = jwtTokenPort.generateToken(user.getId(), session.getId(), user.getUsername(), role.getName());
+        String newToken = jwtTokenPort.generateToken(user.getId(), session.getId(), user.getUsername(), role.getName(),
+                role.getPermissions().stream().map(permission -> permission.getCode()).collect(java.util.stream.Collectors.toSet()));
 
         return new LoginResult(
                 user.getId(),

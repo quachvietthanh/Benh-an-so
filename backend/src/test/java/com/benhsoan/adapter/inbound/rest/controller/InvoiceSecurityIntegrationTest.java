@@ -16,7 +16,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -31,6 +33,9 @@ import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
+import com.benhsoan.exception.GlobalExceptionHandler;
+import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
+import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
@@ -48,11 +53,20 @@ import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = InvoiceController.class)
-@Import({BillingRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class})
+@Import({BillingRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
+        RequirePermissionAspect.class, PermissionEvaluator.class, InvoiceSecurityIntegrationTest.AspectTestConfig.class})
 class InvoiceSecurityIntegrationTest {
+
+    @TestConfiguration
+    @EnableAspectJAutoProxy(proxyTargetClass = true)
+    static class AspectTestConfig {
+    }
 
     @Autowired private MockMvc mockMvc;
 
@@ -68,6 +82,9 @@ class InvoiceSecurityIntegrationTest {
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
     @MockitoBean private ClockPort clockPort;
+    @MockitoBean private RoleRepository roleRepository;
+    @MockitoBean private AuditLogRepository auditLogRepository;
+    @MockitoBean private CurrentUserPort currentUserPort;
 
     @Test
     void allowsAdminsReceptionistsAndManagersToReadInvoices() throws Exception {
@@ -100,25 +117,25 @@ class InvoiceSecurityIntegrationTest {
         ));
 
         for (String role : new String[] {"ADMIN", "RECEPTIONIST", "MANAGER"}) {
-            mockMvc.perform(get("/invoices/payable").with(user("tester").roles(role)))
+            mockMvc.perform(get("/invoices/payable").with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
                     .andExpect(status().isOk());
 
-            mockMvc.perform(get("/invoices").with(user("tester").roles(role)))
+            mockMvc.perform(get("/invoices").with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
                     .andExpect(status().isOk());
 
             mockMvc.perform(get("/invoices/{invoiceId}", "23100000-0000-0000-0000-000000000001")
-                            .with(user("tester").roles(role)))
+                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
                     .andExpect(status().isOk());
         }
 
-        mockMvc.perform(get("/invoices/payable").with(user("doctor").roles("DOCTOR")))
+        mockMvc.perform(get("/invoices/payable").with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE"))))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(get("/invoices").with(user("doctor").roles("DOCTOR")))
+        mockMvc.perform(get("/invoices").with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE"))))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/invoices/{invoiceId}", "23100000-0000-0000-0000-000000000001")
-                        .with(user("doctor").roles("DOCTOR")))
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -187,19 +204,19 @@ class InvoiceSecurityIntegrationTest {
                 """;
 
         mockMvc.perform(post("/invoices/payments")
-                        .with(user("receptionist").roles("RECEPTIONIST"))
+                        .with(user("receptionist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(paymentBody))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/invoices/payments")
-                        .with(user("doctor").roles("DOCTOR"))
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(paymentBody))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/invoices/payments")
-                        .with(user("manager").roles("MANAGER"))
+                        .with(user("manager").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(paymentBody))
                 .andExpect(status().isForbidden());
@@ -214,20 +231,20 @@ class InvoiceSecurityIntegrationTest {
 
         for (String role : new String[] {"ADMIN", "RECEPTIONIST"}) {
             mockMvc.perform(post("/invoices/payment-quotes")
-                            .with(user("tester").roles(role))
+                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(quoteBody))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/invoices/payment-quotes")
-                        .with(user("manager").roles("MANAGER"))
+                        .with(user("manager").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(quoteBody))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/invoices")
-                        .with(user("admin").roles("ADMIN"))
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"visitId":"d0000000-0000-0000-0000-000000000001"}
@@ -235,7 +252,7 @@ class InvoiceSecurityIntegrationTest {
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/invoices")
-                        .with(user("manager").roles("MANAGER"))
+                        .with(user("manager").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"visitId":"d0000000-0000-0000-0000-000000000001"}
@@ -280,19 +297,19 @@ class InvoiceSecurityIntegrationTest {
                 """;
 
         mockMvc.perform(post("/invoices/{invoiceId}/adjustments", "23100000-0000-0000-0000-000000000001")
-                        .with(user("receptionist").roles("RECEPTIONIST"))
+                        .with(user("receptionist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/invoices/{invoiceId}/adjustments", "23100000-0000-0000-0000-000000000001")
-                        .with(user("admin").roles("ADMIN"))
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/invoices/{invoiceId}/adjustments", "23100000-0000-0000-0000-000000000001")
-                        .with(user("manager").roles("MANAGER"))
+                        .with(user("manager").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_UPDATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
@@ -332,14 +349,14 @@ class InvoiceSecurityIntegrationTest {
                 """;
 
         mockMvc.perform(post("/invoices/payments/{paymentId}/refund", paymentId)
-                        .with(user("manager").roles("MANAGER"))
+                        .with(user("manager").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_UPDATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk());
 
         for (String role : new String[] {"ADMIN", "RECEPTIONIST", "DOCTOR"}) {
             mockMvc.perform(post("/invoices/payments/{paymentId}/refund", paymentId)
-                            .with(user("tester").roles(role))
+                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isForbidden());

@@ -80,4 +80,9 @@ public class UserRepositoryAdapter implements UserRepository {
                 .map(mapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public long countActiveByRoleId(UUID roleId) {
+        return jpaRepository.countByRoleIdAndActiveTrue(roleId);
+    }
 }

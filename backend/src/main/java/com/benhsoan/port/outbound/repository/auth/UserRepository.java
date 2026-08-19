@@ -24,4 +24,6 @@ public interface UserRepository {
     List<User> findAllById(List<UUID> ids);
 
     List<User> findAllActiveByRoleId(UUID roleId);
+
+    long countActiveByRoleId(UUID roleId);
 }

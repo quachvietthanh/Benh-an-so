@@ -14,7 +14,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -27,6 +29,9 @@ import com.benhsoan.domain.carelog.enums.ContactChannel;
 import com.benhsoan.domain.carelog.enums.ContactOutcome;
 import com.benhsoan.domain.carelog.enums.PatientCondition;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
+import com.benhsoan.exception.GlobalExceptionHandler;
+import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
+import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.PostCareLogResult;
 import com.benhsoan.port.inbound.carelog.CreatePostCareLogUseCase;
 import com.benhsoan.port.inbound.carelog.GetPatientCareLogsUseCase;
@@ -34,11 +39,19 @@ import com.benhsoan.port.inbound.carelog.SearchPostCareLogsUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = PostCareLogController.class)
-@Import({PostCareLogRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class})
+@Import({PostCareLogRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
+        RequirePermissionAspect.class, PermissionEvaluator.class, PostCareLogSecurityIntegrationTest.AspectTestConfig.class})
 class PostCareLogSecurityIntegrationTest {
+
+    @TestConfiguration
+    @EnableAspectJAutoProxy(proxyTargetClass = true)
+    static class AspectTestConfig { }
 
     private static final UUID CARE_LOG_ID = UUID.randomUUID();
     private static final UUID PATIENT_ID = UUID.randomUUID();
@@ -61,6 +74,9 @@ class PostCareLogSecurityIntegrationTest {
     private UserSessionRepository userSessionRepository;
     @MockitoBean
     private ClockPort clockPort;
+    @MockitoBean private RoleRepository roleRepository;
+    @MockitoBean private AuditLogRepository auditLogRepository;
+    @MockitoBean private CurrentUserPort currentUserPort;
 
     @Test
     void allowsAdminReceptionistAndDoctor() throws Exception {
@@ -71,16 +87,16 @@ class PostCareLogSecurityIntegrationTest {
 
         for (String role : new String[]{"ADMIN", "RECEPTIONIST", "DOCTOR"}) {
             mockMvc.perform(post("/care-logs")
-                            .with(user(role.toLowerCase()).roles(role))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_CARE_LOG_CREATE")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body()))
                     .andExpect(status().isCreated());
 
             mockMvc.perform(get("/care-logs/patient/{patientId}", PATIENT_ID)
-                            .with(user(role.toLowerCase()).roles(role)))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_CARE_LOG_READ"))))
                     .andExpect(status().isOk());
 
-            mockMvc.perform(get("/care-logs").with(user(role.toLowerCase()).roles(role)))
+            mockMvc.perform(get("/care-logs").with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_CARE_LOG_READ"))))
                     .andExpect(status().isOk());
         }
     }
@@ -89,16 +105,16 @@ class PostCareLogSecurityIntegrationTest {
     void forbidsUnauthorizedRoles() throws Exception {
         for (String role : new String[]{"NURSE", "PHARMACIST", "MANAGER"}) {
             mockMvc.perform(post("/care-logs")
-                            .with(user(role.toLowerCase()).roles(role))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_CARE_LOG_READ")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body()))
                     .andExpect(status().isForbidden());
 
             mockMvc.perform(get("/care-logs/patient/{patientId}", PATIENT_ID)
-                            .with(user(role.toLowerCase()).roles(role)))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_CARE_LOG_CREATE"))))
                     .andExpect(status().isForbidden());
 
-            mockMvc.perform(get("/care-logs").with(user(role.toLowerCase()).roles(role)))
+            mockMvc.perform(get("/care-logs").with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_CARE_LOG_CREATE"))))
                     .andExpect(status().isForbidden());
         }
     }

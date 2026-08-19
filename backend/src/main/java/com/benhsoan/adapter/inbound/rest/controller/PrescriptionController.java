@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -25,6 +24,7 @@ import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWa
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.prescription.SearchPrescriptionsQuery;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
@@ -58,7 +58,7 @@ public class PrescriptionController {
     private final PrescriptionRestMapper mapper;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    @RequirePermission("PRESCRIPTION_READ")
     public Page<PrescriptionResponse> search(
             @RequestParam PrescriptionStatus status,
             @RequestParam(defaultValue = "0") int page,
@@ -70,7 +70,7 @@ public class PrescriptionController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @RequirePermission("PRESCRIPTION_CREATE")
     public PrescriptionResponse create(
             @Valid @RequestBody CreatePrescriptionRequest request
     ) {
@@ -82,7 +82,7 @@ public class PrescriptionController {
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasRole('DOCTOR')")
+    @RequirePermission("PRESCRIPTION_UPDATE")
     public PrescriptionResponse amend(
             @PathVariable UUID id,
             @Valid @RequestBody AmendPrescriptionRequest request
@@ -95,13 +95,13 @@ public class PrescriptionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'PHARMACIST')")
+    @RequirePermission("PRESCRIPTION_READ")
     public PrescriptionResponse getById(@PathVariable UUID id) {
         return mapper.toResponse(getPrescriptionUseCase.getById(id));
     }
 
     @GetMapping("/medical-records/{medicalRecordId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'PHARMACIST')")
+    @RequirePermission("PRESCRIPTION_READ")
     public java.util.List<PrescriptionResponse> getByMedicalRecordId(
             @PathVariable UUID medicalRecordId
     ) {
@@ -112,19 +112,19 @@ public class PrescriptionController {
     }
 
     @PostMapping("/{id}/dispense")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
     public DispensePrescriptionResponse dispense(@PathVariable UUID id) {
         return mapper.toResponse(dispensePrescriptionUseCase.dispense(id));
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('DOCTOR')")
+    @RequirePermission("PRESCRIPTION_UPDATE")
     public PrescriptionResponse cancel(@PathVariable UUID id) {
         return mapper.toResponse(cancelPrescriptionUseCase.cancel(id));
     }
 
     @PostMapping("/check-interactions")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @RequirePermission("PRESCRIPTION_CREATE")
     public List<DrugInteractionWarningResponse> checkInteractions(
             @Valid @RequestBody CheckDrugInteractionRequest request
     ) {

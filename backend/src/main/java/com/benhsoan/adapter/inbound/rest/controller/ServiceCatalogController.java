@@ -26,9 +26,8 @@ import com.benhsoan.adapter.inbound.rest.request.servicecatalog.UpdateServiceCat
 import com.benhsoan.adapter.inbound.rest.request.servicecatalog.UpdateServiceCatalogStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.servicecatalog.ServiceCatalogResponse;
 import com.benhsoan.adapter.inbound.rest.response.servicecatalog.ServicePriceResponse;
-import com.benhsoan.domain.auth.enums.Permission;
-import com.benhsoan.infrastructure.security.annotation.CheckPermission;
-import com.benhsoan.infrastructure.security.annotation.CheckPermission.Operator;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission.Operator;
 import com.benhsoan.port.dto.command.servicecatalog.SearchServiceCatalogQuery;
 import com.benhsoan.port.inbound.servicecatalog.CreateServiceCatalogUseCase;
 import com.benhsoan.port.inbound.servicecatalog.GetServiceCatalogUseCase;
@@ -55,7 +54,7 @@ public class ServiceCatalogController {
     private final ServiceCatalogRestMapper mapper;
 
     @GetMapping
-    @CheckPermission(Permission.SERVICE_CATALOG_READ)
+    @RequirePermission("SERVICE_CATALOG_READ")
     public Page<ServiceCatalogResponse> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean active,
@@ -67,14 +66,14 @@ public class ServiceCatalogController {
     }
 
     @GetMapping("/{serviceCatalogId}")
-    @CheckPermission(Permission.SERVICE_CATALOG_READ)
+    @RequirePermission("SERVICE_CATALOG_READ")
     public ServiceCatalogResponse getById(@PathVariable UUID serviceCatalogId) {
         return mapper.toResponse(getServiceCatalogUseCase.getById(serviceCatalogId));
     }
 
     @PostMapping
-    @CheckPermission(
-            value = {Permission.SERVICE_CATALOG_CREATE, Permission.SERVICE_PRICE_MANAGE},
+    @RequirePermission(
+            value = {"SERVICE_CATALOG_CREATE", "SERVICE_PRICE_MANAGE"},
             operator = Operator.ALL
     )
     public ResponseEntity<ServiceCatalogResponse> create(
@@ -91,8 +90,8 @@ public class ServiceCatalogController {
     }
 
     @PutMapping("/{serviceCatalogId}")
-    @CheckPermission(
-            value = {Permission.SERVICE_CATALOG_UPDATE, Permission.SERVICE_PRICE_MANAGE},
+    @RequirePermission(
+            value = {"SERVICE_CATALOG_UPDATE", "SERVICE_PRICE_MANAGE"},
             operator = Operator.ALL
     )
     public ServiceCatalogResponse update(
@@ -105,7 +104,7 @@ public class ServiceCatalogController {
     }
 
     @PatchMapping("/{serviceCatalogId}/status")
-    @CheckPermission(Permission.SERVICE_CATALOG_UPDATE)
+    @RequirePermission("SERVICE_CATALOG_UPDATE")
     public ServiceCatalogResponse updateStatus(
             @PathVariable UUID serviceCatalogId,
             @Valid @RequestBody UpdateServiceCatalogStatusRequest request
@@ -117,7 +116,7 @@ public class ServiceCatalogController {
     }
 
     @GetMapping("/{serviceCatalogId}/prices")
-    @CheckPermission(Permission.SERVICE_CATALOG_READ)
+    @RequirePermission("SERVICE_CATALOG_READ")
     public List<ServicePriceResponse> getPriceHistory(@PathVariable UUID serviceCatalogId) {
         return mapper.toPriceResponse(getServicePriceHistoryUseCase.getHistory(serviceCatalogId));
     }

@@ -10,7 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -19,6 +21,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
+import com.benhsoan.exception.GlobalExceptionHandler;
+import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
+import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
@@ -30,11 +35,20 @@ import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = PrescriptionController.class)
-@Import({PrescriptionRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class})
+@Import({PrescriptionRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
+        RequirePermissionAspect.class, PermissionEvaluator.class, PrescriptionSecurityIntegrationTest.AspectTestConfig.class})
 class PrescriptionSecurityIntegrationTest {
+
+    @TestConfiguration
+    @EnableAspectJAutoProxy(proxyTargetClass = true)
+    static class AspectTestConfig {
+    }
 
     @Autowired private MockMvc mockMvc;
 
@@ -50,6 +64,9 @@ class PrescriptionSecurityIntegrationTest {
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
     @MockitoBean private ClockPort clockPort;
+    @MockitoBean private RoleRepository roleRepository;
+    @MockitoBean private AuditLogRepository auditLogRepository;
+    @MockitoBean private CurrentUserPort currentUserPort;
 
     @Test
     void onlyAllowsPharmacistsAndAdminsToReadDispensingQueue() throws Exception {
@@ -58,13 +75,13 @@ class PrescriptionSecurityIntegrationTest {
         for (String role : new String[] {"ADMIN", "PHARMACIST"}) {
             mockMvc.perform(get("/prescriptions")
                             .param("status", "PENDING_DISPENSE")
-                            .with(user("tester").roles(role)))
+                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(get("/prescriptions")
                         .param("status", "PENDING_DISPENSE")
-                        .with(user("doctor").roles("DOCTOR")))
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -83,14 +100,14 @@ class PrescriptionSecurityIntegrationTest {
 
         for (String role : new String[] {"ADMIN", "DOCTOR"}) {
             mockMvc.perform(post("/prescriptions/check-interactions")
-                            .with(user("tester").roles(role))
+                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/prescriptions/check-interactions")
-                        .with(user("pharmacist").roles("PHARMACIST"))
+                        .with(user("pharmacist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isForbidden());

@@ -111,7 +111,8 @@ public class LoginService implements LoginUseCase {
         userSessionRepository.save(session);
 
         String accessToken = jwtTokenPort.generateToken(
-                user.getId(), session.getId(), user.getUsername(), role.getName());
+                user.getId(), session.getId(), user.getUsername(), role.getName(),
+                role.getPermissions().stream().map(permission -> permission.getCode()).collect(java.util.stream.Collectors.toSet()));
         Instant expiredAt = jwtTokenPort.getExpiredAt(accessToken);
 
         user.updateLastLogin(now);

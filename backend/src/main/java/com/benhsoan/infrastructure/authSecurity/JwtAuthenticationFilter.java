@@ -66,11 +66,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String role = jwtTokenPort.getRole(token);
                     CurrentUserPrincipal principal = new CurrentUserPrincipal(userId, username);
 
+                    List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+                    jwtTokenPort.getPermissions(token).forEach(permission ->
+                            authorities.add(new SimpleGrantedAuthority("PERMISSION_" + permission)));
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
                                     principal,
                                     null,
-                                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                                    authorities
                             );
 
                     authentication.setDetails(

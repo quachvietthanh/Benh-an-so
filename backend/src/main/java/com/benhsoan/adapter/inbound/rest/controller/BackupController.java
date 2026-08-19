@@ -7,7 +7,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.BackupRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.backup.CreateBackupRequest;
 import com.benhsoan.adapter.inbound.rest.response.backup.BackupResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.BackupDownloadResult;
 import com.benhsoan.port.inbound.backup.CreateBackupUseCase;
 import com.benhsoan.port.inbound.backup.DownloadBackupUseCase;
@@ -47,31 +47,31 @@ public class BackupController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("BACKUP_CREATE")
     public BackupResponse create(@Valid @RequestBody CreateBackupRequest request) {
         return mapper.toResponse(createBackupUseCase.create(mapper.toCommand(request)));
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("BACKUP_READ")
     public List<BackupResponse> list() {
         return mapper.toResponse(listBackupsUseCase.list());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("BACKUP_READ")
     public BackupResponse getById(@PathVariable UUID id) {
         return mapper.toResponse(getBackupByIdUseCase.getById(id));
     }
 
     @PostMapping("/{id}/restore")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("BACKUP_RESTORE")
     public BackupResponse restore(@PathVariable UUID id) {
         return mapper.toResponse(restoreBackupUseCase.restore(id));
     }
 
     @GetMapping("/{id}/download")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("BACKUP_READ")
     public ResponseEntity<byte[]> download(@PathVariable UUID id) {
         BackupDownloadResult result = downloadBackupUseCase.download(id);
 

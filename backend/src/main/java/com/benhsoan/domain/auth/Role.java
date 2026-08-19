@@ -8,7 +8,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.shared.Guard.Guard;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
@@ -45,7 +44,7 @@ public class Role {
             boolean system,
             Instant createdAt,
             Instant updatedAt,
-            Set<Permission> permissions
+            Set<?> permissions
     ) {
         this.id = Objects.requireNonNull(id);
         this.name = Guard.require(name, "Role name");
@@ -55,7 +54,9 @@ public class Role {
         this.updatedAt = updatedAt;
 
         if (permissions != null) {
-            this.permissions.addAll(permissions);
+            permissions.stream()
+                    .map(Role::normalizePermission)
+                    .forEach(this.permissions::add);
         }
     }
 
@@ -63,7 +64,7 @@ public class Role {
             String name,
             String description,
             boolean system,
-            Set<Permission> permissions
+            Set<?> permissions
     ) {
         Instant now = Instant.now();
 
@@ -85,7 +86,7 @@ public class Role {
             boolean system,
             Instant createdAt,
             Instant updatedAt,
-            Set<Permission> permissions
+            Set<?> permissions
     ) {
         return new Role(
                 id,
@@ -112,34 +113,51 @@ public class Role {
         this.updatedAt = Instant.now();
     }
 
-    public void addPermission(Permission permission) {
-        Objects.requireNonNull(permission);
+    public void addPermission(Object permission) {
+        Permission normalized = normalizePermission(permission);
 
-        if (permissions.add(permission)) {
+        if (permissions.add(normalized)) {
             updatedAt = Instant.now();
         }
     }
 
-    public void removePermission(Permission permission) {
-        if (permissions.remove(permission)) {
+    public void removePermission(Object permission) {
+        if (permissions.remove(normalizePermission(permission))) {
             updatedAt = Instant.now();
         }
     }
 
-    public boolean hasPermission(Permission permission) {
-        return permissions.contains(permission);
+    public boolean hasPermission(Object permission) {
+        return permissions.contains(normalizePermission(permission));
     }
 
-    public boolean hasAnyPermission(Permission... permissions) {
+    public boolean hasAnyPermission(Object... permissions) {
         return Arrays.stream(permissions)
+                .map(Role::normalizePermission)
                 .anyMatch(this.permissions::contains);
     }
 
-    public boolean hasAllPermissions(Permission... permissions) {
-        return this.permissions.containsAll(Arrays.asList(permissions));
+    public boolean hasAllPermissions(Object... permissions) {
+        return Arrays.stream(permissions)
+                .map(Role::normalizePermission)
+                .allMatch(this.permissions::contains);
     }
 
     public Set<Permission> getPermissions() {
         return Collections.unmodifiableSet(permissions);
+    }
+
+    public void replacePermissions(Set<Permission> permissions) {
+        this.permissions.clear();
+        this.permissions.addAll(permissions);
+        this.updatedAt = Instant.now();
+    }
+
+    private static Permission normalizePermission(Object permission) {
+        Objects.requireNonNull(permission);
+        if (permission instanceof Permission value) return value;
+        if (permission instanceof Enum<?> value) return Permission.fromCode(value.name());
+        if (permission instanceof String value) return Permission.fromCode(value);
+        throw new IllegalArgumentException("Unsupported permission type: " + permission.getClass().getName());
     }
 }

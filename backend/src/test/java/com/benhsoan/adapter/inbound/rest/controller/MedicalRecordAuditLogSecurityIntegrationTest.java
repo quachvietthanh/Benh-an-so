@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,12 +28,10 @@ import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.config.SecurityConfig;
-import com.benhsoan.domain.auth.Role;
-import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
-import com.benhsoan.infrastructure.security.annotation.PermissionAspect;
+import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
@@ -49,6 +46,8 @@ import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = MedicalRecordController.class)
@@ -61,7 +60,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
         GlobalExceptionHandler.class,
         SecurityConfig.class,
         JwtAuthenticationFilter.class,
-        PermissionAspect.class,
+        RequirePermissionAspect.class,
         PermissionEvaluator.class
 })
 class MedicalRecordAuditLogSecurityIntegrationTest {
@@ -87,27 +86,19 @@ class MedicalRecordAuditLogSecurityIntegrationTest {
     @MockitoBean private UserSessionRepository userSessionRepository;
     @MockitoBean private RoleRepository roleRepository;
     @MockitoBean private ClockPort clockPort;
+    @MockitoBean private AuditLogRepository auditLogRepository;
+    @MockitoBean private CurrentUserPort currentUserPort;
 
     private final UUID patientId = UUID.randomUUID();
     private final UUID visitId = UUID.randomUUID();
     private final UUID medicalRecordId = UUID.randomUUID();
     private final UUID accessedBy = UUID.randomUUID();
 
-    @BeforeEach
-    void setUp() {
-        when(roleRepository.findByName("ADMIN")).thenReturn(java.util.Optional.of(
-                Role.create("ADMIN", "Admin", true, Set.of(Permission.AUDIT_READ))
-        ));
-        when(roleRepository.findByName("DOCTOR")).thenReturn(java.util.Optional.of(
-                Role.create("DOCTOR", "Doctor", true, Set.of(Permission.MEDICAL_RECORD_READ))
-        ));
-    }
-
     @Test
     void forbidsDoctorWithoutAuditReadPermission() throws Exception {
         mockMvc.perform(get("/medical-records/access-logs")
                         .param("patientId", patientId.toString())
-                        .with(user("doctor").roles("DOCTOR")))
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_READ"))))
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(getMedicalRecordAccessLogsUseCase);
@@ -136,7 +127,7 @@ class MedicalRecordAuditLogSecurityIntegrationTest {
                         .param("to", "2026-08-12T23:59:59Z")
                         .param("page", "0")
                         .param("size", "20")
-                        .with(user("admin").roles("ADMIN")))
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_AUDIT_READ"))))
                 .andExpect(status().isOk());
     }
 }

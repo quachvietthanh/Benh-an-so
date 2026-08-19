@@ -5,7 +5,6 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +18,7 @@ import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.GetPatientByCodeUseCase;
 import com.benhsoan.port.inbound.patient.GetPatientByIdUseCase;
@@ -48,7 +48,7 @@ public class PatientController {
     private final PatientRestMapper patientRestMapper;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("PATIENT_CREATE")
     public PatientResponse register(
             @Valid @RequestBody RegisterPatientRequest request
     ) {
@@ -61,7 +61,7 @@ public class PatientController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
+    @RequirePermission("PATIENT_READ")
     public Page<PatientResponse> search(
         SearchPatientRequest request,
         Pageable pageable ) {
@@ -76,19 +76,19 @@ public class PatientController {
         }
 
     @GetMapping("/code/{code}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
+    @RequirePermission("PATIENT_READ")
     public PatientResponse getByCode(@PathVariable String code) {
         return patientRestMapper.toResponse(getPatientByCodeUseCase.getByCode(code));
     }
 
     @GetMapping("/{patientId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
+    @RequirePermission("PATIENT_READ")
     public PatientResponse getById(@PathVariable UUID patientId) {
         return patientRestMapper.toResponse(getPatientByIdUseCase.getById(patientId));
     }
 
     @PutMapping("/{patientId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("PATIENT_UPDATE")
     public PatientResponse update(
 
             @PathVariable

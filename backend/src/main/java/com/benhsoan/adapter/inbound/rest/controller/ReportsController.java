@@ -8,7 +8,6 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,9 +19,8 @@ import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportRe
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
-import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.infrastructure.security.annotation.CheckPermission;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
@@ -49,8 +47,7 @@ public class ReportsController {
     private final ReportingRestMapper mapper;
 
     @GetMapping("/summary")
-    @PreAuthorize("hasRole('MANAGER')")
-    @CheckPermission(Permission.REPORT_VIEW)
+    @RequirePermission("REPORT_VIEW")
     public OperationalSummaryResponse getSummary(
             @RequestParam String from,
             @RequestParam String to
@@ -63,8 +60,7 @@ public class ReportsController {
     }
 
     @GetMapping("/visits-timeline")
-    @PreAuthorize("hasRole('MANAGER')")
-    @CheckPermission(Permission.REPORT_VIEW)
+    @RequirePermission("REPORT_VIEW")
     public OperationalTimelineResponse getVisitsTimeline(
             @RequestParam String from,
             @RequestParam String to
@@ -77,8 +73,7 @@ public class ReportsController {
     }
 
     @GetMapping("/top-medicines")
-    @PreAuthorize("hasRole('MANAGER')")
-    @CheckPermission(Permission.REPORT_VIEW)
+    @RequirePermission("REPORT_VIEW")
     public TopMedicinesReportResponse getTopMedicines(
             @RequestParam String from,
             @RequestParam String to
@@ -91,8 +86,7 @@ public class ReportsController {
     }
 
     @GetMapping("/doctor-visits")
-    @PreAuthorize("hasRole('MANAGER')")
-    @CheckPermission(Permission.REPORT_VIEW)
+    @RequirePermission("REPORT_VIEW")
     public DoctorVisitsReportResponse getDoctorVisits(
             @RequestParam String from,
             @RequestParam String to
@@ -105,8 +99,7 @@ public class ReportsController {
     }
 
     @GetMapping("/export")
-    @PreAuthorize("hasRole('MANAGER')")
-    @CheckPermission(Permission.REPORT_EXPORT)
+    @RequirePermission("REPORT_EXPORT")
     public ResponseEntity<ByteArrayResource> export(
             @RequestParam String from,
             @RequestParam String to

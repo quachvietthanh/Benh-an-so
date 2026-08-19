@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,8 +29,7 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAme
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDiagnosisResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
-import com.benhsoan.domain.auth.enums.Permission;
-import com.benhsoan.infrastructure.security.annotation.CheckPermission;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
@@ -64,43 +62,43 @@ public class MedicalRecordController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("MEDICAL_RECORD_CREATE")
     public MedicalRecordResponse create(@Valid @RequestBody CreateMedicalRecordRequest request) {
         return mapper.toResponse(createMedicalRecordUseCase.create(mapper.toCommand(request)));
     }
 
     @GetMapping("/{medicalRecordId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("MEDICAL_RECORD_READ")
     public MedicalRecordResponse getById(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(getMedicalRecordUseCase.getById(medicalRecordId));
     }
 
     @GetMapping("/{medicalRecordId}/diagnoses")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("MEDICAL_RECORD_READ")
     public List<MedicalRecordDiagnosisResponse> getDiagnoses(@PathVariable UUID medicalRecordId) {
         return diagnosisMapper.toResponses(getMedicalRecordDiagnosesUseCase.getByMedicalRecordId(medicalRecordId));
     }
 
     @GetMapping("/visits/{visitId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("MEDICAL_RECORD_READ")
     public MedicalRecordDetailResponse getByVisitId(@PathVariable UUID visitId) {
         return detailMapper.toResponse(getMedicalRecordUseCase.getDetailByVisitId(visitId));
     }
 
     @GetMapping("/patient/{patientId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("MEDICAL_RECORD_READ")
     public List<MedicalRecordDetailResponse> getPatientMedicalRecords(@PathVariable UUID patientId) {
         return detailMapper.toResponses(getMedicalRecordUseCase.getHistoryByPatientId(patientId));
     }
 
     @PutMapping("/{medicalRecordId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("MEDICAL_RECORD_UPDATE")
     public MedicalRecordResponse update(@PathVariable UUID medicalRecordId, @RequestBody UpdateMedicalRecordRequest request) {
         return mapper.toResponse(updateMedicalRecordUseCase.update(medicalRecordId, mapper.toCommand(request)));
     }
 
     @PutMapping("/{medicalRecordId}/diagnoses")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("MEDICAL_RECORD_UPDATE")
     public List<MedicalRecordDiagnosisResponse> replaceDiagnoses(
             @PathVariable UUID medicalRecordId,
             @Valid @RequestBody ReplaceMedicalRecordDiagnosesRequest request
@@ -111,20 +109,20 @@ public class MedicalRecordController {
     }
 
     @PostMapping("/{medicalRecordId}/lock")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("MEDICAL_RECORD_UPDATE_STATUS")
     public MedicalRecordResponse lock(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(lockMedicalRecordUseCase.lock(medicalRecordId));
     }
 
     @PostMapping("/{medicalRecordId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("MEDICAL_RECORD_UPDATE")
     public MedicalRecordAmendmentResponse amend(@PathVariable UUID medicalRecordId, @Valid @RequestBody AmendMedicalRecordRequest request) {
         return mapper.toResponse(amendMedicalRecordUseCase.amend(medicalRecordId, mapper.toCommand(request)));
     }
 
     @GetMapping("/{medicalRecordId}/access-logs")
-    @CheckPermission(Permission.AUDIT_READ)
+    @RequirePermission("AUDIT_READ")
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByRecord(
             @PathVariable UUID medicalRecordId,
             @RequestParam(required = false) Instant from,
@@ -138,7 +136,7 @@ public class MedicalRecordController {
     }
 
     @GetMapping("/access-logs")
-    @CheckPermission(Permission.AUDIT_READ)
+    @RequirePermission("AUDIT_READ")
     public Page<MedicalRecordAccessLogResponse> getAccessLogsByPatient(
             @RequestParam UUID patientId,
             @RequestParam(required = false) Instant from,
