@@ -115,7 +115,13 @@ class ServiceCatalogControllerTest {
                 "MANAGER",
                 "Clinic manager",
                 true,
-                Set.of(Permission.REPORT_VIEW)
+                Set.of(
+                        Permission.REPORT_VIEW,
+                        Permission.SERVICE_CATALOG_READ,
+                        Permission.SERVICE_CATALOG_CREATE,
+                        Permission.SERVICE_CATALOG_UPDATE,
+                        Permission.SERVICE_PRICE_MANAGE
+                )
         )));
     }
 
@@ -226,45 +232,43 @@ class ServiceCatalogControllerTest {
     }
 
     @Test
-    void deniesManagerFromAllServiceCatalogEndpointsByDefault() throws Exception {
+    void allowsManagerToManageServiceCatalogAndPrices() throws Exception {
+        when(searchServiceCatalogUseCase.search(any())).thenReturn(Page.empty());
+        when(getServiceCatalogUseCase.getById(SERVICE_ID)).thenReturn(result(true));
+        when(getServicePriceHistoryUseCase.getHistory(SERVICE_ID)).thenReturn(List.of());
+        when(createServiceCatalogUseCase.create(any())).thenReturn(result(true));
+        when(updateServiceCatalogUseCase.update(any())).thenReturn(result(true));
+        when(updateServiceCatalogStatusUseCase.updateStatus(SERVICE_ID, false)).thenReturn(result(false));
+
         mockMvc.perform(get("/system/services")
                         .with(user("manager").roles("MANAGER")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
 
         mockMvc.perform(get("/system/services/{id}", SERVICE_ID)
                         .with(user("manager").roles("MANAGER")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
 
         mockMvc.perform(get("/system/services/{id}/prices", SERVICE_ID)
                         .with(user("manager").roles("MANAGER")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
 
         mockMvc.perform(post("/system/services")
                         .with(user("manager").roles("MANAGER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createRequestBody()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated());
 
         mockMvc.perform(put("/system/services/{id}", SERVICE_ID)
                         .with(user("manager").roles("MANAGER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequestBody()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
 
         mockMvc.perform(patch("/system/services/{id}/status", SERVICE_ID)
                         .with(user("manager").roles("MANAGER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"active\":false}"))
-                .andExpect(status().isForbidden());
-
-        verifyNoInteractions(
-                createServiceCatalogUseCase,
-                updateServiceCatalogUseCase,
-                updateServiceCatalogStatusUseCase,
-                getServiceCatalogUseCase,
-                searchServiceCatalogUseCase,
-                getServicePriceHistoryUseCase
-        );
+                .andExpect(status().isOk());
     }
 
     @Test
