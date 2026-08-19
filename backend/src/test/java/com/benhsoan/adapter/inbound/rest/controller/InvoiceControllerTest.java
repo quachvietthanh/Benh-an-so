@@ -31,15 +31,22 @@ import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException;
 import com.benhsoan.domain.billing.exception.InvoiceNotFoundException;
+import com.benhsoan.domain.billing.exception.PaymentNotAllowedException;
+import com.benhsoan.domain.billing.exception.PaymentNotFoundException;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
 import com.benhsoan.port.dto.result.PaymentResult;
+import com.benhsoan.port.dto.result.PaymentQuoteResult;
+import com.benhsoan.port.dto.result.PaymentServiceFeeQuoteResult;
+import com.benhsoan.port.dto.result.RefundPaymentResult;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.GetInvoiceByIdUseCase;
 import com.benhsoan.port.inbound.billing.GetPayableEncountersUseCase;
+import com.benhsoan.port.inbound.billing.GetPaymentQuoteUseCase;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
+import com.benhsoan.port.inbound.billing.RefundPaymentUseCase;
 import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -57,7 +64,9 @@ class InvoiceControllerTest {
     @MockitoBean private RecordPaymentUseCase recordPaymentUseCase;
     @MockitoBean private CreateInvoiceUseCase createInvoiceUseCase;
     @MockitoBean private AdjustInvoiceUseCase adjustInvoiceUseCase;
+    @MockitoBean private RefundPaymentUseCase refundPaymentUseCase;
     @MockitoBean private GetPayableEncountersUseCase getPayableEncountersUseCase;
+    @MockitoBean private GetPaymentQuoteUseCase getPaymentQuoteUseCase;
     @MockitoBean private SearchInvoicesUseCase searchInvoicesUseCase;
     @MockitoBean private GetInvoiceByIdUseCase getInvoiceByIdUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
@@ -74,6 +83,7 @@ class InvoiceControllerTest {
                 visitId,
                 new BigDecimal("100000"),
                 new BigDecimal("150000"),
+                BigDecimal.ZERO,
                 new BigDecimal("250000"),
                 new BigDecimal("250000"),
                 PaymentMethod.CASH,
@@ -98,6 +108,36 @@ class InvoiceControllerTest {
                 .andExpect(jsonPath("$.visitId").value(visitId.toString()))
                 .andExpect(jsonPath("$.totalAmount").value(250000))
                 .andExpect(jsonPath("$.status").value("RECORDED"));
+    }
+
+    @Test
+    void returnsPaymentQuoteWithClinicalServiceFees() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        when(getPaymentQuoteUseCase.quote(any())).thenReturn(new PaymentQuoteResult(
+                visitId,
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("95000"),
+                new BigDecimal("345000"),
+                List.of(new PaymentServiceFeeQuoteResult(
+                        UUID.randomUUID(), "Blood test", new BigDecimal("95000")
+                )),
+                Instant.parse("2026-08-18T08:00:00Z")
+        ));
+
+        mockMvc.perform(post("/invoices/payment-quotes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "visitId":"%s",
+                                  "examFee":100000,
+                                  "medicineFee":150000
+                                }
+                                """.formatted(visitId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.serviceFee").value(95000))
+                .andExpect(jsonPath("$.totalAmount").value(345000))
+                .andExpect(jsonPath("$.serviceFees[0].serviceName").value("Blood test"));
     }
 
     @Test
@@ -204,6 +244,101 @@ class InvoiceControllerTest {
                 .andExpect(jsonPath("$.type").value("ADJUSTMENT"))
                 .andExpect(jsonPath("$.originalInvoiceId").value(originalInvoiceId.toString()))
                 .andExpect(jsonPath("$.totalAmount").value(-20000));
+    }
+
+    @Test
+    void refundsPayment() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        UUID originalInvoiceId = UUID.randomUUID();
+        Instant refundedAt = Instant.parse("2026-08-18T04:00:00Z");
+        when(refundPaymentUseCase.refund(any())).thenReturn(new RefundPaymentResult(
+                paymentId,
+                visitId,
+                PaymentStatus.REFUNDED,
+                new BigDecimal("250000"),
+                "Patient cancelled",
+                actorId,
+                refundedAt,
+                adjustmentInvoice(originalInvoiceId)
+        ));
+
+        mockMvc.perform(post("/invoices/payments/{paymentId}/refund", paymentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Patient cancelled"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").value(paymentId.toString()))
+                .andExpect(jsonPath("$.visitId").value(visitId.toString()))
+                .andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.amountRefunded").value(250000))
+                .andExpect(jsonPath("$.refundReason").value("Patient cancelled"))
+                .andExpect(jsonPath("$.refundedBy").value(actorId.toString()))
+                .andExpect(jsonPath("$.refundedAt").value("2026-08-18T04:00:00Z"))
+                .andExpect(jsonPath("$.adjustmentInvoice.type").value("ADJUSTMENT"))
+                .andExpect(jsonPath("$.adjustmentInvoice.totalAmount").value(-20000));
+    }
+
+    @Test
+    void rejectsRefundWithBlankReason() throws Exception {
+        mockMvc.perform(post("/invoices/payments/{paymentId}/refund", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":" "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.reason").exists());
+
+        verifyNoInteractions(refundPaymentUseCase);
+    }
+
+    @Test
+    void mapsMissingPaymentDuringRefundTo404() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        when(refundPaymentUseCase.refund(any())).thenThrow(new PaymentNotFoundException(paymentId));
+
+        mockMvc.perform(post("/invoices/payments/{paymentId}/refund", paymentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Patient cancelled"}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Payment not found: " + paymentId));
+    }
+
+    @Test
+    void mapsMissingOriginalInvoiceDuringRefundTo404() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        when(refundPaymentUseCase.refund(any()))
+                .thenThrow(new InvoiceNotFoundException(paymentId, true));
+
+        mockMvc.perform(post("/invoices/payments/{paymentId}/refund", paymentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Patient cancelled"}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(
+                        "Original invoice not found for payment: " + paymentId
+                ));
+    }
+
+    @Test
+    void mapsInvalidRefundStateTo409() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        when(refundPaymentUseCase.refund(any())).thenThrow(
+                new PaymentNotAllowedException("Payment has already been refunded.")
+        );
+
+        mockMvc.perform(post("/invoices/payments/{paymentId}/refund", paymentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"reason":"Patient cancelled"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Payment has already been refunded."));
     }
 
     @Test

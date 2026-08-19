@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
+import org.mockito.ArgumentCaptor;
 
 import com.benhsoan.domain.billing.Payment;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
@@ -35,9 +36,12 @@ import com.benhsoan.port.dto.command.billing.RecordPaymentCommand;
 import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
+import com.benhsoan.port.outbound.repository.billing.PaymentServiceFeeRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -49,9 +53,11 @@ class RecordPaymentServiceTest {
         MedicalRecordRepository medicalRecordRepository = mock(MedicalRecordRepository.class);
         PrescriptionRepository prescriptionRepository = mock(PrescriptionRepository.class);
         PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentServiceFeeRepository paymentServiceFeeRepository = mock(PaymentServiceFeeRepository.class);
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
         ClockPort clockPort = mock(ClockPort.class);
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
         RecordPaymentService service = new RecordPaymentService(
                 visitRepository,
                 medicalRecordRepository,
@@ -60,7 +66,9 @@ class RecordPaymentServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                new PaymentResultMapper()
+                new PaymentResultMapper(),
+                feeCalculator,
+                paymentServiceFeeRepository
         );
 
         UUID visitId = UUID.randomUUID();
@@ -75,20 +83,29 @@ class RecordPaymentServiceTest {
         when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(visit));
         when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
         when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(feeCalculator.calculate(visitId, now)).thenReturn(List.of(
+                new ClinicalServiceCharge(UUID.randomUUID(), "Blood test", new BigDecimal("95000"))
+        ));
+        when(feeCalculator.total(any())).thenReturn(new BigDecimal("95000"));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentResult result = service.record(new RecordPaymentCommand(
                 visitId,
                 new BigDecimal("100000"),
                 new BigDecimal("150000"),
-                new BigDecimal("250000"),
+                new BigDecimal("345000"),
                 PaymentMethod.CASH
         ));
 
         assertEquals(visitId, result.visitId());
-        assertEquals(new BigDecimal("250000"), result.totalAmount());
+        assertEquals(new BigDecimal("95000"), result.serviceFee());
+        assertEquals(new BigDecimal("345000"), result.totalAmount());
         assertEquals(actorId, result.collectedBy());
         verify(paymentRepository).save(any(Payment.class));
+        ArgumentCaptor<List<com.benhsoan.domain.billing.PaymentServiceFee>> snapshotCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(paymentServiceFeeRepository).saveAll(snapshotCaptor.capture());
+        assertEquals(new BigDecimal("95000"), snapshotCaptor.getValue().getFirst().getAmount());
         verify(auditLogRepository).save(any());
     }
 
@@ -115,9 +132,37 @@ class RecordPaymentServiceTest {
     }
 
     @Test
-    void rejectsPaymentWhenVisitIsNotCompleted() {
+    void recordsPaymentWhenVisitIsWaiting() {
         VisitRepository visitRepository = mock(VisitRepository.class);
-        when(visitRepository.findByIdForUpdate(any())).thenReturn(Optional.of(waitingVisit()));
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        UUID visitId = UUID.randomUUID();
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(waitingVisit(visitId)));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RecordPaymentService service = service(
+                visitRepository,
+                mock(MedicalRecordRepository.class),
+                mock(PrescriptionRepository.class),
+                paymentRepository,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class)
+        );
+
+        PaymentResult result = service.record(
+                command(visitId, "100000", "0", "100000")
+        );
+
+        assertEquals(visitId, result.visitId());
+        assertEquals(new BigDecimal("100000"), result.totalAmount());
+    }
+
+    @Test
+    void rejectsPaymentWhenVisitIsCancelled() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        UUID visitId = UUID.randomUUID();
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(cancelledVisit(visitId)));
 
         RecordPaymentService service = service(
                 visitRepository,
@@ -131,7 +176,7 @@ class RecordPaymentServiceTest {
 
         assertThrows(
                 PaymentNotAllowedException.class,
-                () -> service.record(command(UUID.randomUUID(), "100000", "150000", "250000"))
+                () -> service.record(command(visitId, "100000", "0", "100000"))
         );
     }
 
@@ -336,7 +381,16 @@ class RecordPaymentServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                new PaymentResultMapper()
+                new PaymentResultMapper(),
+                noServiceFees(),
+                mock(PaymentServiceFeeRepository.class)
+        );
+    }
+
+    private static ClinicalServiceFeeCalculator noServiceFees() {
+        return new ClinicalServiceFeeCalculator(
+                mock(ClinicalOrderItemRepository.class),
+                mock(ServicePriceRepository.class)
         );
     }
 
@@ -390,9 +444,9 @@ class RecordPaymentServiceTest {
         );
     }
 
-    private static Visit waitingVisit() {
+    private static Visit waitingVisit(UUID visitId) {
         return Visit.restore(
-                UUID.randomUUID(),
+                visitId,
                 "VIS-002",
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -400,6 +454,27 @@ class RecordPaymentServiceTest {
                 null,
                 VisitType.WALK_IN,
                 VisitStatus.WAITING,
+                Instant.parse("2026-08-12T00:00:00Z"),
+                null,
+                null,
+                "Checkup",
+                null,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-12T00:00:00Z"),
+                null
+        );
+    }
+
+    private static Visit cancelledVisit(UUID visitId) {
+        return Visit.restore(
+                visitId,
+                "VIS-003",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null,
+                null,
+                VisitType.WALK_IN,
+                VisitStatus.CANCELLED,
                 Instant.parse("2026-08-12T00:00:00Z"),
                 null,
                 null,

@@ -155,7 +155,7 @@ class ClinicalResultApplicationServiceTest {
         when(visitRepository.findById(fixture.visit().getId())).thenReturn(Optional.of(fixture.visit()));
         when(medicalRecordRepository.findByVisitId(fixture.visit().getId())).thenReturn(Optional.of(fixture.record()));
         when(clinicalServiceCatalogRepository.findById(fixture.item().getClinicalServiceId()))
-                .thenReturn(Optional.of(ClinicalServiceCatalog.restore(fixture.item().getClinicalServiceId(), "LAB-GLU",
+                .thenReturn(Optional.of(ClinicalServiceCatalog.restore(fixture.item().getClinicalServiceId(), UUID.randomUUID(), "LAB-GLU",
                         "Blood glucose", ClinicalServiceType.LAB_TEST, dataType, "mmol/L", "3.9-6.4", null,
                         true, NOW, null)));
         return fixture;

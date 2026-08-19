@@ -22,7 +22,8 @@ public class BackupStorageConfiguration {
     public BackupRestorePlan fullBackupRestorePlan() {
         return new BackupRestorePlan(
                 List.of(
-                        "rooms", "medicines", "diagnosis_catalog", "clinical_service_catalog",
+                        "rooms", "medicines", "diagnosis_catalog", "service_catalog", "service_price",
+                        "clinical_service_catalog",
                         "drug_interaction_rules", "prescription_code_sequences", "invoice_code_sequences",
                         "patients", "patient_change_logs", "appointments", "appointment_notification_logs",
                         "doctor_room_assignments", "medical_queues", "queue_items", "visits",
@@ -32,7 +33,7 @@ public class BackupStorageConfiguration {
                         "prescriptions", "prescription_items", "prescription_dispense_items",
                         "prescription_amendments", "prescription_warning_logs", "medicine_batches",
                         "inventory_receipts", "inventory_receipt_items", "stock_movements",
-                        "inventory_alert_logs", "payments", "invoices", "invoice_lines"
+                        "inventory_alert_logs", "payments", "payment_service_fees", "invoices", "invoice_lines"
                 ),
                 Set.of("users"),
                 List.of(
@@ -59,6 +60,8 @@ public class BackupStorageConfiguration {
                         dependency("clinical_orders", "visit_id", "visits"),
                         dependency("clinical_orders", "medical_record_id", "medical_records"),
                         dependency("clinical_orders", "patient_id", "patients"),
+                        dependency("service_price", "service_catalog_id", "service_catalog"),
+                        dependency("clinical_service_catalog", "service_catalog_id", "service_catalog"),
                         dependency("clinical_order_items", "clinical_order_id", "clinical_orders"),
                         dependency("clinical_order_items", "clinical_service_id", "clinical_service_catalog"),
                         dependency("clinical_results", "clinical_order_item_id", "clinical_order_items"),
@@ -87,6 +90,8 @@ public class BackupStorageConfiguration {
                         dependency("stock_movements", "medicine_batch_id", "medicine_batches"),
                         dependency("inventory_alert_logs", "medicine_id", "medicines"),
                         dependency("payments", "visit_id", "visits"),
+                        dependency("payment_service_fees", "payment_id", "payments"),
+                        dependency("payment_service_fees", "clinical_order_item_id", "clinical_order_items"),
                         dependency("invoices", "visit_id", "visits"),
                         dependency("invoices", "payment_id", "payments"),
                         dependency("invoices", "original_invoice_id", "invoices"),

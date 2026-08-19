@@ -71,6 +71,12 @@ public enum Permission {
     REPORT_VIEW,
     REPORT_EXPORT,
 
+    // Service Catalog
+    SERVICE_CATALOG_READ,
+    SERVICE_CATALOG_CREATE,
+    SERVICE_CATALOG_UPDATE,
+    SERVICE_PRICE_MANAGE,
+
     // Medical Queue
     QUEUE_CREATE,
     QUEUE_CALL_NEXT,

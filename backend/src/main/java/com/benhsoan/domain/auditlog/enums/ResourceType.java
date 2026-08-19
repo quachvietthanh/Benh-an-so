@@ -24,6 +24,10 @@ public enum ResourceType {
 
     MEDICINE,
 
+    SERVICE_CATALOG,
+
+    SERVICE_PRICE,
+
     INVOICE,
 
     PAYMENT,

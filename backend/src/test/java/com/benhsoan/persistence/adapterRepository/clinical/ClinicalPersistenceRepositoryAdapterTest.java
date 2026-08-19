@@ -68,7 +68,8 @@ class ClinicalPersistenceRepositoryAdapterTest {
     void findsOnlyActiveCatalogServicesUsingNormalizedKeyword() {
         PageRequest pageable = PageRequest.of(0, 20);
         ClinicalServiceCatalogEntity entity = ClinicalServiceCatalogEntity.builder()
-                .id(UUID.randomUUID()).serviceCode("LAB-GLU").serviceName("Blood glucose")
+                .id(UUID.randomUUID()).serviceCatalogId(UUID.randomUUID())
+                .serviceCode("LAB-GLU").serviceName("Blood glucose")
                 .serviceType(ClinicalServiceType.LAB_TEST).resultDataType(ClinicalResultDataType.NUMBER)
                 .active(true).createdAt(CREATED_AT).build();
         when(clinicalServiceCatalogJpaRepository.findActiveByKeyword("glucose", pageable))

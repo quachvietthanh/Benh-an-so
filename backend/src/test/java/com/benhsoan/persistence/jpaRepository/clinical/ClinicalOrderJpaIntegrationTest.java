@@ -19,8 +19,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.benhsoan.domain.clinical.enums.ClinicalOrderItemStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderStatus;
+import com.benhsoan.domain.clinical.enums.ClinicalResultDataType;
+import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
+import com.benhsoan.persistence.adapterRepository.clinical.ClinicalOrderItemRepositoryAdapter;
 import com.benhsoan.persistence.entity.clinical.ClinicalOrderEntity;
 import com.benhsoan.persistence.entity.clinical.ClinicalOrderItemEntity;
+import com.benhsoan.persistence.entity.clinical.ClinicalServiceCatalogEntity;
+import com.benhsoan.persistence.mapper.clinical.ClinicalOrderItemPersistenceMapper;
 
 @DataJpaTest(properties = {
         "spring.flyway.enabled=false",
@@ -36,6 +41,7 @@ class ClinicalOrderJpaIntegrationTest {
 
     @Autowired private JpaClinicalOrderRepository clinicalOrderRepository;
     @Autowired private JpaClinicalOrderItemRepository clinicalOrderItemRepository;
+    @Autowired private JpaClinicalServiceCatalogRepository clinicalServiceCatalogRepository;
     @Autowired private PlatformTransactionManager transactionManager;
 
     @Test
@@ -76,6 +82,50 @@ class ClinicalOrderJpaIntegrationTest {
                 )));
     }
 
+    @Test
+    void findsOnlyCompletedItemsAndMapsThemToServiceMaster() {
+        UUID visitId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID completedClinicalServiceId = UUID.randomUUID();
+        UUID cancelledClinicalServiceId = UUID.randomUUID();
+        UUID completedMasterId = UUID.randomUUID();
+        inTransaction(() -> {
+            clinicalOrderRepository.save(order(orderId, visitId, "ORD-BILLING"));
+            clinicalServiceCatalogRepository.save(clinicalService(
+                    completedClinicalServiceId,
+                    completedMasterId,
+                    "LAB-CBC"
+            ));
+            clinicalServiceCatalogRepository.save(clinicalService(
+                    cancelledClinicalServiceId,
+                    UUID.randomUUID(),
+                    "LAB-GLU"
+            ));
+            clinicalOrderItemRepository.save(item(
+                    orderId,
+                    completedClinicalServiceId,
+                    ClinicalOrderItemStatus.COMPLETED,
+                    "LAB-CBC"
+            ));
+            clinicalOrderItemRepository.save(item(
+                    orderId,
+                    cancelledClinicalServiceId,
+                    ClinicalOrderItemStatus.CANCELLED,
+                    "LAB-GLU"
+            ));
+        });
+        ClinicalOrderItemRepositoryAdapter adapter = new ClinicalOrderItemRepositoryAdapter(
+                clinicalOrderItemRepository,
+                new ClinicalOrderItemPersistenceMapper()
+        );
+
+        var billableServices = adapter.findBillableByVisitId(visitId);
+
+        assertEquals(1, billableServices.size());
+        assertEquals(completedMasterId, billableServices.getFirst().serviceCatalogId());
+        assertEquals("Blood test", billableServices.getFirst().serviceName());
+    }
+
     private void inTransaction(Runnable action) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> action.run());
     }
@@ -88,9 +138,40 @@ class ClinicalOrderJpaIntegrationTest {
     }
 
     private ClinicalOrderItemEntity item(UUID orderId) {
+        return item(
+                orderId,
+                UUID.randomUUID(),
+                ClinicalOrderItemStatus.PENDING,
+                "LAB-GLU"
+        );
+    }
+
+    private ClinicalOrderItemEntity item(
+            UUID orderId,
+            UUID clinicalServiceId,
+            ClinicalOrderItemStatus status,
+            String serviceCode
+    ) {
         return ClinicalOrderItemEntity.builder()
-                .id(UUID.randomUUID()).clinicalOrderId(orderId).clinicalServiceId(UUID.randomUUID())
-                .serviceCode("LAB-GLU").serviceName("Blood glucose")
-                .status(ClinicalOrderItemStatus.PENDING).createdAt(NOW).build();
+                .id(UUID.randomUUID()).clinicalOrderId(orderId).clinicalServiceId(clinicalServiceId)
+                .serviceCode(serviceCode).serviceName("Blood test")
+                .status(status).createdAt(NOW).build();
+    }
+
+    private ClinicalServiceCatalogEntity clinicalService(
+            UUID id,
+            UUID serviceCatalogId,
+            String serviceCode
+    ) {
+        return ClinicalServiceCatalogEntity.builder()
+                .id(id)
+                .serviceCatalogId(serviceCatalogId)
+                .serviceCode(serviceCode)
+                .serviceName("Blood test")
+                .serviceType(ClinicalServiceType.LAB_TEST)
+                .resultDataType(ClinicalResultDataType.NUMBER)
+                .active(false)
+                .createdAt(NOW)
+                .build();
     }
 }

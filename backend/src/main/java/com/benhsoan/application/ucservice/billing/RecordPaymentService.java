@@ -13,18 +13,21 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.billing.Payment;
+import com.benhsoan.domain.billing.PaymentServiceFee;
 import com.benhsoan.domain.billing.exception.PaymentAlreadyExistsException;
 import com.benhsoan.domain.billing.exception.PaymentNotAllowedException;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.billing.RecordPaymentCommand;
 import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
+import com.benhsoan.port.outbound.repository.billing.PaymentServiceFeeRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
@@ -46,6 +49,8 @@ public class RecordPaymentService implements RecordPaymentUseCase {
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final PaymentResultMapper resultMapper;
+    private final ClinicalServiceFeeCalculator clinicalServiceFeeCalculator;
+    private final PaymentServiceFeeRepository paymentServiceFeeRepository;
 
     @Override
     public PaymentResult record(RecordPaymentCommand command) {
@@ -54,9 +59,9 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         Visit visit = visitRepository.findByIdForUpdate(command.visitId())
                 .orElseThrow(() -> new VisitNotFoundException(command.visitId()));
 
-        if (!visit.isCompleted()) {
+        if (visit.getStatus() == VisitStatus.CANCELLED) {
             throw new PaymentNotAllowedException(
-                    "Payment can only be recorded for completed visits."
+                    "Payment cannot be recorded for cancelled visits."
             );
         }
 
@@ -68,12 +73,15 @@ public class RecordPaymentService implements RecordPaymentUseCase {
 
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
+        List<ClinicalServiceCharge> serviceCharges = clinicalServiceFeeCalculator
+                .calculate(visit.getId(), now);
 
         Payment payment = Payment.record(
                 UUID.randomUUID(),
                 visit.getId(),
                 command.examFee(),
                 command.medicineFee(),
+                clinicalServiceFeeCalculator.total(serviceCharges),
                 command.amountPaid(),
                 command.paymentMethod(),
                 actorId,
@@ -91,6 +99,16 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             }
             throw ex;
         }
+        paymentServiceFeeRepository.saveAll(serviceCharges.stream()
+                .map(charge -> PaymentServiceFee.create(
+                        UUID.randomUUID(),
+                        saved.getId(),
+                        charge.clinicalOrderItemId(),
+                        charge.serviceName(),
+                        charge.price(),
+                        now
+                ))
+                .toList());
 
         auditLogRepository.save(AuditLog.create(
                 actorId,
@@ -102,6 +120,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 "visitId":"%s",
                 "examFee":"%s",
                 "medicineFee":"%s",
+                "serviceFee":"%s",
                 "totalAmount":"%s",
                 "paymentMethod":"%s"
                 }
@@ -109,6 +128,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                         saved.getVisitId(),
                         saved.getExamFee(),
                         saved.getMedicineFee(),
+                        saved.getServiceFee(),
                         saved.getTotalAmount(),
                         saved.getPaymentMethod()
                 ),

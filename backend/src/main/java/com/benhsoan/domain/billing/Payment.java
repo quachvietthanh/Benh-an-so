@@ -32,6 +32,8 @@ public class Payment {
 
     private BigDecimal medicineFee;
 
+    private BigDecimal serviceFee;
+
     private BigDecimal totalAmount;
 
     private BigDecimal amountPaid;
@@ -44,6 +46,12 @@ public class Payment {
 
     private Instant paidAt;
 
+    private String refundReason;
+
+    private UUID refundedBy;
+
+    private Instant refundedAt;
+
     private Instant createdAt;
 
     private Payment(
@@ -51,25 +59,79 @@ public class Payment {
             UUID visitId,
             BigDecimal examFee,
             BigDecimal medicineFee,
+            BigDecimal serviceFee,
             BigDecimal totalAmount,
             BigDecimal amountPaid,
             PaymentMethod paymentMethod,
             PaymentStatus status,
             UUID collectedBy,
             Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
             Instant createdAt
     ) {
         this.id = requireNonNull(id, "Payment id is required.");
         this.visitId = requireNonNull(visitId, "Visit id is required.");
         this.examFee = validateNonNegative(examFee, "Exam fee is required.");
         this.medicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
-        this.totalAmount = validateTotalAmount(totalAmount, this.examFee, this.medicineFee);
+        this.serviceFee = validateNonNegative(serviceFee, "Service fee is required.");
+        this.totalAmount = validateTotalAmount(
+                totalAmount,
+                this.examFee,
+                this.medicineFee,
+                this.serviceFee
+        );
         this.amountPaid = validateAmountPaid(amountPaid, this.totalAmount);
         this.paymentMethod = requireNonNull(paymentMethod, "Payment method is required.");
         this.status = requireNonNull(status, "Payment status is required.");
         this.collectedBy = requireNonNull(collectedBy, "Collector id is required.");
         this.paidAt = requireNonNull(paidAt, "Payment time is required.");
+        this.refundReason = refundReason;
+        this.refundedBy = refundedBy;
+        this.refundedAt = refundedAt;
         this.createdAt = requireNonNull(createdAt, "Payment creation time is required.");
+    }
+
+    public static Payment record(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            UUID collectedBy,
+            Instant paidAt,
+            VisitStatus visitStatus,
+            boolean dispensingCompleted
+    ) {
+        validatePaymentEligibility(visitStatus, dispensingCompleted);
+        BigDecimal validatedExamFee = validateNonNegative(examFee, "Exam fee is required.");
+        BigDecimal validatedMedicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
+        BigDecimal validatedServiceFee = validateNonNegative(serviceFee, "Service fee is required.");
+        BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee).add(validatedServiceFee);
+        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidationException("Payment total amount must be greater than zero.");
+        }
+
+        return new Payment(
+                id,
+                visitId,
+                validatedExamFee,
+                validatedMedicineFee,
+                validatedServiceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                PaymentStatus.RECORDED,
+                collectedBy,
+                paidAt,
+                null,
+                null,
+                null,
+                paidAt
+        );
     }
 
     public static Payment record(
@@ -84,26 +146,18 @@ public class Payment {
             VisitStatus visitStatus,
             boolean dispensingCompleted
     ) {
-        validatePaymentEligibility(visitStatus, dispensingCompleted);
-        BigDecimal validatedExamFee = validateNonNegative(examFee, "Exam fee is required.");
-        BigDecimal validatedMedicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
-        BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee);
-        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ValidationException("Payment total amount must be greater than zero.");
-        }
-
-        return new Payment(
+        return record(
                 id,
                 visitId,
-                validatedExamFee,
-                validatedMedicineFee,
-                totalAmount,
+                examFee,
+                medicineFee,
+                BigDecimal.ZERO,
                 amountPaid,
                 paymentMethod,
-                PaymentStatus.RECORDED,
                 collectedBy,
                 paidAt,
-                paidAt
+                visitStatus,
+                dispensingCompleted
         );
     }
 
@@ -120,17 +174,125 @@ public class Payment {
             Instant paidAt,
             Instant createdAt
     ) {
-        return new Payment(
+        return restore(
                 id,
                 visitId,
                 examFee,
                 medicineFee,
+                BigDecimal.ZERO,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
                 status,
                 collectedBy,
                 paidAt,
+                null,
+                null,
+                null,
+                createdAt
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            Instant createdAt
+    ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                null,
+                null,
+                null,
+                createdAt
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt
+    ) {
+        return new Payment(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                BigDecimal.ZERO,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt
+    ) {
+        return new Payment(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
                 createdAt
         );
     }
@@ -143,9 +305,16 @@ public class Payment {
         return status == PaymentStatus.REFUNDED;
     }
 
-    public void refund(String reason, UUID refundedBy) {
-        requireText(reason, "Refund reason is required.");
-        requireNonNull(refundedBy, "Refunded by user id is required.");
+    public void refund(String reason, UUID refundedBy, Instant refundedAt) {
+        String validatedReason = requireText(reason, "Refund reason is required.");
+        UUID validatedRefundedBy = requireNonNull(
+                refundedBy,
+                "Refunded by user id is required."
+        );
+        Instant validatedRefundedAt = requireNonNull(
+                refundedAt,
+                "Refund time is required."
+        );
 
         if (status != PaymentStatus.RECORDED && status != PaymentStatus.SUCCESS) {
             throw new PaymentNotAllowedException(
@@ -154,15 +323,18 @@ public class Payment {
         }
 
         this.status = PaymentStatus.REFUNDED;
+        this.refundReason = validatedReason;
+        this.refundedBy = validatedRefundedBy;
+        this.refundedAt = validatedRefundedAt;
     }
 
     private static void validatePaymentEligibility(
             VisitStatus visitStatus,
             boolean dispensingCompleted
     ) {
-        if (visitStatus != VisitStatus.COMPLETED) {
+        if (visitStatus == VisitStatus.CANCELLED) {
             throw new PaymentNotAllowedException(
-                    "Payment can only be recorded after the visit is completed."
+                    "Payment cannot be recorded for cancelled visits."
             );
         }
         if (!dispensingCompleted) {
@@ -175,12 +347,15 @@ public class Payment {
     private static BigDecimal validateTotalAmount(
             BigDecimal totalAmount,
             BigDecimal examFee,
-            BigDecimal medicineFee
+            BigDecimal medicineFee,
+            BigDecimal serviceFee
     ) {
         BigDecimal validatedTotal = validateNonNegative(totalAmount, "Total amount is required.");
-        BigDecimal expectedTotal = examFee.add(medicineFee);
+        BigDecimal expectedTotal = examFee.add(medicineFee).add(serviceFee);
         if (validatedTotal.compareTo(expectedTotal) != 0) {
-            throw new ValidationException("Total amount must equal exam fee plus medicine fee.");
+            throw new ValidationException(
+                    "Total amount must equal exam fee plus medicine fee plus service fee."
+            );
         }
         return validatedTotal;
     }

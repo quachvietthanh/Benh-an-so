@@ -18,12 +18,16 @@ public class PaymentPersistenceMapper {
                 entity.getVisitId(),
                 entity.getExamFee(),
                 entity.getMedicineFee(),
+                entity.getServiceFee(),
                 entity.getTotalAmount(),
                 entity.getAmountPaid(),
                 entity.getPaymentMethod(),
                 entity.getStatus(),
                 entity.getCollectedBy(),
                 entity.getPaidAt(),
+                entity.getRefundReason(),
+                entity.getRefundedBy(),
+                entity.getRefundedAt(),
                 entity.getCreatedAt()
         );
     }
@@ -38,12 +42,16 @@ public class PaymentPersistenceMapper {
                 .visitId(domain.getVisitId())
                 .examFee(domain.getExamFee())
                 .medicineFee(domain.getMedicineFee())
+                .serviceFee(domain.getServiceFee())
                 .totalAmount(domain.getTotalAmount())
                 .amountPaid(domain.getAmountPaid())
                 .paymentMethod(domain.getPaymentMethod())
                 .status(domain.getStatus())
                 .collectedBy(domain.getCollectedBy())
                 .paidAt(domain.getPaidAt())
+                .refundReason(domain.getRefundReason())
+                .refundedBy(domain.getRefundedBy())
+                .refundedAt(domain.getRefundedAt())
                 .createdAt(domain.getCreatedAt())
                 .build();
     }

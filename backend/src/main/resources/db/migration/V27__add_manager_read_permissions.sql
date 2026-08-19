@@ -1,6 +1,0 @@
--- Allow MANAGER to read patient and queue data for billing review screens.
-
-INSERT INTO role_permissions (role_id, permission) VALUES
-(UUID_TO_BIN('66666666-6666-6666-6666-666666666666'), 'PATIENT_READ'),
-(UUID_TO_BIN('66666666-6666-6666-6666-666666666666'), 'QUEUE_VIEW'),
-(UUID_TO_BIN('66666666-6666-6666-6666-666666666666'), 'QUEUE_COUNT');

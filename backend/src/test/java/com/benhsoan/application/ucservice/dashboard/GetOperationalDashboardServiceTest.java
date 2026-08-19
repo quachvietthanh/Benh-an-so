@@ -25,6 +25,7 @@ import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
+import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
@@ -60,6 +61,10 @@ class GetOperationalDashboardServiceTest {
         when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
         when(currentUserPort.hasRole("CLINIC_MANAGER")).thenReturn(false);
         when(clockPort.now()).thenReturn(NOW);
+        when(paymentRepository.sumRefundedAmountByRefundedAtBetween(
+                START_OF_DAY,
+                START_OF_NEXT_DAY
+        )).thenReturn(BigDecimal.ZERO);
 
         service = new GetOperationalDashboardService(
                 visitRepository,
@@ -151,6 +156,36 @@ class GetOperationalDashboardServiceTest {
         assertEquals(NOW, result.asOf());
     }
 
+    @Test
+    void subtractsRefundsInRefundPeriodWithoutRemovingOriginalCollections() {
+        when(visitRepository.findByVisitAtBetween(START_OF_DAY, START_OF_NEXT_DAY))
+                .thenReturn(List.of());
+        when(paymentRepository.sumAmountPaidByStatusInAndPaidAtBetween(
+                List.of(
+                        PaymentStatus.RECORDED,
+                        PaymentStatus.SUCCESS,
+                        PaymentStatus.REFUNDED
+                ),
+                START_OF_DAY,
+                START_OF_NEXT_DAY
+        )).thenReturn(new BigDecimal("1000000"));
+        when(paymentRepository.sumRefundedAmountByRefundedAtBetween(
+                START_OF_DAY,
+                START_OF_NEXT_DAY
+        )).thenReturn(new BigDecimal("250000"));
+        when(medicineRepository.findAllActive()).thenReturn(List.of());
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(any(), any()))
+                .thenReturn(Map.of());
+        when(medicineBatchRepository.findAll()).thenReturn(List.of());
+
+        OperationalDashboardResult result = service.get();
+
+        assertEquals(
+                new BigDecimal("750000"),
+                result.revenueSummary().totalRevenueToday()
+        );
+    }
+
     private Visit visit(VisitStatus status) {
         return Visit.restore(
                 UUID.randomUUID(),
@@ -203,4 +238,3 @@ class GetOperationalDashboardServiceTest {
         );
     }
 }
-

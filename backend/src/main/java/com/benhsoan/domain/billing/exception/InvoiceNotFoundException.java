@@ -9,4 +9,8 @@ public class InvoiceNotFoundException extends BillingException {
     public InvoiceNotFoundException(UUID invoiceId) {
         super(HttpStatus.NOT_FOUND, "Invoice not found: " + invoiceId);
     }
+
+    public InvoiceNotFoundException(UUID paymentId, boolean byPaymentId) {
+        super(HttpStatus.NOT_FOUND, "Original invoice not found for payment: " + paymentId);
+    }
 }

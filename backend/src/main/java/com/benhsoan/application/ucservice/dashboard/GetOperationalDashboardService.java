@@ -37,8 +37,11 @@ public class GetOperationalDashboardService implements GetOperationalDashboardUs
     private static final String ADMIN_ROLE = "ADMIN";
     private static final String MANAGER_ROLE = "MANAGER";
     private static final String CLINIC_MANAGER_ROLE = "CLINIC_MANAGER";
-    private static final List<PaymentStatus> REVENUE_STATUSES =
-            List.of(PaymentStatus.RECORDED, PaymentStatus.SUCCESS);
+    private static final List<PaymentStatus> COLLECTION_STATUSES = List.of(
+            PaymentStatus.RECORDED,
+            PaymentStatus.SUCCESS,
+            PaymentStatus.REFUNDED
+    );
 
     private final VisitRepository visitRepository;
     private final PaymentRepository paymentRepository;
@@ -65,8 +68,17 @@ public class GetOperationalDashboardService implements GetOperationalDashboardUs
                 visitRepository.findByVisitAtBetween(startOfDay, startOfNextDay)
         );
 
-        BigDecimal totalRevenueToday = paymentRepository
-                .sumAmountPaidByStatusInAndPaidAtBetween(REVENUE_STATUSES, startOfDay, startOfNextDay);
+        BigDecimal grossCollections = paymentRepository
+                .sumAmountPaidByStatusInAndPaidAtBetween(
+                        COLLECTION_STATUSES,
+                        startOfDay,
+                        startOfNextDay
+                );
+        BigDecimal refunds = paymentRepository.sumRefundedAmountByRefundedAtBetween(
+                startOfDay,
+                startOfNextDay
+        );
+        BigDecimal totalRevenueToday = grossCollections.subtract(refunds);
 
         int lowStockCount = countLowStockMedicines(today);
         int expiryAlertCount = countExpiryAlertBatches(today);

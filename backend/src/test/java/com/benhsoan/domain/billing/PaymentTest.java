@@ -21,8 +21,28 @@ import com.benhsoan.domain.visit.enums.VisitStatus;
 class PaymentTest {
 
     @Test
-    @DisplayName("record should create payment when visit is completed and dispensing is done")
-    void recordShouldSucceedForEligibleVisit() {
+    void recordIncludesClinicalServiceFeeInTotal() {
+        Payment payment = Payment.record(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("95000"),
+                new BigDecimal("345000"),
+                PaymentMethod.CASH,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                VisitStatus.COMPLETED,
+                true
+        );
+
+        assertEquals(new BigDecimal("95000"), payment.getServiceFee());
+        assertEquals(new BigDecimal("345000"), payment.getTotalAmount());
+    }
+
+    @Test
+    @DisplayName("record should create payment before the visit is completed")
+    void recordShouldSucceedForWaitingVisit() {
         Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
 
         Payment payment = Payment.record(
@@ -34,7 +54,7 @@ class PaymentTest {
                 PaymentMethod.CASH,
                 UUID.randomUUID(),
                 paidAt,
-                VisitStatus.COMPLETED,
+                VisitStatus.WAITING,
                 true
         );
 
@@ -57,7 +77,7 @@ class PaymentTest {
                         PaymentMethod.CASH,
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T03:00:00Z"),
-                        VisitStatus.COMPLETED,
+                        VisitStatus.WAITING,
                         true
                 )
         );
@@ -77,8 +97,28 @@ class PaymentTest {
                         PaymentMethod.CARD,
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T03:00:00Z"),
-                        VisitStatus.COMPLETED,
+                        VisitStatus.WAITING,
                         false
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("record should reject payment for a cancelled visit")
+    void recordShouldRejectCancelledVisit() {
+        assertThrows(
+                PaymentNotAllowedException.class,
+                () -> Payment.record(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        new BigDecimal("100000"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("100000"),
+                        PaymentMethod.CASH,
+                        UUID.randomUUID(),
+                        Instant.parse("2026-08-11T03:00:00Z"),
+                        VisitStatus.CANCELLED,
+                        true
                 )
         );
     }
@@ -106,6 +146,8 @@ class PaymentTest {
     @Test
     @DisplayName("refund should mark a recorded payment as refunded")
     void refundShouldMarkPaymentAsRefunded() {
+        UUID refundedBy = UUID.randomUUID();
+        Instant refundedAt = Instant.parse("2026-08-12T03:00:00Z");
         Payment payment = Payment.restore(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -120,9 +162,16 @@ class PaymentTest {
                 Instant.parse("2026-08-11T03:00:00Z")
         );
 
-        payment.refund("Patient cancelled after payment review", UUID.randomUUID());
+        payment.refund(
+                "  Patient cancelled after payment review  ",
+                refundedBy,
+                refundedAt
+        );
 
         assertEquals(PaymentStatus.REFUNDED, payment.getStatus());
+        assertEquals("Patient cancelled after payment review", payment.getRefundReason());
+        assertEquals(refundedBy, payment.getRefundedBy());
+        assertEquals(refundedAt, payment.getRefundedAt());
     }
 
     @Test
@@ -144,7 +193,7 @@ class PaymentTest {
 
         assertThrows(
                 ValidationException.class,
-                () -> payment.refund(" ", UUID.randomUUID())
+                () -> payment.refund(" ", UUID.randomUUID(), Instant.now())
         );
     }
 
@@ -167,7 +216,34 @@ class PaymentTest {
 
         assertThrows(
                 PaymentNotAllowedException.class,
-                () -> payment.refund("Cancel receipt before settlement", UUID.randomUUID())
+                () -> payment.refund(
+                        "Cancel receipt before settlement",
+                        UUID.randomUUID(),
+                        Instant.now()
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("refund should require refund time")
+    void refundShouldRequireRefundTime() {
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                BigDecimal.ZERO,
+                new BigDecimal("100000"),
+                new BigDecimal("100000"),
+                PaymentMethod.CASH,
+                PaymentStatus.SUCCESS,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                Instant.parse("2026-08-11T03:00:00Z")
+        );
+
+        assertThrows(
+                ValidationException.class,
+                () -> payment.refund("Patient cancelled", UUID.randomUUID(), null)
         );
     }
 }

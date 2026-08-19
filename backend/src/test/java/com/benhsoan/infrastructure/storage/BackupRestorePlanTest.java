@@ -21,8 +21,9 @@ class BackupRestorePlanTest {
         BackupRestorePlan plan = new BackupStorageConfiguration().fullBackupRestorePlan();
 
         assertTrue(plan.allowedTables().containsAll(List.of(
-                "diagnosis_catalog", "clinical_service_catalog", "drug_interaction_rules",
-                "prescription_code_sequences", "invoice_code_sequences", "payments"
+                "diagnosis_catalog", "service_catalog", "service_price", "clinical_service_catalog",
+                "drug_interaction_rules", "prescription_code_sequences", "invoice_code_sequences",
+                "payments", "payment_service_fees"
         )));
         assertEquals(Set.of("users"), plan.approvedExternalParentTables());
         assertTrue(plan.dependencies().stream().allMatch(dependency ->

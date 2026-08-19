@@ -30,6 +30,8 @@ public class ClinicalServiceCatalogEntity {
     @Id
     @Column(columnDefinition = "BINARY(16)")
     UUID id;
+    @Column(name = "service_catalog_id", nullable = false, columnDefinition = "BINARY(16)")
+    UUID serviceCatalogId;
     @Column(name = "service_code", nullable = false, length = 30)
     String serviceCode;
     @Column(name = "service_name", nullable = false, length = 150)

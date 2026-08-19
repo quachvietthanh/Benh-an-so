@@ -15,6 +15,7 @@ public class ClinicalServiceCatalogPersistenceMapper {
 
         return ClinicalServiceCatalog.restore(
                 entity.getId(),
+                entity.getServiceCatalogId(),
                 entity.getServiceCode(),
                 entity.getServiceName(),
                 entity.getServiceType(),
@@ -35,6 +36,7 @@ public class ClinicalServiceCatalogPersistenceMapper {
 
         return ClinicalServiceCatalogEntity.builder()
                 .id(domain.getId())
+                .serviceCatalogId(domain.getServiceCatalogId())
                 .serviceCode(domain.getServiceCode())
                 .serviceName(domain.getServiceName())
                 .serviceType(domain.getServiceType())

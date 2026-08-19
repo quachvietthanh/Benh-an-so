@@ -41,6 +41,9 @@ public class PaymentEntity {
     @Column(name = "medicine_fee", nullable = false, precision = 15, scale = 2)
     private BigDecimal medicineFee;
 
+    @Column(name = "service_fee", nullable = false, precision = 15, scale = 2)
+    private BigDecimal serviceFee;
+
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalAmount;
 
@@ -60,6 +63,15 @@ public class PaymentEntity {
 
     @Column(name = "paid_at", nullable = false)
     private Instant paidAt;
+
+    @Column(name = "refund_reason", columnDefinition = "TEXT")
+    private String refundReason;
+
+    @Column(name = "refunded_by", columnDefinition = "BINARY(16)")
+    private UUID refundedBy;
+
+    @Column(name = "refunded_at")
+    private Instant refundedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
