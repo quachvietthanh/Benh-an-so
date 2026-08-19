@@ -7,7 +7,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,10 +28,9 @@ import com.benhsoan.adapter.inbound.rest.response.billing.PayableEncounterRespon
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentQuoteResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.RefundPaymentResponse;
-import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.infrastructure.security.annotation.CheckPermission;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.billing.SearchInvoicesQuery;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
@@ -64,22 +62,19 @@ public class InvoiceController {
 
     @PostMapping("/payments")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
-    @CheckPermission(Permission.INVOICE_CREATE)
+    @RequirePermission("INVOICE_CREATE")
     public PaymentResponse recordPayment(@Valid @RequestBody RecordPaymentRequest request) {
         return mapper.toResponse(recordPaymentUseCase.record(mapper.toCommand(request)));
     }
 
     @PostMapping("/payment-quotes")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
-    @CheckPermission(Permission.INVOICE_CREATE)
+    @RequirePermission("INVOICE_CREATE")
     public PaymentQuoteResponse quotePayment(@Valid @RequestBody GetPaymentQuoteRequest request) {
         return mapper.toResponse(getPaymentQuoteUseCase.quote(mapper.toCommand(request)));
     }
 
     @PostMapping("/payments/{paymentId}/refund")
-    @PreAuthorize("hasRole('MANAGER')")
-    @CheckPermission(Permission.INVOICE_UPDATE)
+    @RequirePermission("INVOICE_UPDATE")
     public RefundPaymentResponse refundPayment(
             @PathVariable UUID paymentId,
             @Valid @RequestBody RefundPaymentRequest request
@@ -91,15 +86,13 @@ public class InvoiceController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
-    @CheckPermission(Permission.INVOICE_CREATE)
+    @RequirePermission("INVOICE_CREATE")
     public InvoiceResponse createInvoice(@Valid @RequestBody CreateInvoiceRequest request) {
         return mapper.toResponse(createInvoiceUseCase.create(mapper.toCommand(request)));
     }
 
     @GetMapping("/payable")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'MANAGER')")
-    @CheckPermission(Permission.INVOICE_READ)
+    @RequirePermission("INVOICE_READ")
     public Page<PayableEncounterResponse> getPayableEncounters(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
@@ -116,8 +109,7 @@ public class InvoiceController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'MANAGER')")
-    @CheckPermission(Permission.INVOICE_READ)
+    @RequirePermission("INVOICE_READ")
     public Page<InvoiceResponse> search(
             @RequestParam(required = false) String invoiceCode,
             @RequestParam(required = false) InvoiceType invoiceType,
@@ -151,16 +143,14 @@ public class InvoiceController {
     }
 
     @GetMapping("/{invoiceId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'MANAGER')")
-    @CheckPermission(Permission.INVOICE_READ)
+    @RequirePermission("INVOICE_READ")
     public InvoiceResponse getById(@PathVariable UUID invoiceId) {
         return mapper.toResponse(getInvoiceByIdUseCase.getById(invoiceId));
     }
 
     @PostMapping("/{invoiceId}/adjustments")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('MANAGER')")
-    @CheckPermission(Permission.INVOICE_UPDATE)
+    @RequirePermission("INVOICE_UPDATE")
     public InvoiceResponse adjust(
             @PathVariable UUID invoiceId,
             @Valid @RequestBody AdjustInvoiceRequest request

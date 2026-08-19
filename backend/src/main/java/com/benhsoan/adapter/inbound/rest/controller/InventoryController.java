@@ -3,7 +3,6 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,6 +15,7 @@ import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockRespon
 import com.benhsoan.adapter.inbound.rest.response.inventory.LowStockMedicineResponse;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.domain.inventory.enums.InventoryExpiryAlertStatus;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.query.inventory.ListInventoryBatchesQuery;
 import com.benhsoan.port.dto.query.inventory.ListInventoryExpiryAlertsQuery;
 import com.benhsoan.port.dto.query.inventory.ListInventoryStocksQuery;
@@ -38,7 +38,7 @@ public class InventoryController {
     private final InventoryRestMapper mapper;
 
     @GetMapping("/stocks")
-    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
+    @RequirePermission("PHARMACY_READ")
     public List<InventoryStockResponse> listStocks(
             @RequestParam(required = false) Boolean active
     ) {
@@ -48,7 +48,7 @@ public class InventoryController {
     }
 
     @GetMapping("/batches")
-    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
+    @RequirePermission("PHARMACY_READ")
     public List<InventoryBatchResponse> listBatches(
             @RequestParam(required = false) UUID medicineId,
             @RequestParam(required = false) BatchStatus status,
@@ -62,7 +62,7 @@ public class InventoryController {
     }
 
     @GetMapping("/low-stock")
-    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
+    @RequirePermission("PHARMACY_READ")
     public List<LowStockMedicineResponse> listLowStockMedicines() {
         return mapper.toLowStockResponses(
                 listLowStockMedicinesUseCase.list()
@@ -70,7 +70,7 @@ public class InventoryController {
     }
 
     @GetMapping("/expiry-alerts")
-    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
+    @RequirePermission("PHARMACY_READ")
     public List<InventoryExpiryAlertResponse> listExpiryAlerts(
             @RequestParam(required = false) UUID medicineId,
             @RequestParam(required = false) InventoryExpiryAlertStatus status

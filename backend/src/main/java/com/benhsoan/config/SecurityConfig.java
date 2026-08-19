@@ -87,6 +87,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/medical-records/**").authenticated()
 
                                                 // ===== PRESCRIPTIONS / CLINICAL =====
+                                                .requestMatchers("/medicines/**").authenticated()
                                                 .requestMatchers("/prescriptions/**").authenticated()
                                                 .requestMatchers("/clinical-services/**").authenticated()
                                                 .requestMatchers("/clinical-orders/**").authenticated()
@@ -103,19 +104,8 @@ public class SecurityConfig {
                                                 .requestMatchers("/reports/**").authenticated()
 
                                                 // ===== PHARMACY / INVOICES =====
-                                                .requestMatchers(HttpMethod.DELETE, "/inventory/**").hasRole("ADMIN")
-                                                .requestMatchers("/inventory/**")
-                                                .hasAnyRole("ADMIN", "PHARMACIST")
-                                                .requestMatchers(HttpMethod.POST, "/invoices/payments/*/refund")
-                                                .hasRole("MANAGER")
-                                                .requestMatchers(HttpMethod.POST, "/invoices/*/adjustments")
-                                                .hasRole("MANAGER")
-                                                .requestMatchers(HttpMethod.GET, "/invoices")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST", "MANAGER")
-                                                .requestMatchers(HttpMethod.GET, "/invoices/*")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST", "MANAGER")
-                                                .requestMatchers("/invoices/**")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
+                                                .requestMatchers("/inventory/**").authenticated()
+                                                .requestMatchers("/invoices/**").authenticated()
 
                                                 // ===== MEDICAL QUEUE =====
                                                 .requestMatchers(HttpMethod.GET, "/queues/me")

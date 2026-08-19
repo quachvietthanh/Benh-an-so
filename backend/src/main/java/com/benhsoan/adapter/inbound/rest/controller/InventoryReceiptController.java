@@ -3,7 +3,6 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import java.net.URI;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +13,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import com.benhsoan.adapter.inbound.rest.mapper.InventoryReceiptRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.inventory.CreateInventoryReceiptRequest;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryReceiptResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.inventory.ReceiveStockUseCase;
 
 import jakarta.validation.Valid;
@@ -29,7 +29,7 @@ public class InventoryReceiptController {
     private final InventoryReceiptRestMapper restMapper;
 
     @PostMapping("/receipts")
-    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN')")
+    @RequirePermission("PHARMACY_CREATE")
     public ResponseEntity<InventoryReceiptResponse> receiveStock(
             @Valid @RequestBody CreateInventoryReceiptRequest request
     ) {
