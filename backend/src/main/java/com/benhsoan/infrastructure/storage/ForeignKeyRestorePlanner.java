@@ -169,10 +169,20 @@ final class ForeignKeyRestorePlanner {
             deferredUpdates.add(new DeferredUpdate(
                     foreignKey.childTable(),
                     foreignKey.childColumn(),
+                    parentTable(foreignKey),
                     primaryKey(metadata, catalog, foreignKey.childTable())
             ));
         }
         return List.copyOf(deferredUpdates);
+    }
+
+    private String parentTable(BackupRestorePlan.DeferredForeignKey foreignKey) {
+        return backupRestorePlan.dependencies().stream()
+                .filter(dependency -> dependency.childTable().equals(foreignKey.childTable())
+                        && dependency.childColumn().equals(foreignKey.childColumn()))
+                .findFirst()
+                .orElseThrow()
+                .parentTable();
     }
 
     private String primaryKey(DatabaseMetaData metadata, String catalog, String table) throws SQLException {
@@ -204,7 +214,7 @@ final class ForeignKeyRestorePlanner {
     ) {
     }
 
-    record DeferredUpdate(String tableName, String columnName, String primaryKeyColumn) {
+    record DeferredUpdate(String tableName, String columnName, String parentTable, String primaryKeyColumn) {
     }
 
     private record ForeignKeyEdge(String childTable, String childColumn, String parentTable) {

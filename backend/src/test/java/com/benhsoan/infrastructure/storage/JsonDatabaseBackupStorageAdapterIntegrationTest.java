@@ -182,8 +182,8 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         jdbc.update("INSERT INTO queue_items VALUES (?, ?)", queueItemId, visitId);
         jdbc.update("UPDATE visits SET queue_item_id = ? WHERE id = ?", queueItemId, visitId);
         jdbc.update("INSERT INTO payments VALUES (?)", paymentId);
-        jdbc.update("INSERT INTO invoices VALUES (?, ?, ?, ?)", invoiceId, "INV-001", paymentId, null);
-        jdbc.update("INSERT INTO invoices VALUES (?, ?, ?, ?)", adjustmentInvoiceId, "INV-002", null, invoiceId);
+        jdbc.update("INSERT INTO invoices VALUES (?, ?, ?, ?, ?)", invoiceId, "INV-001", paymentId, null, "ORIGINAL");
+        jdbc.update("INSERT INTO invoices VALUES (?, ?, ?, ?, ?)", adjustmentInvoiceId, "INV-002", null, invoiceId, "ADJUSTMENT");
         jdbc.update("INSERT INTO invoice_lines VALUES (?, ?, ?)", lineId, invoiceId, new BigDecimal("100.00"));
         return new Fixture(medicineId, invoiceId, adjustmentInvoiceId, lineId, visitId, queueItemId);
     }
@@ -218,7 +218,7 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         jdbc.execute("CREATE TABLE prescriptions (id VARCHAR(36) PRIMARY KEY, medicine_id VARCHAR(36) NOT NULL, prescription_code VARCHAR(30) NOT NULL, FOREIGN KEY (medicine_id) REFERENCES medicines(id)) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE prescription_dispense_items (id VARCHAR(36) PRIMARY KEY, prescription_id VARCHAR(36) NOT NULL, medicine_batch_id VARCHAR(36) NOT NULL, FOREIGN KEY (prescription_id) REFERENCES prescriptions(id), FOREIGN KEY (medicine_batch_id) REFERENCES medicine_batches(id)) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE payments (id VARCHAR(36) PRIMARY KEY) ENGINE=InnoDB");
-        jdbc.execute("CREATE TABLE invoices (id VARCHAR(36) PRIMARY KEY, invoice_code VARCHAR(30) NOT NULL, payment_id VARCHAR(36), original_invoice_id VARCHAR(36), FOREIGN KEY (payment_id) REFERENCES payments(id), FOREIGN KEY (original_invoice_id) REFERENCES invoices(id)) ENGINE=InnoDB");
+        jdbc.execute("CREATE TABLE invoices (id VARCHAR(36) PRIMARY KEY, invoice_code VARCHAR(30) NOT NULL, payment_id VARCHAR(36), original_invoice_id VARCHAR(36), invoice_type VARCHAR(30) NOT NULL, FOREIGN KEY (payment_id) REFERENCES payments(id), FOREIGN KEY (original_invoice_id) REFERENCES invoices(id), CONSTRAINT chk_invoices_original_shape CHECK ((invoice_type = 'ORIGINAL' AND original_invoice_id IS NULL) OR (invoice_type = 'ADJUSTMENT' AND original_invoice_id IS NOT NULL))) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE invoice_lines (id VARCHAR(36) PRIMARY KEY, invoice_id VARCHAR(36) NOT NULL, amount DECIMAL(15, 2) NOT NULL, FOREIGN KEY (invoice_id) REFERENCES invoices(id)) ENGINE=InnoDB");
     }
 
