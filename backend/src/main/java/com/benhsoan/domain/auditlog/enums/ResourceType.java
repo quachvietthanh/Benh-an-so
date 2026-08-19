@@ -36,5 +36,7 @@ public enum ResourceType {
 
     DRUG_INTERACTION,
 
-    SYSTEM_BACKUP
+    SYSTEM_BACKUP,
+
+    CARE_LOG
 }
