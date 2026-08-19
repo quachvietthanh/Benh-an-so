@@ -45,6 +45,7 @@ class FollowUpReminderControllerTest {
 
     private static final UUID REMINDER_ID = UUID.randomUUID();
     private static final UUID PATIENT_ID = UUID.randomUUID();
+    private static final UUID VISIT_ID = UUID.randomUUID();
 
     @Autowired
     private MockMvc mockMvc;
@@ -78,14 +79,29 @@ class FollowUpReminderControllerTest {
                         .content("""
                                 {
                                   "patientId": "%s",
+                                  "visitId": "%s",
                                   "followUpDate": "2026-08-30",
                                   "remindAt": "2026-08-15T08:00:00Z",
                                   "reminderType": "REVISIT"
                                 }
-                                """.formatted(PATIENT_ID)))
+                                """.formatted(PATIENT_ID, VISIT_ID)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.reminderType").value("REVISIT"));
+    }
+
+    @Test
+    void rejectsCreateWithoutVisitId() throws Exception {
+        mockMvc.perform(post("/follow-up-reminders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "patientId": "%s",
+                                  "followUpDate": "2026-08-30",
+                                  "remindAt": "2026-08-15T08:00:00Z"
+                                }
+                                """.formatted(PATIENT_ID)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -95,9 +111,10 @@ class FollowUpReminderControllerTest {
                         .content("""
                                 {
                                   "patientId": "%s",
+                                  "visitId": "%s",
                                   "remindAt": "2026-08-15T08:00:00Z"
                                 }
-                                """.formatted(PATIENT_ID)))
+                                """.formatted(PATIENT_ID, VISIT_ID)))
                 .andExpect(status().isBadRequest());
     }
 

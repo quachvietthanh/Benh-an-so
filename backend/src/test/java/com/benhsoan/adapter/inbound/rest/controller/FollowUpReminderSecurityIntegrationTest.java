@@ -78,7 +78,7 @@ class FollowUpReminderSecurityIntegrationTest {
             mockMvc.perform(post("/follow-up-reminders")
                             .with(user(role.toLowerCase()).roles(role))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"patientId\":\"" + REMINDER_ID + "\",\"followUpDate\":\"2026-08-30\",\"remindAt\":\"2026-08-15T08:00:00Z\"}"))
+                            .content("{\"patientId\":\"" + REMINDER_ID + "\",\"visitId\":\"" + REMINDER_ID + "\",\"followUpDate\":\"2026-08-30\",\"remindAt\":\"2026-08-15T08:00:00Z\"}"))
                     .andExpect(status().isCreated());
 
             mockMvc.perform(get("/follow-up-reminders/due").with(user(role.toLowerCase()).roles(role)))
@@ -100,7 +100,7 @@ class FollowUpReminderSecurityIntegrationTest {
             mockMvc.perform(post("/follow-up-reminders")
                             .with(user(role.toLowerCase()).roles(role))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"patientId\":\"" + REMINDER_ID + "\",\"followUpDate\":\"2026-08-30\",\"remindAt\":\"2026-08-15T08:00:00Z\"}"))
+                            .content("{\"patientId\":\"" + REMINDER_ID + "\",\"visitId\":\"" + REMINDER_ID + "\",\"followUpDate\":\"2026-08-30\",\"remindAt\":\"2026-08-15T08:00:00Z\"}"))
                     .andExpect(status().isForbidden());
 
             mockMvc.perform(get("/follow-up-reminders/due").with(user(role.toLowerCase()).roles(role)))

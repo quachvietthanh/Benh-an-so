@@ -13,6 +13,7 @@ public record CreateFollowUpReminderRequest(
         @NotNull(message = "patientId is required.")
         UUID patientId,
 
+        @NotNull(message = "visitId is required.")
         UUID visitId,
 
         UUID appointmentId,
