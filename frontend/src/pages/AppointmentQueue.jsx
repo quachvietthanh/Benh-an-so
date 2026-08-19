@@ -211,6 +211,25 @@ function AppointmentQueue() {
     return String(id1) === String(id2)
   }, [])
 
+  const updateDoctorsFromList = useCallback((items = []) => {
+    if (!Array.isArray(items) || !items.length) return
+    setDoctors((prev) => {
+      const map = new Map()
+      prev.forEach((d) => map.set(String(d.id), d))
+      items.forEach((item) => {
+        if (item.doctorId && !map.has(String(item.doctorId))) {
+          map.set(String(item.doctorId), {
+            id: item.doctorId,
+            fullName: item.doctorName || 'Bác sĩ',
+            name: item.doctorName || 'Bác sĩ',
+            department: item.department || 'Phòng khám',
+          })
+        }
+      })
+      return Array.from(map.values())
+    })
+  }, [])
+
   const loadDirectories = useCallback(async () => {
     try {
       const [patientRes, doctorRes] = await Promise.allSettled([
@@ -225,23 +244,31 @@ function AppointmentQueue() {
         setPatients([])
       }
 
+      let doctorList = []
       if (doctorRes.status === 'fulfilled' && Array.isArray(doctorRes.value?.data)) {
-        setDoctors(doctorRes.value.data)
-      } else {
-        setDoctors([])
+        doctorList = doctorRes.value.data
       }
+
+      setDoctors((prev) => {
+        const map = new Map()
+        // Default seed doctors fallback in case userApi.getDoctors() returns 403 for RECEPTIONIST role
+        const defaultDocs = [
+          { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', fullName: 'Dr. Nguyen Minh Anh', name: 'Dr. Nguyen Minh Anh', department: 'Nội khoa' },
+          { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', fullName: 'Dr. Tran Quang Huy', name: 'Dr. Tran Quang Huy', department: 'Ngoại khoa' },
+        ]
+        defaultDocs.forEach((d) => map.set(String(d.id), d))
+        doctorList.forEach((d) => map.set(String(d.id), d))
+        prev.forEach((d) => map.set(String(d.id), d))
+        return Array.from(map.values())
+      })
     } catch {
       setPatients([])
-      setDoctors([])
     }
   }, [])
 
   const loadAppointments = useCallback(async () => {
     try {
-      const res = await appointmentApi.getAll({
-        startDate: selectedDate.startOf('day').toISOString(),
-        endDate: selectedDate.endOf('day').toISOString(),
-      })
+      const res = await appointmentApi.getAll({ size: 100 })
       const list = Array.isArray(res.data) ? res.data : (res.data?.content || [])
       const rawList = list
 
@@ -253,10 +280,11 @@ function AppointmentQueue() {
         }
       })
       setAppointments(normalized)
+      updateDoctorsFromList(normalized)
     } catch {
       setAppointments([])
     }
-  }, [selectedDate])
+  }, [updateDoctorsFromList])
 
   const loadQueues = useCallback(async () => {
     try {
@@ -266,7 +294,9 @@ function AppointmentQueue() {
         roomId: queueRoomFilter !== 'ALL' ? queueRoomFilter : undefined,
       }
       const res = await queueApi.getQueues(params)
-      setQueues(normalizeQueueList(res.data))
+      const list = normalizeQueueList(res.data)
+      setQueues(list)
+      updateDoctorsFromList(list)
     } catch (err) {
       setQueues([])
       console.error('Error loading queue board:', err)

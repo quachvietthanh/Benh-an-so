@@ -53,9 +53,11 @@ export const AuthProvider = ({ children }) => {
           if (parsed && typeof parsed === 'object') {
             const tokenRole = payload?.role || payload?.roles || parsed.roles || parsed.role
             const tokenUsername = payload?.username || parsed.username
+            const rawPerms = payload?.permissions || payload?.authorities || parsed.permissions || []
             parsed.username = tokenUsername || parsed.username
             parsed.fullName = tokenUsername || parsed.fullName || parsed.username
             parsed.roles = normalizeRoles(tokenRole)
+            parsed.permissions = Array.isArray(rawPerms) ? rawPerms : Array.from(rawPerms || [])
             localStorage.setItem('user', JSON.stringify(parsed))
             setUser(parsed)
           } else {
@@ -73,11 +75,13 @@ export const AuthProvider = ({ children }) => {
     } else if (storedToken && !storedUser) {
       const payload = getJwtPayload(storedToken)
       if (payload && (payload.role || payload.sub)) {
+        const rawPerms = payload?.permissions || payload?.authorities || []
         const reconstructedUser = {
           id: payload.userId || payload.sub,
           username: payload.username || 'User',
           fullName: payload.username || 'User',
           roles: normalizeRoles(payload.role),
+          permissions: Array.isArray(rawPerms) ? rawPerms : Array.from(rawPerms || []),
         }
         localStorage.setItem('user', JSON.stringify(reconstructedUser))
         setUser(reconstructedUser)
@@ -93,6 +97,7 @@ export const AuthProvider = ({ children }) => {
 
       const payload = getJwtPayload(data.accessToken)
       const rawRoles = payload?.role || data.roles || (data.role ? [data.role] : [])
+      const rawPerms = payload?.permissions || payload?.authorities || data?.permissions || []
       const username = payload?.username || data.username || credentials.username
 
       const normalizedUser = {
@@ -100,6 +105,7 @@ export const AuthProvider = ({ children }) => {
         username: username,
         fullName: username,
         roles: normalizeRoles(rawRoles),
+        permissions: Array.isArray(rawPerms) ? rawPerms : Array.from(rawPerms || []),
         expiredAt: data.expiredAt,
       }
 
