@@ -58,7 +58,7 @@ import {
   areAllInteractionsHandled,
   getUnhandledInteractions,
 } from '../utils/drugInteractionValidation'
-import { saveStoredPrescription, mergeMedicines } from '../utils/storageHelpers'
+import { saveStoredPrescription } from '../utils/storageHelpers'
 import {
   getAvailableStock,
   sortMedicinesByStockAvailability,

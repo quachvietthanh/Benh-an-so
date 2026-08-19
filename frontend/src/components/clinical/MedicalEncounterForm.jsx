@@ -355,17 +355,10 @@ function MedicalEncounterForm({
               </div>
             </Form.Item>
 
-            <Form.Item name="treatmentPlan" label="Hướng điều trị">
+            <Form.Item name="treatmentPlan" label="Hướng điều trị & Lời dặn của bác sĩ">
               <Input.TextArea
                 rows={2}
-                placeholder="Chỉ định nhập viện, kê đơn thuốc về nhà, theo dõi tại nhà..."
-              />
-            </Form.Item>
-
-            <Form.Item name="doctorInstructions" label="Dặn dò & Chỉ định tái khám của Bác sĩ (Doctor Instructions)">
-              <Input.TextArea
-                rows={2}
-                placeholder="Ví dụ: Tái khám sau 7 ngày để đánh giá đáp ứng điều trị; mang theo kết quả xét nghiệm khi tái khám..."
+                placeholder="Chỉ định nhập viện, kê đơn thuốc về nhà, hạn chế ăn mặn, tái khám sau 7 ngày..."
               />
             </Form.Item>
           </Card>

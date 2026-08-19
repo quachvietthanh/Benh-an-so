@@ -1,14 +1,30 @@
-import followUpReminderApi from './followUpReminderApi'
-import careLogApi from './careLogApi'
+import {
+  getStoredAftercareNotes,
+  getStoredFollowupReminders,
+  saveAftercareNote,
+  saveFollowupReminder,
+  updateReminderStatus,
+} from '../utils/aftercareHelpers'
 
 const aftercareApi = {
-  getReminders: (params) => followUpReminderApi.search(params),
-  getDueReminders: (params) => followUpReminderApi.getDue(params),
-  createReminder: (data) => followUpReminderApi.create(data),
-  updateReminderStatus: (id, status) => followUpReminderApi.updateStatus(id, status),
-  getNotes: (params) => careLogApi.search(params),
-  getPatientNotes: (patientId) => careLogApi.getForPatient(patientId),
-  createNote: (data) => careLogApi.create(data),
+  getReminders: async () => {
+    return { data: getStoredFollowupReminders() }
+  },
+  createReminder: async (data) => {
+    const updated = saveFollowupReminder(data)
+    return { data: updated[0] }
+  },
+  updateReminderStatus: async (id, status) => {
+    const updated = updateReminderStatus(id, status)
+    return { data: updated }
+  },
+  getNotes: async () => {
+    return { data: getStoredAftercareNotes() }
+  },
+  createNote: async (data) => {
+    const updated = saveAftercareNote(data)
+    return { data: updated[0] }
+  },
 }
 
 export default aftercareApi

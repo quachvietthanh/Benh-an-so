@@ -22,7 +22,6 @@ import PublicLookupPage from '../pages/PublicLookupPage'
 import SystemManagementPage from '../pages/SystemManagementPage'
 import BackupRestorePage from '../pages/BackupRestorePage'
 import MedicalRecordAccessLogsPage from '../pages/MedicalRecordAccessLogsPage'
-import AfterCarePage from '../pages/AfterCarePage'
 import NotFound from '../pages/NotFound'
 
 const PrivateRoute = ({ children, allowedRoles = [] }) => {
@@ -72,8 +71,6 @@ function AppRoutes() {
         <Route path="patients" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientList /></PrivateRoute>} />
         <Route path="patients/:id" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientDetail /></PrivateRoute>} />
         <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'nurse', 'receptionist']}><AppointmentQueue /></PrivateRoute>} />
-        <Route path="after-care" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><AfterCarePage /></PrivateRoute>} />
-        <Route path="aftercare" element={<Navigate to="/after-care" replace />} />
         <Route path="medical-records" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
         <Route path="medical-records/visits/:visitId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
         <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><PrescriptionPage /></PrivateRoute>} />

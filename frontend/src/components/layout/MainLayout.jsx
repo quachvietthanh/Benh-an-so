@@ -5,7 +5,6 @@ import {
   BellOutlined,
   CalendarOutlined,
   CaretDownOutlined,
-  CustomerServiceOutlined,
   DashboardOutlined,
   FileTextOutlined,
   FormOutlined,
@@ -37,7 +36,7 @@ const roleNames = {
 
 const navigationSections = [
   { key: 'overview', paths: ['/'] },
-  { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments', '/after-care'] },
+  { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments'] },
   { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/prescriptions', '/clinical-results', '/results'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
@@ -57,7 +56,6 @@ const getNavigationItems = (roles = []) => {
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'doctor', 'receptionist'] },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
-    { key: '/after-care', label: 'Chăm sóc sau khám', icon: CustomerServiceOutlined, roles: ['admin', 'doctor', 'receptionist'] },
     { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, roles: ['admin', 'doctor'] },
     { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, roles: ['admin', 'doctor'] },
     { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, roles: ['admin', 'doctor'] },
