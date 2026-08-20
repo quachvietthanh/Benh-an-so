@@ -50,15 +50,6 @@ export const validateItemStock = (item, medicinesData) => {
   const availableStock = getAvailableStock(medicine)
   const qty = Number(item.quantity || 0)
 
-  if (qty <= 0) {
-    return {
-      isValid: false,
-      error: `Số lượng kê phải lớn hơn 0 cho thuốc "${name}".`,
-      availableStock,
-      medicineName: name,
-    }
-  }
-
   if (availableStock <= 0) {
     return {
       isValid: false,
