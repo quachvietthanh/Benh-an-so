@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -14,16 +15,26 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.reporting.enums.ReportType;
+import com.benhsoan.infrastructure.authSecurity.CurrentUserPrincipal;
+import com.benhsoan.infrastructure.security.service.CurrentUserAdapter;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 class OperationalReportAuditServiceTest {
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void writesSelectedReportTypeToExportAuditLog() {
@@ -83,5 +94,29 @@ class OperationalReportAuditServiceTest {
         verify(auditLogRepository).save(captor.capture());
 
         assertTrue(captor.getValue().getDetail().contains("\"role\":\"MANAGER\""));
+    }
+
+    @Test
+    void writesRoleWithoutPermissionAuthoritiesToAudit() {
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        ClockPort clockPort = mock(ClockPort.class);
+        UUID actorId = UUID.randomUUID();
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new CurrentUserPrincipal(actorId, "manager"),
+                null,
+                Set.of(
+                        new SimpleGrantedAuthority("ROLE_MANAGER"),
+                        new SimpleGrantedAuthority("PERMISSION_REPORT_EXPORT")
+                )
+        ));
+        when(clockPort.now()).thenReturn(Instant.parse("2026-08-13T02:15:30Z"));
+
+        new OperationalReportAuditService(auditLogRepository, new CurrentUserAdapter(), clockPort)
+                .logExport(ReportType.OPERATIONAL_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertTrue(captor.getValue().getDetail().contains("\"role\":\"MANAGER\""));
+        assertFalse(captor.getValue().getDetail().contains("PERMISSION_REPORT_EXPORT"));
     }
 }

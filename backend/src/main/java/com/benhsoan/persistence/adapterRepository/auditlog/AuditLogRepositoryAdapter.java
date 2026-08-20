@@ -36,4 +36,5 @@ public class AuditLogRepositoryAdapter
         return jpaRepository.findById(id)
                 .map(mapper::toDomain);
     }
+
 }

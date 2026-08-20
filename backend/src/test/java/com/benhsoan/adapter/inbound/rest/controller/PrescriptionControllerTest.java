@@ -41,6 +41,7 @@ import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
@@ -84,6 +85,9 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+
+    @MockitoBean
+    private ExportPrescriptionUseCase exportPrescriptionUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -139,6 +143,24 @@ class PrescriptionControllerTest {
                 .andExpect(jsonPath("$.content[0].status").value("PENDING_DISPENSE"))
                 .andExpect(jsonPath("$.content[0].patientName").value("Nguyen Van A"))
                 .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /prescriptions/{id}/print returns a downloadable PDF")
+    void printReturnsDownloadablePdf() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        byte[] pdf = "%PDF-1.7".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        when(exportPrescriptionUseCase.export(prescriptionId))
+                .thenReturn(new com.benhsoan.port.dto.result.PrescriptionPrintResult(
+                        "prescription-RX-001.pdf", "application/pdf", pdf));
+
+        mockMvc.perform(get("/prescriptions/{id}/print", prescriptionId))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Type", "application/pdf"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Disposition", "attachment; filename=\"prescription-RX-001.pdf\""))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(pdf));
     }
 
     @Test
