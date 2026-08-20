@@ -33,12 +33,19 @@ const { Text, Paragraph, Title } = Typography
 
 const ROUTE_LABELS = {
   ORAL: 'Uống',
-  TOPICAL: 'Bôi ngoài',
-  INHALATION: 'Hít/Xịt',
-  INTRAVENOUS: 'Tiêm IV',
-  INTRAMUSCULAR: 'Tiêm IM',
-  SUBCUTANEOUS: 'Tiêm SC',
-  OTHER: 'Khác',
+  TOPICAL: 'Bôi ngoài da',
+  INHALATION: 'Hít / Khí dung',
+  OPHTHALMIC: 'Nhỏ / Tra mắt',
+  NASAL: 'Xịt / Nhỏ mũi',
+  OTIC: 'Nhỏ tai',
+  SUBLINGUAL: 'Ngậm dưới lưỡi',
+  RECTAL: 'Đặt hậu môn / Trực tràng',
+  INTRAVENOUS: 'Tiêm tĩnh mạch',
+  INTRAMUSCULAR: 'Tiêm bắp',
+  SUBCUTANEOUS: 'Tiêm dưới da',
+  TRANSDERMAL: 'Dán ngoài da',
+  VAGINAL: 'Đặt âm đạo',
+  OTHER: 'Cách dùng khác',
 }
 
 function PrescriptionDetailModal({
