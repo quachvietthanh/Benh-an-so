@@ -60,7 +60,13 @@ const loadRecentDiagnoses = () => {
     const saved = localStorage.getItem('recent_diagnoses')
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      if (Array.isArray(parsed)) {
+        const valid = parsed.filter((item) => item?.id && item?.code)
+        if (valid.length !== parsed.length) {
+          localStorage.setItem('recent_diagnoses', JSON.stringify(valid))
+        }
+        return valid
+      }
     }
   } catch {
   }
@@ -369,15 +375,25 @@ function MedicalEncounter() {
   const selectPrimaryDiagnosis = useCallback(
     (icd) => {
       if (!icd?.code) return
-      const cleanIcd = { ...icd, name: fixMojibake(icd.name) }
+      const backendItem = allBackendDiagnoses.find(
+        (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+      )
+      const cleanIcd = {
+        id: icd.id || backendItem?.id,
+        code: backendItem?.code || icd.code,
+        name: fixMojibake(backendItem?.name || icd.name),
+        note: icd.note,
+      }
       setPrimaryIcd(cleanIcd)
       form.setFieldsValue({
         diagnosisText: `[${cleanIcd.code}] ${cleanIcd.name}`,
       })
-      saveRecentDiagnosis(cleanIcd)
-      setRecentIcds(loadRecentDiagnoses())
+      if (cleanIcd.id) {
+        saveRecentDiagnosis(cleanIcd)
+        setRecentIcds(loadRecentDiagnoses())
+      }
     },
-    [form],
+    [allBackendDiagnoses, form],
   )
 
   const clearPrimaryDiagnosis = useCallback(() => {
@@ -394,7 +410,15 @@ function MedicalEncounter() {
         message.warning('Mã này đã được chọn làm chẩn đoán chính.')
         return
       }
-      const cleanIcd = { ...icd, name: fixMojibake(icd.name) }
+      const backendItem = allBackendDiagnoses.find(
+        (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+      )
+      const cleanIcd = {
+        id: icd.id || backendItem?.id,
+        code: backendItem?.code || icd.code,
+        name: fixMojibake(backendItem?.name || icd.name),
+        note: icd.note,
+      }
       setSecondaryIcds((prev) => {
         if (prev.some((item) => item.code === cleanIcd.code)) {
           message.info('Mã chẩn đoán phụ này đã có trong danh sách.')
@@ -402,23 +426,20 @@ function MedicalEncounter() {
         }
         return [...prev, cleanIcd]
       })
-      saveRecentDiagnosis(cleanIcd)
-      setRecentIcds(loadRecentDiagnoses())
+      if (cleanIcd.id) {
+        saveRecentDiagnosis(cleanIcd)
+        setRecentIcds(loadRecentDiagnoses())
+      }
     },
-    [primaryIcd?.code],
+    [allBackendDiagnoses, primaryIcd?.code],
   )
 
   const diagnosisSelectOptions = useMemo(() => {
     if (icdSearchQuery.trim()) {
       return filteredIcdList
     }
-    const combined = new Map()
-    recentIcds.forEach((item) => combined.set(item.code, item))
-    allBackendDiagnoses.forEach((item) => {
-      if (!combined.has(item.code)) combined.set(item.code, item)
-    })
-    return Array.from(combined.values())
-  }, [allBackendDiagnoses, filteredIcdList, icdSearchQuery, recentIcds])
+    return allBackendDiagnoses
+  }, [allBackendDiagnoses, filteredIcdList, icdSearchQuery])
 
   const handleAddOrder = (catalogItem) => {
     if (selectedOrders.some((item) => item.id === catalogItem.id)) {
@@ -445,14 +466,24 @@ function MedicalEncounter() {
     if (diagnosis?.id) return diagnosis
     if (!diagnosis?.code) throw new Error('Vui lòng chọn chẩn đoán ICD-10 từ danh mục chuẩn.')
 
-    const response = await medicalRecordApi.getDiagnosisCatalog(diagnosis.code)
-    const exact = (response.data || []).find(
+    const foundInState = allBackendDiagnoses.find(
       (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase(),
     )
-    if (!exact) {
+    if (foundInState?.id) {
+      return { id: foundInState.id, code: foundInState.code, name: foundInState.name, note: diagnosis.note }
+    }
+
+    const response = await medicalRecordApi.getDiagnosisCatalog(diagnosis.code)
+    const list = Array.isArray(response.data) ? response.data : []
+    const exact =
+      list.find((item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase()) ||
+      list.find((item) => String(item.code).toUpperCase().startsWith(String(diagnosis.code).toUpperCase())) ||
+      list[0]
+
+    if (!exact?.id) {
       throw new Error(`Mã ${diagnosis.code} chưa tồn tại trong danh mục chẩn đoán chuẩn.`)
     }
-    return { id: exact.id, code: exact.code, name: exact.name, note: diagnosis.note }
+    return { id: exact.id, code: exact.code, name: fixMojibake(exact.name), note: diagnosis.note }
   }
 
   const openPrescription = async (medicalRecordId) => {
