@@ -26,7 +26,7 @@ public record PrescriptionItemResponse(
 
         String dosage,
 
-        String frequency,
+        Integer frequency,
 
         AdministrationRoute route,
 

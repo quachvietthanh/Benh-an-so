@@ -202,7 +202,7 @@ class PrescriptionRepositoryAdapterIntegrationTest {
                 "500 mg",
                 "tablet",
                 dosage,
-                "Twice daily",
+                2,
                 AdministrationRoute.ORAL,
                 5,
                 10,

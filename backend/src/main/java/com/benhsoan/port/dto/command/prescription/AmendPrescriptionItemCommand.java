@@ -13,7 +13,7 @@ public record AmendPrescriptionItemCommand(
 
         String dosage,
 
-        String frequency,
+        Integer frequency,
 
         AdministrationRoute route,
 

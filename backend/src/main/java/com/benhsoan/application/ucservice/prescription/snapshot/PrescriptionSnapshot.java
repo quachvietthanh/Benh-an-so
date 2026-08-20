@@ -29,7 +29,7 @@ public record PrescriptionSnapshot(
             String strength,
             String unit,
             String dosage,
-            String frequency,
+            Integer frequency,
             AdministrationRoute route,
             Integer durationDays,
             int quantity,
