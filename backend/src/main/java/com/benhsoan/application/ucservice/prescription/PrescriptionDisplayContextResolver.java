@@ -45,11 +45,6 @@ public class PrescriptionDisplayContextResolver {
                 visitCode = visit.getVisitCode();
                 patientId = visit.getPatientId();
 
-                if (visit.getDoctorId() != null) {
-                    doctorName = userRepository.findById(visit.getDoctorId())
-                            .map(user -> user.getFullName())
-                            .orElse(null);
-                }
             }
         }
 
@@ -61,7 +56,7 @@ public class PrescriptionDisplayContextResolver {
             }
         }
 
-        if (doctorName == null && prescribedBy != null) {
+        if (prescribedBy != null) {
             doctorName = userRepository.findById(prescribedBy)
                     .map(user -> user.getFullName())
                     .orElse(null);

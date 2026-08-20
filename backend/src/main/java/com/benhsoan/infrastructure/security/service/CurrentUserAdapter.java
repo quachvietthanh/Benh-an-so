@@ -60,9 +60,8 @@ public class CurrentUserAdapter implements CurrentUserPort {
         return authentication.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)
-                .map(role -> role.startsWith("ROLE_")
-                        ? role.substring(5)
-                        : role)
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .map(authority -> authority.substring(5))
                 .collect(Collectors.toSet());
     }
 

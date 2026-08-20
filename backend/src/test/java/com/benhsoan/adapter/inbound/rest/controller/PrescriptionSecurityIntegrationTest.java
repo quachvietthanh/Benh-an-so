@@ -29,6 +29,7 @@ import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
@@ -60,6 +61,7 @@ class PrescriptionSecurityIntegrationTest {
     @MockitoBean private DispensePrescriptionUseCase dispensePrescriptionUseCase;
     @MockitoBean private CancelPrescriptionUseCase cancelPrescriptionUseCase;
     @MockitoBean private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+    @MockitoBean private ExportPrescriptionUseCase exportPrescriptionUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -111,5 +113,48 @@ class PrescriptionSecurityIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsDoctorsAndPharmacistsButRejectsReceptionistsToPrint() throws Exception {
+        java.util.UUID prescriptionId = java.util.UUID.randomUUID();
+        when(exportPrescriptionUseCase.export(prescriptionId))
+                .thenReturn(new com.benhsoan.port.dto.result.PrescriptionPrintResult(
+                        "prescription-RX-001.pdf", "application/pdf", "%PDF".getBytes()));
+
+        for (String userRole : new String[] {"DOCTOR", "PHARMACIST"}) {
+            mockMvc.perform(get("/prescriptions/{id}/print", prescriptionId)
+                            .with(user(userRole.toLowerCase())
+                                    .authorities(
+                                            new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                    "ROLE_" + userRole),
+                                            new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                    "PERMISSION_PRESCRIPTION_PRINT"))))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get("/prescriptions/{id}/print", prescriptionId)
+                        .with(user("receptionist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                        "ROLE_RECEPTIONIST"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                        "PERMISSION_PRESCRIPTION_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsInternalServerErrorWhenPdfRenderingFails() throws Exception {
+        java.util.UUID prescriptionId = java.util.UUID.randomUUID();
+        when(exportPrescriptionUseCase.export(prescriptionId)).thenThrow(
+                new com.benhsoan.infrastructure.pdf.PdfRenderingException(
+                        "Unable to generate prescription PDF.", new java.io.IOException("Render failure")
+                )
+        );
+
+        mockMvc.perform(get("/prescriptions/{id}/print", prescriptionId)
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "ROLE_DOCTOR"), new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "PERMISSION_PRESCRIPTION_PRINT"))))
+                .andExpect(status().isInternalServerError());
     }
 }
