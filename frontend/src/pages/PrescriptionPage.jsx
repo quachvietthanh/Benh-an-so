@@ -100,7 +100,7 @@ const createEmptyItem = (isOriginal = false) => ({
   medicineId: undefined,
   quantity: 1,
   dosage: '',
-  frequency: '',
+  frequency: 2,
   route: undefined,
   durationDays: 1,
   instructions: '',
@@ -310,7 +310,7 @@ function PrescriptionPage() {
     const response = await queueApi.getById(queueItemId)
     const liveQueueItem = response?.data
     if (!liveQueueItem?.id || String(liveQueueItem.id) !== String(queueItemId)) {
-      throw new Error('Backend không trả đúng queue item của lượt khám.')
+      throw new Error('Hệ thống không tìm thấy thông tin lượt khám trong hàng đợi.')
     }
 
     setEncounter((current) =>
@@ -413,8 +413,17 @@ function PrescriptionPage() {
       if (!item.medicineId) return `Dòng ${index + 1}: chưa chọn thuốc.`
       if (seen.has(item.medicineId)) return `Dòng ${index + 1}: thuốc bị trùng trong đơn.`
       seen.add(item.medicineId)
-      if (!item.dosage.trim()) return `Dòng ${index + 1}: chưa nhập liều dùng.`
-      if (!item.frequency.trim()) return `Dòng ${index + 1}: chưa nhập tần suất.`
+      if (!item.dosage?.trim()) return `Dòng ${index + 1}: chưa nhập liều dùng.`
+      const freqNum = Number(item.frequency)
+      if (
+        item.frequency === '' ||
+        item.frequency == null ||
+        isNaN(freqNum) ||
+        !Number.isInteger(freqNum) ||
+        freqNum <= 0
+      ) {
+        return `Dòng ${index + 1}: tần suất dùng thuốc phải là số nguyên dương lớn hơn 0 (lần/ngày).`
+      }
       if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
         return `Dòng ${index + 1}: số lượng phải là số nguyên dương.`
       }
@@ -438,11 +447,11 @@ function PrescriptionPage() {
     items.map((item) => ({
       medicineId: item.medicineId,
       dosage: item.dosage.trim(),
-      frequency: item.frequency.trim(),
+      frequency: Number(item.frequency),
       route: item.route || null,
       durationDays: Number(item.durationDays),
       quantity: Number(item.quantity),
-      instructions: item.instructions.trim(),
+      instructions: (item.instructions || '').trim(),
     }))
 
   const executeSavePrescription = async (overrides = []) => {
@@ -498,7 +507,7 @@ function PrescriptionPage() {
           content: (
             <div>
               <Paragraph style={{ color: '#dc2626', marginBottom: 8 }}>
-                Dữ liệu tồn kho khả dụng mới nhất từ Backend không đủ cho đơn thuốc này:
+                Dữ liệu tồn kho khả dụng mới nhất của hệ thống không đủ cho đơn thuốc này:
               </Paragraph>
               <ul style={{ paddingLeft: 20, color: '#b91c1c', marginBottom: 8 }}>
                 {liveStockValidation.errors.map((err, idx) => (
@@ -552,9 +561,9 @@ function PrescriptionPage() {
         items: items.map((i) => ({
           medicineId: i.medicineId,
           medicineName: i.medicineName || i.name,
-          quantity: i.quantity,
+          quantity: Number(i.quantity),
           dosage: i.dosage,
-          frequency: i.frequency,
+          frequency: Number(i.frequency),
           unitPrice: i.unitPrice || i.price,
         })),
         createdAt: new Date().toISOString(),
@@ -644,11 +653,11 @@ function PrescriptionPage() {
       (prescription.items || []).map((item) => ({
         clientId: `prescription-item-${++localItemSequence}`,
         medicineId: item.medicineId,
-        quantity: item.quantity,
+        quantity: Number(item.quantity),
         dosage: item.dosage || '',
-        frequency: item.frequency || '',
+        frequency: item.frequency != null ? Number(item.frequency) : 2,
         route: item.route,
-        durationDays: item.durationDays || 1,
+        durationDays: Number(item.durationDays) || 1,
         instructions: item.instructions || '',
         isOriginal: true,
       })),
@@ -734,7 +743,7 @@ function PrescriptionPage() {
             const lockResponse = await medicalRecordApi.lock(medicalRecordId)
             locked = lockResponse.data?.status === 'LOCKED'
             if (!locked) {
-              throw new Error('Backend không xác nhận bệnh án đã được khóa.')
+              throw new Error('Hệ thống không xác nhận bệnh án đã được khóa.')
             }
             setRecord((current) => ({ ...current, ...lockResponse.data }))
           }
@@ -746,14 +755,14 @@ function PrescriptionPage() {
             String(completedQueueItem.id) !== String(liveQueueItem.id) ||
             completedQueueItem.status !== 'COMPLETED'
           ) {
-            throw new Error('Backend không xác nhận queue item/visit đã hoàn tất.')
+            throw new Error('Hệ thống không xác nhận lượt khám đã hoàn tất.')
           }
           setEncounter((current) =>
             current
               ? { ...current, queueItem: { ...current.queueItem, ...completedQueueItem } }
               : current,
           )
-          message.success('Đã khóa bệnh án và hoàn tất queue item/visit trên backend.')
+          message.success('Đã khóa bệnh án và hoàn tất lượt khám thành công.')
           navigate('/appointments')
         } catch (error) {
           message.error(
@@ -1267,12 +1276,18 @@ function PrescriptionPage() {
                               placeholder="Ví dụ: 1 viên/lần, 5ml/lần..."
                             />
                           </Form.Item>
-                          <Form.Item label="Tần suất *" style={{ marginBottom: 0, flex: 1, minWidth: 240 }}>
-                            <Input
+                          <Form.Item label="Tần suất (lần/ngày) *" style={{ marginBottom: 0, flex: 1, minWidth: 240 }}>
+                            <InputNumber
+                              min={1}
+                              max={24}
+                              step={1}
+                              precision={0}
+                              style={{ width: '100%' }}
+                              placeholder="Số lần/ngày (VD: 2)"
+                              addonAfter="lần/ngày"
                               disabled={!canPrescribe || checkingInteractions || saving}
                               value={item.frequency}
-                              onChange={(event) => handleItemChange(item.clientId, 'frequency', event.target.value)}
-                              placeholder="Ví dụ: 2 lần/ngày, sáng - tối..."
+                              onChange={(value) => handleItemChange(item.clientId, 'frequency', value)}
                             />
                           </Form.Item>
                           <Form.Item label="Hướng dẫn dùng" style={{ marginBottom: 0, flex: 1, minWidth: 260 }}>
@@ -1395,7 +1410,7 @@ function PrescriptionPage() {
                         type="info"
                         showIcon
                         icon={<Spin size="small" />}
-                        message="Đang kiểm tra tương tác thuốc từ Backend..."
+                        message="Đang kiểm tra tương tác thuốc..."
                       />
                     </div>
                   )}

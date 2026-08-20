@@ -475,8 +475,12 @@ function BillingPage() {
           const qty = Number(item.quantity || 1)
           const amount = qty * unitPrice
           const name = item.medicineName || matchedMed?.medicineName || matchedMed?.name || `Thuốc ${idx + 1}`
-          const unit = item.unit || matchedMed?.unit || 'viên'
-          const dosageInfo = [item.dosage, item.frequency].filter(Boolean).join(' - ')
+          const freqStr = item.frequency != null && item.frequency !== ''
+            ? typeof item.frequency === 'number' || !isNaN(Number(item.frequency))
+              ? `${item.frequency} lần/ngày`
+              : item.frequency
+            : ''
+          const dosageInfo = [item.dosage, freqStr].filter(Boolean).join(' - ')
 
           return {
             ...item,

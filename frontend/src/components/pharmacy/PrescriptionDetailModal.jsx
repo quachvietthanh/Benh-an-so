@@ -100,7 +100,13 @@ function PrescriptionDetailModal({
       render: (_, item) => (
         <div>
           <div><Text strong>{item.dosage || '—'}</Text></div>
-          <div style={{ fontSize: 12, color: '#4b5563' }}>{item.frequency || '—'}</div>
+          <div style={{ fontSize: 12, color: '#4b5563' }}>
+            {item.frequency != null && item.frequency !== ''
+              ? typeof item.frequency === 'number' || !isNaN(Number(item.frequency))
+                ? `${item.frequency} lần/ngày`
+                : item.frequency
+              : '—'}
+          </div>
         </div>
       ),
     },
@@ -334,11 +340,18 @@ function PrescriptionDetailModal({
                                     : typeof log.before.items === 'string'
                                       ? JSON.parse(log.before.items)
                                       : []
-                                  ).map((item, i) => (
-                                    <li key={i}>
-                                      <strong>{item.medicineName || getMedicineName(item.medicineId)}</strong> — SL: {item.quantity} | Liều: {item.dosage || 'Theo chỉ định'} ({item.frequency || ''})
-                                    </li>
-                                  ))}
+                                  ).map((item, i) => {
+                                    const freqText = item.frequency != null && item.frequency !== ''
+                                      ? typeof item.frequency === 'number' || !isNaN(Number(item.frequency))
+                                        ? `${item.frequency} lần/ngày`
+                                        : item.frequency
+                                      : ''
+                                    return (
+                                      <li key={i}>
+                                        <strong>{item.medicineName || getMedicineName(item.medicineId)}</strong> — SL: {item.quantity} | Liều: {item.dosage || 'Theo chỉ định'} {freqText ? `(${freqText})` : ''}
+                                      </li>
+                                    )
+                                  })}
                                 </ul>
                               </div>
                             )}
@@ -353,11 +366,18 @@ function PrescriptionDetailModal({
                                   : typeof log.after?.items === 'string'
                                     ? JSON.parse(log.after.items)
                                     : items
-                                ).map((item, i) => (
-                                  <li key={i}>
-                                    <strong>{item.medicineName || getMedicineName(item.medicineId)}</strong> — SL: {item.quantity} | Liều: {item.dosage || 'Theo chỉ định'} ({item.frequency || ''})
-                                  </li>
-                                ))}
+                                ).map((item, i) => {
+                                  const freqText = item.frequency != null && item.frequency !== ''
+                                    ? typeof item.frequency === 'number' || !isNaN(Number(item.frequency))
+                                      ? `${item.frequency} lần/ngày`
+                                      : item.frequency
+                                    : ''
+                                  return (
+                                    <li key={i}>
+                                      <strong>{item.medicineName || getMedicineName(item.medicineId)}</strong> — SL: {item.quantity} | Liều: {item.dosage || 'Theo chỉ định'} {freqText ? `(${freqText})` : ''}
+                                    </li>
+                                  )
+                                })}
                               </ul>
                             </div>
                           </Card>
