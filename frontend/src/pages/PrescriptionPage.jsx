@@ -26,10 +26,14 @@ import {
   Typography,
 } from 'antd'
 import {
+  AlertOutlined,
+  BarcodeOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  CopyOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   EllipsisOutlined,
   ExclamationCircleOutlined,
@@ -39,7 +43,10 @@ import {
   LockOutlined,
   MedicineBoxOutlined,
   PlusOutlined,
+  PrinterOutlined,
   RollbackOutlined,
+  SafetyCertificateOutlined,
+  SearchOutlined,
   StopOutlined,
   SwapOutlined,
   SyncOutlined,
@@ -53,6 +60,7 @@ import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
+import PrescriptionPrintModal from '../components/pharmacy/PrescriptionPrintModal'
 import { useAuthContext } from '../context/AuthContext'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
@@ -153,6 +161,23 @@ function PrescriptionPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
+  const [searchCodeQuery, setSearchCodeQuery] = useState('')
+  const [downloadingPdfMap, setDownloadingPdfMap] = useState({})
+  const [printModalOpen, setPrintModalOpen] = useState(false)
+  const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
+
+  const handleCopyPrescriptionCode = (code) => {
+    if (code) {
+      navigator.clipboard?.writeText(code)
+      message.success(`Đã sao chép mã đơn thuốc điện tử: ${code}`)
+    }
+  }
+
+  const handlePrintPrescriptionPdf = (prescription) => {
+    if (!prescription) return
+    setSelectedPrescriptionForPrint(prescription)
+    setPrintModalOpen(true)
+  }
 
   const isDoctor = roles.includes('doctor') || roles.includes('admin')
   const isAssignedDoctor = Boolean(
@@ -207,6 +232,18 @@ function PrescriptionPage() {
   )
   const canSubmit = submitStatus.allowed
 
+  const filteredPrescriptions = useMemo(() => {
+    const q = (searchCodeQuery || '').trim().toLowerCase()
+    if (!q) return prescriptions
+    return prescriptions.filter((p) => {
+      const code = String(p.prescriptionCode || '').toLowerCase()
+      const doctor = String(p.doctorName || '').toLowerCase()
+      const patient = String(p.patientName || '').toLowerCase()
+      const medNames = (p.items || []).map((i) => String(i.medicineName || '').toLowerCase()).join(' ')
+      return code.includes(q) || doctor.includes(q) || patient.includes(q) || medNames.includes(q)
+    })
+  }, [prescriptions, searchCodeQuery])
+
   const diagnosisSummary = useMemo(() => {
     const primary = diagnoses.find((diagnosis) => diagnosis.diagnosisType === 'PRIMARY') || diagnoses[0]
     if (!primary) return 'Chưa có chẩn đoán'
@@ -233,6 +270,8 @@ function PrescriptionPage() {
       const rawDiagnoses = Array.isArray(diagnosisResult.data) ? diagnosisResult.data : []
       const cleanedDiagnoses = rawDiagnoses.map((d) => ({
         ...d,
+        code: d.diagnosisCode || d.code || d.icdCode || '',
+        diagnosisCode: d.diagnosisCode || d.code || d.icdCode || '',
         diagnosisName: fixMojibake(d.diagnosisName || d.name || ''),
         name: fixMojibake(d.diagnosisName || d.name || ''),
       }))
@@ -626,11 +665,54 @@ function PrescriptionPage() {
         createdAt: new Date().toISOString(),
       })
 
-      message.success(
-        editingPrescription
-          ? `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công.`
-          : `Đã tạo đơn ${prescriptionCode} với trạng thái PENDING_DISPENSE.`,
-      )
+      if (!editingPrescription) {
+        Modal.success({
+          title: 'Cấp mã đơn thuốc điện tử thành công',
+          icon: <SafetyCertificateOutlined style={{ color: '#16a34a', fontSize: 24 }} />,
+          width: 520,
+          content: (
+            <div style={{ marginTop: 12 }}>
+              <Paragraph style={{ marginBottom: 6 }}>
+                Hệ thống đã cấp mã đơn thuốc điện tử chính thức duy nhất gắn cố định với đơn:
+              </Paragraph>
+              <div style={{ margin: '12px 0', textAlign: 'center', backgroundColor: '#eff6ff', padding: '14px', borderRadius: 8, border: '1px solid #bfdbfe' }}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>MÃ ĐƠN THUỐC ĐIỆN TỬ LIÊN THÔNG</Text>
+                <Space align="center">
+                  <BarcodeOutlined style={{ fontSize: 22, color: '#1e40af' }} />
+                  <Text strong style={{ fontSize: 24, color: '#1e40af', letterSpacing: '1px' }}>
+                    {prescriptionCode}
+                  </Text>
+                </Space>
+                <div style={{ marginTop: 10 }}>
+                  <Button
+                    size="small"
+                    icon={<CopyOutlined />}
+                    onClick={() => handleCopyPrescriptionCode(prescriptionCode)}
+                  >
+                    Sao chép mã đơn
+                  </Button>
+                </div>
+              </div>
+              <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 0 }}>
+                ✓ Mã đơn được bảo toàn cố định trong suốt vòng đời của đơn (kể cả khi điều chỉnh).<br />
+                ✓ Sẵn sàng phục vụ tra cứu, cấp phát thuốc tại quầy dược và in/xuất liên thông y tế.
+              </Paragraph>
+            </div>
+          ),
+          okText: 'In đơn thuốc ngay',
+          cancelText: 'Đóng',
+          okCancel: true,
+          onOk: () => {
+            if (response?.data?.id) {
+              handlePrintPrescriptionPdf(response.data)
+            }
+          },
+        })
+      } else {
+        message.success(
+          `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công. Mã đơn điện tử được bảo toàn cố định.`,
+        )
+      }
       setEditingPrescription(null)
       setItems([createEmptyItem()])
       setNote('')
@@ -837,17 +919,36 @@ function PrescriptionPage() {
 
   const historyColumns = [
     {
-      title: 'Mã đơn thuốc',
+      title: 'Mã đơn thuốc điện tử',
       dataIndex: 'prescriptionCode',
       key: 'prescriptionCode',
+      width: 220,
       render: (value, row) => (
-        <Space orientation="vertical" size={2}>
-          <Text strong style={{ color: '#2563eb', cursor: 'pointer' }} onClick={() => openDetailModal(row)}>
-            {value}
-          </Text>
+        <Space direction="vertical" size={2}>
+          <Space wrap>
+            <Tag
+              color="geekblue"
+              style={{ fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 8px' }}
+              onClick={() => openDetailModal(row)}
+            >
+              <BarcodeOutlined style={{ marginRight: 4 }} />
+              {value}
+            </Tag>
+            <Tooltip title="Sao chép mã đơn điện tử">
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined style={{ color: '#6b7280' }} />}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCopyPrescriptionCode(value)
+                }}
+              />
+            </Tooltip>
+          </Space>
           {row.updatedAt && row.updatedAt !== row.prescribedAt && (
             <Tag color="purple" style={{ fontSize: 11, padding: '0 4px' }}>
-              <SyncOutlined spin={false} /> Đã sửa
+              <SyncOutlined spin={false} /> Đã sửa (Mã cố định)
             </Tag>
           )}
         </Space>
@@ -918,7 +1019,7 @@ function PrescriptionPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 150,
+      width: 180,
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
         const canEditThis = canPrescribe && isPending
@@ -929,6 +1030,18 @@ function PrescriptionPage() {
             icon: <EyeOutlined />,
             label: 'Xem chi tiết đơn thuốc',
             onClick: () => openDetailModal(prescription),
+          },
+          {
+            key: 'print',
+            icon: <PrinterOutlined />,
+            label: 'In đơn thuốc (PDF)',
+            onClick: () => handlePrintPrescriptionPdf(prescription),
+          },
+          {
+            key: 'copy',
+            icon: <CopyOutlined />,
+            label: 'Sao chép mã đơn điện tử',
+            onClick: () => handleCopyPrescriptionCode(prescription.prescriptionCode),
           },
           canEditThis && {
             key: 'edit',
@@ -959,6 +1072,14 @@ function PrescriptionPage() {
             >
               Chi tiết
             </Button>
+            <Tooltip title="In đơn thuốc điện tử / Tải PDF">
+              <Button
+                size="small"
+                icon={<PrinterOutlined />}
+                loading={Boolean(downloadingPdfMap[prescription.id])}
+                onClick={() => handlePrintPrescriptionPdf(prescription)}
+              />
+            </Tooltip>
             <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
               <Button size="small" icon={<EllipsisOutlined />} title="Thao tác khác" />
             </Dropdown>
@@ -1703,9 +1824,21 @@ function PrescriptionPage() {
             ),
             children: (
               <div>
+                <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <Input.Search
+                    placeholder="Tra cứu theo mã đơn điện tử (VD: RX000001), tên thuốc, bác sĩ..."
+                    value={searchCodeQuery}
+                    onChange={(e) => setSearchCodeQuery(e.target.value)}
+                    allowClear
+                    style={{ maxWidth: 450 }}
+                  />
+                  <Text type="secondary">
+                    Tìm thấy <strong>{filteredPrescriptions.length}</strong> / {prescriptions.length} đơn thuốc
+                  </Text>
+                </div>
                 <Table
                   rowKey="id"
-                  dataSource={prescriptions}
+                  dataSource={filteredPrescriptions}
                   columns={historyColumns}
                   pagination={{ pageSize: 10 }}
                   bordered
@@ -1730,6 +1863,16 @@ function PrescriptionPage() {
         medicines={medicines}
         canEdit={canPrescribe}
         onEditClick={startEditPrescription}
+      />
+
+      <PrescriptionPrintModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        prescription={selectedPrescriptionForPrint}
+        medicines={medicines}
+        patient={encounter?.patient || record?.patient}
+        doctorName={encounter?.doctor?.fullName || encounter?.doctorName || record?.doctorName}
+        diagnoses={diagnoses}
       />
     </div>
   )

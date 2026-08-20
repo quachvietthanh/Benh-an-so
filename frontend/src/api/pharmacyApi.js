@@ -5,6 +5,7 @@ const pharmacyApi = {
   prescriptions: (params = { status: 'PENDING_DISPENSE' }) => axiosClient.get('/prescriptions', { params }),
   getByMedicalRecord: (medicalRecordId) => axiosClient.get(`/prescriptions/medical-records/${medicalRecordId}`),
   getById: (id) => axiosClient.get(`/prescriptions/${id}`),
+  printPrescription: (id) => axiosClient.get(`/prescriptions/${id}/print`, { responseType: 'blob' }),
   checkInteractions: (drugIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds }),
   createPrescription: (data) => axiosClient.post('/prescriptions', data),
   updatePrescription: (id, data) => axiosClient.patch(`/prescriptions/${id}`, data),

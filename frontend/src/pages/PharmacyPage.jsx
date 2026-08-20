@@ -16,18 +16,23 @@ import {
   Statistic,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd'
 import {
   AlertOutlined,
+  BarcodeOutlined,
   CheckCircleOutlined,
+  CopyOutlined,
   FieldTimeOutlined,
   InboxOutlined,
   MedicineBoxOutlined,
+  PrinterOutlined,
   ReloadOutlined,
   RightOutlined,
   RollbackOutlined,
+  SafetyCertificateOutlined,
   SearchOutlined,
   ShopOutlined,
   WarningOutlined,
@@ -35,6 +40,7 @@ import {
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
+import PrescriptionPrintModal from '../components/pharmacy/PrescriptionPrintModal'
 import { useAuthContext } from '../context/AuthContext'
 import { buildFefoPreview, fixMojibake } from '../utils/workflowContract'
 import { saveStoredPrescription, dispensePrescriptionHelper, mergePrescriptions } from '../utils/storageHelpers'
@@ -244,6 +250,23 @@ function PharmacyPage() {
     [selectedPrescription, batches],
   )
   const hasPreviewShortage = fefoPreview.some((item) => Number(item.shortageQuantity) > 0)
+
+  const [printModalOpen, setPrintModalOpen] = useState(false)
+  const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
+
+  const handleCopyCode = (code) => {
+    if (code) {
+      navigator.clipboard?.writeText(code)
+      message.success(`Đã sao chép mã đơn thuốc điện tử: ${code}`)
+    }
+  }
+
+  const handlePrintPdf = (prescription) => {
+    const target = prescription || selectedPrescription
+    if (!target) return
+    setSelectedPrescriptionForPrint(target)
+    setPrintModalOpen(true)
+  }
 
   const selectPrescription = (prescriptionId) => {
     setSelectedPrescriptionId(prescriptionId)
@@ -565,8 +588,11 @@ function PharmacyPage() {
                   >
                     <List.Item.Meta
                       title={(
-                        <Space wrap>
-                          <Text strong>{item.prescriptionCode || item.id}</Text>
+                        <Space wrap align="center">
+                          <Tag color="geekblue" style={{ fontSize: 13, fontWeight: 700, padding: '2px 8px' }}>
+                            <BarcodeOutlined style={{ marginRight: 4 }} />
+                            {item.prescriptionCode || item.id}
+                          </Tag>
                           <Tag color="orange">Chờ cấp phát</Tag>
                         </Space>
                       )}
@@ -602,9 +628,29 @@ function PharmacyPage() {
 
         <Col xs={24} xl={15}>
           <Card
-            title={selectedPrescription
-              ? `Chi tiết đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id}`
-              : 'Chi tiết đơn thuốc'}
+            title={selectedPrescription ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <Space wrap>
+                  <span>Chi tiết Đơn thuốc:</span>
+                  <Tag color="geekblue" style={{ fontSize: 14, fontWeight: 700, padding: '2px 8px' }}>
+                    <BarcodeOutlined style={{ marginRight: 4 }} />
+                    {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                  </Tag>
+                  <Tooltip title="Sao chép mã đơn thuốc điện tử">
+                    <Button
+                      size="small"
+                      icon={<CopyOutlined />}
+                      onClick={() => handleCopyCode(selectedPrescription.prescriptionCode || selectedPrescription.id)}
+                    >
+                      Sao chép
+                    </Button>
+                  </Tooltip>
+                </Space>
+                <Tag color="blue" icon={<SafetyCertificateOutlined />}>
+                  Đơn thuốc điện tử liên thông
+                </Tag>
+              </div>
+            ) : 'Chi tiết đơn thuốc'}
             style={{ height: '100%' }}
           >
             {!selectedPrescription ? (
@@ -612,6 +658,14 @@ function PharmacyPage() {
             ) : (
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
                 <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
+                  <Descriptions.Item label="Mã đơn điện tử">
+                    <Space>
+                      <Text code strong style={{ color: '#1e40af', fontSize: 14 }}>
+                        {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                      </Text>
+                      <Tag color="cyan" style={{ fontSize: 11 }}>Cố định duy nhất</Tag>
+                    </Space>
+                  </Descriptions.Item>
                   <Descriptions.Item label="Bệnh nhân">
                     {selectedPrescription.patientName || '—'} ({selectedPrescription.patientCode || '—'})
                   </Descriptions.Item>
@@ -657,55 +711,66 @@ function PharmacyPage() {
                   />
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Popconfirm
-                    title={
-                      <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
-                        Xác nhận cấp phát đơn thuốc
-                      </Text>
-                    }
-                    description={
-                      <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
-                        <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
-                          Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
-                          <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
-                            {selectedPrescription.prescriptionCode || selectedPrescription.id}
-                          </Text>?
-                        </div>
-                        <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
-                          <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
-                          <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
-                        </div>
-                      </div>
-                    }
-                    icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
-                    okText="Xác nhận cấp phát"
-                    cancelText="Kiểm tra lại"
-                    okButtonProps={{
-                      type: 'primary',
-                      size: 'large',
-                      icon: <CheckCircleOutlined />,
-                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 600 },
-                    }}
-                    cancelButtonProps={{
-                      size: 'large',
-                      icon: <RollbackOutlined />,
-                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 500 },
-                    }}
-                    onConfirm={handleDispense}
-                    disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
-                    overlayStyle={{ maxWidth: 500 }}
-                  >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <Space>
                     <Button
-                      type="primary"
-                      size="large"
-                      icon={<CheckCircleOutlined />}
-                      loading={dispensingId === selectedPrescription.id}
-                      disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                      icon={<PrinterOutlined />}
+                      loading={downloadingPdf}
+                      onClick={() => handlePrintPdf(selectedPrescription)}
                     >
-                      Xác nhận cấp phát theo FEFO
+                      In đơn thuốc / Xuất PDF
                     </Button>
-                  </Popconfirm>
+                  </Space>
+                  <Space>
+                    <Popconfirm
+                      title={
+                        <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
+                          Xác nhận cấp phát đơn thuốc
+                        </Text>
+                      }
+                      description={
+                        <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
+                          <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
+                            Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
+                            <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
+                              {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                            </Text>?
+                          </div>
+                          <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
+                            <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
+                            <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
+                          </div>
+                        </div>
+                      }
+                      icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
+                      okText="Xác nhận cấp phát"
+                      cancelText="Kiểm tra lại"
+                      okButtonProps={{
+                        type: 'primary',
+                        size: 'large',
+                        icon: <CheckCircleOutlined />,
+                        style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 600 },
+                      }}
+                      cancelButtonProps={{
+                        size: 'large',
+                        icon: <RollbackOutlined />,
+                        style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 500 },
+                      }}
+                      onConfirm={handleDispense}
+                      disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                      overlayStyle={{ maxWidth: 500 }}
+                    >
+                      <Button
+                        type="primary"
+                        size="large"
+                        icon={<CheckCircleOutlined />}
+                        loading={dispensingId === selectedPrescription.id}
+                        disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                      >
+                        Xác nhận cấp phát theo FEFO
+                      </Button>
+                    </Popconfirm>
+                  </Space>
                 </div>
                 {!canDispense && <Text type="danger">Tài khoản hiện tại không có quyền cấp phát thuốc.</Text>}
               </Space>
@@ -819,6 +884,13 @@ function PharmacyPage() {
           ]}
         />
       </Modal>
+
+      <PrescriptionPrintModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        prescription={selectedPrescriptionForPrint}
+        medicines={medicines}
+      />
     </div>
   )
 }

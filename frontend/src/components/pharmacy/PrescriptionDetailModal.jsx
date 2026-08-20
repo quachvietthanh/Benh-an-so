@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Alert,
   Badge,
@@ -7,27 +7,36 @@ import {
   Descriptions,
   Divider,
   Empty,
+  message,
   Modal,
   Space,
   Table,
   Tabs,
   Tag,
   Timeline,
+  Tooltip,
   Typography,
 } from 'antd'
 import {
   AlertOutlined,
+  BarcodeOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  CopyOutlined,
+  DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
   HistoryOutlined,
   MedicineBoxOutlined,
   PlusCircleOutlined,
+  PrinterOutlined,
+  SafetyCertificateOutlined,
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import pharmacyApi from '../../api/pharmacyApi'
+import PrescriptionPrintModal from './PrescriptionPrintModal'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 
 const { Text, Paragraph, Title } = Typography
@@ -57,7 +66,19 @@ function PrescriptionDetailModal({
   onEditClick,
   canEdit = false,
 }) {
+  const [printModalOpen, setPrintModalOpen] = useState(false)
   if (!prescription) return null
+
+  const handleCopyCode = () => {
+    if (prescription?.prescriptionCode) {
+      navigator.clipboard?.writeText(prescription.prescriptionCode)
+      message.success(`Đã sao chép mã đơn thuốc điện tử: ${prescription.prescriptionCode}`)
+    }
+  }
+
+  const handlePrintPdf = () => {
+    setPrintModalOpen(true)
+  }
 
   const getMedicineName = (id, fallback) => {
     const found = medicines.find((m) => String(m.id) === String(id))
@@ -173,41 +194,74 @@ function PrescriptionDetailModal({
     <Modal
       open={open}
       title={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingRight: 24 }}>
-          <Space>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingRight: 24, flexWrap: 'wrap' }}>
+          <Space wrap>
             <MedicineBoxOutlined style={{ color: '#2563eb', fontSize: 20 }} />
             <span style={{ fontSize: 17, fontWeight: 600 }}>
-              Chi tiết Đơn thuốc: {prescription.prescriptionCode}
+              Đơn thuốc điện tử:
             </span>
+            <Tag color="geekblue" style={{ fontSize: 16, fontWeight: 700, padding: '2px 10px', borderRadius: 6 }}>
+              <BarcodeOutlined style={{ marginRight: 6 }} />
+              {prescription.prescriptionCode}
+            </Tag>
+            <Tooltip title="Sao chép mã đơn thuốc điện tử">
+              <Button size="small" icon={<CopyOutlined />} onClick={handleCopyCode}>
+                Sao chép
+              </Button>
+            </Tooltip>
           </Space>
-          {statusTag}
+          <Space wrap>
+            <Tag color="blue" icon={<SafetyCertificateOutlined />}>
+              Đơn thuốc điện tử liên thông
+            </Tag>
+            {statusTag}
+          </Space>
         </div>
       }
       onCancel={onClose}
       footer={
-        <Space>
-          {canEdit && isPending && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <Space>
             <Button
-              type="primary"
-              icon={<EditOutlined />}
-              onClick={() => {
-                onClose()
-                if (onEditClick) onEditClick(prescription)
-              }}
+              icon={<PrinterOutlined />}
+              loading={downloadingPdf}
+              onClick={handlePrintPdf}
+              type="default"
             >
-              Điều chỉnh đơn này
+              In đơn thuốc / Xuất PDF
             </Button>
-          )}
-          <Button onClick={onClose}>Đóng</Button>
-        </Space>
+          </Space>
+          <Space>
+            {canEdit && isPending && (
+              <Button
+                type="primary"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  onClose()
+                  if (onEditClick) onEditClick(prescription)
+                }}
+              >
+                Điều chỉnh đơn này
+              </Button>
+            )}
+            <Button onClick={onClose}>Đóng</Button>
+          </Space>
+        </div>
       }
-      width={840}
+      width={880}
       style={{ top: 20 }}
     >
-      <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc' }}>
+      <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc', borderColor: '#bfdbfe' }}>
         <Descriptions size="small" column={{ xs: 1, sm: 2, lg: 3 }} bordered={false}>
-          <Descriptions.Item label={<Text strong><FileTextOutlined /> Mã đơn</Text>}>
-            <Text code strong style={{ color: '#2563eb' }}>{prescription.prescriptionCode}</Text>
+          <Descriptions.Item label={<Text strong><BarcodeOutlined /> Mã đơn điện tử</Text>}>
+            <Space>
+              <Text code strong style={{ color: '#1e40af', fontSize: 15 }}>
+                {prescription.prescriptionCode}
+              </Text>
+              <Tooltip title="Mã đơn là duy nhất và cố định trong suốt vòng đời của đơn">
+                <Tag color="cyan" style={{ fontSize: 11 }}>Cố định duy nhất</Tag>
+              </Tooltip>
+            </Space>
           </Descriptions.Item>
           <Descriptions.Item label={<Text strong><UserOutlined /> Bệnh nhân</Text>}>
             {prescription.patientName ? (
@@ -222,7 +276,7 @@ function PrescriptionDetailModal({
           <Descriptions.Item label="Bác sĩ kê đơn">
             <Text strong>{fixMojibake(prescription.doctorName) || '—'}</Text>
           </Descriptions.Item>
-          <Descriptions.Item label="Ngày kê">
+          <Descriptions.Item label="Ngày cấp mã & kê đơn">
             {prescription.prescribedAt ? dayjs(prescription.prescribedAt).format('HH:mm DD/MM/YYYY') : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Cập nhật lần cuối">
@@ -398,6 +452,13 @@ function PrescriptionDetailModal({
             ),
           },
         ]}
+      />
+
+      <PrescriptionPrintModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        prescription={prescription}
+        medicines={medicines}
       />
     </Modal>
   )
