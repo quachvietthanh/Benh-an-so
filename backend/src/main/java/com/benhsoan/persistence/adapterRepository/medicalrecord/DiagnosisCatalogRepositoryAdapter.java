@@ -30,4 +30,10 @@ public class DiagnosisCatalogRepositoryAdapter implements DiagnosisCatalogReposi
         return jpaRepository.findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(code, name)
                 .stream().map(mapper::toDomain).toList();
     }
+
+    @Override
+    public List<DiagnosisCatalog> findAll() {
+        return jpaRepository.findAll()
+                .stream().map(mapper::toDomain).toList();
+    }
 }

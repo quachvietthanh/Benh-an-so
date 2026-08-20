@@ -30,7 +30,7 @@ import {
   TableOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { commonIcd10List, icd10Categories } from '../../utils/icd10Data'
+import { icd10Categories, getIcd10CategoryByCode } from '../../utils/icd10Data'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
 
@@ -87,23 +87,16 @@ function MedicalEncounterForm({
   const [showIcdTable, setShowIcdTable] = useState(true)
 
   const availableIcdList = useMemo(() => {
-    const map = new Map()
-    commonIcd10List.forEach((item) => map.set(item.code, item))
-    ;(diagnosisOptions || []).forEach((item) => {
-      const existing = map.get(item.code)
-      map.set(item.code, {
-        category: existing?.category || item.category || 'ALL',
-        ...existing,
-        ...item,
-      })
-    })
+    let list = (diagnosisOptions || []).map((item) => ({
+      ...item,
+      category: item.category || getIcd10CategoryByCode(item.code),
+    }))
 
-    let list = Array.from(map.values())
     const q = icdTableSearch.trim().toLowerCase()
     if (q) {
       list = list.filter(
         (item) =>
-          item.code.toLowerCase().includes(q) ||
+          (item.code && item.code.toLowerCase().includes(q)) ||
           (item.name && item.name.toLowerCase().includes(q)),
       )
     }
@@ -435,7 +428,13 @@ function MedicalEncounterForm({
                         placeholder="Tìm nhanh theo mã (J00, I10, K21...) hoặc tên bệnh..."
                         prefix={<SearchOutlined style={{ color: '#94A3B8' }} />}
                         value={icdTableSearch}
-                        onChange={(e) => setIcdTableSearch(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setIcdTableSearch(val)
+                          if (typeof onDiagnosisSearch === 'function') {
+                            onDiagnosisSearch(val)
+                          }
+                        }}
                       />
                     </Col>
                     <Col xs={24} sm={10}>
@@ -453,7 +452,8 @@ function MedicalEncounterForm({
 
                   <Table
                     size="small"
-                    rowKey={(record) => record.code}
+                    loading={diagnosisSearching}
+                    rowKey={(record) => record.code || record.id}
                     dataSource={availableIcdList}
                     pagination={{
                       pageSize: 5,

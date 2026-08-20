@@ -35,8 +35,7 @@ import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintModal'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
-import { useAuthContext } from '../context/AuthContext'
-import { commonIcd10List, icd10Categories, searchIcd10 } from '../utils/icd10Data'
+import { icd10Categories, getIcd10CategoryByCode } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
 import {
   buildClinicalOrderPayload,
@@ -253,25 +252,35 @@ function MedicalEncounter() {
     loadWorkflow()
   }, [loadWorkflow])
 
-  useEffect(() => {
-    const query = icdSearchQuery.trim()
-    if (!query) {
+  const loadBackendIcdCatalog = useCallback(async (query = '') => {
+    try {
+      const response = await medicalRecordApi.getDiagnosisCatalog(query)
+      const raw = Array.isArray(response.data) ? response.data : []
+      setBackendIcdCatalog(
+        raw.map((item) => ({
+          id: item.id,
+          code: item.code,
+          name: fixMojibake(item.name),
+          description: fixMojibake(item.description || ''),
+          category: item.category || getIcd10CategoryByCode(item.code),
+        })),
+      )
+    } catch {
       setBackendIcdCatalog([])
-      return
     }
+  }, [])
 
-    const timer = setTimeout(async () => {
-      try {
-        const response = await medicalRecordApi.getDiagnosisCatalog(query)
-        const raw = Array.isArray(response.data) ? response.data : []
-        setBackendIcdCatalog(raw.map((item) => ({ ...item, name: fixMojibake(item.name) })))
-      } catch {
-        setBackendIcdCatalog([])
-      }
+  useEffect(() => {
+    loadBackendIcdCatalog('')
+  }, [loadBackendIcdCatalog])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadBackendIcdCatalog(icdSearchQuery.trim())
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [icdSearchQuery])
+  }, [icdSearchQuery, loadBackendIcdCatalog])
 
   const bmiValue = useMemo(() => {
     const weight = Number(vitalSigns.weight)
@@ -280,20 +289,11 @@ function MedicalEncounter() {
   }, [vitalSigns.height, vitalSigns.weight])
 
   const filteredIcdList = useMemo(() => {
-    const combined = new Map()
-    searchIcd10(icdSearchQuery, icdCategory).forEach((item) =>
-      combined.set(item.code, { ...item, name: fixMojibake(item.name) }),
-    )
-    backendIcdCatalog.forEach((item) =>
-      combined.set(item.code, {
-        id: item.id,
-        code: item.code,
-        name: fixMojibake(item.name),
-        category: item.category || 'ALL',
-      }),
-    )
-    return Array.from(combined.values())
-  }, [backendIcdCatalog, icdCategory, icdSearchQuery])
+    return backendIcdCatalog.filter((item) => {
+      const matchesCategory = icdCategory === 'ALL' || item.category === icdCategory
+      return matchesCategory
+    })
+  }, [backendIcdCatalog, icdCategory])
 
   const filteredCatalog = useMemo(() => {
     const query = orderSearchQuery.trim().toLowerCase()
