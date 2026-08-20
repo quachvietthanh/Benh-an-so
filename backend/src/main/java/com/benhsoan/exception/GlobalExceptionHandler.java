@@ -20,6 +20,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
+import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
 import com.benhsoan.domain.shared.exception.DomainException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +33,23 @@ import org.slf4j.LoggerFactory;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(OperationalReportDataEmptyException.class)
+    public ResponseEntity<ReportDataEmptyResponse> handleOperationalReportDataEmpty(
+            OperationalReportDataEmptyException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity
+                .status(ex.getStatus())
+                .body(new ReportDataEmptyResponse(
+                        Instant.now(),
+                        ex.getStatus().value(),
+                        ex.getStatus().getReasonPhrase(),
+                        "REPORT_DATA_EMPTY",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                ));
+    }
 
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiErrorResponse> handleDomainException(

@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
@@ -25,7 +26,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 class OperationalReportAuditServiceTest {
 
     @Test
-    void writesOperationalReportExportAuditLog() {
+    void writesSelectedReportTypeToExportAuditLog() {
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
         ClockPort clockPort = mock(ClockPort.class);
@@ -42,7 +43,7 @@ class OperationalReportAuditServiceTest {
                 clockPort
         );
 
-        service.logExport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+        service.logExport(ReportType.REVENUE_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(captor.capture());
@@ -53,7 +54,7 @@ class OperationalReportAuditServiceTest {
         assertEquals(ResourceType.OPERATIONAL_REPORT, auditLog.getResourceType());
         assertNull(auditLog.getResourceId());
         assertEquals(exportedAt, auditLog.getCreatedAt());
-        assertTrue(auditLog.getDetail().contains("\"reportType\":\"OPERATIONAL_REPORT\""));
+        assertTrue(auditLog.getDetail().contains("\"reportType\":\"REVENUE_REPORT\""));
         assertTrue(auditLog.getDetail().contains("\"role\":\"MANAGER\""));
         assertTrue(auditLog.getDetail().contains("\"from\":\"2026-08-01\""));
         assertTrue(auditLog.getDetail().contains("\"to\":\"2026-08-03\""));
@@ -76,7 +77,7 @@ class OperationalReportAuditServiceTest {
                 clockPort
         );
 
-        service.logExport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+        service.logExport(ReportType.OPERATIONAL_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(captor.capture());

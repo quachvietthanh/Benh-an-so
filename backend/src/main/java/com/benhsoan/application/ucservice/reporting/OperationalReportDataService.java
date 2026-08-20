@@ -10,6 +10,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
@@ -60,6 +61,19 @@ public class OperationalReportDataService {
                 getSummary(from, to),
                 getTimeline(from, to)
         );
+    }
+
+    public boolean hasReportData(ReportType reportType, LocalDate from, LocalDate to) {
+        ReportingTimeRange range = ReportingTimeRange.of(from, to);
+        return switch (reportType) {
+            case VISIT_REPORT -> operationalReportQueryRepository.hasCompletedVisits(
+                    range.fromInclusive(), range.toExclusive());
+            case REVENUE_REPORT -> operationalReportQueryRepository.hasInvoices(
+                    range.fromInclusive(), range.toExclusive());
+            case OPERATIONAL_REPORT -> operationalReportQueryRepository.hasCompletedVisits(
+                    range.fromInclusive(), range.toExclusive())
+                    || operationalReportQueryRepository.hasInvoices(range.fromInclusive(), range.toExclusive());
+        };
     }
 
     public TopMedicinesReportResult getTopMedicines(LocalDate from, LocalDate to) {

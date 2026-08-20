@@ -386,6 +386,13 @@ Trả về timeline theo ngày cho cả 2 chỉ số chính để frontend có t
 }
 ```
 
+### 8.6 Empty Period Behaviour
+
+`GET /reports/summary` and `GET /reports/visits-timeline` are read APIs. They
+return `200 OK` for an empty period: summary values are zero and timeline rows
+are present with zero values. The empty-period rule for file export in section
+10.3 does not apply to these APIs.
+
 ---
 
 ## 9. Export Endpoint Contract
@@ -393,8 +400,36 @@ Trả về timeline theo ngày cho cả 2 chỉ số chính để frontend có t
 ### 9.1 Endpoint
 
 ```text
-GET /reports/export?from=YYYY-MM-DD&to=YYYY-MM-DD
+GET /reports/export?reportType={REPORT_TYPE}&from=YYYY-MM-DD&to=YYYY-MM-DD
 ```
+
+### 9.1.1 Report Type
+
+The export request requires one of these `reportType` values:
+
+```text
+VISIT_REPORT
+REVENUE_REPORT
+OPERATIONAL_REPORT
+```
+
+`VISIT_REPORT` exports completed visits. `REVENUE_REPORT` exports net revenue.
+`OPERATIONAL_REPORT` is retained as a combined export of both metrics. Export
+types for top medicines, doctor visits, and audit logs are out of scope.
+
+The selected type controls the data-exists check, CSV layout, filename, and
+the report type written to the audit record.
+
+Requests with a missing or unsupported `reportType` return `400 Bad Request`.
+
+### 9.1.2 Authorization and Validation
+
+The caller must have the `REPORT_EXPORT` permission. A caller without that
+permission receives `403 Forbidden` and no file is generated.
+
+`from` and `to` are required `YYYY-MM-DD` values. The request receives `400
+Bad Request` when either value is missing or invalid, `from` is after `to`, or
+the inclusive range exceeds 366 days.
 
 ### 9.2 Output Format
 
@@ -404,10 +439,27 @@ Response headers nên là:
 
 ```text
 Content-Type: text/csv; charset=UTF-8
-Content-Disposition: attachment; filename="operational-report-2026-08-01-to-2026-08-13.csv"
+Content-Disposition: attachment; filename="{report-type}-report-2026-08-01-to-2026-08-13.csv"
+```
+
+The response body is UTF-8 CSV prefixed with a UTF-8 BOM so spreadsheet
+applications open Vietnamese text correctly. The filename varies by type:
+
+```text
+visit-report-{from}-to-{to}.csv
+revenue-report-{from}-to-{to}.csv
+operational-report-{from}-to-{to}.csv
 ```
 
 ### 9.3 Export Content Scope
+
+The selected type determines the CSV columns and data source:
+
+| `reportType` | Summary fields | Daily timeline columns | Data source |
+| --- | --- | --- | --- |
+| `VISIT_REPORT` | From, To, Visit Count | Date, Visit Count | Completed visits by `completedAt` |
+| `REVENUE_REPORT` | From, To, Revenue (VND) | Date, Revenue (VND) | Original and adjustment invoices by `createdAt` |
+| `OPERATIONAL_REPORT` | From, To, Visit Count, Revenue (VND) | Date, Visit Count, Revenue (VND) | Both sources above |
 
 File export Phase 1 gồm 2 phần dữ liệu chính:
 
@@ -435,6 +487,34 @@ Date,Visit Count,Revenue (VND)
 2026-08-03,0,-200000
 ```
 
+### 9.4.1 Visit Report CSV Layout
+
+```csv
+VISIT REPORT
+From,2026-08-01
+To,2026-08-03
+Visit Count,21
+
+Date,Visit Count
+2026-08-01,12
+2026-08-02,9
+2026-08-03,0
+```
+
+### 9.4.2 Revenue Report CSV Layout
+
+```csv
+REVENUE REPORT
+From,2026-08-01
+To,2026-08-03
+Revenue (VND),8500000
+
+Date,Revenue (VND)
+2026-08-01,5400000
+2026-08-02,3100000
+2026-08-03,0
+```
+
 ### 9.5 Export Audit Rule
 
 Mỗi lần export thành công, hệ thống phải lưu:
@@ -443,9 +523,9 @@ Mỗi lần export thành công, hệ thống phải lưu:
 - Vai trò tại thời điểm export
 - Khoảng thời gian báo cáo
 - Thời điểm export
-- Loại báo cáo: `OPERATIONAL_REPORT`
+- Loại báo cáo được chọn trong request (`VISIT_REPORT`, `REVENUE_REPORT`, hoặc `OPERATIONAL_REPORT`)
 
-Phase 1 mới chốt rule và contract nghiệp vụ; phần persistence/audit implementation sẽ làm ở giai đoạn sau.
+Mỗi export thành công ghi audit theo các trường ở trên; việc bị từ chối do không có dữ liệu không ghi audit.
 
 ---
 
@@ -478,6 +558,39 @@ Ví dụ:
 {
   "code": "ACCESS_DENIED",
   "message": "You do not have permission to access this report."
+}
+```
+
+### 10.3 No Data To Export
+
+This rule applies only to `GET /reports/export`. Summary and timeline endpoints
+continue to return successful zero-value responses for an empty period.
+
+The source-data check depends on `reportType`:
+
+| `reportType` | Export is empty when |
+| --- | --- |
+| `VISIT_REPORT` | no completed visit has `completedAt` in the selected period |
+| `REVENUE_REPORT` | no original or adjustment invoice has `createdAt` in the selected period |
+| `OPERATIONAL_REPORT` | neither source above has a record in the selected period |
+
+Do not use `visitCount = 0` or `revenue = 0` to determine this condition: a
+revenue report remains exportable when invoices exist but their net revenue is
+zero.
+
+HTTP status:
+
+- `422 Unprocessable Entity`
+
+Response example:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "REPORT_DATA_EMPTY",
+  "message": "No report data available for the selected period.",
+  "path": "/reports/export"
 }
 ```
 

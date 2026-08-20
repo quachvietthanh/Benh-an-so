@@ -11,6 +11,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
+import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
 
 class GlobalExceptionHandlerTest {
 
@@ -60,5 +61,19 @@ class GlobalExceptionHandlerTest {
         assertEquals(prescriptionId, response.getBody().prescriptionId());
         assertEquals(1, response.getBody().details().size());
         assertEquals(15, response.getBody().details().get(0).shortageQuantity());
+    }
+
+    @Test
+    void returnsStructuredUnprocessableContentForEmptyOperationalReport() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.GET.name(), "/reports/export");
+
+        var response = handler.handleOperationalReportDataEmpty(
+                new OperationalReportDataEmptyException(), request
+        );
+
+        assertEquals(422, response.getStatusCode().value());
+        assertEquals("REPORT_DATA_EMPTY", response.getBody().code());
+        assertEquals("No report data available for the selected period.", response.getBody().message());
+        assertEquals(request.getRequestURI(), response.getBody().path());
     }
 }
