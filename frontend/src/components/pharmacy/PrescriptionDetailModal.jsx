@@ -64,9 +64,12 @@ function PrescriptionDetailModal({
   prescription,
   medicines = [],
   onEditClick,
+  onPrintClick,
   canEdit = false,
 }) {
   const [printModalOpen, setPrintModalOpen] = useState(false)
+  const [printing, setPrinting] = useState(false)
+
   if (!prescription) return null
 
   const handleCopyCode = () => {
@@ -76,8 +79,83 @@ function PrescriptionDetailModal({
     }
   }
 
+  const isPending = prescription.status === 'PENDING_DISPENSE'
+  const isPrintable = Boolean(
+    prescription?.id &&
+    prescription?.prescriptionCode &&
+    (prescription?.status === 'PENDING_DISPENSE' || prescription?.status === 'DISPENSED')
+  )
+
+  const handlePrintPrescription = async () => {
+    if (!isPrintable || printing) return
+    setPrinting(true)
+    try {
+      const response = await pharmacyApi.printPrescription(prescription.id)
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+
+      const disposition = response.headers?.['content-disposition']
+      let filename = `prescription-${prescription.prescriptionCode || prescription.id}.pdf`
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        if (match && match[1]) filename = match[1]
+      }
+
+      const newWindow = window.open(url, '_blank')
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        setTimeout(() => {
+          if (link.parentNode) link.parentNode.removeChild(link)
+        }, 1000)
+        message.info('Trình duyệt đang chặn cửa sổ xem bản in. Bản in đơn thuốc đã được tải về máy của bạn.')
+      } else {
+        message.success('Đã mở bản in đơn thuốc thành công.')
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url)
+      }, 30000)
+    } catch (error) {
+      let backendMessage = ''
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text()
+          const json = JSON.parse(text)
+          backendMessage = json.message || json.error
+        } catch {
+          // ignore
+        }
+      } else if (error.response?.data?.message) {
+        backendMessage = error.response.data.message
+      }
+
+      const status = error.response?.status
+      if (status === 403) {
+        message.error(backendMessage || 'Bạn không có quyền in đơn thuốc.')
+      } else if (status === 404) {
+        message.error(backendMessage || 'Không tìm thấy đơn thuốc cần in.')
+      } else if (status === 400 || status === 409) {
+        message.error(backendMessage || 'Đơn thuốc chưa đủ điều kiện để in.')
+      } else if (status === 500) {
+        message.error(backendMessage || 'Không thể tạo bản in đơn thuốc từ hệ thống. Vui lòng thử lại.')
+      } else {
+        message.error(backendMessage || error.message || 'Lỗi khi tạo bản in đơn thuốc.')
+      }
+    } finally {
+      setPrinting(false)
+    }
+  }
+
   const handlePrintPdf = () => {
-    setPrintModalOpen(true)
+    if (onPrintClick) {
+      onPrintClick(prescription)
+    } else {
+      setPrintModalOpen(true)
+    }
   }
 
   const getMedicineName = (id, fallback) => {
@@ -188,8 +266,6 @@ function PrescriptionDetailModal({
     </Tag>
   )
 
-  const isPending = prescription.status === 'PENDING_DISPENSE'
-
   return (
     <Modal
       open={open}
@@ -223,10 +299,11 @@ function PrescriptionDetailModal({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <Space>
             <Button
+              type="primary"
               icon={<PrinterOutlined />}
-              loading={downloadingPdf}
+              loading={printing}
+              disabled={!isPrintable && !prescription?.prescriptionCode}
               onClick={handlePrintPdf}
-              type="default"
             >
               In đơn thuốc / Xuất PDF
             </Button>
@@ -234,7 +311,7 @@ function PrescriptionDetailModal({
           <Space>
             {canEdit && isPending && (
               <Button
-                type="primary"
+                type="default"
                 icon={<EditOutlined />}
                 onClick={() => {
                   onClose()

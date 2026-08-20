@@ -1,255 +1,373 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Alert, Button, Card, DatePicker, Divider, Input, Tag } from 'antd'
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Divider,
+  Empty,
+  Form,
+  Input,
+  Row,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
 import {
   ArrowLeftOutlined,
   CalendarOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
-  CloseCircleOutlined,
+  FileDoneOutlined,
   FileTextOutlined,
   InfoCircleOutlined,
   LockOutlined,
   LoginOutlined,
   MedicineBoxOutlined,
+  PhoneOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
-import publicLookupApi from '../api/publicLookupApi'
-import {
-  getLookupErrorMessage,
-  getPublicLookupStatus,
-  normalizeAppointmentCode,
-  validateLookupInput,
-} from '../utils/publicLookup'
-import { mergeMedicalRecords } from '../utils/storageHelpers'
+import portalApi from '../api/portalApi.js'
 import './publicLookup.css'
 
-const getStatusIcon = (careState) => {
-  if (careState === 'COMPLETED') return <CheckCircleOutlined />
-  if (careState === 'UNAVAILABLE') return <CloseCircleOutlined />
-  if (careState === 'IN_PROGRESS') return <ClockCircleOutlined />
-  return <CalendarOutlined />
+const { Text, Title, Paragraph } = Typography
+
+const formatDate = (val) => (val && dayjs(val).isValid() ? dayjs(val).format('DD/MM/YYYY') : '—')
+const formatDateTime = (val) => (val && dayjs(val).isValid() ? dayjs(val).format('HH:mm DD/MM/YYYY') : '—')
+
+const formatGender = (gender) => {
+  if (!gender) return '—'
+  const upper = String(gender).toUpperCase()
+  if (upper === 'MALE') return 'Nam'
+  if (upper === 'FEMALE') return 'Nữ'
+  return gender
+}
+
+const formatRoute = (route) => {
+  if (!route) return '—'
+  const upper = String(route).toUpperCase()
+  if (upper === 'ORAL') return 'Uống'
+  if (upper === 'INJECTION') return 'Tiêm'
+  if (upper === 'TOPICAL') return 'Dùng ngoài'
+  if (upper === 'EYE_DROPS') return 'Nhỏ mắt'
+  if (upper === 'INHALATION') return 'Hít'
+  return route
 }
 
 function PublicLookupPage() {
-  const appointmentCodeInput = useRef(null)
-  const dateOfBirthInput = useRef(null)
-  const [appointmentCode, setAppointmentCode] = useState('')
-  const [dateOfBirth, setDateOfBirth] = useState(null)
-  const [fieldErrors, setFieldErrors] = useState({})
-  const [lookupResult, setLookupResult] = useState(null)
-  const [clinicalResult, setClinicalResult] = useState(null)
-  const [errorMessage, setErrorMessage] = useState('')
+  const [code, setCode] = useState('')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
-  const requestSequence = useRef(0)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState(null)
 
-  const invalidateResult = () => {
-    requestSequence.current += 1
-    setLookupResult(null)
-    setClinicalResult(null)
-    setErrorMessage('')
-  }
-
-  const handleCodeChange = (event) => {
-    invalidateResult()
-    setAppointmentCode(event.target.value.toUpperCase())
-    setFieldErrors((current) => ({ ...current, appointmentCode: undefined }))
-  }
-
-  const handleDateChange = (value) => {
-    invalidateResult()
-    setDateOfBirth(value)
-    setFieldErrors((current) => ({ ...current, dateOfBirth: undefined }))
-  }
-
-  const handleLookup = async (event) => {
-    event.preventDefault()
+  const handleLookup = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
     if (loading) return
 
-    const normalizedCode = normalizeAppointmentCode(appointmentCode)
-    const normalizedDateOfBirth = dateOfBirth?.format('YYYY-MM-DD') || ''
-    const validationErrors = validateLookupInput({
-      appointmentCode: normalizedCode,
-      dateOfBirth: normalizedDateOfBirth,
-    })
+    const trimmedCode = code.trim()
+    const trimmedPhone = phone.trim()
 
-    setAppointmentCode(normalizedCode)
-    setFieldErrors(validationErrors)
-    setLookupResult(null)
-    setClinicalResult(null)
-    setErrorMessage('')
-    if (Object.keys(validationErrors).length) {
-      if (validationErrors.appointmentCode) appointmentCodeInput.current?.focus()
-      else dateOfBirthInput.current?.focus()
+    if (!trimmedCode) {
+      setError('Vui lòng nhập mã lịch hẹn để tra cứu.')
+      setResult(null)
       return
     }
 
-    const requestId = requestSequence.current + 1
-    requestSequence.current = requestId
     setLoading(true)
+    setError('')
+    setResult(null) // CRITICAL: Reset previous result on new query
 
     try {
-      const response = await publicLookupApi.lookupAppointment({
-        appointmentCode: normalizedCode,
-        dateOfBirth: normalizedDateOfBirth,
+      const response = await portalApi.lookup({
+        code: trimmedCode,
+        phone: trimmedPhone,
       })
-      if (requestSequence.current !== requestId) return
 
-      if (!response.data?.matched) {
-        setErrorMessage('Không tìm thấy lịch hẹn phù hợp. Vui lòng kiểm tra lại mã hẹn và ngày sinh.')
-        return
+      if (response && response.data) {
+        setResult(response.data)
+      } else {
+        setError('Không tìm thấy kết quả phù hợp. Vui lòng kiểm tra lại mã hẹn, số điện thoại hoặc trạng thái lượt khám.')
       }
-
-      if (!response.data?.careState || !response.data?.scheduledAt) {
-        setErrorMessage(getLookupErrorMessage(500))
-        return
+    } catch (err) {
+      setResult(null)
+      const status = err?.response?.status
+      if (status === 400) {
+        setError('Thông tin tra cứu chưa hợp lệ. Vui lòng kiểm tra lại mã hẹn.')
+      } else if (status === 404) {
+        setError('Không tìm thấy kết quả phù hợp. Vui lòng kiểm tra lại mã hẹn, số điện thoại hoặc trạng thái lượt khám.')
+      } else if (status === 429) {
+        setError('Bạn đã thực hiện quá nhiều yêu cầu, vui lòng thử lại sau.')
+      } else {
+        setError('Hệ thống đang gặp sự cố. Vui lòng thử lại sau.')
       }
-
-      const resData = {
-        ...response.data,
-        appointmentCode: normalizedCode,
-      }
-
-      setLookupResult(resData)
-
-      // NCL-10-CN-003: If appointment completed, load clinical visit details
-      const allRecords = mergeMedicalRecords([])
-      const foundRecord = allRecords.find((r) => r.appointmentCode === normalizedCode || r.recordCode === normalizedCode) || allRecords[0]
-      if (foundRecord) {
-        setClinicalResult({
-          recordCode: foundRecord.recordCode || 'BA-2026-001',
-          doctorName: foundRecord.doctorName || 'BS. Trần Văn Minh',
-          symptoms: foundRecord.symptoms || 'Tăng huyết áp, đau đầu nhẹ về chiều',
-          diagnosis: foundRecord.diagnosis || 'Tăng huyết áp vô căn (I10) - Đã ổn định',
-          doctorAdvice: foundRecord.treatment || 'Uống thuốc đúng giờ, hạn chế ăn mặn, tập thể dục nhẹ nhàng. Tái khám sau 2 tuần.',
-          prescriptionSummary: foundRecord.prescriptionSummary || 'Amlodipine 5mg (14 viên), Paracetamol 500mg (10 viên)',
-          completedAt: foundRecord.createdAt || dayjs().format('YYYY-MM-DDTHH:mm:ssZ'),
-        })
-      }
-    } catch (error) {
-      if (requestSequence.current !== requestId) return
-      setErrorMessage(getLookupErrorMessage(error.response?.status))
     } finally {
-      if (requestSequence.current === requestId) setLoading(false)
+      setLoading(false)
     }
   }
 
-  const resetLookup = () => {
-    requestSequence.current += 1
-    setAppointmentCode('')
-    setDateOfBirth(null)
-    setFieldErrors({})
-    setLookupResult(null)
-    setClinicalResult(null)
-    setErrorMessage('')
+  const handleReset = () => {
+    setCode('')
+    setPhone('')
+    setError('')
+    setResult(null)
     setLoading(false)
   }
 
-  const status = lookupResult ? getPublicLookupStatus(lookupResult.careState) : null
-  const scheduledAt = lookupResult ? dayjs(lookupResult.scheduledAt) : null
+  const diagnosesColumns = [
+    {
+      title: 'Mã ICD',
+      dataIndex: 'code',
+      key: 'code',
+      width: 120,
+      render: (val) => <Tag color="blue">{val || '—'}</Tag>,
+    },
+    {
+      title: 'Tên chẩn đoán',
+      dataIndex: 'name',
+      key: 'name',
+      render: (val) => <Text strong>{val || '—'}</Text>,
+    },
+    {
+      title: 'Phân loại',
+      dataIndex: 'type',
+      key: 'type',
+      width: 140,
+      render: (type) => {
+        if (!type) return '—'
+        const upper = String(type).toUpperCase()
+        if (upper === 'PRIMARY') return <Tag color="red">Chẩn đoán chính</Tag>
+        if (upper === 'SECONDARY') return <Tag color="orange">Chẩn đoán kèm theo</Tag>
+        return <Tag>{type}</Tag>
+      },
+    },
+  ]
+
+  const testResultsColumns = [
+    {
+      title: 'Mã dịch vụ',
+      dataIndex: 'serviceCode',
+      key: 'serviceCode',
+      width: 120,
+      render: (val) => <Tag color="cyan">{val || '—'}</Tag>,
+    },
+    {
+      title: 'Tên xét nghiệm / Dịch vụ',
+      dataIndex: 'serviceName',
+      key: 'serviceName',
+      render: (val) => <Text strong>{val || '—'}</Text>,
+    },
+    {
+      title: 'Kết quả',
+      dataIndex: 'value',
+      key: 'value',
+      render: (val) => <Text style={{ color: '#096dd9', fontWeight: 600 }}>{val || '—'}</Text>,
+    },
+    {
+      title: 'Đơn vị',
+      dataIndex: 'unit',
+      key: 'unit',
+      width: 90,
+      render: (val) => val || '—',
+    },
+    {
+      title: 'CS Tham chiếu',
+      dataIndex: 'referenceRange',
+      key: 'referenceRange',
+      width: 140,
+      render: (val) => val || '—',
+    },
+    {
+      title: 'Kết luận cận lâm sàng',
+      dataIndex: 'conclusion',
+      key: 'conclusion',
+      render: (val) => (val ? <Tag color="green">{val}</Tag> : '—'),
+    },
+  ]
+
+  const prescriptionColumns = [
+    {
+      title: 'Tên thuốc',
+      dataIndex: 'medicineName',
+      key: 'medicineName',
+      render: (name, item) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{name || '—'}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {[item.activeIngredient, item.strength].filter(Boolean).join(' · ')}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Liều dùng & Tần suất',
+      key: 'dosageInfo',
+      render: (_, item) => {
+        const freqStr = item.frequency ? `${item.frequency} lần/ngày` : ''
+        return [item.dosage, freqStr].filter(Boolean).join(' — ') || '—'
+      },
+    },
+    {
+      title: 'Đường dùng',
+      dataIndex: 'route',
+      key: 'route',
+      width: 110,
+      render: (route) => <Tag color="blue">{formatRoute(route)}</Tag>,
+    },
+    {
+      title: 'Số ngày',
+      dataIndex: 'durationDays',
+      key: 'durationDays',
+      width: 100,
+      align: 'center',
+      render: (days) => (days ? `${days} ngày` : '—'),
+    },
+    {
+      title: 'Số lượng',
+      key: 'quantity',
+      width: 100,
+      align: 'center',
+      render: (_, item) => (item.quantity ? `${item.quantity} ${item.unit || ''}` : '—'),
+    },
+    {
+      title: 'Hướng dẫn dùng thuốc',
+      dataIndex: 'instructions',
+      key: 'instructions',
+      render: (val) => val || '—',
+    },
+  ]
 
   return (
     <div className="public-lookup-page">
       <div className="public-lookup-decoration public-lookup-decoration-one" aria-hidden="true" />
       <div className="public-lookup-decoration public-lookup-decoration-two" aria-hidden="true" />
 
+      {/* Header */}
       <header className="public-lookup-header">
         <div className="public-lookup-header-inner">
-          <Link className="public-lookup-brand" to="/public-lookup" aria-label="Bệnh Án Số - Cổng tra cứu">
-            <span className="public-lookup-brand-icon"><MedicineBoxOutlined /></span>
+          <Link className="public-lookup-brand" to="/portal" aria-label="Bệnh Án Số - Cổng tra cứu">
+            <span className="public-lookup-brand-icon">
+              <MedicineBoxOutlined />
+            </span>
             <span>
               <strong>BỆNH ÁN SỐ</strong>
-              <small>Cổng tra cứu kết quả khám bệnh (NCL-10-CN-003)</small>
+              <small>Cổng tra cứu kết quả khám bệnh trực tuyến</small>
             </span>
           </Link>
 
           <div className="public-lookup-header-actions">
-            <span className="public-lookup-secure"><SafetyCertificateOutlined /> Tra cứu an toàn</span>
-            <Link className="public-lookup-login" to="/login"><LoginOutlined /> Đăng nhập nhân viên</Link>
+            <span className="public-lookup-secure">
+              <SafetyCertificateOutlined /> Tra cứu an toàn
+            </span>
+            <Link className="public-lookup-login" to="/login">
+              <LoginOutlined /> Đăng nhập nhân viên
+            </Link>
           </div>
         </div>
       </header>
 
-      <main className="public-lookup-main">
-        <section className="public-lookup-intro" aria-labelledby="lookup-title">
-          <span className="public-lookup-eyebrow"><SafetyCertificateOutlined /> Tra cứu kết quả trực tuyến</span>
-          <h1 id="lookup-title">Tra cứu lịch hẹn & Kết quả khám</h1>
+      {/* Main Content */}
+      <main className="public-lookup-main" style={{ gridTemplateColumns: result ? '1fr' : undefined }}>
+        <section className="public-lookup-intro">
+          <span className="public-lookup-eyebrow">
+            <SafetyCertificateOutlined /> Tra cứu kết quả trực tuyến
+          </span>
+          <h1>Tra cứu kết quả khám bệnh</h1>
           <p>
-            Nhập mã hẹn cùng ngày sinh để kiểm tra kết quả khám, chẩn đoán của bác sĩ và đơn thuốc mà không cần đến phòng khám.
+            Nhập mã hẹn để tra cứu kết quả khám đã được hệ thống công bố.
           </p>
 
           <div className="public-lookup-steps" aria-label="Hướng dẫn tra cứu">
-            <div><b>1</b><span><strong>Nhập mã lịch hẹn</strong><small>Mã được cấp khi đặt lịch hẹn.</small></span></div>
-            <div><b>2</b><span><strong>Xác minh ngày sinh</strong><small>Bảo vệ riêng tư thông tin y tế.</small></span></div>
-            <div><b>3</b><span><strong>Xem kết quả khám</strong><small>Nhận chẩn đoán và dặn dò của bác sĩ.</small></span></div>
+            <div>
+              <b>1</b>
+              <span>
+                <strong>Nhập mã hẹn</strong>
+                <small>Sử dụng mã hẹn để tra cứu kết quả.</small>
+              </span>
+            </div>
+            <div>
+              <b>2</b>
+              <span>
+                <strong>Xác minh số điện thoại (tùy chọn)</strong>
+                <small>Bảo vệ riêng tư thông tin y tế.</small>
+              </span>
+            </div>
+            <div>
+              <b>3</b>
+              <span>
+                <strong>Xem kết quả khám</strong>
+                <small>Nhận chẩn đoán và dặn dò của bác sĩ.</small>
+              </span>
+            </div>
           </div>
 
           <div className="public-lookup-trust-note">
             <LockOutlined />
             <span>
               <strong>Bảo mật thông tin y tế</strong>
-              <small>Dữ liệu chỉ hiển thị khi nhập đúng cả Mã lịch hẹn và Ngày sinh xác minh.</small>
+              <small>Dữ liệu chỉ hiển thị khi tra cứu đúng Mã hẹn hợp lệ.</small>
             </span>
           </div>
         </section>
 
-        <section className="public-lookup-card" aria-labelledby="lookup-form-title">
+        {/* Search Card Section */}
+        <section className="public-lookup-card">
           <div className="public-lookup-card-heading">
-            <span><SearchOutlined /></span>
+            <span>
+              <SearchOutlined />
+            </span>
             <div>
-              <h2 id="lookup-form-title">Tra cứu kết quả</h2>
-              <p>Vui lòng nhập chính xác mã hẹn và ngày sinh bệnh nhân.</p>
+              <h2>Tra cứu kết quả</h2>
+              <p>Vui lòng nhập chính xác mã hẹn và số điện thoại bệnh nhân.</p>
             </div>
           </div>
 
-          <form className="public-lookup-form" onSubmit={handleLookup} noValidate aria-busy={loading}>
+          <form className="public-lookup-form" onSubmit={handleLookup} noValidate>
             <div className="public-lookup-field">
-              <label htmlFor="public-appointment-code">Mã lịch hẹn <b>*</b></label>
+              <label htmlFor="public-appointment-code">
+                Mã hẹn <b>*</b>
+              </label>
               <Input
-                ref={appointmentCodeInput}
                 id="public-appointment-code"
-                name="appointmentCode"
                 size="large"
                 prefix={<CalendarOutlined />}
-                value={appointmentCode}
-                maxLength={20}
-                placeholder="Ví dụ: LH-7F2A91C4D8BE"
+                placeholder="Ví dụ: APT000001"
+                value={code}
+                maxLength={30}
                 autoComplete="off"
                 disabled={loading}
-                required
-                aria-required="true"
-                status={fieldErrors.appointmentCode ? 'error' : undefined}
-                onChange={handleCodeChange}
+                onChange={(e) => {
+                  setError('')
+                  setCode(e.target.value)
+                }}
               />
-              {fieldErrors.appointmentCode
-                ? <small className="public-lookup-field-error" id="appointment-code-error">{fieldErrors.appointmentCode}</small>
-                : <small id="appointment-code-hint">Không chứa khoảng trắng hoặc ký tự đặc biệt.</small>}
+              <small>Nhập mã hẹn hợp lệ để tra cứu kết quả khám.</small>
             </div>
 
             <div className="public-lookup-field">
-              <label htmlFor="public-date-of-birth">Ngày sinh bệnh nhân <b>*</b></label>
-              <DatePicker
-                ref={dateOfBirthInput}
-                id="public-date-of-birth"
+              <label htmlFor="public-phone-number">Số điện thoại bệnh nhân (tùy chọn)</label>
+              <Input
+                id="public-phone-number"
                 size="large"
-                value={dateOfBirth}
-                format="DD/MM/YYYY"
-                placeholder="Chọn ngày sinh"
-                inputReadOnly
+                prefix={<PhoneOutlined />}
+                placeholder="Nhập số điện thoại để xác thực (nếu cần)"
+                value={phone}
+                maxLength={20}
+                inputMode="tel"
+                autoComplete="off"
                 disabled={loading}
-                required
-                aria-required="true"
-                disabledDate={(date) => date && date.isAfter(dayjs(), 'day')}
-                status={fieldErrors.dateOfBirth ? 'error' : undefined}
-                onChange={handleDateChange}
+                onChange={(e) => {
+                  setError('')
+                  setPhone(e.target.value)
+                }}
               />
-              {fieldErrors.dateOfBirth
-                ? <small className="public-lookup-field-error" id="date-of-birth-error">{fieldErrors.dateOfBirth}</small>
-                : <small id="date-of-birth-hint">Nhập đúng ngày sinh đã đăng ký tại phòng khám.</small>}
+              <small>Nhập số điện thoại để xác thực thêm nếu cần.</small>
             </div>
 
             <Button
@@ -262,93 +380,142 @@ function PublicLookupPage() {
               disabled={loading}
               block
             >
-              Tra cứu ngay
+              Tra cứu kết quả
             </Button>
 
-            <div className="public-lookup-privacy"><LockOutlined /> Dữ liệu tra cứu an toàn và bảo mật.</div>
+            <div className="public-lookup-privacy">
+              <LockOutlined /> Dữ liệu tra cứu an toàn và bảo mật.
+            </div>
           </form>
 
-          <div className="public-lookup-feedback" aria-live="polite">
-            {errorMessage && (
+          {/* Feedback Alert */}
+          {error && (
+            <div className="public-lookup-feedback">
               <Alert
-                type="warning"
+                type="error"
                 showIcon
+                message="Thông báo tra cứu"
+                description={error}
                 closable
-                message="Không tìm thấy thông tin"
-                description={errorMessage}
-                onClose={() => setErrorMessage('')}
+                onClose={() => setError('')}
               />
-            )}
-
-            {lookupResult && status && scheduledAt && (
-              <article className="public-lookup-result">
-                <header>
-                  <span className={`public-lookup-result-icon public-lookup-result-${status.tone}`}>
-                    {getStatusIcon(lookupResult.careState)}
-                  </span>
-                  <div>
-                    <small>Mã lịch hẹn</small>
-                    <h3>{lookupResult.appointmentCode}</h3>
-                  </div>
-                  <span className={`public-lookup-status public-lookup-status-${status.tone}`}>
-                    {status.label}
-                  </span>
-                </header>
-
-                <div className="public-lookup-result-grid">
-                  <div><span><CalendarOutlined /></span><p><small>Ngày khám</small><strong>{scheduledAt.format('DD/MM/YYYY')}</strong></p></div>
-                  <div><span><ClockCircleOutlined /></span><p><small>Giờ khám</small><strong>{scheduledAt.format('HH:mm')}</strong></p></div>
-                </div>
-
-                <div className={`public-lookup-result-note public-lookup-result-note-${status.tone}`}>
-                  <InfoCircleOutlined />
-                  <p>{status.description}</p>
-                </div>
-
-                {/* NCL-10-CN-003: Render Clinical Result Details when COMPLETED */}
-                {(lookupResult.careState === 'COMPLETED' || clinicalResult) && clinicalResult && (
-                  <Card title={<span style={{ color: '#1890ff' }}><FileTextOutlined /> KẾT QUẢ KHÁM BỆNH BÁC SĨ (NCL-10-CN-003)</span>} style={{ marginTop: 16, borderRadius: 8, textAlign: 'left' }}>
-                    <div style={{ marginBottom: 12 }}>
-                      <Tag color="purple"><UserOutlined /> Bác sĩ phụ trách: {clinicalResult.doctorName}</Tag>
-                      <Tag color="cyan">Mã bệnh án: {clinicalResult.recordCode}</Tag>
-                    </div>
-
-                    <Divider style={{ margin: '8px 0' }} />
-
-                    <div style={{ marginBottom: 10 }}>
-                      <strong style={{ color: '#262626' }}>1. Triệu chứng & Lý do khám:</strong>
-                      <p style={{ margin: '4px 0 0 12px', color: '#595959' }}>{clinicalResult.symptoms}</p>
-                    </div>
-
-                    <div style={{ marginBottom: 10 }}>
-                      <strong style={{ color: '#262626' }}>2. Chẩn đoán của bác sĩ:</strong>
-                      <p style={{ margin: '4px 0 0 12px', color: '#cf1322', fontWeight: 600 }}>{clinicalResult.diagnosis}</p>
-                    </div>
-
-                    <div style={{ marginBottom: 10 }}>
-                      <strong style={{ color: '#262626' }}>3. Lời dặn & Hướng điều trị:</strong>
-                      <p style={{ margin: '4px 0 0 12px', color: '#389e0d' }}>{clinicalResult.doctorAdvice}</p>
-                    </div>
-
-                    <div>
-                      <strong style={{ color: '#262626' }}>4. Đơn thuốc chỉ định:</strong>
-                      <p style={{ margin: '4px 0 0 12px', color: '#096dd9' }}>{clinicalResult.prescriptionSummary}</p>
-                    </div>
-                  </Card>
-                )}
-
-                <div className="public-lookup-result-actions">
-                  <Button icon={<ArrowLeftOutlined />} onClick={resetLookup}>Tra cứu lịch khác</Button>
-                </div>
-              </article>
-            )}
-          </div>
+            </div>
+          )}
         </section>
       </main>
 
+      {/* Result Display Section (Renders when result is loaded) */}
+      {result && (
+        <div style={{ width: 'min(1080px, calc(100% - 40px))', margin: '0 auto 48px auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Title level={4} style={{ margin: 0, color: '#172840' }}>
+              <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+              KẾT QUẢ KHÁM BỆNH CHI TIẾT
+            </Title>
+            <Button icon={<ArrowLeftOutlined />} onClick={handleReset}>
+              Tra cứu mã khác
+            </Button>
+          </div>
+
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            {/* Section A: THÔNG TIN BỆNH NHÂN */}
+            <Card title={<Space><UserOutlined style={{ color: '#1890ff' }} /><span>THÔNG TIN BỆNH NHÂN</span></Space>} style={{ borderRadius: 12 }}>
+              <Descriptions column={{ xs: 1, sm: 2, md: 4 }} bordered size="middle">
+                <Descriptions.Item label="Họ và tên"><Text strong>{result.patientName || '—'}</Text></Descriptions.Item>
+                <Descriptions.Item label="Ngày sinh">{formatDate(result.patientDateOfBirth)}</Descriptions.Item>
+                <Descriptions.Item label="Giới tính">{formatGender(result.patientGender)}</Descriptions.Item>
+                <Descriptions.Item label="Số điện thoại">{result.patientPhoneMasked || '—'}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* Section B: THÔNG TIN LƯỢT KHÁM */}
+            <Card title={<Space><CalendarOutlined style={{ color: '#722ed1' }} /><span>THÔNG TIN LƯỢT KHÁM</span></Space>} style={{ borderRadius: 12 }}>
+              <Descriptions column={{ xs: 1, sm: 2, md: 3 }} bordered size="middle">
+                <Descriptions.Item label="Mã hẹn"><Tag color="purple">{result.appointmentCode || '—'}</Tag></Descriptions.Item>
+                <Descriptions.Item label="Thời gian hẹn">{formatDateTime(result.appointmentStartTime)}</Descriptions.Item>
+                <Descriptions.Item label="Lý do khám">{result.appointmentReason || '—'}</Descriptions.Item>
+                <Descriptions.Item label="Mã lượt khám"><Tag color="blue">{result.visitCode || '—'}</Tag></Descriptions.Item>
+                <Descriptions.Item label="Thời gian khám">{formatDateTime(result.visitAt)}</Descriptions.Item>
+                <Descriptions.Item label="Bác sĩ phụ trách">{result.doctorName ? `BS. ${result.doctorName.replace(/^BS\.\s*/i, '')}` : '—'}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* Section C: KẾT LUẬN & DẶN DÒ */}
+            <Card title={<Space><InfoCircleOutlined style={{ color: '#fa8c16' }} /><span>KẾT LUẬN & DẶN DÒ BÁC SĨ</span></Space>} style={{ borderRadius: 12 }}>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} md={12}>
+                  <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, borderLeft: '4px solid #1890ff', height: '100%' }}>
+                    <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>KẾT LUẬN CHUNG</Text>
+                    <Text strong style={{ fontSize: 15, color: '#262626' }}>{result.conclusion || '—'}</Text>
+                  </div>
+                </Col>
+                <Col xs={24} md={12}>
+                  <div style={{ background: '#f6ffed', padding: 16, borderRadius: 8, borderLeft: '4px solid #52c41a', height: '100%' }}>
+                    <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>DẶN DÒ & CHỈ ĐỊNH BÁC SĨ</Text>
+                    <Text style={{ fontSize: 15, color: '#274e13' }}>{result.doctorInstructions || '—'}</Text>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* Section D: CHẨN ĐOÁN */}
+            <Card title={<Space><FileTextOutlined style={{ color: '#ff4d4f' }} /><span>CHẨN ĐOÁN CỦA BÁC SĨ</span></Space>} style={{ borderRadius: 12 }}>
+              {Array.isArray(result.diagnoses) && result.diagnoses.length > 0 ? (
+                <Table
+                  columns={diagnosesColumns}
+                  dataSource={result.diagnoses}
+                  rowKey={(r, idx) => r.code || idx}
+                  pagination={false}
+                  size="middle"
+                />
+              ) : (
+                <Empty description="Không có chẩn đoán được công bố." image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              )}
+            </Card>
+
+            {/* Section E: KẾT QUẢ CẬN LÂM SÀNG */}
+            <Card title={<Space><FileDoneOutlined style={{ color: '#13c2c2' }} /><span>KẾT QUẢ CẬN LÂM SÀNG & XÉT NGHIỆM</span></Space>} style={{ borderRadius: 12 }}>
+              {Array.isArray(result.clinicalTestResults) && result.clinicalTestResults.length > 0 ? (
+                <Table
+                  columns={testResultsColumns}
+                  dataSource={result.clinicalTestResults}
+                  rowKey={(r, idx) => r.serviceCode || idx}
+                  pagination={false}
+                  size="middle"
+                  scroll={{ x: 'max-content' }}
+                />
+              ) : (
+                <Empty description="Không có kết quả cận lâm sàng." image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              )}
+            </Card>
+
+            {/* Section F: ĐƠN THUỐC */}
+            <Card title={<Space><MedicineBoxOutlined style={{ color: '#eb2f96' }} /><span>ĐƠN THUỐC CHỈ ĐỊNH</span></Space>} style={{ borderRadius: 12 }}>
+              {Array.isArray(result.prescriptions) && result.prescriptions.length > 0 ? (
+                <Table
+                  columns={prescriptionColumns}
+                  dataSource={result.prescriptions}
+                  rowKey={(r, idx) => r.medicineName || idx}
+                  pagination={false}
+                  size="middle"
+                  scroll={{ x: 'max-content' }}
+                />
+              ) : (
+                <Empty description="Không có thuốc được kê trong lượt khám này." image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              )}
+            </Card>
+          </Space>
+        </div>
+      )}
+
+      {/* Footer */}
       <footer className="public-lookup-footer">
-        <span>© {new Date().getFullYear()} Bệnh Án Số</span>
-        <span><SafetyCertificateOutlined /> Kết nối tra cứu an toàn</span>
+        <div className="public-lookup-header-inner">
+          <span>© {new Date().getFullYear()} Bệnh Án Số — Hệ thống quản lý hồ sơ sức khỏe điện tử</span>
+          <span>
+            <SafetyCertificateOutlined /> Kết nối tra cứu an toàn & bảo mật
+          </span>
+        </div>
       </footer>
     </div>
   )

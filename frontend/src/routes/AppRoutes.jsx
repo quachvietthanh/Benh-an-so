@@ -58,7 +58,9 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/public-lookup" element={<PublicLookupPage />} />
-      <Route path="/tra-cuu" element={<Navigate to="/public-lookup" replace />} />
+      <Route path="/portal" element={<PublicLookupPage />} />
+      <Route path="/tra-cuu-ket-qua" element={<PublicLookupPage />} />
+      <Route path="/tra-cuu" element={<Navigate to="/portal" replace />} />
 
       <Route
         path="/"
@@ -72,7 +74,7 @@ function AppRoutes() {
         <Route path="patients" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientList /></PrivateRoute>} />
         <Route path="patients/:id" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientDetail /></PrivateRoute>} />
         <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'nurse', 'receptionist']}><AppointmentQueue /></PrivateRoute>} />
-        <Route path="after-care" element={<PrivateRoute allowedRoles={['receptionist']}><AfterCarePage /></PrivateRoute>} />
+        <Route path="after-care" element={<PrivateRoute allowedRoles={['receptionist', 'admin']}><AfterCarePage /></PrivateRoute>} />
         <Route path="medical-records" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
         <Route path="medical-records/visits/:visitId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
         <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><PrescriptionPage /></PrivateRoute>} />

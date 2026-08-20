@@ -309,6 +309,16 @@ const normalizeAuthority = (value) => String(value || '')
   .replace(/^PERMISSION_/, '')
 
 export const hasAftercarePermission = (user, permission) => {
+  const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  const isAdmin = userRoles.includes('admin')
+  const isReceptionist = userRoles.includes('receptionist')
+
+  if (isAdmin || isReceptionist) {
+    if (permission === 'FOLLOW_UP_REMINDER_READ' || permission === 'CARE_LOG_READ' || permission === 'MEDICAL_RECORD_READ') {
+      return true
+    }
+  }
+
   const permissions = Array.isArray(user?.permissions) ? user.permissions : []
   return permissions.some((item) => normalizeAuthority(item) === permission)
 }

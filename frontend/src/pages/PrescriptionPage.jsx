@@ -26,14 +26,11 @@ import {
   Typography,
 } from 'antd'
 import {
-  AlertOutlined,
-  BarcodeOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
   CopyOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   EditOutlined,
   EllipsisOutlined,
   ExclamationCircleOutlined,
@@ -45,8 +42,6 @@ import {
   PlusOutlined,
   PrinterOutlined,
   RollbackOutlined,
-  SafetyCertificateOutlined,
-  SearchOutlined,
   StopOutlined,
   SwapOutlined,
   SyncOutlined,
@@ -161,7 +156,6 @@ function PrescriptionPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
-  const [searchCodeQuery, setSearchCodeQuery] = useState('')
   const [downloadingPdfMap, setDownloadingPdfMap] = useState({})
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
@@ -232,18 +226,6 @@ function PrescriptionPage() {
   )
   const canSubmit = submitStatus.allowed
 
-  const filteredPrescriptions = useMemo(() => {
-    const q = (searchCodeQuery || '').trim().toLowerCase()
-    if (!q) return prescriptions
-    return prescriptions.filter((p) => {
-      const code = String(p.prescriptionCode || '').toLowerCase()
-      const doctor = String(p.doctorName || '').toLowerCase()
-      const patient = String(p.patientName || '').toLowerCase()
-      const medNames = (p.items || []).map((i) => String(i.medicineName || '').toLowerCase()).join(' ')
-      return code.includes(q) || doctor.includes(q) || patient.includes(q) || medNames.includes(q)
-    })
-  }, [prescriptions, searchCodeQuery])
-
   const diagnosisSummary = useMemo(() => {
     const primary = diagnoses.find((diagnosis) => diagnosis.diagnosisType === 'PRIMARY') || diagnoses[0]
     if (!primary) return 'Chưa có chẩn đoán'
@@ -270,8 +252,6 @@ function PrescriptionPage() {
       const rawDiagnoses = Array.isArray(diagnosisResult.data) ? diagnosisResult.data : []
       const cleanedDiagnoses = rawDiagnoses.map((d) => ({
         ...d,
-        code: d.diagnosisCode || d.code || d.icdCode || '',
-        diagnosisCode: d.diagnosisCode || d.code || d.icdCode || '',
         diagnosisName: fixMojibake(d.diagnosisName || d.name || ''),
         name: fixMojibake(d.diagnosisName || d.name || ''),
       }))
@@ -308,7 +288,7 @@ function PrescriptionPage() {
 
         return {
           ...m,
-          medicineName: m.medicineName || m.name || 'Thuốc',
+          medicineName: fixMojibake(m.medicineName || m.name || 'Thuốc'),
           stockQuantity: avail,
           availableStock: avail,
           eligibleStockQuantity: avail,
@@ -585,7 +565,7 @@ function PrescriptionPage() {
 
         return {
           ...m,
-          medicineName: m.medicineName || m.name || 'Thuốc',
+          medicineName: fixMojibake(m.medicineName || m.name || 'Thuốc'),
           stockQuantity: avail,
           availableStock: avail,
           eligibleStockQuantity: avail,
@@ -658,61 +638,16 @@ function PrescriptionPage() {
           quantity: Number(i.quantity),
           dosage: i.dosage,
           frequency: Number(i.frequency),
-          route: i.route,
-          durationDays: Number(i.durationDays),
           unitPrice: i.unitPrice || i.price,
         })),
         createdAt: new Date().toISOString(),
       })
 
-      if (!editingPrescription) {
-        Modal.success({
-          title: 'Cấp mã đơn thuốc điện tử thành công',
-          icon: <SafetyCertificateOutlined style={{ color: '#16a34a', fontSize: 24 }} />,
-          width: 520,
-          content: (
-            <div style={{ marginTop: 12 }}>
-              <Paragraph style={{ marginBottom: 6 }}>
-                Hệ thống đã cấp mã đơn thuốc điện tử chính thức duy nhất gắn cố định với đơn:
-              </Paragraph>
-              <div style={{ margin: '12px 0', textAlign: 'center', backgroundColor: '#eff6ff', padding: '14px', borderRadius: 8, border: '1px solid #bfdbfe' }}>
-                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>MÃ ĐƠN THUỐC ĐIỆN TỬ LIÊN THÔNG</Text>
-                <Space align="center">
-                  <BarcodeOutlined style={{ fontSize: 22, color: '#1e40af' }} />
-                  <Text strong style={{ fontSize: 24, color: '#1e40af', letterSpacing: '1px' }}>
-                    {prescriptionCode}
-                  </Text>
-                </Space>
-                <div style={{ marginTop: 10 }}>
-                  <Button
-                    size="small"
-                    icon={<CopyOutlined />}
-                    onClick={() => handleCopyPrescriptionCode(prescriptionCode)}
-                  >
-                    Sao chép mã đơn
-                  </Button>
-                </div>
-              </div>
-              <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 0 }}>
-                ✓ Mã đơn được bảo toàn cố định trong suốt vòng đời của đơn (kể cả khi điều chỉnh).<br />
-                ✓ Sẵn sàng phục vụ tra cứu, cấp phát thuốc tại quầy dược và in/xuất liên thông y tế.
-              </Paragraph>
-            </div>
-          ),
-          okText: 'In đơn thuốc ngay',
-          cancelText: 'Đóng',
-          okCancel: true,
-          onOk: () => {
-            if (response?.data?.id) {
-              handlePrintPrescriptionPdf(response.data)
-            }
-          },
-        })
-      } else {
-        message.success(
-          `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công. Mã đơn điện tử được bảo toàn cố định.`,
-        )
-      }
+      message.success(
+        editingPrescription
+          ? `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công.`
+          : `Đã tạo đơn ${prescriptionCode} với trạng thái PENDING_DISPENSE.`,
+      )
       setEditingPrescription(null)
       setItems([createEmptyItem()])
       setNote('')
@@ -796,7 +731,7 @@ function PrescriptionPage() {
         dosage: item.dosage || '',
         frequency: item.frequency != null ? Number(item.frequency) : 2,
         route: item.route || 'ORAL',
-        durationDays: Number(item.durationDays) || 5,
+        durationDays: Number(item.durationDays) || 1,
         instructions: item.instructions || '',
         isOriginal: true,
       })),
@@ -919,36 +854,17 @@ function PrescriptionPage() {
 
   const historyColumns = [
     {
-      title: 'Mã đơn thuốc điện tử',
+      title: 'Mã đơn thuốc',
       dataIndex: 'prescriptionCode',
       key: 'prescriptionCode',
-      width: 220,
       render: (value, row) => (
         <Space direction="vertical" size={2}>
-          <Space wrap>
-            <Tag
-              color="geekblue"
-              style={{ fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '2px 8px' }}
-              onClick={() => openDetailModal(row)}
-            >
-              <BarcodeOutlined style={{ marginRight: 4 }} />
-              {value}
-            </Tag>
-            <Tooltip title="Sao chép mã đơn điện tử">
-              <Button
-                type="text"
-                size="small"
-                icon={<CopyOutlined style={{ color: '#6b7280' }} />}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleCopyPrescriptionCode(value)
-                }}
-              />
-            </Tooltip>
-          </Space>
+          <Text strong style={{ color: '#2563eb', cursor: 'pointer' }} onClick={() => openDetailModal(row)}>
+            {value}
+          </Text>
           {row.updatedAt && row.updatedAt !== row.prescribedAt && (
             <Tag color="purple" style={{ fontSize: 11, padding: '0 4px' }}>
-              <SyncOutlined spin={false} /> Đã sửa (Mã cố định)
+              <SyncOutlined spin={false} /> Đã sửa
             </Tag>
           )}
         </Space>
@@ -962,7 +878,7 @@ function PrescriptionPage() {
         <div>
           {value.slice(0, 3).map((item, idx) => (
             <div key={idx} style={{ marginBottom: 2 }}>
-              <Text strong>{item.medicineName}</Text> <Text type="secondary">× {item.quantity} ({item.dosage || 'Theo chỉ định'})</Text>
+              <Text strong>{fixMojibake(item.medicineName || item.name || 'Thuốc')}</Text> <Text type="secondary">× {item.quantity} ({item.dosage || 'Theo chỉ định'})</Text>
             </div>
           ))}
           {value.length > 3 && (
@@ -1009,7 +925,7 @@ function PrescriptionPage() {
       width: 180,
       render: (_, row) => (
         <div>
-          <div><Text strong>{row.doctorName || '—'}</Text></div>
+          <div><Text strong>{fixMojibake(row.doctorName) || '—'}</Text></div>
           <div style={{ fontSize: 12, color: '#6b7280' }}>
             {row.prescribedAt ? dayjs(row.prescribedAt).format('HH:mm DD/MM/YYYY') : '—'}
           </div>
@@ -1020,8 +936,14 @@ function PrescriptionPage() {
       title: 'Thao tác',
       key: 'actions',
       width: 180,
+      align: 'center',
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
+        const isPrintable = Boolean(
+          prescription.id &&
+          prescription.prescriptionCode &&
+          (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')
+        )
         const canEditThis = canPrescribe && isPending
 
         const menuItems = [
@@ -1209,9 +1131,9 @@ function PrescriptionPage() {
           <Descriptions.Item label="Mã bệnh án"><Text code>{medicalRecordId}</Text></Descriptions.Item>
           <Descriptions.Item label="Mã lượt khám">{encounter?.visit?.visitCode || record?.visitId || '—'}</Descriptions.Item>
           <Descriptions.Item label="Bệnh nhân">
-            <Text strong>{encounter?.patient?.fullName || record?.patientName || '—'}</Text> ({encounter?.patient?.patientCode || record?.patientCode || 'BN'})
+            <Text strong>{fixMojibake(encounter?.patient?.fullName || record?.patientName || '—')}</Text> ({encounter?.patient?.patientCode || record?.patientCode || 'BN'})
           </Descriptions.Item>
-          <Descriptions.Item label="Bác sĩ phụ trách">{encounter?.doctor?.fullName || record?.doctorName || '—'}</Descriptions.Item>
+          <Descriptions.Item label="Bác sĩ phụ trách">{fixMojibake(encounter?.doctor?.fullName || record?.doctorName || '—')}</Descriptions.Item>
           <Descriptions.Item label="Chẩn đoán chính" span={2}>
             <Text strong style={{ color: '#1e40af' }}>{diagnosisSummary}</Text>
           </Descriptions.Item>
@@ -1399,7 +1321,7 @@ function PrescriptionPage() {
                           </Tooltip>
                         </div>
 
-                        {/* Hàng 1: Thuốc & Cách dùng */}
+                        {/* Hàng 1: Thuốc & Đường dùng */}
                         <Row gutter={[12, 12]} style={{ marginBottom: 10 }}>
                           <Col xs={24} md={15}>
                             <Form.Item
@@ -1543,17 +1465,6 @@ function PrescriptionPage() {
                                 addonAfter={unit}
                               />
                             </Form.Item>
-                            {selectedMed && (() => {
-                              const avail = getAvailableStock(selectedMed)
-                              if (avail > 0 && item.quantity > avail) {
-                                return (
-                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-                                    Không đủ tồn kho. Tối đa có thể kê: {avail} {unit}.
-                                  </div>
-                                )
-                              }
-                              return null
-                            })()}
                             {Number(item.frequency) > 0 && Number(item.durationDays) > 0 && (
                               <div style={{ marginTop: 4 }}>
                                 <Text
@@ -1630,16 +1541,7 @@ function PrescriptionPage() {
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
-                      disabled={checkingInteractions || saving || items.some((i) => {
-                        if (!i.medicineId) return false
-                        const med = selectedMedicineMap.get(String(i.medicineId))
-                        if (!med) return false
-                        const avail = getAvailableStock(med)
-                        const totalQty = items
-                          .filter((x) => String(x.medicineId) === String(i.medicineId))
-                          .reduce((sum, x) => sum + Number(x.quantity || 0), 0)
-                        return avail <= 0 || Number(i.quantity || 0) > avail || totalQty > avail
-                      })}
+                      disabled={checkingInteractions || saving}
                       onClick={() => {
                         setConfirmedOverrides([])
                         setItems((current) => [...current, createEmptyItem(false)])
@@ -1824,21 +1726,9 @@ function PrescriptionPage() {
             ),
             children: (
               <div>
-                <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                  <Input.Search
-                    placeholder="Tra cứu theo mã đơn điện tử (VD: RX000001), tên thuốc, bác sĩ..."
-                    value={searchCodeQuery}
-                    onChange={(e) => setSearchCodeQuery(e.target.value)}
-                    allowClear
-                    style={{ maxWidth: 450 }}
-                  />
-                  <Text type="secondary">
-                    Tìm thấy <strong>{filteredPrescriptions.length}</strong> / {prescriptions.length} đơn thuốc
-                  </Text>
-                </div>
                 <Table
                   rowKey="id"
-                  dataSource={filteredPrescriptions}
+                  dataSource={prescriptions}
                   columns={historyColumns}
                   pagination={{ pageSize: 10 }}
                   bordered
@@ -1863,11 +1753,15 @@ function PrescriptionPage() {
         medicines={medicines}
         canEdit={canPrescribe}
         onEditClick={startEditPrescription}
+        onPrintClick={handlePrintPrescriptionPdf}
       />
 
       <PrescriptionPrintModal
         open={printModalOpen}
-        onClose={() => setPrintModalOpen(false)}
+        onClose={() => {
+          setPrintModalOpen(false)
+          setSelectedPrescriptionForPrint(null)
+        }}
         prescription={selectedPrescriptionForPrint}
         medicines={medicines}
         patient={encounter?.patient || record?.patient}
