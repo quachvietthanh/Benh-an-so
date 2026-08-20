@@ -78,10 +78,38 @@ export const buildClinicalOrderPayload = ({ clinicalReason = '', orders = [] }) 
   })),
 })
 
+export const fixMojibake = (str) => {
+  if (typeof str !== 'string' || !str) return str || ''
+  if (!/[\u00C0-\u00FF]/.test(str)) return str
+
+  try {
+    const bytes = Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff)
+    const decoded = new TextDecoder('utf-8').decode(bytes)
+    if (decoded && !decoded.includes('\uFFFD')) {
+      if (/[\u00C0-\u00FF]/.test(decoded)) {
+        try {
+          const bytes2 = Uint8Array.from(decoded, (c) => c.charCodeAt(0) & 0xff)
+          const decoded2 = new TextDecoder('utf-8').decode(bytes2)
+          if (decoded2 && !decoded2.includes('\uFFFD')) {
+            return decoded2
+          }
+        } catch {}
+      }
+      return decoded
+    }
+  } catch {}
+
+  return str
+}
+
 export const normalizeMedicalRecordDetail = (detail) => {
   if (!detail) return null
   const diagnoses = Array.isArray(detail.diagnoses) ? detail.diagnoses : []
   const primary = diagnoses.find((item) => item.diagnosisType === 'PRIMARY') || diagnoses[0]
+
+  const rawName = primary ? (primary.diagnosisName || primary.name) : detail.primaryIcdName
+  const cleanName = fixMojibake(rawName)
+  const code = primary ? (primary.diagnosisCode || primary.code) : detail.primaryIcdCode
 
   return {
     ...detail,
@@ -94,12 +122,9 @@ export const normalizeMedicalRecordDetail = (detail) => {
     patientCode: detail.patient?.patientCode || detail.patientCode,
     doctorId: detail.visit?.doctorId || detail.doctorId,
     doctorName: detail.visit?.doctorName || detail.doctorName,
-    diagnosis: primary
-      ? `[${primary.diagnosisCode || primary.code}] ${primary.diagnosisName || primary.name}`
-      : compactText([
-          detail.primaryIcdCode && `[${detail.primaryIcdCode}]`,
-          detail.primaryIcdName,
-        ]),
+    diagnosis: code
+      ? `[${code}] ${cleanName}`
+      : cleanName,
     recordCode: detail.recordCode || detail.medicalRecordId || detail.id,
     createdAt: detail.visit?.startedAt || detail.visit?.visitAt || detail.createdAt,
   }

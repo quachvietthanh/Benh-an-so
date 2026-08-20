@@ -21,6 +21,7 @@ import {
 } from 'antd'
 import {
   CheckCircleOutlined,
+  CheckOutlined,
   EyeOutlined,
   MedicineBoxOutlined,
   PrinterOutlined,
@@ -36,6 +37,7 @@ import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintMo
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import { useAuthContext } from '../context/AuthContext'
 import { commonIcd10List, icd10Categories, searchIcd10 } from '../utils/icd10Data'
+import { fixMojibake } from '../utils/serviceCatalogValidation'
 import {
   buildClinicalOrderPayload,
   buildDiagnosisPayload,
@@ -156,17 +158,20 @@ function MedicalEncounter() {
       return
     }
 
+    const cleanPrimaryName = fixMojibake(detail.primaryIcdName)
+    const cleanConclusion = fixMojibake(detail.conclusion)
+
     setCurrentRecordId(detail.medicalRecordId)
     form.setFieldsValue({
       patientId: detail.patient?.id,
-      symptoms: detail.symptoms || detail.chiefComplaint || '',
-      medicalHistory: detail.medicalHistory || '',
-      examinationNote: detail.physicalExamination || '',
-      treatmentPlan: detail.treatmentPlan || detail.doctorInstructions || '',
+      symptoms: fixMojibake(detail.symptoms || detail.chiefComplaint || ''),
+      medicalHistory: fixMojibake(detail.medicalHistory || ''),
+      examinationNote: fixMojibake(detail.physicalExamination || ''),
+      treatmentPlan: fixMojibake(detail.treatmentPlan || detail.doctorInstructions || ''),
       diagnosisText:
-        detail.primaryIcdCode && detail.primaryIcdName
-          ? `[${detail.primaryIcdCode}] ${detail.primaryIcdName}`
-          : detail.conclusion || '',
+        detail.primaryIcdCode && cleanPrimaryName
+          ? `[${detail.primaryIcdCode}] ${cleanPrimaryName}`
+          : cleanConclusion || '',
     })
 
     const diagnoses = Array.isArray(detail.diagnoses) ? detail.diagnoses : []
@@ -175,11 +180,11 @@ function MedicalEncounter() {
       primary
         ? {
           code: primary.diagnosisCode,
-          name: primary.diagnosisName,
-          note: primary.note,
+          name: fixMojibake(primary.diagnosisName),
+          note: fixMojibake(primary.note),
         }
         : detail.primaryIcdCode
-          ? { code: detail.primaryIcdCode, name: detail.primaryIcdName }
+          ? { code: detail.primaryIcdCode, name: cleanPrimaryName }
           : null,
     )
     setSecondaryIcds(
@@ -187,8 +192,8 @@ function MedicalEncounter() {
         .filter((item) => item.diagnosisType === 'SECONDARY')
         .map((item) => ({
           code: item.diagnosisCode,
-          name: item.diagnosisName,
-          note: item.note,
+          name: fixMojibake(item.diagnosisName),
+          note: fixMojibake(item.note),
         })),
     )
   }, [form])
@@ -205,7 +210,7 @@ function MedicalEncounter() {
       setEncounter(encounterData)
       form.setFieldsValue({
         patientId: encounterData.patient?.id,
-        symptoms: encounterData.visit?.reason || '',
+        symptoms: fixMojibake(encounterData.visit?.reason || ''),
       })
 
       const [recordResult, historyResult, serviceResult] = await Promise.allSettled([
@@ -234,7 +239,7 @@ function MedicalEncounter() {
         setClinicalServices(unwrapCollection(serviceResult.value.data).map(mapClinicalService))
       } else {
         setClinicalServices([])
-        setServiceCatalogError('Không tải được danh mục dịch vụ thật từ backend. Không thể tạo chỉ định lúc này.')
+        setServiceCatalogError('Không tải được danh mục dịch vụ từ hệ thống. Không thể tạo chỉ định lúc này.')
       }
     } catch (error) {
       setEncounter(null)
@@ -258,7 +263,8 @@ function MedicalEncounter() {
     const timer = setTimeout(async () => {
       try {
         const response = await medicalRecordApi.getDiagnosisCatalog(query)
-        setBackendIcdCatalog(Array.isArray(response.data) ? response.data : [])
+        const raw = Array.isArray(response.data) ? response.data : []
+        setBackendIcdCatalog(raw.map((item) => ({ ...item, name: fixMojibake(item.name) })))
       } catch {
         setBackendIcdCatalog([])
       }
@@ -275,13 +281,15 @@ function MedicalEncounter() {
 
   const filteredIcdList = useMemo(() => {
     const combined = new Map()
-    searchIcd10(icdSearchQuery, icdCategory).forEach((item) => combined.set(item.code, item))
+    searchIcd10(icdSearchQuery, icdCategory).forEach((item) =>
+      combined.set(item.code, { ...item, name: fixMojibake(item.name) }),
+    )
     backendIcdCatalog.forEach((item) =>
       combined.set(item.code, {
         id: item.id,
         code: item.code,
-        name: item.name,
-        category: 'ALL',
+        name: fixMojibake(item.name),
+        category: item.category || 'ALL',
       }),
     )
     return Array.from(combined.values())
@@ -309,11 +317,12 @@ function MedicalEncounter() {
   const selectPrimaryDiagnosis = useCallback(
     (icd) => {
       if (!icd?.code) return
-      setPrimaryIcd(icd)
+      const cleanIcd = { ...icd, name: fixMojibake(icd.name) }
+      setPrimaryIcd(cleanIcd)
       form.setFieldsValue({
-        diagnosisText: `[${icd.code}] ${icd.name}`,
+        diagnosisText: `[${cleanIcd.code}] ${cleanIcd.name}`,
       })
-      saveRecentDiagnosis(icd)
+      saveRecentDiagnosis(cleanIcd)
       setRecentIcds(loadRecentDiagnoses())
     },
     [form],
@@ -333,14 +342,15 @@ function MedicalEncounter() {
         message.warning('Mã này đã được chọn làm chẩn đoán chính.')
         return
       }
+      const cleanIcd = { ...icd, name: fixMojibake(icd.name) }
       setSecondaryIcds((prev) => {
-        if (prev.some((item) => item.code === icd.code)) {
+        if (prev.some((item) => item.code === cleanIcd.code)) {
           message.info('Mã chẩn đoán phụ này đã có trong danh sách.')
           return prev
         }
-        return [...prev, icd]
+        return [...prev, cleanIcd]
       })
-      saveRecentDiagnosis(icd)
+      saveRecentDiagnosis(cleanIcd)
       setRecentIcds(loadRecentDiagnoses())
     },
     [primaryIcd?.code],
@@ -396,13 +406,13 @@ function MedicalEncounter() {
 
   const openPrescription = async (medicalRecordId) => {
     if (!medicalRecordId) {
-      message.error('Không có medicalRecordId thật để chuyển sang kê đơn.')
+      message.error('Chưa có mã bệnh án hợp lệ để chuyển sang kê đơn.')
       return false
     }
 
     const queueItemId = encounter?.queueItem?.id
     if (!queueItemId) {
-      message.error('Không có queueItemId thật để chuyển sang kê đơn.')
+      message.error('Chưa có thông tin hàng đợi hợp lệ để chuyển sang kê đơn.')
       return false
     }
 
@@ -410,7 +420,7 @@ function MedicalEncounter() {
       const response = await queueApi.getById(queueItemId)
       const liveQueueItem = response?.data
       if (!liveQueueItem?.id || String(liveQueueItem.id) !== String(queueItemId)) {
-        throw new Error('Backend không trả đúng queue item của lượt khám.')
+        throw new Error('Hệ thống không tìm thấy thông tin lượt khám trong hàng đợi.')
       }
 
       const blockReason = getQueueInProgressBlockReason(liveQueueItem, 'chuyển sang kê đơn')
@@ -458,7 +468,7 @@ function MedicalEncounter() {
       return
     }
     if (!encounter.queueItem?.id) {
-      message.error('Không có queueItemId thật trong encounter để lưu bệnh án.')
+      message.error('Không có thông tin lượt khám trong hàng đợi để lưu bệnh án.')
       return
     }
 
@@ -476,7 +486,7 @@ function MedicalEncounter() {
     }
 
     if (selectedOrders.some((item) => !item.id)) {
-      message.error('Phiếu chỉ định chứa dịch vụ không có UUID backend.')
+      message.error('Phiếu chỉ định chứa dịch vụ chưa hợp lệ trong hệ thống.')
       return
     }
 
@@ -520,7 +530,7 @@ function MedicalEncounter() {
       }
 
       persistedRecordId = recordResponse.data?.id || persistedRecordId
-      if (!persistedRecordId) throw new Error('Backend không trả medicalRecordId sau khi lưu.')
+      if (!persistedRecordId) throw new Error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
       setCurrentRecordId(persistedRecordId)
 
       await medicalRecordApi.recordDiagnosis(
@@ -540,7 +550,7 @@ function MedicalEncounter() {
           !queueBeforeOrder?.id ||
           String(queueBeforeOrder.id) !== String(encounter.queueItem.id)
         ) {
-          throw new Error('Backend không trả đúng queue item trước khi tạo chỉ định.')
+          throw new Error('Hệ thống không tìm thấy thông tin lượt khám trước khi tạo chỉ định.')
         }
         const orderBlockReason = getQueueInProgressBlockReason(
           queueBeforeOrder,
@@ -562,14 +572,14 @@ function MedicalEncounter() {
           String(liveQueueItem.id) !== String(encounter.queueItem.id) ||
           liveQueueItem.status !== 'WAITING_FOR_RESULT'
         ) {
-          throw new Error('Backend không xác nhận queue item đã chuyển sang WAITING_FOR_RESULT.')
+          throw new Error('Hệ thống không xác nhận trạng thái hàng đợi chuyển sang Chờ kết quả.')
         }
         setSelectedOrders([])
       } else {
         const queueResponse = await queueApi.getById(encounter.queueItem.id)
         liveQueueItem = queueResponse?.data
         if (!liveQueueItem?.id || String(liveQueueItem.id) !== String(encounter.queueItem.id)) {
-          throw new Error('Backend không trả đúng queue item của lượt khám.')
+          throw new Error('Hệ thống không tìm thấy thông tin lượt khám trong hàng đợi.')
         }
       }
 
@@ -581,7 +591,7 @@ function MedicalEncounter() {
         throw new Error(continuationBlockReason)
       }
 
-      message.success('Đã lưu bệnh án, chẩn đoán và chỉ định vào backend.')
+      message.success('Đã lưu bệnh án, chẩn đoán và chỉ định thành công.')
       await loadWorkflow()
       if (liveQueueItem.status === 'WAITING_FOR_RESULT') {
         Modal.confirm({
@@ -596,7 +606,7 @@ function MedicalEncounter() {
       }
     } catch (error) {
       const prefix = persistedRecordId
-        ? `Bệnh án ${persistedRecordId} đã có trên backend nhưng một bước đồng bộ chưa hoàn tất. `
+        ? `Bệnh án ${persistedRecordId} đã được lưu nhưng một bước đồng bộ chưa hoàn tất. `
         : ''
       message.error(prefix + getApiMessage(error, 'Không thể lưu bệnh án.'))
     } finally {
@@ -845,32 +855,49 @@ function MedicalEncounter() {
               ),
             },
             {
-              title: '',
-              width: 180,
-              render: (_, item) => (
-                <Space>
-                  <Button
-                    size="small"
-                    type="primary"
-                    onClick={async () => {
-                      await selectPrimaryDiagnosis(item)
-                      setDiagnosisModalOpen(false)
-                    }}
-                  >
-                    Chọn chính
-                  </Button>
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      if (!secondaryIcds.some((diagnosis) => diagnosis.code === item.code)) {
-                        setSecondaryIcds((items) => [...items, item])
-                      }
-                    }}
-                  >
-                    Thêm phụ
-                  </Button>
-                </Space>
-              ),
+              title: 'Thao tác chọn',
+              width: 220,
+              align: 'center',
+              render: (_, item) => {
+                const isPrimary = primaryIcd?.code === item.code
+                const isSecondary = secondaryIcds.some((diagnosis) => diagnosis.code === item.code)
+
+                return (
+                  <Space size={6} wrap>
+                    {isPrimary ? (
+                      <Tag color="success" style={{ fontWeight: 600 }}>
+                        <CheckCircleOutlined /> Đang là CĐ chính
+                      </Tag>
+                    ) : (
+                      <Button
+                        size="small"
+                        type="primary"
+                        onClick={async () => {
+                          await selectPrimaryDiagnosis(item)
+                          setDiagnosisModalOpen(false)
+                        }}
+                      >
+                        Chọn chính
+                      </Button>
+                    )}
+                    {isSecondary ? (
+                      <Tag color="purple" style={{ fontWeight: 600 }}>
+                        <CheckOutlined /> Đã thêm phụ
+                      </Tag>
+                    ) : isPrimary ? null : (
+                      <Button
+                        size="small"
+                        disabled={!primaryIcd}
+                        onClick={() => {
+                          addSecondaryDiagnosis(item)
+                        }}
+                      >
+                        + Thêm phụ
+                      </Button>
+                    )}
+                  </Space>
+                )
+              },
             },
           ]}
         />
