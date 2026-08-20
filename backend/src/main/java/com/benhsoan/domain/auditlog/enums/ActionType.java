@@ -8,6 +8,8 @@ public enum ActionType {
 
     DELETE,
 
+    READ,
+
     LOGIN,
 
     LOGIN_FAILED,
