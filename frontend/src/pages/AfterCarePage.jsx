@@ -57,6 +57,7 @@ function AfterCarePage() {
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
 
+  // Modal states
   const [createReminderOpen, setCreateReminderOpen] = useState(false)
   const [createNoteOpen, setCreateNoteOpen] = useState(false)
   const [selectedReminder, setSelectedReminder] = useState(null)
@@ -90,6 +91,7 @@ function AfterCarePage() {
       if (noteRes.status === 'fulfilled') setNotes(noteRes.value.data || [])
       if (patRes.status === 'fulfilled') setPatients(patRes.value.data?.content || [])
     } catch {
+      // ignore load error
     } finally {
       setLoading(false)
     }
@@ -99,6 +101,7 @@ function AfterCarePage() {
     loadData()
   }, [loadData])
 
+  // NCL-10-CN-001: Create follow-up reminder
   const handleCreateReminder = async (values) => {
     setSubmitting(true)
     try {
@@ -126,6 +129,7 @@ function AfterCarePage() {
     }
   }
 
+  // NCL-10-CN-002: Create after-care note
   const handleCreateNote = async (values) => {
     setSubmitting(true)
     try {
@@ -314,6 +318,7 @@ function AfterCarePage() {
   return (
     <div style={{ padding: '24px', maxWidth: 1200, margin: '0 auto' }}>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {/* Banner Header */}
         <Card
           style={{
             background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
@@ -348,6 +353,7 @@ function AfterCarePage() {
           </Row>
         </Card>
 
+        {/* Statistics Cards */}
         <Row gutter={16}>
           <Col span={6}>
             <Card style={{ borderRadius: 8 }}>
@@ -391,6 +397,7 @@ function AfterCarePage() {
           </Col>
         </Row>
 
+        {/* Main Content Tabs */}
         <Card style={{ borderRadius: 12 }}>
           <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
             <Col span={12}>
@@ -463,6 +470,7 @@ function AfterCarePage() {
         </Card>
       </Space>
 
+      {/* Modal 1: Tạo lịch nhắc tái khám */}
       <Modal
         title="Tạo lịch nhắc tái khám mới"
         open={createReminderOpen}
@@ -525,6 +533,7 @@ function AfterCarePage() {
         </Form>
       </Modal>
 
+      {/* Modal 2: Ghi nhận chăm sóc sau khám (NCL-10-CN-002) */}
       <Modal
         title="Ghi nhận nội dung chăm sóc sau khám (NCL-10-CN-002)"
         open={createNoteOpen}

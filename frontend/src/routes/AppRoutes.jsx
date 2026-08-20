@@ -84,12 +84,12 @@ function AppRoutes() {
         <Route path="medicine-catalog" element={<PrivateRoute allowedRoles={['admin', 'pharmacist']}><MedicineCatalogPage /></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedRoles={['admin', 'manager', 'receptionist']}><BillingPage /></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedRoles={['admin', 'manager']}><ReportsPage /></PrivateRoute>} />
-        <Route path="system-management" element={<PrivateRoute allowedRoles={['admin']}><SystemManagementPage /></PrivateRoute>} />
+        <Route path="system-management" element={<PrivateRoute allowedRoles={['admin', 'manager', 'clinic_manager']}><SystemManagementPage /></PrivateRoute>} />
         <Route path="backup-restore" element={<PrivateRoute allowedRoles={['admin']}><BackupRestorePage /></PrivateRoute>} />
         <Route path="audit-logs" element={<PrivateRoute allowedRoles={['admin']}><MedicalRecordAccessLogsPage /></PrivateRoute>} />
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedRoles={['admin']}><MedicalRecordAccessLogsPage /></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute allowedRoles={['admin']}><UsersPage /></PrivateRoute>} />
-        <Route path="services" element={<PrivateRoute allowedRoles={['admin', 'manager']}><ServicesPage /></PrivateRoute>} />
+        <Route path="services" element={<PrivateRoute allowedRoles={['admin', 'manager', 'clinic_manager']}><ServicesPage /></PrivateRoute>} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

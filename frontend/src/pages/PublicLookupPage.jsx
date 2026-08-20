@@ -116,6 +116,7 @@ function PublicLookupPage() {
 
       setLookupResult(resData)
 
+      // NCL-10-CN-003: If appointment completed, load clinical visit details
       const allRecords = mergeMedicalRecords([])
       const foundRecord = allRecords.find((r) => r.appointmentCode === normalizedCode || r.recordCode === normalizedCode) || allRecords[0]
       if (foundRecord) {
@@ -304,6 +305,7 @@ function PublicLookupPage() {
                   <p>{status.description}</p>
                 </div>
 
+                {/* NCL-10-CN-003: Render Clinical Result Details when COMPLETED */}
                 {(lookupResult.careState === 'COMPLETED' || clinicalResult) && clinicalResult && (
                   <Card title={<span style={{ color: '#1890ff' }}><FileTextOutlined /> KẾT QUẢ KHÁM BỆNH BÁC SĨ (NCL-10-CN-003)</span>} style={{ marginTop: 16, borderRadius: 8, textAlign: 'left' }}>
                     <div style={{ marginBottom: 12 }}>
