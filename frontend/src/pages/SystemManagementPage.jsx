@@ -13,19 +13,24 @@ const { Title, Text } = Typography
 
 function SystemManagementPage() {
   const { user } = useAuthContext()
-  const userRoles = user?.roles || []
-  const userPermissions = user?.permissions || []
+  const userPermissions = (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  const isAdmin = userRoles.includes('admin')
 
-  const isAdmin = userRoles.includes('admin') || userRoles.includes('role_admin')
-  const canViewRolePermissions = isAdmin || userPermissions.includes('ROLE_READ')
+  const canViewConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || isAdmin
+  const canViewUsers = userPermissions.includes('USER_READ') || isAdmin
+  const canViewRolePermissions = userPermissions.includes('ROLE_READ') || userPermissions.includes('PERMISSION_READ')
+  const canViewServices = userPermissions.includes('SERVICE_CATALOG_READ') || isAdmin
+  const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || isAdmin
+  const canViewBackup = userPermissions.includes('BACKUP_READ') || isAdmin
 
   const tabItems = [
-    {
+    canViewConfig && {
       key: 'clinic-config',
       label: <span><SettingOutlined /> Cấu hình phòng khám</span>,
       children: <ClinicConfigurationPage />,
     },
-    {
+    canViewUsers && {
       key: 'users',
       label: <span><TeamOutlined /> Tài khoản người dùng</span>,
       children: <UsersPage />,
@@ -35,17 +40,17 @@ function SystemManagementPage() {
       label: <span><KeyOutlined /> Phân quyền vai trò</span>,
       children: <RolePermissionsPage />,
     },
-    {
+    canViewServices && {
       key: 'services',
       label: <span><AppstoreOutlined /> Danh mục dịch vụ</span>,
       children: <ServicesPage />,
     },
-    {
+    canViewAccessLogs && {
       key: 'access-logs',
       label: <span><SafetyCertificateOutlined /> Nhật ký truy cập bệnh án</span>,
       children: <MedicalRecordAccessLogsPage />,
     },
-    {
+    canViewBackup && {
       key: 'backup-restore',
       label: <span><DatabaseOutlined /> Sao lưu & Phục hồi</span>,
       children: <BackupRestorePage />,

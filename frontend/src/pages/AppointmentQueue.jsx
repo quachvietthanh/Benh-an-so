@@ -155,7 +155,10 @@ function AppointmentQueue() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
 
-  const permissions = useMemo(() => checkQueuePermissions(user?.roles || []), [user?.roles])
+  const permissions = useMemo(
+    () => checkQueuePermissions(user?.roles || [], user?.permissions || []),
+    [user?.roles, user?.permissions],
+  )
 
   const [activeMainTab, setActiveMainTab] = useState(() =>
     permissions.isDoctorOnly ? 'doctor_queue' : 'appointments',
