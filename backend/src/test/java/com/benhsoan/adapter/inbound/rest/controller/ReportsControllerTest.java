@@ -1,9 +1,11 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -23,6 +25,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
+import com.benhsoan.domain.reporting.enums.ReportType;
+import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
+import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
@@ -44,7 +49,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = ReportsController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(ReportingRestMapper.class)
+@Import({ReportingRestMapper.class, GlobalExceptionHandler.class})
 class ReportsControllerTest {
 
     @Autowired private MockMvc mockMvc;
@@ -336,7 +341,8 @@ class ReportsControllerTest {
 
     @Test
     void exportsCsv() throws Exception {
-        when(exportOperationalReportUseCase.export(any(), any())).thenReturn(new OperationalReportExportResult(
+        when(exportOperationalReportUseCase.export(any(), any(), any())).thenReturn(new OperationalReportExportResult(
+                ReportType.OPERATIONAL_REPORT,
                 "operational-report-2026-08-01-to-2026-08-03.csv",
                 "text/csv; charset=UTF-8",
                 "\uFEFFOPERATIONAL REPORT\nFrom,2026-08-01\nTo,2026-08-03\nVisit Count,2\nRevenue (VND),100000\n\nDate,Visit Count,Revenue (VND)\n2026-08-01,2,100000\n"
@@ -344,11 +350,85 @@ class ReportsControllerTest {
         ));
 
         mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-03"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "text/csv;charset=UTF-8"))
                 .andExpect(header().string("Content-Disposition",
-                        "attachment; filename=\"operational-report-2026-08-01-to-2026-08-03.csv\""));
+                        "attachment; filename=\"operational-report-2026-08-01-to-2026-08-03.csv\""))
+                .andExpect(content().bytes(
+                        "\uFEFFOPERATIONAL REPORT\nFrom,2026-08-01\nTo,2026-08-03\nVisit Count,2\n"
+                                .concat("Revenue (VND),100000\n\nDate,Visit Count,Revenue (VND)\n2026-08-01,2,100000\n")
+                                .getBytes(StandardCharsets.UTF_8)
+                ));
+        verify(exportOperationalReportUseCase).export(
+                ReportType.OPERATIONAL_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+    }
+
+    @Test
+    void returnsStructuredErrorWhenNoDataCanBeExported() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any()))
+                .thenThrow(new OperationalReportDataEmptyException());
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("REPORT_DATA_EMPTY"))
+                .andExpect(jsonPath("$.message").value("No report data available for the selected period."))
+                .andExpect(header().doesNotExist("Content-Disposition"));
+    }
+
+    @Test
+    void rejectsInvalidExportDateInputsBeforeCallingUseCase() throws Exception {
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from is required."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
+                        .param("from", "01-08-2026")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be in yyyy-MM-dd format."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
+                        .param("from", "2026-08-04")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "OPERATIONAL_REPORT")
+                        .param("from", "2025-01-01")
+                        .param("to", "2026-01-02"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
+
+        verifyNoInteractions(exportOperationalReportUseCase);
+    }
+
+    @Test
+    void rejectsMissingOrUnsupportedReportTypeBeforeCallingUseCase() throws Exception {
+        mockMvc.perform(get("/reports/export")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("reportType is required."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "TOP_MEDICINES_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT."));
+
+        verifyNoInteractions(exportOperationalReportUseCase);
     }
 }
