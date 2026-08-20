@@ -101,6 +101,27 @@ const getInitials = (name = '') =>
     .join('')
     .toUpperCase()
 
+const DEFAULT_DOCTORS = [
+  {
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
+    username: 'doctor1',
+    fullName: 'Dr. Nguyen Minh Anh',
+    department: 'Nội khoa',
+  },
+  {
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
+    username: 'doctor2',
+    fullName: 'Dr. Tran Quang Huy',
+    department: 'Ngoại khoa',
+  },
+  {
+    id: 'u3',
+    username: 'doctor1',
+    fullName: 'BS. Phạm Hồng Anh',
+    department: 'Nội tổng hợp',
+  },
+]
+
 const getAvatarStyle = (seed = '') => {
   const paletteIndex =
     [...String(seed)].reduce((sum, character) => sum + character.charCodeAt(0), 0) % avatarPalette.length
@@ -146,7 +167,8 @@ function AppointmentQueue() {
   const [queues, setQueues] = useState([])
   const [myQueueData, setMyQueueData] = useState(null)
   const [patients, setPatients] = useState([])
-  const [doctors, setDoctors] = useState([])
+  const [doctors, setDoctors] = useState(DEFAULT_DOCTORS)
+  const doctorList = useMemo(() => (Array.isArray(doctors) ? doctors : DEFAULT_DOCTORS), [doctors])
   const [appointmentLogs, setAppointmentLogs] = useState([])
   const [notificationLogs, setNotificationLogs] = useState([])
 
@@ -225,14 +247,22 @@ function AppointmentQueue() {
         setPatients([])
       }
 
-      if (doctorRes.status === 'fulfilled' && Array.isArray(doctorRes.value?.data)) {
-        setDoctors(doctorRes.value.data)
+      if (doctorRes.status === 'fulfilled') {
+        const rawData = doctorRes.value?.data
+        const list = Array.isArray(rawData)
+          ? rawData
+          : (Array.isArray(rawData?.content) ? rawData.content : [])
+        if (list.length > 0) {
+          setDoctors(list)
+        } else {
+          setDoctors(DEFAULT_DOCTORS)
+        }
       } else {
-        setDoctors([])
+        setDoctors(DEFAULT_DOCTORS)
       }
     } catch {
       setPatients([])
-      setDoctors([])
+      setDoctors(DEFAULT_DOCTORS)
     }
   }, [])
 
@@ -1257,7 +1287,7 @@ function AppointmentQueue() {
                           ? [{ value: 'ALL', label: `Bác sĩ: ${user?.fullName || user?.username || 'Bạn'}` }]
                           : [
                             { value: 'ALL', label: 'Tất cả Bác sĩ' },
-                            ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
+                            ...doctorList.map((d) => ({ value: d.id, label: d.fullName || d.username })),
                           ]
                       }
                       disabled={permissions.isDoctorOnly}
@@ -1319,7 +1349,7 @@ function AppointmentQueue() {
                           ? [{ value: 'ALL', label: `Bác sĩ: ${user?.fullName || user?.username || 'Bạn'}` }]
                           : [
                             { value: 'ALL', label: 'Tất cả Bác sĩ' },
-                            ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
+                            ...doctorList.map((d) => ({ value: d.id, label: d.fullName || d.username })),
                           ]
                       }
                       disabled={permissions.isDoctorOnly}
@@ -1417,7 +1447,7 @@ function AppointmentQueue() {
                           onChange={setQueueDoctorFilter}
                           options={[
                             { value: 'ALL', label: 'Tất cả Bác sĩ (Hôm nay)' },
-                            ...doctors.map((d) => ({ value: d.id, label: d.fullName || d.username })),
+                            ...doctorList.map((d) => ({ value: d.id, label: d.fullName || d.username })),
                           ]}
                         />
                       </Col>
@@ -1656,7 +1686,7 @@ function AppointmentQueue() {
           >
             <Select
               placeholder="Chọn bác sĩ phụ trách..."
-              options={doctors.map((d) => ({
+              options={doctorList.map((d) => ({
                 value: d.id,
                 label: `${d.fullName || d.username} - ${d.department || 'Chuyên khoa'}`,
               }))}
@@ -1760,7 +1790,7 @@ function AppointmentQueue() {
           >
             <Select
               placeholder="Chọn bác sĩ phụ trách..."
-              options={doctors.map((d) => ({
+              options={doctorList.map((d) => ({
                 value: d.id,
                 label: `${d.fullName || d.username} (${d.department || 'Phòng khám'})`,
               }))}

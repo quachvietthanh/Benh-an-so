@@ -31,7 +31,7 @@ export const roleRoutes = {
   admin: ['/', '/patients', '/appointments', '/medical-records', '/prescriptions', '/clinical-orders', '/clinical-results', '/results', '/pharmacy', '/billing', '/reports', '/system-management', '/users', '/services', '/public-lookup'],
   manager: ['/', '/patients', '/medical-records', '/prescriptions', '/clinical-orders', '/clinical-results', '/results', '/pharmacy', '/billing', '/reports', '/services'],
   doctor: ['/', '/patients', '/appointments', '/medical-records', '/clinical-orders', '/clinical-results', '/results', '/prescriptions'],
-  receptionist: ['/', '/patients', '/appointments', '/clinical-orders', '/clinical-results', '/results', '/billing'],
+  receptionist: ['/', '/patients', '/appointments', '/after-care', '/clinical-orders', '/clinical-results', '/results', '/billing'],
   pharmacist: ['/', '/pharmacy', '/prescriptions'],
 }
 

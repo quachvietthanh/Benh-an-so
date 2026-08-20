@@ -38,5 +38,7 @@ public enum ResourceType {
 
     SYSTEM_BACKUP,
 
-    CARE_LOG
+    CARE_LOG,
+
+    PATIENT_PORTAL
 }

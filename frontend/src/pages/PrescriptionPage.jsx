@@ -54,21 +54,19 @@ import visitApi from '../api/visitApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import { useAuthContext } from '../context/AuthContext'
-import { getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
-import { fixMojibake } from '../utils/serviceCatalogValidation'
+import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
   canSubmitPrescription,
   areAllInteractionsHandled,
   getUnhandledInteractions,
 } from '../utils/drugInteractionValidation'
-import { saveStoredPrescription, mergeMedicines } from '../utils/storageHelpers'
+import { mergeMedicines, saveStoredPrescription } from '../utils/storageHelpers'
 import {
   getAvailableStock,
   sortMedicinesByStockAvailability,
   validateItemStock,
   validatePrescriptionStock,
 } from '../utils/prescriptionInventoryValidation'
-
 
 const { Text, Paragraph, Title } = Typography
 
@@ -211,9 +209,11 @@ function PrescriptionPage() {
 
   const diagnosisSummary = useMemo(() => {
     const primary = diagnoses.find((diagnosis) => diagnosis.diagnosisType === 'PRIMARY') || diagnoses[0]
-    return primary
-      ? `[${primary.diagnosisCode}] ${fixMojibake(primary.diagnosisName)}`
-      : 'Chưa có chẩn đoán'
+    if (!primary) return 'Chưa có chẩn đoán'
+    const code = primary.diagnosisCode || primary.code || ''
+    const rawName = primary.diagnosisName || primary.name || ''
+    const cleanName = fixMojibake(rawName)
+    return code ? `[${code}] ${cleanName}` : cleanName
   }, [diagnoses])
 
   const loadData = useCallback(async () => {
@@ -230,27 +230,49 @@ function PrescriptionPage() {
 
       const recordData = recordResult.data
       setRecord(recordData)
-      const rawDiag = Array.isArray(diagnosisResult.data) ? diagnosisResult.data : []
-      setDiagnoses(rawDiag.map((d) => ({ ...d, diagnosisName: fixMojibake(d.diagnosisName) })))
+      const rawDiagnoses = Array.isArray(diagnosisResult.data) ? diagnosisResult.data : []
+      const cleanedDiagnoses = rawDiagnoses.map((d) => ({
+        ...d,
+        diagnosisName: fixMojibake(d.diagnosisName || d.name || ''),
+        name: fixMojibake(d.diagnosisName || d.name || ''),
+      }))
+      setDiagnoses(cleanedDiagnoses)
       setPrescriptions(Array.isArray(prescriptionResult.data) ? prescriptionResult.data : [])
 
       let loadedMeds = []
+      let stockItems = []
       try {
-        const medicineResponse = await pharmacyApi.medicines({ active: true })
-        loadedMeds = unwrapCollection(medicineResponse.data)
+        const [medRes, stockRes] = await Promise.allSettled([
+          pharmacyApi.medicines({ active: true }),
+          pharmacyApi.stocks({ active: true }),
+        ])
+        if (medRes.status === 'fulfilled') {
+          loadedMeds = unwrapCollection(medRes.value.data)
+        }
+        if (stockRes.status === 'fulfilled') {
+          stockItems = unwrapCollection(stockRes.value.data)
+        }
       } catch {
         loadedMeds = mergeMedicines([])
       }
       if (!loadedMeds || loadedMeds.length === 0) {
         loadedMeds = mergeMedicines([])
       }
+
+      const stockMap = new Map((stockItems || []).map((s) => [String(s.medicineId || s.id), s]))
+
       const normalizedMeds = loadedMeds.map((m) => {
-        const avail = getAvailableStock(m)
+        const stockItem = stockMap.get(String(m.id))
+        const avail = stockItem
+          ? (stockItem.eligibleStockQuantity ?? stockItem.stockQuantity ?? 0)
+          : getAvailableStock(m)
+
         return {
           ...m,
           medicineName: m.medicineName || m.name || 'Thuốc',
           stockQuantity: avail,
           availableStock: avail,
+          eligibleStockQuantity: avail,
           unit: m.unit || 'viên',
         }
       })
@@ -495,9 +517,18 @@ function PrescriptionPage() {
       )
 
       let freshMeds = []
+      let freshStocks = []
       try {
-        const medicineResponse = await pharmacyApi.medicines({ active: true })
-        freshMeds = unwrapCollection(medicineResponse.data)
+        const [medRes, stockRes] = await Promise.allSettled([
+          pharmacyApi.medicines({ active: true }),
+          pharmacyApi.stocks({ active: true }),
+        ])
+        if (medRes.status === 'fulfilled') {
+          freshMeds = unwrapCollection(medRes.value.data)
+        }
+        if (stockRes.status === 'fulfilled') {
+          freshStocks = unwrapCollection(stockRes.value.data)
+        }
       } catch {
         freshMeds = medicines
       }
@@ -505,13 +536,20 @@ function PrescriptionPage() {
         freshMeds = medicines
       }
 
+      const freshStockMap = new Map((freshStocks || []).map((s) => [String(s.medicineId || s.id), s]))
+
       const normalizedFreshMeds = freshMeds.map((m) => {
-        const avail = getAvailableStock(m)
+        const stockItem = freshStockMap.get(String(m.id))
+        const avail = stockItem
+          ? (stockItem.eligibleStockQuantity ?? stockItem.stockQuantity ?? 0)
+          : getAvailableStock(m)
+
         return {
           ...m,
           medicineName: m.medicineName || m.name || 'Thuốc',
           stockQuantity: avail,
           availableStock: avail,
+          eligibleStockQuantity: avail,
           unit: m.unit || 'viên',
         }
       })
@@ -581,6 +619,8 @@ function PrescriptionPage() {
           quantity: Number(i.quantity),
           dosage: i.dosage,
           frequency: Number(i.frequency),
+          route: i.route,
+          durationDays: Number(i.durationDays),
           unitPrice: i.unitPrice || i.price,
         })),
         createdAt: new Date().toISOString(),
@@ -673,8 +713,8 @@ function PrescriptionPage() {
         quantity: Number(item.quantity),
         dosage: item.dosage || '',
         frequency: item.frequency != null ? Number(item.frequency) : 2,
-        route: item.route,
-        durationDays: Number(item.durationDays) || 1,
+        route: item.route || 'ORAL',
+        durationDays: Number(item.durationDays) || 5,
         instructions: item.instructions || '',
         isOriginal: true,
       })),
@@ -1238,7 +1278,7 @@ function PrescriptionPage() {
                           </Tooltip>
                         </div>
 
-                        {/* Hàng 1: Thuốc & Đường dùng */}
+                        {/* Hàng 1: Thuốc & Cách dùng */}
                         <Row gutter={[12, 12]} style={{ marginBottom: 10 }}>
                           <Col xs={24} md={15}>
                             <Form.Item
@@ -1382,6 +1422,24 @@ function PrescriptionPage() {
                                 addonAfter={unit}
                               />
                             </Form.Item>
+                            {selectedMed && (() => {
+                              const avail = getAvailableStock(selectedMed)
+                              if (Number(item.quantity || 0) <= 0) {
+                                return (
+                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                    Số lượng kê phải lớn hơn 0.
+                                  </div>
+                                )
+                              }
+                              if (avail > 0 && item.quantity > avail) {
+                                return (
+                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                    Không đủ tồn kho. Tối đa có thể kê: {avail} {unit}.
+                                  </div>
+                                )
+                              }
+                              return null
+                            })()}
                             {Number(item.frequency) > 0 && Number(item.durationDays) > 0 && (
                               <div style={{ marginTop: 4 }}>
                                 <Text
@@ -1458,7 +1516,16 @@ function PrescriptionPage() {
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
-                      disabled={checkingInteractions || saving}
+                      disabled={checkingInteractions || saving || items.some((i) => {
+                        if (!i.medicineId) return false
+                        const med = selectedMedicineMap.get(String(i.medicineId))
+                        if (!med) return false
+                        const avail = getAvailableStock(med)
+                        const totalQty = items
+                          .filter((x) => String(x.medicineId) === String(i.medicineId))
+                          .reduce((sum, x) => sum + Number(x.quantity || 0), 0)
+                        return avail <= 0 || Number(i.quantity || 0) > avail || totalQty > avail
+                      })}
                       onClick={() => {
                         setConfirmedOverrides([])
                         setItems((current) => [...current, createEmptyItem(false)])
