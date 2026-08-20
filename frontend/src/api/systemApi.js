@@ -1,9 +1,14 @@
 import axiosClient from './axiosClient'
 
 const systemApi = {
-  services: () => axiosClient.get('/system/services'),
+  // Service Catalog & Price Management
+  services: (params = {}) => axiosClient.get('/system/services', { params }),
+  getServiceById: (id) => axiosClient.get(`/system/services/${id}`),
   createService: (data) => axiosClient.post('/system/services', data),
   updateService: (id, data) => axiosClient.put(`/system/services/${id}`, data),
+  updateServiceStatus: (id, active) => axiosClient.patch(`/system/services/${id}/status`, { active }),
+  getServicePriceHistory: (id) => axiosClient.get(`/system/services/${id}/prices`),
+
   clinic: () => axiosClient.get('/system/clinic'),
   updateClinic: (data) => axiosClient.put('/system/clinic', data),
 
