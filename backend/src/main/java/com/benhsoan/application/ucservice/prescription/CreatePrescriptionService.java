@@ -77,7 +77,7 @@ public class CreatePrescriptionService
             CreatePrescriptionCommand command
     ) {
         requireCommand(command);
-        authorizeDoctorOrAdmin();
+        authorizeDoctor();
 
         UUID currentUserId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
@@ -131,11 +131,10 @@ public class CreatePrescriptionService
         return resultMapper.toResult(saved, warningLogs);
     }
 
-    private void authorizeDoctorOrAdmin() {
-        if (!currentUserPort.hasRole("DOCTOR")
-                && !currentUserPort.hasRole("ADMIN")) {
+    private void authorizeDoctor() {
+        if (!currentUserPort.hasRole("DOCTOR")) {
             throw new AccessDeniedException(
-                    "Only doctors and admins are allowed to create prescriptions."
+                    "Only doctors are allowed to create prescriptions."
             );
         }
     }
@@ -234,9 +233,7 @@ public class CreatePrescriptionService
                             medicine.getUnit(),
                             command.dosage(),
                             command.frequency(),
-                            command.route() == null
-                                    ? medicine.getDefaultRoute()
-                                    : command.route(),
+                            command.route(),
                             command.durationDays(),
                             command.quantity(),
                             command.instructions(),

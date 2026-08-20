@@ -150,9 +150,9 @@ CREATE TABLE prescription_items (
     strength VARCHAR(100) NOT NULL,
     unit VARCHAR(50) NOT NULL,
     dosage VARCHAR(100) NOT NULL,
-    frequency VARCHAR(100) NOT NULL,
+    frequency INT NOT NULL,
     route VARCHAR(30) NOT NULL,
-    duration_days INT NULL,
+    duration_days INT NOT NULL,
     quantity INT NOT NULL,
     instructions TEXT NULL,
     created_at TIMESTAMP NOT NULL,
@@ -188,7 +188,10 @@ CREATE TABLE prescription_items (
         )
     ),
     CONSTRAINT chk_prescription_items_duration_days CHECK (
-        duration_days IS NULL OR duration_days > 0
+        duration_days > 0
+    ),
+    CONSTRAINT chk_prescription_items_frequency CHECK (
+        frequency > 0
     ),
     CONSTRAINT chk_prescription_items_quantity CHECK (quantity > 0)
 );

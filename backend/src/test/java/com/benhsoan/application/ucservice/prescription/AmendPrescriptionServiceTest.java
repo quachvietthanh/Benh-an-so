@@ -209,7 +209,7 @@ class AmendPrescriptionServiceTest {
         return AmendPrescriptionItemCommand.builder()
                 .medicineId(medicineId)
                 .dosage(dosage)
-                .frequency("Twice daily")
+                .frequency(2)
                 .route(AdministrationRoute.ORAL)
                 .durationDays(5)
                 .quantity(10)
@@ -223,7 +223,7 @@ class AmendPrescriptionServiceTest {
 
     private Prescription prescription(UUID prescribedBy, PrescriptionStatus status) {
         PrescriptionItem item = PrescriptionItem.create(UUID.randomUUID(), prescriptionId, existingMedicineId,
-                "Paracetamol", "Paracetamol", "500 mg", "tablet", "1 tablet", "Twice daily",
+                "Paracetamol", "Paracetamol", "500 mg", "tablet", "1 tablet", 2,
                 AdministrationRoute.ORAL, 5, 10, null, CREATED_AT);
         return Prescription.restore(prescriptionId, "RX000001", UUID.randomUUID(), status, "Take after meals",
                 prescribedBy, CREATED_AT, null, null, List.of(item));

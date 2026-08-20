@@ -58,8 +58,8 @@ public class PrescriptionItemEntity {
     @Column(name = "dosage", nullable = false, length = 100)
     private String dosage;
 
-    @Column(name = "frequency", nullable = false, length = 100)
-    private String frequency;
+    @Column(name = "frequency", nullable = false)
+    private Integer frequency;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "route", nullable = false, length = 30)

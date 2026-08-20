@@ -519,7 +519,7 @@ class RecordPaymentServiceTest {
                 "500 mg",
                 "vien",
                 "1 vien",
-                "2 lan/ngay",
+                2,
                 com.benhsoan.domain.medicine.enums.AdministrationRoute.ORAL,
                 5,
                 10,
