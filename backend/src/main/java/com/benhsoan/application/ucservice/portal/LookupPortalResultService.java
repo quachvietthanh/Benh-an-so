@@ -1,8 +1,10 @@
 package com.benhsoan.application.ucservice.portal;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +16,7 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.ClinicalResult;
+import com.benhsoan.domain.clinical.enums.ClinicalResultStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalResultType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
@@ -69,15 +72,15 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
         Appointment appointment = appointmentRepository.findByAppointmentCode(query.appointmentCode())
                 .orElseThrow(PortalLookupNotFoundException::new);
 
-        if (!matchesPhone(query.phoneNumber(), appointment.getPatientId())) {
+        Patient patient = patientRepository.findById(appointment.getPatientId())
+                .orElseThrow(PortalLookupNotFoundException::new);
+
+        if (!matchesPhone(query.phoneNumber(), patient)) {
             throw new PortalLookupNotFoundException();
         }
 
         Visit visit = visitRepository.findByAppointmentId(appointment.getId())
                 .filter(Visit::isCompleted)
-                .orElseThrow(PortalLookupNotFoundException::new);
-
-        Patient patient = patientRepository.findById(appointment.getPatientId())
                 .orElseThrow(PortalLookupNotFoundException::new);
 
         User doctor = userRepository.findById(appointment.getDoctorId()).orElse(null);
@@ -114,7 +117,7 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
                 ActionType.READ,
                 ResourceType.PATIENT_PORTAL,
                 appointment.getId(),
-                detail(appointment.getAppointmentCode()),
+                "Patient portal lookup by appointment code: " + appointment.getAppointmentCode(),
                 null,
                 clockPort.now()
         ));
@@ -122,12 +125,11 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
         return result;
     }
 
-    private boolean matchesPhone(String phoneNumber, UUID patientId) {
+    private boolean matchesPhone(String phoneNumber, Patient patient) {
         if (phoneNumber == null) {
             return true;
         }
-        Patient patient = patientRepository.findById(patientId).orElse(null);
-        if (patient == null || patient.getPhone() == null) {
+        if (patient.getPhone() == null) {
             return false;
         }
         return patient.getPhone().replaceAll("\\D", "")
@@ -136,7 +138,7 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
 
     private List<ClinicalTestResultItem> resolveClinicalTestResults(UUID visitId) {
         List<ClinicalOrder> orders = clinicalOrderRepository
-                .findByVisitId(visitId, org.springframework.data.domain.Pageable.unpaged())
+                .findByVisitId(visitId, Pageable.unpaged())
                 .getContent();
 
         if (orders.isEmpty()) {
@@ -155,36 +157,40 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
 
         return items.stream()
                 .map(item -> toClinicalTestResultItem(item, findResult(results, item.getId())))
+                .filter(Objects::nonNull)
                 .toList();
     }
 
     private ClinicalResult findResult(List<ClinicalResult> results, UUID itemId) {
         return results.stream()
                 .filter(r -> r.getClinicalOrderItemId().equals(itemId))
+                .filter(r -> r.getStatus() == ClinicalResultStatus.FINAL)
                 .findFirst()
                 .orElse(null);
     }
 
     private ClinicalTestResultItem toClinicalTestResultItem(ClinicalOrderItem item, ClinicalResult result) {
+        if (result == null) {
+            return null;
+        }
+
         String value = null;
-        if (result != null) {
-            if (result.getResultType() == ClinicalResultType.NUMBER && result.getNumericValue() != null) {
-                value = result.getNumericValue().stripTrailingZeros().toPlainString();
-            } else if (result.getTextValue() != null) {
-                value = result.getTextValue();
-            } else if (result.getConclusion() != null) {
-                value = result.getConclusion();
-            }
+        if (result.getResultType() == ClinicalResultType.NUMBER && result.getNumericValue() != null) {
+            value = result.getNumericValue().stripTrailingZeros().toPlainString();
+        } else if (result.getTextValue() != null) {
+            value = result.getTextValue();
+        } else if (result.getConclusion() != null) {
+            value = result.getConclusion();
         }
 
         return new ClinicalTestResultItem(
                 item.getServiceCode(),
                 item.getServiceName(),
-                result == null ? null : result.getResultType().name(),
+                result.getResultType().name(),
                 value,
-                result == null ? null : result.getUnit(),
-                result == null ? null : result.getReferenceRange(),
-                result == null ? null : result.getConclusion()
+                result.getUnit(),
+                result.getReferenceRange(),
+                result.getConclusion()
         );
     }
 
@@ -235,9 +241,5 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
             return "***";
         }
         return digits.substring(0, 3) + "***" + digits.substring(digits.length() - 3);
-    }
-
-    private String detail(String appointmentCode) {
-        return "Patient portal lookup by appointment code: " + appointmentCode;
     }
 }

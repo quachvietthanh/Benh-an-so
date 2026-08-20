@@ -3,7 +3,6 @@ package com.benhsoan.port.dto.result.portal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 public record PortalLookupResult(
         String appointmentCode,

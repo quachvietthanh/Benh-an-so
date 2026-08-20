@@ -27,6 +27,7 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.ClinicalResult;
+import com.benhsoan.domain.clinical.enums.ClinicalResultStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalResultType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
@@ -128,6 +129,22 @@ class LookupPortalResultServiceTest {
         assertEquals(1, result.clinicalTestResults().size());
         assertEquals(1, result.prescriptions().size());
         verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void omitsNonFinalClinicalResults() {
+        ClinicalResult draft = mock(ClinicalResult.class);
+        when(draft.getClinicalOrderItemId()).thenReturn(ITEM_ID);
+        when(draft.getResultType()).thenReturn(ClinicalResultType.NUMBER);
+        when(draft.getStatus()).thenReturn(ClinicalResultStatus.DRAFT);
+        when(draft.getNumericValue()).thenReturn(new BigDecimal("5.00"));
+
+        when(clinicalResultRepository.findByClinicalOrderItemIdIn(any()))
+                .thenReturn(List.of(draft));
+
+        PortalLookupResult result = service.lookup(new LookupPortalResultQuery(CODE, null));
+
+        assertEquals(0, result.clinicalTestResults().size());
     }
 
     @Test
@@ -235,6 +252,7 @@ class LookupPortalResultServiceTest {
         ClinicalResult result = mock(ClinicalResult.class);
         when(result.getClinicalOrderItemId()).thenReturn(ITEM_ID);
         when(result.getResultType()).thenReturn(ClinicalResultType.NUMBER);
+        when(result.getStatus()).thenReturn(ClinicalResultStatus.FINAL);
         when(result.getNumericValue()).thenReturn(new BigDecimal("5.00"));
         when(result.getUnit()).thenReturn("10^9/L");
         when(result.getReferenceRange()).thenReturn("4-10");
