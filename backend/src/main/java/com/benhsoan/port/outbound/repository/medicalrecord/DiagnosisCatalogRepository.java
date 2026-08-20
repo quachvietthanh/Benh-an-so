@@ -10,6 +10,4 @@ public interface DiagnosisCatalogRepository {
     Optional<DiagnosisCatalog> findById(UUID id);
 
     List<DiagnosisCatalog> findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(String code, String name);
-
-    List<DiagnosisCatalog> findAll();
 }

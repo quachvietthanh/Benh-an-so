@@ -26,13 +26,9 @@ public class DiagnosisCatalogService implements GetDiagnosisCatalogUseCase {
     @Override
     public List<DiagnosisCatalogResult> search(String query) {
         if (query == null || query.isBlank()) {
-            return repository.findAll()
-                    .stream()
-                    .map(this::toResult)
-                    .toList();
+            return Collections.emptyList();
         }
-        String trimmed = query.trim();
-        return repository.findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(trimmed, trimmed)
+        return repository.findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(query, query)
                 .stream()
                 .map(this::toResult)
                 .toList();

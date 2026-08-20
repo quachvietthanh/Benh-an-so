@@ -35,21 +35,12 @@ class DiagnosisCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("Should return all diagnoses when query is blank")
-    void searchBlankReturnsAll() {
-        var catalog = sampleDiagnosis("J00", "Common cold");
-        when(repository.findAll()).thenReturn(List.of(catalog));
-
-        List<DiagnosisCatalogResult> results = service.search(null);
-        assertEquals(1, results.size());
-        assertEquals("J00", results.getFirst().code());
-
-        results = service.search("");
-        assertEquals(1, results.size());
-
-        results = service.search("   ");
-        assertEquals(1, results.size());
-        verify(repository, times(3)).findAll();
+    @DisplayName("Should return empty list when query is blank")
+    void searchBlankReturnsEmpty() {
+        assertTrue(service.search(null).isEmpty());
+        assertTrue(service.search("").isEmpty());
+        assertTrue(service.search("   ").isEmpty());
+        verifyNoInteractions(repository);
     }
 
     @Test
