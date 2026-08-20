@@ -35,7 +35,8 @@ import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintModal'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
-import { icd10Categories, getIcd10CategoryByCode } from '../utils/icd10Data'
+import { useAuthContext } from '../context/AuthContext'
+import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
 import {
   buildClinicalOrderPayload,
@@ -63,7 +64,7 @@ const loadRecentDiagnoses = () => {
     }
   } catch {
   }
-  return commonIcd10List.filter((item) => item.isPopular).slice(0, 10)
+  return []
 }
 
 const saveRecentDiagnosis = (icd) => {
@@ -131,8 +132,45 @@ function MedicalEncounter() {
   const [icdSearchQuery, setIcdSearchQuery] = useState('')
   const [icdCategory, setIcdCategory] = useState('ALL')
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
+  const [allBackendDiagnoses, setAllBackendDiagnoses] = useState([])
   const [icdSearching, setIcdSearching] = useState(false)
   const [recentIcds, setRecentIcds] = useState(loadRecentDiagnoses)
+
+  const loadAllBackendDiagnoses = useCallback(async () => {
+    setIcdSearching(true)
+    try {
+      const keyPrefixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'R', 'S', 'T', 'Z']
+      const results = await Promise.allSettled(
+        keyPrefixes.map((prefix) => medicalRecordApi.getDiagnosisCatalog(prefix)),
+      )
+      const map = new Map()
+      results.forEach((res) => {
+        if (res.status === 'fulfilled' && Array.isArray(res.value?.data)) {
+          res.value.data.forEach((item) => {
+            if (item?.code && !map.has(item.code)) {
+              map.set(item.code, {
+                id: item.id,
+                code: item.code,
+                name: fixMojibake(item.name),
+                description: fixMojibake(item.description || ''),
+                category: getCategoryFromIcdCode(item.code),
+              })
+            }
+          })
+        }
+      })
+      const list = Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code))
+      setAllBackendDiagnoses(list)
+    } catch {
+      setAllBackendDiagnoses([])
+    } finally {
+      setIcdSearching(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadAllBackendDiagnoses()
+  }, [loadAllBackendDiagnoses])
 
   const [selectedOrders, setSelectedOrders] = useState([])
   const [orderCategory, setOrderCategory] = useState('ALL')
@@ -252,35 +290,33 @@ function MedicalEncounter() {
     loadWorkflow()
   }, [loadWorkflow])
 
-  const loadBackendIcdCatalog = useCallback(async (query = '') => {
-    try {
-      const response = await medicalRecordApi.getDiagnosisCatalog(query)
-      const raw = Array.isArray(response.data) ? response.data : []
-      setBackendIcdCatalog(
-        raw.map((item) => ({
-          id: item.id,
-          code: item.code,
-          name: fixMojibake(item.name),
-          description: fixMojibake(item.description || ''),
-          category: item.category || getIcd10CategoryByCode(item.code),
-        })),
-      )
-    } catch {
+  useEffect(() => {
+    const query = icdSearchQuery.trim()
+    if (!query) {
       setBackendIcdCatalog([])
+      return
     }
-  }, [])
 
-  useEffect(() => {
-    loadBackendIcdCatalog('')
-  }, [loadBackendIcdCatalog])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      loadBackendIcdCatalog(icdSearchQuery.trim())
+    const timer = setTimeout(async () => {
+      try {
+        const response = await medicalRecordApi.getDiagnosisCatalog(query)
+        const raw = Array.isArray(response.data) ? response.data : []
+        setBackendIcdCatalog(
+          raw.map((item) => ({
+            id: item.id,
+            code: item.code,
+            name: fixMojibake(item.name),
+            description: fixMojibake(item.description || ''),
+            category: getCategoryFromIcdCode(item.code),
+          })),
+        )
+      } catch {
+        setBackendIcdCatalog([])
+      }
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [icdSearchQuery, loadBackendIcdCatalog])
+  }, [icdSearchQuery])
 
   const bmiValue = useMemo(() => {
     const weight = Number(vitalSigns.weight)
@@ -289,11 +325,27 @@ function MedicalEncounter() {
   }, [vitalSigns.height, vitalSigns.weight])
 
   const filteredIcdList = useMemo(() => {
-    return backendIcdCatalog.filter((item) => {
-      const matchesCategory = icdCategory === 'ALL' || item.category === icdCategory
-      return matchesCategory
-    })
-  }, [backendIcdCatalog, icdCategory])
+    const query = icdSearchQuery.trim().toLowerCase()
+    let list = []
+    if (query) {
+      if (backendIcdCatalog.length > 0) {
+        list = backendIcdCatalog
+      } else {
+        list = allBackendDiagnoses.filter(
+          (item) =>
+            item.code.toLowerCase().includes(query) ||
+            (item.name && item.name.toLowerCase().includes(query)),
+        )
+      }
+    } else {
+      list = allBackendDiagnoses
+    }
+
+    if (icdCategory !== 'ALL') {
+      list = list.filter((item) => item.category === icdCategory)
+    }
+    return list
+  }, [allBackendDiagnoses, backendIcdCatalog, icdCategory, icdSearchQuery])
 
   const filteredCatalog = useMemo(() => {
     const query = orderSearchQuery.trim().toLowerCase()
@@ -357,17 +409,16 @@ function MedicalEncounter() {
   )
 
   const diagnosisSelectOptions = useMemo(() => {
-    const combined = new Map()
     if (icdSearchQuery.trim()) {
-      filteredIcdList.forEach((item) => combined.set(item.code, item))
-    } else {
-      recentIcds.forEach((item) => combined.set(item.code, item))
-      commonIcd10List.forEach((item) => {
-        if (!combined.has(item.code)) combined.set(item.code, item)
-      })
+      return filteredIcdList
     }
+    const combined = new Map()
+    recentIcds.forEach((item) => combined.set(item.code, item))
+    allBackendDiagnoses.forEach((item) => {
+      if (!combined.has(item.code)) combined.set(item.code, item)
+    })
     return Array.from(combined.values())
-  }, [filteredIcdList, icdSearchQuery, recentIcds])
+  }, [allBackendDiagnoses, filteredIcdList, icdSearchQuery, recentIcds])
 
   const handleAddOrder = (catalogItem) => {
     if (selectedOrders.some((item) => item.id === catalogItem.id)) {

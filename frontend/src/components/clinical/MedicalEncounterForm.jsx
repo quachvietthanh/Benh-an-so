@@ -30,7 +30,7 @@ import {
   TableOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { icd10Categories, getIcd10CategoryByCode } from '../../utils/icd10Data'
+import { icd10Categories } from '../../utils/icd10Data'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
 
@@ -87,16 +87,12 @@ function MedicalEncounterForm({
   const [showIcdTable, setShowIcdTable] = useState(true)
 
   const availableIcdList = useMemo(() => {
-    let list = (diagnosisOptions || []).map((item) => ({
-      ...item,
-      category: item.category || getIcd10CategoryByCode(item.code),
-    }))
-
+    let list = diagnosisOptions || []
     const q = icdTableSearch.trim().toLowerCase()
     if (q) {
       list = list.filter(
         (item) =>
-          (item.code && item.code.toLowerCase().includes(q)) ||
+          item.code.toLowerCase().includes(q) ||
           (item.name && item.name.toLowerCase().includes(q)),
       )
     }
@@ -428,13 +424,7 @@ function MedicalEncounterForm({
                         placeholder="Tìm nhanh theo mã (J00, I10, K21...) hoặc tên bệnh..."
                         prefix={<SearchOutlined style={{ color: '#94A3B8' }} />}
                         value={icdTableSearch}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setIcdTableSearch(val)
-                          if (typeof onDiagnosisSearch === 'function') {
-                            onDiagnosisSearch(val)
-                          }
-                        }}
+                        onChange={(e) => setIcdTableSearch(e.target.value)}
                       />
                     </Col>
                     <Col xs={24} sm={10}>
@@ -452,8 +442,7 @@ function MedicalEncounterForm({
 
                   <Table
                     size="small"
-                    loading={diagnosisSearching}
-                    rowKey={(record) => record.code || record.id}
+                    rowKey={(record) => record.code}
                     dataSource={availableIcdList}
                     pagination={{
                       pageSize: 5,
