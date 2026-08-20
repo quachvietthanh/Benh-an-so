@@ -356,10 +356,16 @@ function FollowUpReminderModal({
             { required: true, message: 'Vui lòng chọn ngày tái khám.' },
             {
               validator: (_, value) => {
-                if (!value || !minimumFollowUpDate || value.format('YYYY-MM-DD') >= minimumFollowUpDate) {
-                  return Promise.resolve()
+                if (!value) return Promise.resolve()
+                const todayKey = getVietnamDateKey(new Date())
+                const dateKey = value.format('YYYY-MM-DD')
+                if (dateKey < todayKey) {
+                  return Promise.reject(new Error('Ngày tái khám không được trong quá khứ.'))
                 }
-                return Promise.reject(new Error('Ngày tái khám không được trước ngày của lượt khám.'))
+                if (minimumFollowUpDate && dateKey < minimumFollowUpDate) {
+                  return Promise.reject(new Error('Ngày tái khám không được trước ngày của lượt khám.'))
+                }
+                return Promise.resolve()
               },
             },
           ]}
@@ -369,10 +375,13 @@ function FollowUpReminderModal({
             format="DD/MM/YYYY"
             placeholder="Chọn ngày tái khám"
             disabled={submitting}
-            disabledDate={(current) => (
-              Boolean(current && minimumFollowUpDate)
-              && current.format('YYYY-MM-DD') < minimumFollowUpDate
-            )}
+            disabledDate={(current) => {
+              if (!current) return false
+              const todayKey = getVietnamDateKey(new Date())
+              const dateKey = current.format('YYYY-MM-DD')
+              const minKey = minimumFollowUpDate || todayKey
+              return dateKey < minKey
+            }}
           />
         </Form.Item>
 
