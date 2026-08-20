@@ -482,6 +482,7 @@ function BillingPage() {
             : ''
           const dosageInfo = [item.dosage, freqStr].filter(Boolean).join(' - ')
 
+          const unit = item.unit || matchedMed?.unit || 'viên'
           return {
             ...item,
             key: `med-item-${idx}`,

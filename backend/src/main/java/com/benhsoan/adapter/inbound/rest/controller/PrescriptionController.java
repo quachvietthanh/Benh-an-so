@@ -4,7 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,6 +36,7 @@ import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
@@ -54,6 +59,7 @@ public class PrescriptionController {
     private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
     private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
     private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+    private final ExportPrescriptionUseCase exportPrescriptionUseCase;
 
     private final PrescriptionRestMapper mapper;
 
@@ -98,6 +104,18 @@ public class PrescriptionController {
     @RequirePermission("PRESCRIPTION_READ")
     public PrescriptionResponse getById(@PathVariable UUID id) {
         return mapper.toResponse(getPrescriptionUseCase.getById(id));
+    }
+
+    @GetMapping("/{id}/print")
+    @RequirePermission("PRESCRIPTION_PRINT")
+    public ResponseEntity<ByteArrayResource> print(@PathVariable UUID id) {
+        var printResult = exportPrescriptionUseCase.export(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + printResult.fileName() + "\"")
+                .contentType(MediaType.parseMediaType(printResult.contentType()))
+                .contentLength(printResult.content().length)
+                .body(new ByteArrayResource(printResult.content()));
     }
 
     @GetMapping("/medical-records/{medicalRecordId}")
