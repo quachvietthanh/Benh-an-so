@@ -51,11 +51,16 @@ import {
 
 const { Text, Paragraph, Title } = Typography
 
-const getApiMessage = (error, fallback) =>
-  error?.response?.data?.message ||
-  Object.values(error?.response?.data?.errors || {})[0] ||
-  error?.message ||
-  fallback
+const getApiMessage = (error, fallback) => {
+  const errors = error?.response?.data?.errors
+  if (errors && typeof errors === 'object') {
+    const values = Object.values(errors).filter(Boolean)
+    if (values.length > 0) {
+      return String(values[0])
+    }
+  }
+  return error?.response?.data?.message || error?.message || fallback
+}
 
 const loadRecentDiagnoses = () => {
   try {
@@ -523,7 +528,11 @@ function MedicalEncounter() {
 
   const openPrescription = async (medicalRecordId) => {
     if (!medicalRecordId) {
-      message.error('Chưa có mã bệnh án hợp lệ để chuyển sang kê đơn.')
+      message.error('Chưa có mã bệnh án hợp lệ để chuyển sang kê đơn. Vui lòng bấm "Cập nhật bệnh án" trước.')
+      return false
+    }
+    if (!primaryIcd?.code) {
+      message.warning('Bệnh án cần có chẩn đoán chính trước khi chuyển sang kê đơn thuốc. Vui lòng chọn chẩn đoán và bấm "Cập nhật bệnh án".')
       return false
     }
 
