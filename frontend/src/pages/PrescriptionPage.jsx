@@ -1231,13 +1231,6 @@ function PrescriptionPage() {
                             />
                             {selectedMed && (() => {
                               const avail = getAvailableStock(selectedMed)
-                              if (Number(item.quantity || 0) <= 0) {
-                                return (
-                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-                                    Số lượng kê phải lớn hơn 0.
-                                  </div>
-                                )
-                              }
                               if (avail > 0 && item.quantity > avail) {
                                 return (
                                   <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
