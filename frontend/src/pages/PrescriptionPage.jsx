@@ -39,6 +39,7 @@ import {
   LockOutlined,
   MedicineBoxOutlined,
   PlusOutlined,
+  PrinterOutlined,
   RollbackOutlined,
   StopOutlined,
   SwapOutlined,
@@ -53,6 +54,7 @@ import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
+import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import { useAuthContext } from '../context/AuthContext'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
@@ -153,6 +155,8 @@ function PrescriptionPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
+  const [printModalOpen, setPrintModalOpen] = useState(false)
+  const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
 
   const isDoctor = roles.includes('doctor') || roles.includes('admin')
   const isAssignedDoctor = Boolean(
@@ -835,6 +839,12 @@ function PrescriptionPage() {
     })
   }
 
+  const handlePrintPrescription = (prescription) => {
+    if (!prescription) return
+    setSelectedPrescriptionForPrint(prescription)
+    setPrintModalOpen(true)
+  }
+
   const historyColumns = [
     {
       title: 'Mã đơn thuốc',
@@ -918,9 +928,15 @@ function PrescriptionPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 150,
+      width: 90,
+      align: 'center',
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
+        const isPrintable = Boolean(
+          prescription.id &&
+          prescription.prescriptionCode &&
+          (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')
+        )
         const canEditThis = canPrescribe && isPending
 
         const menuItems = [
@@ -929,6 +945,12 @@ function PrescriptionPage() {
             icon: <EyeOutlined />,
             label: 'Xem chi tiết đơn thuốc',
             onClick: () => openDetailModal(prescription),
+          },
+          isPrintable && {
+            key: 'print',
+            icon: <PrinterOutlined />,
+            label: 'In đơn thuốc',
+            onClick: () => handlePrintPrescription(prescription),
           },
           canEditThis && {
             key: 'edit',
@@ -949,20 +971,9 @@ function PrescriptionPage() {
         ].filter(Boolean)
 
         return (
-          <Space size="small">
-            <Button
-              size="small"
-              type="primary"
-              ghost
-              icon={<EyeOutlined />}
-              onClick={() => openDetailModal(prescription)}
-            >
-              Chi tiết
-            </Button>
-            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-              <Button size="small" icon={<EllipsisOutlined />} title="Thao tác khác" />
-            </Dropdown>
-          </Space>
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+            <Button size="small" icon={<EllipsisOutlined />} title="Thao tác" />
+          </Dropdown>
         )
       },
     },
@@ -1730,6 +1741,23 @@ function PrescriptionPage() {
         medicines={medicines}
         canEdit={canPrescribe}
         onEditClick={startEditPrescription}
+        onPrintClick={(p) => {
+          setSelectedPrescriptionForPrint(p)
+          setPrintModalOpen(true)
+        }}
+      />
+
+      <PrescriptionPrintTemplateModal
+        open={printModalOpen}
+        onClose={() => {
+          setPrintModalOpen(false)
+          setSelectedPrescriptionForPrint(null)
+        }}
+        prescription={selectedPrescriptionForPrint}
+        record={record}
+        diagnoses={diagnoses}
+        patient={encounter?.patient}
+        encounter={encounter}
       />
     </div>
   )
