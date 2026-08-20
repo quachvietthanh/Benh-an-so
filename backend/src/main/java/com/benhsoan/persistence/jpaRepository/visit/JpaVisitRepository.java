@@ -29,6 +29,8 @@ public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {
 
     Optional<VisitEntity> findTopByOrderByVisitCodeDesc();
 
+    Optional<VisitEntity> findByAppointmentId(UUID appointmentId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select visit from VisitEntity visit where visit.id = :visitId")
     Optional<VisitEntity> findByIdForUpdate(@Param("visitId") UUID visitId);

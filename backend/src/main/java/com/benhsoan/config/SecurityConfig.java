@@ -70,6 +70,9 @@ public class SecurityConfig {
                                                                 "/actuator/info")
                                                 .permitAll()
 
+                                                // Patient portal result lookup (public, strictly scoped by appointment code — QTN-15)
+                                                .requestMatchers("/portal/**").permitAll()
+
                                                 // ===== ADMIN / USER MANAGEMENT =====
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/users/**").authenticated()
