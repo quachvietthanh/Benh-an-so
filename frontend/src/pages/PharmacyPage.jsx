@@ -265,33 +265,43 @@ function PharmacyPage() {
       return
     }
 
+    if (hasPreviewShortage) {
+      message.error('Không thể cấp phát đơn thuốc do tồn kho khả dụng không đủ.')
+      return
+    }
+
     setDispensingId(selectedPrescription.id)
     setShortageDetails([])
     try {
       let allocationCount = 0
+      let dispensedSuccessfully = false
       try {
         const response = await pharmacyApi.dispense(selectedPrescription.id)
         allocationCount = Number(response.data?.allocationCount) || 0
+        dispensedSuccessfully = true
       } catch (apiErr) {
+        if (apiErr?.response?.status === 409) {
+          throw apiErr
+        }
         console.warn('[PharmacyPage] Backend dispense API fallback:', apiErr)
-        try {
-          dispensePrescriptionHelper(selectedPrescription.id)
-        } catch {}
+        dispensePrescriptionHelper(selectedPrescription.id)
+        dispensedSuccessfully = true
       }
-      
-      saveStoredPrescription({ ...selectedPrescription, status: 'DISPENSED' })
 
-      message.success(
-        `Đã cấp phát đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id}`
-        + (allocationCount ? ` qua ${allocationCount} lượt phân bổ FEFO.` : '.'),
-      )
-      await loadData()
+      if (dispensedSuccessfully) {
+        saveStoredPrescription({ ...selectedPrescription, status: 'DISPENSED' })
+        message.success(
+          `Đã cấp phát đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id}`
+          + (allocationCount ? ` qua ${allocationCount} lượt phân bổ FEFO.` : '.'),
+        )
+        await loadData()
+      }
     } catch (error) {
       const responseData = error?.response?.data
       if (error?.response?.status === 409 && Array.isArray(responseData?.details)) {
         setShortageDetails(responseData.details)
       }
-      message.error(getErrorMessage(error, 'Không thể cấp phát đơn thuốc.'))
+      message.error(getErrorMessage(error, error?.message || 'Không thể cấp phát đơn thuốc do thiếu tồn kho.'))
     } finally {
       setDispensingId(null)
     }

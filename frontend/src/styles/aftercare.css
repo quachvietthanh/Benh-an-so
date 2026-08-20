@@ -1,0 +1,198 @@
+.aftercare-page {
+  width: 100%;
+  max-width: 1880px;
+  margin: 0 auto;
+  padding: 4px 0 28px;
+}
+
+.aftercare-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.aftercare-page-header h2.ant-typography {
+  margin: 3px 0 4px;
+  color: #0f2744;
+  font-size: clamp(25px, 2.2vw, 32px);
+  line-height: 1.2;
+}
+
+.aftercare-page-header p.ant-typography {
+  max-width: 720px;
+  margin: 0;
+  color: #64748b;
+}
+
+.aftercare-eyebrow {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.aftercare-header-actions {
+  justify-content: flex-end;
+}
+
+.aftercare-patient-alert {
+  margin-bottom: 16px;
+}
+
+.aftercare-stats {
+  margin-bottom: 18px;
+}
+
+.aftercare-stat-card {
+  position: relative;
+  height: 100%;
+  min-height: 126px;
+  overflow: hidden;
+  border-left: 4px solid #2563eb !important;
+}
+
+.aftercare-stat-card.is-warning {
+  border-left-color: #d97706 !important;
+}
+
+.aftercare-stat-card.is-success {
+  border-left-color: #16a34a !important;
+}
+
+.aftercare-stat-card .ant-statistic-title {
+  margin-bottom: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.aftercare-stat-card .ant-statistic-content {
+  color: #0f2744;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.aftercare-stat-card.is-warning .ant-statistic-content-prefix {
+  color: #d97706;
+}
+
+.aftercare-stat-card.is-success .ant-statistic-content-prefix {
+  color: #16a34a;
+}
+
+.aftercare-stat-card.is-primary .ant-statistic-content-prefix {
+  color: #2563eb;
+}
+
+.aftercare-workspace > .ant-card-body {
+  padding: 20px;
+}
+
+.aftercare-workspace .ant-tabs-nav {
+  margin-bottom: 18px;
+}
+
+.aftercare-workspace .ant-tabs-tab {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+}
+
+.aftercare-filter-form {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.25fr) minmax(160px, 0.8fr) minmax(170px, 0.9fr) minmax(250px, 1.25fr) auto;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.aftercare-filter-form .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+
+.aftercare-filter-form .ant-form-item-row {
+  display: block;
+}
+
+.aftercare-filter-form .ant-form-item-label {
+  padding: 0 0 5px;
+  text-align: left;
+}
+
+.aftercare-filter-form .ant-select,
+.aftercare-filter-form .ant-picker {
+  width: 100%;
+}
+
+.aftercare-filter-actions {
+  align-self: end;
+}
+
+.aftercare-table.ant-table-wrapper {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.aftercare-table .ant-table-cell {
+  vertical-align: top;
+}
+
+.aftercare-person-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.aftercare-person-cell > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1280px) {
+  .aftercare-filter-form {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+
+  .aftercare-filter-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .aftercare-page-header {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .aftercare-header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .aftercare-header-actions .ant-btn {
+    flex: 1 1 190px;
+  }
+
+  .aftercare-filter-form {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .aftercare-filter-actions {
+    grid-column: auto;
+  }
+
+  .aftercare-workspace > .ant-card-body {
+    padding: 12px;
+  }
+}

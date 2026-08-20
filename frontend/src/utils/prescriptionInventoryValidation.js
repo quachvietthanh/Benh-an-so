@@ -82,16 +82,40 @@ export const validatePrescriptionStock = (items = [], medicinesData = []) => {
     return { isValid: true, errors: [], outOfStockItems: [], insufficientStockItems: [] }
   }
 
-  for (let idx = 0; idx < validItems.length; idx++) {
-    const item = validItems[idx]
-    const result = validateItemStock(item, medicinesData)
-    if (!result.isValid) {
-      errors.push(result.error)
-      if (result.availableStock <= 0) {
-        outOfStockItems.push({ item, result })
-      } else {
-        insufficientStockItems.push({ item, result })
-      }
+  const medMap = new Map()
+  if (medicinesData instanceof Map) {
+    medicinesData.forEach((v, k) => medMap.set(String(k), v))
+  } else if (Array.isArray(medicinesData)) {
+    medicinesData.forEach((m) => {
+      if (m && m.id) medMap.set(String(m.id), m)
+    })
+  }
+
+  const totalQtyByMedId = new Map()
+  validItems.forEach((item) => {
+    const medIdKey = String(item.medicineId)
+    const currentQty = totalQtyByMedId.get(medIdKey) || 0
+    totalQtyByMedId.set(medIdKey, currentQty + Number(item.quantity || 0))
+  })
+
+  for (const [medIdKey, totalQty] of totalQtyByMedId.entries()) {
+    const medicine = medMap.get(medIdKey)
+    const name = medicine?.medicineName || medicine?.name || `Mã ${medIdKey}`
+    const unit = medicine?.unit || 'viên'
+
+    if (!medicine) {
+      errors.push(`Không tìm thấy thông tin thuốc (${name}) trong hệ thống.`)
+      continue
+    }
+
+    const availableStock = getAvailableStock(medicine)
+
+    if (availableStock <= 0) {
+      errors.push(`Thuốc "${name}" hiện đã hết hàng (tồn 0 ${unit}).`)
+      outOfStockItems.push({ medicineId: medIdKey, availableStock, medicineName: name })
+    } else if (totalQty > availableStock) {
+      errors.push(`Tổng số lượng kê (${totalQty} ${unit}) vượt quá tồn kho khả dụng (${availableStock} ${unit}) của thuốc "${name}".`)
+      insufficientStockItems.push({ medicineId: medIdKey, totalQty, availableStock, medicineName: name })
     }
   }
 

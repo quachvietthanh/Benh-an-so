@@ -21,13 +21,21 @@ const normalizeRoles = (rawRoles) => {
   return Array.from(normalized)
 }
 
+const normalizePermissions = (rawPermissions) => {
+  if (!rawPermissions) return []
+  const permissions = Array.isArray(rawPermissions) ? rawPermissions : [rawPermissions]
+  return Array.from(new Set(permissions
+    .map((permission) => String(permission || '').toUpperCase().replace(/^PERMISSION_/, ''))
+    .filter(Boolean)))
+}
+
 const getJwtPayload = (token) => {
   if (!token || typeof token !== 'string') return null
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null
     const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const decoded = atob(payloadBase64)
+    const decoded = window.atob(payloadBase64)
     return JSON.parse(decoded)
   } catch {
     return null
@@ -56,6 +64,7 @@ export const AuthProvider = ({ children }) => {
             parsed.username = tokenUsername || parsed.username
             parsed.fullName = tokenUsername || parsed.fullName || parsed.username
             parsed.roles = normalizeRoles(tokenRole)
+            parsed.permissions = normalizePermissions(payload?.permissions || parsed.permissions)
             localStorage.setItem('user', JSON.stringify(parsed))
             setUser(parsed)
           } else {
@@ -78,6 +87,7 @@ export const AuthProvider = ({ children }) => {
           username: payload.username || 'User',
           fullName: payload.username || 'User',
           roles: normalizeRoles(payload.role),
+          permissions: normalizePermissions(payload.permissions),
         }
         localStorage.setItem('user', JSON.stringify(reconstructedUser))
         setUser(reconstructedUser)
@@ -100,6 +110,7 @@ export const AuthProvider = ({ children }) => {
         username: username,
         fullName: username,
         roles: normalizeRoles(rawRoles),
+        permissions: normalizePermissions(payload?.permissions || data.permissions),
         expiredAt: data.expiredAt,
       }
 

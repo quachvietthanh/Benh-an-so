@@ -29,6 +29,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
+import { fixMojibake } from '../../utils/workflowContract'
 
 const { Title, Text } = Typography
 
@@ -308,7 +309,7 @@ function MedicalEncounterForm({
                   {primaryIcd ? (
                     <Space size={6} wrap>
                       <Tag color="blue" style={{ margin: 0, fontWeight: 700 }}>{primaryIcd.code}</Tag>
-                      <Text strong style={{ color: '#1E40AF' }}>{primaryIcd.name}</Text>
+                      <Text strong style={{ color: '#1E40AF' }}>{fixMojibake(primaryIcd.name)}</Text>
                     </Space>
                   ) : (
                     <Text type="warning">Vui lòng chọn chẩn đoán chính trước khi thêm chẩn đoán phụ.</Text>
