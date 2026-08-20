@@ -73,7 +73,7 @@ public record PortalLookupResponse(
             String strength,
             String unit,
             String dosage,
-            String frequency,
+            Integer frequency,
             String route,
             Integer durationDays,
             int quantity,

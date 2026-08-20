@@ -274,7 +274,7 @@ class LookupPortalResultServiceTest {
         when(item.getStrength()).thenReturn("500mg");
         when(item.getUnit()).thenReturn("vien");
         when(item.getDosage()).thenReturn("1 vien");
-        when(item.getFrequency()).thenReturn("3 lan/ngay");
+        when(item.getFrequency()).thenReturn(3);
         when(item.getRoute()).thenReturn(com.benhsoan.domain.medicine.enums.AdministrationRoute.ORAL);
         when(item.getDurationDays()).thenReturn(5);
         when(item.getQuantity()).thenReturn(15);
