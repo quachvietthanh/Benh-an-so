@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat.js'
+import { normalizeApiError } from './apiError.js'
 
 dayjs.extend(customParseFormat)
 
@@ -233,40 +234,22 @@ export function prepareUpdateServicePayload(values = {}) {
 }
 
 /**
- * Translates backend error messages into friendly Vietnamese text
+ * Translates backend errors using stable response codes.
  */
 export function translateServiceErrorMessage(error) {
   if (!error) return 'Đã xảy ra lỗi không xác định.'
   
-  const rawMsg =
-    error?.response?.data?.message ||
-    error?.response?.data?.error ||
-    error?.message ||
-    String(error)
+  const apiError = normalizeApiError(error)
 
-  const lower = rawMsg.toLowerCase()
-
-  if (lower.includes('service code already exists') || (lower.includes('duplicate entry') && lower.includes('service_code'))) {
-    return 'Mã dịch vụ đã tồn tại trên hệ thống. Vui lòng chọn mã khác.'
-  }
-  if (lower.includes('service name already exists') || (lower.includes('duplicate entry') && lower.includes('normalized_service_name'))) {
-    return 'Tên dịch vụ đã tồn tại trên hệ thống. Vui lòng chọn tên khác.'
-  }
-  if (lower.includes('a different service price already exists for this effective date') || lower.includes('uk_service_price_effective_from')) {
-    return 'Đã tồn tại mức giá khác cho cùng ngày hiệu lực này. Vui lòng chọn ngày hiệu lực khác.'
-  }
-  if (lower.includes('service catalog not found')) {
-    return 'Không tìm thấy thông tin dịch vụ trong hệ thống.'
-  }
-  if (lower.includes('greater than or equal to 0') || lower.includes('positiveorzero')) {
-    return 'Đơn giá dịch vụ phải lớn hơn hoặc bằng 0.'
-  }
-  if (lower.includes('access denied') || lower.includes('forbidden') || error?.response?.status === 403) {
+  if (apiError.code === 'ACCESS_DENIED' || apiError.status === 403) {
     return 'Bạn không có quyền thực hiện thao tác này.'
   }
-  if (error?.response?.status === 401) {
+  if (apiError.code === 'AUTHENTICATION_FAILED' || apiError.status === 401) {
     return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
   }
+  if (apiError.code === 'RESOURCE_NOT_FOUND' || apiError.status === 404) {
+    return 'Không tìm thấy thông tin dịch vụ trong hệ thống.'
+  }
 
-  return rawMsg || 'Thao tác không thành công. Vui lòng thử lại sau.'
+  return apiError.firstFieldError || apiError.message
 }

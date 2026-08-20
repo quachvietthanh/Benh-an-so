@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import com.benhsoan.domain.billing.Invoice;
 import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.enums.InvoiceType;
-import com.benhsoan.domain.billing.exception.InvoiceAdjustmentReasonRequiredException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.billing.exception.InvoiceNotFoundException;
 import com.benhsoan.domain.billing.exception.InvoiceUnauthorizedAdjustmentException;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -164,7 +164,7 @@ class AdjustInvoiceServiceTest {
         );
 
         assertThrows(
-                InvoiceAdjustmentReasonRequiredException.class,
+                ValidationException.class,
                 () -> service.adjust(command(originalInvoice.getId(), " "))
         );
     }

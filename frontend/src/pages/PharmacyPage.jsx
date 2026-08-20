@@ -36,6 +36,7 @@ import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage as getErrorMessage } from '../utils/apiError'
 import { buildFefoPreview } from '../utils/workflowContract'
 import { saveStoredPrescription, dispensePrescriptionHelper, mergePrescriptions } from '../utils/storageHelpers'
 
@@ -65,9 +66,6 @@ const normalizeBatch = (batch) => ({
   batchId: batch?.batchId || batch?.id,
   id: batch?.batchId || batch?.id,
 })
-
-const getErrorMessage = (error, fallback) =>
-  error?.response?.data?.message || error?.message || fallback
 
 const formatDateTime = (value) =>
   value && dayjs(value).isValid() ? dayjs(value).format('HH:mm DD/MM/YYYY') : '—'
@@ -298,8 +296,8 @@ function PharmacyPage() {
       }
     } catch (error) {
       const responseData = error?.response?.data
-      if (error?.response?.status === 409 && Array.isArray(responseData?.details)) {
-        setShortageDetails(responseData.details)
+      if (error?.response?.status === 409 && Array.isArray(responseData?.details?.shortages)) {
+        setShortageDetails(responseData.details.shortages)
       }
       message.error(getErrorMessage(error, error?.message || 'Không thể cấp phát đơn thuốc do thiếu tồn kho.'))
     } finally {

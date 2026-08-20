@@ -100,7 +100,7 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
 
         StoredClinicalAttachment stored = storagePort.upload(new ClinicalAttachmentUpload(clinicalResultId,
                 command.originalFileName(), contentType, command.content()));
-        registerRollbackCompensation(stored);
+        registerRollbackCompensation(clinicalResultId, stored);
 
         Instant now = clock.now();
         MedicalAttachment attachment = medicalAttachmentRepository.save(MedicalAttachment.create(
@@ -152,7 +152,7 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
         return visit;
     }
 
-    private void registerRollbackCompensation(StoredClinicalAttachment stored) {
+    private void registerRollbackCompensation(UUID clinicalResultId, StoredClinicalAttachment stored) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             return;
         }
@@ -165,7 +165,8 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
                 try {
                     storagePort.delete(stored.publicId(), stored.resourceType());
                 } catch (RuntimeException ex) {
-                    log.error("Failed to compensate Cloudinary attachment upload after transaction rollback.", ex);
+                    log.error("Infrastructure failure: operation=cloudinary_rollback_delete clinicalResultId={} publicId={}",
+                            clinicalResultId, stored.publicId(), ex);
                 }
             }
         });

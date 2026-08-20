@@ -1,12 +1,9 @@
 package com.benhsoan.domain.visit.exception;
 
-import org.springframework.http.HttpStatus;
 
-import com.benhsoan.domain.shared.exception.DomainException;
-
-public class VisitEncounterAccessDeniedException extends DomainException {
+public class VisitEncounterAccessDeniedException extends VisitException {
 
     public VisitEncounterAccessDeniedException() {
-        super(HttpStatus.FORBIDDEN, "You do not have permission to view this visit encounter.");
+        super("You do not have permission to view this visit encounter.");
     }
 }

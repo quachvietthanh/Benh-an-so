@@ -7,11 +7,11 @@ import {
   buildTodayPatients,
   formatVietnamDateTime,
   getAllowedStatusActions,
+  getAftercareErrorMessage,
   getTodayVisitsForPatient,
   getVietnamDateKey,
   hasAftercarePermission,
   isUuid,
-  isDoctorInstructionError,
   isTodayVisitSelectionValid,
   normalizePage,
   selectTodayCompletedVisits,
@@ -97,10 +97,10 @@ test('normalizes both Spring Page and list responses without hiding API errors',
   assert.throws(() => normalizePage({}), /không đúng định dạng/)
 })
 
-test('recognizes doctor-instruction business validation', () => {
-  assert.equal(isDoctorInstructionError({
-    response: { data: { message: 'Cannot create reminder: Visit has no follow-up indication from doctor.' } },
-  }), true)
+test('uses the stable validation code instead of inspecting the error message', () => {
+  assert.equal(getAftercareErrorMessage({
+    response: { data: { code: 'VALIDATION_FAILED', message: 'Follow-up indication is required.' } },
+  }), 'Follow-up indication is required.')
 })
 
 test('uses JWT permissions rather than usernames or inferred frontend roles', () => {

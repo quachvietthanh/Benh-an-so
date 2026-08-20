@@ -52,6 +52,7 @@ import visitApi from '../api/visitApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage as getApiMessage } from '../utils/apiError'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
   canSubmitPrescription,
@@ -87,12 +88,6 @@ const ROUTE_OPTIONS = [
   { value: 'SUBCUTANEOUS', label: 'Tiêm SC' },
   { value: 'OTHER', label: 'Khác' },
 ]
-
-const getApiMessage = (error, fallback) =>
-  error?.response?.data?.message ||
-  Object.values(error?.response?.data?.errors || {})[0] ||
-  error?.message ||
-  fallback
 
 let localItemSequence = 0
 const createEmptyItem = (isOriginal = false) => ({

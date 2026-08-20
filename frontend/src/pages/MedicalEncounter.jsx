@@ -36,6 +36,7 @@ import visitApi from '../api/visitApi'
 import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintModal'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage as getApiMessage } from '../utils/apiError'
 import { commonIcd10List, icd10Categories, searchIcd10 } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
 import {
@@ -48,12 +49,6 @@ import {
 } from '../utils/workflowContract'
 
 const { Text, Paragraph, Title } = Typography
-
-const getApiMessage = (error, fallback) =>
-  error?.response?.data?.message ||
-  Object.values(error?.response?.data?.errors || {})[0] ||
-  error?.message ||
-  fallback
 
 const loadRecentDiagnoses = () => {
   try {

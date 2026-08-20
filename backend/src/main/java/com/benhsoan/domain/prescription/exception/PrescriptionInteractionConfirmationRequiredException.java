@@ -7,7 +7,6 @@ import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.shared.exception.DomainException;
 
 import lombok.Getter;
-import org.springframework.http.HttpStatus;
 
 @Getter
 public class PrescriptionInteractionConfirmationRequiredException
@@ -19,7 +18,6 @@ public class PrescriptionInteractionConfirmationRequiredException
             List<InteractionWarning> warnings
     ) {
         super(
-                HttpStatus.CONFLICT,
                 "All detected drug interactions must be confirmed with an override reason."
         );
         this.warnings = List.copyOf(warnings);

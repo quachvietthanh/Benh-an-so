@@ -13,9 +13,8 @@ import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.domain.auth.exception.AccountDisabledException;
-import com.benhsoan.domain.auth.exception.InvalidPasswordException;
+import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
 import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
-import com.benhsoan.domain.auth.exception.UserNotFoundException;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.inbound.auth.LoginUseCase;
@@ -73,7 +72,7 @@ public class LoginService implements LoginUseCase {
 
                     loginAttemptPort.loginFailed(username);
 
-                    return new UserNotFoundException();
+                    return new InvalidCredentialsException();
                 });
 
         if (!user.isActive()) {
@@ -87,7 +86,7 @@ public class LoginService implements LoginUseCase {
 
             loginAttemptPort.loginFailed(username);
 
-            throw new InvalidPasswordException();
+            throw new InvalidCredentialsException();
         }
 
         loginAttemptPort.loginSucceeded(username);

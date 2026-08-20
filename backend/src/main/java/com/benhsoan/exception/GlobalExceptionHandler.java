@@ -36,20 +36,11 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(OperationalReportDataEmptyException.class)
-    public ResponseEntity<ReportDataEmptyResponse> handleOperationalReportDataEmpty(
+    public ResponseEntity<ApiErrorResponse> handleOperationalReportDataEmpty(
             OperationalReportDataEmptyException ex,
             HttpServletRequest request
     ) {
-        return ResponseEntity
-                .status(ex.getStatus())
-                .body(new ReportDataEmptyResponse(
-                        Instant.now(),
-                        ex.getStatus().value(),
-                        ex.getStatus().getReasonPhrase(),
-                        "REPORT_DATA_EMPTY",
-                        ex.getMessage(),
-                        request.getRequestURI()
-                ));
+        return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(DomainException.class)
@@ -58,58 +49,57 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
 
-        ApiErrorResponse response =
-                new ApiErrorResponse(
-                        Instant.now(),
-                        ex.getStatus().value(),
-                        ex.getStatus().getReasonPhrase(),
-                        ex.getMessage(),
-                        request.getRequestURI()
-                );
-
-        return ResponseEntity
-                .status(ex.getStatus())
-                .body(response);
+        return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler(PrescriptionInteractionConfirmationRequiredException.class)
-    public ResponseEntity<InteractionConflictResponse> handleInteractionConfirmationRequired(
+    public ResponseEntity<ApiErrorResponse> handleInteractionConfirmationRequired(
             PrescriptionInteractionConfirmationRequiredException ex,
             HttpServletRequest request
     ) {
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(new InteractionConflictResponse(
-                        Instant.now(),
-                        HttpStatus.CONFLICT.value(),
-                        HttpStatus.CONFLICT.getReasonPhrase(),
-                        ex.getMessage(),
-                        request.getRequestURI(),
-                        ex.getWarnings()
-                ));
+        return build(
+                DomainExceptionHttpStatusMapper.statusFor(ex.getCode()),
+                ex.getCode().name(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                Map.of("warnings", ex.getWarnings().stream().map(warning -> Map.<String, Object>of(
+                        "ruleId", warning.ruleId(),
+                        "firstMedicineId", warning.firstMedicineId(),
+                        "secondMedicineId", warning.secondMedicineId(),
+                        "severity", warning.severity(),
+                        "description", warning.description(),
+                        "recommendation", warning.recommendation()
+                )).toList())
+        );
     }
 
     @ExceptionHandler(PrescriptionInsufficientStockException.class)
-    public ResponseEntity<PrescriptionInsufficientStockResponse> handleInsufficientStock(
+    public ResponseEntity<ApiErrorResponse> handleInsufficientStock(
             PrescriptionInsufficientStockException ex,
             HttpServletRequest request
     ) {
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(new PrescriptionInsufficientStockResponse(
-                        Instant.now(),
-                        HttpStatus.CONFLICT.value(),
-                        HttpStatus.CONFLICT.getReasonPhrase(),
-                        "INSUFFICIENT_STOCK",
-                        ex.getMessage(),
-                        request.getRequestURI(),
-                        ex.getPrescriptionId(),
-                        ex.getDetails()
-                ));
+        return build(
+                DomainExceptionHttpStatusMapper.statusFor(ex.getCode()),
+                ex.getCode().name(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                Map.of(
+                        "prescriptionId", ex.getPrescriptionId(),
+                        "shortages", ex.getDetails().stream().map(shortage -> Map.<String, Object>of(
+                                "prescriptionItemId", shortage.prescriptionItemId(),
+                                "medicineId", shortage.medicineId(),
+                                "medicineCode", shortage.medicineCode(),
+                                "medicineName", shortage.medicineName(),
+                                "requiredQuantity", shortage.requiredQuantity(),
+                                "availableQuantity", shortage.availableQuantity(),
+                                "shortageQuantity", shortage.shortageQuantity()
+                        )).toList()
+                )
+        );
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(
+    public ResponseEntity<ApiErrorResponse> handleValidation(
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
@@ -123,16 +113,13 @@ public class GlobalExceptionHandler {
             );
         }
 
-        Map<String, Object> body = new HashMap<>();
-
-        body.put("timestamp", Instant.now());
-        body.put("status", 400);
-        body.put("error", "Bad Request");
-        body.put("message", "Validation failed.");
-        body.put("path", request.getRequestURI());
-        body.put("errors", errors);
-
-        return ResponseEntity.badRequest().body(body);
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_FAILED",
+                "Validation failed.",
+                request.getRequestURI(),
+                Map.of("fields", errors)
+        );
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -143,13 +130,14 @@ public class GlobalExceptionHandler {
 
         return build(
                 HttpStatus.BAD_REQUEST,
+                "INVALID_PARAMETER",
                 "Invalid parameter: " + ex.getName(),
                 request.getRequestURI()
         );
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<?> handleUnreadable(
+    public ResponseEntity<ApiErrorResponse> handleUnreadable(
             HttpMessageNotReadableException ex,
             HttpServletRequest request
     ) {
@@ -157,19 +145,18 @@ public class GlobalExceptionHandler {
         if (ex.getCause() instanceof JsonMappingException mappingException
                 && !mappingException.getPath().isEmpty()) {
             String field = toFieldPath(mappingException);
-            Map<String, String> errors = Map.of(field, "Invalid value.");
-            Map<String, Object> body = new HashMap<>();
-            body.put("timestamp", Instant.now());
-            body.put("status", HttpStatus.BAD_REQUEST.value());
-            body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
-            body.put("message", "Validation failed.");
-            body.put("path", request.getRequestURI());
-            body.put("errors", errors);
-            return ResponseEntity.badRequest().body(body);
+            return build(
+                    HttpStatus.BAD_REQUEST,
+                    "VALIDATION_FAILED",
+                    "Validation failed.",
+                    request.getRequestURI(),
+                    Map.of("fields", Map.of(field, "Invalid value."))
+            );
         }
 
         return build(
                 HttpStatus.BAD_REQUEST,
+                "MALFORMED_JSON",
                 "Malformed JSON request.",
                 request.getRequestURI()
         );
@@ -198,6 +185,7 @@ public class GlobalExceptionHandler {
 
         return build(
                 HttpStatus.BAD_REQUEST,
+                "MISSING_PARAMETER",
                 ex.getParameterName() + " is required.",
                 request.getRequestURI()
         );
@@ -211,6 +199,7 @@ public class GlobalExceptionHandler {
 
         return build(
                 HttpStatus.UNAUTHORIZED,
+                "AUTHENTICATION_FAILED",
                 ex.getMessage(),
                 request.getRequestURI()
         );
@@ -224,6 +213,7 @@ public class GlobalExceptionHandler {
 
         return build(
                 HttpStatus.FORBIDDEN,
+                "ACCESS_DENIED",
                 "Access denied.",
                 request.getRequestURI()
         );
@@ -234,7 +224,7 @@ public class GlobalExceptionHandler {
             MissingServletRequestPartException ex,
             HttpServletRequest request
     ) {
-        return build(HttpStatus.BAD_REQUEST, ex.getRequestPartName() + " is required.", request.getRequestURI());
+        return build(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PART", ex.getRequestPartName() + " is required.", request.getRequestURI());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -242,7 +232,7 @@ public class GlobalExceptionHandler {
             MaxUploadSizeExceededException ex,
             HttpServletRequest request
     ) {
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Uploaded file exceeds the allowed size.", request.getRequestURI());
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "PAYLOAD_TOO_LARGE", "Uploaded file exceeds the allowed size.", request.getRequestURI());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -250,7 +240,7 @@ public class GlobalExceptionHandler {
             NoResourceFoundException ex,
             HttpServletRequest request
     ) {
-        return build(HttpStatus.NOT_FOUND, "Resource not found.", request.getRequestURI());
+        return build(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found.", request.getRequestURI());
     }
 
     @ExceptionHandler(Exception.class)
@@ -263,6 +253,7 @@ public class GlobalExceptionHandler {
 
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,
+                "INTERNAL_SERVER_ERROR",
                 "Internal server error.",
                 request.getRequestURI()
         );
@@ -270,8 +261,19 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiErrorResponse> build(
             HttpStatus status,
+            String code,
             String message,
             String path
+    ) {
+        return build(status, code, message, path, Map.of());
+    }
+
+    private ResponseEntity<ApiErrorResponse> build(
+            HttpStatus status,
+            String code,
+            String message,
+            String path,
+            Map<String, Object> details
     ) {
 
         ApiErrorResponse response =
@@ -279,12 +281,15 @@ public class GlobalExceptionHandler {
                         Instant.now(),
                         status.value(),
                         status.getReasonPhrase(),
+                        code,
                         message,
-                        path
+                        path,
+                        details
                 );
 
         return ResponseEntity
                 .status(status)
                 .body(response);
     }
+
 }

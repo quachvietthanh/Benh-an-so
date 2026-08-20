@@ -26,11 +26,11 @@ import com.benhsoan.domain.prescription.PrescriptionAmendment;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
 import com.benhsoan.domain.prescription.enums.WarningAction;
-import com.benhsoan.domain.prescription.exception.PrescriptionAmendmentReasonRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionAmendmentException;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -181,7 +181,7 @@ public class AmendPrescriptionService
         }
         if (command.changeReason() == null
                 || command.changeReason().isBlank()) {
-            throw new PrescriptionAmendmentReasonRequiredException();
+            throw new ValidationException("Amendment reason is required.");
         }
     }
 
