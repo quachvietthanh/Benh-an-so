@@ -126,7 +126,7 @@ public class CreatePrescriptionService
                 now
         );
 
-        saveAuditLog(saved, warningLogs.size(), currentUserId);
+        saveAuditLog(saved, warningLogs.size(), currentUserId, now);
 
         return resultMapper.toResult(saved, warningLogs);
     }
@@ -347,7 +347,8 @@ public class CreatePrescriptionService
     private void saveAuditLog(
             Prescription prescription,
             int warningOverrideCount,
-            UUID currentUserId
+            UUID currentUserId,
+            Instant issuedAt
     ) {
         auditLogRepository.save(
                 AuditLog.create(
@@ -368,7 +369,8 @@ public class CreatePrescriptionService
                                 prescription.getItems().size(),
                                 warningOverrideCount
                         ),
-                        null
+                        null,
+                        issuedAt
                 )
         );
     }

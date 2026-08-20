@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.prescription;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -123,6 +124,8 @@ class CreatePrescriptionServiceTest {
         assertEquals(ActionType.CREATE, auditCaptor.getValue().getActionType());
         assertEquals(ResourceType.PRESCRIPTION, auditCaptor.getValue().getResourceType());
         assertEquals(prescriptionCaptor.getValue().getId(), auditCaptor.getValue().getResourceId());
+        assertEquals(NOW, auditCaptor.getValue().getCreatedAt());
+        assertTrue(auditCaptor.getValue().getDetail().contains("RX000001"));
         verify(warningLogRepository, never()).save(any());
     }
 

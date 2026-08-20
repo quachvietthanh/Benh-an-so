@@ -112,6 +112,8 @@ class AmendPrescriptionServiceTest {
 
         var result = service.amend(command(List.of(item(existingMedicineId, "2 tablets"))));
 
+        assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(CREATED_AT, result.prescribedAt());
         assertEquals("2 tablets", result.items().getFirst().dosage());
         assertEquals(AMENDED_AT, result.updatedAt());
         ArgumentCaptor<PrescriptionAmendment> amendmentCaptor = ArgumentCaptor.forClass(PrescriptionAmendment.class);
