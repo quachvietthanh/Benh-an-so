@@ -28,17 +28,25 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { fixMojibake } from '../../utils/serviceCatalogValidation'
 
 const { Text, Paragraph, Title } = Typography
 
 const ROUTE_LABELS = {
   ORAL: 'Uống',
-  TOPICAL: 'Bôi ngoài',
-  INHALATION: 'Hít/Xịt',
-  INTRAVENOUS: 'Tiêm IV',
-  INTRAMUSCULAR: 'Tiêm IM',
-  SUBCUTANEOUS: 'Tiêm SC',
-  OTHER: 'Khác',
+  TOPICAL: 'Bôi ngoài da',
+  INHALATION: 'Hít / Khí dung',
+  OPHTHALMIC: 'Nhỏ / Tra mắt',
+  NASAL: 'Xịt / Nhỏ mũi',
+  OTIC: 'Nhỏ tai',
+  SUBLINGUAL: 'Ngậm dưới lưỡi',
+  RECTAL: 'Đặt hậu môn / Trực tràng',
+  INTRAVENOUS: 'Tiêm tĩnh mạch',
+  INTRAMUSCULAR: 'Tiêm bắp',
+  SUBCUTANEOUS: 'Tiêm dưới da',
+  TRANSDERMAL: 'Dán ngoài da',
+  VAGINAL: 'Đặt âm đạo',
+  OTHER: 'Cách dùng khác',
 }
 
 function PrescriptionDetailModal({
@@ -53,7 +61,7 @@ function PrescriptionDetailModal({
 
   const getMedicineName = (id, fallback) => {
     const found = medicines.find((m) => String(m.id) === String(id))
-    return found?.medicineName || found?.name || fallback || id || '—'
+    return fixMojibake(found?.medicineName || found?.name || fallback || id || '—')
   }
 
   const items = prescription.items || []
@@ -204,7 +212,7 @@ function PrescriptionDetailModal({
           <Descriptions.Item label={<Text strong><UserOutlined /> Bệnh nhân</Text>}>
             {prescription.patientName ? (
               <span>
-                <Text strong>{prescription.patientName}</Text> ({prescription.patientCode || '—'})
+                <Text strong>{fixMojibake(prescription.patientName)}</Text> ({prescription.patientCode || '—'})
               </span>
             ) : '—'}
           </Descriptions.Item>
@@ -212,7 +220,7 @@ function PrescriptionDetailModal({
             <Text code>{prescription.visitCode || '—'}</Text>
           </Descriptions.Item>
           <Descriptions.Item label="Bác sĩ kê đơn">
-            <Text strong>{prescription.doctorName || '—'}</Text>
+            <Text strong>{fixMojibake(prescription.doctorName) || '—'}</Text>
           </Descriptions.Item>
           <Descriptions.Item label="Ngày kê">
             {prescription.prescribedAt ? dayjs(prescription.prescribedAt).format('HH:mm DD/MM/YYYY') : '—'}
@@ -223,7 +231,7 @@ function PrescriptionDetailModal({
         </Descriptions>
         {prescription.note && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>
-            <Text type="secondary"><strong>Ghi chú bác sĩ:</strong> {prescription.note}</Text>
+            <Text type="secondary"><strong>Ghi chú bác sĩ:</strong> {fixMojibake(prescription.note)}</Text>
           </div>
         )}
       </Card>
