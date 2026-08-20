@@ -1,6 +1,5 @@
 package com.benhsoan.exception;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -276,20 +275,9 @@ public class GlobalExceptionHandler {
             Map<String, Object> details
     ) {
 
-        ApiErrorResponse response =
-                new ApiErrorResponse(
-                        Instant.now(),
-                        status.value(),
-                        status.getReasonPhrase(),
-                        code,
-                        message,
-                        path,
-                        details
-                );
-
         return ResponseEntity
                 .status(status)
-                .body(response);
+                .body(ApiErrorResponseFactory.create(status, code, message, path, details));
     }
 
 }

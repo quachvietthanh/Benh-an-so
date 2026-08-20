@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
@@ -59,6 +60,29 @@ class QueueSecurityIntegrationTest {
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
     @MockitoBean private ClockPort clockPort;
+
+    @Test
+    void returnsTheCommonErrorContractForSecurityFilterFailures() throws Exception {
+        mockMvc.perform(get("/queues"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Bạn cần đăng nhập để truy cập tài nguyên này"))
+                .andExpect(jsonPath("$.path").value("/queues"))
+                .andExpect(jsonPath("$.details").isMap());
+
+        mockMvc.perform(get("/queues").with(user("doctor").roles("DOCTOR")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.error").value("Forbidden"))
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+                .andExpect(jsonPath("$.message").value("Bạn không có quyền truy cập tài nguyên này"))
+                .andExpect(jsonPath("$.path").value("/queues"))
+                .andExpect(jsonPath("$.details").isMap());
+    }
 
     @Test
     void allowsManagerToReadQueueButNotOperate() throws Exception {

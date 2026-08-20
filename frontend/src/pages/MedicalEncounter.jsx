@@ -33,7 +33,6 @@ import clinicalServiceApi from '../api/clinicalServiceApi'
 import medicalRecordApi from '../api/medicalRecordApi'
 import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
-import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintModal'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage as getApiMessage } from '../utils/apiError'
@@ -47,6 +46,8 @@ import {
   normalizeMedicalRecordDetail,
   unwrapCollection,
 } from '../utils/workflowContract'
+
+const ClinicalOrderPrintModal = React.lazy(() => import('../components/clinical/ClinicalOrderPrintModal'))
 
 const { Text, Paragraph, Title } = Typography
 
@@ -923,18 +924,22 @@ function MedicalEncounter() {
         )}
       </Modal>
 
-      <ClinicalOrderPrintModal
-        open={printModalOpen}
-        onClose={() => setPrintModalOpen(false)}
-        patient={selectedPatientObj}
-        recordCode={currentRecordId || `VISIT-${visitId}`}
-        diagnosis={form.getFieldValue('diagnosisText')}
-        primaryIcd={primaryIcd}
-        secondaryIcds={secondaryIcds}
-        orders={selectedOrders}
-        doctorName={encounter?.doctor?.fullName || user?.fullName || user?.username}
-        vitalSigns={vitalSigns}
-      />
+      {printModalOpen && (
+        <React.Suspense fallback={<Spin size="small" />}>
+          <ClinicalOrderPrintModal
+            open={printModalOpen}
+            onClose={() => setPrintModalOpen(false)}
+            patient={selectedPatientObj}
+            recordCode={currentRecordId || `VISIT-${visitId}`}
+            diagnosis={form.getFieldValue('diagnosisText')}
+            primaryIcd={primaryIcd}
+            secondaryIcds={secondaryIcds}
+            orders={selectedOrders}
+            doctorName={encounter?.doctor?.fullName || user?.fullName || user?.username}
+            vitalSigns={vitalSigns}
+          />
+        </React.Suspense>
+      )}
     </div>
   )
 }

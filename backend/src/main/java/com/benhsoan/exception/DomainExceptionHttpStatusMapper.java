@@ -14,6 +14,9 @@ final class DomainExceptionHttpStatusMapper {
             case APPOINTMENT_NOT_FOUND,
                     BACKUP_NOT_FOUND,
                     CARE_LOG_NOT_FOUND,
+                    CLINICAL_ATTACHMENT_NOT_FOUND,
+                    CLINICAL_ORDER_ITEM_NOT_FOUND,
+                    CLINICAL_RESULT_NOT_FOUND,
                     DOCTOR_NOT_FOUND,
                     DRUG_INTERACTION_NOT_FOUND,
                     FOLLOW_UP_REMINDER_NOT_FOUND,
@@ -29,6 +32,7 @@ final class DomainExceptionHttpStatusMapper {
                     QUEUE_NOT_FOUND,
                     ROLE_NOT_FOUND,
                     ROOM_NOT_FOUND,
+                    SERVICE_CATALOG_NOT_FOUND,
                     USER_NOT_FOUND,
                     VISIT_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ACCOUNT_DISABLED,

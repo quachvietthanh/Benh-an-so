@@ -23,3 +23,6 @@ export const getApiErrorMessage = (error, fallbackMessage) => {
   const normalized = normalizeApiError(error, fallbackMessage)
   return normalized.firstFieldError || normalized.message
 }
+
+export const isAccessDeniedApiError = (apiError) =>
+  apiError?.code === 'ACCESS_DENIED' || apiError?.status === 403

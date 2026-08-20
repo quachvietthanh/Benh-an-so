@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getApiErrorMessage, normalizeApiError } from './apiError.js'
+import { getApiErrorMessage, isAccessDeniedApiError, normalizeApiError } from './apiError.js'
 
 test('normalizes the common backend error envelope', () => {
   const error = {
@@ -52,4 +52,10 @@ test('normalizes a legacy plain-text HTTP response', () => {
     fields: {},
     firstFieldError: null,
   })
+})
+
+test('identifies access denial from the stable code or HTTP status, never the message', () => {
+  assert.equal(isAccessDeniedApiError({ code: 'ACCESS_DENIED', status: 400, message: 'Other message.' }), true)
+  assert.equal(isAccessDeniedApiError({ code: 'NETWORK_ERROR', status: 403, message: 'Other message.' }), true)
+  assert.equal(isAccessDeniedApiError({ code: 'NETWORK_ERROR', status: 400, message: 'Access denied.' }), false)
 })

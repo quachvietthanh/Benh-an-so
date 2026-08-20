@@ -1,3 +1,5 @@
+/* global TextDecoder */
+
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat.js'
 import { normalizeApiError } from './apiError.js'

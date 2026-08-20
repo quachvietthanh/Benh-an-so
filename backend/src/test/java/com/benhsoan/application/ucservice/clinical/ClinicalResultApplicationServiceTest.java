@@ -32,6 +32,8 @@ import com.benhsoan.domain.clinical.enums.ClinicalResultStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalResultType;
 import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderInvalidVisitException;
+import com.benhsoan.domain.clinical.exception.ClinicalOrderItemNotFoundException;
+import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
@@ -144,6 +146,33 @@ class ClinicalResultApplicationServiceTest {
         assertThrows(com.benhsoan.domain.clinical.exception.ClinicalResultAlreadyFinalizedException.class,
                 () -> clinicalResultService.update(result.getId(), new UpdateClinicalResultCommand(BigDecimal.TEN,
                         null, null, null, "Correct input")));
+    }
+
+    @Test
+    void returnsNotFoundExceptionsForRequestedClinicalResultResources() {
+        UUID clinicalResultId = UUID.randomUUID();
+        UUID clinicalOrderItemId = UUID.randomUUID();
+        when(authorizationService.requireReadAccess()).thenReturn(UUID.randomUUID());
+        when(clinicalResultRepository.findById(clinicalResultId)).thenReturn(Optional.empty());
+        when(authorizationService.requireWriteAccess()).thenReturn(UUID.randomUUID());
+        when(clinicalOrderItemRepository.findById(clinicalOrderItemId)).thenReturn(Optional.empty());
+
+        assertThrows(ClinicalResultNotFoundException.class, () -> clinicalResultService.getById(clinicalResultId));
+        assertThrows(ClinicalOrderItemNotFoundException.class, () -> clinicalResultService.enter(clinicalOrderItemId,
+                new EnterClinicalResultCommand(BigDecimal.TEN, null, ClinicalResultAbnormalFlag.NORMAL, null)));
+    }
+
+    @Test
+    void treatsMissingRelationsOfAnExistingResultAsInfrastructureFailure() {
+        Fixture fixture = fixture();
+        ClinicalResult result = ClinicalResult.create(fixture.item().getId(), fixture.visit().getId(),
+                ClinicalResultType.NUMBER, BigDecimal.ONE, null, null, null, null, null, fixture.actorId(), NOW);
+        when(authorizationService.requireWriteAccess()).thenReturn(fixture.actorId());
+        when(clinicalResultRepository.findById(result.getId())).thenReturn(Optional.of(result));
+        when(visitRepository.findById(fixture.visit().getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalStateException.class, () -> clinicalResultService.update(result.getId(),
+                new UpdateClinicalResultCommand(BigDecimal.TEN, null, null, null, "Correct input")));
     }
 
     private Fixture arrangeEnter(ClinicalResultDataType dataType) {

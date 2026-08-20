@@ -28,9 +28,12 @@ import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
+import com.benhsoan.domain.clinical.exception.ClinicalAttachmentNotFoundException;
+import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
 import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.servicecatalog.exception.ServiceCatalogNotFoundException;
 import com.benhsoan.infrastructure.pdf.PdfRenderingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 
@@ -127,6 +130,20 @@ class GlobalExceptionHandlerTest {
         assertEquals("INVALID_CREDENTIALS", invalidCredentials.getBody().code());
         assertEquals(409, doctorNotAssigned.getStatusCode().value());
         assertEquals("DOCTOR_NOT_ASSIGNED_TO_ROOM", doctorNotAssigned.getBody().code());
+    }
+
+    @Test
+    void mapsNewRequestedResourceExceptionsToNotFound() {
+        var clinicalResult = handler.handleDomainException(new ClinicalResultNotFoundException(UUID.randomUUID()), request);
+        var attachment = handler.handleDomainException(new ClinicalAttachmentNotFoundException(UUID.randomUUID()), request);
+        var serviceCatalog = handler.handleDomainException(new ServiceCatalogNotFoundException(UUID.randomUUID()), request);
+
+        assertEquals(404, clinicalResult.getStatusCode().value());
+        assertEquals("CLINICAL_RESULT_NOT_FOUND", clinicalResult.getBody().code());
+        assertEquals(404, attachment.getStatusCode().value());
+        assertEquals("CLINICAL_ATTACHMENT_NOT_FOUND", attachment.getBody().code());
+        assertEquals(404, serviceCatalog.getStatusCode().value());
+        assertEquals("SERVICE_CATALOG_NOT_FOUND", serviceCatalog.getBody().code());
     }
 
     @Test

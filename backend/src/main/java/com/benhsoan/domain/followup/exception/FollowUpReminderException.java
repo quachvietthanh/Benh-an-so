@@ -1,11 +1,13 @@
 package com.benhsoan.domain.followup.exception;
 
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 import com.benhsoan.domain.shared.exception.DomainException;
 
 public abstract class FollowUpReminderException extends DomainException {
 
-    protected FollowUpReminderException(String message) {
-        super(message);
+    protected FollowUpReminderException(DomainErrorCode code, String message) {
+        super(code, message);
     }
 }

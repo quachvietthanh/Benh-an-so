@@ -1,9 +1,11 @@
 package com.benhsoan.domain.clinical.exception;
 
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public abstract class ClinicalOrderItemException extends ClinicalException {
 
-    protected ClinicalOrderItemException(String message) {
-        super(message);
+    protected ClinicalOrderItemException(DomainErrorCode code, String message) {
+        super(code, message);
     }
 }

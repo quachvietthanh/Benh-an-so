@@ -1,23 +1,23 @@
 package com.benhsoan.domain.prescription.exception;
 
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 import java.util.List;
 import java.util.UUID;
 
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
-import com.benhsoan.domain.shared.exception.DomainException;
-
 import lombok.Getter;
 
 @Getter
 public class PrescriptionInteractionConfirmationRequiredException
-        extends DomainException {
+        extends PrescriptionException {
 
     private final List<InteractionWarning> warnings;
 
     public PrescriptionInteractionConfirmationRequiredException(
             List<InteractionWarning> warnings
     ) {
-        super(
+        super(DomainErrorCode.INTERACTION_CONFIRMATION_REQUIRED,
                 "All detected drug interactions must be confirmed with an override reason."
         );
         this.warnings = List.copyOf(warnings);
