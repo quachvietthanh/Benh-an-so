@@ -161,14 +161,25 @@ function AfterCarePage() {
   const createdReminderVisitIdsRef = useRef(new Set())
   const createdReminderPatientIdsRef = useRef(new Set())
 
-  const permissions = useMemo(() => ({
-    reminderCreate: hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_CREATE'),
-    reminderRead: hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_READ'),
-    reminderUpdate: hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_UPDATE'),
-    careCreate: hasAftercarePermission(user, 'CARE_LOG_CREATE'),
-    careRead: hasAftercarePermission(user, 'CARE_LOG_READ'),
-    medicalRecordRead: hasAftercarePermission(user, 'MEDICAL_RECORD_READ'),
-  }), [user])
+  const userRoles = useMemo(() => {
+    return (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user])
+
+  const permissions = useMemo(() => {
+    const isRec = userRoles.includes('receptionist')
+    const isAdmin = userRoles.includes('admin')
+    const isReadOnly = isAdmin && !isRec
+
+    return {
+      reminderCreate: !isReadOnly && (isRec || hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_CREATE')),
+      reminderRead: isAdmin || isRec || hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_READ'),
+      reminderUpdate: !isReadOnly && (isRec || hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_UPDATE')),
+      careCreate: !isReadOnly && (isRec || hasAftercarePermission(user, 'CARE_LOG_CREATE')),
+      careRead: isAdmin || isRec || hasAftercarePermission(user, 'CARE_LOG_READ'),
+      medicalRecordRead: isAdmin || isRec || hasAftercarePermission(user, 'MEDICAL_RECORD_READ'),
+      isReadOnly,
+    }
+  }, [user, userRoles])
 
   const performerNames = useMemo(() => {
     if (!user?.id) return {}
@@ -949,6 +960,16 @@ function AfterCarePage() {
           )}
         </Space>
       </header>
+
+      {permissions.isReadOnly && (
+        <Alert
+          type="info"
+          showIcon
+          message="Chế độ giám sát (Quản trị viên)"
+          description="Tài khoản Quản trị viên (Admin) có quyền xem và giám sát toàn bộ dữ liệu Chăm sóc sau khám, không có quyền tạo hoặc chỉnh sửa lịch nhắc."
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {patientsError && (
         <Alert

@@ -44,7 +44,6 @@ const navigationSections = [
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
   { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system-management'] },
-  { key: 'lookup', label: 'Tra cứu', paths: ['/public-lookup'] },
 ]
 
 const getNavigationItems = (roles = []) => {
@@ -58,7 +57,7 @@ const getNavigationItems = (roles = []) => {
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'doctor', 'receptionist'] },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
-    { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, roles: ['receptionist'] },
+    { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, roles: ['receptionist', 'admin'] },
     { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, roles: ['admin', 'doctor'] },
     { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, roles: ['admin', 'doctor'] },
     { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, roles: ['admin', 'doctor'] },
@@ -69,7 +68,6 @@ const getNavigationItems = (roles = []) => {
     { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, roles: ['admin', 'manager'] },
     { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, roles: ['admin', 'manager', 'clinic_manager'] },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, roles: ['admin', 'manager', 'clinic_manager'] },
-    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SearchOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
   ]
 
   return items.filter((item) => item.roles.some((role) => normalizedRoles.includes(role)))
@@ -295,18 +293,6 @@ function MainLayout() {
           inlineIndent={16}
           onClick={handleMenuClick}
         />
-
-        <Tooltip title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} placement="right">
-          <button
-            type="button"
-            className="sidebar-collapse"
-            onClick={() => setCollapsed((value) => !value)}
-            aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-          >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            {!collapsed && <span>Thu gọn menu</span>}
-          </button>
-        </Tooltip>
       </Sider>
 
       <Layout className="clinic-main-layout">
