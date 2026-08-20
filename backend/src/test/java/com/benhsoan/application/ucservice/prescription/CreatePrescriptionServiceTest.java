@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.prescription;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -22,12 +23,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
@@ -102,17 +106,48 @@ class CreatePrescriptionServiceTest {
         var result = service.create(command(List.of(item(medicineId)), List.of()));
 
         assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(PrescriptionStatus.PENDING_DISPENSE, result.status());
         assertEquals(1, result.items().size());
         assertEquals("Paracetamol", result.items().getFirst().medicineName());
-        assertEquals(AdministrationRoute.ORAL, result.items().getFirst().route());
+        assertEquals(AdministrationRoute.TOPICAL, result.items().getFirst().route());
         assertEquals(0, result.warnings().size());
 
         ArgumentCaptor<Prescription> prescriptionCaptor = ArgumentCaptor.forClass(Prescription.class);
         verify(prescriptionRepository).save(prescriptionCaptor.capture());
+        assertEquals(PrescriptionStatus.PENDING_DISPENSE,
+                prescriptionCaptor.getValue().getStatus());
         assertEquals(actorId, prescriptionCaptor.getValue().getPrescribedBy());
         assertEquals(NOW, prescriptionCaptor.getValue().getPrescribedAt());
-        verify(auditLogRepository).save(any(AuditLog.class));
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        assertEquals(actorId, auditCaptor.getValue().getUserId());
+        assertEquals(ActionType.CREATE, auditCaptor.getValue().getActionType());
+        assertEquals(ResourceType.PRESCRIPTION, auditCaptor.getValue().getResourceType());
+        assertEquals(prescriptionCaptor.getValue().getId(), auditCaptor.getValue().getResourceId());
+        assertEquals(NOW, auditCaptor.getValue().getCreatedAt());
+        assertTrue(auditCaptor.getValue().getDetail().contains("RX000001"));
         verify(warningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void createsPendingDispensePrescriptionWhenTwoMedicinesAreComplete() {
+        UUID secondMedicineId = UUID.randomUUID();
+        prepareValidCreate();
+        preparePersistence();
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(
+                activeMedicine(medicineId),
+                activeMedicine(secondMedicineId)
+        ));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        var result = service.create(command(
+                List.of(item(medicineId), item(secondMedicineId)),
+                List.of()
+        ));
+
+        assertEquals(PrescriptionStatus.PENDING_DISPENSE, result.status());
+        assertEquals(2, result.items().size());
+        verify(prescriptionRepository).save(any(Prescription.class));
     }
 
     @Test
@@ -167,9 +202,8 @@ class CreatePrescriptionServiceTest {
     }
 
     @Test
-    void rejectsCallerWithoutDoctorOrAdminRole() {
+    void rejectsCallerWithoutDoctorRole() {
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
-        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
 
         assertThrows(AccessDeniedException.class,
                 () -> service.create(command(List.of(item(medicineId)), List.of())));
@@ -178,21 +212,14 @@ class CreatePrescriptionServiceTest {
     }
 
     @Test
-    void allowsAdministratorRoleToCreatePrescription() {
-        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+    void rejectsAdministratorRoleFromCreatingPrescription() {
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
-        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
-        when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(medicalRecordId)).thenReturn(true);
-        when(medicineRepository.findAllById(any())).thenReturn(List.of(activeMedicine(medicineId)));
-        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
-        when(prescriptionCodeGenerator.generate()).thenReturn("RX000001");
-        when(prescriptionRepository.save(any(Prescription.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = service.create(command(List.of(item(medicineId)), List.of()));
+        assertThrows(AccessDeniedException.class,
+                () -> service.create(command(List.of(item(medicineId)), List.of())));
 
-        assertEquals("RX000001", result.prescriptionCode());
-        verify(prescriptionRepository).save(any(Prescription.class));
+        verify(currentUserPort, never()).hasRole("ADMIN");
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
     }
 
     private void prepareValidCreate() {
@@ -224,7 +251,9 @@ class CreatePrescriptionServiceTest {
         return CreatePrescriptionItemCommand.builder()
                 .medicineId(id)
                 .dosage("1 tablet")
-                .frequency("Twice daily")
+                .frequency(2)
+                .route(AdministrationRoute.TOPICAL)
+                .durationDays(5)
                 .quantity(10)
                 .build();
     }

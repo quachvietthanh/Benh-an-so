@@ -209,7 +209,7 @@ INSERT INTO prescription_items (
     '500 mg',
     'vien',
     '1 vien',
-    'Moi 8 gio khi sot',
+    3,
     'ORAL',
     2,
     6,

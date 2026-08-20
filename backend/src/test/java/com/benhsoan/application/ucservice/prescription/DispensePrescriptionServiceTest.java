@@ -267,7 +267,7 @@ class DispensePrescriptionServiceTest {
                 "500 mg",
                 "vien",
                 "1 vien",
-                "2 lan/ngay",
+                2,
                 AdministrationRoute.ORAL,
                 5,
                 quantity,

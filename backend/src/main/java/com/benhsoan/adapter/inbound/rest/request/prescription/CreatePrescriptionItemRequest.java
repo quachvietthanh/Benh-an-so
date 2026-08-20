@@ -18,12 +18,14 @@ public record CreatePrescriptionItemRequest(
         @Size(max = 100)
         String dosage,
 
-        @NotBlank
-        @Size(max = 100)
-        String frequency,
+        @NotNull
+        @Positive
+        Integer frequency,
 
+        @NotNull
         AdministrationRoute route,
 
+        @NotNull
         @Positive
         Integer durationDays,
 

@@ -310,9 +310,7 @@ public class AmendPrescriptionService
                 existing.getUnit(),
                 command.dosage(),
                 command.frequency(),
-                command.route() == null
-                        ? existing.getRoute()
-                        : command.route(),
+                command.route(),
                 command.durationDays(),
                 command.quantity(),
                 command.instructions(),
@@ -337,9 +335,7 @@ public class AmendPrescriptionService
                 medicine.getUnit(),
                 command.dosage(),
                 command.frequency(),
-                command.route() == null
-                        ? medicine.getDefaultRoute()
-                        : command.route(),
+                command.route(),
                 command.durationDays(),
                 command.quantity(),
                 command.instructions(),

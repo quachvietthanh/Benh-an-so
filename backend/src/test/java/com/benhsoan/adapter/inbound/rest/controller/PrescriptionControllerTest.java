@@ -1,8 +1,11 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -217,6 +220,123 @@ class PrescriptionControllerTest {
     }
 
     @Test
+    @DisplayName("POST /prescriptions - 400 when a required item field is missing or invalid")
+    void createRejectsInvalidRequiredItemFields() throws Exception {
+        UUID medicalRecordId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+
+        mockMvc.perform(post("/prescriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId":"%s",
+                                  "items":[{
+                                    "medicineId":"%s",
+                                    "dosage":"1 tablet",
+                                    "frequency":-1,
+                                    "route":"ORAL",
+                                    "durationDays":5,
+                                    "quantity":10
+                                  }]
+                                }
+                                """.formatted(medicalRecordId, medicineId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors['items[0].frequency']").exists());
+
+        mockMvc.perform(post("/prescriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId":"%s",
+                                  "items":[{
+                                    "medicineId":"%s",
+                                    "dosage":"1 tablet",
+                                    "frequency":2,
+                                    "durationDays":5,
+                                    "quantity":10
+                                  }]
+                                }
+                                """.formatted(medicalRecordId, medicineId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors['items[0].route']").exists());
+
+        mockMvc.perform(post("/prescriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId":"%s",
+                                  "items":[{
+                                    "medicineId":"%s",
+                                    "dosage":"1 tablet",
+                                    "frequency":2,
+                                    "route":"ORAL",
+                                    "quantity":10
+                                  }]
+                                }
+                                """.formatted(medicalRecordId, medicineId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors['items[0].durationDays']").exists());
+
+        mockMvc.perform(post("/prescriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId":"%s",
+                                  "items":[{
+                                    "medicineId":"%s",
+                                    "frequency":2,
+                                    "route":"ORAL",
+                                    "durationDays":5,
+                                    "quantity":10
+                                  }]
+                                }
+                                """.formatted(medicalRecordId, medicineId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors['items[0].dosage']").exists());
+
+        verify(createPrescriptionUseCase, never()).create(any());
+    }
+
+    @Test
+    @DisplayName("POST and PATCH /prescriptions report an invalid route by item field")
+    void createAndAmendReportInvalidRouteByItemField() throws Exception {
+        UUID medicalRecordId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        String item = """
+                {
+                  "medicineId":"%s",
+                  "dosage":"1 tablet",
+                  "frequency":2,
+                  "route":"INVALID_ROUTE",
+                  "durationDays":5,
+                  "quantity":10
+                }
+                """.formatted(medicineId);
+
+        mockMvc.perform(post("/prescriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId":"%s",
+                                  "items":[%s]
+                                }
+                                """.formatted(medicalRecordId, item)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors['items[0].route']").exists());
+
+        mockMvc.perform(patch("/prescriptions/{id}", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "changeReason":"Correct route",
+                                  "items":[%s]
+                                }
+                                """.formatted(item)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors['items[0].route']").exists());
+    }
+
+    @Test
     @DisplayName("POST /prescriptions/{id}/dispense - 200 OK with allocation payload")
     void dispenseReturnsAllocationPayload() throws Exception {
         UUID prescriptionId = UUID.randomUUID();
@@ -255,7 +375,7 @@ class PrescriptionControllerTest {
                         "500 mg",
                         "vien",
                         "1 vien",
-                        "2 lan/ngay",
+                        2,
                         AdministrationRoute.ORAL,
                         5,
                         20,
