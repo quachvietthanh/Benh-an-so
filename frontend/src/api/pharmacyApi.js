@@ -9,6 +9,7 @@ const pharmacyApi = {
   createPrescription: (data) => axiosClient.post('/prescriptions', data),
   updatePrescription: (id, data) => axiosClient.patch(`/prescriptions/${id}`, data),
   cancelPrescription: (id) => axiosClient.post(`/prescriptions/${id}/cancel`),
+  printPrescription: (id) => axiosClient.get(`/prescriptions/${id}/print`, { responseType: 'blob' }),
   stocks: (params) => axiosClient.get('/inventory/stocks', { params }),
   lowStock: () => axiosClient.get('/inventory/low-stock'),
   batches: (params) => axiosClient.get('/inventory/batches', { params }),

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Alert,
   Badge,
@@ -14,6 +14,7 @@ import {
   Tag,
   Timeline,
   Typography,
+  message,
 } from 'antd'
 import {
   AlertOutlined,
@@ -24,10 +25,12 @@ import {
   HistoryOutlined,
   MedicineBoxOutlined,
   PlusCircleOutlined,
+  PrinterOutlined,
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import pharmacyApi from '../../api/pharmacyApi'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 
 const { Text, Paragraph, Title } = Typography
@@ -55,6 +58,7 @@ function PrescriptionDetailModal({
   prescription,
   medicines = [],
   onEditClick,
+  onPrintClick,
   canEdit = false,
 }) {
   if (!prescription) return null
@@ -168,6 +172,77 @@ function PrescriptionDetailModal({
   )
 
   const isPending = prescription.status === 'PENDING_DISPENSE'
+  const isPrintable = Boolean(
+    prescription?.id &&
+    prescription?.prescriptionCode &&
+    (prescription?.status === 'PENDING_DISPENSE' || prescription?.status === 'DISPENSED')
+  )
+
+  const [printing, setPrinting] = useState(false)
+
+  const handlePrintPrescription = async () => {
+    if (!isPrintable || printing) return
+    setPrinting(true)
+    try {
+      const response = await pharmacyApi.printPrescription(prescription.id)
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+
+      const disposition = response.headers?.['content-disposition']
+      let filename = `prescription-${prescription.prescriptionCode || prescription.id}.pdf`
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        if (match && match[1]) filename = match[1]
+      }
+
+      const newWindow = window.open(url, '_blank')
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        setTimeout(() => {
+          if (link.parentNode) link.parentNode.removeChild(link)
+        }, 1000)
+        message.info('Trình duyệt đang chặn cửa sổ xem bản in. Bản in đơn thuốc đã được tải về máy của bạn.')
+      } else {
+        message.success('Đã mở bản in đơn thuốc thành công.')
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url)
+      }, 30000)
+    } catch (error) {
+      let backendMessage = ''
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text()
+          const json = JSON.parse(text)
+          backendMessage = json.message || json.error
+        } catch {
+          // ignore
+        }
+      } else if (error.response?.data?.message) {
+        backendMessage = error.response.data.message
+      }
+
+      const status = error.response?.status
+      if (status === 403) {
+        message.error(backendMessage || 'Bạn không có quyền in đơn thuốc.')
+      } else if (status === 404) {
+        message.error(backendMessage || 'Không tìm thấy đơn thuốc cần in.')
+      } else if (status === 400 || status === 409) {
+        message.error(backendMessage || 'Đơn thuốc chưa đủ điều kiện để in.')
+      } else if (status === 500) {
+        message.error(backendMessage || 'Không thể tạo bản in đơn thuốc từ hệ thống. Vui lòng thử lại.')
+      } else {
+        message.error(backendMessage || error.message || 'Lỗi khi tạo bản in đơn thuốc.')
+      }
+    } finally {
+      setPrinting(false)
+    }
+  }
 
   return (
     <Modal
@@ -186,9 +261,24 @@ function PrescriptionDetailModal({
       onCancel={onClose}
       footer={
         <Space>
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
+            loading={printing}
+            disabled={!isPrintable || printing}
+            onClick={() => {
+              if (onPrintClick) {
+                onPrintClick(prescription)
+              } else {
+                handlePrintPrescription()
+              }
+            }}
+          >
+            In đơn thuốc
+          </Button>
           {canEdit && isPending && (
             <Button
-              type="primary"
+              type="default"
               icon={<EditOutlined />}
               onClick={() => {
                 onClose()
