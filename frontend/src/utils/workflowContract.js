@@ -60,7 +60,7 @@ export const buildDiagnosisPayload = ({ primaryDiagnosis, secondaryDiagnoses = [
   const toDiagnosis = (diagnosis) => ({
     diagnosisCatalogId: diagnosis.id,
     code: diagnosis.code,
-    name: diagnosis.name,
+    name: diagnosis.rawName || diagnosis.name,
     note: diagnosis.note || note || '',
   })
 

@@ -32,10 +32,12 @@ import {
 import clinicalServiceApi from '../api/clinicalServiceApi'
 import medicalRecordApi from '../api/medicalRecordApi'
 import queueApi from '../api/queueApi'
+import systemApi from '../api/systemApi'
 import visitApi from '../api/visitApi'
 import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintModal'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import { useAuthContext } from '../context/AuthContext'
+import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
 import {
@@ -84,17 +86,19 @@ const saveRecentDiagnosis = (icd) => {
 }
 
 const mapClinicalService = (item) => ({
-  id: item.id,
-  code: item.serviceCode,
-  name: item.serviceName,
+  id: item.id || item.serviceCode || item.code,
+  code: item.serviceCode || item.code || '',
+  name: fixMojibake(item.serviceName || item.name || ''),
   category:
-    item.serviceType === 'LAB_TEST'
+    item.category ||
+    (item.serviceType === 'LAB_TEST'
       ? 'XET_NGHIEM'
       : item.serviceType === 'IMAGING'
         ? 'CDHA'
-        : 'THU_THUAT',
-  department: item.description || 'Dịch vụ cận lâm sàng',
-  price: 0,
+        : 'THU_THUAT'),
+  department: item.department || item.description || 'Dịch vụ cận lâm sàng',
+  price: Number(item.price ?? item.currentPrice ?? 0),
+  preparation: item.preparation || '',
 })
 
 function MedicalEncounter() {
@@ -157,6 +161,7 @@ function MedicalEncounter() {
               map.set(item.code, {
                 id: item.id,
                 code: item.code,
+                rawName: item.name,
                 name: fixMojibake(item.name),
                 description: fixMojibake(item.description || ''),
                 category: getCategoryFromIcdCode(item.code),
@@ -278,11 +283,28 @@ function MedicalEncounter() {
           : []
       setRecords(history)
 
-      if (serviceResult.status === 'fulfilled') {
+      if (
+        serviceResult.status === 'fulfilled' &&
+        (Array.isArray(serviceResult.value?.data?.content) || Array.isArray(serviceResult.value?.data)) &&
+        (serviceResult.value?.data?.content?.length > 0 || serviceResult.value?.data?.length > 0)
+      ) {
         setClinicalServices(unwrapCollection(serviceResult.value.data).map(mapClinicalService))
+        setServiceCatalogError('')
       } else {
-        setClinicalServices([])
-        setServiceCatalogError('Không tải được danh mục dịch vụ từ hệ thống. Không thể tạo chỉ định lúc này.')
+        let fallbackServices = []
+        try {
+          const sysRes = await systemApi.services({ active: true, size: 100 })
+          const items = unwrapCollection(sysRes.data)
+          if (items.length > 0) {
+            fallbackServices = items.map(mapClinicalService)
+          }
+        } catch {
+        }
+        if (fallbackServices.length === 0) {
+          fallbackServices = clinicalServiceCatalog.map(mapClinicalService)
+        }
+        setClinicalServices(fallbackServices)
+        setServiceCatalogError('')
       }
     } catch (error) {
       setEncounter(null)
@@ -311,6 +333,7 @@ function MedicalEncounter() {
           raw.map((item) => ({
             id: item.id,
             code: item.code,
+            rawName: item.name,
             name: fixMojibake(item.name),
             description: fixMojibake(item.description || ''),
             category: getCategoryFromIcdCode(item.code),
@@ -463,14 +486,20 @@ function MedicalEncounter() {
     )
 
   const resolveDiagnosis = async (diagnosis) => {
-    if (diagnosis?.id) return diagnosis
+    if (diagnosis?.id && diagnosis?.rawName) return diagnosis
     if (!diagnosis?.code) throw new Error('Vui lòng chọn chẩn đoán ICD-10 từ danh mục chuẩn.')
 
     const foundInState = allBackendDiagnoses.find(
-      (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase(),
+      (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
     )
     if (foundInState?.id) {
-      return { id: foundInState.id, code: foundInState.code, name: foundInState.name, note: diagnosis.note }
+      return {
+        id: foundInState.id,
+        code: foundInState.code,
+        rawName: foundInState.rawName,
+        name: foundInState.name,
+        note: diagnosis.note,
+      }
     }
 
     const response = await medicalRecordApi.getDiagnosisCatalog(diagnosis.code)
@@ -483,7 +512,13 @@ function MedicalEncounter() {
     if (!exact?.id) {
       throw new Error(`Mã ${diagnosis.code} chưa tồn tại trong danh mục chẩn đoán chuẩn.`)
     }
-    return { id: exact.id, code: exact.code, name: fixMojibake(exact.name), note: diagnosis.note }
+    return {
+      id: exact.id,
+      code: exact.code,
+      rawName: exact.name,
+      name: fixMojibake(exact.name),
+      note: diagnosis.note,
+    }
   }
 
   const openPrescription = async (medicalRecordId) => {
