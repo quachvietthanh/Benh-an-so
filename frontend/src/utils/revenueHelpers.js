@@ -2,7 +2,6 @@ import dayjs from 'dayjs'
 
 export const formatMoney = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`
 
-// Helper calculation of financial metrics
 export const calculateFinancialMetrics = (invoices = [], timeline = [], dayCount = 1) => {
   let grossRevenue = 0
   let adjustmentTotal = 0
@@ -12,7 +11,7 @@ export const calculateFinancialMetrics = (invoices = [], timeline = [], dayCount
   invoices.forEach((inv) => {
     const amt = Number(inv.totalAmount || 0)
     if (inv.invoiceType === 'ADJUSTMENT' || amt < 0) {
-      adjustmentTotal += amt // usually negative
+      adjustmentTotal += amt
       adjustmentCount += 1
     } else {
       grossRevenue += amt
@@ -20,7 +19,6 @@ export const calculateFinancialMetrics = (invoices = [], timeline = [], dayCount
     }
   })
 
-  // Net revenue = Gross + negative adjustments (or Gross - abs(adjustments))
   const netRevenue = grossRevenue + adjustmentTotal
   const effectiveDays = Math.max(1, dayCount)
   const averageDaily = netRevenue / effectiveDays

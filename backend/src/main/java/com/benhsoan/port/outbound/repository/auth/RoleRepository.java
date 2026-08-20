@@ -15,5 +15,7 @@ public interface RoleRepository {
 
     List<Role> findAll();
 
+    List<Role> findAllSystemRoles();
+
     boolean existsByName(String name);
 }

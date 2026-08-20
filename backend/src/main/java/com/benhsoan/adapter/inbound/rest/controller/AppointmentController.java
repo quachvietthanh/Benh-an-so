@@ -8,7 +8,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,6 +25,7 @@ import com.benhsoan.adapter.inbound.rest.request.appointment.CreateAppointmentRe
 import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentResponse;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.appointment.GetOverdueAppointmentsCommand;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
@@ -64,7 +64,7 @@ public class AppointmentController {
     private final AppointmentRestMapper mapper;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("APPOINTMENT_READ")
     public Page<AppointmentResponse> search(
             @RequestParam(required = false) UUID patientId,
             @RequestParam(required = false) UUID doctorId,
@@ -89,14 +89,14 @@ public class AppointmentController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("APPOINTMENT_READ")
     public AppointmentResponse getById(@PathVariable UUID id) {
         return mapper.toResponse(getAppointmentByIdUseCase.getById(id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("APPOINTMENT_CREATE")
     public AppointmentResponse create(@Valid @RequestBody CreateAppointmentRequest request) {
         AppointmentResult result
                 = createAppointmentUseCase.create(
@@ -107,13 +107,13 @@ public class AppointmentController {
     }
 
     @PostMapping("/{id}/reminder")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("APPOINTMENT_UPDATE")
     public AppointmentReminderResult sendReminderManually(@PathVariable UUID id) {
         return sendAppointmentReminderManuallyUseCase.sendManually(id);
     }
 
     @PatchMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("APPOINTMENT_UPDATE")
     public AppointmentResponse cancel(
             @PathVariable UUID id,
             @Valid
@@ -128,7 +128,7 @@ public class AppointmentController {
     }
 
     @GetMapping("/overdue")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("APPOINTMENT_READ")
     public Page<AppointmentResponse> getOverdueAppointments(Pageable pageable) {
         Page<AppointmentResult> result
                 = getOverdueAppointmentsUseCase.execute(
@@ -141,7 +141,7 @@ public class AppointmentController {
     }
 
     @PatchMapping("/{id}/no-show")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("APPOINTMENT_UPDATE")
     public AppointmentResponse markNoShow(@PathVariable UUID id) {
         AppointmentResult result
                 = markAppointmentNoShowUseCase.execute(

@@ -75,14 +75,12 @@ export function ClinicalOrdersPage() {
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState([])
 
-  // Filters state
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [priorityFilter, setPriorityFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [dateRange, setDateRange] = useState(null)
 
-  // Modals state
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [editModalVisible, setEditModalVisible] = useState(false)
   const [detailModalVisible, setDetailModalVisible] = useState(false)
@@ -117,10 +115,8 @@ export function ClinicalOrdersPage() {
       updatedAt: new Date().toISOString(),
     }
 
-    // Save to LocalStorage
     saveStoredClinicalOrder(cancelledOrder)
 
-    // Log to Audit History
     logMedicalAccess({
       userName: user?.fullName || 'Dr. Nguyen Minh Anh',
       patientName: orderToCancel.patientName,
@@ -227,13 +223,11 @@ export function ClinicalOrdersPage() {
     loadData()
   }, [loadData])
 
-  const [activeTab, setActiveTab] = useState('ACTIVE') // 'ACTIVE' | 'CANCELLED'
+  const [activeTab, setActiveTab] = useState('ACTIVE')
 
-  // Filter logic
   const filteredOrders = useMemo(() => {
     const kw = searchText.trim().toLowerCase()
     return orders.filter((order) => {
-      // Tab filter logic: ACTIVE tab excludes CANCELLED, CANCELLED tab shows ONLY CANCELLED
       if (activeTab === 'ACTIVE' && order.status === 'CANCELLED') return false
       if (activeTab === 'CANCELLED' && order.status !== 'CANCELLED') return false
 
@@ -266,7 +260,6 @@ export function ClinicalOrdersPage() {
     })
   }, [orders, activeTab, searchText, statusFilter, priorityFilter, categoryFilter, dateRange])
 
-  // Stats calculation
   const stats = useMemo(() => {
     const total = orders.length
     const pending = orders.filter((o) => o.status === 'PENDING').length
@@ -278,7 +271,6 @@ export function ClinicalOrdersPage() {
     return { total, pending, inProgress, resulted, completed, cancelled, urgent }
   }, [orders])
 
-  // Actions
   const handleResetFilter = () => {
     setSearchText('')
     setStatusFilter('ALL')
@@ -328,7 +320,6 @@ export function ClinicalOrdersPage() {
 
   return (
     <div style={{ padding: '4px 0 24px' }}>
-      {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>
@@ -358,7 +349,6 @@ export function ClinicalOrdersPage() {
         </Space>
       </div>
 
-      {/* Overview Statistics Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={8} md={4}>
           <Card size="small" style={{ borderRadius: 8, borderLeft: '4px solid #1890ff' }}>
@@ -425,7 +415,6 @@ export function ClinicalOrdersPage() {
         </Col>
       </Row>
 
-      {/* Filter Component */}
       <ClinicalOrderFilter
         searchText={searchText}
         onSearchChange={setSearchText}
@@ -440,7 +429,6 @@ export function ClinicalOrdersPage() {
         onReset={handleResetFilter}
       />
 
-      {/* Main View Tabs: Active Orders vs Cancelled History */}
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
@@ -468,7 +456,6 @@ export function ClinicalOrdersPage() {
         ]}
       />
 
-      {/* Table Component */}
       <Card size="small" style={{ borderRadius: '0 8px 8px 8px' }}>
         <ClinicalOrderTable
           dataSource={filteredOrders}
@@ -482,7 +469,6 @@ export function ClinicalOrdersPage() {
         />
       </Card>
 
-      {/* Modals */}
       <CreateClinicalOrderModal
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
@@ -509,7 +495,6 @@ export function ClinicalOrdersPage() {
         onClose={() => setPrintModalVisible(false)}
       />
 
-      {/* Cancel Order Modal with Reason Input */}
       <Modal
         title={
           <span style={{ color: '#cf1322', fontWeight: 600, fontSize: 16 }}>

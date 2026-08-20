@@ -11,7 +11,6 @@ import { formatMoney } from '../../../utils/revenueHelpers'
 export default function RevenueKPICards({ metrics = {}, daysDiff = 1 }) {
   return (
     <div className="revenue-kpi-grid">
-      {/* Card 1: Doanh thu thuần */}
       <div className="revenue-kpi-card net">
         <div>
           <div className="revenue-kpi-header">
@@ -26,7 +25,6 @@ export default function RevenueKPICards({ metrics = {}, daysDiff = 1 }) {
         </div>
       </div>
 
-      {/* Card 2: Doanh thu gốc */}
       <div className="revenue-kpi-card gross">
         <div>
           <div className="revenue-kpi-header">
@@ -41,7 +39,6 @@ export default function RevenueKPICards({ metrics = {}, daysDiff = 1 }) {
         </div>
       </div>
 
-      {/* Card 3: Khoản điều chỉnh */}
       <div className="revenue-kpi-card adjustment">
         <div>
           <div className="revenue-kpi-header">
@@ -58,7 +55,6 @@ export default function RevenueKPICards({ metrics = {}, daysDiff = 1 }) {
         </div>
       </div>
 
-      {/* Card 4: Trung bình / ngày */}
       <div className="revenue-kpi-card average">
         <div>
           <div className="revenue-kpi-header">
@@ -72,7 +68,6 @@ export default function RevenueKPICards({ metrics = {}, daysDiff = 1 }) {
         </div>
       </div>
 
-      {/* Card 5: Tỷ lệ điều chỉnh */}
       <div className="revenue-kpi-card rate">
         <div>
           <div className="revenue-kpi-header">

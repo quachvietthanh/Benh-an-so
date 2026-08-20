@@ -5,6 +5,7 @@ import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -38,7 +39,8 @@ public class JwtTokenAdapter implements JwtTokenPort {
             UUID userId,
             UUID sessionId,
             String username,
-            String role
+            String role,
+            Set<String> permissions
     ) {
 
         Date now = new Date();
@@ -53,6 +55,7 @@ public class JwtTokenAdapter implements JwtTokenPort {
                 .claim("userId", userId.toString())
                 .claim("username", username)
                 .claim("role", role)
+                .claim("permissions", permissions)
                 .issuedAt(now)
                 .expiration(expired)
                 .signWith(secretKey)
@@ -76,6 +79,14 @@ public class JwtTokenAdapter implements JwtTokenPort {
     public String getRole(String token) {
         return getClaims(token)
                 .get("role", String.class);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Set<String> getPermissions(String token) {
+        Object value = getClaims(token).get("permissions");
+        if (!(value instanceof java.util.Collection<?> values)) return Set.of();
+        return values.stream().map(String::valueOf).collect(java.util.stream.Collectors.toSet());
     }
 
     @Override

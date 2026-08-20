@@ -435,8 +435,8 @@ export const demoClinicalOrders = [
     doctorName: 'BS. Phạm Hồng Anh',
     department: 'Khoa Nội tổng quát',
     diagnosis: 'Tăng huyết áp vô căn, nghi ngờ đái tháo đường',
-    priority: 'URGENT', // URGENT | NORMAL
-    status: 'IN_PROGRESS', // PENDING | IN_PROGRESS | RESULTED | COMPLETED | CANCELLED
+    priority: 'URGENT',
+    status: 'IN_PROGRESS',
     items: [
       { serviceId: 'cls-1', serviceCode: 'XN-01', serviceName: 'Tổng phân tích tế bào máu ngoại vi (24 chỉ số)', categoryName: 'Xét nghiệm', price: 120000, quantity: 1, note: 'Kiểm tra bạch cầu', status: 'COMPLETED' },
       { serviceId: 'cls-2', serviceCode: 'XN-02', serviceName: 'Sinh hóa máu (Glucose, Ure, Creatinin, GOT, GPT)', categoryName: 'Xét nghiệm', price: 250000, quantity: 1, note: 'Xét nghiệm lúc đói', status: 'IN_PROGRESS' },
@@ -512,7 +512,7 @@ export const demoClinicalOrders = [
     status: 'COMPLETED',
     items: [
       { serviceId: 'cls-9', serviceCode: 'CDHA-04', serviceName: 'Chụp CT-Scanner sọ não 128 dãy (Có thuốc cản quang)', categoryName: 'Chẩn đoán hình ảnh', price: 1200000, quantity: 1, note: 'Khẩn cấp', status: 'COMPLETED' },
-      { serviceId: 'cls-12', serviceCode: 'TDCN-02', serviceName: 'Nội soi dạ dày - thực quản bằng ống mềm (Không đau)', categoryName: 'Thăm dò chức năng', price: 850000, quantity: 1, note: 'Kiểm tra xuất huyết', status: 'COMPLETED' },
+      { serviceId: 'cls-12', serviceCode: 'TDCN-02', serviceName: 'Nội soi dạ dày - thực quản bằng ống mềm (Không đau)', category: 'Thăm dò chức năng', price: 850000, quantity: 1, note: 'Kiểm tra xuất huyết', status: 'COMPLETED' },
     ],
     totalAmount: 2050000,
     createdAt: '2026-07-28T10:00:00',
@@ -520,4 +520,3 @@ export const demoClinicalOrders = [
     resultSummary: 'CT Sọ não không phát hiện xuất huyết nội sọ. Nội soi niêm mạc dạ dày bình thường.',
   },
 ]
-

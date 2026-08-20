@@ -79,7 +79,7 @@ test('buildOperationalSnapshotFromReports seamlessly creates snapshot from repor
     { id: '2', status: 'IN_PROGRESS', createdAt: '2026-08-14T09:00:00' },
     { id: '3', status: 'COMPLETED', createdAt: '2026-08-14T09:30:00' },
     { id: '4', status: 'CANCELLED', createdAt: '2026-08-14T10:00:00' },
-    { id: '5', status: 'COMPLETED', createdAt: '2026-08-13T10:00:00' }, // yesterday
+    { id: '5', status: 'COMPLETED', createdAt: '2026-08-13T10:00:00' },
   ]
   const medicines = [
     { id: 'm1', name: 'Paracetamol', stock: 5, minStock: 20, active: true },
@@ -97,7 +97,7 @@ test('buildOperationalSnapshotFromReports seamlessly creates snapshot from repor
   assert.equal(snapshot.visitSummary.inProgress, 1)
   assert.equal(snapshot.visitSummary.completed, 15)
   assert.equal(snapshot.visitSummary.cancelled, 1)
-  assert.equal(snapshot.visitSummary.total, 18) // 1 waiting + 1 inProgress + 15 completed + 1 cancelled
+  assert.equal(snapshot.visitSummary.total, 18)
   assert.equal(snapshot.revenueSummary.totalRevenueToday, 4500000)
   assert.equal(snapshot.inventoryAlertSummary.lowStockCount, 1)
 })

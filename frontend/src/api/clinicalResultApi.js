@@ -14,14 +14,7 @@ const updateRequest = (data = {}) => ({
   changeReason: data.changeReason,
 })
 
-/**
- * API client matching ClinicalResultController and ClinicalOrderController.
- * Clinical results do not have a global list/create endpoint: every read is
- * scoped to a visit and every create is scoped to a clinical-order item.
- */
 const clinicalResultApi = {
-  // Kept for callers that still use the old name, but never calls the invalid
-  // GET /clinical-results endpoint. A visit context is mandatory.
   getAll: (params = {}) => {
     const { visitId, ...query } = params
     if (!visitId) {

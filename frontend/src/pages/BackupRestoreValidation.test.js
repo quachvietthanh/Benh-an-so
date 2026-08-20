@@ -1,8 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-// Helper validation logic for Backup & Restore module based on Backend contract
-
 export function validateBackupCreationAccess(userRoles = []) {
   const normalized = userRoles.map((r) => String(r || '').toUpperCase().replace(/^ROLE_/, ''))
   const isAdmin = normalized.includes('ADMIN')
@@ -73,10 +71,6 @@ export function handleListFetchResult(response, isError = false) {
   const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : []
   return { loadError: false, backups: list, errorMsg: null }
 }
-
-// ==========================================
-// TEST SUITE: BACKUP & RESTORE CONTRACT VALIDATION
-// ==========================================
 
 test('1. GET dùng /backups', () => {
   const getEndpoint = '/backups'
@@ -155,7 +149,6 @@ test('TC04: Retry khi GET 200 -> Error State biến mất', () => {
   let state = handleListFetchResult(null, true)
   assert.strictEqual(state.loadError, true)
 
-  // User clicks retry
   state = handleListFetchResult({ data: [{ id: 'b-1', status: 'SUCCESS' }] }, false)
   assert.strictEqual(state.loadError, false)
   assert.strictEqual(state.backups.length, 1)
@@ -164,14 +157,11 @@ test('TC04: Retry khi GET 200 -> Error State biến mất', () => {
 test('TC05 & TC06: POST error -> không tạo backup giả; POST 2xx -> trigger reload', () => {
   let localList = [{ id: 'existing-1' }]
   
-  // POST 500 error occurs
   const postFailed = true
   if (postFailed) {
-    // Should NOT append any item to localList
   }
   assert.strictEqual(localList.length, 1)
 
-  // POST 2xx success occurs -> triggers GET reload
   const reloaded = handleListFetchResult({ data: [{ id: 'existing-1' }, { id: 'new-2' }] }, false)
   assert.strictEqual(reloaded.backups.length, 2)
 })

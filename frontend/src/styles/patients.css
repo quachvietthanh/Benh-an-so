@@ -1,5 +1,3 @@
-/* Patient Management & Registration Styles */
-
 .patient-stat-card {
   position: relative;
   display: flex;
@@ -580,7 +578,6 @@
   }
 }
 
-/* Patient Registration Modal Grid Layout */
 .patient-register-modal .ant-modal-content {
   border-radius: 14px;
   overflow: hidden;

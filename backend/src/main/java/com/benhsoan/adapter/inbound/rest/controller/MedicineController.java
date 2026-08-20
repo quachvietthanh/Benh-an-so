@@ -7,7 +7,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -25,6 +24,7 @@ import com.benhsoan.adapter.inbound.rest.request.medicine.CreateMedicineRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicine.UpdateMedicineRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicine.UpdateMedicineStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicine.MedicineResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.medicine.SearchMedicinesQuery;
 import com.benhsoan.port.dto.result.MedicineResult;
 import com.benhsoan.port.inbound.medicine.ActivateMedicineUseCase;
@@ -58,7 +58,7 @@ public class MedicineController {
     private final MedicineRestMapper restMapper;
 
     @PostMapping
-    @PreAuthorize("hasRole('PHARMACIST')")
+    @RequirePermission("PHARMACY_CREATE")
     public ResponseEntity<MedicineResponse> create(
             @Valid @RequestBody CreateMedicineRequest request
     ) {
@@ -75,7 +75,7 @@ public class MedicineController {
     }
 
     @PutMapping("/{medicineId}")
-    @PreAuthorize("hasRole('PHARMACIST')")
+    @RequirePermission("PHARMACY_UPDATE")
     public ResponseEntity<MedicineResponse> update(
             @PathVariable UUID medicineId,
             @Valid @RequestBody UpdateMedicineRequest request
@@ -88,7 +88,7 @@ public class MedicineController {
     }
 
     @PatchMapping("/{medicineId}/status")
-    @PreAuthorize("hasRole('PHARMACIST')")
+    @RequirePermission("PHARMACY_UPDATE")
     public ResponseEntity<MedicineResponse> updateStatus(
             @PathVariable UUID medicineId,
             @Valid @RequestBody UpdateMedicineStatusRequest request
@@ -101,7 +101,7 @@ public class MedicineController {
     }
 
     @GetMapping("/{medicineId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'PHARMACIST')")
+    @RequirePermission("PHARMACY_READ")
     public ResponseEntity<MedicineResponse> getById(
             @PathVariable UUID medicineId
     ) {
@@ -111,7 +111,7 @@ public class MedicineController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'PHARMACIST')")
+    @RequirePermission("PHARMACY_READ")
     public Page<MedicineResponse> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean active,

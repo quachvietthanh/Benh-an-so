@@ -80,7 +80,6 @@ function InventoryReceiptPage() {
   const location = useLocation()
   const { user } = useAuthContext()
 
-  // Phân quyền cho Dược sĩ / Admin theo permission hiện tại
   const roles = useMemo(() => {
     const values = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
     return values
@@ -91,10 +90,8 @@ function InventoryReceiptPage() {
 
   const [form] = Form.useForm()
 
-  // State Tabs
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'create')
 
-  // State Dữ liệu từ Backend (Source of truth)
   const [medicines, setMedicines] = useState([])
   const [stocks, setStocks] = useState([])
   const [batches, setBatches] = useState([])
@@ -104,7 +101,6 @@ function InventoryReceiptPage() {
   const [submitting, setSubmitting] = useState(false)
   const [loadError, setLoadError] = useState('')
 
-  // State Bộ lọc Lô thuốc
   const [batchKeyword, setBatchKeyword] = useState('')
   const [batchStatusFilter, setBatchStatusFilter] = useState('ALL')
   const [batchEligibleFilter, setBatchEligibleFilter] = useState('ALL')
@@ -119,7 +115,6 @@ function InventoryReceiptPage() {
     }, 0)
   }, [formItems])
 
-  // Tải dữ liệu thật từ Backend (Không cộng dồn local state)
   const loadData = useCallback(async () => {
     if (!canManageReceipts) return
     setLoading(true)
@@ -191,7 +186,6 @@ function InventoryReceiptPage() {
     [medicines],
   )
 
-  // Thống kê nhanh
   const stats = useMemo(() => {
     const totalBatches = batches.length
     const eligibleBatches = batches.filter((b) => b.eligibleForDispense !== false && b.status !== 'EXPIRED' && b.quantity > 0).length
@@ -211,7 +205,6 @@ function InventoryReceiptPage() {
     }
   }, [batches, expiryAlerts])
 
-  // Xử lý nộp phiếu nhập kho
   const handleSubmit = async (values) => {
     if (!canManageReceipts) {
       message.error('Bạn không có quyền tạo phiếu nhập kho.')
@@ -229,39 +222,33 @@ function InventoryReceiptPage() {
     for (let i = 0; i < rawItems.length; i++) {
       const item = rawItems[i]
 
-      // 1. Chưa chọn thuốc
       if (!item.medicineId) {
         message.error(`Dòng ${i + 1}: Vui lòng chọn thuốc.`)
         return
       }
 
-      // 2. Thiếu số lô
       if (!item.batchNumber || !String(item.batchNumber).trim()) {
         message.error(`Dòng ${i + 1}: Vui lòng nhập số lô.`)
         return
       }
 
-      // 5. Thiếu hạn dùng
       if (!item.expiryDate) {
         message.error(`Dòng ${i + 1}: Vui lòng chọn hạn dùng.`)
         return
       }
 
-      // 6. Hạn dùng trong quá khứ / không tương lai
       const expDay = dayjs(item.expiryDate).startOf('day')
       if (!expDay.isAfter(today)) {
         message.error(`Dòng ${i + 1}: Hạn sử dụng phải là ngày trong tương lai.`)
         return
       }
 
-      // 3 & 4. Số lượng <= 0 hoặc không hợp lệ
       const qty = Number(item.quantity)
       if (item.quantity == null || isNaN(qty) || qty <= 0 || !Number.isInteger(qty)) {
         message.error(`Dòng ${i + 1}: Số lượng nhập phải là số nguyên lớn hơn 0.`)
         return
       }
 
-      // Đơn giá nhập
       const price = Number(item.importPrice)
       if (item.importPrice == null || isNaN(price) || price < 0) {
         message.error(`Dòng ${i + 1}: Đơn giá nhập không được âm.`)
@@ -309,7 +296,6 @@ function InventoryReceiptPage() {
       form.resetFields()
       form.setFieldsValue({ items: [{ ...EMPTY_RECEIPT_ITEM }] })
 
-      // TẢI LẠI DỮ LIỆU TỒN KHO TỪ BACKEND
       await loadData()
       setActiveTab('batches')
     } catch (error) {
@@ -336,7 +322,6 @@ function InventoryReceiptPage() {
     }
   }
 
-  // Lọc danh sách lô thuốc
   const filteredBatches = useMemo(() => {
     let list = Array.isArray(batches) ? batches : []
 
@@ -383,7 +368,6 @@ function InventoryReceiptPage() {
     return list
   }, [batches, batchKeyword, batchStatusFilter, batchEligibleFilter, batchExpiryFilter])
 
-  // Cột bảng Lô thuốc
   const batchColumns = [
     {
       title: 'Mã thuốc',
@@ -499,7 +483,6 @@ function InventoryReceiptPage() {
     },
   ]
 
-  // Cột bảng Cảnh báo Hạn dùng (Map đúng DTO Backend InventoryExpiryAlertResponse)
   const alertColumns = [
     {
       title: 'Mã & Tên thuốc',
@@ -600,7 +583,6 @@ function InventoryReceiptPage() {
     },
   ]
 
-  // Cột bảng Lịch sử phiếu nhập
   const receiptHistoryColumns = [
     {
       title: 'Mã phiếu',
@@ -665,7 +647,6 @@ function InventoryReceiptPage() {
 
   return (
     <div style={{ paddingBottom: 40 }}>
-      {/* Header trang */}
       <div
         className="page-header"
         style={{
@@ -710,7 +691,6 @@ function InventoryReceiptPage() {
         />
       )}
 
-      {/* KPI Metric Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         <Col xs={24} sm={12} md={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
@@ -762,7 +742,6 @@ function InventoryReceiptPage() {
         </Col>
       </Row>
 
-      {/* Tabs Chức năng chính */}
       <Card styles={{ body: { padding: '16px 20px' } }}>
         <Tabs
           activeKey={activeTab}
@@ -828,7 +807,6 @@ function InventoryReceiptPage() {
 
                     <Divider style={{ margin: '16px 0' }} />
 
-                    {/* Danh sách dòng thuốc */}
                     <Title level={5} style={{ marginBottom: 12 }}>
                       Chi tiết thuốc, số lô và hạn dùng:
                     </Title>
@@ -1033,7 +1011,6 @@ function InventoryReceiptPage() {
               ),
               children: (
                 <div>
-                  {/* Bộ lọc Lô thuốc */}
                   <div
                     style={{
                       display: 'flex',
@@ -1186,4 +1163,3 @@ function InventoryReceiptPage() {
 }
 
 export default InventoryReceiptPage
-

@@ -101,17 +101,14 @@ function MedicalRecordAccessLogsPage() {
   const [patientLoading, setPatientLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
-  // Pagination state
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [totalElements, setTotalElements] = useState(0)
 
-  // Filter state
   const [actionFilter, setActionFilter] = useState('ALL')
   const [userFilter, setUserFilter] = useState('ALL')
   const [dateRange, setDateRange] = useState(null)
 
-  // 1. Tải danh sách bệnh nhân và người dùng ban đầu
   const loadInitialData = useCallback(async () => {
     setPatientLoading(true)
     try {
@@ -154,7 +151,6 @@ function MedicalRecordAccessLogsPage() {
     loadInitialData()
   }, [loadInitialData])
 
-  // Map người dùng theo ID để hiển thị họ tên & vai trò
   const userMap = useMemo(() => {
     const map = new Map()
     users.forEach((u) => {
@@ -163,7 +159,6 @@ function MedicalRecordAccessLogsPage() {
     return map
   }, [users])
 
-  // Map bệnh nhân theo ID
   const patientMap = useMemo(() => {
     const map = new Map()
     patients.forEach((p) => {
@@ -172,7 +167,6 @@ function MedicalRecordAccessLogsPage() {
     return map
   }, [patients])
 
-  // 2. Tải danh sách nhật ký truy cập theo bệnh nhân đã chọn
   const loadAccessLogs = useCallback(async () => {
     if (!selectedPatientId) return
 
@@ -217,7 +211,6 @@ function MedicalRecordAccessLogsPage() {
     loadAccessLogs()
   }, [loadAccessLogs])
 
-  // Lọc dữ liệu client-side nếu có chọn actionFilter hoặc userFilter
   const filteredLogs = useMemo(() => {
     let list = accessLogs
 
@@ -232,7 +225,6 @@ function MedicalRecordAccessLogsPage() {
     return list
   }, [accessLogs, actionFilter, userFilter])
 
-  // Thống kê KPI Cards
   const stats = useMemo(() => {
     const total = totalElements || accessLogs.length
     const reads = accessLogs.filter((l) => ['VIEW', 'VIEW_HISTORY'].includes(l.action)).length
@@ -249,7 +241,6 @@ function MedicalRecordAccessLogsPage() {
 
   const selectedPatientObj = patientMap.get(String(selectedPatientId))
 
-  // Cấu hình cột bảng
   const columns = [
     {
       title: 'Thời gian truy cập',
@@ -385,7 +376,6 @@ function MedicalRecordAccessLogsPage() {
 
   return (
     <div style={{ paddingBottom: 32 }}>
-      {/* Header trang */}
       <div
         style={{
           display: 'flex',
@@ -423,7 +413,6 @@ function MedicalRecordAccessLogsPage() {
         />
       )}
 
-      {/* Dashboard KPI Metric Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         <Col xs={24} sm={12} md={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
@@ -466,7 +455,6 @@ function MedicalRecordAccessLogsPage() {
         </Col>
       </Row>
 
-      {/* Khung Bộ lọc tra cứu */}
       <Card
         size="small"
         style={{ marginBottom: 16, borderRadius: 8, background: '#f8fafc', borderColor: '#e2e8f0' }}
@@ -557,7 +545,6 @@ function MedicalRecordAccessLogsPage() {
         </Row>
       </Card>
 
-      {/* Bảng Danh sách Nhật ký */}
       <Card style={{ borderRadius: 8 }}>
         <Table
           rowKey="id"

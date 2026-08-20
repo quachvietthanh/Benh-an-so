@@ -2,7 +2,6 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { validateItemStock } from '../utils/prescriptionInventoryValidation.js'
 
-// Helper kiểm tra điều kiện được phép điều chỉnh đơn thuốc
 export const canAdjustPrescription = ({
   userRoles = [],
   currentUserId,
@@ -33,7 +32,6 @@ export const canAdjustPrescription = ({
   return { allowed: true }
 }
 
-// Helper validation form điều chỉnh đơn thuốc
 export const validatePrescriptionAdjustmentForm = ({
   medicalRecordId,
   diagnoses = [],
@@ -90,7 +88,6 @@ export const validatePrescriptionAdjustmentForm = ({
   }
 }
 
-// Helper xây dựng payload điều chỉnh đơn thuốc gửi lên PATCH /prescriptions/{id}
 export const buildPrescriptionAdjustmentPayload = ({
   note = '',
   changeReason = '',
@@ -116,8 +113,6 @@ export const buildPrescriptionAdjustmentPayload = ({
   }
 }
 
-// --- SUITE KIỂM THỬ TỰ ĐỘNG ---
-
 test('1. Kiểm thử RÀNG BUỘC TRẠNG THÁI: Chỉ điều chỉnh khi PENDING_DISPENSE', () => {
   const baseContext = {
     userRoles: ['doctor'],
@@ -127,23 +122,19 @@ test('1. Kiểm thử RÀNG BUỘC TRẠNG THÁI: Chỉ điều chỉnh khi PEND
     queueBlocked: false,
   }
 
-  // TH 1.1: Đơn PENDING_DISPENSE -> Được phép điều chỉnh
   const resPending = canAdjustPrescription({ ...baseContext, prescriptionStatus: 'PENDING_DISPENSE' })
   assert.equal(resPending.allowed, true)
 
-  // TH 1.2: Đơn đã cấp phát DISPENSED -> Không được phép
   const resDispensed = canAdjustPrescription({ ...baseContext, prescriptionStatus: 'DISPENSED' })
   assert.equal(resDispensed.allowed, false)
   assert.equal(resDispensed.reason, 'Thuốc đã được cấp phát, không thể điều chỉnh.')
 
-  // TH 1.3: Đơn đã hủy CANCELLED -> Không được phép
   const resCancelled = canAdjustPrescription({ ...baseContext, prescriptionStatus: 'CANCELLED' })
   assert.equal(resCancelled.allowed, false)
   assert.equal(resCancelled.reason, 'Đơn thuốc đã bị hủy.')
 })
 
 test('2. Kiểm thử RÀNG BUỘC PHÂN QUYỀN & BỆNH ÁN KHÓA', () => {
-  // TH 2.1: Bệnh án đã khóa (LOCKED) -> Không được phép
   const resLocked = canAdjustPrescription({
     userRoles: ['doctor'],
     currentUserId: 'doc-1',
@@ -154,7 +145,6 @@ test('2. Kiểm thử RÀNG BUỘC PHÂN QUYỀN & BỆNH ÁN KHÓA', () => {
   assert.equal(resLocked.allowed, false)
   assert.ok(resLocked.reason.includes('Bệnh án đã khóa'))
 
-  // TH 2.2: Không phải bác sĩ phụ trách lượt khám
   const resOtherDoctor = canAdjustPrescription({
     userRoles: ['doctor'],
     currentUserId: 'doc-2',
@@ -165,7 +155,6 @@ test('2. Kiểm thử RÀNG BUỘC PHÂN QUYỀN & BỆNH ÁN KHÓA', () => {
   assert.equal(resOtherDoctor.allowed, false)
   assert.ok(resOtherDoctor.reason.includes('Chỉ bác sĩ phụ trách'))
 
-  // TH 2.3: Vai trò Dược sĩ hoặc Lễ tân cố điều chỉnh
   const resPharmacist = canAdjustPrescription({
     userRoles: ['pharmacist'],
     currentUserId: 'pharm-1',
@@ -188,7 +177,6 @@ test('3. Kiểm thử BẮT BUỘC NHẬP LÝ DO ĐIỀU CHỈNH (Change Reason 
     },
   ]
 
-  // TH 3.1: Thiếu lý do điều chỉnh khi sửa đơn
   const resMissingReason = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
     diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
@@ -199,7 +187,6 @@ test('3. Kiểm thử BẮT BUỘC NHẬP LÝ DO ĐIỀU CHỈNH (Change Reason 
   assert.equal(resMissingReason.isValid, false)
   assert.ok(resMissingReason.errors.some((e) => e.includes('lý do điều chỉnh')))
 
-  // TH 3.2: Có lý do điều chỉnh hợp lệ (Preset hoặc tự nhập)
   const resValidReason = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
     diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
@@ -212,7 +199,6 @@ test('3. Kiểm thử BẮT BUỘC NHẬP LÝ DO ĐIỀU CHỈNH (Change Reason 
 })
 
 test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU ĐẦU VÀO', () => {
-  // TH 4.1: Đơn thuốc rỗng (Bỏ hết thuốc) -> Báo lỗi
   const resEmpty = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
     diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
@@ -223,7 +209,6 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.equal(resEmpty.isValid, false)
   assert.ok(resEmpty.errors.some((e) => e.includes('ít nhất một loại thuốc')))
 
-  // TH 4.2: Thuốc bị trùng lặp trong đơn
   const duplicateItems = [
     { medicineId: 'med-1', dosage: '1 viên', frequency: '2 lần', quantity: 10, durationDays: 5 },
     { medicineId: 'med-1', dosage: '2 viên', frequency: '1 lần', quantity: 5, durationDays: 5 },
@@ -238,7 +223,6 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.equal(resDuplicate.isValid, false)
   assert.ok(resDuplicate.errors.some((e) => e.includes('thuốc bị trùng')))
 
-  // TH 4.3: Số lượng hoặc số ngày âm/không hợp lệ
   const invalidQuantityItems = [
     { medicineId: 'med-1', dosage: '1 viên', frequency: '2 lần', quantity: -5, durationDays: 0 },
   ]

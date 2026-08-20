@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import com.benhsoan.domain.auth.enums.Permission;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -35,7 +34,7 @@ public class MedicalRecordAuthorizationService {
     }
 
     public UUID requireAuditReadAccess() {
-        if (!permissionEvaluator.hasPermission(Permission.AUDIT_READ)) {
+        if (!permissionEvaluator.hasPermission("AUDIT_READ")) {
             throw new MedicalRecordAccessDeniedException();
         }
         return currentUserPort.getCurrentUserId();

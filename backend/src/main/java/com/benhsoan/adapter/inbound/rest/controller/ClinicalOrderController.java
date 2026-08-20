@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.ClinicalOrderRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.clinical.CreateClinicalOrderRequest;
 import com.benhsoan.adapter.inbound.rest.response.clinical.ClinicalOrderResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.clinical.CreateClinicalOrderUseCase;
 import com.benhsoan.port.inbound.clinical.GetClinicalOrdersByVisitUseCase;
 import com.benhsoan.port.dto.command.clinical.GetClinicalOrdersByVisitQuery;
@@ -37,7 +37,7 @@ public class ClinicalOrderController {
 
     @PostMapping("/visits/{visitId}")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("CLINICAL_ORDER_CREATE")
     public ClinicalOrderResponse create(
             @PathVariable UUID visitId,
             @Valid @RequestBody CreateClinicalOrderRequest request
@@ -46,7 +46,7 @@ public class ClinicalOrderController {
     }
 
     @GetMapping("/visits/{visitId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("CLINICAL_ORDER_READ")
     public Page<ClinicalOrderResponse> getByVisitId(
             @PathVariable UUID visitId,
             @RequestParam(defaultValue = "0") int page,

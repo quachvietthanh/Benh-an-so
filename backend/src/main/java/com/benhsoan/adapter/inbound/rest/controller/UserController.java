@@ -3,7 +3,6 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +16,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.UserRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.user.CreateUserRequest;
 import com.benhsoan.adapter.inbound.rest.request.user.UpdateUserRequest;
 import com.benhsoan.adapter.inbound.rest.response.user.UserResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.UserResult;
 import com.benhsoan.port.inbound.user.ActivateUserUseCase;
 import com.benhsoan.port.inbound.user.CreateUserUseCase;
@@ -45,7 +45,7 @@ public class UserController {
     private final UserRestMapper userRestMapper;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("USER_CREATE")
     public UserResponse create(
             @Valid @RequestBody CreateUserRequest request
     ) {
@@ -58,7 +58,7 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("USER_READ")
     public List<UserResponse> getAll() {
 
         return userRestMapper.toResponse(
@@ -66,7 +66,7 @@ public class UserController {
     }
 
     @GetMapping("/doctors")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("USER_READ")
     public List<UserResponse> getDoctors() {
 
         return userRestMapper.toResponse(
@@ -74,7 +74,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("USER_READ")
     public UserResponse getById(
             @PathVariable UUID id
     ) {
@@ -84,7 +84,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("USER_UPDATE")
     public UserResponse update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateUserRequest request
@@ -99,7 +99,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("USER_UPDATE")
     public UserResponse activate(
             @PathVariable UUID id
     ) {
@@ -109,7 +109,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("USER_UPDATE")
     public UserResponse deactivate(
             @PathVariable UUID id
     ) {

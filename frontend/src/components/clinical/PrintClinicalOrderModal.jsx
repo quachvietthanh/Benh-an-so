@@ -24,7 +24,6 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
       title="Xem trước bản in phiếu chỉ định"
     >
       <div id="printable-clinical-order" style={{ padding: 24, background: '#fff', color: '#000', fontFamily: 'Times New Roman, serif' }}>
-        {/* Header */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={14}>
             <div style={{ fontWeight: 'bold', fontSize: 14 }}>BỆNH VIỆN / PHÒNG KHÁM ĐA KHOA BỆNH ÁN SỐ</div>
@@ -46,7 +45,6 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
           </Title>
         </div>
 
-        {/* Patient Demographics */}
         <div style={{ fontSize: 14, lineHeight: '1.8' }}>
           <Row>
             <Col span={16}>Họ và tên bệnh nhân: <b>{order.patientName?.toUpperCase()}</b></Col>
@@ -65,7 +63,6 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
           </Row>
         </div>
 
-        {/* Services Table */}
         <table style={{ width: '100%', marginTop: 16, marginBottom: 16, borderCollapse: 'collapse', border: '1px solid #000' }}>
           <thead>
             <tr style={{ background: '#f0f0f0', textAlign: 'center' }}>
@@ -101,7 +98,6 @@ export const PrintClinicalOrderModal = ({ visible, order, onClose }) => {
           </tfoot>
         </table>
 
-        {/* Signatures */}
         <Row gutter={16} style={{ marginTop: 30, textAlign: 'center' }}>
           <Col span={12}>
             <div style={{ fontWeight: 'bold' }}>BỆNH NHÂN / NGƯỜI NHÀ</div>

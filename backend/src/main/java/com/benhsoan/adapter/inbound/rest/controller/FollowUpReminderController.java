@@ -8,7 +8,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,6 +25,7 @@ import com.benhsoan.adapter.inbound.rest.request.followup.UpdateFollowUpReminder
 import com.benhsoan.adapter.inbound.rest.response.followup.FollowUpReminderResponse;
 import com.benhsoan.domain.followup.enums.ReminderStatus;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.followup.SearchFollowUpRemindersQuery;
 import com.benhsoan.port.inbound.followup.CreateFollowUpReminderUseCase;
 import com.benhsoan.port.inbound.followup.GetDueFollowUpRemindersUseCase;
@@ -49,13 +49,13 @@ public class FollowUpReminderController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("FOLLOW_UP_REMINDER_CREATE")
     public FollowUpReminderResponse create(@Valid @RequestBody CreateFollowUpReminderRequest request) {
         return mapper.toResponse(createFollowUpReminderUseCase.create(mapper.toCommand(request)));
     }
 
     @GetMapping("/due")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("FOLLOW_UP_REMINDER_READ")
     public Page<FollowUpReminderResponse> getDue(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -73,7 +73,7 @@ public class FollowUpReminderController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("FOLLOW_UP_REMINDER_READ")
     public Page<FollowUpReminderResponse> search(
             @RequestParam(required = false) UUID patientId,
             @RequestParam(required = false) ReminderStatus status,
@@ -97,7 +97,7 @@ public class FollowUpReminderController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("FOLLOW_UP_REMINDER_UPDATE")
     public FollowUpReminderResponse updateStatus(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateFollowUpReminderStatusRequest request

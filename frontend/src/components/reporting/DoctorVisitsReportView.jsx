@@ -52,7 +52,6 @@ export default function DoctorVisitsReportView({
     [range],
   )
 
-  // Validate khoảng thời gian
   const validateDates = useCallback((start, end) => {
     if (!start || !end) {
       return 'Từ ngày và đến ngày là bắt buộc.'
@@ -63,7 +62,6 @@ export default function DoctorVisitsReportView({
     return ''
   }, [])
 
-  // Hàm gọi API Backend report lượt khám theo bác sĩ
   const fetchDoctorVisitsReport = useCallback(async (startRange, endRange) => {
     const rStart = startRange || range?.[0]
     const rEnd = endRange || range?.[1]
@@ -87,7 +85,6 @@ export default function DoctorVisitsReportView({
         to: tStr,
       })
 
-      // Backend trả về DoctorVisitsReportResponse: { from, to, generatedAt, items: [...] }
       setReportData(response.data || { from: fStr, to: tStr, items: [] })
     } catch (err) {
       console.error('Lỗi khi tải báo cáo lượt khám theo bác sĩ:', err)
@@ -133,10 +130,8 @@ export default function DoctorVisitsReportView({
     fetchDoctorVisitsReport(newRange[0], newRange[1])
   }
 
-  // Map & tổng hợp chỉ số thống kê từ response items Backend
   const items = useMemo(() => {
     const list = Array.isArray(reportData?.items) ? reportData.items : []
-    // Sắp xếp mặc định: số lượt khám giảm dần
     return [...list].sort(
       (a, b) => Number(b.totalVisits || 0) - Number(a.totalVisits || 0),
     )
@@ -170,7 +165,6 @@ export default function DoctorVisitsReportView({
     }
   }, [items])
 
-  // Trục Y tối đa cho biểu đồ
   const maxVisitsInChart = useMemo(() => {
     const maxVal = Math.max(
       ...items.map((d) => Number(d.totalVisits || 0)),
@@ -179,7 +173,6 @@ export default function DoctorVisitsReportView({
     return Math.ceil(maxVal / 5) * 5
   }, [items])
 
-  // Cột cho Bảng báo cáo
   const columns = [
     {
       title: 'STT',
@@ -277,7 +270,6 @@ export default function DoctorVisitsReportView({
 
   return (
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
-      {/* Header & Filter Card */}
       <Card
         style={{
           borderRadius: 14,
@@ -387,7 +379,6 @@ export default function DoctorVisitsReportView({
           </Space>
         </div>
 
-        {/* Cảnh báo validate ngày */}
         {dateValidationError && (
           <Alert
             type="warning"
@@ -397,7 +388,6 @@ export default function DoctorVisitsReportView({
           />
         )}
 
-        {/* Thống báo lỗi từ API Backend */}
         {errorMsg && (
           <Alert
             type="error"
@@ -413,7 +403,6 @@ export default function DoctorVisitsReportView({
         )}
       </Card>
 
-      {/* 4 Thống kê tổng quan */}
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={6}>
           <Card
@@ -506,7 +495,6 @@ export default function DoctorVisitsReportView({
         </Col>
       </Row>
 
-      {/* Biểu đồ Cột Lượt Khám theo Bác Sĩ */}
       <Card
         style={{
           borderRadius: 14,
@@ -537,7 +525,6 @@ export default function DoctorVisitsReportView({
                     </linearGradient>
                   </defs>
 
-                  {/* Lưới ngang */}
                   {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
                     const val = Math.round(maxVisitsInChart * ratio)
                     const y = 180 - ratio * 155
@@ -564,7 +551,6 @@ export default function DoctorVisitsReportView({
                     )
                   })}
 
-                  {/* Các cột cho từng bác sĩ */}
                   {items.map((doctor, idx) => {
                     const totalWidth = Math.max(items.length * 90, 680)
                     const step = totalWidth / items.length
@@ -655,7 +641,6 @@ export default function DoctorVisitsReportView({
         </Spin>
       </Card>
 
-      {/* Bảng Báo cáo Chi tiết */}
       <Card
         style={{
           borderRadius: 14,

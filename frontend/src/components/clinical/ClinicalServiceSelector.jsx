@@ -173,7 +173,6 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
   return (
     <div style={{ background: '#fff', borderRadius: 8 }}>
       <Row gutter={[16, 16]} align="stretch">
-        {/* Left Column: Service Catalog Browser */}
         <Col xs={24} lg={14} style={{ display: 'flex' }}>
           <Card
             title={
@@ -263,7 +262,6 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
           </Card>
         </Col>
 
-        {/* Right Column: Selected Services & Notes */}
         <Col xs={24} lg={10} style={{ display: 'flex' }}>
           <Card
             title={
@@ -338,7 +336,6 @@ export const ClinicalServiceSelector = ({ selectedServices = [], onChange }) => 
               )}
             </div>
 
-            {/* Total Footer Summary */}
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 14 }}>{hasCompletePricing ? 'Tổng chi phí tạm tính:' : 'Bảng giá:'}</Text>

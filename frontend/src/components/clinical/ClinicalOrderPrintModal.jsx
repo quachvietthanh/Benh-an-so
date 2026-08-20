@@ -61,7 +61,6 @@ function ClinicalOrderPrintModal({ open, onClose, patient, recordCode, diagnosis
       ]}
     >
       <div id="printable-order-sheet" style={{ padding: '16px', background: '#fff', color: '#111827' }}>
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #2563EB', pb: 12, marginBottom: 16 }}>
           <div>
             <Title level={4} style={{ margin: 0, color: '#1E3A8A' }}>
@@ -85,7 +84,6 @@ function ClinicalOrderPrintModal({ open, onClose, patient, recordCode, diagnosis
           </Title>
         </div>
 
-        {/* Patient Details */}
         <div style={{ background: '#F8FAFC', padding: 12, borderRadius: 8, marginBottom: 16, border: '1px solid #E2E8F0' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 16px', fontSize: 13 }}>
             <div>
@@ -128,7 +126,6 @@ function ClinicalOrderPrintModal({ open, onClose, patient, recordCode, diagnosis
           )}
         </div>
 
-        {/* Diagnosis */}
         <div style={{ marginBottom: 16, fontSize: 13 }}>
           <div style={{ marginBottom: 4 }}>
             <Text type="secondary">Chẩn đoán chính: </Text>
@@ -146,7 +143,6 @@ function ClinicalOrderPrintModal({ open, onClose, patient, recordCode, diagnosis
           )}
         </div>
 
-        {/* Orders Table */}
         <Table
           size="small"
           columns={columns}
@@ -157,7 +153,6 @@ function ClinicalOrderPrintModal({ open, onClose, patient, recordCode, diagnosis
           style={{ marginBottom: 16 }}
         />
 
-        {/* Summary & Footer Signatures */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 16 }}>
           <div>
             <Text strong style={{ fontSize: 14 }}>

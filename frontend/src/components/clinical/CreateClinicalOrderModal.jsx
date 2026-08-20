@@ -276,7 +276,6 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
         scrollToFirstError
       >
         <Row gutter={16}>
-          {/* Patient Selection */}
           <Col xs={24} sm={12} md={8}>
             <Form.Item
               name="patientId"
@@ -311,7 +310,6 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
           <Form.Item name="age" hidden><Input /></Form.Item>
           <Form.Item name="phone" hidden><Input /></Form.Item>
 
-          {/* Thông tin người tạo được lấy từ phiên đăng nhập để khớp dữ liệu máy chủ. */}
           <Col xs={12} sm={6} md={8}>
             <Form.Item
               name="department"
@@ -322,7 +320,6 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
             </Form.Item>
           </Col>
 
-          {/* Doctor */}
           <Col xs={12} sm={6} md={8}>
             <Form.Item
               name="doctorName"
@@ -335,7 +332,6 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
         </Row>
 
         <Row gutter={16}>
-          {/* Clinical Diagnosis */}
           <Col span={24}>
             <Form.Item
               name="diagnosis"
@@ -350,7 +346,6 @@ export const CreateClinicalOrderModal = ({ visible, onClose, onCreateSuccess }) 
 
         <Divider style={{ margin: '12px 0 16px' }}>Lựa chọn dịch vụ cận lâm sàng</Divider>
 
-        {/* Embedded Service Selector */}
         <ClinicalServiceSelector
           selectedServices={selectedServices}
           onChange={setSelectedServices}

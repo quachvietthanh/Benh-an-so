@@ -1,6 +1,5 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -11,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.ClinicConfigurationRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.clinic.UpdateClinicConfigurationRequest;
 import com.benhsoan.adapter.inbound.rest.response.clinic.ClinicConfigurationResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.clinic.GetClinicConfigurationUseCase;
 import com.benhsoan.port.inbound.clinic.UpdateClinicConfigurationUseCase;
 
@@ -28,13 +28,13 @@ public class ClinicConfigurationController {
     private final ClinicConfigurationRestMapper mapper;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("CLINIC_CONFIGURATION_READ")
     public ClinicConfigurationResponse get() {
         return mapper.toResponse(getClinicConfigurationUseCase.get());
     }
 
     @PutMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("CLINIC_CONFIGURATION_UPDATE")
     public ClinicConfigurationResponse update(@Valid @RequestBody UpdateClinicConfigurationRequest request) {
         return mapper.toResponse(updateClinicConfigurationUseCase.update(mapper.toCommand(request)));
     }

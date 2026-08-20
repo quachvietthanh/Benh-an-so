@@ -197,7 +197,6 @@ function StockThresholdModal({ open, onCancel, onSuccess, medicine }) {
 
           <Divider style={{ margin: '12px 0' }} />
 
-          {/* Dự báo trạng thái cảnh báo sau khi thiết lập */}
           <div style={{ marginTop: 8 }}>
             {currentThreshold <= 0 ? (
               <Alert

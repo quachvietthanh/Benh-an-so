@@ -12,6 +12,8 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,26 +89,40 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
 
         clearDeferredForeignKeys(restorePlan.deferredUpdates());
         for (String tableName : restorePlan.childFirstTables()) {
-            deleteTable(tablesByName.get(tableName));
+            deleteTable(tablesByName.get(tableName), restorePlan.deferredUpdates());
         }
         for (String tableName : restorePlan.parentFirstTables()) {
             TableSnapshot table = tablesByName.get(tableName);
-            Set<String> deferredColumns = restorePlan.deferredUpdates().stream()
+            List<ForeignKeyRestorePlanner.DeferredUpdate> tableDeferredUpdates = restorePlan.deferredUpdates().stream()
                     .filter(deferred -> deferred.tableName().equals(tableName))
+                    .toList();
+            Set<String> deferredColumns = tableDeferredUpdates.stream()
+                    .filter(deferred -> !isSelfReference(deferred))
                     .map(ForeignKeyRestorePlanner.DeferredUpdate::columnName)
                     .collect(Collectors.toUnmodifiableSet());
-            insertTable(table, deferredColumns);
+            insertTable(table, deferredColumns, tableDeferredUpdates.stream()
+                    .filter(this::isSelfReference)
+                    .toList());
         }
         for (ForeignKeyRestorePlanner.DeferredUpdate deferredUpdate : restorePlan.deferredUpdates()) {
-            updateDeferredForeignKey(tablesByName.get(deferredUpdate.tableName()), deferredUpdate);
+            if (!isSelfReference(deferredUpdate)) {
+                updateDeferredForeignKey(tablesByName.get(deferredUpdate.tableName()), deferredUpdate);
+            }
         }
     }
 
     private void clearDeferredForeignKeys(List<ForeignKeyRestorePlanner.DeferredUpdate> deferredUpdates) {
         for (ForeignKeyRestorePlanner.DeferredUpdate deferredUpdate : deferredUpdates) {
+            if (isSelfReference(deferredUpdate)) {
+                continue;
+            }
             jdbcTemplate.update("UPDATE " + deferredUpdate.tableName()
                     + " SET " + deferredUpdate.columnName() + " = NULL");
         }
+    }
+
+    private boolean isSelfReference(ForeignKeyRestorePlanner.DeferredUpdate deferredUpdate) {
+        return deferredUpdate.tableName().equals(deferredUpdate.parentTable());
     }
 
     private Map<String, TableSnapshot> tablesByName(List<TableSnapshot> tables) {
@@ -250,11 +266,42 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
         }
     }
 
-    private void deleteTable(TableSnapshot table) {
+    private void deleteTable(
+            TableSnapshot table,
+            List<ForeignKeyRestorePlanner.DeferredUpdate> deferredUpdates
+    ) {
+        deferredUpdates.stream()
+                .filter(this::isSelfReference)
+                .filter(deferred -> deferred.tableName().equals(table.name()))
+                .forEach(deferred -> deleteSelfReferencingRows(table, deferred));
         jdbcTemplate.update("DELETE FROM " + table.name());
     }
 
-    private void insertTable(TableSnapshot table, Set<String> deferredColumns) {
+    private void deleteSelfReferencingRows(
+            TableSnapshot table,
+            ForeignKeyRestorePlanner.DeferredUpdate deferredUpdate
+    ) {
+        String deleteLeafRows = "DELETE child FROM " + table.name() + " child "
+                + "LEFT JOIN " + table.name() + " dependent ON dependent." + deferredUpdate.columnName()
+                + " = child." + deferredUpdate.primaryKeyColumn() + " "
+                + "WHERE child." + deferredUpdate.columnName() + " IS NOT NULL "
+                + "AND dependent." + deferredUpdate.primaryKeyColumn() + " IS NULL";
+        while (jdbcTemplate.update(deleteLeafRows) > 0) {
+            // Delete adjustment records before their referenced records without breaking table checks.
+        }
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + table.name() + " WHERE " + deferredUpdate.columnName() + " IS NOT NULL",
+                Integer.class);
+        if (remaining != null && remaining > 0) {
+            throw new BackupExecutionException("Cannot restore self-referencing rows in table " + table.name() + ".");
+        }
+    }
+
+    private void insertTable(
+            TableSnapshot table,
+            Set<String> deferredColumns,
+            List<ForeignKeyRestorePlanner.DeferredUpdate> selfReferences
+    ) {
         if (table.rows().isEmpty()) {
             return;
         }
@@ -267,8 +314,35 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
                 .collect(Collectors.joining(", "));
         String insertSql = "INSERT INTO " + table.name() + " (" + columnList + ") VALUES (" + placeholders + ")";
 
-        for (List<String> row : table.rows()) {
-            jdbcTemplate.update(insertSql, ps -> bindRow(ps, table.columns(), row, deferredColumns));
+        if (selfReferences.isEmpty()) {
+            for (List<String> row : table.rows()) {
+                jdbcTemplate.update(insertSql, ps -> bindRow(ps, table.columns(), row, deferredColumns));
+            }
+            return;
+        }
+
+        List<List<String>> pendingRows = new ArrayList<>(table.rows());
+        Set<String> insertedIds = new HashSet<>();
+        int primaryKeyIndex = columnIndex(table, selfReferences.getFirst().primaryKeyColumn());
+        while (!pendingRows.isEmpty()) {
+            boolean insertedAny = false;
+            for (Iterator<List<String>> iterator = pendingRows.iterator(); iterator.hasNext();) {
+                List<String> row = iterator.next();
+                boolean referencesInsertedRow = selfReferences.stream().allMatch(deferred -> {
+                    String value = row.get(columnIndex(table, deferred.columnName()));
+                    return value == null || insertedIds.contains(value);
+                });
+                if (referencesInsertedRow) {
+                    jdbcTemplate.update(insertSql, ps -> bindRow(ps, table.columns(), row, deferredColumns));
+                    insertedIds.add(row.get(primaryKeyIndex));
+                    iterator.remove();
+                    insertedAny = true;
+                }
+            }
+            if (!insertedAny) {
+                throw new BackupExecutionException("Backup snapshot contains a self-referencing cycle in table "
+                        + table.name() + ".");
+            }
         }
     }
 

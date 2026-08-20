@@ -11,7 +11,7 @@ export const demoAttachments = [
     categoryLabel: 'Công thức máu 18 chỉ số',
     testDate: '2026-03-30 09:15',
     doctorName: 'ThS. BS. Nguyễn Văn B',
-    status: 'NORMAL', // 'NORMAL', 'ABNORMAL', 'PENDING'
+    status: 'NORMAL',
     statusLabel: 'Bình thường',
     resultSummary: 'RBC: 4.8 T/L, WBC: 7.2 G/L, PLT: 250 G/L, Hb: 142 g/L. Tất cả chỉ số nằm trong giới hạn tham chiếu bình thường.',
     note: 'Bệnh nhân không có dấu hiệu nhiễm trùng hoặc thiếu máu.',

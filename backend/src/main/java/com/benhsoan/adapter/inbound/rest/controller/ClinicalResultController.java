@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +19,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.ClinicalResultRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.clinical.EnterClinicalResultRequest;
 import com.benhsoan.adapter.inbound.rest.request.clinical.UpdateClinicalResultRequest;
 import com.benhsoan.adapter.inbound.rest.response.clinical.ClinicalResultResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.clinical.GetClinicalResultsByVisitQuery;
 import com.benhsoan.port.inbound.clinical.EnterClinicalResultUseCase;
 import com.benhsoan.port.inbound.clinical.FinalizeClinicalResultUseCase;
@@ -46,31 +46,31 @@ public class ClinicalResultController {
 
     @PostMapping("/clinical-order-items/{itemId}/results")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("CLINICAL_RESULT_CREATE")
     public ClinicalResultResponse enter(@PathVariable UUID itemId, @Valid @RequestBody EnterClinicalResultRequest request) {
         return mapper.toResponse(enterClinicalResultUseCase.enter(itemId, mapper.toCommand(request)));
     }
 
     @PutMapping("/clinical-results/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("CLINICAL_RESULT_UPDATE")
     public ClinicalResultResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateClinicalResultRequest request) {
         return mapper.toResponse(updateClinicalResultUseCase.update(id, mapper.toCommand(request)));
     }
 
     @PostMapping("/clinical-results/{id}/finalize")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("CLINICAL_RESULT_FINALIZE")
     public ClinicalResultResponse finalizeResult(@PathVariable UUID id) {
         return mapper.toResponse(finalizeClinicalResultUseCase.finalizeResult(id));
     }
 
     @GetMapping("/clinical-results/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("CLINICAL_RESULT_READ")
     public ClinicalResultResponse getById(@PathVariable UUID id) {
         return mapper.toResponse(getClinicalResultUseCase.getById(id));
     }
 
     @GetMapping("/clinical-results/visits/{visitId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("CLINICAL_RESULT_READ")
     public Page<ClinicalResultResponse> getByVisit(@PathVariable UUID visitId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return getClinicalResultsByVisitUseCase.getResultsByVisit(new GetClinicalResultsByVisitQuery(visitId, page, size))
@@ -78,7 +78,7 @@ public class ClinicalResultController {
     }
 
     @GetMapping("/clinical-results/{id}/history")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @RequirePermission("CLINICAL_RESULT_READ")
     public List<ClinicalResultResponse.HistoryResponse> getHistory(@PathVariable UUID id) {
         return getClinicalResultHistoryUseCase.getHistory(id).stream().map(mapper::toHistoryResponse).toList();
     }

@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AutoComplete, Avatar, Badge, Drawer, Dropdown, Input, Layout, Menu, Tooltip } from 'antd'
 import {
-  AppstoreOutlined,
   BellOutlined,
   CalendarOutlined,
   CaretDownOutlined,
@@ -42,7 +41,7 @@ const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system-management'] },
+  { key: 'system', label: 'Hệ thống', paths: ['/system-management'] },
   { key: 'lookup', label: 'Tra cứu', paths: ['/public-lookup'] },
 ]
 
@@ -65,7 +64,6 @@ const getNavigationItems = (roles = []) => {
     { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, roles: ['admin', 'pharmacist'] },
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, roles: ['admin', 'manager', 'receptionist'] },
     { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, roles: ['admin', 'manager'] },
-    { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, roles: ['admin', 'manager'] },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, roles: ['admin'] },
     { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SearchOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
   ]

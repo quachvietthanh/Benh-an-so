@@ -38,7 +38,6 @@ test('2. Có interaction chưa xử lý -> Nút tạo đơn bị disable & báo 
 })
 
 test('3. Sửa thuốc làm hết interaction -> Cho phép tạo đơn thuốc', () => {
-  // Giả sử sau khi bỏ/đổi thuốc, detectedInteractions giảm về 0
   const result = canSubmitPrescription({
     canPrescribe: true,
     saving: false,
@@ -86,7 +85,6 @@ test('6. Thay đổi thuốc sau khi override -> Phải kiểm tra lại & reset
     { ruleId: 'rule-01', drugIdA: 'med-1', drugIdB: 'med-2', severity: 'SEVERE' },
     { ruleId: 'rule-02', drugIdA: 'med-1', drugIdB: 'med-3', severity: 'MODERATE' },
   ]
-  // Lý do cũ chỉ áp dụng cho rule-01
   const oldOverrides = [
     { ruleId: 'rule-01', overrideReason: 'Lý do cũ' },
   ]
@@ -99,7 +97,7 @@ test('6. Thay đổi thuốc sau khi override -> Phải kiểm tra lại & reset
     checkingInteractions: false,
     interactionApiError: null,
     detectedInteractions: warnings,
-    confirmedOverrides: [], // Sau khi thay đổi danh sách thuốc, confirmedOverrides bị reset về []
+    confirmedOverrides: [],
   })
   assert.equal(result.allowed, false)
 })
