@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
@@ -148,16 +149,45 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiErrorResponse> handleUnreadable(
+    public ResponseEntity<?> handleUnreadable(
             HttpMessageNotReadableException ex,
             HttpServletRequest request
     ) {
+
+        if (ex.getCause() instanceof JsonMappingException mappingException
+                && !mappingException.getPath().isEmpty()) {
+            String field = toFieldPath(mappingException);
+            Map<String, String> errors = Map.of(field, "Invalid value.");
+            Map<String, Object> body = new HashMap<>();
+            body.put("timestamp", Instant.now());
+            body.put("status", HttpStatus.BAD_REQUEST.value());
+            body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
+            body.put("message", "Validation failed.");
+            body.put("path", request.getRequestURI());
+            body.put("errors", errors);
+            return ResponseEntity.badRequest().body(body);
+        }
 
         return build(
                 HttpStatus.BAD_REQUEST,
                 "Malformed JSON request.",
                 request.getRequestURI()
         );
+    }
+
+    private String toFieldPath(JsonMappingException exception) {
+        StringBuilder field = new StringBuilder();
+        for (JsonMappingException.Reference reference : exception.getPath()) {
+            if (reference.getFieldName() != null) {
+                if (!field.isEmpty()) {
+                    field.append('.');
+                }
+                field.append(reference.getFieldName());
+            } else if (reference.getIndex() >= 0) {
+                field.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+        return field.toString();
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

@@ -35,7 +35,7 @@ public class PrescriptionItem {
 
     private String dosage;
 
-    private String frequency;
+    private Integer frequency;
 
     private AdministrationRoute route;
 
@@ -58,7 +58,7 @@ public class PrescriptionItem {
             String strength,
             String unit,
             String dosage,
-            String frequency,
+            Integer frequency,
             AdministrationRoute route,
             Integer durationDays,
             int quantity,
@@ -74,7 +74,7 @@ public class PrescriptionItem {
         this.strength = requireText(strength, "Medicine strength snapshot is required.");
         this.unit = requireText(unit, "Medicine unit snapshot is required.");
         this.dosage = requireText(dosage, "Dosage is required.");
-        this.frequency = requireText(frequency, "Frequency is required.");
+        this.frequency = validateFrequency(frequency);
         this.route = requireNonNull(route, "Administration route is required.");
         this.durationDays = validateDurationDays(durationDays);
         this.quantity = validateQuantity(quantity);
@@ -92,7 +92,7 @@ public class PrescriptionItem {
             String strength,
             String unit,
             String dosage,
-            String frequency,
+            Integer frequency,
             AdministrationRoute route,
             Integer durationDays,
             int quantity,
@@ -127,7 +127,7 @@ public class PrescriptionItem {
             String strength,
             String unit,
             String dosage,
-            String frequency,
+            Integer frequency,
             AdministrationRoute route,
             Integer durationDays,
             int quantity,
@@ -162,10 +162,19 @@ public class PrescriptionItem {
     }
 
     private static Integer validateDurationDays(Integer durationDays) {
-        if (durationDays != null && durationDays <= 0) {
+        if (durationDays == null || durationDays <= 0) {
             throw new ValidationException("Prescription duration must be greater than zero days.");
         }
         return durationDays;
+    }
+
+    private static Integer validateFrequency(Integer frequency) {
+        if (frequency == null || frequency <= 0) {
+            throw new ValidationException(
+                    "Prescription frequency must be greater than zero per day."
+            );
+        }
+        return frequency;
     }
 
     private static String normalizeOptionalText(String value) {

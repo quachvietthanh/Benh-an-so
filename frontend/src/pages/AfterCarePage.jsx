@@ -662,6 +662,7 @@ function AfterCarePage() {
     loadCareLogs({}, 0, careSource.size)
   }
 
+  // NCL-10-CN-001: Create follow-up reminder
   const handleCreateReminder = async (values) => {
     if (reminderSubmitLockRef.current) return
     reminderSubmitLockRef.current = true
