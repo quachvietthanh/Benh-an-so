@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
@@ -24,7 +25,7 @@ public class OperationalReportAuditService {
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
 
-    public void logExport(LocalDate from, LocalDate to) {
+    public void logExport(ReportType reportType, LocalDate from, LocalDate to) {
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant exportedAt = clockPort.now();
 
@@ -35,13 +36,14 @@ public class OperationalReportAuditService {
                 null,
                 """
                 {
-                "reportType":"OPERATIONAL_REPORT",
+                "reportType":"%s",
                 "role":"%s",
                 "from":"%s",
                 "to":"%s",
                 "exportedAt":"%s"
                 }
                 """.formatted(
+                        reportType.name(),
                         resolvePrimaryRole(currentUserPort.getCurrentUserRoles()),
                         from,
                         to,

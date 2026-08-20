@@ -8,6 +8,10 @@ public interface OperationalReportQueryRepository {
 
     long countCompletedVisits(Instant fromInclusive, Instant toExclusive);
 
+    boolean hasCompletedVisits(Instant fromInclusive, Instant toExclusive);
+
+    boolean hasInvoices(Instant fromInclusive, Instant toExclusive);
+
     List<DailyVisitSummary> findDailyCompletedVisits(Instant fromInclusive, Instant toExclusive);
 
     BigDecimal sumNetRevenue(Instant fromInclusive, Instant toExclusive);

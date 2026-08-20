@@ -46,6 +46,26 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
     }
 
     @Override
+    public boolean hasCompletedVisits(Instant fromInclusive, Instant toExclusive) {
+        return countCompletedVisits(fromInclusive, toExclusive) > 0;
+    }
+
+    @Override
+    public boolean hasInvoices(Instant fromInclusive, Instant toExclusive) {
+        Long invoiceCount = entityManager.createQuery("""
+                select count(invoice)
+                from InvoiceEntity invoice
+                where invoice.createdAt >= :fromInclusive
+                  and invoice.createdAt < :toExclusive
+                """, Long.class)
+                .setParameter("fromInclusive", fromInclusive)
+                .setParameter("toExclusive", toExclusive)
+                .getSingleResult();
+
+        return invoiceCount != null && invoiceCount > 0;
+    }
+
+    @Override
     public List<DailyVisitSummary> findDailyCompletedVisits(Instant fromInclusive, Instant toExclusive) {
         return entityManager.createQuery("""
                 select cast(visit.completedAt as date), count(visit)

@@ -2,6 +2,8 @@ package com.benhsoan.application.ucservice.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -18,8 +20,34 @@ import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
+import com.benhsoan.domain.reporting.enums.ReportType;
 
 class OperationalReportDataServiceTest {
+
+    @Test
+    void checksSourceDataAccordingToReportType() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        when(repository.hasCompletedVisits(any(), any())).thenReturn(true);
+        when(repository.hasInvoices(any(), any())).thenReturn(false);
+        OperationalReportDataService service = new OperationalReportDataService(repository);
+        LocalDate from = LocalDate.of(2026, 8, 1);
+        LocalDate to = LocalDate.of(2026, 8, 3);
+
+        assertTrue(service.hasReportData(ReportType.VISIT_REPORT, from, to));
+        assertFalse(service.hasReportData(ReportType.REVENUE_REPORT, from, to));
+        assertTrue(service.hasReportData(ReportType.OPERATIONAL_REPORT, from, to));
+    }
+
+    @Test
+    void treatsInvoicesAsOperationalSourceDataWhenNoCompletedVisitExists() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        when(repository.hasCompletedVisits(any(), any())).thenReturn(false);
+        when(repository.hasInvoices(any(), any())).thenReturn(true);
+        OperationalReportDataService service = new OperationalReportDataService(repository);
+
+        assertTrue(service.hasReportData(
+                ReportType.OPERATIONAL_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3)));
+    }
 
     @Test
     void buildsSummaryAndTimelineFromSharedReportingDataSource() {
