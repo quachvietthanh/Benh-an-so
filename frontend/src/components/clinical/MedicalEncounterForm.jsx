@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Avatar,
   Button,
@@ -18,6 +18,7 @@ import {
 } from 'antd'
 import {
   CheckCircleOutlined,
+  CheckOutlined,
   DeleteOutlined,
   FileSearchOutlined,
   FileTextOutlined,
@@ -26,11 +27,26 @@ import {
   PlusOutlined,
   PrinterOutlined,
   SearchOutlined,
+  TableOutlined,
   UserOutlined,
 } from '@ant-design/icons'
+import { commonIcd10List, icd10Categories } from '../../utils/icd10Data'
+import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
 
 const { Title, Text } = Typography
+
+const categoryMeta = {
+  RESPIRATORY: { label: 'Hô hấp', color: 'cyan' },
+  CIRCULATORY: { label: 'Tim mạch', color: 'red' },
+  DIGESTIVE: { label: 'Tiêu hóa', color: 'orange' },
+  ENDOCRINE: { label: 'Nội tiết', color: 'gold' },
+  MUSCULOSKELETAL: { label: 'Cơ xương khớp', color: 'geekblue' },
+  NERVOUS: { label: 'Thần kinh', color: 'purple' },
+  INFECTIOUS: { label: 'Nhiễm trùng', color: 'magenta' },
+  GENITOURINARY: { label: 'Tiết niệu', color: 'blue' },
+  SYMPTOMS: { label: 'Triệu chứng', color: 'volcano' },
+}
 
 function MedicalEncounterForm({
   form,
@@ -66,6 +82,37 @@ function MedicalEncounterForm({
   setPrintModalOpen,
   serviceCatalogError,
 }) {
+  const [icdTableSearch, setIcdTableSearch] = useState('')
+  const [icdTableCategory, setIcdTableCategory] = useState('ALL')
+  const [showIcdTable, setShowIcdTable] = useState(true)
+
+  const availableIcdList = useMemo(() => {
+    const map = new Map()
+    commonIcd10List.forEach((item) => map.set(item.code, item))
+    ;(diagnosisOptions || []).forEach((item) => {
+      const existing = map.get(item.code)
+      map.set(item.code, {
+        category: existing?.category || item.category || 'ALL',
+        ...existing,
+        ...item,
+      })
+    })
+
+    let list = Array.from(map.values())
+    const q = icdTableSearch.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (item) =>
+          item.code.toLowerCase().includes(q) ||
+          (item.name && item.name.toLowerCase().includes(q)),
+      )
+    }
+    if (icdTableCategory !== 'ALL') {
+      list = list.filter((item) => item.category === icdTableCategory)
+    }
+    return list
+  }, [diagnosisOptions, icdTableSearch, icdTableCategory])
+
   const hasCompletePricing = selectedOrders.every((order) => order.price != null)
 
   return (
@@ -262,7 +309,7 @@ function MedicalEncounterForm({
                       {primaryIcd.code}
                     </Tag>
                     <Text strong style={{ fontSize: 14, color: '#1E40AF', marginLeft: 8 }}>
-                      {primaryIcd.name}
+                      {fixMojibake(primaryIcd.name)}
                     </Text>
                   </div>
                   <Button type="text" danger icon={<DeleteOutlined />} onClick={clearPrimaryDiagnosis}>
@@ -290,7 +337,7 @@ function MedicalEncounterForm({
                           style={{ cursor: 'pointer', padding: '4px 8px', fontSize: 12 }}
                           onClick={() => selectPrimaryDiagnosis(icd)}
                         >
-                          <b>{icd.code}</b> - {icd.name}
+                          <b>{icd.code}</b> - {fixMojibake(icd.name)}
                         </Tag>
                       ))}
                     </Space>
@@ -308,7 +355,7 @@ function MedicalEncounterForm({
                   {primaryIcd ? (
                     <Space size={6} wrap>
                       <Tag color="blue" style={{ margin: 0, fontWeight: 700 }}>{primaryIcd.code}</Tag>
-                      <Text strong style={{ color: '#1E40AF' }}>{primaryIcd.name}</Text>
+                      <Text strong style={{ color: '#1E40AF' }}>{fixMojibake(primaryIcd.name)}</Text>
                     </Space>
                   ) : (
                     <Text type="warning">Vui lòng chọn chẩn đoán chính trước khi thêm chẩn đoán phụ.</Text>
@@ -326,7 +373,7 @@ function MedicalEncounterForm({
                           onClose={() => setSecondaryIcds((prev) => prev.filter((i) => i.code !== item.code))}
                           style={{ fontSize: 13, padding: '4px 10px' }}
                         >
-                          <b>{item.code}</b>: {item.name}
+                          <b>{item.code}</b>: {fixMojibake(item.name)}
                         </Tag>
                       ))}
                     </Space>
@@ -354,6 +401,147 @@ function MedicalEncounterForm({
                 />
               </div>
             </Form.Item>
+
+            <Divider style={{ margin: '16px 0 12px' }} />
+
+            {/* Bảng chọn mã bệnh chẩn đoán (ICD-10) */}
+            <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 10, border: '1px solid #E2E8F0', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <TableOutlined style={{ color: '#2563EB', fontSize: 16 }} />
+                  <Text strong style={{ fontSize: 14, color: '#1E293B' }}>
+                    Bảng chọn mã bệnh chẩn đoán (ICD-10)
+                  </Text>
+                  <Tag color="blue" style={{ margin: 0 }}>
+                    {availableIcdList.length} mã bệnh
+                  </Tag>
+                </div>
+                <Button
+                  size="small"
+                  type="text"
+                  onClick={() => setShowIcdTable((prev) => !prev)}
+                  style={{ color: '#2563EB', fontWeight: 600 }}
+                >
+                  {showIcdTable ? 'Thu gọn bảng' : 'Mở rộng bảng chọn'}
+                </Button>
+              </div>
+
+              {showIcdTable && (
+                <>
+                  <Row gutter={[8, 8]} style={{ marginBottom: 10 }}>
+                    <Col xs={24} sm={14}>
+                      <Input
+                        allowClear
+                        placeholder="Tìm nhanh theo mã (J00, I10, K21...) hoặc tên bệnh..."
+                        prefix={<SearchOutlined style={{ color: '#94A3B8' }} />}
+                        value={icdTableSearch}
+                        onChange={(e) => setIcdTableSearch(e.target.value)}
+                      />
+                    </Col>
+                    <Col xs={24} sm={10}>
+                      <Select
+                        style={{ width: '100%' }}
+                        value={icdTableCategory}
+                        onChange={setIcdTableCategory}
+                        options={icd10Categories.map((item) => ({
+                          value: item.key,
+                          label: item.label,
+                        }))}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Table
+                    size="small"
+                    rowKey={(record) => record.code}
+                    dataSource={availableIcdList}
+                    pagination={{
+                      pageSize: 5,
+                      size: 'small',
+                      showSizeChanger: true,
+                      pageSizeOptions: ['5', '10', '20'],
+                      showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} mã bệnh`,
+                    }}
+                    columns={[
+                      {
+                        title: 'Mã ICD',
+                        dataIndex: 'code',
+                        key: 'code',
+                        width: 90,
+                        render: (code) => (
+                          <Tag color="blue" style={{ fontWeight: 700, fontSize: 12.5, margin: 0 }}>
+                            {code}
+                          </Tag>
+                        ),
+                      },
+                      {
+                        title: 'Tên bệnh / Chẩn đoán y khoa',
+                        dataIndex: 'name',
+                        key: 'name',
+                        render: (name) => (
+                          <Text strong style={{ fontSize: 13, color: '#1E293B' }}>
+                            {name}
+                          </Text>
+                        ),
+                      },
+                      {
+                        title: 'Nhóm bệnh',
+                        dataIndex: 'category',
+                        key: 'category',
+                        width: 120,
+                        render: (category) => {
+                          const meta = categoryMeta[category]
+                          return <Tag color={meta?.color || 'default'}>{meta?.label || 'Chung'}</Tag>
+                        },
+                      },
+                      {
+                        title: 'Thao tác chọn',
+                        key: 'actions',
+                        width: 220,
+                        align: 'center',
+                        render: (_, record) => {
+                          const isPrimary = primaryIcd?.code === record.code
+                          const isSecondary = secondaryIcds.some((s) => s.code === record.code)
+
+                          return (
+                            <Space size={6} wrap>
+                              {isPrimary ? (
+                                <Tag color="success" style={{ fontWeight: 600, margin: 0, padding: '2px 8px' }}>
+                                  <CheckCircleOutlined /> Đang là CĐ chính
+                                </Tag>
+                              ) : (
+                                <Button
+                                  size="small"
+                                  type="primary"
+                                  icon={<PlusOutlined />}
+                                  onClick={() => selectPrimaryDiagnosis(record)}
+                                >
+                                  Chọn CĐ chính
+                                </Button>
+                              )}
+
+                              {isSecondary ? (
+                                <Tag color="purple" style={{ fontWeight: 600, margin: 0, padding: '2px 8px' }}>
+                                  <CheckOutlined /> Đã thêm CĐ phụ
+                                </Tag>
+                              ) : isPrimary ? null : (
+                                <Button
+                                  size="small"
+                                  disabled={!primaryIcd}
+                                  onClick={() => addSecondaryDiagnosis(record)}
+                                >
+                                  + CĐ phụ
+                                </Button>
+                              )}
+                            </Space>
+                          )
+                        },
+                      },
+                    ]}
+                  />
+                </>
+              )}
+            </div>
 
             <Form.Item name="treatmentPlan" label="Hướng điều trị & Lời dặn của bác sĩ">
               <Input.TextArea

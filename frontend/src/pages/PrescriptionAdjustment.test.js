@@ -60,8 +60,15 @@ export const validatePrescriptionAdjustmentForm = ({
     if (!item.dosage || !item.dosage.trim()) {
       errors.push(`Dòng ${i + 1}: chưa nhập liều dùng.`)
     }
-    if (!item.frequency || !item.frequency.trim()) {
-      errors.push(`Dòng ${i + 1}: chưa nhập tần suất.`)
+    const freqNum = Number(item.frequency)
+    if (
+      item.frequency == null ||
+      item.frequency === '' ||
+      isNaN(freqNum) ||
+      !Number.isInteger(freqNum) ||
+      freqNum <= 0
+    ) {
+      errors.push(`Dòng ${i + 1}: tần suất dùng thuốc phải là số nguyên dương (> 0).`)
     }
     if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
       errors.push(`Dòng ${i + 1}: số lượng phải là số nguyên dương.`)
@@ -100,7 +107,7 @@ export const buildPrescriptionAdjustmentPayload = ({
     items: items.map((item) => ({
       medicineId: item.medicineId,
       dosage: String(item.dosage || '').trim(),
-      frequency: String(item.frequency || '').trim(),
+      frequency: Number(item.frequency),
       route: item.route || null,
       durationDays: Number(item.durationDays),
       quantity: Number(item.quantity),
@@ -171,7 +178,7 @@ test('3. Kiểm thử BẮT BUỘC NHẬP LÝ DO ĐIỀU CHỈNH (Change Reason 
     {
       medicineId: 'med-1',
       dosage: '1 viên/lần',
-      frequency: '2 lần/ngày',
+      frequency: 2,
       quantity: 10,
       durationDays: 5,
     },
@@ -210,8 +217,8 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.ok(resEmpty.errors.some((e) => e.includes('ít nhất một loại thuốc')))
 
   const duplicateItems = [
-    { medicineId: 'med-1', dosage: '1 viên', frequency: '2 lần', quantity: 10, durationDays: 5 },
-    { medicineId: 'med-1', dosage: '2 viên', frequency: '1 lần', quantity: 5, durationDays: 5 },
+    { medicineId: 'med-1', dosage: '1 viên', frequency: 2, quantity: 10, durationDays: 5 },
+    { medicineId: 'med-1', dosage: '2 viên', frequency: 1, quantity: 5, durationDays: 5 },
   ]
   const resDuplicate = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
@@ -224,7 +231,7 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.ok(resDuplicate.errors.some((e) => e.includes('thuốc bị trùng')))
 
   const invalidQuantityItems = [
-    { medicineId: 'med-1', dosage: '1 viên', frequency: '2 lần', quantity: -5, durationDays: 0 },
+    { medicineId: 'med-1', dosage: '1 viên', frequency: 2, quantity: -5, durationDays: 0 },
   ]
   const resInvalidQty = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
@@ -236,6 +243,19 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.equal(resInvalidQty.isValid, false)
   assert.ok(resInvalidQty.errors.some((e) => e.includes('số lượng phải là số nguyên dương')))
   assert.ok(resInvalidQty.errors.some((e) => e.includes('số ngày dùng phải là số nguyên dương')))
+
+  const invalidFrequencyItems = [
+    { medicineId: 'med-1', dosage: '1 viên', frequency: 0, quantity: 5, durationDays: 5 },
+  ]
+  const resInvalidFreq = validatePrescriptionAdjustmentForm({
+    medicalRecordId: 'rec-1',
+    diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
+    items: invalidFrequencyItems,
+    changeReason: 'Sửa tần suất',
+    isEditing: true,
+  })
+  assert.equal(resInvalidFreq.isValid, false)
+  assert.ok(resInvalidFreq.errors.some((e) => e.includes('tần suất dùng thuốc phải là số nguyên dương')))
 })
 
 test('5. Kiểm thử CHUẨN HÓA PAYLOAD GỬI LÊN BACKEND PATCH /prescriptions/{id}', () => {
@@ -246,7 +266,7 @@ test('5. Kiểm thử CHUẨN HÓA PAYLOAD GỬI LÊN BACKEND PATCH /prescriptio
       {
         medicineId: 'med-1',
         dosage: ' 1 viên/lần ',
-        frequency: ' 2 lần/ngày ',
+        frequency: '2',
         route: 'ORAL',
         durationDays: 7,
         quantity: 14,
@@ -263,7 +283,8 @@ test('5. Kiểm thử CHUẨN HÓA PAYLOAD GỬI LÊN BACKEND PATCH /prescriptio
   assert.equal(payload.items.length, 1)
   assert.equal(payload.items[0].medicineId, 'med-1')
   assert.equal(payload.items[0].dosage, '1 viên/lần')
-  assert.equal(payload.items[0].frequency, '2 lần/ngày')
+  assert.equal(payload.items[0].frequency, 2)
+  assert.equal(typeof payload.items[0].frequency, 'number')
   assert.equal(payload.items[0].route, 'ORAL')
   assert.equal(payload.items[0].durationDays, 7)
   assert.equal(payload.items[0].quantity, 14)
