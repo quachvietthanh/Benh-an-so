@@ -128,7 +128,7 @@ function MedicalEncounter() {
   const [icdSearchQuery, setIcdSearchQuery] = useState('')
   const [icdCategory, setIcdCategory] = useState('ALL')
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
-  const [icdSearching, setIcdSearching] = useState(false)
+  const [icdSearching] = useState(false)
   const [recentIcds, setRecentIcds] = useState(loadRecentDiagnoses)
 
   const [selectedOrders, setSelectedOrders] = useState([])

@@ -88,7 +88,7 @@ function InventoryReceiptPage() {
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'create')
 
   const [medicines, setMedicines] = useState([])
-  const [stocks, setStocks] = useState([])
+  const [, setStocks] = useState([])
   const [batches, setBatches] = useState([])
   const [expiryAlerts, setExpiryAlerts] = useState([])
   const [recentReceipts, setRecentReceipts] = useState([])

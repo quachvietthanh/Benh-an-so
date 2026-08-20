@@ -6,9 +6,6 @@ import java.util.List;
 import java.util.UUID;
 
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
-import lombok.Getter;
-
-@Getter
 public class PrescriptionInteractionConfirmationRequiredException
         extends PrescriptionException {
 
@@ -21,6 +18,10 @@ public class PrescriptionInteractionConfirmationRequiredException
                 "All detected drug interactions must be confirmed with an override reason."
         );
         this.warnings = List.copyOf(warnings);
+    }
+
+    public List<InteractionWarning> getWarnings() {
+        return warnings;
     }
 
     public record InteractionWarning(

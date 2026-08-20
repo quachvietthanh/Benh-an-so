@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -57,7 +57,6 @@ import pharmacyApi from '../api/pharmacyApi'
 import queueApi from '../api/queueApi'
 import { useAuthContext } from '../context/AuthContext'
 import { getStoredPrescriptions, mergeMedicines } from '../utils/storageHelpers'
-import { getMockPrescriptionsByVisitOrRecord } from '../services/prescriptionMockRepository'
 
 const { Text, Title } = Typography
 
@@ -237,7 +236,6 @@ const PAYMENT_METHODS = [
 
 function BillingPage() {
   const location = useLocation()
-  const navigate = useNavigate()
   const { user } = useAuthContext()
 
   const userRoles = useMemo(() => {
@@ -799,8 +797,6 @@ function BillingPage() {
     }
 
     const matchedHist = historyInvoices.find((h) => h.id === targetId || h.invoiceCode === targetId)
-    const matchedVisit = pendingVisits.find((v) => String(v.visitId || v.id) === String(invoiceData?.visitId || selectedVisitData?.visitId))
-
     const resolvedCode = invoiceData?.invoiceCode || selectedVisitData?.invoiceCode || matchedHist?.invoiceCode || ''
 
     const storedMethod =

@@ -64,8 +64,6 @@ function PatientList() {
   const { user } = useAuthContext()
   const canManage = user?.roles?.some((role) => ['admin', 'receptionist'].includes(role))
   const [loading, setLoading] = useState(false)
-  const [patients, setPatients] = useState([])
-  const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [searchText, setSearchText] = useState('')
 

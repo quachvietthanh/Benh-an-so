@@ -55,8 +55,6 @@ function ReportsPage() {
       .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
       .filter(Boolean)
   }, [user])
-  const isManager = roles.includes('manager') || roles.includes('admin')
-
   const [range, setRange] = useState([dayjs().subtract(29, 'day'), dayjs()])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
