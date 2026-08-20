@@ -7,7 +7,6 @@ INSERT INTO roles (id, name, description, is_system, created_at, updated_at)
 VALUES
     (UUID_TO_BIN('11111111-1111-1111-1111-111111111111'), 'ADMIN', 'System administrator', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('22222222-2222-2222-2222-222222222222'), 'DOCTOR', 'Doctor', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    (UUID_TO_BIN('33333333-3333-3333-3333-333333333333'), 'NURSE', 'Nurse', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('44444444-4444-4444-4444-444444444444'), 'RECEPTIONIST', 'Receptionist', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('55555555-5555-5555-5555-555555555555'), 'PHARMACIST', 'Pharmacist', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('66666666-6666-6666-6666-666666666666'), 'MANAGER', 'Clinic manager', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
@@ -120,16 +119,6 @@ WHERE code IN (
 );
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT UUID_TO_BIN('33333333-3333-3333-3333-333333333333'), id
-FROM permissions
-WHERE code IN (
-    'PATIENT_READ', 'APPOINTMENT_READ',
-    'VITAL_SIGN_CREATE', 'VITAL_SIGN_READ', 'VITAL_SIGN_UPDATE',
-    'MEDICAL_RECORD_UPDATE_STATUS',
-    'QUEUE_UPDATE_STATUS', 'QUEUE_VIEW', 'QUEUE_COUNT'
-);
-
-INSERT INTO role_permissions (role_id, permission_id)
 SELECT UUID_TO_BIN('44444444-4444-4444-4444-444444444444'), id
 FROM permissions
 WHERE code IN (
@@ -167,7 +156,6 @@ VALUES
     (UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'), 'admin', '$2a$10$OY5a1YZ/5Iaz2PcEKjfOveEyy3FVXm7ei9OxTW6jPMyap/Hlk.5sK', 'System Administrator', 'admin@benhsoan.com', NULL, UUID_TO_BIN('11111111-1111-1111-1111-111111111111'), TRUE, NULL, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), 'doctor1', '$2a$10$OY5a1YZ/5Iaz2PcEKjfOveEyy3FVXm7ei9OxTW6jPMyap/Hlk.5sK', 'Dr. Nguyen Minh Anh', 'doctor1@benhsoan.com', '0901000001', UUID_TO_BIN('22222222-2222-2222-2222-222222222222'), TRUE, NULL, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3'), 'doctor2', '$2a$10$OY5a1YZ/5Iaz2PcEKjfOveEyy3FVXm7ei9OxTW6jPMyap/Hlk.5sK', 'Dr. Tran Quang Huy', 'doctor2@benhsoan.com', '0901000002', UUID_TO_BIN('22222222-2222-2222-2222-222222222222'), TRUE, NULL, CURRENT_TIMESTAMP),
-    (UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4'), 'nurse1', '$2a$10$OY5a1YZ/5Iaz2PcEKjfOveEyy3FVXm7ei9OxTW6jPMyap/Hlk.5sK', 'Le Thu Ha', 'nurse1@benhsoan.com', '0901000003', UUID_TO_BIN('33333333-3333-3333-3333-333333333333'), TRUE, NULL, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5'), 'receptionist1', '$2a$10$OY5a1YZ/5Iaz2PcEKjfOveEyy3FVXm7ei9OxTW6jPMyap/Hlk.5sK', 'Pham Mai Lan', 'receptionist1@benhsoan.com', '0901000004', UUID_TO_BIN('44444444-4444-4444-4444-444444444444'), TRUE, NULL, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6'), 'pharmacist1', '$2a$10$OY5a1YZ/5Iaz2PcEKjfOveEyy3FVXm7ei9OxTW6jPMyap/Hlk.5sK', 'Vo Thanh Nam', 'pharmacist1@benhsoan.com', '0901000005', UUID_TO_BIN('55555555-5555-5555-5555-555555555555'), TRUE, NULL, CURRENT_TIMESTAMP),
     (UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa7'), 'manager1', '$2a$10$OY5a1YZ/5Iaz2PcEKjfOveEyy3FVXm7ei9OxTW6jPMyap/Hlk.5sK', 'Clinic Manager', 'manager1@benhsoan.com', '0901000006', UUID_TO_BIN('66666666-6666-6666-6666-666666666666'), TRUE, NULL, CURRENT_TIMESTAMP);

@@ -1,6 +1,6 @@
 ﻿-- =====================================================
 -- V20__create_inventory_receipt_tables.sql
--- Stock receipt / nháº­p kho thuá»‘c: medicine batches,
+-- Stock receipt / nhập kho thuốc: medicine batches,
 -- inventory receipts and receipt items
 -- MySQL 8.x
 -- =====================================================
@@ -102,7 +102,7 @@ CREATE INDEX idx_inventory_receipt_items_batch
 
 -- =====================================================
 -- V21__create_dispense_allocation_and_stock_movements.sql
--- Dispense allocation / cáº¥p phÃ¡t theo lÃ´ vÃ  nháº­t kÃ½ biáº¿n Ä‘á»™ng kho
+-- Dispense allocation / cấp phát theo lô và nhật ký biến động kho
 -- MySQL 8.x
 -- =====================================================
 

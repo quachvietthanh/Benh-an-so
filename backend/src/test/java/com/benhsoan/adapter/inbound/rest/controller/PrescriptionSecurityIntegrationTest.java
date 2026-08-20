@@ -157,4 +157,21 @@ class PrescriptionSecurityIntegrationTest {
                                 "PERMISSION_PRESCRIPTION_PRINT"))))
                 .andExpect(status().isInternalServerError());
     }
+
+    @Test
+    void returnsConflictWithVietnameseMessageWhenPrescriptionIsNotComplete() throws Exception {
+        java.util.UUID prescriptionId = java.util.UUID.randomUUID();
+        when(exportPrescriptionUseCase.export(prescriptionId)).thenThrow(
+                new com.benhsoan.domain.prescription.exception.PrescriptionNotPrintableException("Đơn chưa hoàn tất")
+        );
+
+        mockMvc.perform(get("/prescriptions/{id}/print", prescriptionId)
+                        .with(user("doctor").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_DOCTOR"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                        "PERMISSION_PRESCRIPTION_PRINT"))))
+                .andExpect(status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message")
+                        .value("Đơn chưa hoàn tất"));
+    }
 }

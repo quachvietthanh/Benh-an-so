@@ -166,7 +166,7 @@ class ExportPrescriptionServiceTest {
 
         assertThatThrownBy(() -> service.export(prescriptionId))
                 .isInstanceOf(PrescriptionNotPrintableException.class)
-                .hasMessage("Only active prescriptions can be printed.");
+                .hasMessage("Đơn chưa hoàn tất");
     }
 
     @Test
