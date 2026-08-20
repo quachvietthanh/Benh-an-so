@@ -170,6 +170,15 @@ class LookupPortalResultServiceTest {
     }
 
     @Test
+    void throwsNotFoundWhenCompletedVisitHasNoMedicalResults() {
+        when(medicalRecordRepository.findByVisitId(VISIT_ID)).thenReturn(Optional.empty());
+        when(clinicalOrderRepository.findByVisitId(eq(VISIT_ID), any())).thenReturn(new PageImpl<>(List.of()));
+
+        assertThrows(PortalLookupNotFoundException.class,
+                () -> service.lookup(new LookupPortalResultQuery(CODE, null)));
+    }
+
+    @Test
     void throwsNotFoundWhenPhoneDoesNotMatch() {
         assertThrows(PortalLookupNotFoundException.class,
                 () -> service.lookup(new LookupPortalResultQuery(CODE, "0987654321")));

@@ -94,6 +94,14 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
 
         List<PrescriptionItemView> prescriptions = resolvePrescriptions(record);
 
+        boolean hasMedicalResult = (record != null && (record.getConclusion() != null || !diagnoses.isEmpty() || record.getDoctorInstructions() != null))
+                || !testResults.isEmpty()
+                || !prescriptions.isEmpty();
+
+        if (!hasMedicalResult) {
+            throw new PortalLookupNotFoundException();
+        }
+
         PortalLookupResult result = new PortalLookupResult(
                 appointment.getAppointmentCode(),
                 appointment.getStartTime(),
