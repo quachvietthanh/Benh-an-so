@@ -33,6 +33,7 @@ import {
 import { commonIcd10List, icd10Categories } from '../../utils/icd10Data'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
+import { fixMojibake } from '../../utils/workflowContract'
 
 const { Title, Text } = Typography
 
