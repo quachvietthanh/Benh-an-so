@@ -280,15 +280,15 @@ function PublicLookupPage() {
           </span>
           <h1>Tra cứu kết quả khám bệnh</h1>
           <p>
-            Nhập mã hẹn để kiểm tra kết quả khám, chẩn đoán của bác sĩ và đơn thuốc mà không cần đến phòng khám.
+            Nhập mã hẹn để tra cứu kết quả khám đã được hệ thống công bố.
           </p>
 
           <div className="public-lookup-steps" aria-label="Hướng dẫn tra cứu">
             <div>
               <b>1</b>
               <span>
-                <strong>Nhập mã lịch hẹn</strong>
-                <small>Mã được cấp khi đặt lịch hẹn.</small>
+                <strong>Nhập mã hẹn</strong>
+                <small>Sử dụng mã hẹn để tra cứu kết quả.</small>
               </span>
             </div>
             <div>
@@ -311,7 +311,7 @@ function PublicLookupPage() {
             <LockOutlined />
             <span>
               <strong>Bảo mật thông tin y tế</strong>
-              <small>Dữ liệu chỉ hiển thị khi tra cứu đúng Mã lịch hẹn hợp lệ.</small>
+              <small>Dữ liệu chỉ hiển thị khi tra cứu đúng Mã hẹn hợp lệ.</small>
             </span>
           </div>
         </section>
@@ -331,7 +331,7 @@ function PublicLookupPage() {
           <form className="public-lookup-form" onSubmit={handleLookup} noValidate>
             <div className="public-lookup-field">
               <label htmlFor="public-appointment-code">
-                Mã lịch hẹn <b>*</b>
+                Mã hẹn <b>*</b>
               </label>
               <Input
                 id="public-appointment-code"
@@ -347,7 +347,7 @@ function PublicLookupPage() {
                   setCode(e.target.value)
                 }}
               />
-              <small>Mã lịch hẹn nhận từ phòng khám (Ví dụ: APT000001).</small>
+              <small>Nhập mã hẹn hợp lệ để tra cứu kết quả khám.</small>
             </div>
 
             <div className="public-lookup-field">
@@ -359,6 +359,7 @@ function PublicLookupPage() {
                 placeholder="Nhập số điện thoại để xác thực (nếu cần)"
                 value={phone}
                 maxLength={20}
+                inputMode="tel"
                 autoComplete="off"
                 disabled={loading}
                 onChange={(e) => {
@@ -366,6 +367,7 @@ function PublicLookupPage() {
                   setPhone(e.target.value)
                 }}
               />
+              <small>Nhập số điện thoại để xác thực thêm nếu cần.</small>
             </div>
 
             <Button
