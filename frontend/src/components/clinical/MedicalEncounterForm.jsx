@@ -30,9 +30,9 @@ import {
   TableOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { commonIcd10List, icd10Categories } from '../../utils/icd10Data'
+import { icd10Categories } from '../../utils/icd10Data'
+import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
-import { fixMojibake } from '../../utils/workflowContract'
 
 const { Title, Text } = Typography
 
@@ -87,18 +87,7 @@ function MedicalEncounterForm({
   const [showIcdTable, setShowIcdTable] = useState(true)
 
   const availableIcdList = useMemo(() => {
-    const map = new Map()
-    commonIcd10List.forEach((item) => map.set(item.code, item))
-    ;(diagnosisOptions || []).forEach((item) => {
-      const existing = map.get(item.code)
-      map.set(item.code, {
-        category: existing?.category || item.category || 'ALL',
-        ...existing,
-        ...item,
-      })
-    })
-
-    let list = Array.from(map.values())
+    let list = diagnosisOptions || []
     const q = icdTableSearch.trim().toLowerCase()
     if (q) {
       list = list.filter(

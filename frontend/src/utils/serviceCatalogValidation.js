@@ -22,7 +22,7 @@ for (let b = 0; b < 256; b++) {
  */
 export function fixMojibake(str) {
   if (!str || typeof str !== 'string') return str
-  if (!/[ÃÄá»Æ¿]/.test(str)) return str
+  if (!/[ÃÄÅÆáàâãèéêìíòóôõùúý»¿º]/i.test(str)) return str
 
   try {
     const bytes = []
