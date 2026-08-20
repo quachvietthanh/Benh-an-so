@@ -46,4 +46,34 @@ class MedicalRecordAuthorizationServiceTest {
 
         assertThrows(MedicalRecordAccessDeniedException.class, () -> service.requireAuditReadAccess());
     }
+
+    @Test
+    @DisplayName("read access is allowed for DOCTOR")
+    void allowsDoctorReadAccess() {
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        UUID userId = UUID.randomUUID();
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireReadAccess());
+    }
+
+    @Test
+    @DisplayName("read access is allowed for ADMIN")
+    void allowsAdminReadAccess() {
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+        UUID userId = UUID.randomUUID();
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireReadAccess());
+    }
+
+    @Test
+    @DisplayName("read access is denied for non-doctor roles (e.g. NURSE)")
+    void deniesNurseReadAccess() {
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, service::requireReadAccess);
+    }
 }
