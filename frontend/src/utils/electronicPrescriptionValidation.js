@@ -115,3 +115,62 @@ export const getElectronicPrescriptionBadgeProps = (code, status) => {
     badgeLabel: 'Đơn điện tử',
   }
 }
+
+/**
+ * Cấu hình trạng thái liên thông đơn thuốc quốc gia
+ */
+export const INTERCONNECTION_STATUS_CONFIG = {
+  NOT_SENT: {
+    key: 'NOT_SENT',
+    label: 'Chưa gửi liên thông',
+    shortLabel: 'Chưa liên thông',
+    color: 'default',
+    tagColor: '#64748b',
+    bgColor: '#f1f5f9',
+    borderColor: '#cbd5e1',
+    description: 'Đơn thuốc chưa được gửi lên cổng dịch vụ liên thông quốc gia.',
+  },
+  SUCCESS: {
+    key: 'SUCCESS',
+    label: 'Đã liên thông thành công',
+    shortLabel: 'Đã liên thông',
+    color: 'success',
+    tagColor: '#16a34a',
+    bgColor: '#f0fdf4',
+    borderColor: '#86efac',
+    description: 'Đơn thuốc đã được hệ thống liên thông tiếp nhận thành công và cấp mã biên nhận.',
+  },
+  FAILED: {
+    key: 'FAILED',
+    label: 'Gửi liên thông thất bại',
+    shortLabel: 'Gửi lỗi',
+    color: 'error',
+    tagColor: '#dc2626',
+    bgColor: '#fef2f2',
+    borderColor: '#fca5a5',
+    description: 'Quá trình gửi đơn lên cổng liên thông gặp lỗi hoặc bị từ chối.',
+  },
+}
+
+/**
+ * Trả về thông tin cấu hình trạng thái liên thông của đơn thuốc
+ * @param {string} status 
+ * @param {string} receiptCode 
+ * @param {string} failureReason 
+ * @returns {object}
+ */
+export const getInterconnectionStatusInfo = (status, receiptCode = '', failureReason = '') => {
+  const normalizedStatus = (status || 'NOT_SENT').toUpperCase()
+  const config = INTERCONNECTION_STATUS_CONFIG[normalizedStatus] || INTERCONNECTION_STATUS_CONFIG.NOT_SENT
+
+  return {
+    ...config,
+    rawStatus: normalizedStatus,
+    receiptCode: receiptCode || '',
+    failureReason: failureReason || '',
+    isSuccess: normalizedStatus === 'SUCCESS',
+    isFailed: normalizedStatus === 'FAILED',
+    isNotSent: normalizedStatus === 'NOT_SENT',
+  }
+}
+

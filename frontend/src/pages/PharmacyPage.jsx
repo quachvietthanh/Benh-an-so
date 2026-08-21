@@ -663,6 +663,27 @@ function PharmacyPage() {
                   <Descriptions.Item label="Lượt khám">{selectedPrescription.visitCode || selectedPrescription.visitId || '—'}</Descriptions.Item>
                   <Descriptions.Item label="Bác sĩ">{selectedPrescription.doctorName || '—'}</Descriptions.Item>
                   <Descriptions.Item label="Ngày kê">{formatDateTime(selectedPrescription.prescribedAt)}</Descriptions.Item>
+                  <Descriptions.Item label="Liên thông Quốc gia" span={2}>
+                    {selectedPrescription.interconnectionStatus === 'SUCCESS' ? (
+                      <Space>
+                        <Tag color="success" icon={<CheckCircleOutlined />}>Đã liên thông thành công</Tag>
+                        {selectedPrescription.interconnectionReceiptCode && (
+                          <Text code strong style={{ color: '#15803d' }}>
+                            Mã biên nhận: {selectedPrescription.interconnectionReceiptCode}
+                          </Text>
+                        )}
+                      </Space>
+                    ) : selectedPrescription.interconnectionStatus === 'FAILED' ? (
+                      <Space>
+                        <Tag color="error">Liên thông thất bại</Tag>
+                        {selectedPrescription.lastInterconnectionError && (
+                          <Text type="danger">{selectedPrescription.lastInterconnectionError}</Text>
+                        )}
+                      </Space>
+                    ) : (
+                      <Tag color="default">Chưa gửi liên thông</Tag>
+                    )}
+                  </Descriptions.Item>
                   <Descriptions.Item label="Ghi chú" span={2}>{selectedPrescription.note || 'Không có'}</Descriptions.Item>
                 </Descriptions>
 

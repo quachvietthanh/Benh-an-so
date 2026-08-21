@@ -19,6 +19,9 @@ const pharmacyApi = {
   receiveBatch: (data) => axiosClient.post('/inventory/receipts', data),
   dispense: (id) => axiosClient.post(`/prescriptions/${id}/dispense`),
   expiryAlerts: (params) => axiosClient.get('/inventory/expiry-alerts', { params }),
+  sendToInterconnection: (id) => axiosClient.post(`/prescriptions/${id}/interconnection`),
+  retryInterconnection: (id) => axiosClient.post(`/prescriptions/${id}/interconnection/retry`),
+  searchInterconnections: (params) => axiosClient.get('/prescription-interconnections', { params }),
 }
 
 export default pharmacyApi
