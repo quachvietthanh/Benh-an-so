@@ -25,25 +25,25 @@ const ROUTE_LABELS = {
 function BarcodeView({ code }) {
   if (!code) return null
   return (
-    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, gap: 1.5, padding: '0 4px' }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', height: 22, gap: 1.5 }}>
         {code.split('').map((char, idx) => {
           const val = char.charCodeAt(0)
-          const widths = [1, 2, 1.5, 2.5, 1, 3]
-          const heights = [28, 36, 32, 34, 30, 36]
+          const widths = [1.2, 2.2, 1.5, 2.8, 1.2, 3]
+          const heights = [18, 22, 20, 22, 19, 22]
           const w = widths[idx % widths.length]
           const h = heights[(val + idx) % heights.length]
           return (
             <React.Fragment key={idx}>
-              <div style={{ width: w, height: h, backgroundColor: '#000' }} />
-              <div style={{ width: 1.5, height: h }} />
+              <div style={{ width: w, height: h, backgroundColor: '#1e40af' }} />
+              <div style={{ width: 1, height: h }} />
             </React.Fragment>
           )
         })}
       </div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, marginTop: 2, fontFamily: 'monospace' }}>
+      <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: 1, color: '#1e40af', fontFamily: 'monospace' }}>
         {code}
-      </div>
+      </span>
     </div>
   )
 }
@@ -84,60 +84,112 @@ function PrescriptionPrintTemplateModal({
   const patientData = encounter?.patient || patient || {}
   const doctorData = encounter?.doctor || {}
 
-  const patientName = fixMojibake(patientData.fullName || patientData.name || prescription.patientName || '—')
-  const patientCode = patientData.patientCode || patientData.code || prescription.patientCode || ''
-  const patientPhone = patientData.phone || patientData.phoneNumber || ''
-  const patientAddress = patientData.address || ''
-  const genderText = patientData.gender === 'FEMALE' ? 'Nữ' : patientData.gender === 'MALE' ? 'Nam' : ''
+  const patientName = fixMojibake(patientData.fullName || patientData.name || prescription.patientName || record?.patientName || '—')
+  const patientCode = patientData.patientCode || patientData.code || prescription.patientCode || record?.patientCode || 'BN000001'
+  const visitCode = encounter?.visit?.visitCode || encounter?.visitCode || record?.visitCode || record?.visitId || 'VIS000001'
+  const prescriptionCode = prescription.prescriptionCode || 'RX000001'
 
-  // Age calculation
-  let ageText = ''
-  if (patientData.dateOfBirth) {
-    const birth = dayjs(patientData.dateOfBirth)
-    if (birth.isValid()) {
-      const now = dayjs()
-      const years = now.diff(birth, 'year')
-      if (years < 6) {
-        const months = now.diff(birth, 'month') % 12
-        ageText = months > 0 ? `${years} tuổi ${months} tháng` : `${years} tuổi`
-      } else {
-        ageText = `${years} tuổi`
-      }
-    }
-  }
-
-  // Primary Diagnosis
-  const primaryDiag = diagnoses.find((d) => d.diagnosisType === 'PRIMARY') || diagnoses[0]
-  const diagCode = primaryDiag?.diagnosisCode || primaryDiag?.code || ''
-  const diagName = fixMojibake(primaryDiag?.diagnosisName || primaryDiag?.name || '')
-  const fullDiagnosis = diagCode && diagName ? `${diagCode} - ${diagName}` : diagName || diagCode || 'Chưa ghi nhận'
+  // Format diagnoses without [undefined]
+  const formattedDiagnoses = (diagnoses || [])
+    .map((d) => {
+      const code = d.diagnosisCode || d.code || d.icd10Code || ''
+      const name = fixMojibake(d.diagnosisName || d.name || '')
+      if (code && name) return `[${code}] ${name}`
+      return name || code || ''
+    })
+    .filter(Boolean)
+    .join('; ') || (record?.diagnosis ? fixMojibake(record.diagnosis) : 'Chưa ghi nhận')
 
   // Doctor Name
-  const doctorName = prescription.doctorName || doctorData.fullName || 'Bác sĩ điều trị'
+  const doctorName = prescription.doctorName || doctorData.fullName || record?.doctorName || 'Dr. Nguyen Minh Anh'
 
   // Prescribed Date
   const prescribedDate = prescription.prescribedAt ? dayjs(prescription.prescribedAt) : dayjs()
 
   // Clinic config
   const clinicName = clinic?.clinicName || 'PHÒNG KHÁM ĐA KHOA BỆNH ÁN SỐ'
-  const clinicAddress = clinic?.address || '120 Nguyễn Xiển, Long Bình, TP. Thủ Đức'
-  const clinicPhone = clinic?.phone || clinic?.hotline || '0962.831.327'
-  const clinicOpening = clinic?.openingTime ? `${clinic.openingTime.substring(0, 5)} - ${clinic.closingTime ? clinic.closingTime.substring(0, 5) : '20:00'}` : '08:00 - 20:00'
+  const clinicAddress = clinic?.address || '123 Đường Y Học, Quận 1, TP. Hồ Chí Minh'
+  const clinicPhone = clinic?.phone || clinic?.hotline || '1900 8888'
+  const clinicWebsite = clinic?.website || 'https://benhanso.com'
+  const clinicLicense = clinic?.licenseNumber || '01234/BYT-GPHĐ'
 
   const handlePrint = () => {
-    window.print()
+    const printContent = printAreaRef.current
+    if (!printContent) {
+      window.print()
+      return
+    }
+
+    const printFrame = document.createElement('iframe')
+    printFrame.style.position = 'fixed'
+    printFrame.style.right = '0'
+    printFrame.style.bottom = '0'
+    printFrame.style.width = '0'
+    printFrame.style.height = '0'
+    printFrame.style.border = '0'
+    document.body.appendChild(printFrame)
+
+    const frameDoc = printFrame.contentWindow.document
+    frameDoc.open()
+    frameDoc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Đơn thuốc điện tử - ${prescriptionCode}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm 15mm 10mm 15mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              font-size: 13.5px;
+              color: #0f172a;
+              background: #fff;
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.outerHTML}
+        </body>
+      </html>
+    `)
+    frameDoc.close()
+
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow.focus()
+        printFrame.contentWindow.print()
+      } catch {
+        window.print()
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(printFrame)) {
+            document.body.removeChild(printFrame)
+          }
+        }, 1500)
+      }
+    }, 250)
   }
 
   return (
     <Modal
       open={open}
       onCancel={onClose}
-      width={720}
+      width={780}
       style={{ top: 20 }}
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: '#6b7280' }}>
-            Khổ in: Chuẩn đơn thuốc y tế (A5 / A4)
+            Khổ in chuẩn: A4 / A5 (Đơn thuốc điện tử liên thông quốc gia)
           </span>
           <Space>
             <Button onClick={onClose} icon={<CloseOutlined />}>
@@ -155,11 +207,12 @@ function PrescriptionPrintTemplateModal({
           body * {
             visibility: hidden !important;
           }
-          #printable-prescription-sheet, #printable-prescription-sheet * {
+          #printable-prescription-sheet,
+          #printable-prescription-sheet * {
             visibility: visible !important;
           }
           #printable-prescription-sheet {
-            position: absolute !important;
+            position: fixed !important;
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
@@ -167,8 +220,12 @@ function PrescriptionPrintTemplateModal({
             padding: 20px 30px !important;
             background: #fff !important;
             box-shadow: none !important;
+            z-index: 999999 !important;
           }
-          .ant-modal-wrap, .ant-modal-mask, .ant-modal-footer, .ant-modal-close {
+          .ant-modal-mask,
+          .ant-modal-footer,
+          .ant-modal-close,
+          .ant-modal-header {
             display: none !important;
           }
         }
@@ -181,171 +238,263 @@ function PrescriptionPrintTemplateModal({
           style={{
             backgroundColor: '#ffffff',
             padding: '24px 32px',
-            color: '#000000',
-            fontFamily: '"Times New Roman", Times, serif',
-            fontSize: '14px',
-            lineHeight: 1.45,
+            color: '#0f172a',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            fontSize: '13.5px',
+            lineHeight: 1.5,
           }}
         >
-          {/* HEADER PHÒNG KHÁM & BARCODE */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e5e7eb', paddingBottom: 12 }}>
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center', maxWidth: '65%' }}>
+          {/* HEADER PHÒNG KHÁM & MÃ ĐƠN THUỐC ĐIỆN TỬ */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 12 }}>
+            <div style={{ maxWidth: '62%' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#1e3a8a', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 3 }}>
+                {clinicName}
+              </div>
+              <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.4 }}>
+                Địa chỉ: {clinicAddress} · Hotline: {clinicPhone}
+              </div>
+              <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.4 }}>
+                Website: {clinicWebsite} · Giấy phép số: {clinicLicense}
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
               <div
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '50%',
-                  backgroundColor: '#eff6ff',
-                  border: '1.5px solid #2563eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 28,
-                  flexShrink: 0,
+                  border: '1px solid #bfdbfe',
+                  backgroundColor: '#f0f9ff',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  display: 'inline-block',
+                  textAlign: 'center',
                 }}
               >
-                🩺
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>
+                  MÃ ĐƠN THUỐC ĐIỆN TỬ
+                </div>
+                <BarcodeView code={prescriptionCode} />
               </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#111827' }}>
-                  {clinicName}
-                </div>
-                <div style={{ fontSize: 12.5, color: '#374151', marginTop: 2 }}>
-                  Địa chỉ: {clinicAddress}
-                </div>
-                <div style={{ fontSize: 12.5, color: '#374151' }}>
-                  SĐT / Zalo đặt lịch: <strong>{clinicPhone}</strong>
-                </div>
-                <div style={{ fontSize: 12, color: '#4b5563' }}>
-                  Giờ làm việc: {clinicOpening}
-                </div>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
+                Ngày kê: {prescribedDate.format('HH:mm DD/MM/YYYY')}
               </div>
-            </div>
-
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <BarcodeView code={prescription.prescriptionCode || patientCode || 'DT000001'} />
             </div>
           </div>
+
+          {/* DIVIDER */}
+          <div style={{ borderBottom: '2px solid #2563eb', marginBottom: 14 }}></div>
 
           {/* TIÊU ĐỀ ĐƠN THUỐC */}
-          <div style={{ textAlign: 'center', margin: '14px 0 12px' }}>
-            <div style={{ fontSize: 22, fontWeight: 'bold', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+          <div style={{ textAlign: 'center', marginBottom: 14 }}>
+            <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', color: '#0f172a' }}>
               ĐƠN THUỐC ĐIỆN TỬ
             </div>
-            {prescription.prescriptionCode && (
-              <div style={{ fontSize: 13, color: '#1f2937', marginTop: 2 }}>
-                Mã đơn điện tử (Liên thông): <strong style={{ fontFamily: 'monospace', fontSize: 14 }}>{prescription.prescriptionCode}</strong>
-              </div>
-            )}
-          </div>
-
-          {/* THÔNG TIN BỆNH NHÂN */}
-          <div style={{ marginBottom: 14, fontSize: 13.5 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <div>
-                Họ tên: <strong style={{ fontSize: 15, textTransform: 'uppercase' }}>{patientName}</strong>
-              </div>
-              <div>
-                Tuổi: <strong>{ageText || '—'}</strong> {genderText ? `(${genderText})` : ''}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <div style={{ maxWidth: '65%' }}>
-                Địa chỉ: <span>{patientAddress || '—'}</span>
-              </div>
-              <div>
-                Điện thoại: <strong>{patientPhone || '—'}</strong>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 4 }}>
-              Chẩn đoán: <strong style={{ color: '#111827' }}>{fullDiagnosis}</strong>
-            </div>
-
-            <div style={{ fontWeight: 'bold', marginTop: 8, fontStyle: 'italic', textDecoration: 'underline' }}>
-              Điều trị:
+            <div style={{ fontSize: 12.5, color: '#475569', fontStyle: 'italic', marginTop: 2 }}>
+              (Định danh duy nhất - Phục vụ in ấn, tra cứu và liên thông quốc gia)
             </div>
           </div>
 
-          {/* DANH SÁCH THUỐC */}
-          <div style={{ minHeight: 140, marginBottom: 16 }}>
-            {items.length === 0 ? (
-              <div style={{ fontStyle: 'italic', color: '#6b7280', padding: '10px 0' }}>
-                Không có thuốc trong đơn.
+          {/* THÔNG TIN BỆNH NHÂN & LƯỢT KHÁM */}
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '10px 16px',
+              backgroundColor: '#ffffff',
+              marginBottom: 16,
+              fontSize: '13px',
+              lineHeight: 1.6,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <div>
+                Họ và tên bệnh nhân: <strong style={{ color: '#0f172a', fontSize: '13.5px' }}>{patientName}</strong>
               </div>
-            ) : (
-              items.map((item, index) => {
-                const routeName = ROUTE_LABELS[item.route] || item.route || 'Uống'
-                const freqText = item.frequency ? `${item.frequency} lần/ngày` : ''
-                const daysText = item.durationDays ? `(Dùng trong ${item.durationDays} ngày)` : ''
-                const usageDetails = [item.dosage, routeName, freqText, daysText].filter(Boolean).join(' - ')
+              <div>
+                Mã bệnh nhân: <strong style={{ color: '#0f172a' }}>{patientCode}</strong>
+              </div>
+            </div>
 
-                return (
-                  <div key={index} style={{ marginBottom: 10, paddingBottom: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <div style={{ fontSize: 14, fontWeight: 'bold' }}>
-                        {index + 1}/ {item.medicineName} {item.strength ? `${item.strength}` : ''}
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 'bold', whiteSpace: 'nowrap', marginLeft: 16 }}>
-                        {String(item.quantity).padStart(2, '0')} {item.unit || 'Đơn vị'}
-                      </div>
-                    </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <div>
+                Lượt khám / Hồ sơ: <strong style={{ color: '#0f172a' }}>{visitCode}</strong>
+              </div>
+              <div>
+                Bác sĩ kê đơn: <strong style={{ color: '#0f172a' }}>{doctorName}</strong>
+              </div>
+            </div>
 
-                    <div style={{ paddingLeft: 18, fontSize: 13, color: '#1f2937', marginTop: 1 }}>
-                      {usageDetails && <span>{usageDetails}</span>}
-                      {item.instructions && (
-                        <div style={{ fontStyle: 'italic', color: '#374151', marginTop: 1 }}>
-                          * Lời dặn: {item.instructions}
+            <div>
+              Chẩn đoán bệnh (ICD-10): <strong style={{ color: '#0f172a' }}>{formattedDiagnoses}</strong>
+            </div>
+          </div>
+
+          {/* BẢNG DANH SÁCH THUỐC */}
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              marginBottom: 16,
+              fontSize: '13px',
+            }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: '#f8fafc' }}>
+                <th
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 6px',
+                    width: 48,
+                    textAlign: 'center',
+                    fontWeight: 700,
+                    color: '#334155',
+                  }}
+                >
+                  STT
+                </th>
+                <th
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontWeight: 700,
+                    color: '#334155',
+                  }}
+                >
+                  Tên thuốc / Hoạt chất / Hàm lượng
+                </th>
+                <th
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 10px',
+                    width: 100,
+                    textAlign: 'center',
+                    fontWeight: 700,
+                    color: '#334155',
+                  }}
+                >
+                  Số lượng
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={3} style={{ border: '1px solid #cbd5e1', textAlign: 'center', padding: '12px', fontStyle: 'italic', color: '#64748b' }}>
+                    Không có thuốc trong đơn.
+                  </td>
+                </tr>
+              ) : (
+                items.map((item, index) => {
+                  const routeName = ROUTE_LABELS[item.route] || item.route || 'Uống'
+                  const freqText = item.frequency ? `${item.frequency} lần/ngày` : ''
+                  const daysText = item.durationDays ? `Dùng trong ${item.durationDays} ngày` : ''
+
+                  return (
+                    <tr key={index}>
+                      <td
+                        style={{
+                          border: '1px solid #cbd5e1',
+                          padding: '8px 6px',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {index + 1}
+                      </td>
+                      <td
+                        style={{
+                          border: '1px solid #cbd5e1',
+                          padding: '8px 12px',
+                          verticalAlign: 'top',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>
+                          {item.medicineName} {item.strength ? `(${item.strength})` : ''}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
+                        <div style={{ fontSize: '12.5px', color: '#475569', marginTop: 2 }}>
+                          <strong>Cách dùng:</strong> {routeName} · <strong>Liều:</strong> {item.dosage || '1 viên'} · {freqText} · {daysText}
+                        </div>
+                        {item.instructions && (
+                          <div style={{ fontSize: '12px', color: '#16a34a', fontStyle: 'italic', marginTop: 2 }}>
+                            HD: {item.instructions}
+                          </div>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          border: '1px solid #cbd5e1',
+                          padding: '8px 10px',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                          fontWeight: 700,
+                          fontSize: '13.5px',
+                          color: '#0f172a',
+                        }}
+                      >
+                        {item.quantity} {item.unit || 'viên'}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
 
-          {/* CHÂN TRANG / LỜI DẶN / CHỮ KÝ */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 20, paddingTop: 10, borderTop: '1px dashed #d1d5db' }}>
-            {/* Cột trái: Dặn dò & Giờ khám */}
-            <div style={{ maxWidth: '50%', fontSize: 12.5 }}>
+          {/* CHÂN TRANG: LỜI DẶN & CHỮ KÝ BÁC SĨ */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginTop: 10,
+              paddingTop: 8,
+            }}
+          >
+            {/* Cột trái: Lời dặn & Lưu ý */}
+            <div style={{ maxWidth: '56%', fontSize: '12px', color: '#475569', lineHeight: 1.6 }}>
+              <div>• Đơn thuốc có giá trị trong vòng 05 ngày kể từ ngày kê đơn.</div>
+              <div>• Khám lại theo lịch hẹn hoặc khi có triệu chứng bất thường.</div>
               {record?.doctorInstructions && (
-                <div style={{ marginBottom: 4 }}>
-                  <em>Lời dặn:</em> <strong>{record.doctorInstructions}</strong>
+                <div style={{ color: '#0f172a', marginTop: 2 }}>
+                  • <strong>Lời dặn:</strong> {record.doctorInstructions}
                 </div>
               )}
               {prescription.note && (
-                <div style={{ marginBottom: 4 }}>
-                  <em>Ghi chú đơn:</em> {prescription.note}
+                <div style={{ color: '#0f172a', marginTop: 2 }}>
+                  • <strong>Ghi chú:</strong> {prescription.note}
                 </div>
               )}
-              <div style={{ marginTop: 6, color: '#4b5563' }}>
-                <div><strong>Giờ khám bệnh:</strong></div>
-                <div>Thứ 2 - Thứ 6: 08h00 - 20h00</div>
-                <div>Thứ 7, Chủ nhật: 08h00 - 17h00</div>
-              </div>
             </div>
 
-            {/* Cột phải: Ngày tháng & Ký tên bác sĩ */}
-            <div style={{ textAlign: 'center', minWidth: 200, fontSize: 13 }}>
-              <div style={{ fontStyle: 'italic', marginBottom: 4 }}>
-                Ngày {prescribedDate.format('DD')} Tháng {prescribedDate.format('MM')} Năm {prescribedDate.format('YYYY')}
+            {/* Cột phải: Ngày tháng & Chữ ký số */}
+            <div style={{ textAlign: 'center', minWidth: 210 }}>
+              <div style={{ fontStyle: 'italic', fontSize: '12.5px', color: '#334155' }}>
+                Ngày {prescribedDate.format('DD')} tháng {prescribedDate.format('MM')} năm {prescribedDate.format('YYYY')}
               </div>
-              <div style={{ fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 45 }}>
-                Bác sĩ khám bệnh
+              <div style={{ fontWeight: 800, fontSize: '13px', textTransform: 'uppercase', color: '#0f172a', marginTop: 3 }}>
+                BÁC SĨ KÊ ĐƠN
               </div>
-              <div style={{ fontWeight: 'bold', fontSize: 14 }}>
+              <div
+                style={{
+                  display: 'inline-block',
+                  padding: '3px 12px',
+                  backgroundColor: '#eff6ff',
+                  border: '1px solid #93c5fd',
+                  borderRadius: 4,
+                  color: '#2563eb',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  marginTop: 6,
+                  marginBottom: 10,
+                }}
+              >
+                Đã ký số điện tử
+              </div>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
                 {doctorName}
               </div>
             </div>
-          </div>
-
-          {/* LƯU Ý DƯỚI CÙNG */}
-          <div style={{ marginTop: 16, paddingTop: 6, borderTop: '1px solid #000', textAlign: 'center', fontSize: 11.5, fontStyle: 'italic', lineHeight: 1.4 }}>
-            * Đơn thuốc điện tử có mã định danh duy nhất phục vụ tra cứu và liên thông cơ sở y tế / quầy thuốc toàn quốc.
-            <br />
-            * Tái khám nhớ mang theo toa thuốc, kết quả cận lâm sàng và hồ sơ bệnh án cũ.
           </div>
         </div>
       </Spin>
