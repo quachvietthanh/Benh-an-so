@@ -16,12 +16,15 @@ import {
   Statistic,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd'
 import {
   AlertOutlined,
+  BarcodeOutlined,
   CheckCircleOutlined,
+  CopyOutlined,
   FieldTimeOutlined,
   InboxOutlined,
   MedicineBoxOutlined,
@@ -538,7 +541,7 @@ function PharmacyPage() {
             <Input
               allowClear
               prefix={<SearchOutlined />}
-              placeholder="Tìm trong trang hiện tại"
+              placeholder="Tìm theo mã đơn điện tử (RX...), mã/tên BN..."
               value={searchKeyword}
               onChange={(event) => setSearchKeyword(event.target.value)}
               style={{ marginBottom: 12 }}
@@ -550,14 +553,16 @@ function PharmacyPage() {
               style={{ maxHeight: 650, overflowY: 'auto' }}
               renderItem={(item) => {
                 const selected = String(item.id) === String(selectedPrescriptionId)
+                const displayCode = item.prescriptionCode || item.id
+
                 return (
                   <List.Item
                     key={item.id}
                     onClick={() => selectPrescription(item.id)}
                     style={{
                       cursor: 'pointer',
-                      border: selected ? '1px solid #1677ff' : '1px solid #f0f0f0',
-                      background: selected ? '#e6f4ff' : '#fff',
+                      border: selected ? '1.5px solid #1677ff' : '1px solid #f0f0f0',
+                      background: selected ? '#eff6ff' : '#fff',
                       borderRadius: 8,
                       marginBottom: 8,
                       padding: 12,
@@ -566,16 +571,46 @@ function PharmacyPage() {
                   >
                     <List.Item.Meta
                       title={(
-                        <Space wrap>
-                          <Text strong>{item.prescriptionCode || item.id}</Text>
+                        <Space wrap size={6} align="center">
+                          <Tag
+                            color="blue"
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              margin: 0,
+                              padding: '2px 8px',
+                              letterSpacing: 0.5,
+                              border: '1px solid #93c5fd',
+                              backgroundColor: selected ? '#dbeafe' : '#eff6ff',
+                              color: '#1d4ed8',
+                            }}
+                          >
+                            <BarcodeOutlined style={{ marginRight: 4 }} />
+                            {displayCode}
+                          </Tag>
+                          <Tooltip title="Sao chép mã đơn">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CopyOutlined style={{ color: '#2563eb', fontSize: 12 }} />}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (displayCode) {
+                                  navigator.clipboard.writeText(displayCode)
+                                  message.success(`Đã sao chép mã đơn: ${displayCode}`)
+                                }
+                              }}
+                              style={{ padding: '0 4px', height: 20, width: 20 }}
+                            />
+                          </Tooltip>
                           <Tag color="orange">Chờ cấp phát</Tag>
                         </Space>
                       )}
                       description={(
-                        <Space direction="vertical" size={1}>
-                          <Text>{fixMojibake(item.patientName) || 'Chưa có tên bệnh nhân'} ({item.patientCode || '—'})</Text>
-                          <Text type="secondary">Lượt khám: {item.visitCode || item.visitId || '—'}</Text>
-                          <Text type="secondary">Kê lúc {formatDateTime(item.prescribedAt)}</Text>
+                        <Space direction="vertical" size={1} style={{ marginTop: 4 }}>
+                          <Text strong>{fixMojibake(item.patientName) || 'Chưa có tên bệnh nhân'} ({item.patientCode || '—'})</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>Lượt khám: {item.visitCode || item.visitId || '—'}</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>Kê lúc {formatDateTime(item.prescribedAt)}</Text>
                         </Space>
                       )}
                     />
@@ -603,9 +638,18 @@ function PharmacyPage() {
 
         <Col xs={24} xl={15}>
           <Card
-            title={selectedPrescription
-              ? `Chi tiết đơn ${selectedPrescription.prescriptionCode || selectedPrescription.id}`
-              : 'Chi tiết đơn thuốc'}
+            title={selectedPrescription ? (
+              <Space wrap size={8} align="center">
+                <span>Chi tiết Đơn thuốc Điện tử:</span>
+                <Tag color="blue" style={{ fontSize: 15, fontWeight: 700, padding: '2px 10px', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #93c5fd' }}>
+                  <BarcodeOutlined style={{ marginRight: 6 }} />
+                  {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                </Tag>
+                <Tag color="cyan">Định danh duy nhất cố định</Tag>
+              </Space>
+            ) : (
+              'Chi tiết đơn thuốc'
+            )}
             style={{ height: '100%' }}
           >
             {!selectedPrescription ? (
