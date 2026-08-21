@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,4 +33,11 @@ public interface JpaClinicalOrderItemRepository extends JpaRepository<ClinicalOr
     );
 
     boolean existsByClinicalOrderIdAndClinicalServiceId(UUID clinicalOrderId, UUID clinicalServiceId);
+
+    @Query("select item.id from ClinicalOrderItemEntity item where item.clinicalOrderId in :orderIds")
+    List<UUID> findIdsByClinicalOrderIdIn(@Param("orderIds") Collection<UUID> orderIds);
+
+    @Modifying
+    @Query("delete from ClinicalOrderItemEntity item where item.clinicalOrderId in :orderIds")
+    void deleteByClinicalOrderIdIn(@Param("orderIds") Collection<UUID> orderIds);
 }

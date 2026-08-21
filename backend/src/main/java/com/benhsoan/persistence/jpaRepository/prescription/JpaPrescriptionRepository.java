@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -38,4 +39,12 @@ public interface JpaPrescriptionRepository
     @Query("select prescription from PrescriptionEntity prescription "
             + "where prescription.id = :id")
     Optional<PrescriptionEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    @Query("select prescription.id from PrescriptionEntity prescription "
+            + "where prescription.medicalRecordId = :medicalRecordId")
+    List<UUID> findIdsByMedicalRecordId(@Param("medicalRecordId") UUID medicalRecordId);
+
+    @Modifying
+    @Query("delete from PrescriptionEntity prescription where prescription.medicalRecordId = :medicalRecordId")
+    void deleteByMedicalRecordId(@Param("medicalRecordId") UUID medicalRecordId);
 }

@@ -26,21 +26,19 @@ public class MedicalRecordRetentionPolicy {
                 .orElse(ClinicConfiguration.DEFAULT_RETENTION_YEARS);
     }
 
-    public Instant expirationDate(Visit visit) {
+    /**
+     * QTN-19: expiration is computed strictly from the visit completion date.
+     * An uncompleted visit (no completedAt) is always treated as within retention.
+     */
+    public boolean isWithinRetention(Visit visit, Instant now) {
         Instant endedAt = visit.getCompletedAt();
-        if (endedAt == null) {
-            endedAt = visit.getUpdatedAt();
+        if (endedAt == null || !visit.isCompleted()) {
+            return true;
         }
-        if (endedAt == null) {
-            endedAt = visit.getVisitAt();
-        }
-        return endedAt.atZone(ZoneOffset.UTC)
+        Instant expiration = endedAt.atZone(ZoneOffset.UTC)
                 .toLocalDateTime()
                 .plusYears(retentionYears())
                 .toInstant(ZoneOffset.UTC);
-    }
-
-    public boolean isWithinRetention(Visit visit, Instant now) {
-        return now.isBefore(expirationDate(visit));
+        return now.isBefore(expiration);
     }
 }

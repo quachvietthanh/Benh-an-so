@@ -1,8 +1,6 @@
 package com.benhsoan.application.ucservice.medicalrecord;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,20 +11,15 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.domain.auditlog.AuditLog;
-import com.benhsoan.domain.auditlog.enums.ActionType;
-import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordRetentionException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.clinic.ClinicConfigurationRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
@@ -48,7 +41,7 @@ class DeleteMedicalRecordServiceTest {
     @Mock
     private VisitRepository visitRepository;
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private MedicalRecordDeletionAuditWriter auditWriter;
     @Mock
     private CurrentUserPort currentUserPort;
     @Mock
@@ -59,7 +52,7 @@ class DeleteMedicalRecordServiceTest {
     private DeleteMedicalRecordService service() {
         MedicalRecordRetentionPolicy policy = new MedicalRecordRetentionPolicy(clinicConfigurationRepository);
         return new DeleteMedicalRecordService(
-                medicalRecordRepository, visitRepository, auditLogRepository,
+                medicalRecordRepository, visitRepository, auditWriter,
                 currentUserPort, clockPort, policy);
     }
 
@@ -87,14 +80,8 @@ class DeleteMedicalRecordServiceTest {
 
         assertThrows(MedicalRecordRetentionException.class, () -> service().delete(RECORD_ID));
 
-        verify(medicalRecordRepository, never()).deleteById(any());
-
-        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(captor.capture());
-        AuditLog audit = captor.getValue();
-        assertEquals(ActionType.ACCESS_DENIED, audit.getActionType());
-        assertEquals(ResourceType.MEDICAL_RECORD, audit.getResourceType());
-        assertEquals(RECORD_ID, audit.getResourceId());
+        verify(medicalRecordRepository, never()).deleteById(RECORD_ID);
+        verify(auditWriter).writeDenied(ACTOR, RECORD_ID, NOW);
     }
 
     @Test
@@ -109,9 +96,6 @@ class DeleteMedicalRecordServiceTest {
         service().delete(RECORD_ID);
 
         verify(medicalRecordRepository).deleteById(RECORD_ID);
-
-        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(captor.capture());
-        assertEquals(ActionType.DELETE, captor.getValue().getActionType());
+        verify(auditWriter).writeDeleted(ACTOR, RECORD_ID, NOW);
     }
 }
