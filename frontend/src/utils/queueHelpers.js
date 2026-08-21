@@ -78,25 +78,45 @@ export const handleQueueApiError = (error, defaultMessage = 'Thao tác không th
   return detail
 }
 
-export const checkQueuePermissions = (roles = []) => {
+export const checkQueuePermissions = (roles = [], permissions = []) => {
   const normalized = (Array.isArray(roles) ? roles : [roles])
     .map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+
+  const userPerms = (Array.isArray(permissions) ? permissions : [permissions])
+    .map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+
+  const hasPerm = (code) => userPerms.includes(code)
 
   const isAdmin = normalized.includes('admin')
   const isReceptionist = normalized.includes('receptionist')
   const isDoctor = normalized.includes('doctor')
   const isNurse = normalized.includes('nurse')
 
+  const canCreateApp = hasPerm('APPOINTMENT_CREATE')
+  const canReadApp = hasPerm('APPOINTMENT_READ')
+  const canUpdateApp = hasPerm('APPOINTMENT_UPDATE')
+  const canDeleteApp = hasPerm('APPOINTMENT_DELETE')
+
+  const canCreateQueue = hasPerm('QUEUE_CREATE')
+  const canCallNext = hasPerm('QUEUE_CALL_NEXT')
+  const canUpdateQueueStatus = hasPerm('QUEUE_UPDATE_STATUS')
+  const canViewQueue = hasPerm('QUEUE_VIEW')
+  const canCountQueue = hasPerm('QUEUE_COUNT')
+
   return {
-    canViewBoard: isAdmin || isDoctor || isNurse || isReceptionist,
-    canViewMyQueue: isDoctor,
-    canCheckIn: isAdmin || isReceptionist,
-    canCallNext: isAdmin || isReceptionist || isDoctor,
-    canSkip: isAdmin || isReceptionist || isDoctor,
-    canComplete: isAdmin || isDoctor,
-    canUpdateStatus: isAdmin || isDoctor || isNurse,
-    canChangeResultStatus: isAdmin || isDoctor || isNurse,
-    canManageWalkIn: isAdmin || isReceptionist,
+    canViewBoard: canViewQueue || canReadApp || isAdmin || isDoctor || isNurse || isReceptionist,
+    canViewMyQueue: (canViewQueue || isDoctor) && isDoctor,
+    canCheckIn: canCreateQueue || canUpdateQueueStatus || isAdmin || isReceptionist,
+    canCallNext: canCallNext || canUpdateQueueStatus || isAdmin || isReceptionist || isDoctor,
+    canSkip: canUpdateQueueStatus || isAdmin || isReceptionist || isDoctor,
+    canComplete: canUpdateQueueStatus || isAdmin || isDoctor,
+    canUpdateStatus: canUpdateQueueStatus || isAdmin || isDoctor || isNurse,
+    canChangeResultStatus: canUpdateQueueStatus || isAdmin || isDoctor || isNurse,
+    canManageWalkIn: canCreateQueue || canCreateApp || isAdmin || isReceptionist,
+    canCreateAppointment: canCreateApp || isAdmin || isReceptionist,
+    canReadAppointment: canReadApp || isAdmin || isDoctor || isReceptionist,
+    canUpdateAppointment: canUpdateApp || isAdmin || isReceptionist,
+    canDeleteAppointment: canDeleteApp || isAdmin || isReceptionist,
     isNurseOnly: isNurse && !isAdmin && !isDoctor && !isReceptionist,
     isDoctorOnly: isDoctor && !isAdmin && !isReceptionist,
     isAdmin,

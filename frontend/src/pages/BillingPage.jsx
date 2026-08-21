@@ -243,9 +243,22 @@ function BillingPage() {
     return raw.map((r) => String(r || '').toLowerCase().replace(/^role_/, '')).filter(Boolean)
   }, [user])
 
-  const canCollectPayment = userRoles.includes('receptionist') || userRoles.includes('admin')
-  const canAdjustInvoice = userRoles.includes('manager') || userRoles.includes('clinic_manager') || userRoles.includes('admin')
-  const hasBillingAccess = canCollectPayment || canAdjustInvoice
+  const userPermissions = useMemo(() => {
+    return Array.isArray(user?.permissions) ? user.permissions : []
+  }, [user])
+
+  const canCollectPayment =
+    userPermissions.includes('INVOICE_CREATE') || userPermissions.includes('PERMISSION_INVOICE_CREATE')
+  const canAdjustInvoice =
+    userPermissions.includes('INVOICE_UPDATE') || userPermissions.includes('PERMISSION_INVOICE_UPDATE')
+  const hasBillingAccess =
+    canCollectPayment ||
+    canAdjustInvoice ||
+    userPermissions.includes('INVOICE_READ') ||
+    userPermissions.includes('PERMISSION_INVOICE_READ') ||
+    userRoles.includes('admin') ||
+    userRoles.includes('receptionist') ||
+    userRoles.includes('manager')
 
   const [activeTab, setActiveTab] = useState(canAdjustInvoice && !canCollectPayment ? 'history' : 'pending')
   const [pendingVisits, setPendingVisits] = useState([])
@@ -481,6 +494,7 @@ function BillingPage() {
             : ''
           const dosageInfo = [item.dosage, freqStr].filter(Boolean).join(' - ')
 
+          const unit = item.unit || matchedMed?.unit || 'viên'
           return {
             ...item,
             key: `med-item-${idx}`,
@@ -497,6 +511,8 @@ function BillingPage() {
       }
 
       const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
+      const hasPendingDispense = prescriptionStatus === 'PENDING_DISPENSE' || prescriptionStatus === 'CREATED'
+      const isCancelled = visitStatus === 'CANCELLED'
 
       const medicineFee = prescriptionItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
       const examFee = 100000
@@ -528,6 +544,7 @@ function BillingPage() {
       setSelectedVisitData((prev) => {
         const currentPaymentId = invoiceData?.paymentId || (prev?.visitId === visitId ? prev?.paymentId : null)
         const isPaid = hasInvoice || !!currentPaymentId || (prev?.visitId === visitId && prev?.paymentStatus === 'PAID')
+        const isBusinessEligible = !isPaid && !isCancelled && isDispensingCompleted && totalAmount > 0
 
         return {
           visitId,
@@ -546,7 +563,9 @@ function BillingPage() {
           prescriptionStatus,
           isVisitCompleted,
           isDispensingCompleted,
-          isEligibleToPay: isVisitCompleted && isDispensingCompleted,
+          hasPendingDispense,
+          isCancelled,
+          isEligibleToPay: isBusinessEligible,
           examFee,
           medicineFee,
           serviceFee,
@@ -1509,6 +1528,33 @@ function BillingPage() {
                           ) : (
                             <Card style={{ backgroundColor: '#f0f7ff', borderColor: '#bae6fd' }}>
                               <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                                {!canCollectPayment && (
+                                  <Alert
+                                    type="warning"
+                                    showIcon
+                                    message="Tài khoản không có quyền thu viện phí"
+                                    description="Bạn cần được cấp quyền INVOICE_CREATE để thực hiện thu phí và xuất hóa đơn."
+                                  />
+                                )}
+
+                                {selectedVisitData.prescriptionStatus === 'PENDING_DISPENSE' && (
+                                  <Alert
+                                    type="info"
+                                    showIcon
+                                    message="Đơn thuốc đang chờ cấp phát tại Quầy Dược (PENDING_DISPENSE)"
+                                    description="Theo quy trình nghiệp vụ hệ thống, Dược sĩ cần hoàn tất cấp phát thuốc trước khi Lễ tân ghi nhận thu phí."
+                                  />
+                                )}
+
+                                {selectedVisitData.visitStatus === 'CANCELLED' && (
+                                  <Alert
+                                    type="error"
+                                    showIcon
+                                    message="Lượt khám đã bị hủy (CANCELLED)"
+                                    description="Không thể thực hiện thu phí đối với các lượt khám đã bị hủy."
+                                  />
+                                )}
+
                                 <Form layout="vertical">
                                   <Form.Item label={<strong>Phương thức thanh toán *</strong>} style={{ marginBottom: 0 }}>
                                     <Select

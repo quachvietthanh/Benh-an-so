@@ -59,7 +59,10 @@ export const validatePrescriptionAdjustmentForm = ({
 
     if (!item.dosage || !item.dosage.trim()) {
       errors.push(`Dòng ${i + 1}: chưa nhập liều dùng.`)
+    } else if (item.dosage.trim().length > 100) {
+      errors.push(`Dòng ${i + 1}: liều dùng không được vượt quá 100 ký tự.`)
     }
+
     const freqNum = Number(item.frequency)
     if (
       item.frequency == null ||
@@ -70,6 +73,11 @@ export const validatePrescriptionAdjustmentForm = ({
     ) {
       errors.push(`Dòng ${i + 1}: tần suất dùng thuốc phải là số nguyên dương (> 0).`)
     }
+
+    if (!item.route) {
+      errors.push(`Dòng ${i + 1}: chưa chọn cách dùng thuốc.`)
+    }
+
     if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
       errors.push(`Dòng ${i + 1}: số lượng phải là số nguyên dương.`)
     }
@@ -108,7 +116,7 @@ export const buildPrescriptionAdjustmentPayload = ({
       medicineId: item.medicineId,
       dosage: String(item.dosage || '').trim(),
       frequency: Number(item.frequency),
-      route: item.route || null,
+      route: item.route,
       durationDays: Number(item.durationDays),
       quantity: Number(item.quantity),
       instructions: String(item.instructions || '').trim(),
@@ -179,6 +187,7 @@ test('3. Kiểm thử BẮT BUỘC NHẬP LÝ DO ĐIỀU CHỈNH (Change Reason 
       medicineId: 'med-1',
       dosage: '1 viên/lần',
       frequency: 2,
+      route: 'ORAL',
       quantity: 10,
       durationDays: 5,
     },
@@ -217,8 +226,8 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.ok(resEmpty.errors.some((e) => e.includes('ít nhất một loại thuốc')))
 
   const duplicateItems = [
-    { medicineId: 'med-1', dosage: '1 viên', frequency: 2, quantity: 10, durationDays: 5 },
-    { medicineId: 'med-1', dosage: '2 viên', frequency: 1, quantity: 5, durationDays: 5 },
+    { medicineId: 'med-1', dosage: '1 viên', frequency: 2, route: 'ORAL', quantity: 10, durationDays: 5 },
+    { medicineId: 'med-1', dosage: '2 viên', frequency: 1, route: 'ORAL', quantity: 5, durationDays: 5 },
   ]
   const resDuplicate = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
@@ -231,7 +240,7 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.ok(resDuplicate.errors.some((e) => e.includes('thuốc bị trùng')))
 
   const invalidQuantityItems = [
-    { medicineId: 'med-1', dosage: '1 viên', frequency: 2, quantity: -5, durationDays: 0 },
+    { medicineId: 'med-1', dosage: '1 viên', frequency: 2, route: 'ORAL', quantity: -5, durationDays: 0 },
   ]
   const resInvalidQty = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
@@ -245,7 +254,7 @@ test('4. Kiểm thử THAO TÁC SỬA / THÊM / BỎ THUỐC VÀ DỮ LIỆU Đ�
   assert.ok(resInvalidQty.errors.some((e) => e.includes('số ngày dùng phải là số nguyên dương')))
 
   const invalidFrequencyItems = [
-    { medicineId: 'med-1', dosage: '1 viên', frequency: 0, quantity: 5, durationDays: 5 },
+    { medicineId: 'med-1', dosage: '1 viên', frequency: 0, route: 'ORAL', quantity: 5, durationDays: 5 },
   ]
   const resInvalidFreq = validatePrescriptionAdjustmentForm({
     medicalRecordId: 'rec-1',
@@ -291,4 +300,55 @@ test('5. Kiểm thử CHUẨN HÓA PAYLOAD GỬI LÊN BACKEND PATCH /prescriptio
   assert.equal(payload.items[0].instructions, 'Uống sau ăn')
   assert.equal(payload.interactionOverrides.length, 1)
   assert.equal(payload.interactionOverrides[0].ruleId, 'rule-123')
+})
+
+test('6. Kiểm thử CHUẨN HÓA CÁC TRƯỜNG BẮT BUỘC ĐƠN THUỐC (Required Fields Validation)', () => {
+  const baseValidItem = {
+    medicineId: 'med-1',
+    dosage: '1 viên/lần',
+    frequency: 2,
+    route: 'ORAL',
+    durationDays: 5,
+    quantity: 10,
+  }
+
+  // 6.1. Thiếu cách dùng (route)
+  const resMissingRoute = validatePrescriptionAdjustmentForm({
+    medicalRecordId: 'rec-1',
+    diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
+    items: [{ ...baseValidItem, route: null }],
+    changeReason: 'Đổi thuốc',
+  })
+  assert.equal(resMissingRoute.isValid, false)
+  assert.ok(resMissingRoute.errors.some((e) => e.includes('chưa chọn cách dùng thuốc')))
+
+  // 6.2. Thiếu liều dùng một lần (dosage)
+  const resMissingDosage = validatePrescriptionAdjustmentForm({
+    medicalRecordId: 'rec-1',
+    diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
+    items: [{ ...baseValidItem, dosage: '' }],
+    changeReason: 'Đổi thuốc',
+  })
+  assert.equal(resMissingDosage.isValid, false)
+  assert.ok(resMissingDosage.errors.some((e) => e.includes('chưa nhập liều dùng')))
+
+  // 6.3. Liều dùng vượt quá 100 ký tự
+  const resLongDosage = validatePrescriptionAdjustmentForm({
+    medicalRecordId: 'rec-1',
+    diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
+    items: [{ ...baseValidItem, dosage: 'a'.repeat(101) }],
+    changeReason: 'Đổi thuốc',
+  })
+  assert.equal(resLongDosage.isValid, false)
+  assert.ok(resLongDosage.errors.some((e) => e.includes('không được vượt quá 100 ký tự')))
+
+  // 6.4. Đầy đủ tất cả trường bắt buộc
+  const resAllValid = validatePrescriptionAdjustmentForm({
+    medicalRecordId: 'rec-1',
+    diagnoses: [{ code: 'J00', name: 'Viêm họng' }],
+    items: [baseValidItem],
+    changeReason: 'Đầy đủ thông tin',
+  })
+  assert.equal(resAllValid.isValid, true)
+  assert.equal(resAllValid.errors.length, 0)
 })

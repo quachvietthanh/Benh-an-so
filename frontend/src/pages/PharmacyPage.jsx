@@ -36,8 +36,7 @@ import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
-import { getApiErrorMessage as getErrorMessage } from '../utils/apiError'
-import { buildFefoPreview } from '../utils/workflowContract'
+import { buildFefoPreview, fixMojibake } from '../utils/workflowContract'
 import { saveStoredPrescription, dispensePrescriptionHelper, mergePrescriptions } from '../utils/storageHelpers'
 
 
@@ -570,7 +569,7 @@ function PharmacyPage() {
                       )}
                       description={(
                         <Space direction="vertical" size={1}>
-                          <Text>{item.patientName || 'Chưa có tên bệnh nhân'} ({item.patientCode || '—'})</Text>
+                          <Text>{fixMojibake(item.patientName) || 'Chưa có tên bệnh nhân'} ({item.patientCode || '—'})</Text>
                           <Text type="secondary">Lượt khám: {item.visitCode || item.visitId || '—'}</Text>
                           <Text type="secondary">Kê lúc {formatDateTime(item.prescribedAt)}</Text>
                         </Space>
@@ -671,7 +670,7 @@ function PharmacyPage() {
                           </Text>?
                         </div>
                         <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
-                          <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{selectedPrescription.patientName || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
+                          <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
                           <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
                         </div>
                       </div>

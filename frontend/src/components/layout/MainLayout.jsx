@@ -44,35 +44,37 @@ const navigationSections = [
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
   { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system-management'] },
-  { key: 'lookup', label: 'Tra cứu', paths: ['/public-lookup'] },
 ]
 
-const getNavigationItems = (roles = []) => {
+const getNavigationItems = (roles = [], permissions = []) => {
   const normalizedRoles = (Array.isArray(roles) ? roles : [roles])
     .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
     .filter(Boolean)
+  const userPerms = (Array.isArray(permissions) ? permissions : [permissions])
+    .map((perm) => String(perm || '').toUpperCase().replace(/^PERMISSION_/, ''))
+    .filter(Boolean)
 
-  if (!normalizedRoles.length) return []
+  const hasPerm = (code) => userPerms.includes(code)
+  const hasRole = (r) => normalizedRoles.includes(r)
 
   const items = [
-    { key: '/', label: 'Tổng quan', icon: DashboardOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
-    { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, roles: ['admin', 'doctor', 'receptionist'] },
-    { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
-    { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, roles: ['receptionist'] },
-    { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, roles: ['admin', 'doctor'] },
-    { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, roles: ['admin', 'doctor'] },
-    { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, roles: ['admin', 'doctor'] },
-    { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, roles: ['admin', 'pharmacist'] },
-    { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, roles: ['admin', 'pharmacist'] },
-    { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, roles: ['admin', 'pharmacist'] },
-    { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, roles: ['admin', 'manager', 'receptionist'] },
-    { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, roles: ['admin', 'manager'] },
-    { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, roles: ['admin', 'manager', 'clinic_manager'] },
-    { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, roles: ['admin', 'manager', 'clinic_manager'] },
-    { key: '/public-lookup', label: 'Cổng tra cứu công khai', icon: SearchOutlined, roles: ['admin', 'manager', 'doctor', 'nurse', 'receptionist', 'pharmacist'] },
+    { key: '/', label: 'Tổng quan', icon: DashboardOutlined, check: () => true },
+    { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, check: () => hasPerm('PATIENT_READ') || hasRole('admin') || hasRole('doctor') || hasRole('receptionist') },
+    { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, check: () => hasPerm('APPOINTMENT_READ') || hasPerm('QUEUE_VIEW') || hasRole('admin') || hasRole('doctor') || hasRole('receptionist') },
+    { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, check: () => hasPerm('FOLLOW_UP_REMINDER_READ') || hasPerm('CARE_LOG_READ') || hasRole('receptionist') || hasRole('admin') },
+    { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, check: () => hasPerm('MEDICAL_RECORD_READ') || hasRole('admin') || hasRole('doctor') },
+    { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, check: () => hasPerm('PRESCRIPTION_READ') || hasRole('admin') || hasRole('doctor') },
+    { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, check: () => hasPerm('CLINICAL_RESULT_READ') || hasPerm('CLINICAL_RESULT_CREATE') || hasRole('admin') || hasRole('doctor') },
+    { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, check: () => hasPerm('PHARMACY_READ') || hasPerm('PRESCRIPTION_READ') || hasRole('admin') || hasRole('pharmacist') },
+    { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, check: () => hasPerm('PHARMACY_READ') || hasRole('admin') || hasRole('pharmacist') },
+    { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, check: () => hasPerm('PHARMACY_CREATE') || hasRole('admin') || hasRole('pharmacist') },
+    { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, check: () => hasPerm('INVOICE_READ') || hasPerm('INVOICE_CREATE') || hasRole('admin') || hasRole('manager') || hasRole('receptionist') },
+    { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, check: () => hasPerm('REPORT_VIEW') || hasRole('admin') || hasRole('manager') },
+    { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || hasRole('admin') || hasRole('manager') || hasRole('clinic_manager') },
+    { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => hasPerm('ROLE_READ') || hasPerm('CLINIC_CONFIGURATION_READ') || hasPerm('USER_READ') || hasPerm('AUDIT_READ') || hasPerm('BACKUP_READ') || hasRole('admin') || hasRole('manager') || hasRole('clinic_manager') },
   ]
 
-  return items.filter((item) => item.roles.some((role) => normalizedRoles.includes(role)))
+  return items.filter((item) => item.check())
 }
 
 function MainLayout() {
@@ -171,13 +173,13 @@ function MainLayout() {
   }
 
   const navigationItems = useMemo(
-    () => getNavigationItems(user?.roles || []).map((item) => ({
+    () => getNavigationItems(user?.roles || [], user?.permissions || []).map((item) => ({
       key: item.key,
       icon: item.icon ? React.createElement(item.icon) : null,
       label: item.label,
       title: item.label,
     })),
-    [user?.roles],
+    [user?.roles, user?.permissions],
   )
 
   const sidebarItems = useMemo(() => navigationSections.flatMap((section) => {
@@ -295,18 +297,6 @@ function MainLayout() {
           inlineIndent={16}
           onClick={handleMenuClick}
         />
-
-        <Tooltip title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} placement="right">
-          <button
-            type="button"
-            className="sidebar-collapse"
-            onClick={() => setCollapsed((value) => !value)}
-            aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-          >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            {!collapsed && <span>Thu gọn menu</span>}
-          </button>
-        </Tooltip>
       </Sider>
 
       <Layout className="clinic-main-layout">

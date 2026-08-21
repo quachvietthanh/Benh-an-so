@@ -65,6 +65,7 @@ import {
   checkQueuePermissions,
   handleQueueApiError,
 } from '../utils/queueHelpers'
+import { fixMojibake } from '../utils/serviceCatalogValidation'
 import {
   getStoredAppointmentLogs,
   getStoredNotificationLogs,
@@ -144,7 +145,10 @@ function AppointmentQueue() {
   const navigate = useNavigate()
   const { user } = useAuthContext()
 
-  const permissions = useMemo(() => checkQueuePermissions(user?.roles || []), [user?.roles])
+  const permissions = useMemo(
+    () => checkQueuePermissions(user?.roles || [], user?.permissions || []),
+    [user?.roles, user?.permissions],
+  )
 
   const [activeMainTab, setActiveMainTab] = useState(() =>
     permissions.isDoctorOnly ? 'doctor_queue' : 'appointments',
@@ -195,11 +199,11 @@ function AppointmentQueue() {
     })
     if (doc) {
       return {
-        name: doc.fullName || doc.name || doc.username || fallbackName || 'BS. Chưa phân công',
-        department: doc.department || fallbackDept || '—',
+        name: fixMojibake(doc.fullName || doc.name || doc.username || fallbackName || 'BS. Chưa phân công'),
+        department: fixMojibake(doc.department || fallbackDept || '—'),
       }
     }
-    return { name: fallbackName || 'Bác sĩ chưa xác định', department: fallbackDept || '—' }
+    return { name: fixMojibake(fallbackName || 'Bác sĩ chưa xác định'), department: fixMojibake(fallbackDept || '—') }
   }, [doctors])
 
   const getPatientInfo = useCallback((patientId, fallbackName, fallbackCode, fallbackPhone) => {
@@ -210,12 +214,12 @@ function AppointmentQueue() {
     })
     if (pat) {
       return {
-        name: pat.fullName || pat.name || fallbackName || 'Bệnh nhân',
+        name: fixMojibake(pat.fullName || pat.name || fallbackName || 'Bệnh nhân'),
         code: pat.patientCode || pat.code || fallbackCode || '—',
         phone: pat.phoneNumber || pat.phone || fallbackPhone || '',
       }
     }
-    return { name: fallbackName || 'Bệnh nhân', code: fallbackCode || '—', phone: fallbackPhone || '' }
+    return { name: fixMojibake(fallbackName || 'Bệnh nhân'), code: fallbackCode || '—', phone: fallbackPhone || '' }
   }, [patients])
 
   const isSamePatient = useCallback((id1, id2) => {

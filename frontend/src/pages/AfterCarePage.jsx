@@ -162,14 +162,29 @@ function AfterCarePage() {
   const createdReminderVisitIdsRef = useRef(new Set())
   const createdReminderPatientIdsRef = useRef(new Set())
 
-  const permissions = useMemo(() => ({
-    reminderCreate: hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_CREATE'),
-    reminderRead: hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_READ'),
-    reminderUpdate: hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_UPDATE'),
-    careCreate: hasAftercarePermission(user, 'CARE_LOG_CREATE'),
-    careRead: hasAftercarePermission(user, 'CARE_LOG_READ'),
-    medicalRecordRead: hasAftercarePermission(user, 'MEDICAL_RECORD_READ'),
-  }), [user])
+  const userRoles = useMemo(() => {
+    return (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user])
+
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
+  const permissions = useMemo(() => {
+    const isRec = userRoles.includes('receptionist')
+    const isAdmin = userRoles.includes('admin')
+    const hasPerm = (code) => userPermissions.includes(code)
+
+    return {
+      reminderCreate: hasPerm('FOLLOW_UP_REMINDER_CREATE') || isRec,
+      reminderRead: hasPerm('FOLLOW_UP_REMINDER_READ') || isRec || isAdmin,
+      reminderUpdate: hasPerm('FOLLOW_UP_REMINDER_UPDATE') || isRec,
+      careCreate: hasPerm('CARE_LOG_CREATE') || isRec,
+      careRead: hasPerm('CARE_LOG_READ') || isRec || isAdmin,
+      medicalRecordRead: hasPerm('MEDICAL_RECORD_READ') || isRec || isAdmin,
+      isReadOnly: !hasPerm('FOLLOW_UP_REMINDER_CREATE') && !hasPerm('CARE_LOG_CREATE') && !isRec,
+    }
+  }, [userRoles, userPermissions])
 
   const performerNames = useMemo(() => {
     if (!user?.id) return {}
@@ -950,6 +965,16 @@ function AfterCarePage() {
           )}
         </Space>
       </header>
+
+      {permissions.isReadOnly && (
+        <Alert
+          type="info"
+          showIcon
+          message="Chế độ giám sát (Quản trị viên)"
+          description="Tài khoản Quản trị viên (Admin) có quyền xem và giám sát toàn bộ dữ liệu Chăm sóc sau khám, không có quyền tạo hoặc chỉnh sửa lịch nhắc."
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {patientsError && (
         <Alert

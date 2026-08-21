@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  Col,
   Descriptions,
   Divider,
   Dropdown,
@@ -14,6 +15,7 @@ import {
   message,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Space,
   Spin,
@@ -37,6 +39,7 @@ import {
   LockOutlined,
   MedicineBoxOutlined,
   PlusOutlined,
+  PrinterOutlined,
   RollbackOutlined,
   StopOutlined,
   SwapOutlined,
@@ -49,6 +52,9 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import pharmacyApi from '../api/pharmacyApi'
 import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
+import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
+import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
+import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
@@ -66,9 +72,6 @@ import {
   validatePrescriptionStock,
 } from '../utils/prescriptionInventoryValidation'
 
-const InteractionWarningModal = React.lazy(() => import('../components/pharmacy/InteractionWarningModal'))
-const PrescriptionDetailModal = React.lazy(() => import('../components/pharmacy/PrescriptionDetailModal'))
-
 const { Text, Paragraph, Title } = Typography
 
 const PRESET_CHANGE_REASONS = [
@@ -82,23 +85,35 @@ const PRESET_CHANGE_REASONS = [
 
 const ROUTE_OPTIONS = [
   { value: 'ORAL', label: 'Uống' },
-  { value: 'TOPICAL', label: 'Bôi ngoài' },
-  { value: 'INHALATION', label: 'Hít/Xịt' },
-  { value: 'INTRAVENOUS', label: 'Tiêm IV' },
-  { value: 'INTRAMUSCULAR', label: 'Tiêm IM' },
-  { value: 'SUBCUTANEOUS', label: 'Tiêm SC' },
-  { value: 'OTHER', label: 'Khác' },
+  { value: 'TOPICAL', label: 'Bôi ngoài da' },
+  { value: 'INHALATION', label: 'Hít / Khí dung' },
+  { value: 'OPHTHALMIC', label: 'Nhỏ / Tra mắt' },
+  { value: 'NASAL', label: 'Xịt / Nhỏ mũi' },
+  { value: 'OTIC', label: 'Nhỏ tai' },
+  { value: 'SUBLINGUAL', label: 'Ngậm dưới lưỡi' },
+  { value: 'RECTAL', label: 'Đặt hậu môn / Trực tràng' },
+  { value: 'INTRAVENOUS', label: 'Tiêm tĩnh mạch' },
+  { value: 'INTRAMUSCULAR', label: 'Tiêm bắp' },
+  { value: 'SUBCUTANEOUS', label: 'Tiêm dưới da' },
+  { value: 'TRANSDERMAL', label: 'Dán ngoài da' },
+  { value: 'OTHER', label: 'Cách dùng khác' },
 ]
+
+const getApiMessage = (error, fallback) =>
+  error?.response?.data?.message ||
+  Object.values(error?.response?.data?.errors || {})[0] ||
+  error?.message ||
+  fallback
 
 let localItemSequence = 0
 const createEmptyItem = (isOriginal = false) => ({
   clientId: `prescription-item-${++localItemSequence}`,
   medicineId: undefined,
-  quantity: 1,
-  dosage: '',
+  quantity: 10,
+  dosage: '1 viên',
   frequency: 2,
-  route: undefined,
-  durationDays: 1,
+  route: 'ORAL',
+  durationDays: 5,
   instructions: '',
   isOriginal,
 })
@@ -141,8 +156,18 @@ function PrescriptionPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
+  const [printModalOpen, setPrintModalOpen] = useState(false)
+  const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
 
-  const isDoctor = roles.includes('doctor') || roles.includes('admin')
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
+  const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE')
+  const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
+  const canReadPrescription = userPermissions.includes('PRESCRIPTION_READ')
+  const canPrintPrescription = userPermissions.includes('PRESCRIPTION_PRINT')
+
   const isAssignedDoctor = Boolean(
     roles.includes('admin') ||
     (currentUser?.id && encounter?.doctor?.id && String(currentUser.id) === String(encounter.doctor.id)),
@@ -153,7 +178,7 @@ function PrescriptionPage() {
     'kê đơn, khóa bệnh án hoặc hoàn tất lượt khám',
   )
   const canPrescribe =
-    isDoctor &&
+    (editingPrescription ? canUpdatePrescription : canCreatePrescription) &&
     isAssignedDoctor &&
     Boolean(medicalRecordId) &&
     diagnoses.length > 0 &&
@@ -376,9 +401,30 @@ function PrescriptionPage() {
   }, [medicines])
 
   const handleItemChange = (clientId, field, value) => {
-    const nextItems = items.map((item) =>
-      item.clientId === clientId ? { ...item, [field]: value } : item,
-    )
+    const nextItems = items.map((item) => {
+      if (item.clientId !== clientId) return item
+
+      if (field === 'medicineId') {
+        const chosenMed = selectedMedicineMap.get(String(value))
+        const unit = chosenMed?.unit || 'viên'
+        const initialDosage = item.dosage || `1 ${unit}`
+        const initialRoute = item.route || 'ORAL'
+        const freq = Number(item.frequency) || 2
+        const days = Number(item.durationDays) || 5
+        const initialQty = item.quantity > 1 ? item.quantity : freq * days
+
+        return {
+          ...item,
+          medicineId: value,
+          dosage: initialDosage,
+          route: initialRoute,
+          quantity: initialQty,
+        }
+      }
+
+      return { ...item, [field]: value }
+    })
+
     setItems(nextItems)
     if (field === 'medicineId') {
       setConfirmedOverrides([])
@@ -412,7 +458,14 @@ function PrescriptionPage() {
       if (!item.medicineId) return `Dòng ${index + 1}: chưa chọn thuốc.`
       if (seen.has(item.medicineId)) return `Dòng ${index + 1}: thuốc bị trùng trong đơn.`
       seen.add(item.medicineId)
-      if (!item.dosage?.trim()) return `Dòng ${index + 1}: chưa nhập liều dùng.`
+
+      if (!item.dosage || !item.dosage.trim()) {
+        return `Dòng ${index + 1}: chưa nhập liều dùng một lần (ví dụ: 1 viên/lần, 5ml/lần).`
+      }
+      if (item.dosage.trim().length > 100) {
+        return `Dòng ${index + 1}: liều dùng không được vượt quá 100 ký tự.`
+      }
+
       const freqNum = Number(item.frequency)
       if (
         item.frequency === '' ||
@@ -421,13 +474,33 @@ function PrescriptionPage() {
         !Number.isInteger(freqNum) ||
         freqNum <= 0
       ) {
-        return `Dòng ${index + 1}: tần suất dùng thuốc phải là số nguyên dương lớn hơn 0 (lần/ngày).`
+        return `Dòng ${index + 1}: số lần dùng mỗi ngày (tần suất) phải là số nguyên dương lớn hơn 0.`
       }
-      if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
-        return `Dòng ${index + 1}: số lượng phải là số nguyên dương.`
+
+      if (!item.route) {
+        return `Dòng ${index + 1}: chưa chọn cách dùng thuốc (uống, bôi ngoài da, tiêm...).`
       }
-      if (!Number.isInteger(Number(item.durationDays)) || Number(item.durationDays) <= 0) {
-        return `Dòng ${index + 1}: số ngày dùng phải là số nguyên dương.`
+
+      const durationNum = Number(item.durationDays)
+      if (
+        item.durationDays === '' ||
+        item.durationDays == null ||
+        isNaN(durationNum) ||
+        !Number.isInteger(durationNum) ||
+        durationNum <= 0
+      ) {
+        return `Dòng ${index + 1}: số ngày dùng thuốc phải là số nguyên dương lớn hơn 0.`
+      }
+
+      const qtyNum = Number(item.quantity)
+      if (
+        item.quantity === '' ||
+        item.quantity == null ||
+        isNaN(qtyNum) ||
+        !Number.isInteger(qtyNum) ||
+        qtyNum <= 0
+      ) {
+        return `Dòng ${index + 1}: tổng số lượng thuốc phải là số nguyên dương lớn hơn 0.`
       }
 
       const itemStockRes = validateItemStock(item, selectedMedicineMap)
@@ -447,7 +520,7 @@ function PrescriptionPage() {
       medicineId: item.medicineId,
       dosage: item.dosage.trim(),
       frequency: Number(item.frequency),
-      route: item.route || null,
+      route: item.route,
       durationDays: Number(item.durationDays),
       quantity: Number(item.quantity),
       instructions: (item.instructions || '').trim(),
@@ -563,6 +636,8 @@ function PrescriptionPage() {
           quantity: Number(i.quantity),
           dosage: i.dosage,
           frequency: Number(i.frequency),
+          route: i.route,
+          durationDays: Number(i.durationDays),
           unitPrice: i.unitPrice || i.price,
         })),
         createdAt: new Date().toISOString(),
@@ -655,8 +730,8 @@ function PrescriptionPage() {
         quantity: Number(item.quantity),
         dosage: item.dosage || '',
         frequency: item.frequency != null ? Number(item.frequency) : 2,
-        route: item.route,
-        durationDays: Number(item.durationDays) || 1,
+        route: item.route || 'ORAL',
+        durationDays: Number(item.durationDays) || 5,
         instructions: item.instructions || '',
         isOriginal: true,
       })),
@@ -774,6 +849,16 @@ function PrescriptionPage() {
     })
   }
 
+  const handlePrintPrescription = (prescription) => {
+    if (!canPrintPrescription) {
+      message.error('Bạn không có quyền in đơn thuốc (Yêu cầu quyền PRESCRIPTION_PRINT).')
+      return
+    }
+    if (!prescription) return
+    setSelectedPrescriptionForPrint(prescription)
+    setPrintModalOpen(true)
+  }
+
   const historyColumns = [
     {
       title: 'Mã đơn thuốc',
@@ -857,9 +942,16 @@ function PrescriptionPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 150,
+      width: 90,
+      align: 'center',
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
+        const isPrintable = Boolean(
+          canPrintPrescription &&
+          prescription.id &&
+          prescription.prescriptionCode &&
+          (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')
+        )
         const canEditThis = canPrescribe && isPending
 
         const menuItems = [
@@ -868,6 +960,12 @@ function PrescriptionPage() {
             icon: <EyeOutlined />,
             label: 'Xem chi tiết đơn thuốc',
             onClick: () => openDetailModal(prescription),
+          },
+          isPrintable && {
+            key: 'print',
+            icon: <PrinterOutlined />,
+            label: 'In đơn thuốc',
+            onClick: () => handlePrintPrescription(prescription),
           },
           canEditThis && {
             key: 'edit',
@@ -888,20 +986,9 @@ function PrescriptionPage() {
         ].filter(Boolean)
 
         return (
-          <Space size="small">
-            <Button
-              size="small"
-              type="primary"
-              ghost
-              icon={<EyeOutlined />}
-              onClick={() => openDetailModal(prescription)}
-            >
-              Chi tiết
-            </Button>
-            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-              <Button size="small" icon={<EllipsisOutlined />} title="Thao tác khác" />
-            </Dropdown>
-          </Space>
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+            <Button size="small" icon={<EllipsisOutlined />} title="Thao tác" />
+          </Dropdown>
         )
       },
     },
@@ -1133,46 +1220,72 @@ function PrescriptionPage() {
                 >
                   {items.map((item, index) => {
                     const selectedMed = selectedMedicineMap.get(String(item.medicineId))
+                    const unit = selectedMed?.unit || 'viên'
+                    const isComplete = Boolean(
+                      item.medicineId &&
+                      item.dosage?.trim() &&
+                      item.frequency &&
+                      Number(item.frequency) > 0 &&
+                      item.route &&
+                      item.durationDays &&
+                      Number(item.durationDays) > 0 &&
+                      item.quantity &&
+                      Number(item.quantity) > 0,
+                    )
+
                     return (
                       <Card
                         key={item.clientId}
                         size="small"
                         style={{
-                          marginBottom: 14,
-                          borderRadius: 8,
-                          borderColor: item.isOriginal ? '#cbd5e1' : '#93c5fd',
-                          backgroundColor: item.isOriginal ? '#ffffff' : '#f0f9ff',
+                          marginBottom: 16,
+                          borderRadius: 10,
+                          borderWidth: 2,
+                          borderColor: isComplete ? '#BFDBFE' : '#FDE68A',
+                          backgroundColor: item.isOriginal ? '#ffffff' : '#f8fafc',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                          <Space>
-                            <Text strong style={{ fontSize: 15, color: '#1e40af' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                          <Space size={8} wrap>
+                            <Text strong style={{ fontSize: 15, color: '#1E40AF' }}>
                               Thuốc #{index + 1}
                             </Text>
+
+                            {isComplete ? (
+                              <Tag color="success" icon={<CheckCircleOutlined />}>
+                                Đủ thông tin bắt buộc
+                              </Tag>
+                            ) : (
+                              <Tag color="warning" icon={<ExclamationCircleOutlined />}>
+                                Chưa đủ trường bắt buộc
+                              </Tag>
+                            )}
+
                             {editingPrescription && (
                               <Tag color={item.isOriginal ? 'default' : 'cyan'}>
                                 {item.isOriginal ? 'Thuốc trong đơn gốc' : 'Thuốc thêm mới'}
                               </Tag>
                             )}
+
                             {selectedMed && (() => {
                               const avail = getAvailableStock(selectedMed)
                               if (avail <= 0) {
                                 return (
                                   <Tag color="red" icon={<CloseCircleOutlined />}>
-                                    HẾT HÀNG (Tồn khả dụng: 0 {selectedMed.unit || 'viên'})
+                                    HẾT HÀNG (Tồn khả dụng: 0 {unit})
                                   </Tag>
                                 )
                               }
                               if (item.quantity > avail) {
                                 return (
                                   <Tag color="volcano" icon={<WarningOutlined />}>
-                                    Vượt quá tồn kho (Còn {avail} {selectedMed.unit || 'viên'})
+                                    Vượt quá tồn kho (Còn {avail} {unit})
                                   </Tag>
                                 )
                               }
                               return (
                                 <Text type="secondary" style={{ fontSize: 13 }}>
-                                  (Còn <strong style={{ color: '#16a34a' }}>{avail}</strong> {selectedMed.unit || 'viên'})
+                                  (Tồn khả dụng: <strong style={{ color: '#16a34a' }}>{avail}</strong> {unit})
                                 </Text>
                               )
                             })()}
@@ -1191,118 +1304,203 @@ function PrescriptionPage() {
                           </Tooltip>
                         </div>
 
-                        <Space wrap align="start" style={{ width: '100%' }}>
-                          <Form.Item label="Chọn thuốc *" style={{ marginBottom: 8, flex: 3, minWidth: 420 }}>
-                            <Select
-                              showSearch
-                              style={{ width: '100%', minWidth: 320 }}
-                              optionFilterProp="label"
-                              disabled={!canPrescribe || checkingInteractions || saving}
-                              value={item.medicineId}
-                              onChange={(value) => handleItemChange(item.clientId, 'medicineId', value)}
-                              options={sortedMedicines.map((medicine) => {
-                                const availStock = getAvailableStock(medicine)
-                                const isOut = availStock <= 0
-                                return {
-                                  value: medicine.id,
-                                  disabled: isOut,
-                                  label: isOut
-                                    ? `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Hết hàng`
-                                    : `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
-                                }
-                              })}
-                              placeholder="Tìm kiếm thuốc theo tên..."
-                            />
-                          </Form.Item>
+                        {/* Hàng 1: Thuốc & Cách dùng */}
+                        <Row gutter={[12, 12]} style={{ marginBottom: 10 }}>
+                          <Col xs={24} md={15}>
+                            <Form.Item
+                              label={<span>1. Chọn thuốc <span style={{ color: '#ef4444' }}>*</span></span>}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <Select
+                                showSearch
+                                style={{ width: '100%' }}
+                                optionFilterProp="label"
+                                disabled={!canPrescribe || checkingInteractions || saving}
+                                value={item.medicineId}
+                                onChange={(value) => handleItemChange(item.clientId, 'medicineId', value)}
+                                options={sortedMedicines.map((medicine) => {
+                                  const availStock = getAvailableStock(medicine)
+                                  const isOut = availStock <= 0
+                                  return {
+                                    value: medicine.id,
+                                    disabled: isOut,
+                                    label: isOut
+                                      ? `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Hết hàng`
+                                      : `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
+                                  }
+                                })}
+                                placeholder="Tìm kiếm thuốc theo tên hoặc hoạt chất..."
+                              />
+                            </Form.Item>
+                          </Col>
 
-                          <Form.Item label="Số lượng *" style={{ marginBottom: 8 }}>
-                            <InputNumber
-                              min={1}
-                              precision={0}
-                              disabled={!canPrescribe || checkingInteractions || saving}
-                              value={item.quantity}
-                              onChange={(value) => handleItemChange(item.clientId, 'quantity', value)}
-                              style={{ width: 110 }}
-                              addonAfter={selectedMed?.unit || 'ĐV'}
-                            />
+                          <Col xs={24} md={9}>
+                            <Form.Item
+                              label={<span>2. Cách dùng <span style={{ color: '#ef4444' }}>*</span></span>}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <Select
+                                style={{ width: '100%' }}
+                                disabled={!canPrescribe || checkingInteractions || saving}
+                                value={item.route}
+                                onChange={(value) => handleItemChange(item.clientId, 'route', value)}
+                                options={ROUTE_OPTIONS}
+                                placeholder="Chọn cách dùng (bắt buộc)"
+                              />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+
+                        {/* Thông tin quy cách / hàm lượng thuốc đang chọn */}
+                        {selectedMed && (
+                          <div style={{ background: '#F1F5F9', padding: '8px 12px', borderRadius: 8, marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                            <Tag color="blue" style={{ margin: 0 }}>
+                              Hàm lượng: <strong>{selectedMed.strength || 'Theo quy cách'}</strong>
+                            </Tag>
+                            <Tag color="cyan" style={{ margin: 0 }}>
+                              Hoạt chất: <strong>{selectedMed.activeIngredient || selectedMed.medicineName}</strong>
+                            </Tag>
+                            <Tag color="purple" style={{ margin: 0 }}>
+                              Đơn vị: <strong>{selectedMed.unit || 'viên'}</strong>
+                            </Tag>
+                          </div>
+                        )}
+
+                        {/* Hàng 2: Liều dùng, Tần suất, Số ngày & Tổng số lượng */}
+                        <Row gutter={[12, 12]} style={{ marginBottom: 10 }}>
+                          <Col xs={24} sm={12} md={6}>
+                            <Form.Item
+                              label={<span>3. Liều một lần <span style={{ color: '#ef4444' }}>*</span></span>}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <Input
+                                disabled={!canPrescribe || checkingInteractions || saving}
+                                value={item.dosage}
+                                onChange={(event) => handleItemChange(item.clientId, 'dosage', event.target.value)}
+                                placeholder={`VD: 1 ${unit}/lần`}
+                              />
+                            </Form.Item>
+                            <div style={{ marginTop: 4 }}>
+                              <Space size={4} wrap>
+                                {[`1 ${unit}`, `2 ${unit}`, `1/2 ${unit}`].map((sug) => (
+                                  <Tag
+                                    key={sug}
+                                    style={{ cursor: 'pointer', fontSize: 11, margin: 0 }}
+                                    onClick={() => handleItemChange(item.clientId, 'dosage', sug)}
+                                  >
+                                    {sug}
+                                  </Tag>
+                                ))}
+                              </Space>
+                            </div>
+                          </Col>
+
+                          <Col xs={24} sm={12} md={6}>
+                            <Form.Item
+                              label={<span>4. Số lần / ngày <span style={{ color: '#ef4444' }}>*</span></span>}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <InputNumber
+                                min={1}
+                                max={24}
+                                step={1}
+                                precision={0}
+                                style={{ width: '100%' }}
+                                placeholder="VD: 2"
+                                addonAfter="lần/ngày"
+                                disabled={!canPrescribe || checkingInteractions || saving}
+                                value={item.frequency}
+                                onChange={(value) => handleItemChange(item.clientId, 'frequency', value)}
+                              />
+                            </Form.Item>
+                          </Col>
+
+                          <Col xs={24} sm={12} md={6}>
+                            <Form.Item
+                              label={<span>5. Số ngày dùng <span style={{ color: '#ef4444' }}>*</span></span>}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <InputNumber
+                                min={1}
+                                max={365}
+                                precision={0}
+                                disabled={!canPrescribe || checkingInteractions || saving}
+                                value={item.durationDays}
+                                onChange={(value) => handleItemChange(item.clientId, 'durationDays', value)}
+                                style={{ width: '100%' }}
+                                addonAfter="ngày"
+                              />
+                            </Form.Item>
+                          </Col>
+
+                          <Col xs={24} sm={12} md={6}>
+                            <Form.Item
+                              label={<span>6. Tổng số lượng <span style={{ color: '#ef4444' }}>*</span></span>}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <InputNumber
+                                min={1}
+                                precision={0}
+                                disabled={!canPrescribe || checkingInteractions || saving}
+                                value={item.quantity}
+                                onChange={(value) => handleItemChange(item.clientId, 'quantity', value)}
+                                style={{ width: '100%' }}
+                                addonAfter={unit}
+                              />
+                            </Form.Item>
                             {selectedMed && (() => {
                               const avail = getAvailableStock(selectedMed)
-                              if (Number(item.quantity || 0) <= 0) {
-                                return (
-                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-                                    Số lượng kê phải lớn hơn 0.
-                                  </div>
-                                )
-                              }
                               if (avail > 0 && item.quantity > avail) {
                                 return (
                                   <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-                                    Không đủ tồn kho. Tối đa có thể kê: {avail} {selectedMed.unit || 'viên'}.
+                                    Không đủ tồn kho. Tối đa có thể kê: {avail} {unit}.
                                   </div>
                                 )
                               }
                               return null
                             })()}
-                          </Form.Item>
+                            {Number(item.frequency) > 0 && Number(item.durationDays) > 0 && (
+                              <div style={{ marginTop: 4 }}>
+                                <Text
+                                  type="secondary"
+                                  style={{ fontSize: 11, cursor: 'pointer', color: '#2563EB' }}
+                                  onClick={() => {
+                                    const qty = Number(item.frequency) * Number(item.durationDays)
+                                    handleItemChange(item.clientId, 'quantity', qty)
+                                  }}
+                                >
+                                  ⚡ Gợi ý: {Number(item.frequency) * Number(item.durationDays)} {unit}
+                                </Text>
+                              </div>
+                            )}
+                          </Col>
+                        </Row>
 
-                          <Form.Item label="Số ngày *" style={{ marginBottom: 8 }}>
-                            <InputNumber
-                              min={1}
-                              precision={0}
-                              disabled={!canPrescribe || checkingInteractions || saving}
-                              value={item.durationDays}
-                              onChange={(value) => handleItemChange(item.clientId, 'durationDays', value)}
-                              style={{ width: 100 }}
-                              addonAfter="ngày"
-                            />
-                          </Form.Item>
-
-                          <Form.Item label="Cách dùng" style={{ marginBottom: 8, flex: 1, minWidth: 200 }}>
-                            <Select
-                              allowClear
-                              style={{ width: '100%', minWidth: 140 }}
-                              disabled={!canPrescribe || checkingInteractions || saving}
-                              value={item.route}
-                              onChange={(value) => handleItemChange(item.clientId, 'route', value)}
-                              options={ROUTE_OPTIONS}
-                              placeholder="Chọn cách dùng"
-                            />
-                          </Form.Item>
+                        {/* Hàng 3: Hướng dẫn dùng chi tiết */}
+                        <Form.Item
+                          label="7. Hướng dẫn dùng & Lời dặn chi tiết"
+                          style={{ marginBottom: 4 }}
+                        >
+                          <Input
+                            disabled={!canPrescribe || checkingInteractions || saving}
+                            value={item.instructions}
+                            onChange={(event) => handleItemChange(item.clientId, 'instructions', event.target.value)}
+                            placeholder="Ví dụ: Uống sau khi ăn no 30 phút, uống với nhiều nước..."
+                          />
+                        </Form.Item>
+                        <Space size={4} wrap style={{ marginBottom: 4 }}>
+                          {['Uống sau ăn no', 'Uống trước ăn 30 phút', 'Uống trước khi đi ngủ', 'Uống nhiều nước'].map((preset) => (
+                            <Tag
+                              key={preset}
+                              style={{ cursor: 'pointer', fontSize: 11 }}
+                              onClick={() => handleItemChange(item.clientId, 'instructions', preset)}
+                            >
+                              + {preset}
+                            </Tag>
+                          ))}
                         </Space>
 
-                        <Space wrap style={{ width: '100%', marginTop: 4 }} align="start">
-                          <Form.Item label="Liều dùng *" style={{ marginBottom: 0, flex: 1, minWidth: 260 }}>
-                            <Input
-                              disabled={!canPrescribe || checkingInteractions || saving}
-                              value={item.dosage}
-                              onChange={(event) => handleItemChange(item.clientId, 'dosage', event.target.value)}
-                              placeholder="Ví dụ: 1 viên/lần, 5ml/lần..."
-                            />
-                          </Form.Item>
-                          <Form.Item label="Tần suất (lần/ngày) *" style={{ marginBottom: 0, flex: 1, minWidth: 240 }}>
-                            <InputNumber
-                              min={1}
-                              max={24}
-                              step={1}
-                              precision={0}
-                              style={{ width: '100%' }}
-                              placeholder="Số lần/ngày (VD: 2)"
-                              addonAfter="lần/ngày"
-                              disabled={!canPrescribe || checkingInteractions || saving}
-                              value={item.frequency}
-                              onChange={(value) => handleItemChange(item.clientId, 'frequency', value)}
-                            />
-                          </Form.Item>
-                          <Form.Item label="Hướng dẫn dùng" style={{ marginBottom: 0, flex: 1, minWidth: 260 }}>
-                            <Input
-                              disabled={!canPrescribe || checkingInteractions || saving}
-                              value={item.instructions}
-                              onChange={(event) => handleItemChange(item.clientId, 'instructions', event.target.value)}
-                              placeholder="Ví dụ: Uống sau khi ăn no..."
-                            />
-                          </Form.Item>
-                        </Space>
-
+                        {/* Cảnh báo tồn kho */}
                         {selectedMed && (() => {
                           const avail = getAvailableStock(selectedMed)
                           if (avail <= 0) {
@@ -1322,7 +1520,7 @@ function PrescriptionPage() {
                                 type="error"
                                 showIcon
                                 icon={<WarningOutlined />}
-                                message={`Số lượng kê (${item.quantity} ${selectedMed.unit || 'viên'}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${selectedMed.unit || 'viên'}).`}
+                                message={`Số lượng kê (${item.quantity} ${unit}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${unit}).`}
                                 style={{ marginTop: 10 }}
                               />
                             )
@@ -1555,18 +1753,31 @@ function PrescriptionPage() {
         </React.Suspense>
       )}
 
-      {detailModalOpen && (
-        <React.Suspense fallback={<Spin size="small" />}>
-          <PrescriptionDetailModal
-            open={detailModalOpen}
-            onClose={() => setDetailModalOpen(false)}
-            prescription={selectedPrescriptionForDetail}
-            medicines={medicines}
-            canEdit={canPrescribe}
-            onEditClick={startEditPrescription}
-          />
-        </React.Suspense>
-      )}
+      <PrescriptionDetailModal
+        open={detailModalOpen}
+        onClose={() => setDetailModalOpen(false)}
+        prescription={selectedPrescriptionForDetail}
+        medicines={medicines}
+        canEdit={canPrescribe}
+        onEditClick={startEditPrescription}
+        onPrintClick={(p) => {
+          setSelectedPrescriptionForPrint(p)
+          setPrintModalOpen(true)
+        }}
+      />
+
+      <PrescriptionPrintTemplateModal
+        open={printModalOpen}
+        onClose={() => {
+          setPrintModalOpen(false)
+          setSelectedPrescriptionForPrint(null)
+        }}
+        prescription={selectedPrescriptionForPrint}
+        record={record}
+        diagnoses={diagnoses}
+        patient={encounter?.patient}
+        encounter={encounter}
+      />
     </div>
   )
 }
