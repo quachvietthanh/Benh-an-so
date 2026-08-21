@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.prescription;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,4 +22,9 @@ public interface JpaPrescriptionItemRepository
     @Query("delete from PrescriptionItemEntity item "
             + "where item.prescriptionId = :prescriptionId")
     void deleteAllByPrescriptionId(@Param("prescriptionId") UUID prescriptionId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from PrescriptionItemEntity item "
+            + "where item.prescriptionId in :prescriptionIds")
+    void deleteAllByPrescriptionIdIn(@Param("prescriptionIds") Collection<UUID> prescriptionIds);
 }

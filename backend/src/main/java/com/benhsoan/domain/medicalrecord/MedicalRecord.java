@@ -87,11 +87,27 @@ public class MedicalRecord {
         return status == MedicalRecordStatus.LOCKED;
     }
 
+    public void archive(UUID by, Instant at) {
+        if (status != MedicalRecordStatus.LOCKED) {
+            conflict("Only locked records can be archived.");
+        }
+        status = MedicalRecordStatus.ARCHIVED;
+        updatedBy = Objects.requireNonNull(by);
+        updatedAt = Objects.requireNonNull(at);
+    }
+
+    public boolean isArchived() {
+        return status == MedicalRecordStatus.ARCHIVED;
+    }
+
     public void ensureEditable() {
         if (isLocked()) {
             throw new MedicalRecordAlreadyLockedException();
-    
-        }}
+        }
+        if (isArchived()) {
+            throw new MedicalRecordInvalidStatusException("Archived medical records are read-only.");
+        }
+    }
 
     private void ensureLockableContent() {
         if (chiefComplaint == null || chiefComplaint.isBlank()) {

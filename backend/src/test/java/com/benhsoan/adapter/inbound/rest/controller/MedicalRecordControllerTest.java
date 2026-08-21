@@ -34,7 +34,9 @@ import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
@@ -72,6 +74,10 @@ class MedicalRecordControllerTest {
     private GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
     @MockitoBean
     private ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
+    @MockitoBean
+    private ArchiveMedicalRecordUseCase archiveMedicalRecordUseCase;
+    @MockitoBean
+    private DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;

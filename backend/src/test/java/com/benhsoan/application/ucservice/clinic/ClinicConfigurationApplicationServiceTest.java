@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,16 +22,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.benhsoan.domain.clinic.ClinicConfiguration;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.clinic.UpdateClinicConfigurationCommand;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.clinic.ClinicConfigurationRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)
 class ClinicConfigurationApplicationServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-19T01:00:00Z");
+    private static final UUID ACTOR = UUID.randomUUID();
 
     @Mock
     private ClinicConfigurationRepository clinicConfigurationRepository;
+    @Mock
+    private AuditLogRepository auditLogRepository;
+    @Mock
+    private CurrentUserPort currentUserPort;
     @Mock
     private ClockPort clockPort;
 
@@ -43,6 +51,8 @@ class ClinicConfigurationApplicationServiceTest {
         getService = new GetClinicConfigurationService(clinicConfigurationRepository, resultMapper);
         updateService = new UpdateClinicConfigurationService(
                 clinicConfigurationRepository,
+                auditLogRepository,
+                currentUserPort,
                 clockPort,
                 resultMapper
         );
@@ -63,6 +73,7 @@ class ClinicConfigurationApplicationServiceTest {
     void updateCreatesTheSingletonWhenItDoesNotExist() {
         when(clinicConfigurationRepository.find()).thenReturn(Optional.empty());
         when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR);
         when(clinicConfigurationRepository.save(any(ClinicConfiguration.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -83,6 +94,7 @@ class ClinicConfigurationApplicationServiceTest {
         );
         when(clinicConfigurationRepository.find()).thenReturn(Optional.of(existing));
         when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR);
         when(clinicConfigurationRepository.save(any(ClinicConfiguration.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -114,7 +126,8 @@ class ClinicConfigurationApplicationServiceTest {
                 "Thanh pho Ho Chi Minh",
                 "0900000000",
                 openingTime,
-                closingTime
+                closingTime,
+                10
         );
     }
 }

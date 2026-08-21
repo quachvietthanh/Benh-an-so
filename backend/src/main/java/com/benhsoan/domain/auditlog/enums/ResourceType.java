@@ -40,5 +40,7 @@ public enum ResourceType {
 
     CARE_LOG,
 
-    PATIENT_PORTAL
+    PATIENT_PORTAL,
+
+    CONFIGURATION
 }

@@ -24,6 +24,8 @@ class MedicalRecordRepositoryAdapterTest {
 
     @Mock
     private JpaMedicalRecordRepository jpaRepository;
+    @Mock
+    private MedicalRecordCascadeDeleter cascadeDeleter;
     @Spy
     private MedicalRecordPersistenceMapper mapper = new MedicalRecordPersistenceMapper();
     @InjectMocks
