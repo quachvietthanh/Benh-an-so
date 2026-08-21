@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Alert,
   Button,
@@ -53,8 +53,14 @@ function ClinicConfigurationPage() {
   const [editingRoom, setEditingRoom] = useState(null)
   const [savingRoom, setSavingRoom] = useState(false)
 
-  const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
-  const isAdmin = userRoles.includes('admin')
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
+  const canReadConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ')
+  const canUpdateConfig = userPermissions.includes('CLINIC_CONFIGURATION_UPDATE')
+  const canCreateRoom = userPermissions.includes('ROOM_CREATE')
+  const canUpdateRoom = userPermissions.includes('ROOM_UPDATE')
 
   const fetchConfig = useCallback(async () => {
     setLoadingConfig(true)
@@ -74,7 +80,7 @@ function ClinicConfigurationPage() {
       console.error('[ClinicConfigurationPage] Lỗi tải cấu hình phòng khám:', err)
       const status = err?.response?.status
       if (status === 403) {
-        setConfigErrorMsg('Bạn không có quyền truy cập cấu hình phòng khám.')
+        setConfigErrorMsg('Bạn không có quyền truy cập cấu hình phòng khám (403 Forbidden).')
       } else if (status === 401) {
         setConfigErrorMsg('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
       } else {
@@ -99,11 +105,11 @@ function ClinicConfigurationPage() {
   }, [])
 
   useEffect(() => {
-    if (isAdmin) {
+    if (canReadConfig) {
       fetchConfig()
       fetchRooms()
     }
-  }, [isAdmin, fetchConfig, fetchRooms])
+  }, [canReadConfig, fetchConfig, fetchRooms])
 
   const handleResetConfig = () => {
     if (lastFetchedConfig) {
@@ -121,8 +127,8 @@ function ClinicConfigurationPage() {
   }
 
   const handleSubmitConfig = async (values) => {
-    if (!isAdmin) {
-      message.error('Bạn không có quyền cập nhật cấu hình phòng khám.')
+    if (!canUpdateConfig) {
+      message.error('Bạn không có quyền cập nhật cấu hình phòng khám (Yêu cầu quyền CLINIC_CONFIGURATION_UPDATE).')
       return
     }
 
@@ -251,7 +257,7 @@ function ClinicConfigurationPage() {
     }
   }
 
-  if (!isAdmin) {
+  if (!canReadConfig) {
     return (
       <Card style={{ marginTop: 16 }}>
         <Alert
@@ -259,7 +265,7 @@ function ClinicConfigurationPage() {
           showIcon
           icon={<LockOutlined />}
           message="Bạn không có quyền truy cập chức năng này."
-          description="Chức năng Cấu hình thông tin phòng khám chỉ dành cho Quản trị viên (ADMIN)."
+          description="Chức năng Cấu hình thông tin phòng khám yêu cầu quyền CLINIC_CONFIGURATION_READ hoặc ROOM_READ."
         />
       </Card>
     )

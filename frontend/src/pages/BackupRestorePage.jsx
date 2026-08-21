@@ -59,12 +59,13 @@ const formatFileSize = (bytes) => {
 function BackupRestorePage() {
   const { user } = useAuthContext()
 
-  const userRoles = useMemo(() => {
-    const raw = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
-    return raw.map((r) => String(r || '').toUpperCase().replace(/^ROLE_/, '')).filter(Boolean)
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
 
-  const isAdmin = userRoles.includes('ADMIN')
+  const canReadBackup = userPermissions.includes('BACKUP_READ')
+  const canCreateBackup = userPermissions.includes('BACKUP_CREATE')
+  const canRestoreBackup = userPermissions.includes('BACKUP_RESTORE')
 
   const [backups, setBackups] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -120,8 +121,8 @@ function BackupRestorePage() {
   }, [loadBackups])
 
   const handleConfirmCreateBackup = async () => {
-    if (!isAdmin) {
-      message.error('Bạn không có quyền thực hiện thao tác này.')
+    if (!canCreateBackup) {
+      message.error('Bạn không có quyền tạo bản sao lưu dữ liệu (Yêu cầu quyền BACKUP_CREATE).')
       return
     }
 
@@ -165,8 +166,8 @@ function BackupRestorePage() {
       message.error('Mã bản sao lưu không hợp lệ.')
       return
     }
-    if (!isAdmin) {
-      message.error('Bạn không có quyền phục hồi dữ liệu.')
+    if (!canRestoreBackup) {
+      message.error('Bạn không có quyền phục hồi dữ liệu (Yêu cầu quyền BACKUP_RESTORE).')
       return
     }
 
@@ -313,7 +314,7 @@ function BackupRestorePage() {
             <Button
               size="small"
               icon={<DownloadOutlined />}
-              disabled={!isAdmin || !isSuccess || downloadingId === record.id}
+              disabled={!canReadBackup || !isSuccess || downloadingId === record.id}
               loading={downloadingId === record.id}
               onClick={() => handleDownload(record)}
             >
@@ -324,7 +325,7 @@ function BackupRestorePage() {
               type="primary"
               danger
               icon={<CloudDownloadOutlined />}
-              disabled={!isAdmin || !isSuccess || restoring || loading}
+              disabled={!canRestoreBackup || !isSuccess || restoring || loading}
               onClick={() => setRestoreTargetBackup(record)}
             >
               Phục hồi
@@ -354,7 +355,7 @@ function BackupRestorePage() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            disabled={!isAdmin || loading || creating}
+            disabled={!canCreateBackup || loading || creating}
             onClick={() => setCreateModalOpen(true)}
           >
             + Tạo bản sao lưu
@@ -362,13 +363,13 @@ function BackupRestorePage() {
         </Space>
       </div>
 
-      {!isAdmin && (
+      {!canReadBackup && (
         <Alert
           type="error"
           showIcon
           icon={<LockOutlined />}
           message="Bạn không có quyền thực hiện sao lưu hoặc phục hồi dữ liệu."
-          description="Chức năng quản trị an toàn dữ liệu chỉ dành riêng cho tài khoản Quản trị viên (ADMIN)."
+          description="Chức năng quản trị an toàn dữ liệu yêu cầu quyền BACKUP_READ, BACKUP_CREATE hoặc BACKUP_RESTORE."
           style={{ marginBottom: 20 }}
         />
       )}
@@ -485,7 +486,7 @@ function BackupRestorePage() {
             key="submit"
             type="primary"
             loading={creating}
-            disabled={!isAdmin || creating}
+            disabled={!canCreateBackup || creating}
             onClick={handleConfirmCreateBackup}
           >
             Xác nhận sao lưu
@@ -531,7 +532,7 @@ function BackupRestorePage() {
             type="primary"
             danger
             loading={restoring}
-            disabled={!isAdmin || restoring}
+            disabled={!canRestoreBackup || restoring}
             onClick={handleConfirmRestore}
           >
             Phục hồi

@@ -158,7 +158,15 @@ function PrescriptionPage() {
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
 
-  const isDoctor = roles.includes('doctor') || roles.includes('admin')
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
+  const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE')
+  const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
+  const canReadPrescription = userPermissions.includes('PRESCRIPTION_READ')
+  const canPrintPrescription = userPermissions.includes('PRESCRIPTION_PRINT')
+
   const isAssignedDoctor = Boolean(
     roles.includes('admin') ||
     (currentUser?.id && encounter?.doctor?.id && String(currentUser.id) === String(encounter.doctor.id)),
@@ -169,7 +177,7 @@ function PrescriptionPage() {
     'kê đơn, khóa bệnh án hoặc hoàn tất lượt khám',
   )
   const canPrescribe =
-    isDoctor &&
+    (editingPrescription ? canUpdatePrescription : canCreatePrescription) &&
     isAssignedDoctor &&
     Boolean(medicalRecordId) &&
     diagnoses.length > 0 &&
@@ -840,6 +848,10 @@ function PrescriptionPage() {
   }
 
   const handlePrintPrescription = (prescription) => {
+    if (!canPrintPrescription) {
+      message.error('Bạn không có quyền in đơn thuốc (Yêu cầu quyền PRESCRIPTION_PRINT).')
+      return
+    }
     if (!prescription) return
     setSelectedPrescriptionForPrint(prescription)
     setPrintModalOpen(true)
@@ -933,6 +945,7 @@ function PrescriptionPage() {
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
         const isPrintable = Boolean(
+          canPrintPrescription &&
           prescription.id &&
           prescription.prescriptionCode &&
           (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')

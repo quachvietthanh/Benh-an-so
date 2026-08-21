@@ -61,8 +61,14 @@ const getPatientStatus = (patient) => (
 function PatientList() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuthContext()
-  const canManage = user?.roles?.some((role) => ['admin', 'receptionist'].includes(role))
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
+  const canCreatePatient = userPermissions.includes('PATIENT_CREATE')
+  const canUpdatePatient = userPermissions.includes('PATIENT_UPDATE')
+  const canReadPatient = userPermissions.includes('PATIENT_READ')
+  const canManage = canCreatePatient || canUpdatePatient
   const [loading, setLoading] = useState(false)
   const [patients, setPatients] = useState([])
   const [total, setTotal] = useState(0)
@@ -354,7 +360,7 @@ ${rowsXml}
       render: (_, patient) => (
         <Space size={5} onClick={(event) => event.stopPropagation()}>
           <Button className="patient-action-button" icon={<EyeOutlined />} onClick={() => navigate(`/patients/${patient.id}`, { state: { patient } })} aria-label="Xem hồ sơ" />
-          {canManage && <Button className="patient-action-button" icon={<EditOutlined />} onClick={() => navigate(`/patients/${patient.id}`, { state: { patient } })} aria-label="Sửa hồ sơ" />}
+          {canUpdatePatient && <Button className="patient-action-button" icon={<EditOutlined />} onClick={() => navigate(`/patients/${patient.id}`, { state: { patient } })} aria-label="Sửa hồ sơ" />}
           <Dropdown
             trigger={['click']}
             menu={{
@@ -395,7 +401,7 @@ ${rowsXml}
           <h1>Danh sách bệnh nhân</h1>
           <Space size={10}>
             <Button icon={<DownloadOutlined />} onClick={exportPatients}>Xuất Excel</Button>
-            {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>Thêm bệnh nhân</Button>}
+            {canCreatePatient && <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>Thêm bệnh nhân</Button>}
           </Space>
         </header>
 

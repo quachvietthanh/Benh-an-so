@@ -49,13 +49,12 @@ function ReportsPage() {
   const navigate = useNavigate()
   const { user, logout } = useAuthContext()
 
-  const roles = useMemo(() => {
-    const values = Array.isArray(user?.roles) ? user.roles : user?.role ? [user.role] : []
-    return values
-      .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
-      .filter(Boolean)
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
-  const isManager = roles.includes('manager') || roles.includes('admin')
+
+  const canViewReports = userPermissions.includes('REPORT_VIEW')
+  const canExportReports = userPermissions.includes('REPORT_EXPORT')
 
   const [range, setRange] = useState([dayjs().subtract(29, 'day'), dayjs()])
   const [loading, setLoading] = useState(false)
@@ -229,6 +228,10 @@ function ReportsPage() {
   }, [loadData])
 
   const handleExportCSV = async () => {
+    if (!canExportReports) {
+      message.error('Bạn không có quyền xuất báo cáo (Yêu cầu quyền REPORT_EXPORT).')
+      return
+    }
     setExporting(true)
     try {
       const response = await reportApi.export({ from: fromStr, to: toStr })
@@ -301,22 +304,26 @@ function ReportsPage() {
             type="primary"
             icon={<DownloadOutlined />}
             loading={exporting}
+            disabled={!canExportReports || exporting}
             onClick={handleExportCSV}
-            style={{ borderRadius: 8, background: '#1677ff', fontWeight: 600 }}
+            style={{ borderRadius: 8, background: canExportReports ? '#1677ff' : undefined, fontWeight: 600 }}
           >
             Xuất báo cáo (CSV)
           </Button>
         </Space>
       </div>
 
-      {loadError === 'PERMISSION_DENIED_NOT_MANAGER' ? (
-        <ManagerPermissionAlert
-          user={user}
-          roles={roles}
-          logout={logout}
-          navigate={navigate}
+      {!canViewReports && (
+        <Alert
+          type="error"
+          showIcon
+          message="Không có quyền xem báo cáo"
+          description="Bạn không có quyền truy cập module Báo cáo vận hành (Yêu cầu quyền REPORT_VIEW)."
+          style={{ marginBottom: 16 }}
         />
-      ) : loadError ? (
+      )}
+
+      {loadError && canViewReports ? (
         <Alert
           type="error"
           showIcon
