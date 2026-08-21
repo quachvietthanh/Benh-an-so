@@ -36,6 +36,26 @@ Cung cấp API để hiển thị nội dung hồ sơ bệnh án điện tử ch
 | `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR, NURSE |
 | `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR, NURSE |
 
+## Ký bệnh án
+
+`POST /medical-records/{medicalRecordId}/sign`
+
+Permission: `MEDICAL_RECORD_UPDATE_STATUS`. Ngoài RBAC, chỉ bác sĩ được gán cho lượt khám mới được ký.
+
+Request body là tùy chọn. Khi không truyền `signatureData`, hệ thống tạo chữ ký mô phỏng.
+
+```json
+{
+  "signatureData": "DR_SIM_SIG"
+}
+```
+
+Bệnh án phải có ít nhất một chẩn đoán và nội dung bắt buộc. Lifecycle là
+`OPEN` → `SIGNED` → `LOCKED`; trạng thái `SIGNED` đã khóa mọi sửa đổi nội dung trực tiếp.
+Một lần ký thứ hai trả về conflict và không tạo chữ ký/audit `SIGN` thành công thứ hai.
+
+Response là `MedicalRecordResponse`, bao gồm `status`, `signatureData`, `signedAt` và `signedBy`.
+
 > ⚠️ Audit log được tự động ghi khi gọi **các endpoint đọc hồ sơ** (`getDetailByVisitId`, `getHistoryByPatientId`, `getById`, `getByVisitId`).
 
 ## 1. GET /medical-records/visits/{visitId}

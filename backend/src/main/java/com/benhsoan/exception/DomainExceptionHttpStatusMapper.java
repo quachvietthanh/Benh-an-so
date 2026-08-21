@@ -39,6 +39,7 @@ final class DomainExceptionHttpStatusMapper {
                     ACCOUNT_LOCKED,
                     INVOICE_UNAUTHORIZED_ADJUSTMENT,
                     MEDICAL_RECORD_ACCESS_DENIED,
+                    MEDICAL_RECORD_UNAUTHORIZED_SIGNER,
                     PATIENT_INACTIVE,
                     UNAUTHORIZED_APPOINTMENT_OPERATION,
                     UNAUTHORIZED_PRESCRIPTION_AMENDMENT,
@@ -49,6 +50,7 @@ final class DomainExceptionHttpStatusMapper {
                     TOKEN_INVALID -> HttpStatus.UNAUTHORIZED;
             case APPOINTMENT_TIME_IN_PAST,
                     INVALID_BACKUP_STATUS,
+                    MEDICAL_RECORD_MISSING_DIAGNOSIS,
                     PAYMENT_AMOUNT_MISMATCH,
                     SELF_DRUG_INTERACTION,
                     VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;

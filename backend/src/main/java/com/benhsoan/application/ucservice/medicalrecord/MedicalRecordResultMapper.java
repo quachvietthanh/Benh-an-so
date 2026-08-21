@@ -28,7 +28,8 @@ public class MedicalRecordResultMapper {
                 record.getId(), record.getVisitId(), record.getChiefComplaint(), record.getSymptoms(),
                 record.getMedicalHistory(), record.getPhysicalExamination(), record.getClinicalProgress(),
                 record.getTreatmentPlan(), record.getDoctorInstructions(), record.getConclusion(),
-                record.getStatus(), record.getLockedAt(), record.getLockedBy(), record.getCreatedBy(),
+                record.getStatus(), record.getSignatureData(), record.getSignedAt(), record.getSignedBy(),
+                record.getLockedAt(), record.getLockedBy(), record.getCreatedBy(),
                 record.getCreatedAt(), record.getUpdatedBy(), record.getUpdatedAt()
         );
     }
@@ -81,7 +82,8 @@ public class MedicalRecordResultMapper {
                 record.getId(), record.getChiefComplaint(), record.getSymptoms(),
                 record.getMedicalHistory(), record.getPhysicalExamination(), record.getClinicalProgress(),
                 record.getTreatmentPlan(), record.getDoctorInstructions(), record.getConclusion(),
-                record.getStatus(), record.getLockedAt(), record.getLockedBy(),
+                record.getStatus(), record.getSignatureData(), record.getSignedAt(), record.getSignedBy(),
+                record.getLockedAt(), record.getLockedBy(),
                 primary == null ? null : primary.getDiagnosisCode(),
                 primary == null ? null : primary.getDiagnosisName(),
                 secondaryIcdCodes,

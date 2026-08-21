@@ -8,6 +8,8 @@ public interface MedicalRecordRepository {
 
     Optional<MedicalRecord> findById(UUID id);
 
+    Optional<MedicalRecord> findByIdForUpdate(UUID id);
+
     MedicalRecord save(MedicalRecord medicalRecord);
 
     Optional<MedicalRecord> findByVisitId(UUID visitId);

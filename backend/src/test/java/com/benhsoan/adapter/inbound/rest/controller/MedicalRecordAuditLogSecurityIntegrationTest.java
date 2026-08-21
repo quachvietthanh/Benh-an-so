@@ -79,6 +79,7 @@ class MedicalRecordAuditLogSecurityIntegrationTest {
     @MockitoBean private GetMedicalRecordUseCase getMedicalRecordUseCase;
     @MockitoBean private UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
     @MockitoBean private LockMedicalRecordUseCase lockMedicalRecordUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase signMedicalRecordUseCase;
     @MockitoBean private AmendMedicalRecordUseCase amendMedicalRecordUseCase;
     @MockitoBean private GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
     @MockitoBean private GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
