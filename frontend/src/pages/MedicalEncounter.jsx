@@ -39,6 +39,7 @@ import { useAuthContext } from '../context/AuthContext'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
+import { getApiErrorMessage as getApiMessage, normalizeApiError } from '../utils/apiError'
 import {
   buildClinicalOrderPayload,
   buildDiagnosisPayload,
@@ -51,17 +52,6 @@ import {
 const ClinicalOrderPrintModal = React.lazy(() => import('../components/clinical/ClinicalOrderPrintModal'))
 
 const { Text, Paragraph, Title } = Typography
-
-const getApiMessage = (error, fallback) => {
-  const errors = error?.response?.data?.errors
-  if (errors && typeof errors === 'object') {
-    const values = Object.values(errors).filter(Boolean)
-    if (values.length > 0) {
-      return String(values[0])
-    }
-  }
-  return error?.response?.data?.message || error?.message || fallback
-}
 
 const loadRecentDiagnoses = () => {
   try {
@@ -150,7 +140,7 @@ function MedicalEncounter() {
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
   const [allBackendDiagnoses, setAllBackendDiagnoses] = useState([])
   const [icdSearching, setIcdSearching] = useState(false)
-  const [recentIcds, setRecentIcds] = useState(loadRecentDiagnoses)
+  const [, setRecentIcds] = useState(loadRecentDiagnoses)
 
   const loadAllBackendDiagnoses = useCallback(async () => {
     setIcdSearching(true)
@@ -277,7 +267,7 @@ function MedicalEncounter() {
 
       if (recordResult.status === 'fulfilled') {
         hydrateRecord(recordResult.value.data)
-      } else if (recordResult.reason?.response?.status === 404) {
+      } else if ((recordResult.reason?.apiError || normalizeApiError(recordResult.reason)).status === 404) {
         hydrateRecord(null)
       } else {
         throw recordResult.reason

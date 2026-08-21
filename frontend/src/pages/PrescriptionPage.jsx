@@ -99,12 +99,6 @@ const ROUTE_OPTIONS = [
   { value: 'OTHER', label: 'Cách dùng khác' },
 ]
 
-const getApiMessage = (error, fallback) =>
-  error?.response?.data?.message ||
-  Object.values(error?.response?.data?.errors || {})[0] ||
-  error?.message ||
-  fallback
-
 let localItemSequence = 0
 const createEmptyItem = (isOriginal = false) => ({
   clientId: `prescription-item-${++localItemSequence}`,
@@ -160,13 +154,13 @@ function PrescriptionPage() {
   const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
 
   const userPermissions = useMemo(() => {
-    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
-  }, [user])
+    return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [currentUser])
 
   const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE')
   const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
-  const canReadPrescription = userPermissions.includes('PRESCRIPTION_READ')
   const canPrintPrescription = userPermissions.includes('PRESCRIPTION_PRINT')
+  const isDoctor = roles.includes('doctor') || roles.includes('admin')
 
   const isAssignedDoctor = Boolean(
     roles.includes('admin') ||

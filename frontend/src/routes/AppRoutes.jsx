@@ -64,10 +64,10 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/public-lookup" element={<PublicLookupPage />} />
-      <Route path="/portal" element={<PublicLookupPage />} />
-      <Route path="/tra-cuu-ket-qua" element={<PublicLookupPage />} />
+      <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
+      <Route path="/public-lookup" element={<LazyPage><PublicLookupPage /></LazyPage>} />
+      <Route path="/portal" element={<LazyPage><PublicLookupPage /></LazyPage>} />
+      <Route path="/tra-cuu-ket-qua" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/tra-cuu" element={<Navigate to="/portal" replace />} />
 
       <Route
@@ -78,15 +78,15 @@ function AppRoutes() {
           </PrivateRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="patients" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientList /></PrivateRoute>} />
-        <Route path="patients/:id" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><PatientDetail /></PrivateRoute>} />
-        <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'nurse', 'receptionist']}><AppointmentQueue /></PrivateRoute>} />
-        <Route path="after-care" element={<PrivateRoute allowedRoles={['receptionist', 'admin']}><AfterCarePage /></PrivateRoute>} />
-        <Route path="medical-records" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
-        <Route path="medical-records/visits/:visitId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><MedicalEncounter /></PrivateRoute>} />
-        <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><PrescriptionPage /></PrivateRoute>} />
-        <Route path="prescriptions/:medicalRecordId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><PrescriptionPage /></PrivateRoute>} />
+        <Route index element={<LazyPage><Dashboard /></LazyPage>} />
+        <Route path="patients" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientList /></LazyPage></PrivateRoute>} />
+        <Route path="patients/:id" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientDetail /></LazyPage></PrivateRoute>} />
+        <Route path="appointments" element={<PrivateRoute allowedRoles={['admin', 'doctor', 'nurse', 'receptionist']}><LazyPage><AppointmentQueue /></LazyPage></PrivateRoute>} />
+        <Route path="after-care" element={<PrivateRoute allowedRoles={['receptionist', 'admin']}><LazyPage><AfterCarePage /></LazyPage></PrivateRoute>} />
+        <Route path="medical-records" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><LazyPage><MedicalEncounter /></LazyPage></PrivateRoute>} />
+        <Route path="medical-records/visits/:visitId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><LazyPage><MedicalEncounter /></LazyPage></PrivateRoute>} />
+        <Route path="prescriptions" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><LazyPage><PrescriptionPage /></LazyPage></PrivateRoute>} />
+        <Route path="prescriptions/:medicalRecordId" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><LazyPage><PrescriptionPage /></LazyPage></PrivateRoute>} />
         <Route path="clinical-orders" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><Navigate to="/appointments" replace /></PrivateRoute>} />
         <Route path="clinical-results" element={<PrivateRoute allowedRoles={['admin', 'doctor']}><LazyPage><ResultPage /></LazyPage></PrivateRoute>} />
         <Route path="results" element={<Navigate to="/clinical-results" replace />} />
