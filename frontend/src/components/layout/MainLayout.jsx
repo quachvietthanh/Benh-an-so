@@ -56,22 +56,23 @@ const getNavigationItems = (roles = [], permissions = []) => {
 
   const hasPerm = (code) => userPerms.includes(code)
   const hasRole = (r) => normalizedRoles.includes(r)
+  const isAdmin = hasRole('admin')
 
   const items = [
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, check: () => true },
-    { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, check: () => hasPerm('PATIENT_READ') || hasRole('admin') || hasRole('doctor') || hasRole('receptionist') },
-    { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, check: () => hasPerm('APPOINTMENT_READ') || hasPerm('QUEUE_VIEW') || hasRole('admin') || hasRole('doctor') || hasRole('receptionist') },
-    { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, check: () => hasPerm('FOLLOW_UP_REMINDER_READ') || hasPerm('CARE_LOG_READ') || hasRole('receptionist') || hasRole('admin') },
-    { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, check: () => hasPerm('MEDICAL_RECORD_READ') || hasRole('admin') || hasRole('doctor') },
-    { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, check: () => hasPerm('PRESCRIPTION_READ') || hasRole('admin') || hasRole('doctor') },
-    { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, check: () => hasPerm('CLINICAL_RESULT_READ') || hasPerm('CLINICAL_RESULT_CREATE') || hasRole('admin') || hasRole('doctor') },
-    { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, check: () => hasPerm('PHARMACY_READ') || hasPerm('PRESCRIPTION_READ') || hasRole('admin') || hasRole('pharmacist') },
-    { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, check: () => hasPerm('PHARMACY_READ') || hasRole('admin') || hasRole('pharmacist') },
-    { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, check: () => hasPerm('PHARMACY_CREATE') || hasRole('admin') || hasRole('pharmacist') },
-    { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, check: () => hasPerm('INVOICE_READ') || hasPerm('INVOICE_CREATE') || hasRole('admin') || hasRole('manager') || hasRole('receptionist') },
-    { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, check: () => hasPerm('REPORT_VIEW') || hasRole('admin') || hasRole('manager') },
-    { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || hasRole('admin') || hasRole('manager') || hasRole('clinic_manager') },
-    { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => hasPerm('ROLE_READ') || hasPerm('CLINIC_CONFIGURATION_READ') || hasPerm('USER_READ') || hasPerm('AUDIT_READ') || hasPerm('BACKUP_READ') || hasRole('admin') || hasRole('manager') || hasRole('clinic_manager') },
+    { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, check: () => !isAdmin && (hasPerm('PATIENT_READ') || hasRole('doctor') || hasRole('receptionist')) },
+    { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, check: () => !isAdmin && (hasPerm('APPOINTMENT_READ') || hasPerm('QUEUE_VIEW') || hasRole('doctor') || hasRole('receptionist')) },
+    { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, check: () => !isAdmin && (hasPerm('FOLLOW_UP_REMINDER_READ') || hasPerm('CARE_LOG_READ') || hasRole('receptionist')) },
+    { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, check: () => !isAdmin && (hasPerm('MEDICAL_RECORD_READ') || hasRole('doctor')) },
+    { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, check: () => !isAdmin && (hasPerm('PRESCRIPTION_READ') || hasRole('doctor')) },
+    { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, check: () => !isAdmin && (hasPerm('CLINICAL_RESULT_READ') || hasPerm('CLINICAL_RESULT_CREATE') || hasRole('doctor')) },
+    { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, check: () => !isAdmin && (hasPerm('PHARMACY_READ') || hasPerm('PRESCRIPTION_READ') || hasRole('pharmacist')) },
+    { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, check: () => !isAdmin && (hasPerm('PHARMACY_READ') || hasRole('pharmacist')) },
+    { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, check: () => !isAdmin && (hasPerm('PHARMACY_CREATE') || hasRole('pharmacist')) },
+    { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, check: () => !isAdmin && (hasPerm('INVOICE_READ') || hasPerm('INVOICE_CREATE') || hasRole('manager') || hasRole('receptionist')) },
+    { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, check: () => hasPerm('REPORT_VIEW') || isAdmin || hasRole('manager') },
+    { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || isAdmin || hasRole('manager') || hasRole('clinic_manager') },
+    { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => hasPerm('ROLE_READ') || hasPerm('CLINIC_CONFIGURATION_READ') || hasPerm('USER_READ') || hasPerm('AUDIT_READ') || hasPerm('BACKUP_READ') || isAdmin || hasRole('manager') || hasRole('clinic_manager') },
   ]
 
   return items.filter((item) => item.check())
