@@ -13,6 +13,9 @@ public class ClinicConfiguration {
 
     public static final int SINGLETON_ID = 1;
 
+    public static final int DEFAULT_RETENTION_YEARS = 10;
+    public static final int MIN_RETENTION_YEARS = 10;
+
     private static final int MAX_CLINIC_NAME_LENGTH = 150;
     private static final int MAX_ADDRESS_LENGTH = 500;
     private static final int MAX_PHONE_LENGTH = 30;
@@ -23,6 +26,7 @@ public class ClinicConfiguration {
     private String phone;
     private LocalTime openingTime;
     private LocalTime closingTime;
+    private int retentionYears;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -33,6 +37,7 @@ public class ClinicConfiguration {
             String phone,
             LocalTime openingTime,
             LocalTime closingTime,
+            int retentionYears,
             Instant createdAt,
             Instant updatedAt
     ) {
@@ -46,6 +51,7 @@ public class ClinicConfiguration {
         this.openingTime = Guard.require(openingTime, "Opening time");
         this.closingTime = Guard.require(closingTime, "Closing time");
         validateWorkingHours(this.openingTime, this.closingTime);
+        this.retentionYears = validateRetentionYears(retentionYears);
         this.createdAt = Guard.require(createdAt, "Created at");
         this.updatedAt = Guard.require(updatedAt, "Updated at");
     }
@@ -58,8 +64,20 @@ public class ClinicConfiguration {
             LocalTime closingTime,
             Instant now
     ) {
+        return create(clinicName, address, phone, openingTime, closingTime, DEFAULT_RETENTION_YEARS, now);
+    }
+
+    public static ClinicConfiguration create(
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            int retentionYears,
+            Instant now
+    ) {
         return new ClinicConfiguration(
-                SINGLETON_ID, clinicName, address, phone, openingTime, closingTime, now, now
+                SINGLETON_ID, clinicName, address, phone, openingTime, closingTime, retentionYears, now, now
         );
     }
 
@@ -73,8 +91,22 @@ public class ClinicConfiguration {
             Instant createdAt,
             Instant updatedAt
     ) {
+        return restore(id, clinicName, address, phone, openingTime, closingTime, DEFAULT_RETENTION_YEARS, createdAt, updatedAt);
+    }
+
+    public static ClinicConfiguration restore(
+            int id,
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            int retentionYears,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
         return new ClinicConfiguration(
-                id, clinicName, address, phone, openingTime, closingTime, createdAt, updatedAt
+                id, clinicName, address, phone, openingTime, closingTime, retentionYears, createdAt, updatedAt
         );
     }
 
@@ -92,6 +124,11 @@ public class ClinicConfiguration {
         this.openingTime = Guard.require(openingTime, "Opening time");
         this.closingTime = Guard.require(closingTime, "Closing time");
         validateWorkingHours(this.openingTime, this.closingTime);
+        this.updatedAt = Guard.require(updatedAt, "Updated at");
+    }
+
+    public void updateRetentionYears(int retentionYears, Instant updatedAt) {
+        this.retentionYears = validateRetentionYears(retentionYears);
         this.updatedAt = Guard.require(updatedAt, "Updated at");
     }
 
@@ -118,5 +155,12 @@ public class ClinicConfiguration {
         if (!closingTime.isAfter(openingTime)) {
             throw new ValidationException("Closing time must be after opening time.");
         }
+    }
+
+    private static int validateRetentionYears(int retentionYears) {
+        if (retentionYears < MIN_RETENTION_YEARS) {
+            throw new ValidationException("Retention years must be at least " + MIN_RETENTION_YEARS + ".");
+        }
+        return retentionYears;
     }
 }

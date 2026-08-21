@@ -40,4 +40,9 @@ public class MedicalRecordRepositoryAdapter implements MedicalRecordRepository {
     public boolean existsByVisitId(UUID visitId) {
         return jpaRepository.existsByVisitId(visitId);
     }
+
+    @Override
+    public void deleteById(UUID id) {
+        jpaRepository.deleteById(id);
+    }
 }

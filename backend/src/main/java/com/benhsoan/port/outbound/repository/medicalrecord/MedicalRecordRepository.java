@@ -13,4 +13,6 @@ public interface MedicalRecordRepository {
     Optional<MedicalRecord> findByVisitId(UUID visitId);
 
     boolean existsByVisitId(UUID visitId);
+
+    void deleteById(UUID id);
 }

@@ -20,6 +20,7 @@ public class ClinicConfigurationPersistenceMapper {
                 entity.getPhone(),
                 entity.getOpeningTime(),
                 entity.getClosingTime(),
+                entity.getRetentionYears(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -37,6 +38,7 @@ public class ClinicConfigurationPersistenceMapper {
                 .phone(domain.getPhone())
                 .openingTime(domain.getOpeningTime())
                 .closingTime(domain.getClosingTime())
+                .retentionYears(domain.getRetentionYears())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

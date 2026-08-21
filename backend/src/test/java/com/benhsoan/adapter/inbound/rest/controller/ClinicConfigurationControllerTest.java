@@ -118,6 +118,25 @@ class ClinicConfigurationControllerTest {
     }
 
     @Test
+    void rejectsRetentionBelowMinimum() throws Exception {
+        mockMvc.perform(put("/system/clinic")
+                        .with(user("admin").authorities(new SimpleGrantedAuthority("PERMISSION_CLINIC_CONFIGURATION_UPDATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clinicName":"Phong kham Benh So An",
+                                  "openingTime":"08:00:00",
+                                  "closingTime":"17:00:00",
+                                  "retentionYears": 5
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.retentionYears").value("Retention years must be at least 10."));
+
+        verifyNoInteractions(updateClinicConfigurationUseCase);
+    }
+
+    @Test
     void rejectsNonAdminAccess() throws Exception {
         mockMvc.perform(get("/system/clinic")
                         .with(user("doctor").roles("DOCTOR")))
@@ -139,7 +158,8 @@ class ClinicConfigurationControllerTest {
                   "address":"Thanh pho Ho Chi Minh",
                   "phone":"0900000000",
                   "openingTime":"08:00:00",
-                  "closingTime":"17:00:00"
+                  "closingTime":"17:00:00",
+                  "retentionYears": 10
                 }
                 """;
     }
@@ -150,7 +170,8 @@ class ClinicConfigurationControllerTest {
                 "Thanh pho Ho Chi Minh",
                 "0900000000",
                 LocalTime.of(8, 0),
-                LocalTime.of(17, 0)
+                LocalTime.of(17, 0),
+                10
         );
     }
 }

@@ -29,7 +29,9 @@ import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
@@ -75,6 +77,8 @@ class MedicalRecordReadSecurityIntegrationTest {
     @MockitoBean private GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
     @MockitoBean private GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
     @MockitoBean private ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
+    @MockitoBean private ArchiveMedicalRecordUseCase archiveMedicalRecordUseCase;
+    @MockitoBean private DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;

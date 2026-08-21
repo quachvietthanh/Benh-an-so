@@ -7,10 +7,11 @@ public record ClinicConfigurationResult(
         String address,
         String phone,
         LocalTime openingTime,
-        LocalTime closingTime
+        LocalTime closingTime,
+        Integer retentionYears
 ) {
 
     public static ClinicConfigurationResult empty() {
-        return new ClinicConfigurationResult(null, null, null, null, null);
+        return new ClinicConfigurationResult(null, null, null, null, null, null);
     }
 }

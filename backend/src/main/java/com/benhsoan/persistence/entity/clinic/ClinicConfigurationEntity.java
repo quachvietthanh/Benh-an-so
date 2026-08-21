@@ -41,6 +41,9 @@ public class ClinicConfigurationEntity {
     @Column(name = "closing_time", nullable = false)
     private LocalTime closingTime;
 
+    @Column(name = "retention_years", nullable = false)
+    private int retentionYears;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

@@ -14,7 +14,8 @@ class ClinicConfigurationResultMapper {
                 configuration.getAddress(),
                 configuration.getPhone(),
                 configuration.getOpeningTime(),
-                configuration.getClosingTime()
+                configuration.getClosingTime(),
+                configuration.getRetentionYears()
         );
     }
 }
