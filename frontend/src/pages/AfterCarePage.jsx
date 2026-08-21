@@ -165,21 +165,25 @@ function AfterCarePage() {
     return (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   }, [user])
 
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
   const permissions = useMemo(() => {
     const isRec = userRoles.includes('receptionist')
     const isAdmin = userRoles.includes('admin')
-    const isReadOnly = isAdmin && !isRec
+    const hasPerm = (code) => userPermissions.includes(code)
 
     return {
-      reminderCreate: !isReadOnly && (isRec || hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_CREATE')),
-      reminderRead: isAdmin || isRec || hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_READ'),
-      reminderUpdate: !isReadOnly && (isRec || hasAftercarePermission(user, 'FOLLOW_UP_REMINDER_UPDATE')),
-      careCreate: !isReadOnly && (isRec || hasAftercarePermission(user, 'CARE_LOG_CREATE')),
-      careRead: isAdmin || isRec || hasAftercarePermission(user, 'CARE_LOG_READ'),
-      medicalRecordRead: isAdmin || isRec || hasAftercarePermission(user, 'MEDICAL_RECORD_READ'),
-      isReadOnly,
+      reminderCreate: hasPerm('FOLLOW_UP_REMINDER_CREATE') || isRec,
+      reminderRead: hasPerm('FOLLOW_UP_REMINDER_READ') || isRec || isAdmin,
+      reminderUpdate: hasPerm('FOLLOW_UP_REMINDER_UPDATE') || isRec,
+      careCreate: hasPerm('CARE_LOG_CREATE') || isRec,
+      careRead: hasPerm('CARE_LOG_READ') || isRec || isAdmin,
+      medicalRecordRead: hasPerm('MEDICAL_RECORD_READ') || isRec || isAdmin,
+      isReadOnly: !hasPerm('FOLLOW_UP_REMINDER_CREATE') && !hasPerm('CARE_LOG_CREATE') && !isRec,
     }
-  }, [user, userRoles])
+  }, [userRoles, userPermissions])
 
   const performerNames = useMemo(() => {
     if (!user?.id) return {}

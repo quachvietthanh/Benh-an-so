@@ -55,7 +55,7 @@ import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
-import PrescriptionPrintModal from '../components/pharmacy/PrescriptionPrintModal'
+import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import { useAuthContext } from '../context/AuthContext'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
@@ -156,24 +156,19 @@ function PrescriptionPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
-  const [downloadingPdfMap, setDownloadingPdfMap] = useState({})
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
 
-  const handleCopyPrescriptionCode = (code) => {
-    if (code) {
-      navigator.clipboard?.writeText(code)
-      message.success(`Đã sao chép mã đơn thuốc điện tử: ${code}`)
-    }
-  }
-
-  const handlePrintPrescriptionPdf = (prescription) => {
-    if (!prescription) return
-    setSelectedPrescriptionForPrint(prescription)
-    setPrintModalOpen(true)
-  }
+  const userPermissions = useMemo(() => {
+    return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [currentUser])
 
   const isDoctor = roles.includes('doctor') || roles.includes('admin')
+  const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE') || isDoctor
+  const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE') || isDoctor
+  const canReadPrescription = userPermissions.includes('PRESCRIPTION_READ') || isDoctor
+  const canPrintPrescription = userPermissions.includes('PRESCRIPTION_PRINT') || isDoctor
+
   const isAssignedDoctor = Boolean(
     roles.includes('admin') ||
     (currentUser?.id && encounter?.doctor?.id && String(currentUser.id) === String(encounter.doctor.id)),
@@ -184,7 +179,7 @@ function PrescriptionPage() {
     'kê đơn, khóa bệnh án hoặc hoàn tất lượt khám',
   )
   const canPrescribe =
-    isDoctor &&
+    (editingPrescription ? canUpdatePrescription : canCreatePrescription) &&
     isAssignedDoctor &&
     Boolean(medicalRecordId) &&
     diagnoses.length > 0 &&
@@ -448,7 +443,6 @@ function PrescriptionPage() {
   const validateForm = () => {
     if (!medicalRecordId) return 'Thiếu medicalRecordId.'
     if (!diagnoses.length) return 'Bệnh án phải có chẩn đoán trước khi kê đơn.'
-    if (!isDoctor) return 'Chỉ bác sĩ mới được kê đơn.'
     if (!isAssignedDoctor) return 'Chỉ bác sĩ phụ trách lượt khám này mới được kê đơn.'
     if (prescriptionBlockReason) return prescriptionBlockReason
     if (recordLocked) return 'Bệnh án đã khóa nên không thể kê hoặc điều chỉnh đơn.'
@@ -629,15 +623,17 @@ function PrescriptionPage() {
         visitCode: encounter?.visitCode || encounter?.visit?.visitCode || activeQueueItem?.visitCode || encounter?.queueItem?.visitCode,
         patientId: encounter?.patientId || encounter?.patient?.id || activeQueueItem?.patientId,
         patientCode: encounter?.patientCode || encounter?.patient?.patientCode || activeQueueItem?.patientCode,
-        patientName: encounter?.patientName || encounter?.patient?.fullName || activeQueueItem?.patientName,
+        patientName: fixMojibake(encounter?.patientName || encounter?.patient?.fullName || activeQueueItem?.patientName),
         medicalRecordId: medicalRecordId,
         status: pData.status || 'PENDING_DISPENSE',
         items: items.map((i) => ({
           medicineId: i.medicineId,
-          medicineName: i.medicineName || i.name,
+          medicineName: fixMojibake(i.medicineName || i.name),
           quantity: Number(i.quantity),
           dosage: i.dosage,
           frequency: Number(i.frequency),
+          route: i.route,
+          durationDays: Number(i.durationDays),
           unitPrice: i.unitPrice || i.price,
         })),
         createdAt: new Date().toISOString(),
@@ -661,6 +657,23 @@ function PrescriptionPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleCopyPrescriptionCode = (code) => {
+    if (code) {
+      navigator.clipboard?.writeText(code)
+      message.success(`Đã sao chép mã đơn thuốc điện tử: ${code}`)
+    }
+  }
+
+  const handlePrintPrescription = (prescription) => {
+    if (!canPrintPrescription) {
+      message.error('Bạn không có quyền in đơn thuốc (Yêu cầu quyền PRESCRIPTION_PRINT).')
+      return
+    }
+    if (!prescription) return
+    setSelectedPrescriptionForPrint(prescription)
+    setPrintModalOpen(true)
   }
 
   const handleSaveClick = async () => {
@@ -731,7 +744,7 @@ function PrescriptionPage() {
         dosage: item.dosage || '',
         frequency: item.frequency != null ? Number(item.frequency) : 2,
         route: item.route || 'ORAL',
-        durationDays: Number(item.durationDays) || 1,
+        durationDays: Number(item.durationDays) || 5,
         instructions: item.instructions || '',
         isOriginal: true,
       })),
@@ -940,6 +953,7 @@ function PrescriptionPage() {
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
         const isPrintable = Boolean(
+          canPrintPrescription &&
           prescription.id &&
           prescription.prescriptionCode &&
           (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')
@@ -953,11 +967,11 @@ function PrescriptionPage() {
             label: 'Xem chi tiết đơn thuốc',
             onClick: () => openDetailModal(prescription),
           },
-          {
+          isPrintable && {
             key: 'print',
             icon: <PrinterOutlined />,
-            label: 'In đơn thuốc (PDF)',
-            onClick: () => handlePrintPrescriptionPdf(prescription),
+            label: 'In đơn thuốc',
+            onClick: () => handlePrintPrescription(prescription),
           },
           {
             key: 'copy',
@@ -994,14 +1008,15 @@ function PrescriptionPage() {
             >
               Chi tiết
             </Button>
-            <Tooltip title="In đơn thuốc điện tử / Tải PDF">
-              <Button
-                size="small"
-                icon={<PrinterOutlined />}
-                loading={Boolean(downloadingPdfMap[prescription.id])}
-                onClick={() => handlePrintPrescriptionPdf(prescription)}
-              />
-            </Tooltip>
+            {isPrintable && (
+              <Tooltip title="In đơn thuốc điện tử">
+                <Button
+                  size="small"
+                  icon={<PrinterOutlined />}
+                  onClick={() => handlePrintPrescription(prescription)}
+                />
+              </Tooltip>
+            )}
             <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
               <Button size="small" icon={<EllipsisOutlined />} title="Thao tác khác" />
             </Dropdown>
@@ -1321,7 +1336,7 @@ function PrescriptionPage() {
                           </Tooltip>
                         </div>
 
-                        {/* Hàng 1: Thuốc & Đường dùng */}
+                        {/* Hàng 1: Thuốc & Cách dùng */}
                         <Row gutter={[12, 12]} style={{ marginBottom: 10 }}>
                           <Col xs={24} md={15}>
                             <Form.Item
@@ -1465,6 +1480,17 @@ function PrescriptionPage() {
                                 addonAfter={unit}
                               />
                             </Form.Item>
+                            {selectedMed && (() => {
+                              const avail = getAvailableStock(selectedMed)
+                              if (avail > 0 && item.quantity > avail) {
+                                return (
+                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                    Không đủ tồn kho. Tối đa có thể kê: {avail} {unit}.
+                                  </div>
+                                )
+                              }
+                              return null
+                            })()}
                             {Number(item.frequency) > 0 && Number(item.durationDays) > 0 && (
                               <div style={{ marginTop: 4 }}>
                                 <Text
@@ -1541,7 +1567,16 @@ function PrescriptionPage() {
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
-                      disabled={checkingInteractions || saving}
+                      disabled={checkingInteractions || saving || items.some((i) => {
+                        if (!i.medicineId) return false
+                        const med = selectedMedicineMap.get(String(i.medicineId))
+                        if (!med) return false
+                        const avail = getAvailableStock(med)
+                        const totalQty = items
+                          .filter((x) => String(x.medicineId) === String(i.medicineId))
+                          .reduce((sum, x) => sum + Number(x.quantity || 0), 0)
+                        return avail <= 0 || Number(i.quantity || 0) > avail || totalQty > avail
+                      })}
                       onClick={() => {
                         setConfirmedOverrides([])
                         setItems((current) => [...current, createEmptyItem(false)])
@@ -1753,20 +1788,20 @@ function PrescriptionPage() {
         medicines={medicines}
         canEdit={canPrescribe}
         onEditClick={startEditPrescription}
-        onPrintClick={handlePrintPrescriptionPdf}
+        onPrintClick={handlePrintPrescription}
       />
 
-      <PrescriptionPrintModal
+      <PrescriptionPrintTemplateModal
         open={printModalOpen}
         onClose={() => {
           setPrintModalOpen(false)
           setSelectedPrescriptionForPrint(null)
         }}
         prescription={selectedPrescriptionForPrint}
-        medicines={medicines}
-        patient={encounter?.patient || record?.patient}
-        doctorName={encounter?.doctor?.fullName || encounter?.doctorName || record?.doctorName}
+        record={record}
         diagnoses={diagnoses}
+        patient={encounter?.patient || record?.patient}
+        encounter={encounter}
       />
     </div>
   )
