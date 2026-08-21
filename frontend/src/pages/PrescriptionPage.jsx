@@ -159,8 +159,8 @@ function PrescriptionPage() {
   const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
 
   const userPermissions = useMemo(() => {
-    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
-  }, [user])
+    return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [currentUser])
 
   const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE')
   const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
