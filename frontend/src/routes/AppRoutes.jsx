@@ -25,6 +25,7 @@ const PublicLookupPage = React.lazy(() => import('../pages/PublicLookupPage'))
 const SystemManagementPage = React.lazy(() => import('../pages/SystemManagementPage'))
 const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
 const MedicalRecordAccessLogsPage = React.lazy(() => import('../pages/MedicalRecordAccessLogsPage'))
+const PrescriptionInterconnectionPage = React.lazy(() => import('../pages/PrescriptionInterconnectionPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -116,6 +117,7 @@ function AppRoutes() {
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedPermissions={['AUDIT_READ']} allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute allowedPermissions={['USER_READ', 'USER_CREATE', 'USER_UPDATE']} allowedRoles={['admin']}><LazyPage><UsersPage /></LazyPage></PrivateRoute>} />
         <Route path="services" element={<PrivateRoute allowedPermissions={['SERVICE_CATALOG_READ', 'SERVICE_CATALOG_CREATE', 'SERVICE_CATALOG_UPDATE', 'SERVICE_PRICE_MANAGE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><ServicesPage /></LazyPage></PrivateRoute>} />
+        <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
       </Route>
 
       <Route path="*" element={<LazyPage><NotFound /></LazyPage>} />
