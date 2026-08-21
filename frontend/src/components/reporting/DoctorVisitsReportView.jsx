@@ -34,14 +34,22 @@ const { RangePicker } = DatePicker
 const { Title, Paragraph, Text } = Typography
 
 export default function DoctorVisitsReportView({
+  range: propRange,
   initialRange = [dayjs().subtract(29, 'day'), dayjs()],
 }) {
-  const [range, setRange] = useState(initialRange)
+  const [range, setRange] = useState(propRange || initialRange)
   const [reportData, setReportData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [dateValidationError, setDateValidationError] = useState('')
   const [hoveredDoctor, setHoveredDoctor] = useState(null)
+
+  useEffect(() => {
+    if (propRange && propRange[0] && propRange[1]) {
+      setRange(propRange)
+      fetchDoctorVisitsReport(propRange[0], propRange[1])
+    }
+  }, [propRange])
 
   const fromStr = useMemo(
     () => (range?.[0] ? range[0].format('YYYY-MM-DD') : ''),
