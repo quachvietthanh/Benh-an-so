@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Alert,
   Badge,
@@ -8,6 +8,7 @@ import {
   Divider,
   Empty,
   Modal,
+  Popconfirm,
   Space,
   Table,
   Tabs,
@@ -21,7 +22,11 @@ import {
   AlertOutlined,
   BarcodeOutlined,
   CheckCircleOutlined,
+  CheckOutlined,
   ClockCircleOutlined,
+  CloseCircleOutlined,
+  CloudServerOutlined,
+  CloudUploadOutlined,
   CopyOutlined,
   EditOutlined,
   FileTextOutlined,
@@ -30,6 +35,7 @@ import {
   PlusCircleOutlined,
   PrinterOutlined,
   SafetyCertificateOutlined,
+  SyncOutlined,
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
@@ -38,6 +44,7 @@ import pharmacyApi from '../../api/pharmacyApi'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import {
   formatPrescriptionCode,
+  getInterconnectionStatusInfo,
   isStandardRxCode,
 } from '../../utils/electronicPrescriptionValidation'
 
@@ -67,8 +74,25 @@ function PrescriptionDetailModal({
   medicines = [],
   onEditClick,
   onPrintClick,
+  onInterconnectionUpdated,
   canEdit = false,
+  canSendInterconnection = true,
 }) {
+  const [sendingInterconnection, setSendingInterconnection] = useState(false)
+  const [interconnectionState, setInterconnectionState] = useState(null)
+  const [printing, setPrinting] = useState(false)
+
+  useEffect(() => {
+    if (prescription) {
+      setInterconnectionState({
+        status: prescription.interconnectionStatus || (prescription.receiptCode ? 'SUCCESS' : 'NOT_SENT'),
+        receiptCode: prescription.interconnectionReceiptCode || prescription.receiptCode || '',
+        failureReason: prescription.lastInterconnectionError || prescription.failureReason || '',
+        completedAt: prescription.lastInterconnectionAt || prescription.completedAt || '',
+      })
+    }
+  }, [prescription])
+
   if (!prescription) return null
 
   const getMedicineName = (id, fallback) => {
@@ -79,6 +103,48 @@ function PrescriptionDetailModal({
   const items = prescription.items || []
   const warnings = prescription.warnings || []
   const historyLogs = prescription.amendments || prescription.historyLogs || []
+
+  const currentInterconnection = interconnectionState || {
+    status: prescription.interconnectionStatus || 'NOT_SENT',
+    receiptCode: prescription.interconnectionReceiptCode || prescription.receiptCode || '',
+    failureReason: prescription.lastInterconnectionError || prescription.failureReason || '',
+    completedAt: prescription.lastInterconnectionAt || '',
+  }
+
+  const interInfo = getInterconnectionStatusInfo(
+    currentInterconnection.status,
+    currentInterconnection.receiptCode,
+    currentInterconnection.failureReason,
+  )
+
+  const handleSendInterconnection = async () => {
+    if (!prescription?.id || sendingInterconnection) return
+    setSendingInterconnection(true)
+    try {
+      const res = await pharmacyApi.sendToInterconnection(prescription.id)
+      const data = res.data || {}
+      const newState = {
+        status: data.status,
+        receiptCode: data.receiptCode || '',
+        failureReason: data.failureReason || '',
+        completedAt: data.completedAt || new Date().toISOString(),
+      }
+      setInterconnectionState(newState)
+      if (data.status === 'SUCCESS') {
+        message.success(`Đã gửi đơn lên Cổng liên thông Quốc gia thành công! Mã tiếp nhận: ${data.receiptCode}`)
+      } else {
+        message.error(`Gửi liên thông thất bại: ${data.failureReason || 'Cổng liên thông từ chối tiếp nhận'}`)
+      }
+      if (onInterconnectionUpdated) {
+        onInterconnectionUpdated(prescription.id, newState)
+      }
+    } catch (error) {
+      const msg = error?.response?.data?.message || error.message || 'Không thể gửi đơn thuốc lên cổng liên thông.'
+      message.error(msg)
+    } finally {
+      setSendingInterconnection(false)
+    }
+  }
 
   const itemColumns = [
     {
@@ -180,13 +246,20 @@ function PrescriptionDetailModal({
   )
 
   const isPending = prescription.status === 'PENDING_DISPENSE'
+  const isCancelled = prescription.status === 'CANCELLED'
   const isPrintable = Boolean(
     prescription?.id &&
     prescription?.prescriptionCode &&
     (prescription?.status === 'PENDING_DISPENSE' || prescription?.status === 'DISPENSED')
   )
 
-  const [printing, setPrinting] = useState(false)
+  const canSendNow = Boolean(
+    canSendInterconnection &&
+    !isCancelled &&
+    prescription.id &&
+    prescription.prescriptionCode &&
+    !interInfo.isSuccess
+  )
 
   const handlePrintPrescription = async () => {
     if (!isPrintable || printing) return
@@ -256,53 +329,86 @@ function PrescriptionDetailModal({
     <Modal
       open={open}
       title={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingRight: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingRight: 24, flexWrap: 'wrap' }}>
           <Space>
             <MedicineBoxOutlined style={{ color: '#2563eb', fontSize: 20 }} />
             <span style={{ fontSize: 17, fontWeight: 600 }}>
               Đơn thuốc Điện tử: {formatPrescriptionCode(prescription.prescriptionCode || prescription.id)}
             </span>
           </Space>
-          {statusTag}
+          <Space>
+            {interInfo.isSuccess && (
+              <Tag color="success" icon={<CheckCircleOutlined />}>
+                Đã liên thông ({interInfo.receiptCode})
+              </Tag>
+            )}
+            {interInfo.isFailed && (
+              <Tag color="error" icon={<CloseCircleOutlined />}>
+                Liên thông lỗi
+              </Tag>
+            )}
+            {statusTag}
+          </Space>
         </div>
       }
       onCancel={onClose}
       footer={
-        <Space>
-          <Button
-            type="primary"
-            icon={<PrinterOutlined />}
-            loading={printing}
-            disabled={!isPrintable || printing}
-            onClick={() => {
-              if (onPrintClick) {
-                onPrintClick(prescription)
-              } else {
-                handlePrintPrescription()
-              }
-            }}
-          >
-            In đơn thuốc
-          </Button>
-          {canEdit && isPending && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            {canSendNow && (
+              <Button
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                loading={sendingInterconnection}
+                onClick={handleSendInterconnection}
+                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+              >
+                {interInfo.isFailed ? 'Gửi lại lên Cổng liên thông' : 'Gửi lên Cổng liên thông'}
+              </Button>
+            )}
+            {interInfo.isSuccess && (
+              <Tag color="success" icon={<CheckOutlined />} style={{ padding: '4px 10px', fontSize: 12 }}>
+                Đã liên thông Quốc gia: <strong>{interInfo.receiptCode}</strong>
+              </Tag>
+            )}
+          </div>
+          <Space>
             <Button
-              type="default"
-              icon={<EditOutlined />}
+              type="primary"
+              icon={<PrinterOutlined />}
+              loading={printing}
+              disabled={!isPrintable || printing}
               onClick={() => {
-                onClose()
-                if (onEditClick) onEditClick(prescription)
+                if (onPrintClick) {
+                  onPrintClick(prescription)
+                } else {
+                  handlePrintPrescription()
+                }
               }}
             >
-              Điều chỉnh đơn này
+              In đơn thuốc
             </Button>
-          )}
-          <Button onClick={onClose}>Đóng</Button>
-        </Space>
+            {canEdit && isPending && (
+              <Button
+                type="default"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  onClose()
+                  if (onEditClick) onEditClick(prescription)
+                }}
+              >
+                Điều chỉnh đơn này
+              </Button>
+            )}
+            <Button onClick={onClose}>Đóng</Button>
+          </Space>
+        </div>
       }
-      width={840}
+      width={860}
       style={{ top: 20 }}
     >
       <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc' }}>
+        {/* Banner mã định danh điện tử */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eff6ff', padding: '10px 14px', borderRadius: 8, marginBottom: 12, border: '1px solid #bfdbfe', flexWrap: 'wrap', gap: 8 }}>
           <Space size={8} align="center">
             <BarcodeOutlined style={{ fontSize: 22, color: '#1d4ed8' }} />
@@ -329,7 +435,7 @@ function PrescriptionDetailModal({
                   />
                 </Tooltip>
                 <Tag color="cyan" style={{ fontSize: 11 }}>
-                  <SafetyCertificateOutlined /> Liên thông & Bất biến
+                  <SafetyCertificateOutlined /> Bất biến & Định danh
                 </Tag>
               </Space>
             </div>
@@ -337,6 +443,72 @@ function PrescriptionDetailModal({
           <Text type="secondary" style={{ fontSize: 12, maxWidth: 300, textAlign: 'right' }}>
             Mã được gắn cố định với đơn và không thay đổi trong suốt vòng đời của đơn.
           </Text>
+        </div>
+
+        {/* Banner trạng thái liên thông quốc gia */}
+        <div
+          style={{
+            backgroundColor: interInfo.bgColor,
+            borderColor: interInfo.borderColor,
+            borderWidth: 1,
+            borderStyle: 'solid',
+            borderRadius: 8,
+            padding: '10px 14px',
+            marginBottom: 12,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
+        >
+          <Space size={10} align="center">
+            <CloudServerOutlined style={{ fontSize: 20, color: interInfo.tagColor }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', color: interInfo.tagColor }}>
+                  Cổng liên thông Quốc gia:
+                </span>
+                <Tag color={interInfo.color} style={{ fontWeight: 600, margin: 0 }}>
+                  {interInfo.label}
+                </Tag>
+                {interInfo.receiptCode && (
+                  <Tag color="blue" style={{ fontFamily: 'monospace', fontWeight: 700, margin: 0 }}>
+                    Mã biên nhận: {interInfo.receiptCode}
+                  </Tag>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+                {interInfo.isSuccess ? (
+                  <span>
+                    ✓ Đơn thuốc đã được hệ thống liên thông mô phỏng tiếp nhận thành công lúc{' '}
+                    <strong>{interInfo.completedAt ? dayjs(interInfo.completedAt).format('HH:mm DD/MM/YYYY') : 'vừa xong'}</strong>.
+                  </span>
+                ) : interInfo.isFailed ? (
+                  <span style={{ color: '#b91c1c' }}>
+                    ✕ Lý do thất bại: <strong>{interInfo.failureReason}</strong>
+                  </span>
+                ) : (
+                  <span>
+                    Đơn thuốc sẵn sàng gửi lên dịch vụ liên thông mô phỏng của phòng khám.
+                  </span>
+                )}
+              </div>
+            </div>
+          </Space>
+
+          {canSendNow && (
+            <Button
+              size="small"
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              loading={sendingInterconnection}
+              onClick={handleSendInterconnection}
+              style={{ backgroundColor: interInfo.isFailed ? '#dc2626' : '#0284c7', borderColor: interInfo.isFailed ? '#dc2626' : '#0284c7' }}
+            >
+              {interInfo.isFailed ? 'Gửi lại liên thông' : 'Gửi liên thông ngay'}
+            </Button>
+          )}
         </div>
 
         <Descriptions size="small" column={{ xs: 1, sm: 2, lg: 3 }} bordered={false}>
@@ -358,6 +530,9 @@ function PrescriptionDetailModal({
           </Descriptions.Item>
           <Descriptions.Item label="Cập nhật lần cuối">
             {prescription.updatedAt ? dayjs(prescription.updatedAt).format('HH:mm DD/MM/YYYY') : 'Chưa điều chỉnh'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Mã biên nhận liên thông">
+            {interInfo.receiptCode ? <Text code strong>{interInfo.receiptCode}</Text> : <Text type="secondary">Chưa có</Text>}
           </Descriptions.Item>
         </Descriptions>
         {prescription.note && (
@@ -414,6 +589,105 @@ function PrescriptionDetailModal({
                   </div>
                 )}
               </>
+            ),
+          },
+          {
+            key: 'interconnection',
+            label: (
+              <span>
+                <CloudUploadOutlined /> Cổng liên thông Quốc gia
+                {interInfo.isSuccess && <Tag color="success" style={{ marginLeft: 6, fontSize: 11 }}>Đã gửi</Tag>}
+                {interInfo.isFailed && <Tag color="error" style={{ marginLeft: 6, fontSize: 11 }}>Lỗi</Tag>}
+                {interInfo.isNotSent && <Tag color="default" style={{ marginLeft: 6, fontSize: 11 }}>Chưa gửi</Tag>}
+              </span>
+            ),
+            children: (
+              <div style={{ padding: '8px 4px' }}>
+                <Card
+                  style={{
+                    backgroundColor: interInfo.bgColor,
+                    borderColor: interInfo.borderColor,
+                    borderRadius: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <CloudServerOutlined style={{ fontSize: 24, color: interInfo.tagColor }} />
+                        <Title level={5} style={{ margin: 0, color: '#0f172a' }}>
+                          Kết quả tiếp nhận tại Cổng liên thông mô phỏng
+                        </Title>
+                        <Tag color={interInfo.color} style={{ fontSize: 12, padding: '2px 8px' }}>
+                          {interInfo.label}
+                        </Tag>
+                      </div>
+                      <Paragraph type="secondary" style={{ marginBottom: 12 }}>
+                        {interInfo.description}
+                      </Paragraph>
+                    </div>
+
+                    {canSendNow && (
+                      <Button
+                        type="primary"
+                        icon={<CloudUploadOutlined />}
+                        loading={sendingInterconnection}
+                        onClick={handleSendInterconnection}
+                        style={{ backgroundColor: interInfo.isFailed ? '#dc2626' : '#0284c7', borderColor: interInfo.isFailed ? '#dc2626' : '#0284c7' }}
+                      >
+                        {interInfo.isFailed ? 'Gửi lại liên thông' : 'Gửi đơn lên Cổng liên thông'}
+                      </Button>
+                    )}
+                  </div>
+
+                  <Descriptions size="small" column={{ xs: 1, sm: 2 }} bordered style={{ backgroundColor: '#ffffff', borderRadius: 6 }}>
+                    <Descriptions.Item label="Mã đơn thuốc điện tử">
+                      <Text code strong style={{ color: '#1d4ed8', whiteSpace: 'nowrap', fontSize: 13.5 }}>
+                        {formatPrescriptionCode(prescription.prescriptionCode || prescription.id)}
+                      </Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Trạng thái tiếp nhận">
+                      <Tag color={interInfo.color}>{interInfo.label}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Mã biên nhận (Receipt Code)">
+                      {interInfo.receiptCode ? (
+                        <Space>
+                          <Text code strong style={{ color: '#16a34a', fontSize: 13 }}>
+                            {interInfo.receiptCode}
+                          </Text>
+                          <Tooltip title="Sao chép mã biên nhận">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CopyOutlined style={{ color: '#16a34a' }} />}
+                              onClick={() => {
+                                navigator.clipboard.writeText(interInfo.receiptCode)
+                                message.success(`Đã sao chép mã biên nhận: ${interInfo.receiptCode}`)
+                              }}
+                            />
+                          </Tooltip>
+                        </Space>
+                      ) : (
+                        <Text type="secondary">—</Text>
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Thời gian gửi / phản hồi">
+                      {interInfo.completedAt ? dayjs(interInfo.completedAt).format('HH:mm:ss DD/MM/YYYY') : '—'}
+                    </Descriptions.Item>
+                  </Descriptions>
+
+                  {interInfo.isFailed && interInfo.failureReason && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      icon={<CloseCircleOutlined />}
+                      message="Chi tiết lỗi phản hồi từ Cổng liên thông"
+                      description={interInfo.failureReason}
+                      style={{ marginTop: 12 }}
+                    />
+                  )}
+                </Card>
+              </div>
             ),
           },
           {

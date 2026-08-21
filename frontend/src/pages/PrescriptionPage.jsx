@@ -30,6 +30,8 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  CloudServerOutlined,
+  CloudUploadOutlined,
   CopyOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -78,6 +80,8 @@ import {
   filterPrescriptionsByKeyword,
   formatPrescriptionCode,
   getElectronicPrescriptionBadgeProps,
+  getInterconnectionStatusInfo,
+  INTERCONNECTION_STATUS_CONFIG,
   isStandardRxCode,
 } from '../utils/electronicPrescriptionValidation'
 
@@ -175,6 +179,12 @@ function PrescriptionPage() {
   const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
   const canReadPrescription = userPermissions.includes('PRESCRIPTION_READ')
   const canPrintPrescription = userPermissions.includes('PRESCRIPTION_PRINT')
+  const canSendInterconnection = Boolean(
+    userPermissions.includes('PRESCRIPTION_INTERCONNECTION_SEND') ||
+    roles.includes('doctor') ||
+    roles.includes('admin')
+  )
+  const [sendingInterconnectionId, setSendingInterconnectionId] = useState(null)
 
   const isDoctor = Boolean(roles.includes('doctor') || roles.includes('admin') || canCreatePrescription)
   const isAssignedDoctor = Boolean(
@@ -904,6 +914,41 @@ function PrescriptionPage() {
     setPrintModalOpen(true)
   }
 
+  const handleSendPrescriptionToInterconnection = async (prescription) => {
+    if (!prescription?.id || sendingInterconnectionId) return
+    setSendingInterconnectionId(prescription.id)
+    try {
+      const response = await pharmacyApi.sendToInterconnection(prescription.id)
+      const data = response?.data || {}
+      setJustIssuedPrescription((prev) => {
+        if (prev && String(prev.id) === String(prescription.id)) {
+          return {
+            ...prev,
+            interconnectionStatus: data.status,
+            interconnectionReceiptCode: data.receiptCode,
+            lastInterconnectionError: data.failureReason,
+            lastInterconnectionAt: data.completedAt || new Date().toISOString(),
+          }
+        }
+        return prev
+      })
+      if (data.status === 'SUCCESS') {
+        message.success(
+          `Đã gửi đơn thuốc ${prescription.prescriptionCode || ''} lên Cổng liên thông Quốc gia thành công! Mã biên nhận: ${data.receiptCode}`,
+        )
+      } else {
+        message.error(
+          `Gửi liên thông đơn ${prescription.prescriptionCode || ''} thất bại: ${data.failureReason || 'Cổng liên thông từ chối tiếp nhận'}`,
+        )
+      }
+      await loadData()
+    } catch (error) {
+      message.error(getApiMessage(error, 'Không thể gửi đơn thuốc lên Cổng liên thông Quốc gia.'))
+    } finally {
+      setSendingInterconnectionId(null)
+    }
+  }
+
   const historyColumns = [
     {
       title: 'Mã đơn điện tử',
@@ -1036,6 +1081,80 @@ function PrescriptionPage() {
       ),
     },
     {
+      title: 'Liên thông Quốc gia',
+      key: 'interconnection',
+      width: 175,
+      render: (_, row) => {
+        const status = row.interconnectionStatus || (row.receiptCode ? 'SUCCESS' : 'NOT_SENT')
+        const receiptCode = row.interconnectionReceiptCode || row.receiptCode || ''
+        const error = row.lastInterconnectionError || row.failureReason || ''
+        const isSending = sendingInterconnectionId === row.id
+        const isSuccess = status === 'SUCCESS'
+        const isFailed = status === 'FAILED'
+
+        if (isSuccess) {
+          return (
+            <Space direction="vertical" size={2}>
+              <Tag color="success" icon={<CheckCircleOutlined />}>
+                Đã liên thông
+              </Tag>
+              {receiptCode && (
+                <Tooltip title="Mã biên nhận từ Cổng liên thông Quốc gia">
+                  <Text code style={{ fontSize: 11, color: '#15803d', fontWeight: 600 }}>
+                    {receiptCode}
+                  </Text>
+                </Tooltip>
+              )}
+            </Space>
+          )
+        }
+
+        if (isFailed) {
+          return (
+            <Space direction="vertical" size={2}>
+              <Tooltip title={error ? `Lý do lỗi: ${error}` : 'Gửi liên thông không thành công'}>
+                <Tag color="error" icon={<CloseCircleOutlined />} style={{ cursor: 'pointer' }}>
+                  Liên thông lỗi
+                </Tag>
+              </Tooltip>
+              {canPrescribe && (
+                <Button
+                  size="small"
+                  type="link"
+                  icon={<SyncOutlined spin={isSending} />}
+                  loading={isSending}
+                  onClick={() => handleSendPrescriptionToInterconnection(row)}
+                  style={{ padding: 0, height: 'auto', fontSize: 11, color: '#dc2626' }}
+                >
+                  Gửi lại
+                </Button>
+              )}
+            </Space>
+          )
+        }
+
+        return (
+          <Space direction="vertical" size={2}>
+            <Tag color="default" icon={<CloudServerOutlined />}>
+              Chưa liên thông
+            </Tag>
+            {canPrescribe && row.status !== 'CANCELLED' && (
+              <Button
+                size="small"
+                type="link"
+                icon={<CloudUploadOutlined />}
+                loading={isSending}
+                onClick={() => handleSendPrescriptionToInterconnection(row)}
+                style={{ padding: 0, height: 'auto', fontSize: 11, color: '#0284c7' }}
+              >
+                Gửi liên thông
+              </Button>
+            )}
+          </Space>
+        )
+      },
+    },
+    {
       title: 'Thao tác',
       key: 'actions',
       width: 90,
@@ -1049,6 +1168,7 @@ function PrescriptionPage() {
           (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')
         )
         const canEditThis = canPrescribe && isPending
+        const isInterconnected = prescription.interconnectionStatus === 'SUCCESS'
 
         const menuItems = [
           {
@@ -1056,6 +1176,18 @@ function PrescriptionPage() {
             icon: <EyeOutlined />,
             label: 'Xem chi tiết đơn thuốc',
             onClick: () => openDetailModal(prescription),
+          },
+          canPrescribe && prescription.status !== 'CANCELLED' && {
+            key: 'interconnection',
+            icon: <CloudUploadOutlined style={{ color: '#0284c7' }} />,
+            label: isInterconnected ? 'Xem trạng thái liên thông' : 'Gửi lên Cổng liên thông',
+            onClick: () => {
+              if (!isInterconnected) {
+                handleSendPrescriptionToInterconnection(prescription)
+              } else {
+                openDetailModal(prescription)
+              }
+            },
           },
           isPrintable && {
             key: 'print',
@@ -1857,9 +1989,29 @@ function PrescriptionPage() {
         open={issuedPrescriptionModalOpen}
         onCancel={() => setIssuedPrescriptionModalOpen(false)}
         footer={[
+          justIssuedPrescription?.interconnectionStatus === 'SUCCESS' ? (
+            <Tag key="interconnected" color="success" icon={<CheckCircleOutlined />} style={{ padding: '6px 12px', fontSize: 13 }}>
+              Đã liên thông ({justIssuedPrescription.interconnectionReceiptCode})
+            </Tag>
+          ) : (
+            <Button
+              key="sendInterconnection"
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              loading={sendingInterconnectionId === justIssuedPrescription?.id}
+              onClick={async () => {
+                if (justIssuedPrescription) {
+                  await handleSendPrescriptionToInterconnection(justIssuedPrescription)
+                }
+              }}
+              style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+            >
+              Gửi liên thông ngay
+            </Button>
+          ),
           <Button
             key="print"
-            type="primary"
+            type="default"
             icon={<PrinterOutlined />}
             onClick={() => {
               setIssuedPrescriptionModalOpen(false)
@@ -1947,6 +2099,33 @@ function PrescriptionPage() {
             </div>
           </Card>
 
+          {justIssuedPrescription?.interconnectionStatus === 'SUCCESS' && (
+            <div
+              style={{
+                backgroundColor: '#f0fdf4',
+                borderColor: '#86efac',
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderRadius: 8,
+                padding: '10px 14px',
+                marginBottom: 16,
+                textAlign: 'left',
+              }}
+            >
+              <Space size={10} align="center">
+                <CheckCircleOutlined style={{ fontSize: 22, color: '#16a34a' }} />
+                <div>
+                  <div style={{ fontWeight: 700, color: '#166534', fontSize: 13 }}>
+                    ĐÃ LIÊN THÔNG QUỐC GIA THÀNH CÔNG
+                  </div>
+                  <div style={{ fontSize: 12.5, color: '#15803d', marginTop: 2 }}>
+                    Mã biên nhận: <Text code strong style={{ color: '#15803d', fontSize: 13 }}>{justIssuedPrescription.interconnectionReceiptCode}</Text>
+                  </div>
+                </div>
+              </Space>
+            </div>
+          )}
+
           <Descriptions size="small" column={2} bordered>
             <Descriptions.Item label="Bệnh nhân">
               <strong>{encounter?.patient?.fullName || record?.patientName || '—'}</strong>
@@ -1981,6 +2160,8 @@ function PrescriptionPage() {
         prescription={selectedPrescriptionForDetail}
         medicines={medicines}
         canEdit={canPrescribe}
+        canSendInterconnection={canSendInterconnection}
+        onInterconnectionUpdated={loadData}
         onEditClick={startEditPrescription}
         onPrintClick={(p) => {
           setSelectedPrescriptionForPrint(p)

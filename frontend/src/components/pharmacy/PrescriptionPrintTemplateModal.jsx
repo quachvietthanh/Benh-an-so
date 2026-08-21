@@ -326,6 +326,12 @@ function PrescriptionPrintTemplateModal({
             <div>
               Chẩn đoán bệnh (ICD-10): <strong style={{ color: '#0f172a' }}>{formattedDiagnoses}</strong>
             </div>
+
+            {(prescription?.interconnectionReceiptCode || prescription?.receiptCode) && (
+              <div style={{ marginTop: 3, fontSize: '12px', color: '#15803d' }}>
+                Liên thông Quốc gia: <strong>Đã tiếp nhận</strong> · Mã biên nhận: <strong style={{ fontFamily: 'monospace' }}>{prescription.interconnectionReceiptCode || prescription.receiptCode}</strong>
+              </div>
+            )}
           </div>
 
           {/* BẢNG DANH SÁCH THUỐC */}
