@@ -18,7 +18,9 @@ import com.benhsoan.domain.clinical.enums.ClinicalOrderItemStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalResultType;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderInvalidVisitException;
+import com.benhsoan.domain.clinical.exception.ClinicalOrderItemNotFoundException;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderLockedMedicalRecordException;
+import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
@@ -67,26 +69,26 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
     public ClinicalResultResult enter(UUID clinicalOrderItemId, EnterClinicalResultCommand command) {
         UUID actorId = authorizationService.requireWriteAccess();
         var item = clinicalOrderItemRepository.findById(clinicalOrderItemId)
-                .orElseThrow(() -> new ValidationException("Clinical order item not found."));
+                .orElseThrow(() -> new ClinicalOrderItemNotFoundException(clinicalOrderItemId));
         if (item.getStatus() != ClinicalOrderItemStatus.PENDING
                 || clinicalResultRepository.findByClinicalOrderItemId(clinicalOrderItemId).isPresent()) {
             throw new ValidationException("Clinical order item cannot receive a result.");
         }
 
         var order = clinicalOrderRepository.findById(item.getClinicalOrderId())
-                .orElseThrow(() -> new ValidationException("Clinical order not found."));
+                .orElseThrow(() -> missingRelation("clinicalOrder", item.getClinicalOrderId()));
         var visit = visitRepository.findById(order.getVisitId())
-                .orElseThrow(() -> new ValidationException("Visit not found."));
+                .orElseThrow(() -> missingRelation("visit", order.getVisitId()));
         if (!visit.isActive()) {
             throw new ClinicalOrderInvalidVisitException();
         }
         var medicalRecord = medicalRecordRepository.findByVisitId(visit.getId())
-                .orElseThrow(() -> new ValidationException("Medical record not found."));
+                .orElseThrow(() -> missingRelation("medicalRecord", visit.getId()));
         if (medicalRecord.isLocked()) {
             throw new ClinicalOrderLockedMedicalRecordException();
         }
         var clinicalService = clinicalServiceCatalogRepository.findById(item.getClinicalServiceId())
-                .orElseThrow(() -> new ValidationException("Clinical service not found."));
+                .orElseThrow(() -> missingRelation("clinicalService", item.getClinicalServiceId()));
 
         ClinicalResultType resultType = ClinicalResultType.from(clinicalService.getResultDataType());
 
@@ -135,7 +137,7 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
                 previousResult, savedResult, "Clinical result finalized.", actorId, now));
 
         var item = clinicalOrderItemRepository.findById(savedResult.getClinicalOrderItemId())
-                .orElseThrow(() -> new ValidationException("Clinical order item not found."));
+                .orElseThrow(() -> missingRelation("clinicalOrderItem", savedResult.getClinicalOrderItemId()));
         item.complete(now);
         clinicalOrderItemRepository.save(item);
         synchronizeOrder(item.getClinicalOrderId(), now);
@@ -180,7 +182,7 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
 
     private void synchronizeOrder(UUID clinicalOrderId, Instant now) {
         var order = clinicalOrderRepository.findById(clinicalOrderId)
-                .orElseThrow(() -> new ValidationException("Clinical order not found."));
+                .orElseThrow(() -> missingRelation("clinicalOrder", clinicalOrderId));
         if (order.getStatus() == ClinicalOrderStatus.ORDERED) {
             order.start(now);
         }
@@ -196,20 +198,20 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
 
     private void auditWrite(ClinicalResult result, UUID actorId, MedicalRecordAccessAction action, Instant at) {
         var visit = visitRepository.findById(result.getVisitId())
-                .orElseThrow(() -> new ValidationException("Visit not found."));
+                .orElseThrow(() -> missingRelation("visit", result.getVisitId()));
         var medicalRecord = medicalRecordRepository.findByVisitId(visit.getId())
-                .orElseThrow(() -> new ValidationException("Medical record not found."));
+                .orElseThrow(() -> missingRelation("medicalRecord", visit.getId()));
         auditService.recordWrite(result.getId(), visit.getPatientId(), visit.getId(), medicalRecord.getId(), actorId, action, at);
     }
 
     private void ensureWritableVisitAndRecord(UUID visitId) {
         var visit = visitRepository.findById(visitId)
-                .orElseThrow(() -> new ValidationException("Visit not found."));
+                .orElseThrow(() -> missingRelation("visit", visitId));
         if (!visit.isActive()) {
             throw new ClinicalOrderInvalidVisitException();
         }
         var medicalRecord = medicalRecordRepository.findByVisitId(visitId)
-                .orElseThrow(() -> new ValidationException("Medical record not found."));
+                .orElseThrow(() -> missingRelation("medicalRecord", visitId));
         if (medicalRecord.isLocked()) {
             throw new ClinicalOrderLockedMedicalRecordException();
         }
@@ -221,9 +223,9 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
 
     private void auditView(ClinicalResult result, UUID actorId, MedicalRecordAccessAction action) {
         var visit = visitRepository.findById(result.getVisitId())
-                .orElseThrow(() -> new ValidationException("Visit not found."));
+                .orElseThrow(() -> missingRelation("visit", result.getVisitId()));
         var medicalRecord = medicalRecordRepository.findByVisitId(visit.getId())
-                .orElseThrow(() -> new ValidationException("Medical record not found."));
+                .orElseThrow(() -> missingRelation("medicalRecord", visit.getId()));
         auditService.recordView(result.getId(), visit.getPatientId(), visit.getId(), medicalRecord.getId(), actorId,
                 action, clock.now());
     }
@@ -234,9 +236,9 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         }
         UUID actorId = authorizationService.requireReadAccess();
         var visit = visitRepository.findById(results.getFirst().getVisitId())
-                .orElseThrow(() -> new ValidationException("Visit not found."));
+                .orElseThrow(() -> missingRelation("visit", results.getFirst().getVisitId()));
         var medicalRecord = medicalRecordRepository.findByVisitId(visit.getId())
-                .orElseThrow(() -> new ValidationException("Medical record not found."));
+                .orElseThrow(() -> missingRelation("medicalRecord", visit.getId()));
         Instant now = clock.now();
         for (ClinicalResult result : results) {
             auditService.recordView(result.getId(), visit.getPatientId(), visit.getId(), medicalRecord.getId(), actorId,
@@ -246,7 +248,11 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
 
     private ClinicalResult findResult(UUID clinicalResultId) {
         return clinicalResultRepository.findById(clinicalResultId)
-                .orElseThrow(() -> new ValidationException("Clinical result not found."));
+                .orElseThrow(() -> new ClinicalResultNotFoundException(clinicalResultId));
+    }
+
+    private IllegalStateException missingRelation(String relation, UUID id) {
+        return new IllegalStateException("Clinical data integrity failure: missing " + relation + " " + id);
     }
 
     private ClinicalResult snapshot(ClinicalResult result) {

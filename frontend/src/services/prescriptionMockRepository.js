@@ -1,5 +1,5 @@
 import { drugInteractions, demoPrescriptions } from '../mock-data/mockData'
-import { getStoredPrescriptions, saveStoredPrescription, getStoredMedicalRecords, mergeMedicines } from '../utils/storageHelpers'
+import { getStoredPrescriptions, saveStoredPrescription, mergeMedicines } from '../utils/storageHelpers'
 
 const PRESCRIPTION_HISTORY_KEY = 'app_prescription_history'
 const deepClone = (data) => JSON.parse(JSON.stringify(data))

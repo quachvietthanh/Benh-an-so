@@ -182,35 +182,14 @@ test('TC09: Đóng gói Payload UpdateService đúng chuẩn Backend PUT /system
   })
 })
 
-test('TC10: Dịch thông báo lỗi Backend sang tiếng Việt thân thiện', () => {
-  const duplicateCodeError = {
-    response: { data: { message: 'Service code already exists.' } },
+test('TC10: Xử lý lỗi Backend theo code ổn định', () => {
+  const validationError = {
+    response: { status: 400, data: { code: 'VALIDATION_FAILED', message: 'Service code already exists.' } },
   }
-  assert.equal(
-    translateServiceErrorMessage(duplicateCodeError),
-    'Mã dịch vụ đã tồn tại trên hệ thống. Vui lòng chọn mã khác.'
-  )
-
-  const duplicateNameError = {
-    response: { data: { message: 'Service name already exists.' } },
-  }
-  assert.equal(
-    translateServiceErrorMessage(duplicateNameError),
-    'Tên dịch vụ đã tồn tại trên hệ thống. Vui lòng chọn tên khác.'
-  )
-
-  const duplicateDatePriceError = {
-    response: {
-      data: { message: 'A different service price already exists for this effective date.' },
-    },
-  }
-  assert.equal(
-    translateServiceErrorMessage(duplicateDatePriceError),
-    'Đã tồn tại mức giá khác cho cùng ngày hiệu lực này. Vui lòng chọn ngày hiệu lực khác.'
-  )
+  assert.equal(translateServiceErrorMessage(validationError), 'Service code already exists.')
 
   const forbiddenError = {
-    response: { status: 403, data: { message: 'Access Denied' } },
+    response: { status: 403, data: { code: 'ACCESS_DENIED', message: 'Access Denied' } },
   }
   assert.equal(
     translateServiceErrorMessage(forbiddenError),

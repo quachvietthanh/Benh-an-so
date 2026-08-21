@@ -1,14 +1,12 @@
 package com.benhsoan.domain.auth.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class SessionExpiredException extends DomainException {
+public class SessionExpiredException extends AuthException {
 
     public SessionExpiredException() {
-        super(
-                HttpStatus.UNAUTHORIZED,
+        super(DomainErrorCode.SESSION_EXPIRED,
                 "Session has expired."
         );
     }

@@ -1,10 +1,11 @@
 package com.benhsoan.domain.medicalrecord.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class MedicalRecordAlreadyLockedException extends MedicalRecordException {
 
     public MedicalRecordAlreadyLockedException() {
-        super(HttpStatus.CONFLICT, "Medical record is already locked.");
+        super(DomainErrorCode.MEDICAL_RECORD_LOCKED, "Medical record is already locked.");
     }
 }

@@ -1,13 +1,11 @@
 package com.benhsoan.domain.queue.exception;
 
-import org.springframework.http.HttpStatus;
-
-import com.benhsoan.domain.shared.exception.DomainException;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
 public class QueueNotFoundException
-        extends DomainException {
+        extends QueueException {
 
     public QueueNotFoundException() {
-        super(HttpStatus.NOT_FOUND, "Không tìm thấy hàng đợi");
+        super(DomainErrorCode.QUEUE_NOT_FOUND, "Không tìm thấy hàng đợi");
     }
 }

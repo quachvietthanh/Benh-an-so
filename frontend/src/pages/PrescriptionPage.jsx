@@ -56,12 +56,14 @@ import InteractionWarningModal from '../components/pharmacy/InteractionWarningMo
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
   canSubmitPrescription,
   areAllInteractionsHandled,
   getUnhandledInteractions,
 } from '../utils/drugInteractionValidation'
+
 import { mergeMedicines, saveStoredPrescription } from '../utils/storageHelpers'
 import {
   getAvailableStock,
@@ -96,12 +98,6 @@ const ROUTE_OPTIONS = [
   { value: 'TRANSDERMAL', label: 'Dán ngoài da' },
   { value: 'OTHER', label: 'Cách dùng khác' },
 ]
-
-const getApiMessage = (error, fallback) =>
-  error?.response?.data?.message ||
-  Object.values(error?.response?.data?.errors || {})[0] ||
-  error?.message ||
-  fallback
 
 let localItemSequence = 0
 const createEmptyItem = (isOriginal = false) => ({
@@ -142,9 +138,8 @@ function PrescriptionPage() {
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
-  const [loadError, setLoadError] = useState('')
+  const [loadError, setLoadError] = useState(null)
   const [activeTab, setActiveTab] = useState('prescribe')
 
   const [detectedInteractions, setDetectedInteractions] = useState([])
@@ -164,8 +159,8 @@ function PrescriptionPage() {
 
   const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE')
   const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
-  const canReadPrescription = userPermissions.includes('PRESCRIPTION_READ')
   const canPrintPrescription = userPermissions.includes('PRESCRIPTION_PRINT')
+  const isDoctor = roles.includes('doctor') || roles.includes('admin')
 
   const isAssignedDoctor = Boolean(
     roles.includes('admin') ||
@@ -231,7 +226,7 @@ function PrescriptionPage() {
   const loadData = useCallback(async () => {
     if (!medicalRecordId) return
     setLoading(true)
-    setLoadError('')
+    setLoadError(null)
 
     try {
       const [recordResult, diagnosisResult, prescriptionResult] = await Promise.all([
@@ -310,7 +305,11 @@ function PrescriptionPage() {
         })
       }
     } catch (error) {
-      setLoadError(getApiMessage(error, 'Không thể tải ngữ cảnh kê đơn.'))
+      const apiError = error.apiError || normalizeApiError(error, 'Không thể tải ngữ cảnh kê đơn.')
+      setLoadError({
+        message: apiError.firstFieldError || apiError.message,
+        apiError,
+      })
     } finally {
       setLoading(false)
     }
@@ -758,7 +757,6 @@ function PrescriptionPage() {
       okButtonProps: { danger: true },
       cancelText: 'Bỏ qua',
       onOk: async () => {
-        setCancelling(true)
         try {
           await requireLiveInProgressQueue('hủy đơn thuốc')
           await pharmacyApi.cancelPrescription(prescription.id)
@@ -766,8 +764,6 @@ function PrescriptionPage() {
           await loadData()
         } catch (error) {
           message.error(getApiMessage(error, 'Không thể hủy đơn thuốc.'))
-        } finally {
-          setCancelling(false)
         }
       },
     })
@@ -1009,7 +1005,7 @@ function PrescriptionPage() {
   if (loading && !record) return <Spin fullscreen tip="Đang tải bệnh án và đơn thuốc..." />
 
   if (loadError) {
-    const isAccessDenied = String(loadError).toLowerCase().includes('access denied') || String(loadError).toLowerCase().includes('forbidden')
+    const isAccessDenied = isAccessDeniedApiError(loadError.apiError)
     return (
       <Card style={{ marginTop: 16 }}>
         <Alert
@@ -1019,7 +1015,7 @@ function PrescriptionPage() {
           description={
             <div>
               <Paragraph style={{ marginBottom: 8 }}>
-                <strong>Chi tiết lỗi:</strong> {loadError}
+                <strong>Chi tiết lỗi:</strong> {loadError.message}
               </Paragraph>
               {isAccessDenied && (
                 <Paragraph type="secondary" style={{ marginBottom: 12 }}>
@@ -1740,12 +1736,16 @@ function PrescriptionPage() {
         ]}
       />
 
-      <InteractionWarningModal
-        open={interactionModalOpen}
-        warnings={detectedInteractions}
-        onCancel={() => setInteractionModalOpen(false)}
-        onConfirmOverride={handleConfirmInteractionOverrides}
-      />
+      {interactionModalOpen && (
+        <React.Suspense fallback={<Spin size="small" />}>
+          <InteractionWarningModal
+            open={interactionModalOpen}
+            warnings={detectedInteractions}
+            onCancel={() => setInteractionModalOpen(false)}
+            onConfirmOverride={handleConfirmInteractionOverrides}
+          />
+        </React.Suspense>
+      )}
 
       <PrescriptionDetailModal
         open={detailModalOpen}

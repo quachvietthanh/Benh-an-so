@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.servicecatalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
 import com.benhsoan.domain.servicecatalog.ServicePrice;
+import com.benhsoan.domain.servicecatalog.exception.ServiceCatalogNotFoundException;
 import com.benhsoan.port.dto.command.servicecatalog.SearchServiceCatalogQuery;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
@@ -109,5 +111,14 @@ class ServiceCatalogQueryServicesTest {
 
         assertEquals(LocalDate.of(2026, 1, 1), result.getFirst().effectiveFrom());
         assertEquals(LocalDate.of(2025, 1, 1), result.getLast().effectiveFrom());
+    }
+
+    @Test
+    void historyReturnsNotFoundForAnUnknownServiceCatalog() {
+        when(serviceCatalogRepository.findById(SERVICE_ID)).thenReturn(Optional.empty());
+        GetServicePriceHistoryService service = new GetServicePriceHistoryService(
+                serviceCatalogRepository, servicePriceRepository, mapper);
+
+        assertThrows(ServiceCatalogNotFoundException.class, () -> service.getHistory(SERVICE_ID));
     }
 }

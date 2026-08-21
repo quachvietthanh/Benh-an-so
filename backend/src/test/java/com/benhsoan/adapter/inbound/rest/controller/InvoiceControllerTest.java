@@ -289,7 +289,7 @@ class InvoiceControllerTest {
                                 {"reason":" "}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.reason").exists());
+                .andExpect(jsonPath("$.details.fields.reason").exists());
 
         verifyNoInteractions(refundPaymentUseCase);
     }

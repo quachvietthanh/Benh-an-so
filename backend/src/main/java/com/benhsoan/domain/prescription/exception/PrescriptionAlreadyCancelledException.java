@@ -1,13 +1,13 @@
 package com.benhsoan.domain.prescription.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class PrescriptionAlreadyCancelledException
         extends PrescriptionException {
 
     public PrescriptionAlreadyCancelledException() {
-        super(
-                HttpStatus.CONFLICT,
+        super(DomainErrorCode.PRESCRIPTION_ALREADY_CANCELLED,
                 "Prescription has already been cancelled."
         );
     }

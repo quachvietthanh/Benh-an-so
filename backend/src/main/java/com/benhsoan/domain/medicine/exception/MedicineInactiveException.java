@@ -1,14 +1,14 @@
 package com.benhsoan.domain.medicine.exception;
 
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
 
 public class MedicineInactiveException extends MedicineException {
 
     public MedicineInactiveException(UUID medicineId) {
-        super(
-                HttpStatus.CONFLICT,
+        super(DomainErrorCode.MEDICINE_INACTIVE,
                 "Inactive medicine cannot be added to a prescription: "
                 + medicineId
         );

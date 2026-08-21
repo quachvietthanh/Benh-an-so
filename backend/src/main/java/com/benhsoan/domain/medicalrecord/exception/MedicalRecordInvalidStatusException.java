@@ -1,10 +1,11 @@
 package com.benhsoan.domain.medicalrecord.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class MedicalRecordInvalidStatusException extends MedicalRecordException {
 
     public MedicalRecordInvalidStatusException(String message) {
-        super(HttpStatus.CONFLICT, message);
+        super(DomainErrorCode.MEDICAL_RECORD_INVALID_STATUS, message);
     }
 }

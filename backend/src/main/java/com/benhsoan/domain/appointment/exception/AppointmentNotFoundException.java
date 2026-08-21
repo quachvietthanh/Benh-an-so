@@ -1,14 +1,14 @@
 package com.benhsoan.domain.appointment.exception;
 
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
 
 public class AppointmentNotFoundException extends AppointmentException {
 
     public AppointmentNotFoundException(UUID appointmentId) {
-        super(
-                HttpStatus.NOT_FOUND,
+        super(DomainErrorCode.APPOINTMENT_NOT_FOUND,
                 "Appointment not found with id: " + appointmentId
         );
     }

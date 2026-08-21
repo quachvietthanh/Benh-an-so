@@ -36,6 +36,7 @@ import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage as getErrorMessage, normalizeApiError } from '../utils/apiError'
 import { buildFefoPreview, fixMojibake } from '../utils/workflowContract'
 import { saveStoredPrescription, dispensePrescriptionHelper, mergePrescriptions } from '../utils/storageHelpers'
 
@@ -65,9 +66,6 @@ const normalizeBatch = (batch) => ({
   batchId: batch?.batchId || batch?.id,
   id: batch?.batchId || batch?.id,
 })
-
-const getErrorMessage = (error, fallback) =>
-  error?.response?.data?.message || error?.message || fallback
 
 const formatDateTime = (value) =>
   value && dayjs(value).isValid() ? dayjs(value).format('HH:mm DD/MM/YYYY') : '—'
@@ -283,7 +281,7 @@ function PharmacyPage() {
         allocationCount = Number(response.data?.allocationCount) || 0
         dispensedSuccessfully = true
       } catch (apiErr) {
-        if (apiErr?.response?.status === 409) {
+        if ((apiErr?.apiError || normalizeApiError(apiErr)).status === 409) {
           throw apiErr
         }
         console.warn('[PharmacyPage] Backend dispense API fallback:', apiErr)
@@ -300,11 +298,11 @@ function PharmacyPage() {
         await loadData()
       }
     } catch (error) {
-      const responseData = error?.response?.data
-      if (error?.response?.status === 409 && Array.isArray(responseData?.details)) {
-        setShortageDetails(responseData.details)
+      const apiError = error.apiError || normalizeApiError(error)
+      if (apiError.status === 409 && Array.isArray(apiError.details?.shortages)) {
+        setShortageDetails(apiError.details.shortages)
       }
-      message.error(getErrorMessage(error, error?.message || 'Không thể cấp phát đơn thuốc do thiếu tồn kho.'))
+      message.error(getErrorMessage(error, 'Không thể cấp phát đơn thuốc do thiếu tồn kho.'))
     } finally {
       setDispensingId(null)
     }

@@ -203,7 +203,7 @@ export default function DoctorVisitsReportView({
       dataIndex: 'doctorName',
       key: 'doctorName',
       width: 220,
-      render: (val, record) => (
+      render: (val, _record) => (
         <Space>
           <UserOutlined style={{ color: '#1677ff' }} />
           <strong style={{ color: '#0f172a' }}>{val || 'Chưa xác định'}</strong>

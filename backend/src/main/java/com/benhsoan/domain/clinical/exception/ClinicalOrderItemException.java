@@ -1,12 +1,11 @@
 package com.benhsoan.domain.clinical.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public abstract class ClinicalOrderItemException extends DomainException {
+public abstract class ClinicalOrderItemException extends ClinicalException {
 
-    protected ClinicalOrderItemException(HttpStatus status, String message) {
-        super(status, message);
+    protected ClinicalOrderItemException(DomainErrorCode code, String message) {
+        super(code, message);
     }
 }

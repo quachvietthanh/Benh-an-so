@@ -22,6 +22,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ClinicalResultAttachmentRestMapper;
+import com.benhsoan.domain.clinical.exception.ClinicalAttachmentNotFoundException;
+import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
+import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.domain.clinical.enums.MedicalAttachmentType;
 import com.benhsoan.port.dto.result.ClinicalAttachmentDownloadResult;
 import com.benhsoan.port.dto.result.ClinicalResultResult;
@@ -36,7 +39,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 @WebMvcTest(controllers = ClinicalResultAttachmentController.class,
         properties = "clinical-attachments.cloudinary.enabled=true")
 @AutoConfigureMockMvc(addFilters = false)
-@Import(ClinicalResultAttachmentRestMapper.class)
+@Import({ClinicalResultAttachmentRestMapper.class, GlobalExceptionHandler.class})
 class ClinicalResultAttachmentControllerTest {
 
     @Autowired private MockMvc mockMvc;
@@ -92,5 +95,26 @@ class ClinicalResultAttachmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.attachmentId").value(attachmentId.toString()))
                 .andExpect(jsonPath("$.url").value("https://cloudinary.example/signed"));
+    }
+
+    @Test
+    void returnsTheCommonNotFoundContractForUnknownAttachmentResources() throws Exception {
+        UUID resultId = UUID.randomUUID();
+        UUID attachmentId = UUID.randomUUID();
+        MockMultipartFile file = new MockMultipartFile("file", "result.pdf", "application/pdf", "%PDF-1.7".getBytes());
+        when(uploadClinicalResultAttachmentUseCase.upload(eq(resultId), any()))
+                .thenThrow(new ClinicalResultNotFoundException(resultId));
+        when(downloadClinicalResultAttachmentUseCase.createDownloadUrl(attachmentId))
+                .thenThrow(new ClinicalAttachmentNotFoundException(attachmentId));
+
+        mockMvc.perform(multipart("/clinical-results/{resultId}/attachments", resultId).file(file))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLINICAL_RESULT_NOT_FOUND"))
+                .andExpect(jsonPath("$.details").isMap());
+
+        mockMvc.perform(get("/clinical-result-attachments/{attachmentId}/download", attachmentId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLINICAL_ATTACHMENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.details").isMap());
     }
 }

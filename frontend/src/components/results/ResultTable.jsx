@@ -7,7 +7,6 @@ import {
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import ResultStatusBadge from './ResultStatusBadge'
-import { formatGender } from '../../utils/helpers'
 
 const { Text } = Typography
 

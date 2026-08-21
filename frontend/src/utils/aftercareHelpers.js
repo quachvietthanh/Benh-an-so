@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { normalizeApiError } from './apiError.js'
 
 export const REMINDER_TYPES = [
   { value: 'REVISIT', label: 'Tái khám' },
@@ -281,27 +282,18 @@ export const buildCareLogPayload = (values) => ({
   contactOutcome: values.contactOutcome,
 })
 
-export const getErrorStatus = (error) => error?.response?.status || null
-
-export const isDoctorInstructionError = (error) => {
-  const message = String(error?.response?.data?.message || error?.message || '')
-  return /no follow-up indication from doctor/i.test(message)
-}
+export const getErrorStatus = (error) => normalizeApiError(error).status || null
 
 export const getAftercareErrorMessage = (error, fallback = 'Không thể tải dữ liệu.') => {
-  if (isDoctorInstructionError(error)) {
-    return 'Không thể tạo lịch nhắc vì lượt khám chưa có dặn dò/chỉ định sau khám của bác sĩ.'
-  }
-
-  const status = getErrorStatus(error)
-  const backendMessage = error?.response?.data?.message
-  if (status === 400) return backendMessage || 'Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại.'
-  if (status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
-  if (status === 403) return 'Bạn không có quyền thực hiện chức năng này.'
-  if (status === 404) return backendMessage || 'Không tìm thấy dữ liệu hoặc API tương ứng.'
-  if (status === 409) return backendMessage || 'Dữ liệu đã thay đổi trạng thái. Vui lòng làm mới và thử lại.'
-  if (status >= 500) return 'Backend đang gặp lỗi. Vui lòng thử lại sau.'
-  return backendMessage || error?.message || fallback
+  const apiError = normalizeApiError(error, fallback)
+  if (apiError.code === 'VALIDATION_FAILED') return apiError.firstFieldError || apiError.message
+  if (apiError.status === 400) return apiError.firstFieldError || 'Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại.'
+  if (apiError.status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+  if (apiError.status === 403) return 'Bạn không có quyền thực hiện chức năng này.'
+  if (apiError.status === 404) return apiError.message || 'Không tìm thấy dữ liệu hoặc API tương ứng.'
+  if (apiError.status === 409) return apiError.message || 'Dữ liệu đã thay đổi trạng thái. Vui lòng làm mới và thử lại.'
+  if (apiError.status >= 500) return 'Backend đang gặp lỗi. Vui lòng thử lại sau.'
+  return apiError.firstFieldError || apiError.message
 }
 
 const normalizeAuthority = (value) => String(value || '')

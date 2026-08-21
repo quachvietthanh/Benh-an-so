@@ -1,12 +1,12 @@
 package com.benhsoan.domain.appointment.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class UnauthorizedAppointmentOperationException extends AppointmentException {
 
     public UnauthorizedAppointmentOperationException() {
-        super(
-                HttpStatus.FORBIDDEN,
+        super(DomainErrorCode.UNAUTHORIZED_APPOINTMENT_OPERATION,
                 "You are not authorized to perform this appointment operation."
         );
     }

@@ -98,11 +98,10 @@ function CareLogModal({
 }) {
   const [form] = Form.useForm()
   const selectedPatientId = Form.useWatch('patientId', form)
-  const selectedVisitId = Form.useWatch('visitId', form)
   const patientCondition = Form.useWatch('patientCondition', form)
   const [reminders, setReminders] = useState([])
   const [remindersLoading, setRemindersLoading] = useState(false)
-  const [remindersError, setRemindersError] = useState(null)
+  const [, setRemindersError] = useState(null)
   const contextRequestRef = useRef(0)
   const lockedToReminder = Boolean(sourceReminder)
 

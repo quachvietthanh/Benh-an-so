@@ -46,6 +46,7 @@ import dayjs from 'dayjs'
 import { useLocation, useNavigate } from 'react-router-dom'
 import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage as getErrorMessage } from '../utils/apiError'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -69,12 +70,6 @@ const normalizeBatch = (batch) => ({
   id: batch?.batchId || batch?.id,
 })
 
-const getErrorMessage = (error, fallback) =>
-  error?.response?.data?.message ||
-  Object.values(error?.response?.data?.errors || {})[0] ||
-  error?.message ||
-  fallback
-
 function InventoryReceiptPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -96,7 +91,7 @@ function InventoryReceiptPage() {
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'create')
 
   const [medicines, setMedicines] = useState([])
-  const [stocks, setStocks] = useState([])
+  const [, setStocks] = useState([])
   const [batches, setBatches] = useState([])
   const [expiryAlerts, setExpiryAlerts] = useState([])
   const [recentReceipts, setRecentReceipts] = useState([])

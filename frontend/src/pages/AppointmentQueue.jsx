@@ -83,16 +83,6 @@ const avatarPalette = [
   ['#f1eaff', '#7541b7'],
 ]
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const isUuid = (value) => UUID_PATTERN.test(String(value || ''))
-const isDemoSession = () => localStorage.getItem('token') === 'demo-token'
-const getDisplayStatus = (item) => {
-  const meta = item?.type === 'appointment'
-    ? APPOINTMENT_STATUS_META[item?.status]
-    : QUEUE_STATUS_META[item?.status]
-  return meta || { label: 'Không xác định', tone: 'default' }
-}
-
 const getInitials = (name = '') =>
   name
     .trim()
@@ -1550,18 +1540,6 @@ function AppointmentQueue() {
                     pagination={{ pageSize: 5 }}
                     renderItem={(item) => {
                       const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      const secondaryActions = permissions.canSkip
-                        ? [{
-                          key: 'skip',
-                          label: 'Bỏ qua lượt khám',
-                          icon: <CloseCircleOutlined />,
-                          danger: true,
-                          onClick: () => {
-                            skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                            setSkipModalItem(item)
-                          },
-                        }]
-                        : []
                       return (
                         <List.Item
                           actions={[
@@ -1597,12 +1575,6 @@ function AppointmentQueue() {
                     pagination={{ pageSize: 5 }}
                     renderItem={(item) => {
                       const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      const secondaryActions = [{
-                        key: 'record',
-                        label: 'Xem bệnh án',
-                        icon: <EyeOutlined />,
-                        onClick: () => navigate('/medical-records', { state: { patientId: item.patientId, visitId: item.visitId } }),
-                      }]
                       return (
                         <List.Item
                           actions={[

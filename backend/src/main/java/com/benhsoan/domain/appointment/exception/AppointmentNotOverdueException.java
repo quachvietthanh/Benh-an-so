@@ -1,12 +1,12 @@
 package com.benhsoan.domain.appointment.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class AppointmentNotOverdueException extends AppointmentException {
 
     public AppointmentNotOverdueException() {
-        super(
-                HttpStatus.CONFLICT,
+        super(DomainErrorCode.APPOINTMENT_NOT_OVERDUE,
                 "Appointment has not exceeded the no-show threshold."
         );
     }

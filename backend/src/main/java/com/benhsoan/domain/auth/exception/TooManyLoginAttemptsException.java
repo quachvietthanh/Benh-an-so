@@ -1,14 +1,12 @@
 package com.benhsoan.domain.auth.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class TooManyLoginAttemptsException extends DomainException {
+public class TooManyLoginAttemptsException extends AuthException {
 
     public TooManyLoginAttemptsException() {
-        super(
-                HttpStatus.TOO_MANY_REQUESTS,
+        super(DomainErrorCode.TOO_MANY_LOGIN_ATTEMPTS,
                 "Too many login attempts."
         );
     }

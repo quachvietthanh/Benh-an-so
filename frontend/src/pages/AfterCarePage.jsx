@@ -48,6 +48,7 @@ import {
   selectTodayCompletedVisits,
   vietnamDateTimeToIso,
 } from '../utils/aftercareHelpers'
+import { unwrapCollection } from '../utils/workflowContract'
 
 const { RangePicker } = DatePicker
 const { Paragraph, Text, Title } = Typography

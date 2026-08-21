@@ -1,12 +1,12 @@
 package com.benhsoan.domain.appointment.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class AppointmentAlreadyCompletedException extends AppointmentException {
 
     public AppointmentAlreadyCompletedException() {
-        super(
-                HttpStatus.CONFLICT,
+        super(DomainErrorCode.APPOINTMENT_ALREADY_COMPLETED,
                 "Appointment has already been completed."
         );
     }

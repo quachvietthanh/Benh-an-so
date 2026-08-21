@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-import com.benhsoan.domain.prescription.exception.PrescriptionAmendmentReasonRequiredException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
 import lombok.AccessLevel;
@@ -93,7 +93,7 @@ public class PrescriptionAmendment {
 
     private static String validateChangeReason(String changeReason) {
         if (changeReason == null || changeReason.isBlank()) {
-            throw new PrescriptionAmendmentReasonRequiredException();
+            throw new ValidationException("Amendment reason is required.");
         }
         return changeReason.trim();
     }

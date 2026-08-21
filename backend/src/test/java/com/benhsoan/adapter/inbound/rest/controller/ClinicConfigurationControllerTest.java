@@ -112,7 +112,7 @@ class ClinicConfigurationControllerTest {
                                 {"clinicName":" ","openingTime":"08:00:00","closingTime":"17:00:00"}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.clinicName").value("Clinic name is required."));
+                .andExpect(jsonPath("$.details.fields.clinicName").value("Clinic name is required."));
 
         verifyNoInteractions(updateClinicConfigurationUseCase);
     }

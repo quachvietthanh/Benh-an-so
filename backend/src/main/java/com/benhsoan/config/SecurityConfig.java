@@ -1,14 +1,11 @@
 package com.benhsoan.config;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -27,6 +24,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
+import com.benhsoan.exception.ApiErrorResponseFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -40,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SecurityConfig {
 
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final ObjectMapper objectMapper;
 
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -210,19 +209,8 @@ public class SecurityConfig {
 
                 return (request, response, authException) -> {
 
-                        response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                        response.setCharacterEncoding("UTF-8");
-
-                        ObjectMapper mapper = new ObjectMapper();
-
-                        response.getWriter().write(
-                                        mapper.writeValueAsString(Map.of(
-                                                        "timestamp", Instant.now().toString(),
-                                                        "status", HttpStatus.UNAUTHORIZED.value(),
-                                                        "error", "Unauthorized",
-                                                        "message", "Bạn cần đăng nhập để truy cập tài nguyên này",
-                                                        "path", request.getRequestURI())));
+                        writeError(response, HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED",
+                                        "Bạn cần đăng nhập để truy cập tài nguyên này", request.getRequestURI(), objectMapper);
                 };
         }
 
@@ -231,19 +219,22 @@ public class SecurityConfig {
 
                 return (request, response, accessDeniedException) -> {
 
-                        response.setStatus(HttpStatus.FORBIDDEN.value());
-                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                        response.setCharacterEncoding("UTF-8");
-
-                        ObjectMapper mapper = new ObjectMapper();
-
-                        response.getWriter().write(
-                                        mapper.writeValueAsString(Map.of(
-                                                        "timestamp", Instant.now().toString(),
-                                                        "status", HttpStatus.FORBIDDEN.value(),
-                                                        "error", "Forbidden",
-                                                        "message", "Bạn không có quyền truy cập tài nguyên này",
-                                                        "path", request.getRequestURI())));
+                        writeError(response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Bạn không có quyền truy cập tài nguyên này",
+                                        request.getRequestURI(), objectMapper);
                 };
+        }
+
+        private void writeError(
+                        jakarta.servlet.http.HttpServletResponse response,
+                        HttpStatus status,
+                        String code,
+                        String message,
+                        String path,
+                        ObjectMapper objectMapper) throws java.io.IOException {
+                response.setStatus(status.value());
+                response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                objectMapper.writeValue(response.getWriter(),
+                                ApiErrorResponseFactory.create(status, code, message, path));
         }
 }

@@ -1,10 +1,11 @@
 package com.benhsoan.domain.clinical.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class ClinicalServiceUnavailableException extends ClinicalOrderException {
 
     public ClinicalServiceUnavailableException() {
-        super(HttpStatus.CONFLICT, "One or more clinical services are unavailable.");
+        super(DomainErrorCode.CLINICAL_SERVICE_UNAVAILABLE, "One or more clinical services are unavailable.");
     }
 }
