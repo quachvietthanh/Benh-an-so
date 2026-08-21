@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyCancelledException;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
@@ -43,6 +44,14 @@ public class Prescription {
 
     private Instant updatedAt;
 
+    private InterconnectionStatus interconnectionStatus;
+
+    private Instant lastInterconnectionAt;
+
+    private String lastInterconnectionError;
+
+    private String interconnectionReceiptCode;
+
     private List<PrescriptionItem> items;
 
     private Prescription(
@@ -55,6 +64,10 @@ public class Prescription {
             Instant prescribedAt,
             UUID updatedBy,
             Instant updatedAt,
+            InterconnectionStatus interconnectionStatus,
+            Instant lastInterconnectionAt,
+            String lastInterconnectionError,
+            String interconnectionReceiptCode,
             List<PrescriptionItem> items
     ) {
         this.id = requireNonNull(id, "Prescription id is required.");
@@ -66,6 +79,11 @@ public class Prescription {
         this.prescribedAt = requireNonNull(prescribedAt, "Prescription time is required.");
         this.updatedBy = updatedBy;
         this.updatedAt = updatedAt;
+        this.interconnectionStatus = requireNonNull(interconnectionStatus, "Interconnection status is required.");
+        this.lastInterconnectionAt = lastInterconnectionAt;
+        this.lastInterconnectionError = normalizeOptionalText(lastInterconnectionError);
+        this.interconnectionReceiptCode = normalizeOptionalText(interconnectionReceiptCode);
+        validateInterconnectionState();
         this.items = validateAndCopyItems(items, id);
     }
 
@@ -88,6 +106,10 @@ public class Prescription {
                 prescribedAt,
                 null,
                 null,
+                InterconnectionStatus.NOT_SENT,
+                null,
+                null,
+                null,
                 items
         );
     }
@@ -104,6 +126,28 @@ public class Prescription {
             Instant updatedAt,
             List<PrescriptionItem> items
     ) {
+        return restore(
+                id, prescriptionCode, medicalRecordId, status, note, prescribedBy, prescribedAt,
+                updatedBy, updatedAt, InterconnectionStatus.NOT_SENT, null, null, null, items
+        );
+    }
+
+    public static Prescription restore(
+            UUID id,
+            String prescriptionCode,
+            UUID medicalRecordId,
+            PrescriptionStatus status,
+            String note,
+            UUID prescribedBy,
+            Instant prescribedAt,
+            UUID updatedBy,
+            Instant updatedAt,
+            InterconnectionStatus interconnectionStatus,
+            Instant lastInterconnectionAt,
+            String lastInterconnectionError,
+            String interconnectionReceiptCode,
+            List<PrescriptionItem> items
+    ) {
         return new Prescription(
                 id,
                 prescriptionCode,
@@ -114,8 +158,28 @@ public class Prescription {
                 prescribedAt,
                 updatedBy,
                 updatedAt,
+                interconnectionStatus,
+                lastInterconnectionAt,
+                lastInterconnectionError,
+                interconnectionReceiptCode,
                 items
         );
+    }
+
+    public void markInterconnectionSucceeded(String receiptCode, Instant completedAt) {
+        ensureNotInterconnected();
+        this.interconnectionStatus = InterconnectionStatus.SUCCESS;
+        this.lastInterconnectionAt = requireNonNull(completedAt, "Interconnection completion time is required.");
+        this.lastInterconnectionError = null;
+        this.interconnectionReceiptCode = requireText(receiptCode, "Interconnection receipt code is required.");
+    }
+
+    public void markInterconnectionFailed(String failureReason, Instant completedAt) {
+        ensureNotInterconnected();
+        this.interconnectionStatus = InterconnectionStatus.FAILED;
+        this.lastInterconnectionAt = requireNonNull(completedAt, "Interconnection completion time is required.");
+        this.lastInterconnectionError = requireText(failureReason, "Interconnection failure reason is required.");
+        this.interconnectionReceiptCode = null;
     }
 
     public void replaceItems(
@@ -173,6 +237,31 @@ public class Prescription {
     private void ensurePendingDispense(String message) {
         if (!isPendingDispense()) {
             throw new PrescriptionInvalidStatusException(message);
+        }
+    }
+
+    private void ensureNotInterconnected() {
+        if (interconnectionStatus == InterconnectionStatus.SUCCESS) {
+            throw new PrescriptionInvalidStatusException(
+                    "Successfully interconnected prescriptions cannot be submitted again."
+            );
+        }
+    }
+
+    private void validateInterconnectionState() {
+        boolean valid = switch (interconnectionStatus) {
+            case NOT_SENT -> lastInterconnectionAt == null
+                    && lastInterconnectionError == null
+                    && interconnectionReceiptCode == null;
+            case SUCCESS -> lastInterconnectionAt != null
+                    && lastInterconnectionError == null
+                    && interconnectionReceiptCode != null;
+            case FAILED -> lastInterconnectionAt != null
+                    && lastInterconnectionError != null
+                    && interconnectionReceiptCode == null;
+        };
+        if (!valid) {
+            throw new ValidationException("Prescription interconnection state is inconsistent.");
         }
     }
 

@@ -23,7 +23,7 @@ class BackupRestorePlanTest {
         assertTrue(plan.allowedTables().containsAll(List.of(
                 "clinic_configuration", "diagnosis_catalog", "service_catalog", "service_price", "clinical_service_catalog",
                 "drug_interaction_rules", "prescription_code_sequences", "invoice_code_sequences",
-                "payments", "payment_service_fees"
+                "prescription_interconnection_logs", "payments", "payment_service_fees"
         )));
         assertEquals(Set.of("users"), plan.approvedExternalParentTables());
         assertTrue(plan.dependencies().stream().allMatch(dependency ->
@@ -39,6 +39,16 @@ class BackupRestorePlanTest {
         assertTrue(plan.dependencies().stream().noneMatch(dependency ->
                 "clinic_configuration".equals(dependency.childTable())
                         || "clinic_configuration".equals(dependency.parentTable())));
+    }
+
+    @Test
+    void interconnectionLogsAreIncludedAfterTheirPrescriptionParent() {
+        BackupRestorePlan plan = new BackupStorageConfiguration().fullBackupRestorePlan();
+
+        assertTrue(plan.snapshotTables().contains("prescription_interconnection_logs"));
+        assertTrue(plan.dependencies().contains(new ForeignKeyDependency(
+                "prescription_interconnection_logs", "prescription_id", "prescriptions"
+        )));
     }
 
     @Test

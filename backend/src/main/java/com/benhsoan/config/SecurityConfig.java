@@ -71,6 +71,7 @@ public class SecurityConfig {
 
                                                 // Patient portal result lookup (public, strictly scoped by appointment code — QTN-15)
                                                 .requestMatchers("/portal/**").permitAll()
+                                                .requestMatchers("/mock-interconnection/**").permitAll()
 
                                                 // ===== ADMIN / USER MANAGEMENT =====
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -173,6 +174,7 @@ public class SecurityConfig {
                 configuration.setAllowedHeaders(List.of(
                                 "Authorization",
                                 "Content-Type",
+                                "X-Idempotency-Key",
                                 "Accept",
                                 "X-Requested-With",
                                 "Origin",

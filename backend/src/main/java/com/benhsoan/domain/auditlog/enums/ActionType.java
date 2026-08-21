@@ -32,6 +32,8 @@ public enum ActionType {
 
     EXPORT,
 
+    SEND,
+
     OVERRIDE_DRUG_INTERACTION_WARNING,
 
     BACKUP,

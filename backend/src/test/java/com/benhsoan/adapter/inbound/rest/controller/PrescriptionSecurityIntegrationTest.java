@@ -33,6 +33,10 @@ import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
+import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -41,7 +45,7 @@ import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
-@WebMvcTest(controllers = PrescriptionController.class)
+@WebMvcTest(controllers = {PrescriptionController.class, PrescriptionInterconnectionController.class})
 @Import({PrescriptionRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
         RequirePermissionAspect.class, PermissionEvaluator.class, PrescriptionSecurityIntegrationTest.AspectTestConfig.class})
 class PrescriptionSecurityIntegrationTest {
@@ -62,6 +66,9 @@ class PrescriptionSecurityIntegrationTest {
     @MockitoBean private CancelPrescriptionUseCase cancelPrescriptionUseCase;
     @MockitoBean private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     @MockitoBean private ExportPrescriptionUseCase exportPrescriptionUseCase;
+    @MockitoBean private SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
+    @MockitoBean private RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.prescription.SearchPrescriptionInterconnectionsUseCase searchPrescriptionInterconnectionsUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -173,5 +180,57 @@ class PrescriptionSecurityIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message")
                         .value("Đơn chưa hoàn tất"));
+    }
+
+    @Test
+    void requiresDedicatedInterconnectionPermissions() throws Exception {
+        java.util.UUID prescriptionId = java.util.UUID.randomUUID();
+        var result = new PrescriptionInterconnectionResult(
+                prescriptionId, "RX000001", InterconnectionStatus.SUCCESS,
+                "LT-20260821-000001", null, java.time.Instant.parse("2026-08-21T03:00:00Z"));
+        when(sendPrescriptionInterconnectionUseCase.send(prescriptionId)).thenReturn(result);
+        when(retryPrescriptionInterconnectionUseCase.retry(prescriptionId)).thenReturn(result);
+
+        mockMvc.perform(post("/prescriptions/{id}/interconnection", prescriptionId)
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "PERMISSION_PRESCRIPTION_INTERCONNECTION_SEND"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/prescriptions/{id}/interconnection", prescriptionId)
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "PERMISSION_PRESCRIPTION_UPDATE"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/prescriptions/{id}/interconnection/retry", prescriptionId)
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "PERMISSION_PRESCRIPTION_INTERCONNECTION_RETRY"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/prescriptions/{id}/interconnection/retry", prescriptionId)
+                        .with(user("pharmacist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "PERMISSION_PRESCRIPTION_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void pharmacistIsForbiddenFromInterconnectionSearchAndRetry() throws Exception {
+        java.util.UUID prescriptionId = java.util.UUID.randomUUID();
+        var pharmacist = user("pharmacist").authorities(
+                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"));
+
+        mockMvc.perform(get("/prescription-interconnections").param("status", "FAILED").with(pharmacist))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/prescriptions/{id}/interconnection/retry", prescriptionId).with(pharmacist))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsConflictWhenSuccessfullyInterconnectedPrescriptionIsSentAgain() throws Exception {
+        java.util.UUID prescriptionId = java.util.UUID.randomUUID();
+        when(sendPrescriptionInterconnectionUseCase.send(prescriptionId)).thenThrow(
+                new com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException(
+                        "Successfully interconnected prescriptions cannot be submitted again."));
+
+        mockMvc.perform(post("/prescriptions/{id}/interconnection", prescriptionId)
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "PERMISSION_PRESCRIPTION_INTERCONNECTION_SEND"))))
+                .andExpect(status().isConflict());
     }
 }

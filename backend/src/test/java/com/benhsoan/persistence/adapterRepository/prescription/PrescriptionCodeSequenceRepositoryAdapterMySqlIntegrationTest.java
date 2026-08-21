@@ -86,6 +86,36 @@ class PrescriptionCodeSequenceRepositoryAdapterMySqlIntegrationTest {
         ));
     }
 
+    @Test
+    void flywayCreatesInterconnectionSchemaAndAssignsDedicatedPermissions() {
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'prescription_interconnection_logs'",
+                Integer.class));
+        assertEquals(3, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM permissions WHERE code IN (?, ?, ?)", Integer.class,
+                "PRESCRIPTION_INTERCONNECTION_SEND",
+                "PRESCRIPTION_INTERCONNECTION_READ",
+                "PRESCRIPTION_INTERCONNECTION_RETRY"));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                        + "JOIN permissions p ON p.id = rp.permission_id "
+                        + "WHERE r.name = 'DOCTOR' AND p.code = 'PRESCRIPTION_INTERCONNECTION_SEND'",
+                Integer.class));
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                        + "JOIN permissions p ON p.id = rp.permission_id "
+                        + "WHERE r.name = 'ADMIN' AND p.code IN (?, ?)",
+                Integer.class,
+                "PRESCRIPTION_INTERCONNECTION_READ",
+                "PRESCRIPTION_INTERCONNECTION_RETRY"));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                        + "JOIN permissions p ON p.id = rp.permission_id "
+                        + "WHERE r.name = 'PHARMACIST' AND p.code LIKE 'PRESCRIPTION_INTERCONNECTION_%'",
+                Integer.class));
+    }
+
     private long reserveAfterStart(CountDownLatch ready, CountDownLatch start)
             throws InterruptedException {
         ready.countDown();

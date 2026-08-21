@@ -40,6 +40,11 @@ import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
+import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +65,8 @@ public class PrescriptionController {
     private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
     private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     private final ExportPrescriptionUseCase exportPrescriptionUseCase;
+    private final SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
+    private final RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
 
     private final PrescriptionRestMapper mapper;
 
@@ -139,6 +146,24 @@ public class PrescriptionController {
     @RequirePermission("PRESCRIPTION_UPDATE")
     public PrescriptionResponse cancel(@PathVariable UUID id) {
         return mapper.toResponse(cancelPrescriptionUseCase.cancel(id));
+    }
+
+    @PostMapping("/{id}/interconnection")
+    @RequirePermission("PRESCRIPTION_INTERCONNECTION_SEND")
+    @Operation(summary = "Send a prescription to the interconnection gateway")
+    @ApiResponse(responseCode = "200", description = "Submission result")
+    @ApiResponse(responseCode = "403", description = "Requires interconnection send permission")
+    public PrescriptionInterconnectionResult sendToInterconnection(@PathVariable UUID id) {
+        return sendPrescriptionInterconnectionUseCase.send(id);
+    }
+
+    @PostMapping("/{id}/interconnection/retry")
+    @RequirePermission("PRESCRIPTION_INTERCONNECTION_RETRY")
+    @Operation(summary = "Retry a failed prescription interconnection submission")
+    @ApiResponse(responseCode = "200", description = "Retry result")
+    @ApiResponse(responseCode = "403", description = "Requires interconnection retry permission")
+    public PrescriptionInterconnectionResult retryInterconnection(@PathVariable UUID id) {
+        return retryPrescriptionInterconnectionUseCase.retry(id);
     }
 
     @PostMapping("/check-interactions")
