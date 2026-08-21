@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.enums.InvoiceType;
-import com.benhsoan.domain.billing.exception.InvoiceAdjustmentReasonRequiredException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException;
 import com.benhsoan.domain.billing.exception.InvoiceUnauthorizedAdjustmentException;
 import com.benhsoan.domain.billing.exception.PaymentRequiredForInvoiceException;
@@ -119,7 +119,7 @@ class InvoiceTest {
         UUID invoiceId = UUID.randomUUID();
 
         assertThrows(
-                InvoiceAdjustmentReasonRequiredException.class,
+                ValidationException.class,
                 () -> Invoice.createAdjustment(
                         invoiceId,
                         "HD-DC-0002",

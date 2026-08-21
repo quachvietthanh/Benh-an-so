@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.benhsoan.domain.prescription.PrescriptionItem;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
 public class PrescriptionAllocationInsufficientStockException extends PrescriptionInsufficientStockException {
 
@@ -13,7 +14,7 @@ public class PrescriptionAllocationInsufficientStockException extends Prescripti
             String medicineCode,
             int availableQuantity
     ) {
-        super(
+        super(DomainErrorCode.INSUFFICIENT_STOCK,
                 prescriptionId,
                 List.of(new StockShortageDetail(
                         item.getId(),

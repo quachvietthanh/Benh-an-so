@@ -1,6 +1,7 @@
 package com.benhsoan.domain.prescription.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class UnauthorizedPrescriptionAmendmentException
         extends PrescriptionException {
@@ -8,8 +9,7 @@ public class UnauthorizedPrescriptionAmendmentException
     private static final long serialVersionUID = 1L;
 
     public UnauthorizedPrescriptionAmendmentException() {
-        super(
-                HttpStatus.FORBIDDEN,
+        super(DomainErrorCode.UNAUTHORIZED_PRESCRIPTION_AMENDMENT,
                 "Only the doctor who prescribed the prescription may amend it."
         );
     }

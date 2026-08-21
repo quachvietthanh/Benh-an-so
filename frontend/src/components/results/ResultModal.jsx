@@ -21,7 +21,6 @@ import {
   SafetyCertificateOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
-import { formatGender } from '../../utils/helpers'
 import ResultForm from './ResultForm'
 import ResultStatusBadge from './ResultStatusBadge'
 

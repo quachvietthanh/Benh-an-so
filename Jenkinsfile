@@ -8,10 +8,13 @@ pipeline {
 
     environment {
         BACKEND_DIR = 'backend'
+        FRONTEND_DIR = 'frontend'
         IMAGE_NAME = 'benh-an-so-backend'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
         MAVEN_IMAGE = 'maven:3.9.9-eclipse-temurin-21'
         MAVEN_CACHE_VOLUME = 'benh-so-an-maven-repo'
+        NODE_IMAGE = 'node:20-alpine'
+        NPM_CACHE_VOLUME = 'benh-so-an-npm-cache'
     }
 
     stages {
@@ -75,6 +78,25 @@ pipeline {
             post {
                 always {
                     junit allowEmptyResults: true, testResults: 'backend/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Build & Test Frontend') {
+            steps {
+                dir("${FRONTEND_DIR}") {
+                    sh '''
+                        set -eu
+
+                        docker volume create ${NPM_CACHE_VOLUME} >/dev/null
+
+                        docker run --rm \
+                          -v "$PWD:/app" \
+                          -v ${NPM_CACHE_VOLUME}:/root/.npm \
+                          -w /app \
+                          ${NODE_IMAGE} \
+                          sh -c 'npm ci --cache /root/.npm && npm test && npm run lint && npm run build && npm run check:bundle'
+                    '''
                 }
             }
         }

@@ -13,7 +13,6 @@ import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.domain.auth.exception.AccountDisabledException;
 import com.benhsoan.domain.auth.exception.SessionExpiredException;
 import com.benhsoan.domain.auth.exception.TokenInvalidException;
-import com.benhsoan.domain.auth.exception.UserNotFoundException;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
 import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.inbound.auth.RefreshTokenUseCase;
@@ -74,7 +73,7 @@ public class RefreshTokenService implements RefreshTokenUseCase {
 
         User user =
                 userRepository.findById(session.getUserId())
-                        .orElseThrow(UserNotFoundException::new);
+                        .orElseThrow(TokenInvalidException::new);
 
         if (!user.isActive()) {
             throw new AccountDisabledException();

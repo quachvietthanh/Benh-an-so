@@ -1,12 +1,11 @@
 package com.benhsoan.domain.backup.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class BackupExecutionException extends DomainException {
+public class BackupExecutionException extends BackupException {
 
     public BackupExecutionException(String message) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, message);
+        super(DomainErrorCode.BACKUP_EXECUTION_FAILED, message);
     }
 }

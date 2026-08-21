@@ -1,10 +1,12 @@
 package com.benhsoan.domain.shared.exception;
 
-import org.springframework.http.HttpStatus;
-
 public class ValidationException extends DomainException {
 
     public ValidationException(String message) {
-        super(HttpStatus.BAD_REQUEST, message);
+        this(DomainErrorCode.VALIDATION_FAILED, message);
+    }
+
+    protected ValidationException(DomainErrorCode code, String message) {
+        super(code, message);
     }
 }

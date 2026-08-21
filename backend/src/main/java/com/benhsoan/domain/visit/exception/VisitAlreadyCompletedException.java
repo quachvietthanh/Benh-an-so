@@ -1,10 +1,11 @@
 package com.benhsoan.domain.visit.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class VisitAlreadyCompletedException extends VisitException {
 
     public VisitAlreadyCompletedException() {
-        super(HttpStatus.CONFLICT, "Visit has already been completed.");
+        super(DomainErrorCode.VISIT_ALREADY_COMPLETED, "Visit has already been completed.");
     }
 }

@@ -60,6 +60,7 @@ import InteractionWarningModal from '../components/pharmacy/InteractionWarningMo
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
   canSubmitPrescription,
@@ -107,28 +108,6 @@ const ROUTE_OPTIONS = [
   { value: 'OTHER', label: 'Cách dùng khác' },
 ]
 
-const getApiMessage = (error, fallback) => {
-  if (!error) return fallback
-  if (typeof error === 'string') return error
-  const data = error?.response?.data
-  if (typeof data === 'string') return data
-  if (data?.message && typeof data.message === 'string') return data.message
-  if (data?.error && typeof data.error === 'string') return data.error
-  if (Array.isArray(data?.errors) && data.errors.length > 0) {
-    const firstErr = data.errors[0]
-    if (typeof firstErr === 'string') return firstErr
-    if (firstErr?.defaultMessage) return firstErr.defaultMessage
-    if (firstErr?.message) return firstErr.message
-  }
-  if (data?.errors && typeof data.errors === 'object') {
-    const firstVal = Object.values(data.errors)[0]
-    if (typeof firstVal === 'string') return firstVal
-    if (firstVal?.defaultMessage) return firstVal.defaultMessage
-    if (firstVal?.message) return firstVal.message
-  }
-  return error?.message || fallback
-}
-
 let localItemSequence = 0
 const createEmptyItem = (isOriginal = false) => ({
   clientId: `prescription-item-${++localItemSequence}`,
@@ -170,7 +149,7 @@ function PrescriptionPage() {
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
-  const [loadError, setLoadError] = useState('')
+  const [loadError, setLoadError] = useState(null)
   const [activeTab, setActiveTab] = useState('prescribe')
 
   const [detectedInteractions, setDetectedInteractions] = useState([])
@@ -266,7 +245,7 @@ function PrescriptionPage() {
   const loadData = useCallback(async () => {
     if (!medicalRecordId) return
     setLoading(true)
-    setLoadError('')
+    setLoadError(null)
 
     try {
       const [recordResult, diagnosisResult, prescriptionResult] = await Promise.all([
@@ -345,7 +324,11 @@ function PrescriptionPage() {
         })
       }
     } catch (error) {
-      setLoadError(getApiMessage(error, 'Không thể tải ngữ cảnh kê đơn.'))
+      const apiError = error.apiError || normalizeApiError(error, 'Không thể tải ngữ cảnh kê đơn.')
+      setLoadError({
+        message: apiError.firstFieldError || apiError.message,
+        apiError,
+      })
     } finally {
       setLoading(false)
     }
@@ -1124,7 +1107,7 @@ function PrescriptionPage() {
   if (loading && !record) return <Spin fullscreen tip="Đang tải bệnh án và đơn thuốc..." />
 
   if (loadError) {
-    const isAccessDenied = String(loadError).toLowerCase().includes('access denied') || String(loadError).toLowerCase().includes('forbidden')
+    const isAccessDenied = isAccessDeniedApiError(loadError.apiError)
     return (
       <Card style={{ marginTop: 16 }}>
         <Alert
@@ -1134,7 +1117,7 @@ function PrescriptionPage() {
           description={
             <div>
               <Paragraph style={{ marginBottom: 8 }}>
-                <strong>Chi tiết lỗi:</strong> {loadError}
+                <strong>Chi tiết lỗi:</strong> {loadError.message}
               </Paragraph>
               {isAccessDenied && (
                 <Paragraph type="secondary" style={{ marginBottom: 12 }}>
@@ -1466,7 +1449,7 @@ function PrescriptionPage() {
 
                         {/* Thông tin quy cách / hàm lượng thuốc đang chọn */}
                         {selectedMed && (
-                          <div style={{ background: '#F1F5F9', padding: '8px 12px', borderRadius: 8, marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                          <div style={{ background: '#F1F5F9', padding: '8px 12px', borderRadius: 8, marginBottom: 12, display: 'flex flexWrap', gap: 8, alignItems: 'center' }}>
                             <Tag color="blue" style={{ margin: 0 }}>
                               Hàm lượng: <strong>{selectedMed.strength || 'Theo quy cách'}</strong>
                             </Tag>
@@ -1981,12 +1964,16 @@ function PrescriptionPage() {
         </div>
       </Modal>
 
-      <InteractionWarningModal
-        open={interactionModalOpen}
-        warnings={detectedInteractions}
-        onCancel={() => setInteractionModalOpen(false)}
-        onConfirmOverride={handleConfirmInteractionOverrides}
-      />
+      {interactionModalOpen && (
+        <React.Suspense fallback={<Spin size="small" />}>
+          <InteractionWarningModal
+            open={interactionModalOpen}
+            warnings={detectedInteractions}
+            onCancel={() => setInteractionModalOpen(false)}
+            onConfirmOverride={handleConfirmInteractionOverrides}
+          />
+        </React.Suspense>
+      )}
 
       <PrescriptionDetailModal
         open={detailModalOpen}

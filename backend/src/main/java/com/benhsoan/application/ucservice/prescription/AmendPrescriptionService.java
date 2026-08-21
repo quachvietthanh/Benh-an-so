@@ -26,7 +26,6 @@ import com.benhsoan.domain.prescription.PrescriptionAmendment;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
 import com.benhsoan.domain.prescription.enums.WarningAction;
-import com.benhsoan.domain.prescription.exception.PrescriptionAmendmentReasonRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
@@ -36,8 +35,8 @@ import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionAmendm
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
-import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
@@ -181,7 +180,7 @@ public class AmendPrescriptionService
         }
         if (command.changeReason() == null
                 || command.changeReason().isBlank()) {
-            throw new PrescriptionAmendmentReasonRequiredException();
+            throw new ValidationException("Amendment reason is required.");
         }
     }
 

@@ -1,11 +1,12 @@
 package com.benhsoan.domain.appointment.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class AppointmentInvalidStatusException extends AppointmentException {
 
     public AppointmentInvalidStatusException(String message) {
-        super(HttpStatus.CONFLICT, message);
+        super(DomainErrorCode.APPOINTMENT_INVALID_STATUS, message);
     }
 
 }

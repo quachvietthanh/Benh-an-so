@@ -1,14 +1,12 @@
 package com.benhsoan.domain.auth.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class UserAlreadyExistsException extends DomainException {
+public class UserAlreadyExistsException extends AuthException {
 
     public UserAlreadyExistsException() {
-        super(
-                HttpStatus.CONFLICT,
+        super(DomainErrorCode.USER_ALREADY_EXISTS,
                 "Username already exists."
         );
     }

@@ -1,3 +1,5 @@
+/* global TextDecoder */
+
 import dayjs from 'dayjs'
 
 const compactText = (parts) => parts.filter(Boolean).join('; ')

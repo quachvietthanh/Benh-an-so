@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
 public class PrescriptionInsufficientStockException extends PrescriptionException {
 
@@ -15,7 +15,15 @@ public class PrescriptionInsufficientStockException extends PrescriptionExceptio
             UUID prescriptionId,
             List<StockShortageDetail> details
     ) {
-        super(HttpStatus.CONFLICT, "Insufficient stock for one or more medicines.");
+        this(DomainErrorCode.INSUFFICIENT_STOCK, prescriptionId, details);
+    }
+
+    protected PrescriptionInsufficientStockException(
+            DomainErrorCode code,
+            UUID prescriptionId,
+            List<StockShortageDetail> details
+    ) {
+        super(code, "Insufficient stock for one or more medicines.");
         this.prescriptionId = Objects.requireNonNull(prescriptionId, "Prescription id is required.");
         this.details = List.copyOf(Objects.requireNonNull(details, "Stock shortage details are required."));
     }

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { normalizeApiError } from '../utils/apiError.js'
 
 const configuredBaseUrl = import.meta.env?.VITE_API_BASE_URL
 
@@ -9,5 +10,15 @@ const publicApiClient = axios.create({
   },
   timeout: 10000,
 })
+
+publicApiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error && typeof error === 'object') {
+      error.apiError = normalizeApiError(error)
+    }
+    return Promise.reject(error)
+  }
+)
 
 export default publicApiClient

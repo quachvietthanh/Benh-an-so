@@ -1,10 +1,11 @@
 package com.benhsoan.domain.visit.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class VisitInvalidStatusException extends VisitException {
 
     public VisitInvalidStatusException(String message) {
-        super(HttpStatus.CONFLICT, message);
+        super(DomainErrorCode.VISIT_INVALID_STATUS, message);
     }
 }

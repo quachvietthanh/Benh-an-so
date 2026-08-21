@@ -1,10 +1,11 @@
 package com.benhsoan.domain.billing.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class InvoiceUnauthorizedAdjustmentException extends BillingException {
 
     public InvoiceUnauthorizedAdjustmentException() {
-        super(HttpStatus.FORBIDDEN, "Only clinic managers can adjust invoices.");
+        super(DomainErrorCode.INVOICE_UNAUTHORIZED_ADJUSTMENT, "Only clinic managers can adjust invoices.");
     }
 }

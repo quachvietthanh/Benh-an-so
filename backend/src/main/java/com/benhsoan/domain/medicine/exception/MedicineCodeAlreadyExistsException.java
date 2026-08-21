@@ -1,12 +1,12 @@
 package com.benhsoan.domain.medicine.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class MedicineCodeAlreadyExistsException extends MedicineException {
 
     public MedicineCodeAlreadyExistsException(String medicineCode) {
-        super(
-                HttpStatus.CONFLICT,
+        super(DomainErrorCode.MEDICINE_CODE_ALREADY_EXISTS,
                 "Medicine code already exists: " + medicineCode
         );
     }

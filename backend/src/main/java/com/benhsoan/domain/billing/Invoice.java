@@ -7,7 +7,6 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.benhsoan.domain.billing.enums.InvoiceType;
-import com.benhsoan.domain.billing.exception.InvoiceAdjustmentReasonRequiredException;
 import com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException;
 import com.benhsoan.domain.billing.exception.InvoiceUnauthorizedAdjustmentException;
 import com.benhsoan.domain.billing.exception.PaymentRequiredForInvoiceException;
@@ -127,7 +126,7 @@ public class Invoice {
             throw new InvoiceUnauthorizedAdjustmentException();
         }
         if (adjustmentReason == null || adjustmentReason.isBlank()) {
-            throw new InvoiceAdjustmentReasonRequiredException();
+            throw new ValidationException("Adjustment reason is required.");
         }
 
         BigDecimal totalAmount = sumLineAmounts(lines);
@@ -207,7 +206,7 @@ public class Invoice {
             throw new ValidationException("Adjustment invoice must reference the original invoice.");
         }
         if (adjustmentReason == null) {
-            throw new InvoiceAdjustmentReasonRequiredException();
+            throw new ValidationException("Adjustment reason is required.");
         }
         if (totalAmount.compareTo(BigDecimal.ZERO) == 0) {
             throw new ValidationException("Adjustment invoice total amount must not be zero.");

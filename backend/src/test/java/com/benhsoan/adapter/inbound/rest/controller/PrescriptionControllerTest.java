@@ -263,7 +263,7 @@ class PrescriptionControllerTest {
                                 }
                                 """.formatted(medicalRecordId, medicineId)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors['items[0].frequency']").exists());
+                .andExpect(jsonPath("$.details.fields['items[0].frequency']").exists());
 
         mockMvc.perform(post("/prescriptions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -280,7 +280,7 @@ class PrescriptionControllerTest {
                                 }
                                 """.formatted(medicalRecordId, medicineId)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors['items[0].route']").exists());
+                .andExpect(jsonPath("$.details.fields['items[0].route']").exists());
 
         mockMvc.perform(post("/prescriptions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -297,7 +297,7 @@ class PrescriptionControllerTest {
                                 }
                                 """.formatted(medicalRecordId, medicineId)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors['items[0].durationDays']").exists());
+                .andExpect(jsonPath("$.details.fields['items[0].durationDays']").exists());
 
         mockMvc.perform(post("/prescriptions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -314,7 +314,7 @@ class PrescriptionControllerTest {
                                 }
                                 """.formatted(medicalRecordId, medicineId)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors['items[0].dosage']").exists());
+                .andExpect(jsonPath("$.details.fields['items[0].dosage']").exists());
 
         verify(createPrescriptionUseCase, never()).create(any());
     }
@@ -344,7 +344,7 @@ class PrescriptionControllerTest {
                                 }
                                 """.formatted(medicalRecordId, item)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors['items[0].route']").exists());
+                .andExpect(jsonPath("$.details.fields['items[0].route']").exists());
 
         mockMvc.perform(patch("/prescriptions/{id}", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -355,7 +355,7 @@ class PrescriptionControllerTest {
                                 }
                                 """.formatted(item)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors['items[0].route']").exists());
+                .andExpect(jsonPath("$.details.fields['items[0].route']").exists());
     }
 
     @Test

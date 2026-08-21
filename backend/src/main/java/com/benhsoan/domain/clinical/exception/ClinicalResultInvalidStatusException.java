@@ -1,10 +1,11 @@
 package com.benhsoan.domain.clinical.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class ClinicalResultInvalidStatusException extends ClinicalResultException {
 
     public ClinicalResultInvalidStatusException(String message) {
-        super(HttpStatus.CONFLICT, message);
+        super(DomainErrorCode.CLINICAL_RESULT_INVALID_STATUS, message);
     }
 }

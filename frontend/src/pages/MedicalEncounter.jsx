@@ -34,12 +34,12 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import queueApi from '../api/queueApi'
 import systemApi from '../api/systemApi'
 import visitApi from '../api/visitApi'
-import ClinicalOrderPrintModal from '../components/clinical/ClinicalOrderPrintModal'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import { useAuthContext } from '../context/AuthContext'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
+import { getApiErrorMessage as getApiMessage, normalizeApiError } from '../utils/apiError'
 import {
   buildClinicalOrderPayload,
   buildDiagnosisPayload,
@@ -49,18 +49,9 @@ import {
   unwrapCollection,
 } from '../utils/workflowContract'
 
-const { Text, Paragraph, Title } = Typography
+const ClinicalOrderPrintModal = React.lazy(() => import('../components/clinical/ClinicalOrderPrintModal'))
 
-const getApiMessage = (error, fallback) => {
-  const errors = error?.response?.data?.errors
-  if (errors && typeof errors === 'object') {
-    const values = Object.values(errors).filter(Boolean)
-    if (values.length > 0) {
-      return String(values[0])
-    }
-  }
-  return error?.response?.data?.message || error?.message || fallback
-}
+const { Text, Paragraph, Title } = Typography
 
 const loadRecentDiagnoses = () => {
   try {
@@ -149,7 +140,7 @@ function MedicalEncounter() {
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
   const [allBackendDiagnoses, setAllBackendDiagnoses] = useState([])
   const [icdSearching, setIcdSearching] = useState(false)
-  const [recentIcds, setRecentIcds] = useState(loadRecentDiagnoses)
+  const [, setRecentIcds] = useState(loadRecentDiagnoses)
 
   const loadAllBackendDiagnoses = useCallback(async () => {
     setIcdSearching(true)
@@ -276,7 +267,7 @@ function MedicalEncounter() {
 
       if (recordResult.status === 'fulfilled') {
         hydrateRecord(recordResult.value.data)
-      } else if (recordResult.reason?.response?.status === 404) {
+      } else if ((recordResult.reason?.apiError || normalizeApiError(recordResult.reason)).status === 404) {
         hydrateRecord(null)
       } else {
         throw recordResult.reason
@@ -1054,18 +1045,22 @@ function MedicalEncounter() {
         )}
       </Modal>
 
-      <ClinicalOrderPrintModal
-        open={printModalOpen}
-        onClose={() => setPrintModalOpen(false)}
-        patient={selectedPatientObj}
-        recordCode={currentRecordId || `VISIT-${visitId}`}
-        diagnosis={form.getFieldValue('diagnosisText')}
-        primaryIcd={primaryIcd}
-        secondaryIcds={secondaryIcds}
-        orders={selectedOrders}
-        doctorName={encounter?.doctor?.fullName || user?.fullName || user?.username}
-        vitalSigns={vitalSigns}
-      />
+      {printModalOpen && (
+        <React.Suspense fallback={<Spin size="small" />}>
+          <ClinicalOrderPrintModal
+            open={printModalOpen}
+            onClose={() => setPrintModalOpen(false)}
+            patient={selectedPatientObj}
+            recordCode={currentRecordId || `VISIT-${visitId}`}
+            diagnosis={form.getFieldValue('diagnosisText')}
+            primaryIcd={primaryIcd}
+            secondaryIcds={secondaryIcds}
+            orders={selectedOrders}
+            doctorName={encounter?.doctor?.fullName || user?.fullName || user?.username}
+            vitalSigns={vitalSigns}
+          />
+        </React.Suspense>
+      )}
     </div>
   )
 }

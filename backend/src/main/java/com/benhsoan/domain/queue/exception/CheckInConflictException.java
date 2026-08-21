@@ -1,12 +1,11 @@
 package com.benhsoan.domain.queue.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class CheckInConflictException extends DomainException {
+public class CheckInConflictException extends QueueException {
 
     public CheckInConflictException(String message) {
-        super(HttpStatus.CONFLICT, message);
+        super(DomainErrorCode.CHECK_IN_CONFLICT, message);
     }
 }

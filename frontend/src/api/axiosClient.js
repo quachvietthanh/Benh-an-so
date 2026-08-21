@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { normalizeApiError } from '../utils/apiError.js'
 
 const configuredBaseUrl = import.meta.env?.VITE_API_BASE_URL
 
@@ -26,6 +27,9 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error && typeof error === 'object') {
+      error.apiError = normalizeApiError(error)
+    }
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')

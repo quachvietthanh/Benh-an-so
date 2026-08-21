@@ -1,12 +1,12 @@
 package com.benhsoan.domain.appointment.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class AppointmentTimeInPastException extends AppointmentException {
 
     public AppointmentTimeInPastException() {
-        super(
-                HttpStatus.BAD_REQUEST,
+        super(DomainErrorCode.APPOINTMENT_TIME_IN_PAST,
                 "Appointment time cannot be in the past."
         );
     }

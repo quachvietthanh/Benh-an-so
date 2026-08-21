@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 
 export const formatMoney = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`
 
-export const calculateFinancialMetrics = (invoices = [], timeline = [], dayCount = 1) => {
+export const calculateFinancialMetrics = (invoices = [], _timeline = [], dayCount = 1) => {
   let grossRevenue = 0
   let adjustmentTotal = 0
   let originalCount = 0

@@ -1,10 +1,11 @@
 package com.benhsoan.domain.visit.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class VisitAlreadyCancelledException extends VisitException {
 
     public VisitAlreadyCancelledException() {
-        super(HttpStatus.CONFLICT, "Visit has already been cancelled.");
+        super(DomainErrorCode.VISIT_ALREADY_CANCELLED, "Visit has already been cancelled.");
     }
 }

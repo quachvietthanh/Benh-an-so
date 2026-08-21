@@ -25,7 +25,7 @@ import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.Room;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
-import com.benhsoan.domain.queue.exception.DoctorRoomAssignmentNotFoundException;
+import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.outbound.generator.VisitCodeGenerator;
@@ -200,7 +200,7 @@ class QueueCheckInCoordinatorTest {
                 DoctorRoomAssignment.restore(UUID.randomUUID(), doctorId, roomId, actorId, now)));
         when(roomRepository.findActiveById(roomId)).thenReturn(Optional.empty());
 
-        assertThrows(DoctorRoomAssignmentNotFoundException.class,
+        assertThrows(DoctorNotAssignedToRoomException.class,
                 () -> coordinator.checkIn(patientId, doctorId, null, QueueItemSourceType.WALK_IN,
                         "Kham tong quat", null, actorId, now));
 

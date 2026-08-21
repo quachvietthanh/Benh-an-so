@@ -71,8 +71,6 @@ function PatientList() {
   const canReadPatient = userPermissions.includes('PATIENT_READ')
   const canManage = canCreatePatient || canUpdatePatient
   const [loading, setLoading] = useState(false)
-  const [patients, setPatients] = useState([])
-  const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [searchText, setSearchText] = useState('')
 

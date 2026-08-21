@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -25,6 +24,7 @@ import dayjs from 'dayjs'
 import reportApi from '../api/reportApi'
 import billingApi from '../api/billingApi'
 import { useAuthContext } from '../context/AuthContext'
+import { getApiErrorMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
 import ReportStatCards from '../components/reporting/ReportStatCards'
 import ManagerPermissionAlert from '../components/reporting/ManagerPermissionAlert'
 import OverviewReportView from '../components/reporting/OverviewReportView'
@@ -46,8 +46,7 @@ const { RangePicker } = DatePicker
 const { Title, Paragraph } = Typography
 
 function ReportsPage() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuthContext()
+  const { user } = useAuthContext()
 
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -212,11 +211,11 @@ function ReportsPage() {
       setAuditLogs(realLogs)
     } catch (err) {
       console.error('Lỗi tải báo cáo vận hành:', err)
-      const status = err?.response?.status
-      if (status === 403) {
+      const apiError = err.apiError || normalizeApiError(err, 'Không thể tải báo cáo.')
+      if (isAccessDeniedApiError(apiError)) {
         setLoadError('PERMISSION_DENIED_NOT_MANAGER')
       } else {
-        setLoadError(err?.response?.data?.message || err?.message || 'Không thể tải báo cáo.')
+        setLoadError(getApiErrorMessage(err, 'Không thể tải báo cáo.'))
       }
     } finally {
       setLoading(false)

@@ -1,14 +1,12 @@
 package com.benhsoan.domain.auth.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class TokenInvalidException extends DomainException {
+public class TokenInvalidException extends AuthException {
 
     public TokenInvalidException() {
-        super(
-                HttpStatus.UNAUTHORIZED,
+        super(DomainErrorCode.TOKEN_INVALID,
                 "Token is invalid."
         );
     }
