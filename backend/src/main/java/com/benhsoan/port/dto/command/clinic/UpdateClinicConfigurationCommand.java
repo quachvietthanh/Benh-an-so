@@ -7,6 +7,7 @@ public record UpdateClinicConfigurationCommand(
         String address,
         String phone,
         LocalTime openingTime,
-        LocalTime closingTime
+        LocalTime closingTime,
+        Integer retentionYears
 ) {
 }

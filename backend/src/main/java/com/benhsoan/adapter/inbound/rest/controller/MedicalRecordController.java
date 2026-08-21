@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,7 +32,9 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDia
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
@@ -52,6 +55,8 @@ public class MedicalRecordController {
     private final GetMedicalRecordUseCase getMedicalRecordUseCase;
     private final UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
     private final LockMedicalRecordUseCase lockMedicalRecordUseCase;
+    private final ArchiveMedicalRecordUseCase archiveMedicalRecordUseCase;
+    private final DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
     private final AmendMedicalRecordUseCase amendMedicalRecordUseCase;
     private final GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
     private final GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
@@ -112,6 +117,19 @@ public class MedicalRecordController {
     @RequirePermission("MEDICAL_RECORD_UPDATE_STATUS")
     public MedicalRecordResponse lock(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(lockMedicalRecordUseCase.lock(medicalRecordId));
+    }
+
+    @PostMapping("/{medicalRecordId}/archive")
+    @RequirePermission("MEDICAL_RECORD_UPDATE_STATUS")
+    public MedicalRecordResponse archive(@PathVariable UUID medicalRecordId) {
+        return mapper.toResponse(archiveMedicalRecordUseCase.archive(medicalRecordId));
+    }
+
+    @DeleteMapping("/{medicalRecordId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequirePermission("MEDICAL_RECORD_DELETE")
+    public void delete(@PathVariable UUID medicalRecordId) {
+        deleteMedicalRecordUseCase.delete(medicalRecordId);
     }
 
     @PostMapping("/{medicalRecordId}/amendments")

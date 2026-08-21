@@ -19,6 +19,7 @@ public class MedicalRecordRepositoryAdapter implements MedicalRecordRepository {
 
     private final JpaMedicalRecordRepository jpaRepository;
     private final MedicalRecordPersistenceMapper mapper;
+    private final MedicalRecordCascadeDeleter cascadeDeleter;
 
     @Override
     public Optional<MedicalRecord> findById(UUID id) {
@@ -39,5 +40,11 @@ public class MedicalRecordRepositoryAdapter implements MedicalRecordRepository {
     @Override
     public boolean existsByVisitId(UUID visitId) {
         return jpaRepository.existsByVisitId(visitId);
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        cascadeDeleter.deleteByMedicalRecordId(id);
+        jpaRepository.deleteById(id);
     }
 }
