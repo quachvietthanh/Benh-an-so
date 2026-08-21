@@ -1,14 +1,12 @@
 package com.benhsoan.domain.auth.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class AccountDisabledException extends DomainException {
+public class AccountDisabledException extends AuthException {
 
     public AccountDisabledException() {
-        super(
-                HttpStatus.FORBIDDEN,
+        super(DomainErrorCode.ACCOUNT_DISABLED,
                 "Account has been disabled."
         );
     }

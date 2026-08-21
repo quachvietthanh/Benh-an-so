@@ -2,6 +2,8 @@ package com.benhsoan.application.ucservice.prescription;
 
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,7 @@ import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotPrintableException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.infrastructure.pdf.PdfRenderingException;
 import com.benhsoan.port.dto.result.PrescriptionPrintResult;
 import com.benhsoan.port.dto.result.PrescriptionPrintDocument;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
@@ -31,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class ExportPrescriptionService implements ExportPrescriptionUseCase {
 
     private static final String PDF_CONTENT_TYPE = "application/pdf";
+    private static final Logger log = LoggerFactory.getLogger(ExportPrescriptionService.class);
 
     private final PrescriptionRepository prescriptionRepository;
     private final PrescriptionReadAccessValidator accessValidator;
@@ -52,7 +56,14 @@ public class ExportPrescriptionService implements ExportPrescriptionUseCase {
                 .orElseThrow(() -> new ValidationException("Clinic configuration is required for printing."));
         PrescriptionPrintDocument printModel = toPrintModel(prescription, clinic);
 
-        byte[] content = pdfRenderer.render(printModel);
+        byte[] content;
+        try {
+            content = pdfRenderer.render(printModel);
+        } catch (PdfRenderingException ex) {
+            log.error("Infrastructure failure: operation=render_prescription_pdf prescriptionId={} prescriptionCode={}",
+                    prescriptionId, printModel.prescriptionCode(), ex);
+            throw ex;
+        }
         recordPrintAudit(prescription.getId(), printModel.prescriptionCode());
         return new PrescriptionPrintResult(
                 "prescription-" + printModel.prescriptionCode() + ".pdf",

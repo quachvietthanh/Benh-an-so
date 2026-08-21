@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.prescription.enums.WarningAction;
-import com.benhsoan.domain.prescription.exception.PrescriptionOverrideReasonRequiredException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
 import lombok.AccessLevel;
@@ -148,7 +148,7 @@ public class PrescriptionWarningLog {
     private static String validateOverrideReason(WarningAction action, String overrideReason) {
         if (action == WarningAction.OVERRIDDEN
                 && (overrideReason == null || overrideReason.isBlank())) {
-            throw new PrescriptionOverrideReasonRequiredException();
+            throw new ValidationException("Override reason is required when a drug interaction warning is overridden.");
         }
         return normalizeOptionalText(overrideReason);
     }

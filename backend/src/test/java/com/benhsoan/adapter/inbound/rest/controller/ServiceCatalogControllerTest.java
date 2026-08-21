@@ -39,6 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ServiceCatalogRestMapper;
 import com.benhsoan.config.SecurityConfig;
+import com.benhsoan.domain.servicecatalog.exception.ServiceCatalogNotFoundException;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
@@ -149,6 +150,21 @@ class ServiceCatalogControllerTest {
                 .andExpect(jsonPath("$[0].id").value(PRICE_ID.toString()))
                 .andExpect(jsonPath("$[0].price").value(95000.00))
                 .andExpect(jsonPath("$[0].effectiveFrom").value("2026-08-01"));
+    }
+
+    @Test
+    void returnsTheCommonNotFoundContractForUnknownServiceCatalogPriceHistory() throws Exception {
+        UUID serviceCatalogId = UUID.randomUUID();
+        when(getServicePriceHistoryUseCase.getHistory(serviceCatalogId))
+                .thenThrow(new ServiceCatalogNotFoundException(serviceCatalogId));
+
+        mockMvc.perform(get("/system/services/{id}/prices", serviceCatalogId)
+                        .with(withPermissions("SERVICE_CATALOG_READ")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.code").value("SERVICE_CATALOG_NOT_FOUND"))
+                .andExpect(jsonPath("$.path").value("/system/services/" + serviceCatalogId + "/prices"))
+                .andExpect(jsonPath("$.details").isMap());
     }
 
     @Test

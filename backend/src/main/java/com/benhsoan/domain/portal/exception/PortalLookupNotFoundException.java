@@ -1,7 +1,6 @@
 package com.benhsoan.domain.portal.exception;
 
-import org.springframework.http.HttpStatus;
-
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 import com.benhsoan.domain.shared.exception.DomainException;
 
 /**
@@ -12,6 +11,6 @@ import com.benhsoan.domain.shared.exception.DomainException;
 public class PortalLookupNotFoundException extends DomainException {
 
     public PortalLookupNotFoundException() {
-        super(HttpStatus.NOT_FOUND, "Kết quả khám chưa sẵn sàng hoặc mã hẹn không hợp lệ");
+        super(DomainErrorCode.PORTAL_LOOKUP_NOT_FOUND, "Kết quả khám chưa sẵn sàng hoặc mã hẹn không hợp lệ");
     }
 }

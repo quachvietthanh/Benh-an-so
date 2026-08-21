@@ -8,10 +8,8 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
-import com.benhsoan.domain.prescription.exception.DuplicateMedicineInPrescriptionException;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyCancelledException;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
-import com.benhsoan.domain.prescription.exception.PrescriptionEmptyException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
@@ -183,7 +181,7 @@ public class Prescription {
             UUID prescriptionId
     ) {
         if (items == null || items.isEmpty()) {
-            throw new PrescriptionEmptyException();
+            throw new ValidationException("Prescription must contain at least one medicine.");
         }
 
         Set<UUID> medicineIds = new HashSet<>();
@@ -197,7 +195,7 @@ public class Prescription {
                 );
             }
             if (!medicineIds.add(item.getMedicineId())) {
-                throw new DuplicateMedicineInPrescriptionException(item.getMedicineId());
+                throw new ValidationException("Medicine already exists in the prescription: " + item.getMedicineId());
             }
         }
 

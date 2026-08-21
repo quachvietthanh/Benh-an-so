@@ -21,7 +21,9 @@ import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
 import com.benhsoan.domain.clinical.enums.MedicalAttachmentType;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderInvalidVisitException;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderLockedMedicalRecordException;
+import com.benhsoan.domain.clinical.exception.ClinicalAttachmentNotFoundException;
 import com.benhsoan.domain.clinical.exception.ClinicalResultAlreadyFinalizedException;
+import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.clinical.UploadClinicalResultAttachmentCommand;
@@ -88,19 +90,19 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
         String contentType = command.contentType().toLowerCase(Locale.ROOT);
 
         var result = clinicalResultRepository.findById(clinicalResultId)
-                .orElseThrow(() -> new ValidationException("Clinical result not found."));
+                .orElseThrow(() -> new ClinicalResultNotFoundException(clinicalResultId));
         if (result.getStatus() == ClinicalResultStatus.FINAL) {
             throw new ClinicalResultAlreadyFinalizedException();
         }
         var visit = requireWritableVisitAndRecord(result.getVisitId());
         var item = clinicalOrderItemRepository.findById(result.getClinicalOrderItemId())
-                .orElseThrow(() -> new ValidationException("Clinical order item not found."));
+                .orElseThrow(() -> missingRelation("clinicalOrderItem", result.getClinicalOrderItemId()));
         var clinicalService = clinicalServiceCatalogRepository.findById(item.getClinicalServiceId())
-                .orElseThrow(() -> new ValidationException("Clinical service not found."));
+                .orElseThrow(() -> missingRelation("clinicalService", item.getClinicalServiceId()));
 
         StoredClinicalAttachment stored = storagePort.upload(new ClinicalAttachmentUpload(clinicalResultId,
                 command.originalFileName(), contentType, command.content()));
-        registerRollbackCompensation(stored);
+        registerRollbackCompensation(clinicalResultId, stored);
 
         Instant now = clock.now();
         MedicalAttachment attachment = medicalAttachmentRepository.save(MedicalAttachment.create(
@@ -109,7 +111,7 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
                 attachmentTypeFor(clinicalService.getServiceType()), actorId, now));
         auditService.recordWrite(clinicalResultId, visit.getPatientId(), visit.getId(),
                 medicalRecordRepository.findByVisitId(visit.getId()).orElseThrow(
-                        () -> new ValidationException("Medical record not found.")).getId(),
+                        () -> missingRelation("medicalRecord", visit.getId())).getId(),
                 actorId, MedicalRecordAccessAction.UPDATE, now);
         return new ClinicalResultResult.Attachment(attachment.getId(), attachment.getFileName(),
                 attachment.getContentType(), attachment.getFileSize(), attachment.getAttachmentType());
@@ -120,16 +122,16 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
     public ClinicalAttachmentDownloadResult createDownloadUrl(UUID attachmentId) {
         UUID actorId = authorizationService.requireReadAccess();
         MedicalAttachment attachment = medicalAttachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new ValidationException("Clinical attachment not found."));
+                .orElseThrow(() -> new ClinicalAttachmentNotFoundException(attachmentId));
         if (attachment.getClinicalResultId() == null) {
             throw new ValidationException("Clinical attachment does not belong to a clinical result.");
         }
         var result = clinicalResultRepository.findById(attachment.getClinicalResultId())
-                .orElseThrow(() -> new ValidationException("Clinical result not found."));
+                .orElseThrow(() -> missingRelation("clinicalResult", attachment.getClinicalResultId()));
         var visit = visitRepository.findById(result.getVisitId())
-                .orElseThrow(() -> new ValidationException("Visit not found."));
+                .orElseThrow(() -> missingRelation("visit", result.getVisitId()));
         var medicalRecord = medicalRecordRepository.findByVisitId(visit.getId())
-                .orElseThrow(() -> new ValidationException("Medical record not found."));
+                .orElseThrow(() -> missingRelation("medicalRecord", visit.getId()));
 
         var signedUrl = storagePort.generateSignedDownloadUrl(attachment.getStorageKey(),
                 resourceTypeFor(attachment.getContentType()));
@@ -140,19 +142,19 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
 
     private com.benhsoan.domain.visit.Visit requireWritableVisitAndRecord(UUID visitId) {
         var visit = visitRepository.findById(visitId)
-                .orElseThrow(() -> new ValidationException("Visit not found."));
+                .orElseThrow(() -> missingRelation("visit", visitId));
         if (!visit.isActive()) {
             throw new ClinicalOrderInvalidVisitException();
         }
         var medicalRecord = medicalRecordRepository.findByVisitId(visitId)
-                .orElseThrow(() -> new ValidationException("Medical record not found."));
+                .orElseThrow(() -> missingRelation("medicalRecord", visitId));
         if (medicalRecord.isLocked()) {
             throw new ClinicalOrderLockedMedicalRecordException();
         }
         return visit;
     }
 
-    private void registerRollbackCompensation(StoredClinicalAttachment stored) {
+    private void registerRollbackCompensation(UUID clinicalResultId, StoredClinicalAttachment stored) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             return;
         }
@@ -165,10 +167,15 @@ public class ClinicalResultAttachmentService implements UploadClinicalResultAtta
                 try {
                     storagePort.delete(stored.publicId(), stored.resourceType());
                 } catch (RuntimeException ex) {
-                    log.error("Failed to compensate Cloudinary attachment upload after transaction rollback.", ex);
+                    log.error("Infrastructure failure: operation=cloudinary_rollback_delete clinicalResultId={} publicId={}",
+                            clinicalResultId, stored.publicId(), ex);
                 }
             }
         });
+    }
+
+    private IllegalStateException missingRelation(String relation, UUID id) {
+        return new IllegalStateException("Clinical attachment data integrity failure: missing " + relation + " " + id);
     }
 
     private MedicalAttachmentType attachmentTypeFor(ClinicalServiceType serviceType) {

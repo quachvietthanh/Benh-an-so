@@ -1,12 +1,11 @@
 package com.benhsoan.domain.queue.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class DoctorRoomAssignmentConflictException extends DomainException {
+public class DoctorRoomAssignmentConflictException extends QueueException {
 
     public DoctorRoomAssignmentConflictException(String message) {
-        super(HttpStatus.CONFLICT, message);
+        super(DomainErrorCode.DOCTOR_ROOM_ASSIGNMENT_CONFLICT, message);
     }
 }

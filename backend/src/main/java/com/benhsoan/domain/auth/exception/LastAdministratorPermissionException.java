@@ -1,12 +1,11 @@
 package com.benhsoan.domain.auth.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class LastAdministratorPermissionException extends DomainException {
+public class LastAdministratorPermissionException extends AuthException {
     public LastAdministratorPermissionException() {
-        super(HttpStatus.CONFLICT,
+        super(DomainErrorCode.LAST_ADMINISTRATOR_PERMISSION,
                 "Không thể làm tài khoản quản trị viên duy nhất mất quyền quản trị vai trò.");
     }
 }

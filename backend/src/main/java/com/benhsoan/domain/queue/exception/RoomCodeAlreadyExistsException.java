@@ -1,12 +1,11 @@
 package com.benhsoan.domain.queue.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class RoomCodeAlreadyExistsException extends DomainException {
+public class RoomCodeAlreadyExistsException extends QueueException {
 
     public RoomCodeAlreadyExistsException(String roomCode) {
-        super(HttpStatus.CONFLICT, "Room code already exists: " + roomCode);
+        super(DomainErrorCode.ROOM_CODE_ALREADY_EXISTS, "Room code already exists: " + roomCode);
     }
 }

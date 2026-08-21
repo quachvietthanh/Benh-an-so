@@ -33,6 +33,8 @@ import com.benhsoan.domain.clinical.enums.ClinicalResultType;
 import com.benhsoan.domain.clinical.enums.ClinicalResultStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
 import com.benhsoan.domain.clinical.enums.MedicalAttachmentType;
+import com.benhsoan.domain.clinical.exception.ClinicalAttachmentNotFoundException;
+import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
@@ -177,6 +179,20 @@ class ClinicalResultAttachmentServiceTest {
         ArgumentCaptor<MedicalAttachment> attachmentCaptor = ArgumentCaptor.forClass(MedicalAttachment.class);
         verify(medicalAttachmentRepository).save(attachmentCaptor.capture());
         assertEquals("application/pdf", attachmentCaptor.getValue().getContentType());
+    }
+
+    @Test
+    void returnsNotFoundExceptionsForRequestedAttachmentResources() {
+        ClinicalResultAttachmentService service = service();
+        UUID clinicalResultId = UUID.randomUUID();
+        UUID attachmentId = UUID.randomUUID();
+        when(authorizationService.requireWriteAccess()).thenReturn(UUID.randomUUID());
+        when(clinicalResultRepository.findById(clinicalResultId)).thenReturn(Optional.empty());
+        when(authorizationService.requireReadAccess()).thenReturn(UUID.randomUUID());
+        when(medicalAttachmentRepository.findById(attachmentId)).thenReturn(Optional.empty());
+
+        assertThrows(ClinicalResultNotFoundException.class, () -> service.upload(clinicalResultId, pdfCommand()));
+        assertThrows(ClinicalAttachmentNotFoundException.class, () -> service.createDownloadUrl(attachmentId));
     }
 
     private ClinicalResultAttachmentService service() {

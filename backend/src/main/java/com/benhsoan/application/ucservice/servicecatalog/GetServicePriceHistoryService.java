@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.servicecatalog.exception.ServiceCatalogNotFoundException;
 import com.benhsoan.port.dto.result.servicecatalog.ServicePriceResult;
 import com.benhsoan.port.inbound.servicecatalog.GetServicePriceHistoryUseCase;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
@@ -28,9 +29,8 @@ public class GetServicePriceHistoryService implements GetServicePriceHistoryUseC
         if (serviceCatalogId == null) {
             throw new ValidationException("Service catalog id is required.");
         }
-        if (serviceCatalogRepository.findById(serviceCatalogId).isEmpty()) {
-            throw new ValidationException("Service catalog not found: " + serviceCatalogId);
-        }
+        serviceCatalogRepository.findById(serviceCatalogId)
+                .orElseThrow(() -> new ServiceCatalogNotFoundException(serviceCatalogId));
         return servicePriceRepository.findAllByServiceCatalogId(serviceCatalogId).stream()
                 .map(resultMapper::toResult)
                 .toList();

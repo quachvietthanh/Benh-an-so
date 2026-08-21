@@ -1,10 +1,11 @@
 package com.benhsoan.domain.clinical.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
+
 
 public class ClinicalOrderLockedMedicalRecordException extends ClinicalOrderException {
 
     public ClinicalOrderLockedMedicalRecordException() {
-        super(HttpStatus.CONFLICT, "Clinical orders cannot be created for a locked medical record.");
+        super(DomainErrorCode.CLINICAL_ORDER_LOCKED_MEDICAL_RECORD, "Clinical orders cannot be created for a locked medical record.");
     }
 }

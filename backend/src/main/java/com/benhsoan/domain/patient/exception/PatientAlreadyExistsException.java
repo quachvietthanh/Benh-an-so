@@ -1,14 +1,12 @@
 package com.benhsoan.domain.patient.exception;
 
-import org.springframework.http.HttpStatus;
+import com.benhsoan.domain.shared.exception.DomainErrorCode;
 
-import com.benhsoan.domain.shared.exception.DomainException;
 
-public class PatientAlreadyExistsException extends DomainException {
+public class PatientAlreadyExistsException extends PatientException {
 
     public PatientAlreadyExistsException(String field) {
-        super(
-                HttpStatus.CONFLICT,
+        super(DomainErrorCode.PATIENT_ALREADY_EXISTS,
                 "Patient already exists with " + field + "."
         );
     }

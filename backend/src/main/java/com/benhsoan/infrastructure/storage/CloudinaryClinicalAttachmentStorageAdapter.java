@@ -8,6 +8,8 @@ import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.benhsoan.port.outbound.storage.ClinicalAttachmentResourceType;
 import com.benhsoan.port.outbound.storage.ClinicalAttachmentStoragePort;
@@ -22,6 +24,7 @@ import com.cloudinary.utils.ObjectUtils;
 public class CloudinaryClinicalAttachmentStorageAdapter implements ClinicalAttachmentStoragePort {
 
     private static final String AUTHENTICATED_DELIVERY_TYPE = "authenticated";
+    private static final Logger log = LoggerFactory.getLogger(CloudinaryClinicalAttachmentStorageAdapter.class);
 
     private final Cloudinary cloudinary;
     private final CloudinaryProperties properties;
@@ -51,6 +54,8 @@ public class CloudinaryClinicalAttachmentStorageAdapter implements ClinicalAttac
                     requiredFileSize(response)
             );
         } catch (Exception ex) {
+            log.error("Infrastructure failure: operation=cloudinary_upload clinicalResultId={} publicId={} resourceType={}",
+                    upload.clinicalResultId(), publicId, resourceType, ex);
             throw new CloudinaryAttachmentStorageException("Unable to upload clinical attachment.", ex);
         }
     }
@@ -64,6 +69,8 @@ public class CloudinaryClinicalAttachmentStorageAdapter implements ClinicalAttac
                     "invalidate", true
             ));
         } catch (Exception ex) {
+            log.error("Infrastructure failure: operation=cloudinary_delete publicId={} resourceType={}",
+                    publicId, resourceType, ex);
             throw new CloudinaryAttachmentStorageException("Unable to delete clinical attachment.", ex);
         }
     }
@@ -80,6 +87,8 @@ public class CloudinaryClinicalAttachmentStorageAdapter implements ClinicalAttac
             ));
             return new SignedClinicalAttachmentUrl(url, expiresAt);
         } catch (Exception ex) {
+            log.error("Infrastructure failure: operation=cloudinary_generate_download_url publicId={} resourceType={}",
+                    publicId, resourceType, ex);
             throw new CloudinaryAttachmentStorageException("Unable to generate clinical attachment download URL.", ex);
         }
     }

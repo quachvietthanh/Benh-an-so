@@ -1,20 +1,18 @@
 package com.benhsoan.domain.shared.exception;
 
-import org.springframework.http.HttpStatus;
-
 import lombok.Getter;
 
 @Getter
 public abstract class DomainException extends RuntimeException {
 
-    private final HttpStatus status;
+    private final DomainErrorCode code;
 
     protected DomainException(
-            HttpStatus status,
+            DomainErrorCode code,
             String message
     ) {
         super(message);
-        this.status = status;
+        this.code = code;
     }
 
 }

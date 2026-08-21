@@ -19,7 +19,7 @@ import com.benhsoan.domain.queue.enums.MedicalQueueStatus;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
-import com.benhsoan.domain.queue.exception.DoctorRoomAssignmentNotFoundException;
+import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
@@ -75,9 +75,9 @@ class QueueCheckInCoordinator {
         }
 
         DoctorRoomAssignment assignment = doctorRoomAssignmentRepository.findByDoctorIdForUpdate(doctorId)
-                .orElseThrow(() -> new DoctorRoomAssignmentNotFoundException(doctorId));
+                .orElseThrow(() -> new DoctorNotAssignedToRoomException(doctorId));
         roomRepository.findActiveById(assignment.getRoomId())
-                .orElseThrow(() -> new DoctorRoomAssignmentNotFoundException(doctorId));
+                .orElseThrow(() -> new DoctorNotAssignedToRoomException(doctorId));
 
         MedicalQueue medicalQueue = getOrCreateOpenQueue(doctorId, assignment.getRoomId(), queueDate, checkedInAt);
         Visit visit = Visit.create(visitCodeGenerator.generate(), patientId, doctorId, appointmentId, null,

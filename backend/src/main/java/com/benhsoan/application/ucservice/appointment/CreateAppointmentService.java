@@ -10,7 +10,7 @@ import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.exception.AppointmentTimeConflictException;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
 import com.benhsoan.domain.appointment.exception.DoctorNotFoundException;
-import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeRangeException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
@@ -129,11 +129,11 @@ public class CreateAppointmentService
         }
 
         if (!command.endTime().isAfter(command.startTime())) {
-            throw new InvalidAppointmentTimeRangeException();
+            throw new ValidationException("Appointment end time must be after start time.");
         }
 
         if (command.startTime().isBefore(Instant.now())) {
-            throw new InvalidAppointmentTimeRangeException();
+            throw new ValidationException("Appointment end time must be after start time.");
         }
 
         if (appointmentRepository.existsActiveAppointmentConflict(
