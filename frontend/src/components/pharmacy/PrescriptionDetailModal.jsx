@@ -13,25 +13,33 @@ import {
   Tabs,
   Tag,
   Timeline,
+  Tooltip,
   Typography,
   message,
 } from 'antd'
 import {
   AlertOutlined,
+  BarcodeOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  CopyOutlined,
   EditOutlined,
   FileTextOutlined,
   HistoryOutlined,
   MedicineBoxOutlined,
   PlusCircleOutlined,
   PrinterOutlined,
+  SafetyCertificateOutlined,
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import pharmacyApi from '../../api/pharmacyApi'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
+import {
+  formatPrescriptionCode,
+  isStandardRxCode,
+} from '../../utils/electronicPrescriptionValidation'
 
 const { Text, Paragraph, Title } = Typography
 
@@ -252,7 +260,7 @@ function PrescriptionDetailModal({
           <Space>
             <MedicineBoxOutlined style={{ color: '#2563eb', fontSize: 20 }} />
             <span style={{ fontSize: 17, fontWeight: 600 }}>
-              Chi tiết Đơn thuốc: {prescription.prescriptionCode}
+              Đơn thuốc Điện tử: {formatPrescriptionCode(prescription.prescriptionCode || prescription.id)}
             </span>
           </Space>
           {statusTag}
@@ -295,10 +303,43 @@ function PrescriptionDetailModal({
       style={{ top: 20 }}
     >
       <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eff6ff', padding: '10px 14px', borderRadius: 8, marginBottom: 12, border: '1px solid #bfdbfe', flexWrap: 'wrap', gap: 8 }}>
+          <Space size={8} align="center">
+            <BarcodeOutlined style={{ fontSize: 22, color: '#1d4ed8' }} />
+            <div>
+              <div style={{ fontSize: 11, color: '#1e40af', textTransform: 'uppercase', fontWeight: 600 }}>
+                Mã Đơn Thuốc Điện Tử (Định danh duy nhất)
+              </div>
+              <Space size={6} align="center">
+                <Text code strong style={{ color: '#1d4ed8', fontSize: 18 }}>
+                  {formatPrescriptionCode(prescription.prescriptionCode || prescription.id)}
+                </Text>
+                <Tooltip title="Sao chép mã đơn điện tử">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CopyOutlined style={{ color: '#2563eb' }} />}
+                    onClick={() => {
+                      const code = formatPrescriptionCode(prescription.prescriptionCode || prescription.id)
+                      if (code && code !== '—') {
+                        navigator.clipboard.writeText(code)
+                        message.success(`Đã sao chép mã đơn điện tử: ${code}`)
+                      }
+                    }}
+                  />
+                </Tooltip>
+                <Tag color="cyan" style={{ fontSize: 11 }}>
+                  <SafetyCertificateOutlined /> Liên thông & Bất biến
+                </Tag>
+              </Space>
+            </div>
+          </Space>
+          <Text type="secondary" style={{ fontSize: 12, maxWidth: 300, textAlign: 'right' }}>
+            Mã được gắn cố định với đơn và không thay đổi trong suốt vòng đời của đơn.
+          </Text>
+        </div>
+
         <Descriptions size="small" column={{ xs: 1, sm: 2, lg: 3 }} bordered={false}>
-          <Descriptions.Item label={<Text strong><FileTextOutlined /> Mã đơn</Text>}>
-            <Text code strong style={{ color: '#2563eb' }}>{prescription.prescriptionCode}</Text>
-          </Descriptions.Item>
           <Descriptions.Item label={<Text strong><UserOutlined /> Bệnh nhân</Text>}>
             {prescription.patientName ? (
               <span>
@@ -384,6 +425,13 @@ function PrescriptionDetailModal({
             ),
             children: (
               <div style={{ maxHeight: 400, overflowY: 'auto', padding: '8px 4px' }}>
+                <Alert
+                  type="info"
+                  showIcon
+                  message={`Mã đơn thuốc điện tử: ${formatPrescriptionCode(prescription.prescriptionCode || prescription.id)}`}
+                  description="Mã định danh duy nhất của đơn thuốc được duy trì cố định và bất biến qua mọi lần chỉnh sửa / điều chỉnh liều."
+                  style={{ marginBottom: 12 }}
+                />
                 {historyLogs.length === 0 ? (
                   <div style={{ padding: '24px 0', textAlign: 'center' }}>
                     <Empty

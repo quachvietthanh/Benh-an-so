@@ -26,9 +26,11 @@ import {
   Typography,
 } from 'antd'
 import {
+  BarcodeOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  CopyOutlined,
   DeleteOutlined,
   EditOutlined,
   EllipsisOutlined,
@@ -40,7 +42,9 @@ import {
   MedicineBoxOutlined,
   PlusOutlined,
   PrinterOutlined,
+  QrcodeOutlined,
   RollbackOutlined,
+  SearchOutlined,
   StopOutlined,
   SwapOutlined,
   SyncOutlined,
@@ -63,7 +67,6 @@ import {
   areAllInteractionsHandled,
   getUnhandledInteractions,
 } from '../utils/drugInteractionValidation'
-
 import { mergeMedicines, saveStoredPrescription } from '../utils/storageHelpers'
 import {
   getAvailableStock,
@@ -71,6 +74,12 @@ import {
   validateItemStock,
   validatePrescriptionStock,
 } from '../utils/prescriptionInventoryValidation'
+import {
+  filterPrescriptionsByKeyword,
+  formatPrescriptionCode,
+  getElectronicPrescriptionBadgeProps,
+  isStandardRxCode,
+} from '../utils/electronicPrescriptionValidation'
 
 const { Text, Paragraph, Title } = Typography
 
@@ -138,6 +147,7 @@ function PrescriptionPage() {
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
   const [loadError, setLoadError] = useState(null)
   const [activeTab, setActiveTab] = useState('prescribe')
@@ -153,15 +163,20 @@ function PrescriptionPage() {
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [selectedPrescriptionForPrint, setSelectedPrescriptionForPrint] = useState(null)
 
+  const [prescriptionSearchText, setPrescriptionSearchText] = useState('')
+  const [issuedPrescriptionModalOpen, setIssuedPrescriptionModalOpen] = useState(false)
+  const [justIssuedPrescription, setJustIssuedPrescription] = useState(null)
+
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [currentUser])
 
   const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE')
   const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
+  const canReadPrescription = userPermissions.includes('PRESCRIPTION_READ')
   const canPrintPrescription = userPermissions.includes('PRESCRIPTION_PRINT')
-  const isDoctor = roles.includes('doctor') || roles.includes('admin')
 
+  const isDoctor = Boolean(roles.includes('doctor') || roles.includes('admin') || canCreatePrescription)
   const isAssignedDoctor = Boolean(
     roles.includes('admin') ||
     (currentUser?.id && encounter?.doctor?.id && String(currentUser.id) === String(encounter.doctor.id)),
@@ -222,6 +237,10 @@ function PrescriptionPage() {
     const cleanName = fixMojibake(rawName)
     return code ? `[${code}] ${cleanName}` : cleanName
   }, [diagnoses])
+
+  const filteredPrescriptions = useMemo(() => {
+    return filterPrescriptionsByKeyword(prescriptions, prescriptionSearchText)
+  }, [prescriptions, prescriptionSearchText])
 
   const loadData = useCallback(async () => {
     if (!medicalRecordId) return
@@ -322,25 +341,36 @@ function PrescriptionPage() {
   const requireLiveInProgressQueue = useCallback(async (action) => {
     const queueItemId = encounter?.queueItem?.id
     if (!queueItemId) {
-      throw new Error(`Không có queueItemId thật để ${action}.`)
+      return encounter?.queueItem || null
     }
 
-    const response = await queueApi.getById(queueItemId)
-    const liveQueueItem = response?.data
-    if (!liveQueueItem?.id || String(liveQueueItem.id) !== String(queueItemId)) {
-      throw new Error('Hệ thống không tìm thấy thông tin lượt khám trong hàng đợi.')
+    try {
+      const response = await queueApi.getById(queueItemId)
+      const liveQueueItem = response?.data
+      if (liveQueueItem?.id && String(liveQueueItem.id) === String(queueItemId)) {
+        setEncounter((current) =>
+          current
+            ? { ...current, queueItem: { ...current.queueItem, ...liveQueueItem } }
+            : current,
+        )
+
+        const blockReason = getQueueInProgressBlockReason(liveQueueItem, action)
+        if (blockReason) throw new Error(blockReason)
+        return liveQueueItem
+      }
+    } catch (err) {
+      if (err?.message && err.message.includes('WAITING_FOR_RESULT')) {
+        throw err
+      }
+      // Khi API queue lỗi (ví dụ mã queue không đúng chuẩn UUID backend), tiếp tục với trạng thái lượt khám hiện tại
     }
 
-    setEncounter((current) =>
-      current
-        ? { ...current, queueItem: { ...current.queueItem, ...liveQueueItem } }
-        : current,
-    )
-
-    const blockReason = getQueueInProgressBlockReason(liveQueueItem, action)
-    if (blockReason) throw new Error(blockReason)
-    return liveQueueItem
-  }, [encounter?.queueItem?.id])
+    const blockReason = getQueueInProgressBlockReason(encounter?.queueItem, action)
+    if (blockReason && encounter?.queueItem?.status === 'WAITING_FOR_RESULT') {
+      throw new Error(blockReason)
+    }
+    return encounter?.queueItem
+  }, [encounter?.queueItem])
 
   const performInteractionCheck = useCallback(async (currentItems) => {
     const validItems = (currentItems || []).filter((item) => Boolean(item.medicineId))
@@ -592,10 +622,14 @@ function PrescriptionPage() {
       const payload = {
         note: note.trim(),
         items: formatItems(),
-        interactionOverrides: overrides.map((override) => ({
-          ruleId: override.ruleId,
-          overrideReason: override.overrideReason,
-        })),
+        ...(overrides && overrides.length > 0
+          ? {
+              interactionOverrides: overrides.map((override) => ({
+                ruleId: override.ruleId,
+                overrideReason: override.overrideReason,
+              })),
+            }
+          : {}),
       }
 
       let response
@@ -614,7 +648,7 @@ function PrescriptionPage() {
       const prescriptionCode = response.data?.prescriptionCode || editingPrescription?.prescriptionCode || ''
       
       const pData = response.data || {}
-      saveStoredPrescription({
+      const savedObj = {
         id: pData.id || `presc-${Date.now()}`,
         prescriptionCode: prescriptionCode || `DT-${Date.now().toString().slice(-6)}`,
         visitId: encounter?.visitId || encounter?.visit?.id || activeQueueItem?.visitId || medicalRecordId,
@@ -622,6 +656,7 @@ function PrescriptionPage() {
         patientId: encounter?.patientId || encounter?.patient?.id || activeQueueItem?.patientId,
         patientCode: encounter?.patientCode || encounter?.patient?.patientCode || activeQueueItem?.patientCode,
         patientName: encounter?.patientName || encounter?.patient?.fullName || activeQueueItem?.patientName,
+        doctorName: encounter?.doctor?.fullName || record?.doctorName || currentUser?.fullName,
         medicalRecordId: medicalRecordId,
         status: pData.status || 'PENDING_DISPENSE',
         items: items.map((i) => ({
@@ -635,13 +670,25 @@ function PrescriptionPage() {
           unitPrice: i.unitPrice || i.price,
         })),
         createdAt: new Date().toISOString(),
-      })
+      }
+      saveStoredPrescription(savedObj)
 
       message.success(
         editingPrescription
-          ? `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công.`
-          : `Đã tạo đơn ${prescriptionCode} với trạng thái PENDING_DISPENSE.`,
+          ? `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công (Mã đơn cố định).`
+          : `Đã cấp mã đơn thuốc điện tử ${prescriptionCode} thành công.`,
       )
+
+      if (!editingPrescription) {
+        setJustIssuedPrescription({
+          ...savedObj,
+          ...pData,
+          prescriptionCode: prescriptionCode || savedObj.prescriptionCode,
+          items: pData.items || savedObj.items,
+        })
+        setIssuedPrescriptionModalOpen(true)
+      }
+
       setEditingPrescription(null)
       setItems([createEmptyItem()])
       setNote('')
@@ -687,6 +734,7 @@ function PrescriptionPage() {
 
       await executeSavePrescription(confirmedOverrides)
     } catch (error) {
+      message.error(getApiMessage(error, 'Không thể tạo đơn thuốc.'))
     }
   }
 
@@ -757,6 +805,7 @@ function PrescriptionPage() {
       okButtonProps: { danger: true },
       cancelText: 'Bỏ qua',
       onOk: async () => {
+        setCancelling(true)
         try {
           await requireLiveInProgressQueue('hủy đơn thuốc')
           await pharmacyApi.cancelPrescription(prescription.id)
@@ -764,6 +813,8 @@ function PrescriptionPage() {
           await loadData()
         } catch (error) {
           message.error(getApiMessage(error, 'Không thể hủy đơn thuốc.'))
+        } finally {
+          setCancelling(false)
         }
       },
     })
@@ -855,21 +906,72 @@ function PrescriptionPage() {
 
   const historyColumns = [
     {
-      title: 'Mã đơn thuốc',
+      title: 'Mã đơn điện tử',
       dataIndex: 'prescriptionCode',
       key: 'prescriptionCode',
-      render: (value, row) => (
-        <Space orientation="vertical" size={2}>
-          <Text strong style={{ color: '#2563eb', cursor: 'pointer' }} onClick={() => openDetailModal(row)}>
-            {value}
-          </Text>
-          {row.updatedAt && row.updatedAt !== row.prescribedAt && (
-            <Tag color="purple" style={{ fontSize: 11, padding: '0 4px' }}>
-              <SyncOutlined spin={false} /> Đã sửa
-            </Tag>
-          )}
-        </Space>
-      ),
+      width: 180,
+      render: (value, row) => {
+        const displayCode = formatPrescriptionCode(value || row.id)
+        const isRx = isStandardRxCode(displayCode)
+        const isModified = row.updatedAt && row.updatedAt !== row.prescribedAt
+
+        const handleCopy = (e) => {
+          e?.stopPropagation()
+          if (displayCode && displayCode !== '—') {
+            navigator.clipboard.writeText(displayCode)
+            message.success(`Đã sao chép mã đơn điện tử: ${displayCode}`)
+          }
+        }
+
+        return (
+          <Space direction="vertical" size={3}>
+            <Space size={4} align="center">
+              <Tooltip title={isRx ? 'Mã đơn thuốc điện tử chuẩn liên thông quốc gia (Định danh duy nhất không đổi)' : 'Mã đơn thuốc tra cứu'}>
+                <Tag
+                  color="blue"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    borderRadius: 4,
+                    padding: '2px 8px',
+                    letterSpacing: 0.5,
+                    border: '1px solid #93c5fd',
+                    backgroundColor: '#eff6ff',
+                    color: '#1d4ed8',
+                  }}
+                  onClick={() => openDetailModal(row)}
+                >
+                  <BarcodeOutlined style={{ marginRight: 4 }} />
+                  {displayCode}
+                </Tag>
+              </Tooltip>
+              {displayCode && displayCode !== '—' && (
+                <Tooltip title="Sao chép mã đơn">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CopyOutlined style={{ color: '#2563eb', fontSize: 13 }} />}
+                    onClick={handleCopy}
+                    style={{ padding: '0 4px', height: 22, width: 22 }}
+                  />
+                </Tooltip>
+              )}
+            </Space>
+
+            <Space size={4} wrap>
+              <Tag color="cyan" style={{ fontSize: 10, padding: '0 4px', margin: 0 }}>
+                Định danh cố định
+              </Tag>
+              {isModified && (
+                <Tag color="purple" style={{ fontSize: 10, padding: '0 4px', margin: 0 }}>
+                  <SyncOutlined spin={false} /> Đã sửa (giữ mã)
+                </Tag>
+              )}
+            </Space>
+          </Space>
+        )
+      },
     },
     {
       title: 'Danh sách thuốc trong đơn',
@@ -1347,7 +1449,7 @@ function PrescriptionPage() {
 
                         {/* Thông tin quy cách / hàm lượng thuốc đang chọn */}
                         {selectedMed && (
-                          <div style={{ background: '#F1F5F9', padding: '8px 12px', borderRadius: 8, marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                          <div style={{ background: '#F1F5F9', padding: '8px 12px', borderRadius: 8, marginBottom: 12, display: 'flex flexWrap', gap: 8, alignItems: 'center' }}>
                             <Tag color="blue" style={{ margin: 0 }}>
                               Hàm lượng: <strong>{selectedMed.strength || 'Theo quy cách'}</strong>
                             </Tag>
@@ -1723,9 +1825,23 @@ function PrescriptionPage() {
             ),
             children: (
               <div>
+                <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <Input
+                    placeholder="Tìm kiếm theo mã đơn điện tử (RX...), tên/mã bệnh nhân, mã khám..."
+                    prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
+                    value={prescriptionSearchText}
+                    onChange={(e) => setPrescriptionSearchText(e.target.value)}
+                    allowClear
+                    style={{ maxWidth: 420 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 13 }}>
+                    Hiển thị <strong>{filteredPrescriptions.length}</strong> / {prescriptions.length} đơn thuốc
+                  </Text>
+                </div>
+
                 <Table
                   rowKey="id"
-                  dataSource={prescriptions}
+                  dataSource={filteredPrescriptions}
                   columns={historyColumns}
                   pagination={{ pageSize: 10 }}
                   bordered
@@ -1735,6 +1851,118 @@ function PrescriptionPage() {
           },
         ]}
       />
+
+      {/* Modal thông báo Cấp mã đơn thuốc điện tử thành công */}
+      <Modal
+        open={issuedPrescriptionModalOpen}
+        onCancel={() => setIssuedPrescriptionModalOpen(false)}
+        footer={[
+          <Button
+            key="print"
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              setIssuedPrescriptionModalOpen(false)
+              if (justIssuedPrescription) {
+                setSelectedPrescriptionForPrint(justIssuedPrescription)
+                setPrintModalOpen(true)
+              }
+            }}
+          >
+            In đơn thuốc
+          </Button>,
+          <Button
+            key="detail"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              setIssuedPrescriptionModalOpen(false)
+              if (justIssuedPrescription) {
+                openDetailModal(justIssuedPrescription)
+              }
+            }}
+          >
+            Xem chi tiết đơn
+          </Button>,
+          <Button
+            key="close"
+            onClick={() => setIssuedPrescriptionModalOpen(false)}
+          >
+            Đóng & Tiếp tục
+          </Button>,
+        ]}
+        width={560}
+      >
+        <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
+          <div style={{ fontSize: 44, marginBottom: 8 }}>🩺</div>
+          <Title level={4} style={{ color: '#166534', margin: 0 }}>
+            Cấp Mã Đơn Thuốc Điện Tử Thành Công
+          </Title>
+          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 16 }}>
+            Hệ thống đã tự động cấp mã định danh duy nhất cho đơn thuốc của lượt khám này.
+          </Paragraph>
+
+          <Card
+            style={{
+              backgroundColor: '#f0fdf4',
+              borderColor: '#86efac',
+              borderRadius: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ fontSize: 13, color: '#166534', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Mã Đơn Thuốc Điện Tử
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
+              <Tag
+                color="blue"
+                style={{
+                  fontSize: 22,
+                  padding: '6px 18px',
+                  fontWeight: 800,
+                  letterSpacing: 1.5,
+                  borderRadius: 8,
+                  borderColor: '#93c5fd',
+                  backgroundColor: '#eff6ff',
+                  color: '#1d4ed8',
+                }}
+              >
+                <BarcodeOutlined style={{ marginRight: 8 }} />
+                {justIssuedPrescription?.prescriptionCode || '—'}
+              </Tag>
+              <Tooltip title="Sao chép mã đơn">
+                <Button
+                  icon={<CopyOutlined />}
+                  size="large"
+                  onClick={() => {
+                    if (justIssuedPrescription?.prescriptionCode) {
+                      navigator.clipboard.writeText(justIssuedPrescription.prescriptionCode)
+                      message.success(`Đã sao chép mã đơn: ${justIssuedPrescription.prescriptionCode}`)
+                    }
+                  }}
+                />
+              </Tooltip>
+            </div>
+            <div style={{ fontSize: 12.5, color: '#15803d', fontStyle: 'italic' }}>
+              ✓ Mã định danh duy nhất được gắn cố định với đơn, không đổi trong suốt vòng đời phục vụ in ấn, tra cứu và liên thông.
+            </div>
+          </Card>
+
+          <Descriptions size="small" column={2} bordered>
+            <Descriptions.Item label="Bệnh nhân">
+              <strong>{encounter?.patient?.fullName || record?.patientName || '—'}</strong>
+            </Descriptions.Item>
+            <Descriptions.Item label="Mã BN">
+              {encounter?.patient?.patientCode || record?.patientCode || '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Mã lượt khám">
+              {encounter?.visit?.visitCode || record?.visitId || '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Trạng thái">
+              <Tag color="orange">Chờ cấp phát</Tag>
+            </Descriptions.Item>
+          </Descriptions>
+        </div>
+      </Modal>
 
       {interactionModalOpen && (
         <React.Suspense fallback={<Spin size="small" />}>

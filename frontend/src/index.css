@@ -166,13 +166,16 @@ textarea {
     visibility: hidden !important;
   }
   .printable-invoice-container,
-  .printable-invoice-container * {
+  .printable-invoice-container *,
+  #printable-prescription-sheet,
+  #printable-prescription-sheet * {
     visibility: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  .printable-invoice-container {
-    position: absolute !important;
+  .printable-invoice-container,
+  #printable-prescription-sheet {
+    position: fixed !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
@@ -182,6 +185,7 @@ textarea {
     color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
+    z-index: 999999 !important;
   }
   .no-print,
   .ant-modal-close,
