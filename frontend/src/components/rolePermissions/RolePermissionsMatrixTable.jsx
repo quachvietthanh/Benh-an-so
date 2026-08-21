@@ -197,7 +197,7 @@ function RolePermissionsMatrixTable({
                             <Checkbox
                               checked={checkState.all}
                               indeterminate={checkState.indeterminate}
-                              disabled={!canUpdate}
+                              disabled={!canUpdate || savingRoleId === role.id}
                               onChange={() => onToggleModuleForRole(role.id, permsInMod)}
                             >
                               <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
@@ -295,7 +295,7 @@ function RolePermissionsMatrixTable({
                                   <Switch
                                     size="small"
                                     checked={isAssigned}
-                                    disabled={!canUpdate || perm.active === false}
+                                    disabled={!canUpdate || perm.active === false || savingRoleId === role.id}
                                     onChange={() => onTogglePermission(role.id, perm.code, perm.active)}
                                     style={{
                                       backgroundColor: isAssigned ? '#2563eb' : '#cbd5e1',
