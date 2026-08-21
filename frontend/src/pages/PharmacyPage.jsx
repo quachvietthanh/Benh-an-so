@@ -82,7 +82,10 @@ function PharmacyPage() {
       .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
       .filter(Boolean)
   }, [user])
-  const canDispense = roles.includes('pharmacist') || roles.includes('admin')
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+  const canDispense = userPermissions.includes('PHARMACY_READ') || userPermissions.includes('PRESCRIPTION_READ') || roles.includes('pharmacist') || roles.includes('admin')
 
   const [prescriptions, setPrescriptions] = useState([])
   const [prescriptionPage, setPrescriptionPage] = useState(0)

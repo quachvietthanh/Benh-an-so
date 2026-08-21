@@ -29,7 +29,7 @@ import RolePermissionsConfirmModal from '../components/rolePermissions/RolePermi
 const { Title } = Typography
 
 function RolePermissionsPage() {
-  const { user } = useAuthContext()
+  const { user, updateCurrentUserPermissions } = useAuthContext()
 
   // Strict authorization check based on technical permissions
   const userPermissions = useMemo(() => {
@@ -312,8 +312,14 @@ function RolePermissionsPage() {
           setRoles(rolesRes.data)
         }
 
+        const currentRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+        const targetRoleName = String(role?.name || '').toLowerCase().replace(/^role_/, '')
+        if (currentRoles.includes(targetRoleName) && typeof updateCurrentUserPermissions === 'function') {
+          updateCurrentUserPermissions(fullDraftCodes)
+        }
+
         message.success(
-          `Cập nhật quyền cho vai trò "${getRoleDisplayName(role)}" thành công. Người dùng thuộc vai trò này cần đăng nhập lại để áp dụng quyền mới.`,
+          `Cập nhật quyền cho vai trò "${getRoleDisplayName(role)}" thành công.${currentRoles.includes(targetRoleName) ? ' Quyền của phiên làm việc này đã được áp dụng ngay lập tức.' : ' Người dùng thuộc vai trò này cần tải lại trang để áp dụng quyền mới.'}`,
           5,
         )
       } catch (err) {

@@ -129,6 +129,17 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const updateCurrentUserPermissions = (newPermissions) => {
+    if (!user) return
+    const normalized = normalizePermissions(newPermissions)
+    const updated = {
+      ...user,
+      permissions: normalized,
+    }
+    localStorage.setItem('user', JSON.stringify(updated))
+    setUser(updated)
+  }
+
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -154,7 +165,7 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!user
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, loading, isAuthenticated, updateCurrentUserPermissions }}>
       {children}
     </AuthContext.Provider>
   )

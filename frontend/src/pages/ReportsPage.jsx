@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   DatePicker,
+  Select,
   Space,
   Tabs,
   Typography,
@@ -25,6 +26,13 @@ import reportApi from '../api/reportApi'
 import billingApi from '../api/billingApi'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
+import {
+  REPORT_TYPES,
+  downloadCsvBlob,
+  getExportErrorMessage,
+  getExportFilename,
+  validateExportParams,
+} from '../utils/reportExportHelpers'
 import ReportStatCards from '../components/reporting/ReportStatCards'
 import ManagerPermissionAlert from '../components/reporting/ManagerPermissionAlert'
 import OverviewReportView from '../components/reporting/OverviewReportView'
@@ -226,26 +234,60 @@ function ReportsPage() {
     loadData()
   }, [loadData])
 
+  const [selectedReportType, setSelectedReportType] = useState('VISIT_REPORT')
+
+  const handleTabChange = (key) => {
+    setActiveTab(key)
+    if (key === 'visits') {
+      setSelectedReportType('VISIT_REPORT')
+    } else if (key === 'revenue') {
+      setSelectedReportType('REVENUE_REPORT')
+    } else if (key === 'overview') {
+      setSelectedReportType('OPERATIONAL_REPORT')
+    }
+  }
+
   const handleExportCSV = async () => {
     if (!canExportReports) {
-      message.error('Bạn không có quyền xuất báo cáo (Yêu cầu quyền REPORT_EXPORT).')
+      message.error('Bạn không có quyền xuất báo cáo.')
       return
     }
+
+    if (exporting) return
+
+    const fromVal = range?.[0] ? range[0].format('YYYY-MM-DD') : ''
+    const toVal = range?.[1] ? range[1].format('YYYY-MM-DD') : ''
+
+    const validation = validateExportParams(fromVal, toVal)
+    if (!validation.isValid) {
+      message.error(validation.message)
+      return
+    }
+
     setExporting(true)
     try {
-      const response = await reportApi.export({ from: fromStr, to: toStr })
-      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `Bao-cao-van-hanh-${fromStr}-${toStr}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-      message.success('Đã xuất báo cáo CSV thành công!')
-    } catch {
-      message.error('Không thể xuất báo cáo')
+      const response = await reportApi.exportReport({
+        reportType: selectedReportType,
+        from: validation.from,
+        to: validation.to,
+      })
+
+      const contentDisposition =
+        response.headers?.['content-disposition'] ||
+        response.headers?.['Content-Disposition'] ||
+        ''
+      const fileName = getExportFilename(
+        contentDisposition,
+        selectedReportType,
+        validation.from,
+        validation.to,
+      )
+
+      downloadCsvBlob(response.data, fileName)
+      message.success('Xuất báo cáo thành công.')
+    } catch (err) {
+      const errorMessage = await getExportErrorMessage(err)
+      message.error(errorMessage)
     } finally {
       setExporting(false)
     }
@@ -274,6 +316,15 @@ function ReportsPage() {
         </div>
 
         <Space wrap size="middle">
+          <Select
+            value={selectedReportType}
+            onChange={setSelectedReportType}
+            options={REPORT_TYPES}
+            style={{ width: 220, borderRadius: 8 }}
+            disabled={!canExportReports || exporting}
+            aria-label="Chọn loại báo cáo xuất"
+          />
+
           <RangePicker
             value={range}
             format="DD/MM/YYYY"
@@ -299,16 +350,18 @@ function ReportsPage() {
             Làm mới
           </Button>
 
-          <Button
-            type="primary"
-            icon={<DownloadOutlined />}
-            loading={exporting}
-            disabled={!canExportReports || exporting}
-            onClick={handleExportCSV}
-            style={{ borderRadius: 8, background: canExportReports ? '#1677ff' : undefined, fontWeight: 600 }}
-          >
-            Xuất báo cáo (CSV)
-          </Button>
+          {canExportReports && (
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              loading={exporting}
+              disabled={!canExportReports || exporting || !range || !range[0] || !range[1]}
+              onClick={handleExportCSV}
+              style={{ borderRadius: 8, background: '#1677ff', fontWeight: 600 }}
+            >
+              Xuất CSV
+            </Button>
+          )}
         </Space>
       </div>
 
@@ -346,7 +399,7 @@ function ReportsPage() {
       >
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={handleTabChange}
           style={{ paddingLeft: 16, paddingRight: 16 }}
           items={[
             {

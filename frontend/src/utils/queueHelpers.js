@@ -104,7 +104,7 @@ export const checkQueuePermissions = (roles = [], permissions = []) => {
   const canCountQueue = hasPerm('QUEUE_COUNT')
 
   return {
-    canViewBoard: canViewQueue || canReadApp || isAdmin || isDoctor || isNurse || isReceptionist,
+    canViewBoard: canViewQueue || canReadApp || canCreateApp || isAdmin || isDoctor || isNurse || isReceptionist,
     canViewMyQueue: (canViewQueue || isDoctor) && isDoctor,
     canCheckIn: canCreateQueue || canUpdateQueueStatus || isAdmin || isReceptionist,
     canCallNext: canCallNext || canUpdateQueueStatus || isAdmin || isReceptionist || isDoctor,
