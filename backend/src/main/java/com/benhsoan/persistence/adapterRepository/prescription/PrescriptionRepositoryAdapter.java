@@ -2,6 +2,7 @@ package com.benhsoan.persistence.adapterRepository.prescription;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionItemEntity;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionItemRepository;
@@ -98,6 +100,19 @@ public class PrescriptionRepositoryAdapter
     ) {
         return jpaRepository.findByStatus(status, pageable)
                 .map(this::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Prescription> findByInterconnectionStatus(
+            InterconnectionStatus status,
+            Instant fromInclusive,
+            Instant toExclusive,
+            Pageable pageable
+    ) {
+        return jpaRepository.findByInterconnectionStatus(
+                status, fromInclusive, toExclusive, pageable
+        ).map(this::toDomain);
     }
 
     @Override

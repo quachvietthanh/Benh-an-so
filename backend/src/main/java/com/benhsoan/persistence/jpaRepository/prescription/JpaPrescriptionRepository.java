@@ -2,6 +2,7 @@ package com.benhsoan.persistence.jpaRepository.prescription;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -14,6 +15,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 
 import jakarta.persistence.LockModeType;
 
@@ -32,6 +34,19 @@ public interface JpaPrescriptionRepository
 
     Page<PrescriptionEntity> findByStatus(
             PrescriptionStatus status,
+            Pageable pageable
+    );
+
+    @Query("""
+            select prescription from PrescriptionEntity prescription
+            where prescription.interconnectionStatus = :status
+              and (:fromInclusive is null or prescription.lastInterconnectionAt >= :fromInclusive)
+              and (:toExclusive is null or prescription.lastInterconnectionAt < :toExclusive)
+            """)
+    Page<PrescriptionEntity> findByInterconnectionStatus(
+            @Param("status") InterconnectionStatus status,
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toExclusive") Instant toExclusive,
             Pageable pageable
     );
 

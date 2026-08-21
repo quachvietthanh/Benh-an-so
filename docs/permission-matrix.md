@@ -43,6 +43,9 @@
 | `/api/v1/prescriptions/{id}` | PUT | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/prescriptions/{id}` | DELETE | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/prescriptions/{id}/status` | PUT | ✅ | ❌ | ❌ | ❌ | ✅ |
+| `/api/v1/prescriptions/{id}/interconnection` | POST | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/prescription-interconnections` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `/api/v1/prescriptions/{id}/interconnection/retry` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
 | | | | | | | |
 | **Appointments** | | | | | | |
 | `/api/v1/appointments` | GET | ✅ | ✅ | ❌ | ✅ | ❌ |
@@ -167,7 +170,8 @@ PATIENT_CREATE, PATIENT_READ, PATIENT_UPDATE, PATIENT_DELETE
 RECORD_CREATE, RECORD_READ, RECORD_UPDATE, RECORD_DELETE, RECORD_UPDATE_STATUS
 
 // Prescription
-PRESCRIPTION_CREATE, PRESCRIPTION_READ, PRESCRIPTION_UPDATE, PRESCRIPTION_DELETE, PRESCRIPTION_UPDATE_STATUS
+PRESCRIPTION_CREATE, PRESCRIPTION_READ, PRESCRIPTION_UPDATE, PRESCRIPTION_DELETE, PRESCRIPTION_UPDATE_STATUS,
+PRESCRIPTION_INTERCONNECTION_SEND, PRESCRIPTION_INTERCONNECTION_READ, PRESCRIPTION_INTERCONNECTION_RETRY
 
 // Appointment
 APPOINTMENT_CREATE, APPOINTMENT_READ, APPOINTMENT_UPDATE, APPOINTMENT_DELETE

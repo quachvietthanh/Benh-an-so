@@ -8,13 +8,14 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 
 import com.benhsoan.config.AppointmentReminderProperties;
 import com.benhsoan.config.ClinicalAttachmentProperties;
+import com.benhsoan.config.MockInterconnectionGatewayProperties;
 import com.benhsoan.infrastructure.storage.CloudinaryProperties;
 
 @SpringBootApplication
 @EnableAsync
 @EnableScheduling
 @EnableConfigurationProperties({AppointmentReminderProperties.class, ClinicalAttachmentProperties.class,
-        CloudinaryProperties.class})
+        CloudinaryProperties.class, MockInterconnectionGatewayProperties.class})
 public class BenhSoAnApplication {
 
     public static void main(String[] args) {

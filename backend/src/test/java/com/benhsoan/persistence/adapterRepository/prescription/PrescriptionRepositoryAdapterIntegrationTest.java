@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -26,7 +27,9 @@ import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionItemRepository;
+import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionRepository;
 import com.benhsoan.persistence.mapper.prescription.PrescriptionItemPersistenceMapper;
 import com.benhsoan.persistence.mapper.prescription.PrescriptionPersistenceMapper;
 
@@ -50,7 +53,16 @@ class PrescriptionRepositoryAdapterIntegrationTest {
 
     @Autowired private PrescriptionRepositoryAdapter prescriptionRepository;
     @Autowired private JpaPrescriptionItemRepository prescriptionItemRepository;
+    @Autowired private JpaPrescriptionRepository jpaPrescriptionRepository;
     @Autowired private PlatformTransactionManager transactionManager;
+
+    @BeforeEach
+    void clearPrescriptionData() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            prescriptionItemRepository.deleteAll();
+            jpaPrescriptionRepository.deleteAll();
+        });
+    }
 
     @Test
     void replacesItemsInTheSameTransactionWithoutRetainingDeletedEntities() {
@@ -134,6 +146,76 @@ class PrescriptionRepositoryAdapterIntegrationTest {
         assertEquals(2, firstPage.getTotalElements());
         assertEquals(oldestPendingId, firstPage.getContent().getFirst().getId());
         assertEquals(newestPendingId, secondPage.getContent().getFirst().getId());
+    }
+
+    @Test
+    void findsInterconnectionFailuresWithinTheRequestedTimeRange() {
+        UUID firstFailedId = UUID.randomUUID();
+        UUID secondFailedId = UUID.randomUUID();
+        UUID successfulId = UUID.randomUUID();
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            Prescription firstFailed = prescription(
+                    firstFailedId, "RXINTER001", PrescriptionStatus.PENDING_DISPENSE, CREATED_AT, null
+            );
+            firstFailed.markInterconnectionFailed("Gateway timeout", CREATED_AT.plusSeconds(30));
+            prescriptionRepository.save(firstFailed);
+
+            Prescription secondFailed = prescription(
+                    secondFailedId, "RXINTER002", PrescriptionStatus.PENDING_DISPENSE, CREATED_AT.plusSeconds(60), null
+            );
+            secondFailed.markInterconnectionFailed("Gateway unavailable", CREATED_AT.plusSeconds(90));
+            prescriptionRepository.save(secondFailed);
+
+            Prescription successful = prescription(
+                    successfulId, "RXINTER003", PrescriptionStatus.PENDING_DISPENSE, CREATED_AT.plusSeconds(120), null
+            );
+            successful.markInterconnectionSucceeded("LT-0001", CREATED_AT.plusSeconds(150));
+            prescriptionRepository.save(successful);
+        });
+
+        var page = prescriptionRepository.findByInterconnectionStatus(
+                InterconnectionStatus.FAILED,
+                CREATED_AT.plusSeconds(60),
+                CREATED_AT.plusSeconds(120),
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "lastInterconnectionAt"))
+        );
+
+        assertEquals(1, page.getTotalElements());
+        assertEquals(secondFailedId, page.getContent().getFirst().getId());
+    }
+
+    @Test
+    void returnsExactlyThreeFailedRowsFromTenAndAnEmptyPageForAnUnmatchedFilter() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            for (int index = 0; index < 10; index++) {
+                Prescription prescription = prescription(
+                        UUID.randomUUID(), "RXACCEPT%03d".formatted(index), PrescriptionStatus.PENDING_DISPENSE,
+                        CREATED_AT.plusSeconds(index * 60L), null
+                );
+                if (index < 3) {
+                    prescription.markInterconnectionFailed(
+                            "Gateway timeout", CREATED_AT.plusSeconds(600 + index));
+                } else {
+                    prescription.markInterconnectionSucceeded(
+                            "LT-%04d".formatted(index), CREATED_AT.plusSeconds(600 + index));
+                }
+                prescriptionRepository.save(prescription);
+            }
+        });
+
+        var failed = prescriptionRepository.findByInterconnectionStatus(
+                InterconnectionStatus.FAILED, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "lastInterconnectionAt"))
+        );
+        var notSent = prescriptionRepository.findByInterconnectionStatus(
+                InterconnectionStatus.NOT_SENT, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "lastInterconnectionAt"))
+        );
+
+        assertEquals(3, failed.getTotalElements());
+        assertEquals(3, failed.getContent().size());
+        assertTrue(notSent.isEmpty());
     }
 
     private Prescription prescription(

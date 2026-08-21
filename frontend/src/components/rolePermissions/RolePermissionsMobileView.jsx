@@ -210,7 +210,7 @@ function RolePermissionsMobileView({
                   <Checkbox
                     checked={checkState.all}
                     indeterminate={checkState.indeterminate}
-                    disabled={!canUpdate}
+                    disabled={!canUpdate || isSaving}
                     onChange={() => onToggleModuleForRole(mobileRole.id, permsInMod)}
                   >
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
@@ -260,7 +260,7 @@ function RolePermissionsMobileView({
                         <Switch
                           size="small"
                           checked={isAssigned}
-                          disabled={!canUpdate || perm.active === false}
+                          disabled={!canUpdate || perm.active === false || isSaving}
                           onChange={() => onTogglePermission(mobileRole.id, perm.code, perm.active)}
                           style={{
                             backgroundColor: isAssigned ? '#2563eb' : '#cbd5e1',

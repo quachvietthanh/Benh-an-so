@@ -32,7 +32,8 @@ public class BackupStorageConfiguration {
                         "medical_record_access_logs", "clinical_orders", "clinical_order_items",
                         "clinical_results", "clinical_result_histories", "medical_attachments",
                         "prescriptions", "prescription_items", "prescription_dispense_items",
-                        "prescription_amendments", "prescription_warning_logs", "medicine_batches",
+                        "prescription_amendments", "prescription_warning_logs", "prescription_interconnection_logs",
+                        "medicine_batches",
                         "inventory_receipts", "inventory_receipt_items", "stock_movements",
                         "inventory_alert_logs", "payments", "payment_service_fees", "invoices", "invoice_lines"
                 ),
@@ -89,6 +90,7 @@ public class BackupStorageConfiguration {
                         dependency("prescription_warning_logs", "rule_id", "drug_interaction_rules"),
                         dependency("prescription_warning_logs", "first_medicine_id", "medicines"),
                         dependency("prescription_warning_logs", "second_medicine_id", "medicines"),
+                        dependency("prescription_interconnection_logs", "prescription_id", "prescriptions"),
                         dependency("medicine_batches", "medicine_id", "medicines"),
                         dependency("inventory_receipt_items", "inventory_receipt_id", "inventory_receipts"),
                         dependency("inventory_receipt_items", "medicine_id", "medicines"),

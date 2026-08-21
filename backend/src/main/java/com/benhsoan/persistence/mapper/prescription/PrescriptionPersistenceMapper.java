@@ -43,6 +43,10 @@ public class PrescriptionPersistenceMapper {
                 entity.getPrescribedAt(),
                 entity.getUpdatedBy(),
                 entity.getUpdatedAt(),
+                entity.getInterconnectionStatus(),
+                entity.getLastInterconnectionAt(),
+                entity.getLastInterconnectionError(),
+                entity.getInterconnectionReceiptCode(),
                 items
         );
     }
@@ -62,6 +66,10 @@ public class PrescriptionPersistenceMapper {
                 .prescribedAt(domain.getPrescribedAt())
                 .updatedBy(domain.getUpdatedBy())
                 .updatedAt(domain.getUpdatedAt())
+                .interconnectionStatus(domain.getInterconnectionStatus())
+                .lastInterconnectionAt(domain.getLastInterconnectionAt())
+                .lastInterconnectionError(domain.getLastInterconnectionError())
+                .interconnectionReceiptCode(domain.getInterconnectionReceiptCode())
                 .build();
     }
 }

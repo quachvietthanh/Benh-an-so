@@ -182,52 +182,60 @@ function RolePermissionsPage() {
     [originalPermissionsByRole, draftPermissionsByRole],
   )
 
-  // Toggle single permission for a role (In-Memory Draft only, NO PUT)
-  const handleTogglePermission = useCallback(
-    (roleId, permissionCode, permissionActive) => {
-      if (!canUpdate || permissionActive === false) return
+  // Persist the complete set for a role so every toggle updates Backend immediately.
+  const persistRolePermissions = useCallback(
+    async (roleId, permissionCodes) => {
+      setSavingRoleId(roleId)
+      try {
+        const response = await roleApi.updateRolePermissions(roleId, permissionCodes)
+        const savedRole = response.data
+        const savedCodes = (savedRole?.permissions || []).map((permission) => permission.code).filter(Boolean)
 
-      setDraftPermissionsByRole((prev) => {
-        const currentSet = new Set(prev[roleId] || [])
-        if (currentSet.has(permissionCode)) {
-          currentSet.delete(permissionCode)
-        } else {
-          currentSet.add(permissionCode)
-        }
-        return {
-          ...prev,
-          [roleId]: currentSet,
-        }
-      })
+        setOriginalPermissionsByRole((prev) => ({ ...prev, [roleId]: new Set(savedCodes) }))
+        setDraftPermissionsByRole((prev) => ({ ...prev, [roleId]: new Set(savedCodes) }))
+        setRoles((prev) => prev.map((role) => (role.id === roleId ? savedRole : role)))
+        return true
+      } catch (err) {
+        const errorMsg = err.response?.data?.message || 'KhÃ´ng thá»ƒ lÆ°u phÃ¢n quyá»n lÃªn há»‡ thá»‘ng.'
+        message.error(`Lá»—i cáº­p nháº­t phÃ¢n quyá»n: ${errorMsg}`)
+        return false
+      } finally {
+        setSavingRoleId(null)
+      }
     },
-    [canUpdate],
+    [],
   )
 
-  // Toggle all permissions in a module for a role (In-Memory Draft only)
+  // Toggle single permission for a role and persist it immediately.
+  const handleTogglePermission = useCallback(
+    (roleId, permissionCode, permissionActive) => {
+      if (!canUpdate || permissionActive === false || savingRoleId === roleId) return
+
+      const nextCodes = new Set(draftPermissionsByRole[roleId] || [])
+      if (nextCodes.has(permissionCode)) nextCodes.delete(permissionCode)
+      else nextCodes.add(permissionCode)
+      persistRolePermissions(roleId, Array.from(nextCodes))
+    },
+    [canUpdate, draftPermissionsByRole, persistRolePermissions, savingRoleId],
+  )
+
+  // Toggle all permissions in a module for a role and persist them in one request.
   const handleToggleModuleForRole = useCallback(
     (roleId, permsInModule) => {
-      if (!canUpdate) return
+      if (!canUpdate || savingRoleId === roleId) return
 
       const activePermsInMod = permsInModule.filter((p) => p.active !== false)
       if (activePermsInMod.length === 0) return
 
-      setDraftPermissionsByRole((prev) => {
-        const currentSet = new Set(prev[roleId] || [])
-        const allAssigned = activePermsInMod.every((p) => currentSet.has(p.code))
-
-        if (allAssigned) {
-          activePermsInMod.forEach((p) => currentSet.delete(p.code))
-        } else {
-          activePermsInMod.forEach((p) => currentSet.add(p.code))
-        }
-
-        return {
-          ...prev,
-          [roleId]: currentSet,
-        }
+      const nextCodes = new Set(draftPermissionsByRole[roleId] || [])
+      const allAssigned = activePermsInMod.every((permission) => nextCodes.has(permission.code))
+      activePermsInMod.forEach((permission) => {
+        if (allAssigned) nextCodes.delete(permission.code)
+        else nextCodes.add(permission.code)
       })
+      persistRolePermissions(roleId, Array.from(nextCodes))
     },
-    [canUpdate],
+    [canUpdate, draftPermissionsByRole, persistRolePermissions, savingRoleId],
   )
 
   // Helper to get 3-state checkbox status for a module in a role

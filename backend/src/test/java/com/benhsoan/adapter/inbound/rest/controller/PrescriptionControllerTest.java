@@ -31,11 +31,13 @@ import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.port.dto.result.DispenseAllocationResult;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
+import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
@@ -45,6 +47,8 @@ import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
+import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -88,6 +92,12 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private ExportPrescriptionUseCase exportPrescriptionUseCase;
+
+    @MockitoBean
+    private SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
+
+    @MockitoBean
+    private RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -439,5 +449,37 @@ class PrescriptionControllerTest {
                 .andExpect(jsonPath("$.allocations[0].batchNumber").value("BATCH-001"))
                 .andExpect(jsonPath("$.allocations[0].dispensedQuantity").value(20))
                 .andExpect(jsonPath("$.allocations[0].batchQuantityRemaining").value(15));
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/interconnection returns submission status")
+    void sendToInterconnectionReturnsSubmissionStatus() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(sendPrescriptionInterconnectionUseCase.send(prescriptionId)).thenReturn(
+                new PrescriptionInterconnectionResult(
+                        prescriptionId, "RX000001", InterconnectionStatus.SUCCESS,
+                        "LT-20260821-000001", null, NOW));
+
+        mockMvc.perform(post("/prescriptions/{id}/interconnection", prescriptionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prescriptionId").value(prescriptionId.toString()))
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.receiptCode").value("LT-20260821-000001"));
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/interconnection/retry returns retry status")
+    void retryInterconnectionReturnsSubmissionStatus() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(retryPrescriptionInterconnectionUseCase.retry(prescriptionId)).thenReturn(
+                new PrescriptionInterconnectionResult(
+                        prescriptionId, "RX000001", InterconnectionStatus.FAILED,
+                        null, "Gateway unavailable", NOW));
+
+        mockMvc.perform(post("/prescriptions/{id}/interconnection/retry", prescriptionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prescriptionId").value(prescriptionId.toString()))
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failureReason").value("Gateway unavailable"));
     }
 }

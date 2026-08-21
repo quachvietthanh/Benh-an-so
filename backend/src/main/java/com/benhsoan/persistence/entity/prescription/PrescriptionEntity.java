@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -54,4 +55,17 @@ public class PrescriptionEntity {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "interconnection_status", nullable = false, length = 20)
+    private InterconnectionStatus interconnectionStatus;
+
+    @Column(name = "last_interconnection_at")
+    private Instant lastInterconnectionAt;
+
+    @Column(name = "last_interconnection_error", columnDefinition = "TEXT")
+    private String lastInterconnectionError;
+
+    @Column(name = "interconnection_receipt_code", length = 50)
+    private String interconnectionReceiptCode;
 }
