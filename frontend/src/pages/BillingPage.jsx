@@ -485,7 +485,6 @@ function BillingPage() {
           )
           const qty = Number(item.quantity || 1)
           const amount = qty * unitPrice
-          const unit = item.unit || matchedMed?.unit || ''
           const name = item.medicineName || matchedMed?.medicineName || matchedMed?.name || `Thuốc ${idx + 1}`
           const freqStr = item.frequency != null && item.frequency !== ''
             ? typeof item.frequency === 'number' || !isNaN(Number(item.frequency))
