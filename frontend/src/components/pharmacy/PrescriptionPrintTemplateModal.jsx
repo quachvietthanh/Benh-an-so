@@ -223,18 +223,18 @@ function PrescriptionPrintTemplateModal({
             </div>
 
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <BarcodeView code={patientCode || prescription.prescriptionCode || 'DT000001'} />
+              <BarcodeView code={prescription.prescriptionCode || patientCode || 'DT000001'} />
             </div>
           </div>
 
           {/* TIÊU ĐỀ ĐƠN THUỐC */}
           <div style={{ textAlign: 'center', margin: '14px 0 12px' }}>
-            <div style={{ fontSize: 22, fontWeight: 'bold', letterSpacing: '0.5px' }}>
-              ĐƠN THUỐC
+            <div style={{ fontSize: 22, fontWeight: 'bold', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              ĐƠN THUỐC ĐIỆN TỬ
             </div>
             {prescription.prescriptionCode && (
-              <div style={{ fontSize: 12, color: '#4b5563', marginTop: 1 }}>
-                Mã đơn: <strong>{prescription.prescriptionCode}</strong>
+              <div style={{ fontSize: 13, color: '#1f2937', marginTop: 2 }}>
+                Mã đơn điện tử (Liên thông): <strong style={{ fontFamily: 'monospace', fontSize: 14 }}>{prescription.prescriptionCode}</strong>
               </div>
             )}
           </div>
@@ -342,8 +342,10 @@ function PrescriptionPrintTemplateModal({
           </div>
 
           {/* LƯU Ý DƯỚI CÙNG */}
-          <div style={{ marginTop: 16, paddingTop: 6, borderTop: '1px solid #000', textAlign: 'center', fontSize: 11.5, fontStyle: 'italic' }}>
-            * Lưu ý: Tái khám nhớ mang theo toa thuốc, phim X-quang, xét nghiệm và hồ sơ bệnh án cũ.
+          <div style={{ marginTop: 16, paddingTop: 6, borderTop: '1px solid #000', textAlign: 'center', fontSize: 11.5, fontStyle: 'italic', lineHeight: 1.4 }}>
+            * Đơn thuốc điện tử có mã định danh duy nhất phục vụ tra cứu và liên thông cơ sở y tế / quầy thuốc toàn quốc.
+            <br />
+            * Tái khám nhớ mang theo toa thuốc, kết quả cận lâm sàng và hồ sơ bệnh án cũ.
           </div>
         </div>
       </Spin>

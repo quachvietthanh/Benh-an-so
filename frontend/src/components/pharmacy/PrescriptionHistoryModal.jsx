@@ -36,13 +36,20 @@ function PrescriptionHistoryModal({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <HistoryOutlined style={{ color: '#2563EB' }} />
-          <span>Lịch Sử Thay Đổi Đơn Thuốc {prescriptionCode}</span>
+          <span>Lịch Sử Thay Đổi Đơn Thuốc Điện Tử: <Text code strong style={{ color: '#2563eb' }}>{prescriptionCode}</Text></span>
         </div>
       }
       onCancel={onClose}
       footer={<Button onClick={onClose}>Đóng</Button>}
       width={720}
     >
+      <div style={{ marginBottom: 12, padding: '6px 12px', backgroundColor: '#eff6ff', borderRadius: 6, border: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text strong style={{ color: '#1e40af', fontSize: 13 }}>
+          Mã đơn thuốc điện tử: <Text code>{prescriptionCode}</Text>
+        </Text>
+        <Tag color="cyan" style={{ margin: 0 }}>Định danh cố định bất biến</Tag>
+      </div>
+
       {!historyLogs || historyLogs.length === 0 ? (
         <Empty description="Chưa có lịch sử điều chỉnh cho đơn thuốc này" />
       ) : (
