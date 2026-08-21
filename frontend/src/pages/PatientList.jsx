@@ -61,6 +61,7 @@ const getPatientStatus = (patient) => (
 function PatientList() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useAuthContext()
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])

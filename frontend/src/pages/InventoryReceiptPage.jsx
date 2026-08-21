@@ -86,7 +86,10 @@ function InventoryReceiptPage() {
       .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
       .filter(Boolean)
   }, [user])
-  const canManageReceipts = roles.includes('pharmacist') || roles.includes('admin')
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+  const canManageReceipts = userPermissions.includes('PHARMACY_CREATE') || roles.includes('pharmacist') || roles.includes('admin')
 
   const [form] = Form.useForm()
 
