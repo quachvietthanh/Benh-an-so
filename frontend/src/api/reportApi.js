@@ -8,6 +8,11 @@ const reportApi = {
       params,
       responseType: 'blob',
     }),
+  exportReport: ({ reportType, from, to }) =>
+    axiosClient.get('/reports/export', {
+      params: { reportType, from, to },
+      responseType: 'blob',
+    }),
   topMedicines: (params) => axiosClient.get('/reports/top-medicines', { params }),
   doctorVisits: (params) => axiosClient.get('/reports/doctor-visits', { params }),
   audit: (params) => axiosClient.get('/reports/audit-logs', { params }),
