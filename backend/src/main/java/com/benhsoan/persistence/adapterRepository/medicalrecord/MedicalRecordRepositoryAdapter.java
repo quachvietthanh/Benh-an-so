@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
@@ -24,6 +25,12 @@ public class MedicalRecordRepositoryAdapter implements MedicalRecordRepository {
     @Override
     public Optional<MedicalRecord> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Optional<MedicalRecord> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
     }
 
     @Override

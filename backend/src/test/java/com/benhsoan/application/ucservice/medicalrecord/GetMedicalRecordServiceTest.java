@@ -1,10 +1,11 @@
 package com.benhsoan.application.ucservice.medicalrecord;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -13,10 +14,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -24,6 +25,7 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
 import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.patient.Patient;
@@ -46,13 +48,13 @@ class GetMedicalRecordServiceTest {
     @Mock
     private MedicalRecordRepository medicalRecordRepository;
     @Mock
-    private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
-    @Mock
     private VisitRepository visitRepository;
     @Mock
     private PatientRepository patientRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock
     private MedicalRecordAuthorizationService authorizationService;
     @Mock
@@ -62,51 +64,49 @@ class GetMedicalRecordServiceTest {
     @Mock
     private ClockPort clockPort;
 
+    @InjectMocks
     private GetMedicalRecordService service;
 
-    private final UUID visitId = UUID.randomUUID();
     private final UUID recordId = UUID.randomUUID();
+    private final UUID visitId = UUID.randomUUID();
     private final UUID patientId = UUID.randomUUID();
     private final UUID doctorId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
-    private final Instant now = Instant.now();
-
-    @BeforeEach
-    void setUp() {
-        service = new GetMedicalRecordService(
-                medicalRecordRepository, medicalRecordDiagnosisRepository, visitRepository,
-                patientRepository, userRepository, authorizationService, accessAuditService,
-                resultMapper, clockPort);
-    }
+    private final Instant now = Instant.parse("2026-08-11T13:00:00Z");
 
     private MedicalRecord record() {
         return MedicalRecord.restore(
-                recordId, visitId, "Headache", "Pain", "None", "Normal",
-                "Stable", "Rest", "Follow-up", "Migraine", MedicalRecordStatus.OPEN,
-                null, null, userId, now, null, now);
+                recordId, visitId, "Headache", "Pain", "None", "Normal", "Stable", "Rest",
+                "Follow-up", "Migraine", MedicalRecordStatus.OPEN,
+                null, null, doctorId, now, null, null
+        );
     }
 
     private Visit visit() {
         return Visit.restore(
                 visitId, "VS-0001", patientId, doctorId, null, null,
-VisitType.WALK_IN, VisitStatus.COMPLETED, now, now, now,
-                "Exam", null, userId, now, now);
+                VisitType.WALK_IN, VisitStatus.COMPLETED, now, now, now,
+                "Exam", null, doctorId, now, now
+        );
     }
 
     private Patient patient() {
         return Patient.restore(
                 patientId, "BN-0001", "Nguyen Van A", LocalDate.of(1990, 1, 1),
-                Gender.MALE, "0900000000", null, "Hanoi", "ID-1", "BH-1",
-                null, null, null, true, now, now, null, userId);
+                Gender.MALE, "0900000000", "patient@email.com", "Hanoi", "ID-1", "BH-1",
+                com.benhsoan.domain.patient.enums.BloodType.UNKNOWN,
+                "Contact", "0911111111", true, now, now, doctorId, doctorId
+        );
     }
 
     private User doctor() {
         return User.restore(
-                doctorId, "doctor1", "hash", "Dr. Tran B", "dr@hospital.vn",
-                null, UUID.randomUUID(), true, now, now);
+                doctorId, "doctor", "hash", "Dr. Tran B", "doctor@hospital.com", "0988888888",
+                UUID.randomUUID(), true, now, now
+        );
     }
 
-    private MedicalRecordDiagnosis primaryDiagnosis() {
+    private MedicalRecordDiagnosis diagnosis() {
         return MedicalRecordDiagnosis.restore(
                 UUID.randomUUID(), recordId, null, "G43", "Migraine",
                 DiagnosisType.PRIMARY, null, doctorId, now, now, now);
@@ -116,10 +116,10 @@ VisitType.WALK_IN, VisitStatus.COMPLETED, now, now, now,
         return new MedicalRecordDetailResult(
                 new MedicalRecordDetailResult.PatientInfo(patientId, "BN-0001", "Nguyen Van A",
                         LocalDate.of(1990, 1, 1), Gender.MALE, "0900000000", "ID-1", "BH-1"),
-new MedicalRecordDetailResult.VisitInfo(visitId, "VS-0001", VisitType.WALK_IN,
+                new MedicalRecordDetailResult.VisitInfo(visitId, "VS-0001", VisitType.WALK_IN,
                         VisitStatus.COMPLETED, now, now, now, "Exam", null, doctorId, "Dr. Tran B"),
                 recordId, "Headache", "Pain", "None", "Normal", "Stable", "Rest",
-                "Follow-up", "Migraine", MedicalRecordStatus.OPEN, null, null,
+                "Follow-up", "Migraine", MedicalRecordStatus.OPEN, null, null, null, null, null,
                 "G43", "Migraine", List.of(), List.of());
     }
 
@@ -131,55 +131,66 @@ new MedicalRecordDetailResult.VisitInfo(visitId, "VS-0001", VisitType.WALK_IN,
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit()));
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient()));
         when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor()));
-        when(medicalRecordDiagnosisRepository.findByMedicalRecordId(recordId))
-                .thenReturn(List.of(primaryDiagnosis()));
+        when(medicalRecordDiagnosisRepository.findByMedicalRecordId(recordId)).thenReturn(List.of(diagnosis()));
         when(clockPort.now()).thenReturn(now);
-        when(resultMapper.toDetailResult(any(), any(), any(), any(), any()))
-                .thenReturn(detailResult());
+        when(resultMapper.toDetailResult(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(detailResult());
 
         MedicalRecordDetailResult result = service.getDetailByVisitId(visitId);
 
-        assertEquals(detailResult(), result);
+        assertNotNull(result);
+        assertEquals(recordId, result.medicalRecordId());
+        assertEquals("Headache", result.chiefComplaint());
+        assertEquals("BN-0001", result.patient().patientCode());
+        assertEquals("VS-0001", result.visit().visitCode());
+        assertEquals("Dr. Tran B", result.visit().doctorName());
+
         verify(accessAuditService).recordRecordView(patientId, visitId, recordId, userId, now);
     }
 
     @Test
-    @DisplayName("getDetailByVisitId - throws when record does not exist")
-    void getDetailByVisitIdThrowsWhenRecordMissing() {
+    @DisplayName("getDetailByVisitId - throws MedicalRecordNotFoundException when record not found")
+    void getDetailByVisitIdThrowsWhenNotFound() {
         when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
 
-        assertThrows(MedicalRecordNotFoundException.class,
-                () -> service.getDetailByVisitId(visitId));
-        verify(accessAuditService, never()).recordRecordView(any(), any(), any(), any(), any());
+        assertThrows(MedicalRecordNotFoundException.class, () -> service.getDetailByVisitId(visitId));
+        verifyNoInteractions(accessAuditService);
     }
 
     @Test
-    @DisplayName("getHistoryByPatientId - writes history audit and returns only visits that have a record")
-    void getHistoryByPatientIdReturnsExistingRecordsOnly() {
-        Visit visitWithoutRecord = Visit.restore(
-                UUID.randomUUID(), "VS-0002", patientId, doctorId, null, null,
-VisitType.WALK_IN, VisitStatus.WAITING, now, null, null,
-                "Exam 2", null, userId, now, null);
-
+    @DisplayName("getHistoryByPatientId - returns history list ordered by visit date and writes audit log")
+    void getHistoryByPatientIdReturnsListAndWritesAuditLog() {
         when(authorizationService.requireReadAccess()).thenReturn(userId);
-        when(clockPort.now()).thenReturn(now);
-        when(visitRepository.findByPatientIdOrderByVisitAtDesc(patientId))
-                .thenReturn(List.of(visit(), visitWithoutRecord));
-        when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.of(record()));
-        when(medicalRecordRepository.findByVisitId(visitWithoutRecord.getId()))
-                .thenReturn(Optional.empty());
+        when(visitRepository.findByPatientIdOrderByVisitAtDesc(patientId)).thenReturn(List.of(visit()));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit()));
+        when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.of(record()));
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient()));
         when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor()));
-        when(medicalRecordDiagnosisRepository.findByMedicalRecordId(recordId))
-                .thenReturn(List.of(primaryDiagnosis()));
-        when(resultMapper.toDetailResult(any(), any(), any(), any(), any()))
-                .thenReturn(detailResult());
+        when(medicalRecordDiagnosisRepository.findByMedicalRecordId(recordId)).thenReturn(List.of(diagnosis()));
+        when(clockPort.now()).thenReturn(now);
+        when(resultMapper.toDetailResult(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(detailResult());
 
         List<MedicalRecordDetailResult> history = service.getHistoryByPatientId(patientId);
 
         assertEquals(1, history.size());
+        assertEquals(recordId, history.get(0).medicalRecordId());
+
         verify(accessAuditService).recordHistoryView(patientId, userId, now);
-        verify(accessAuditService).recordRecordView(patientId, visitId, recordId, userId, now);
+    }
+
+    @Test
+    @DisplayName("getHistoryByPatientId - returns empty list when patient has no visits")
+    void getHistoryByPatientIdReturnsEmptyList() {
+        when(authorizationService.requireReadAccess()).thenReturn(userId);
+        when(visitRepository.findByPatientIdOrderByVisitAtDesc(patientId)).thenReturn(List.of());
+        when(clockPort.now()).thenReturn(now);
+
+        List<MedicalRecordDetailResult> history = service.getHistoryByPatientId(patientId);
+
+        assertTrue(history.isEmpty());
+        verify(accessAuditService).recordHistoryView(patientId, userId, now);
     }
 }

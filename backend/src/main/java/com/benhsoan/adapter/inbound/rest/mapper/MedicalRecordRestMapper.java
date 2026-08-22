@@ -39,6 +39,14 @@ public class MedicalRecordRestMapper {
         return new AmendMedicalRecordCommand(request.content(), request.reason());
     }
 
+    public com.benhsoan.port.dto.command.medicalrecord.SignMedicalRecordCommand toCommand(
+            com.benhsoan.adapter.inbound.rest.request.medicalrecord.SignMedicalRecordRequest request
+    ) {
+        return new com.benhsoan.port.dto.command.medicalrecord.SignMedicalRecordCommand(
+                request == null ? null : request.signatureData()
+        );
+    }
+
     public GetMedicalRecordAccessLogsQuery toQuery(
             UUID accessedBy,
             UUID patientId,
@@ -55,7 +63,8 @@ public class MedicalRecordRestMapper {
     public MedicalRecordResponse toResponse(MedicalRecordResult result) {
         return new MedicalRecordResponse(result.id(), result.visitId(), result.chiefComplaint(), result.symptoms(),
                 result.medicalHistory(), result.physicalExamination(), result.clinicalProgress(), result.treatmentPlan(),
-                result.doctorInstructions(), result.conclusion(), result.status(), result.lockedAt(), result.lockedBy(),
+                result.doctorInstructions(), result.conclusion(), result.status(), result.signatureData(),
+                result.signedAt(), result.signedBy(), result.lockedAt(), result.lockedBy(),
                 result.createdBy(), result.createdAt(), result.updatedBy(), result.updatedAt());
     }
 

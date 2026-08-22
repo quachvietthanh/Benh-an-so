@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.adapterRepository.medicalrecord;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -44,5 +45,19 @@ class MedicalRecordRepositoryAdapterTest {
 
         assertEquals(recordId, result.orElseThrow().getId());
         assertEquals(visitId, result.orElseThrow().getVisitId());
+    }
+
+    @Test
+    void findsMedicalRecordForUpdate() {
+        UUID recordId = UUID.randomUUID();
+        when(jpaRepository.findByIdForUpdate(recordId)).thenReturn(Optional.of(MedicalRecordEntity.builder()
+                .id(recordId).visitId(UUID.randomUUID()).status(MedicalRecordStatus.DRAFT)
+                .createdBy(UUID.randomUUID()).createdAt(Instant.parse("2026-08-20T02:00:00Z"))
+                .build()));
+
+        var result = adapter.findByIdForUpdate(recordId);
+
+        assertEquals(recordId, result.orElseThrow().getId());
+        verify(jpaRepository).findByIdForUpdate(recordId);
     }
 }

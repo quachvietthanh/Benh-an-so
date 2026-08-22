@@ -34,6 +34,7 @@
 | `/api/v1/medical-records/{id}` | GET | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}` | PUT | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}/sign` | POST | ❌ | ✅ (chỉ bác sĩ phụ trách lượt khám) | ❌ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}/status` | PATCH | ✅ | ✅ | ✅ | ❌ | ❌ |
 | | | | | | | |
 | **Prescriptions** | | | | | | |

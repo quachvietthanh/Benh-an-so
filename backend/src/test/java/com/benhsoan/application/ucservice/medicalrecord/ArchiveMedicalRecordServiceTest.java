@@ -63,7 +63,7 @@ class ArchiveMedicalRecordServiceTest {
 
         when(resultMapper.toResult(record)).thenReturn(new MedicalRecordResult(
                 RECORD_ID, VISIT_ID, "c", "s", "h", "p", "cp", "tp", "di", "co",
-                MedicalRecordStatus.ARCHIVED, NOW, DOCTOR_ID, DOCTOR_ID, NOW, DOCTOR_ID, NOW));
+                MedicalRecordStatus.ARCHIVED, null, null, null, NOW, DOCTOR_ID, DOCTOR_ID, NOW, DOCTOR_ID, NOW));
 
         ArchiveMedicalRecordService service = new ArchiveMedicalRecordService(
                 medicalRecordRepository, visitRepository, authorizationService,

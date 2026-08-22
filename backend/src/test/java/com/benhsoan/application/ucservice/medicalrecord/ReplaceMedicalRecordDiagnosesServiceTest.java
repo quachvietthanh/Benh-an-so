@@ -108,7 +108,7 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
         UUID visitId = UUID.randomUUID();
         Instant now = Instant.parse("2026-08-20T02:00:00Z");
         MedicalRecord record = MedicalRecord.create(visitId, "Complaint", null, null, null, null, null, null, "Conclusion", actorId, now);
-        record.lock(actorId, now);
+        record.sign("SIG", actorId, now);
         when(authorizationService.requireWriteAccess()).thenReturn(actorId);
         when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
 
