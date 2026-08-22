@@ -50,6 +50,12 @@ const medicalRecordApi = {
   lock: (recordId) => {
     return axiosClient.post(`/medical-records/${recordId}/lock`)
   },
+  archive: (recordId) => {
+    return axiosClient.post(`/medical-records/${recordId}/archive`)
+  },
+  delete: (recordId) => {
+    return axiosClient.delete(`/medical-records/${recordId}`)
+  },
   createClinicalOrder: (visitId, data) => {
     return axiosClient.post(`/clinical-orders/visits/${visitId}`, data)
   },

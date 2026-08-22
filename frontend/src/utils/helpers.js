@@ -17,12 +17,16 @@ export const formatGender = (gender) => {
 
 export const formatRecordStatus = (status) => {
   const map = {
+    DRAFT: { label: 'Bản nháp', color: 'default' },
+    OPEN: { label: 'Đang mở', color: 'processing' },
+    LOCKED: { label: 'Đã khóa', color: 'green' },
+    ARCHIVED: { label: 'Đã lưu trữ', color: 'purple' },
     NEW: { label: 'Mới', color: 'blue' },
     IN_PROGRESS: { label: 'Đang xử lý', color: 'orange' },
     COMPLETED: { label: 'Hoàn thành', color: 'green' },
     CANCELLED: { label: 'Đã hủy', color: 'red' },
   }
-  return map[status] || { label: 'Không xác định', color: 'default' }
+  return map[status] || { label: status || 'Không xác định', color: 'default' }
 }
 
 export const stringToColor = (str) => {

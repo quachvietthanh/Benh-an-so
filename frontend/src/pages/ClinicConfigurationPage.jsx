@@ -5,6 +5,7 @@ import {
   Card,
   Form,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Space,
@@ -75,6 +76,7 @@ function ClinicConfigurationPage() {
         phone: data.phone || '',
         openingTime: data.openingTime ? dayjs(data.openingTime, ['HH:mm:ss', 'HH:mm']) : null,
         closingTime: data.closingTime ? dayjs(data.closingTime, ['HH:mm:ss', 'HH:mm']) : null,
+        retentionYears: data.retentionYears !== undefined && data.retentionYears !== null ? data.retentionYears : 10,
       })
     } catch (err) {
       console.error('[ClinicConfigurationPage] Lỗi tải cấu hình phòng khám:', err)
@@ -119,6 +121,7 @@ function ClinicConfigurationPage() {
         phone: lastFetchedConfig.phone || '',
         openingTime: lastFetchedConfig.openingTime ? dayjs(lastFetchedConfig.openingTime, ['HH:mm:ss', 'HH:mm']) : null,
         closingTime: lastFetchedConfig.closingTime ? dayjs(lastFetchedConfig.closingTime, ['HH:mm:ss', 'HH:mm']) : null,
+        retentionYears: lastFetchedConfig.retentionYears !== undefined && lastFetchedConfig.retentionYears !== null ? lastFetchedConfig.retentionYears : 10,
       })
       message.info('Đã hủy các thay đổi và khôi phục cấu hình gần nhất từ Backend.')
     } else {
@@ -173,12 +176,27 @@ function ClinicConfigurationPage() {
       return
     }
 
+    const retentionNum = Number(values.retentionYears)
+    if (values.retentionYears === undefined || values.retentionYears === null || values.retentionYears === '' || isNaN(retentionNum)) {
+      message.error('Số năm lưu trữ hồ sơ là bắt buộc.')
+      return
+    }
+    if (!Number.isInteger(retentionNum)) {
+      message.error('Số năm lưu trữ hồ sơ phải là số nguyên.')
+      return
+    }
+    if (retentionNum < 10) {
+      message.error('Số năm lưu trữ hồ sơ phải từ 10 năm trở lên.')
+      return
+    }
+
     const payload = {
       clinicName: nameTrimmed,
       address: values.address ? values.address.trim() : null,
       phone: values.phone ? values.phone.trim() : null,
       openingTime: openTimeDayjs.format('HH:mm:ss'),
       closingTime: closeTimeDayjs.format('HH:mm:ss'),
+      retentionYears: retentionNum,
     }
 
     setSavingConfig(true)
@@ -463,6 +481,40 @@ function ClinicConfigurationPage() {
                   <TimePicker format="HH:mm" style={{ width: '100%' }} placeholder="Chọn giờ đóng cửa" />
                 </Form.Item>
               </Space>
+
+              <Form.Item
+                label={<span>Thời hạn lưu trữ hồ sơ bệnh án <span style={{ color: '#dc2626' }}>*</span></span>}
+                name="retentionYears"
+                extra="Quy định số năm lưu trữ hồ sơ bệnh án tối thiểu (tối thiểu 10 năm theo quy chuẩn y tế). Hệ thống sẽ ngăn chặn xóa các hồ sơ chưa hết hạn lưu trữ."
+                rules={[
+                  { required: true, message: 'Số năm lưu trữ hồ sơ là bắt buộc.' },
+                  {
+                    validator: (_, value) => {
+                      if (value === undefined || value === null || value === '') {
+                        return Promise.reject(new Error('Số năm lưu trữ hồ sơ là bắt buộc.'))
+                      }
+                      const num = Number(value)
+                      if (!Number.isInteger(num)) {
+                        return Promise.reject(new Error('Số năm lưu trữ phải là số nguyên.'))
+                      }
+                      if (num < 10) {
+                        return Promise.reject(new Error('Số năm lưu trữ hồ sơ phải từ 10 năm trở lên.'))
+                      }
+                      return Promise.resolve()
+                    },
+                  },
+                ]}
+              >
+                <InputNumber
+                  min={10}
+                  max={100}
+                  step={1}
+                  disabled={!canUpdateConfig}
+                  placeholder="Nhập số năm (tối thiểu 10)"
+                  style={{ width: '100%' }}
+                  addonAfter="năm"
+                />
+              </Form.Item>
 
               <div style={{ marginTop: 24, textAlign: 'right', borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
                 <Space>
