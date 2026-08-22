@@ -73,6 +73,23 @@ export function validateWorkingHours(openingTime, closingTime) {
   return { valid: true }
 }
 
+export const MIN_RETENTION_YEARS = 10
+export const DEFAULT_RETENTION_YEARS = 10
+
+export function validateRetentionYears(retentionYears) {
+  if (retentionYears === undefined || retentionYears === null || retentionYears === '') {
+    return { valid: false, error: 'Số năm lưu trữ hồ sơ là bắt buộc.' }
+  }
+  const num = Number(retentionYears)
+  if (!Number.isInteger(num)) {
+    return { valid: false, error: 'Số năm lưu trữ phải là số nguyên.' }
+  }
+  if (num < MIN_RETENTION_YEARS) {
+    return { valid: false, error: `Số năm lưu trữ hồ sơ phải từ ${MIN_RETENTION_YEARS} năm trở lên.` }
+  }
+  return { valid: true, value: num }
+}
+
 export function formatClinicConfigPayload(values) {
   const nameRes = validateClinicName(values?.clinicName)
   if (!nameRes.valid) return nameRes
@@ -86,6 +103,13 @@ export function formatClinicConfigPayload(values) {
   const hoursRes = validateWorkingHours(values?.openingTime, values?.closingTime)
   if (!hoursRes.valid) return hoursRes
 
+  let retentionYearsVal = DEFAULT_RETENTION_YEARS
+  if (values?.retentionYears !== undefined && values?.retentionYears !== null && values?.retentionYears !== '') {
+    const retentionRes = validateRetentionYears(values.retentionYears)
+    if (!retentionRes.valid) return retentionRes
+    retentionYearsVal = retentionRes.value
+  }
+
   const openParsed = parseTimeString(values.openingTime)
   const closeParsed = parseTimeString(values.closingTime)
 
@@ -97,6 +121,7 @@ export function formatClinicConfigPayload(values) {
       phone: phoneRes.value,
       openingTime: openParsed.format('HH:mm:ss'),
       closingTime: closeParsed.format('HH:mm:ss'),
+      retentionYears: retentionYearsVal,
     },
   }
 }

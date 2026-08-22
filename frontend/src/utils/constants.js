@@ -10,6 +10,10 @@ export const GENDER_OPTIONS = [
 ]
 
 export const RECORD_STATUS_OPTIONS = [
+  { value: 'DRAFT', label: 'Bản nháp', color: 'default' },
+  { value: 'OPEN', label: 'Đang mở', color: 'processing' },
+  { value: 'LOCKED', label: 'Đã khóa', color: 'green' },
+  { value: 'ARCHIVED', label: 'Đã lưu trữ', color: 'purple' },
   { value: 'NEW', label: 'Mới', color: 'blue' },
   { value: 'IN_PROGRESS', label: 'Đang xử lý', color: 'orange' },
   { value: 'COMPLETED', label: 'Hoàn thành', color: 'green' },
@@ -49,6 +53,13 @@ export const PERMISSION_LABELS = {
   RECORD_UPDATE: 'Cập nhật hồ sơ bệnh án',
   RECORD_DELETE: 'Xóa hồ sơ bệnh án',
   RECORD_UPDATE_STATUS: 'Cập nhật trạng thái',
+  MEDICAL_RECORD_CREATE: 'Tạo hồ sơ bệnh án',
+  MEDICAL_RECORD_READ: 'Xem hồ sơ bệnh án',
+  MEDICAL_RECORD_UPDATE: 'Cập nhật hồ sơ bệnh án',
+  MEDICAL_RECORD_DELETE: 'Xóa hồ sơ bệnh án',
+  MEDICAL_RECORD_UPDATE_STATUS: 'Lưu trữ / Đổi trạng thái bệnh án',
+  CLINIC_CONFIGURATION_READ: 'Xem cấu hình phòng khám',
+  CLINIC_CONFIGURATION_UPDATE: 'Cập nhật cấu hình phòng khám',
   PRESCRIPTION_CREATE: 'Tạo đơn thuốc',
   PRESCRIPTION_READ: 'Xem đơn thuốc',
   PRESCRIPTION_UPDATE: 'Cập nhật đơn thuốc',

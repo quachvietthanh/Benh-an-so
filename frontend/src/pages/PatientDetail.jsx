@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, DatePicker, Descriptions, Form, Input, message, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
-import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined, FolderOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
 import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
+import MedicalRecordList from './MedicalRecordList'
 
 const { Title } = Typography
 const phoneRule = { pattern: /^0\d{9}$/, message: 'Số điện thoại phải gồm 10 số và bắt đầu bằng 0' }
@@ -164,6 +165,17 @@ function PatientDetail() {
                     pagination={false}
                     locale={{ emptyText: 'Bệnh nhân chưa có lượt khám' }}
                   />
+                ),
+              },
+              {
+                key: 'records',
+                label: (
+                  <span>
+                    <FolderOutlined /> Hồ sơ bệnh án & Lưu trữ
+                  </span>
+                ),
+                children: (
+                  <MedicalRecordList patientId={patient.id} />
                 ),
               },
               {

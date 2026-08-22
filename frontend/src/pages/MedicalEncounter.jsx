@@ -40,6 +40,7 @@ import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
 import { getApiErrorMessage as getApiMessage, normalizeApiError } from '../utils/apiError'
+import { formatRecordStatus } from '../utils/helpers'
 import {
   buildClinicalOrderPayload,
   buildDiagnosisPayload,
@@ -744,7 +745,10 @@ function MedicalEncounter() {
     {
       title: 'Trạng thái',
       dataIndex: 'status',
-      render: (value) => <Tag color={value === 'LOCKED' ? 'green' : 'processing'}>{value === 'LOCKED' ? 'Đã khóa' : 'Đang mở (Bản nháp)'}</Tag>,
+      render: (value) => {
+        const formatted = formatRecordStatus(value)
+        return <Tag color={formatted.color}>{formatted.label}</Tag>
+      },
     },
     {
       title: '',
@@ -845,9 +849,10 @@ function MedicalEncounter() {
             {currentRecordId ? <Text code>{currentRecordId}</Text> : <Tag>Chưa tạo</Tag>}
           </Descriptions.Item>
           <Descriptions.Item label="Trạng thái bệnh án">
-            <Tag color={encounter?.medicalRecord?.status === 'LOCKED' ? 'green' : 'blue'}>
-              {encounter?.medicalRecord?.status === 'LOCKED' ? 'Đã khóa' : 'Đang mở (Bản nháp)'}
-            </Tag>
+            {(() => {
+              const formatted = formatRecordStatus(encounter?.medicalRecord?.status)
+              return <Tag color={formatted.color}>{formatted.label}</Tag>
+            })()}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -1038,6 +1043,12 @@ function MedicalEncounter() {
               <Descriptions.Item label="Khám lâm sàng">{viewing.physicalExamination || '—'}</Descriptions.Item>
               <Descriptions.Item label="Chẩn đoán">{viewing.diagnosis || '—'}</Descriptions.Item>
               <Descriptions.Item label="Hướng điều trị">{viewing.treatmentPlan || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                {(() => {
+                  const formatted = formatRecordStatus(viewing.status)
+                  return <Tag color={formatted.color}>{formatted.label}</Tag>
+                })()}
+              </Descriptions.Item>
             </Descriptions>
             <Divider />
             <Text type="secondary">Tệp kết quả cận lâm sàng được quản lý tại màn Kết quả CLS, không gắn trực tiếp vào medical record.</Text>

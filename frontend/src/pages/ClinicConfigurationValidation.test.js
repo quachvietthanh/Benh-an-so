@@ -5,7 +5,10 @@ import {
   validateAddress,
   validatePhone,
   validateWorkingHours,
+  validateRetentionYears,
   formatClinicConfigPayload,
+  MIN_RETENTION_YEARS,
+  DEFAULT_RETENTION_YEARS,
 } from '../utils/clinicConfigurationValidation.js'
 
 test('TC01: Admin role verification logic', () => {
@@ -21,6 +24,7 @@ test('TC02: Map backend GET response into form fields contract', () => {
     phone: '0345678910',
     openingTime: '08:00:00',
     closingTime: '17:00:00',
+    retentionYears: 10,
   }
 
   assert.equal(backendResponse.clinicName, 'Phòng khám Bệnh Án Số')
@@ -28,6 +32,7 @@ test('TC02: Map backend GET response into form fields contract', () => {
   assert.equal(backendResponse.phone, '0345678910')
   assert.equal(backendResponse.openingTime, '08:00:00')
   assert.equal(backendResponse.closingTime, '17:00:00')
+  assert.equal(backendResponse.retentionYears, 10)
 })
 
 test('TC03: Tên phòng khám rỗng -> Bị chặn', () => {
@@ -73,6 +78,29 @@ test('TC08: Giờ đóng cửa trước giờ mở cửa -> Bị chặn', () => 
   assert.equal(res.error, 'Giờ đóng cửa phải sau giờ mở cửa.')
 })
 
+test('TC08b: Thời hạn lưu trữ < 10 năm hoặc không hợp lệ -> Bị chặn', () => {
+  assert.equal(validateRetentionYears('').valid, false)
+  assert.equal(validateRetentionYears(null).valid, false)
+  assert.equal(validateRetentionYears(undefined).valid, false)
+  assert.equal(validateRetentionYears(5).valid, false)
+  assert.equal(validateRetentionYears(9).valid, false)
+  assert.equal(validateRetentionYears(10.5).valid, false)
+  assert.equal(validateRetentionYears('abc').valid, false)
+})
+
+test('TC08c: Thời hạn lưu trữ >= 10 năm -> Hợp lệ', () => {
+  const res10 = validateRetentionYears(10)
+  assert.equal(res10.valid, true)
+  assert.equal(res10.value, 10)
+
+  const res15 = validateRetentionYears('15')
+  assert.equal(res15.valid, true)
+  assert.equal(res15.value, 15)
+
+  assert.equal(MIN_RETENTION_YEARS, 10)
+  assert.equal(DEFAULT_RETENTION_YEARS, 10)
+})
+
 test('TC09 & TC10: Dữ liệu hợp lệ -> Payload đúng DTO contract UpdateClinicConfigurationRequest', () => {
   const validInputs = {
     clinicName: '   Phòng Khám Đa Khoa   ',
@@ -80,6 +108,7 @@ test('TC09 & TC10: Dữ liệu hợp lệ -> Payload đúng DTO contract UpdateC
     phone: ' 0987654321 ',
     openingTime: '07:30:00',
     closingTime: '17:30:00',
+    retentionYears: 15,
   }
 
   const result = formatClinicConfigPayload(validInputs)
@@ -90,6 +119,7 @@ test('TC09 & TC10: Dữ liệu hợp lệ -> Payload đúng DTO contract UpdateC
     phone: '0987654321',
     openingTime: '07:30:00',
     closingTime: '17:30:00',
+    retentionYears: 15,
   })
 })
 
