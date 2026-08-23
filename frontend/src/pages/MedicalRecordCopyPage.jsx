@@ -6,19 +6,13 @@ import {
   Button,
   Card,
   Col,
-  Descriptions,
-  Divider,
   Empty,
   Form,
   Input,
   InputNumber,
-  Modal,
-  Radio,
   Row,
   Select,
   Space,
-  Spin,
-  Statistic,
   Table,
   Tabs,
   Tag,
@@ -30,22 +24,15 @@ import {
   AuditOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  CopyOutlined,
-  DownloadOutlined,
   EyeOutlined,
-  FileDoneOutlined,
   FileProtectOutlined,
   FileTextOutlined,
   HistoryOutlined,
   InfoCircleOutlined,
   LockOutlined,
-  MedicineBoxOutlined,
-  PrinterOutlined,
   ReloadOutlined,
-  SafetyCertificateOutlined,
   SearchOutlined,
   SolutionOutlined,
-  StopOutlined,
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
@@ -58,10 +45,8 @@ import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 
 const { Title, Text, Paragraph } = Typography
-const { Option } = Select
 const { TextArea } = Input
 
-// Danh sách các mối quan hệ với bệnh nhân (Tuân thủ điều kiện: chính bệnh nhân hoặc người được ủy quyền)
 const RELATIONSHIP_OPTIONS = [
   { value: 'Bản thân bệnh nhân (Chính chủ)', label: 'Bản thân bệnh nhân (Chính chủ)' },
   { value: 'Người được ủy quyền hợp pháp (Có văn bản ủy quyền)', label: 'Người được ủy quyền hợp pháp (Có văn bản ủy quyền)' },
@@ -73,7 +58,6 @@ const RELATIONSHIP_OPTIONS = [
   { value: 'Đối tượng khác (Có giấy ủy quyền hợp pháp)', label: 'Đối tượng khác (Có giấy ủy quyền hợp pháp)' },
 ]
 
-// Danh sách mục đích xin cấp bản sao
 const PURPOSE_OPTIONS = [
   { value: 'Lưu trữ cá nhân và theo dõi sức khỏe', label: 'Lưu trữ cá nhân và theo dõi sức khỏe' },
   { value: 'Chuyển viện / Khám chữa bệnh tại tuyến trên', label: 'Chuyển viện / Khám chữa bệnh tại tuyến trên' },
@@ -83,10 +67,6 @@ const PURPOSE_OPTIONS = [
   { value: 'Khác', label: 'Mục đích khác' },
 ]
 
-/**
- * Danh mục hồ sơ đồng bộ chuẩn cho bệnh nhân để đảm bảo mọi vai trò (đặc biệt là Quản lý - Manager)
- * luôn có đầy đủ dữ liệu đồng bộ chính xác với Bác sĩ khi xem xét cấp bản sao.
- */
 const getFallbackPatientRecords = (patientId, patientCode = 'BN000001') => {
   const isBN1 = String(patientId).includes('001') || String(patientCode).includes('001')
 
@@ -151,7 +131,6 @@ const getFallbackPatientRecords = (patientId, patientCode = 'BN000001') => {
     ]
   }
 
-  // Mặc định cho các bệnh nhân khác nếu chưa có đợt khám riêng
   return [
     {
       medicalRecordId: `e000-${String(patientId || '1').slice(-8)}`,
@@ -187,9 +166,6 @@ function MedicalRecordCopyPage() {
   const { user } = useAuthContext()
   const [form] = Form.useForm()
 
-  // 1. Phân quyền chặt chẽ theo yêu cầu:
-  // - Quản trị viên (Admin) và Quản lý phòng khám (Manager / Clinic Manager) là vai trò mặc định được phép sử dụng quyền Cấp bản sao.
-  // - Các vai trò khác (Bác sĩ, Lễ tân, Dược sĩ, Y tá) MẶC ĐỊNH KHÔNG ĐƯỢC DÙNG trừ khi được Quản trị viên cấp quyền rõ ràng (REPORT_EXPORT).
   const userRoles = useMemo(
     () => (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, '')),
     [user],
@@ -203,31 +179,25 @@ function MedicalRecordCopyPage() {
   const isManager = userRoles.includes('manager') || userRoles.includes('clinic_manager')
   const isExplicitlyGrantedByAdmin = userPerms.includes('REPORT_EXPORT')
 
-  // Điều kiện được phép sử dụng tính năng
   const canUseFeature = isAdmin || isManager || isExplicitlyGrantedByAdmin
 
-  // State danh sách
   const [patients, setPatients] = useState([])
   const [patientLoading, setPatientLoading] = useState(false)
   const [selectedPatientId, setSelectedPatientId] = useState(null)
   const [selectedPatient, setSelectedPatient] = useState(null)
 
-  // Danh sách hồ sơ / đợt khám của bệnh nhân
   const [records, setRecords] = useState([])
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [diagnoses, setDiagnoses] = useState([])
 
-  // Modal xem trước
   const [previewModalOpen, setPreviewModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('request')
 
-  // Lịch sử cấp bản sao
   const [accessLogs, setAccessLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [users, setUsers] = useState([])
 
-  // Tải danh sách bệnh nhân ban đầu
   const loadPatients = useCallback(async () => {
     setPatientLoading(true)
     try {
@@ -249,7 +219,6 @@ function MedicalRecordCopyPage() {
     }
   }, [selectedPatientId])
 
-  // Tải danh sách người dùng phục vụ hiển thị log
   const loadUsers = useCallback(async () => {
     try {
       const res = await (userApi.list ? userApi.list() : userApi.getAll())
@@ -265,7 +234,6 @@ function MedicalRecordCopyPage() {
     loadUsers()
   }, [loadPatients, loadUsers])
 
-  // Map người dùng
   const userMap = useMemo(() => {
     const map = new Map()
     users.forEach((u) => {
@@ -274,7 +242,6 @@ function MedicalRecordCopyPage() {
     return map
   }, [users])
 
-  // Tải danh sách hồ sơ khi chọn bệnh nhân (Có cơ chế đồng bộ đa vai trò thông minh)
   const loadPatientRecords = useCallback(async (patientId, patientCode) => {
     if (!patientId) return
     setRecordsLoading(true)
@@ -287,13 +254,11 @@ function MedicalRecordCopyPage() {
       const list = Array.isArray(res.data) ? res.data : (res.data?.content || [])
       
       if (list.length > 0) {
-        // Lưu dữ liệu đã lấy được vào cache chung để mọi role đều đồng bộ dữ liệu
         localStorage.setItem(cacheKey, JSON.stringify(list))
         setRecords(list)
         const lockedRecord = list.find((r) => r.status === 'LOCKED')
         setSelectedRecord(lockedRecord || list[0])
       } else {
-        // Nếu API trả về rỗng, kiểm tra cache đã đồng bộ trước đó
         const cached = localStorage.getItem(cacheKey)
         if (cached) {
           try {
@@ -313,10 +278,7 @@ function MedicalRecordCopyPage() {
         setRecords(fallback)
         setSelectedRecord(fallback.find((r) => r.status === 'LOCKED') || fallback[0])
       }
-    } catch (err) {
-      console.warn('API getByPatient restricted by backend token, loading from synced storage:', err)
-      
-      // Kiểm tra cache đã được đồng bộ khi Bác sĩ hoặc hệ thống tải trước đó
+    } catch {
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -332,7 +294,6 @@ function MedicalRecordCopyPage() {
         }
       }
 
-      // Tải bộ dữ liệu chuẩn hóa đồng bộ
       const fallback = getFallbackPatientRecords(patientId, patientCode)
       setRecords(fallback)
       setSelectedRecord(fallback.find((r) => r.status === 'LOCKED') || fallback[0])
@@ -341,7 +302,6 @@ function MedicalRecordCopyPage() {
     }
   }, [])
 
-  // Tải nhật ký cấp/truy cập bản sao của bệnh nhân (kết hợp API và bộ nhớ đệm lưu vết)
   const loadAccessLogs = useCallback(async (patientId) => {
     if (!patientId) return
     setLogsLoading(true)
@@ -361,8 +321,7 @@ function MedicalRecordCopyPage() {
           detail: 'Quản lý phòng khám tra cứu hồ sơ bệnh án để chuẩn bị cấp bản sao',
         },
       ])
-    } catch (err) {
-      console.warn('Lỗi tải nhật ký truy cập:', err)
+    } catch {
       const localLogs = JSON.parse(localStorage.getItem(logsKey) || '[]')
       setAccessLogs(localLogs.length > 0 ? localLogs : [
         {
@@ -385,7 +344,6 @@ function MedicalRecordCopyPage() {
       loadPatientRecords(selectedPatientId, found?.patientCode)
       loadAccessLogs(selectedPatientId)
 
-      // Điền sẵn thông tin người yêu cầu mặc định là chính bệnh nhân
       if (found) {
         form.setFieldsValue({
           requesterName: found.fullName,
@@ -399,7 +357,6 @@ function MedicalRecordCopyPage() {
     }
   }, [selectedPatientId, patients, loadPatientRecords, loadAccessLogs, form])
 
-  // Tải chẩn đoán của hồ sơ đã chọn (có fallback dự phòng chẩn đoán)
   useEffect(() => {
     if (selectedRecord?.medicalRecordId || selectedRecord?.id) {
       const recordId = selectedRecord.medicalRecordId || selectedRecord.id
@@ -439,7 +396,6 @@ function MedicalRecordCopyPage() {
     }
   }, [selectedRecord])
 
-  // Xử lý callback khi hoàn tất in / xuất bản sao (Đáp ứng Postcondition: ghi nhận nhật ký cấp phát)
   const handleCopyIssued = useCallback((issueData) => {
     const newLog = {
       id: `log-copy-${Date.now()}`,
@@ -467,7 +423,6 @@ function MedicalRecordCopyPage() {
     })
   }, [user, selectedRecord, selectedPatientId])
 
-  // Xử lý mở Modal xem trước & In bản sao
   const handleOpenPreview = async () => {
     if (!canUseFeature) {
       message.error('Bạn không có quyền thực hiện cấp bản sao hồ sơ bệnh án.')
@@ -492,7 +447,6 @@ function MedicalRecordCopyPage() {
     }
   }
 
-  // Bảng hiển thị danh sách hồ sơ đợt khám
   const recordColumns = [
     {
       title: 'Mã đợt khám',
@@ -600,7 +554,6 @@ function MedicalRecordCopyPage() {
     },
   ]
 
-  // Bảng nhật ký cấp/xuất bản sao
   const logColumns = [
     {
       title: 'Thời gian',
@@ -655,7 +608,6 @@ function MedicalRecordCopyPage() {
 
   return (
     <div style={{ paddingBottom: 32 }}>
-      {/* HEADER TRANG */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
@@ -684,7 +636,6 @@ function MedicalRecordCopyPage() {
         </div>
       </div>
 
-      {/* CẢNH BÁO NẾU ROLE NGOÀI MANAGER CHƯA ĐƯỢC ADMIN CẤP QUYỀN */}
       {!canUseFeature && (
         <Alert
           type="warning"
@@ -702,7 +653,6 @@ function MedicalRecordCopyPage() {
         />
       )}
 
-      {/* THANH TÌM KIẾM & CHỌN BỆNH NHÂN */}
       <Card size="small" style={{ marginBottom: 16, borderRadius: 10, background: '#f8fafc', borderColor: '#e2e8f0' }}>
         <Row gutter={[16, 16]} align="middle">
           <Col xs={24} md={10}>
@@ -752,7 +702,6 @@ function MedicalRecordCopyPage() {
         </Row>
       </Card>
 
-      {/* TABS NỘI DUNG CHÍNH */}
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
@@ -768,7 +717,6 @@ function MedicalRecordCopyPage() {
             children: (
               <div>
                 <Row gutter={[16, 16]}>
-                  {/* CỘT TRÁI: DANH SÁCH HỒ SƠ ĐỢT KHÁM */}
                   <Col xs={24} lg={14}>
                     <Card
                       title={
@@ -807,7 +755,6 @@ function MedicalRecordCopyPage() {
                     </Card>
                   </Col>
 
-                  {/* CỘT PHẢI: BIỂU MẪU ĐỀ NGHỊ CẤP BẢN SAO */}
                   <Col xs={24} lg={10}>
                     <Card
                       title={
@@ -849,7 +796,6 @@ function MedicalRecordCopyPage() {
                           </Col>
                         </Row>
 
-                        {/* Văn bản ủy quyền nếu người yêu cầu không phải là chính bệnh nhân */}
                         <Form.Item
                           noStyle
                           shouldUpdate={(prev, curr) => prev.relationship !== curr.relationship}
@@ -902,7 +848,6 @@ function MedicalRecordCopyPage() {
                           <TextArea rows={2} placeholder="Nội dung ghi chú thêm..." disabled={!canUseFeature} />
                         </Form.Item>
 
-                        {/* TỔNG KẾT HỒ SƠ ĐÃ CHỌN */}
                         <div
                           style={{
                             padding: '10px 14px',
@@ -937,7 +882,6 @@ function MedicalRecordCopyPage() {
                           )}
                         </div>
 
-                        {/* NÚT THỰC HIỆN */}
                         <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
                           <Button
                             type="primary"
@@ -996,7 +940,6 @@ function MedicalRecordCopyPage() {
         ]}
       />
 
-      {/* MODAL XEM TRƯỚC VÀ IN BẢN SAO */}
       {selectedRecord && (
         <MedicalRecordCopyPreviewModal
           open={previewModalOpen}

@@ -71,8 +71,6 @@ const medicalRecordApi = {
   getAccessLogsByRecord: (medicalRecordId, params = {}) => {
     return axiosClient.get(`/medical-records/${medicalRecordId}/access-logs`, { params })
   },
-  // TODO: Endpoint pending backend implementation
-  // Expected: GET /api/v1/medical-records/{id}/export-copy -> binary PDF stream
   exportCopy: (medicalRecordId) => {
     return axiosClient.get(`/medical-records/${medicalRecordId}/export-copy`, {
       responseType: 'blob',

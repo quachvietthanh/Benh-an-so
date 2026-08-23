@@ -1,23 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   Button,
-  Descriptions,
-  Divider,
   Modal,
   Space,
   Spin,
-  Tag,
   Typography,
   message,
 } from 'antd'
 import {
-  CheckCircleOutlined,
   CloseOutlined,
   DownloadOutlined,
   FileProtectOutlined,
-  MedicineBoxOutlined,
   PrinterOutlined,
-  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import medicalRecordApi from '../../api/medicalRecordApi'
@@ -25,9 +19,6 @@ import systemApi from '../../api/systemApi'
 
 const { Title, Text, Paragraph } = Typography
 
-/**
- * Component tạo thanh mã vạch giả lập trực quan phục vụ in ấn
- */
 function BarcodeStrip({ code }) {
   if (!code) return null
   return (
@@ -54,9 +45,6 @@ function BarcodeStrip({ code }) {
   )
 }
 
-/**
- * Modal xem trước bản sao trích lục hồ sơ bệnh án theo mẫu chuẩn y tế A4
- */
 function MedicalRecordCopyPreviewModal({
   open,
   onClose,
@@ -81,9 +69,7 @@ function MedicalRecordCopyPreviewModal({
         .then((res) => {
           if (res.data) setClinic(res.data)
         })
-        .catch(() => {
-          // Sử dụng thông tin mặc định nếu chưa cấu hình
-        })
+        .catch(() => {})
         .finally(() => {
           setLoadingClinic(false)
         })
@@ -99,7 +85,6 @@ function MedicalRecordCopyPreviewModal({
   const visitCode = visit?.visitCode || record?.visitCode || 'VIS000001'
   const doctorName = visit?.doctorName || record?.doctorName || 'Bác sĩ điều trị'
 
-  // Format danh sách chẩn đoán
   const formattedDiagnoses = (diagnoses || [])
     .map((d) => {
       const code = d.diagnosisCode || d.code || ''
@@ -111,21 +96,15 @@ function MedicalRecordCopyPreviewModal({
     .filter(Boolean)
     .join('; ') || (record?.primaryIcdName ? `[${record.primaryIcdCode || 'ICD'}] ${record.primaryIcdName}` : 'Chưa ghi nhận')
 
-  // Thời gian
   const visitDate = visit?.visitAt ? dayjs(visit.visitAt) : (record?.createdAt ? dayjs(record.createdAt) : dayjs())
   const issueDate = dayjs()
 
-  // Clinic config
   const clinicName = clinic?.clinicName || 'PHÒNG KHÁM ĐA KHOA BỆNH ÁN SỐ'
   const clinicAddress = clinic?.address || '123 Đường Y Học, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh'
   const clinicPhone = clinic?.phone || clinic?.hotline || '1900 8888'
   const clinicLicense = clinic?.licenseNumber || '01234/BYT-GPHĐ'
 
-  /**
-   * Xử lý in bản sao qua IFrame Print chuẩn A4
-   */
   const handlePrint = () => {
-    // Kích hoạt callback ghi nhận nhật ký cấp bản sao (Postcondition)
     onIssued?.({
       recordId: record?.medicalRecordId || record?.id,
       patientId: patientData.id || patientData.patientId,
@@ -202,10 +181,6 @@ function MedicalRecordCopyPreviewModal({
     }, 250)
   }
 
-  /**
-   * Xử lý xuất file PDF trực tiếp từ Backend
-   * (Đã sẵn sàng kết nối API GET /medical-records/{id}/export-copy)
-   */
   const handleExportPdfBackend = async () => {
     const targetRecordId = record?.medicalRecordId || record?.id
     if (!targetRecordId) {
@@ -215,7 +190,6 @@ function MedicalRecordCopyPreviewModal({
 
     setExportingPdf(true)
     try {
-      // Ghi nhận nhật ký cấp bản sao (Postcondition)
       onIssued?.({
         recordId: targetRecordId,
         patientId: patientData.id || patientData.patientId,
@@ -226,10 +200,8 @@ function MedicalRecordCopyPreviewModal({
         action: 'EXPORT',
       })
 
-      // Gọi API xuất PDF từ backend
       const response = await medicalRecordApi.exportCopy(targetRecordId)
       
-      // Tạo đường link tải blob file
       const blob = new Blob([response.data], { type: 'application/pdf' })
       const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -330,7 +302,6 @@ function MedicalRecordCopyPreviewModal({
             lineHeight: 1.5,
           }}
         >
-          {/* HEADER: TÊN CƠ SỞ & QUỐC HIỆU TIÊU NGỮ */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 12 }}>
             <div style={{ maxWidth: '52%' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', textTransform: 'uppercase' }}>
@@ -359,7 +330,6 @@ function MedicalRecordCopyPreviewModal({
 
           <div style={{ borderBottom: '2px solid #1e3a8a', marginBottom: 14 }}></div>
 
-          {/* TIÊU ĐỀ BẢN SAO */}
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
             <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', color: '#1e3a8a' }}>
               BẢN SAO TRÍCH LỤC HỒ SƠ BỆNH ÁN
@@ -372,7 +342,6 @@ function MedicalRecordCopyPreviewModal({
             </div>
           </div>
 
-          {/* MỤC I: THÔNG TIN HÀNH CHÍNH BỆNH NHÂN */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: 3, marginBottom: 8 }}>
               I. THÔNG TIN HÀNH CHÍNH
@@ -413,7 +382,6 @@ function MedicalRecordCopyPreviewModal({
             </table>
           </div>
 
-          {/* MỤC II: QUÁ TRÌNH KHÁM & CHUYÊN MÔN BỆNH ÁN */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', paddingBottom: 3, marginBottom: 8 }}>
               II. QUÁ TRÌNH KHÁM BỆNH & ĐIỀU TRỊ
@@ -477,7 +445,6 @@ function MedicalRecordCopyPreviewModal({
             </table>
           </div>
 
-          {/* MỤC III: THÔNG TIN CẤP BẢN SAO HỒ SƠ */}
           <div
             style={{
               backgroundColor: '#f8fafc',
@@ -504,7 +471,6 @@ function MedicalRecordCopyPreviewModal({
             </div>
           </div>
 
-          {/* CHỮ KÝ XÁC NHẬN */}
           <div
             style={{
               display: 'flex',
