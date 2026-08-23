@@ -54,6 +54,7 @@ import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class IssueMedicalRecordCopyServiceTest {
@@ -97,7 +98,8 @@ class IssueMedicalRecordCopyServiceTest {
                 medicalRecordRepository, medicalRecordDiagnosisRepository, visitRepository,
                 patientRepository, userRepository, clinicConfigurationRepository,
                 pdfRenderer, currentUserPort, clockPort, auditLogRepository,
-                new MedicalRecordCopyAuditWriter(auditLogRepository), accessAuditService);
+                new MedicalRecordCopyAuditWriter(auditLogRepository), accessAuditService,
+                new ObjectMapper());
     }
 
     private IssueMedicalRecordCopyCommand command() {

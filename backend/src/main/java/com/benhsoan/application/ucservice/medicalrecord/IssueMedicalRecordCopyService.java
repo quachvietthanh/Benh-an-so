@@ -54,7 +54,6 @@ import lombok.RequiredArgsConstructor;
 public class IssueMedicalRecordCopyService implements IssueMedicalRecordCopyUseCase {
 
     private static final String PDF_CONTENT_TYPE = "application/pdf";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final MedicalRecordRepository medicalRecordRepository;
     private final MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
@@ -68,6 +67,7 @@ public class IssueMedicalRecordCopyService implements IssueMedicalRecordCopyUseC
     private final AuditLogRepository auditLogRepository;
     private final MedicalRecordCopyAuditWriter copyAuditWriter;
     private final MedicalRecordAccessAuditService accessAuditService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public MedicalRecordCopyResult issue(IssueMedicalRecordCopyCommand command) {
@@ -80,7 +80,13 @@ public class IssueMedicalRecordCopyService implements IssueMedicalRecordCopyUseC
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
         Patient patient = patientRepository.findById(visit.getPatientId())
                 .orElseThrow(() -> new PatientNotFoundException(visit.getPatientId()));
-        verifyRecipient(record, patient, command);
+        UUID actorId = currentUserPort.getCurrentUserId();
+        Instant now = clockPort.now();
+        if (command.recipientType() == MedicalRecordCopyRecipientType.PATIENT) {
+            verifyPatientIdentity(patient, command, record.getId(), actorId, now);
+        } else {
+            verifyAuthorizedRepresentative(command, record.getId(), actorId, now);
+        }
         User doctor = userRepository.findById(visit.getDoctorId())
                 .orElseThrow(() -> new UserNotFoundException(visit.getDoctorId().toString()));
         ClinicConfiguration clinic = clinicConfigurationRepository.find()
@@ -109,19 +115,22 @@ public class IssueMedicalRecordCopyService implements IssueMedicalRecordCopyUseC
         }
     }
 
-    private void verifyRecipient(MedicalRecord record, Patient patient, IssueMedicalRecordCopyCommand command) {
-        if (command.recipientType() == MedicalRecordCopyRecipientType.PATIENT) {
-            if (!matchesPatientIdentity(patient, command.recipientIdentityNumber())
-                    || !matchesPatientName(patient, command.recipientName())) {
-                writeDenialAudit(record, command, "Recipient identity does not match the medical record patient.");
-                throw new MedicalRecordUnauthorizedRecipientException(record.getId(), command.recipientName());
-            }
-            return;
+    private void verifyPatientIdentity(Patient patient, IssueMedicalRecordCopyCommand command,
+            UUID medicalRecordId, UUID actorId, Instant now) {
+        if (!matchesPatientIdentity(patient, command.recipientIdentityNumber())
+                || !matchesPatientName(patient, command.recipientName())) {
+            writeDenialAudit(medicalRecordId, actorId, command,
+                    "Recipient identity does not match the medical record patient.", now);
+            throw new MedicalRecordUnauthorizedRecipientException(medicalRecordId, command.recipientName());
         }
+    }
 
+    private void verifyAuthorizedRepresentative(IssueMedicalRecordCopyCommand command,
+            UUID medicalRecordId, UUID actorId, Instant now) {
         if (isBlank(command.authorizationDocumentNumber()) || isBlank(command.requestReason())) {
-            writeDenialAudit(record, command, "Authorization document is required for an authorized representative.");
-            throw new MedicalRecordMissingAuthorizationException(record.getId());
+            writeDenialAudit(medicalRecordId, actorId, command,
+                    "Authorization document is required for an authorized representative.", now);
+            throw new MedicalRecordMissingAuthorizationException(medicalRecordId);
         }
     }
 
@@ -135,24 +144,23 @@ public class IssueMedicalRecordCopyService implements IssueMedicalRecordCopyUseC
                 && patient.getFullName().trim().equalsIgnoreCase(trimToEmpty(recipientName));
     }
 
-    private void writeDenialAudit(MedicalRecord record, IssueMedicalRecordCopyCommand command, String reason) {
-        UUID issuedBy = currentUserPort.getCurrentUserId();
-        Instant issuedAt = clockPort.now();
+    private void writeDenialAudit(UUID medicalRecordId, UUID actorId, IssueMedicalRecordCopyCommand command,
+            String reason, Instant now) {
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("issuedBy", issuedBy.toString());
+        detail.put("issuedBy", actorId.toString());
         detail.put("recipientType", command.recipientType().name());
         detail.put("recipientName", command.recipientName());
         detail.put("recipientIdentityNumber", command.recipientIdentityNumber());
         detail.put("authorizationDocumentNumber", command.authorizationDocumentNumber());
         detail.put("requestReason", command.requestReason());
         detail.put("denialReason", reason);
-        detail.put("deniedAt", issuedAt.toString());
-        copyAuditWriter.writeDenied(issuedBy, record.getId(), toJson(detail), issuedAt);
+        detail.put("deniedAt", now.toString());
+        copyAuditWriter.writeDenied(actorId, medicalRecordId, toJson(detail), now);
     }
 
     private String toJson(Map<String, Object> detail) {
         try {
-            return OBJECT_MAPPER.writeValueAsString(detail);
+            return objectMapper.writeValueAsString(detail);
         } catch (Exception ex) {
             throw new IllegalStateException("Could not serialize medical record copy audit detail.", ex);
         }
