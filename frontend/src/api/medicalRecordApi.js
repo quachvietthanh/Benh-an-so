@@ -71,6 +71,11 @@ const medicalRecordApi = {
   getAccessLogsByRecord: (medicalRecordId, params = {}) => {
     return axiosClient.get(`/medical-records/${medicalRecordId}/access-logs`, { params })
   },
+  exportCopy: (medicalRecordId) => {
+    return axiosClient.get(`/medical-records/${medicalRecordId}/export-copy`, {
+      responseType: 'blob',
+    })
+  },
 }
 
 export default medicalRecordApi
