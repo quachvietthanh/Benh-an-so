@@ -1,7 +1,7 @@
 ALTER TABLE medical_records
-    ADD COLUMN IF NOT EXISTS signature_data TEXT NULL,
-    ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP WITH TIME ZONE NULL,
-    ADD COLUMN IF NOT EXISTS signed_by UUID NULL;
+    ADD COLUMN signature_data LONGTEXT NULL,
+    ADD COLUMN signed_at TIMESTAMP NULL,
+    ADD COLUMN signed_by BINARY(16) NULL;
 
 ALTER TABLE medical_records
     ADD CONSTRAINT fk_medical_records_signed_by

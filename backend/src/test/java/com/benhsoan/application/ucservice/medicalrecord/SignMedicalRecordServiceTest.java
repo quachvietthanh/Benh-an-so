@@ -80,7 +80,7 @@ class SignMedicalRecordServiceTest {
         Visit visit = activeVisit(doctorId);
 
         when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
-        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
         when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(record.getId())).thenReturn(true);
         when(clockPort.now()).thenReturn(now);
@@ -107,7 +107,7 @@ class SignMedicalRecordServiceTest {
         Visit visit = activeVisit(doctorId);
 
         when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
-        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
         when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(record.getId())).thenReturn(false);
         when(clockPort.now()).thenReturn(now);
@@ -126,7 +126,7 @@ class SignMedicalRecordServiceTest {
         Visit visit = activeVisit(doctorId);
 
         when(authorizationService.requireWriteAccess()).thenReturn(otherDoctorId);
-        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
         when(clockPort.now()).thenReturn(now);
 
@@ -146,7 +146,7 @@ class SignMedicalRecordServiceTest {
         record.sign("EXISTING_SIG", doctorId, now);
 
         when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
-        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
 
         assertThrows(MedicalRecordAlreadyLockedException.class,
                 () -> service.sign(record.getId(), new SignMedicalRecordCommand("NEW_SIG")));
@@ -159,7 +159,7 @@ class SignMedicalRecordServiceTest {
     void recordNotFoundThrowsException() {
         UUID recordId = UUID.randomUUID();
         when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
-        when(medicalRecordRepository.findByIdForUpdate(recordId)).thenReturn(Optional.empty());
+        when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.empty());
 
         assertThrows(MedicalRecordNotFoundException.class,
                 () -> service.sign(recordId, new SignMedicalRecordCommand(null)));
@@ -176,7 +176,7 @@ class SignMedicalRecordServiceTest {
         );
 
         when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
-        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
 
         assertThrows(MedicalRecordInvalidVisitException.class,
@@ -190,7 +190,7 @@ class SignMedicalRecordServiceTest {
         Visit visit = activeVisit(doctorId);
 
         when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
-        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
         when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(record.getId())).thenReturn(true);
         when(clockPort.now()).thenReturn(now);

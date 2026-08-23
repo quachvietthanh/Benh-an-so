@@ -42,7 +42,7 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
     public MedicalRecordResult sign(UUID medicalRecordId, SignMedicalRecordCommand command) {
         UUID userId = authorizationService.requireWriteAccess();
 
-        MedicalRecord record = medicalRecordRepository.findByIdForUpdate(medicalRecordId)
+        MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
 
         if (record.isContentLocked()) {

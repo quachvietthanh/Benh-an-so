@@ -19,6 +19,7 @@ export const formatRecordStatus = (status) => {
   const map = {
     DRAFT: { label: 'Bản nháp', color: 'default' },
     OPEN: { label: 'Đang mở', color: 'processing' },
+    SIGNED: { label: 'Đã ký', color: 'cyan' },
     LOCKED: { label: 'Đã khóa', color: 'green' },
     ARCHIVED: { label: 'Đã lưu trữ', color: 'purple' },
     NEW: { label: 'Mới', color: 'blue' },

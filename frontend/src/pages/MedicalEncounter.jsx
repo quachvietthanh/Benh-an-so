@@ -21,12 +21,16 @@ import {
 } from 'antd'
 import {
   CheckCircleOutlined,
+  CheckCircleFilled,
   CheckOutlined,
   EyeOutlined,
   MedicineBoxOutlined,
   PrinterOutlined,
   SearchOutlined,
   SolutionOutlined,
+  SafetyCertificateOutlined,
+  SafetyCertificateFilled,
+  LockOutlined,
 } from '@ant-design/icons'
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
@@ -35,6 +39,9 @@ import queueApi from '../api/queueApi'
 import systemApi from '../api/systemApi'
 import visitApi from '../api/visitApi'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
+import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
+import MedicalRecordSignatureStamp from '../components/clinical/MedicalRecordSignatureStamp'
+import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { useAuthContext } from '../context/AuthContext'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
@@ -114,6 +121,8 @@ function MedicalEncounter() {
 
   const [encounter, setEncounter] = useState(null)
   const [currentRecordId, setCurrentRecordId] = useState(null)
+  const [medicalRecord, setMedicalRecord] = useState(null)
+  const [signModalOpen, setSignModalOpen] = useState(false)
   const [records, setRecords] = useState([])
   const [clinicalServices, setClinicalServices] = useState([])
   const [serviceCatalogError, setServiceCatalogError] = useState('')
@@ -122,6 +131,11 @@ function MedicalEncounter() {
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('current')
   const [viewing, setViewing] = useState(null)
+
+  const isRecordSigned = useMemo(() => {
+    const status = medicalRecord?.status || encounter?.medicalRecord?.status
+    return isMedicalRecordSigned(status)
+  }, [medicalRecord?.status, encounter?.medicalRecord?.status])
 
   const [vitalSigns, setVitalSigns] = useState({
     bp: '',
@@ -198,11 +212,13 @@ function MedicalEncounter() {
   const hydrateRecord = useCallback((detail) => {
     if (!detail) {
       setCurrentRecordId(null)
+      setMedicalRecord(null)
       setPrimaryIcd(null)
       setSecondaryIcds([])
       return
     }
 
+    setMedicalRecord(detail)
     const cleanPrimaryName = fixMojibake(detail.primaryIcdName)
     const cleanConclusion = fixMojibake(detail.conclusion)
 
@@ -242,6 +258,33 @@ function MedicalEncounter() {
         })),
     )
   }, [form])
+
+  const handleOpenSignFlow = useCallback(async () => {
+    if (!canEditEncounter) {
+      message.error('Bạn không có quyền ký bệnh án.')
+      return
+    }
+    if (isRecordSigned) {
+      setSignModalOpen(true)
+      return
+    }
+    if (!currentRecordId) {
+      Modal.confirm({
+        title: 'Lưu bệnh án trước khi ký',
+        content: 'Bệnh án cần được lưu vào hệ thống trước khi tiến hành ký xác nhận. Bạn có muốn lưu bệnh án ngay bây giờ không?',
+        okText: 'Lưu & Tiếp tục ký',
+        cancelText: 'Hủy',
+        onOk: async () => {
+          const savedId = await saveRecord({ showModal: false })
+          if (savedId) {
+            setSignModalOpen(true)
+          }
+        },
+      })
+      return
+    }
+    setSignModalOpen(true)
+  }, [canEditEncounter, isRecordSigned, currentRecordId])
 
   const loadWorkflow = useCallback(async () => {
     if (!visitId) return
@@ -580,14 +623,14 @@ function MedicalEncounter() {
     })
   }
 
-  const saveRecord = async () => {
+  const saveRecord = async (options = { showModal: true }) => {
     if (!visitId || !encounter) {
       message.error('Không có visitId hợp lệ để lưu bệnh án.')
-      return
+      return null
     }
     if (!encounter.queueItem?.id) {
       message.error('Không có thông tin lượt khám trong hàng đợi để lưu bệnh án.')
-      return
+      return null
     }
 
     let values
@@ -595,17 +638,17 @@ function MedicalEncounter() {
       values = await form.validateFields()
     } catch {
       message.error('Vui lòng nhập triệu chứng và thông tin khám bắt buộc.')
-      return
+      return null
     }
 
     if (!primaryIcd) {
       message.error('Vui lòng chọn chẩn đoán chính từ danh mục ICD-10.')
-      return
+      return null
     }
 
     if (selectedOrders.some((item) => !item.id)) {
       message.error('Phiếu chỉ định chứa dịch vụ chưa hợp lệ trong hệ thống.')
-      return
+      return null
     }
 
     if (selectedOrders.length > 0) {
@@ -615,7 +658,7 @@ function MedicalEncounter() {
       )
       if (orderBlockReason) {
         message.error(orderBlockReason)
-        return
+        return null
       }
     }
 
@@ -650,6 +693,7 @@ function MedicalEncounter() {
       persistedRecordId = recordResponse.data?.id || persistedRecordId
       if (!persistedRecordId) throw new Error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
       setCurrentRecordId(persistedRecordId)
+      setMedicalRecord((prev) => ({ ...prev, ...recordResponse.data, medicalRecordId: persistedRecordId }))
 
       await medicalRecordApi.recordDiagnosis(
         persistedRecordId,
@@ -712,21 +756,25 @@ function MedicalEncounter() {
       message.success('Đã lưu bệnh án, chẩn đoán và chỉ định thành công.')
       await loadWorkflow()
       if (liveQueueItem.status === 'WAITING_FOR_RESULT') {
-        Modal.confirm({
-          title: 'Lượt khám đang chờ kết quả cận lâm sàng',
-          content: continuationBlockReason,
-          okText: 'Về hàng đợi',
-          cancelText: 'Ở lại bệnh án',
-          onOk: () => navigate('/appointments'),
-        })
-      } else {
+        if (options?.showModal !== false) {
+          Modal.confirm({
+            title: 'Lượt khám đang chờ kết quả cận lâm sàng',
+            content: continuationBlockReason,
+            okText: 'Về hàng đợi',
+            cancelText: 'Ở lại bệnh án',
+            onOk: () => navigate('/appointments'),
+          })
+        }
+      } else if (options?.showModal !== false) {
         showSuccessModal(persistedRecordId)
       }
+      return persistedRecordId
     } catch (error) {
       const prefix = persistedRecordId
         ? `Bệnh án ${persistedRecordId} đã được lưu nhưng một bước đồng bộ chưa hoàn tất. `
         : ''
       message.error(prefix + getApiMessage(error, 'Không thể lưu bệnh án.'))
+      return null
     } finally {
       setSaving(false)
     }
@@ -800,7 +848,7 @@ function MedicalEncounter() {
           <Text type="secondary">Bệnh án được gắn cố định với lượt khám và số thứ tự trong hàng đợi khám.</Text>
         </div>
         {canEditEncounter && (
-          <Space>
+          <Space wrap>
             {selectedOrders.length > 0 && (
               <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
                 In phiếu chỉ định
@@ -814,9 +862,54 @@ function MedicalEncounter() {
                 Chuyển sang kê đơn
               </Button>
             )}
-            <Button type="primary" size="large" loading={saving} icon={<CheckCircleOutlined />} onClick={saveRecord}>
-              {currentRecordId ? 'Cập nhật bệnh án' : 'Lưu bệnh án'}
-            </Button>
+            {!isRecordSigned ? (
+              <>
+                <Button
+                  type="primary"
+                  size="large"
+                  loading={saving}
+                  icon={<CheckCircleOutlined />}
+                  onClick={() => saveRecord()}
+                >
+                  {currentRecordId ? 'Cập nhật bệnh án' : 'Lưu bệnh án'}
+                </Button>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<SafetyCertificateOutlined />}
+                  onClick={handleOpenSignFlow}
+                  style={{
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    borderColor: '#16a34a',
+                    fontWeight: 600,
+                  }}
+                >
+                  Ký bệnh án
+                </Button>
+              </>
+            ) : (
+              <Space>
+                <Tag
+                  color="success"
+                  style={{
+                    fontSize: 13,
+                    padding: '6px 12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontWeight: 700,
+                  }}
+                >
+                  <SafetyCertificateFilled /> BỆNH ÁN ĐÃ KÝ & KHÓA
+                </Tag>
+                <Button
+                  icon={<SafetyCertificateOutlined />}
+                  onClick={() => setSignModalOpen(true)}
+                >
+                  Xem chứng thư ký số
+                </Button>
+              </Space>
+            )}
           </Space>
         )}
       </div>
@@ -850,8 +943,14 @@ function MedicalEncounter() {
           </Descriptions.Item>
           <Descriptions.Item label="Trạng thái bệnh án">
             {(() => {
-              const formatted = formatRecordStatus(encounter?.medicalRecord?.status)
-              return <Tag color={formatted.color}>{formatted.label}</Tag>
+              const currentStatus = medicalRecord?.status || encounter?.medicalRecord?.status
+              const formatted = formatRecordStatus(currentStatus)
+              return (
+                <Space size={4}>
+                  <Tag color={formatted.color}>{formatted.label}</Tag>
+                  {isRecordSigned && <SafetyCertificateFilled style={{ color: '#16a34a' }} />}
+                </Space>
+              )
             })()}
           </Descriptions.Item>
         </Descriptions>
@@ -872,7 +971,7 @@ function MedicalEncounter() {
         showIcon
         type="info"
         message="Quy trình theo lượt khám"
-        description="1. Xác nhận thông tin lượt khám → 2. Khám và chọn chẩn đoán ICD-10 → 3. Chỉ định cận lâm sàng (nếu cần) → 4. Chờ kết quả CĐLS → 5. Chuyển sang kê đơn thuốc."
+        description="1. Xác nhận thông tin lượt khám → 2. Khám và chọn chẩn đoán ICD-10 → 3. Chỉ định cận lâm sàng (nếu cần) → 4. Ký xác nhận & khóa bệnh án → 5. Chuyển sang kê đơn thuốc."
         style={{ marginBottom: 16 }}
       />
 
@@ -883,11 +982,18 @@ function MedicalEncounter() {
         items={[
           {
             key: 'current',
-            label: <span><SolutionOutlined /> Khám & chẩn đoán</span>,
+            label: (
+              <span>
+                <SolutionOutlined /> Khám & chẩn đoán {isRecordSigned && <Tag color="success" style={{ marginLeft: 4 }}>Đã ký</Tag>}
+              </span>
+            ),
             children: (
               <MedicalEncounterForm
                 form={form}
                 isDoctor={canEditEncounter}
+                isSigned={isRecordSigned}
+                medicalRecord={medicalRecord || encounter?.medicalRecord}
+                onOpenSignModal={handleOpenSignFlow}
                 encounterContext={encounter}
                 selectedPatientObj={selectedPatientObj}
                 vitalSigns={vitalSigns}
@@ -1034,6 +1140,17 @@ function MedicalEncounter() {
       >
         {viewing && (
           <>
+            {isMedicalRecordSigned(viewing.status) && (
+              <div style={{ marginBottom: 16 }}>
+                <MedicalRecordSignatureStamp
+                  signatureData={viewing.signatureData}
+                  signedAt={viewing.signedAt}
+                  signedBy={viewing.signedBy}
+                  doctorName={viewing.doctorName || 'Bác sĩ phụ trách'}
+                  status={viewing.status}
+                />
+              </div>
+            )}
             <Descriptions bordered column={1} size="small">
               <Descriptions.Item label="Medical record ID">{viewing.medicalRecordId}</Descriptions.Item>
               <Descriptions.Item label="Visit">{viewing.visitCode || viewing.visitId}</Descriptions.Item>
@@ -1055,6 +1172,27 @@ function MedicalEncounter() {
           </>
         )}
       </Modal>
+
+      {signModalOpen && (
+        <SignMedicalRecordModal
+          open={signModalOpen}
+          onClose={() => setSignModalOpen(false)}
+          onSuccess={async (signedData) => {
+            setMedicalRecord((prev) => ({ ...prev, ...signedData, status: 'SIGNED' }))
+            await loadWorkflow()
+          }}
+          recordId={currentRecordId}
+          encounterContext={encounter}
+          patient={selectedPatientObj}
+          formValues={form.getFieldsValue()}
+          vitalSigns={vitalSigns}
+          bmiValue={bmiValue}
+          primaryIcd={primaryIcd}
+          secondaryIcds={secondaryIcds}
+          selectedOrders={selectedOrders}
+          currentUser={user}
+        />
+      )}
 
       {printModalOpen && (
         <React.Suspense fallback={<Spin size="small" />}>
