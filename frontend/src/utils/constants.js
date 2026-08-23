@@ -12,6 +12,7 @@ export const GENDER_OPTIONS = [
 export const RECORD_STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Bản nháp', color: 'default' },
   { value: 'OPEN', label: 'Đang mở', color: 'processing' },
+  { value: 'SIGNED', label: 'Đã ký', color: 'cyan' },
   { value: 'LOCKED', label: 'Đã khóa', color: 'green' },
   { value: 'ARCHIVED', label: 'Đã lưu trữ', color: 'purple' },
   { value: 'NEW', label: 'Mới', color: 'blue' },

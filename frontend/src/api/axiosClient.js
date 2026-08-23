@@ -1,11 +1,13 @@
 import axios from 'axios'
 import { normalizeApiError } from '../utils/apiError.js'
 
+import { API_TIMEOUT } from '../utils/constants.js'
+
 const configuredBaseUrl = import.meta.env?.VITE_API_BASE_URL
 
 const axiosClient = axios.create({
   baseURL: configuredBaseUrl || 'http://localhost:8080/api/v1',
-  timeout: 10000,
+  timeout: API_TIMEOUT || 30000,
   headers: {
     'Content-Type': 'application/json',
   },

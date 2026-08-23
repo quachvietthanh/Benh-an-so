@@ -33,6 +33,7 @@ import {
 import { icd10Categories } from '../../utils/icd10Data'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
+import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
 
 const { Title, Text } = Typography
 
@@ -51,6 +52,8 @@ const categoryMeta = {
 function MedicalEncounterForm({
   form,
   isDoctor,
+  isSigned = false,
+  medicalRecord = null,
   encounterContext,
   selectedPatientObj,
   vitalSigns,
@@ -81,6 +84,7 @@ function MedicalEncounterForm({
   totalOrderFee,
   setPrintModalOpen,
   serviceCatalogError,
+  onOpenSignModal,
 }) {
   const [icdTableSearch, setIcdTableSearch] = useState('')
   const [icdTableCategory, setIcdTableCategory] = useState('ALL')
@@ -105,7 +109,18 @@ function MedicalEncounterForm({
   const hasCompletePricing = selectedOrders.every((order) => order.price != null)
 
   return (
-    <Form form={form} layout="vertical" disabled={!isDoctor}>
+    <Form form={form} layout="vertical" disabled={!isDoctor || isSigned}>
+      {isSigned && (
+        <div style={{ marginBottom: 16 }}>
+          <MedicalRecordSignatureStamp
+            signatureData={medicalRecord?.signatureData}
+            signedAt={medicalRecord?.signedAt}
+            signedBy={medicalRecord?.signedBy}
+            doctorName={encounterContext?.doctor?.fullName || 'Bác sĩ phụ trách'}
+            status={medicalRecord?.status || 'SIGNED'}
+          />
+        </div>
+      )}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
           <Card

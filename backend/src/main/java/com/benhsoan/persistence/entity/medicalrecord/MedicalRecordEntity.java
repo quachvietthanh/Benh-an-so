@@ -61,7 +61,7 @@ public class MedicalRecordEntity {
     @Column(name = "status", nullable = false, length = 30)
     private MedicalRecordStatus status;
 
-    @Column(name = "signature_data", columnDefinition = "TEXT")
+    @Column(name = "signature_data", columnDefinition = "LONGTEXT")
     private String signatureData;
 
     @Column(name = "signed_at")
