@@ -140,7 +140,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("MEDICAL_RECORD_MISSING_DIAGNOSIS", missingDiagnosis.getBody().code());
         assertEquals(403, unauthorizedSigner.getStatusCode().value());
         assertEquals("MEDICAL_RECORD_UNAUTHORIZED_SIGNER", unauthorizedSigner.getBody().code());
-        assertEquals(409, notSigned.getStatusCode().value());
+        assertEquals(400, notSigned.getStatusCode().value());
         assertEquals("MEDICAL_RECORD_NOT_SIGNED", notSigned.getBody().code());
     }
 

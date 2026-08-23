@@ -4,8 +4,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +27,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.IssueMedicalRecordCopyRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ReplaceMedicalRecordDiagnosesRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
@@ -38,6 +43,7 @@ import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
+import com.benhsoan.port.inbound.medicalrecord.IssueMedicalRecordCopyUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
@@ -63,6 +69,7 @@ public class MedicalRecordController {
     private final GetMedicalRecordAccessLogsUseCase getMedicalRecordAccessLogsUseCase;
     private final GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
     private final ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
+    private final IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
     private final MedicalRecordDiagnosisRestMapper diagnosisMapper;
@@ -134,6 +141,20 @@ public class MedicalRecordController {
     @RequirePermission("MEDICAL_RECORD_UPDATE_STATUS")
     public MedicalRecordResponse archive(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(archiveMedicalRecordUseCase.archive(medicalRecordId));
+    }
+
+    @PostMapping("/{medicalRecordId}/copy")
+    @RequirePermission("MEDICAL_RECORD_COPY")
+    public ResponseEntity<ByteArrayResource> issueCopy(
+            @PathVariable UUID medicalRecordId,
+            @Valid @RequestBody IssueMedicalRecordCopyRequest request
+    ) {
+        var result = issueMedicalRecordCopyUseCase.issue(mapper.toCommand(medicalRecordId, request));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.fileName() + "\"")
+                .contentType(MediaType.parseMediaType(result.contentType()))
+                .contentLength(result.content().length)
+                .body(new ByteArrayResource(result.content()));
     }
 
     @DeleteMapping("/{medicalRecordId}")
