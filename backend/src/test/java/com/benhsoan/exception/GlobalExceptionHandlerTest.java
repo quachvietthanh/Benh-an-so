@@ -125,11 +125,23 @@ class GlobalExceptionHandlerTest {
         var invalidCredentials = handler.handleDomainException(new InvalidCredentialsException(), request);
         var doctorNotAssigned = handler.handleDomainException(
                 new DoctorNotAssignedToRoomException(UUID.randomUUID()), request);
+        var missingDiagnosis = handler.handleDomainException(
+                new com.benhsoan.domain.medicalrecord.exception.MedicalRecordMissingDiagnosisException(UUID.randomUUID()), request);
+        var unauthorizedSigner = handler.handleDomainException(
+                new com.benhsoan.domain.medicalrecord.exception.MedicalRecordUnauthorizedSignerException(UUID.randomUUID(), UUID.randomUUID()), request);
+        var notSigned = handler.handleDomainException(
+                new com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotSignedException(UUID.randomUUID()), request);
 
         assertEquals(401, invalidCredentials.getStatusCode().value());
         assertEquals("INVALID_CREDENTIALS", invalidCredentials.getBody().code());
         assertEquals(409, doctorNotAssigned.getStatusCode().value());
         assertEquals("DOCTOR_NOT_ASSIGNED_TO_ROOM", doctorNotAssigned.getBody().code());
+        assertEquals(400, missingDiagnosis.getStatusCode().value());
+        assertEquals("MEDICAL_RECORD_MISSING_DIAGNOSIS", missingDiagnosis.getBody().code());
+        assertEquals(403, unauthorizedSigner.getStatusCode().value());
+        assertEquals("MEDICAL_RECORD_UNAUTHORIZED_SIGNER", unauthorizedSigner.getBody().code());
+        assertEquals(409, notSigned.getStatusCode().value());
+        assertEquals("MEDICAL_RECORD_NOT_SIGNED", notSigned.getBody().code());
     }
 
     @Test

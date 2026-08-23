@@ -52,6 +52,7 @@ class AmendMedicalRecordServiceTest {
         Instant now = Instant.parse("2026-08-20T02:00:00Z");
         MedicalRecord record = MedicalRecord.create(visitId, "Headache", null, null, null, null, null, null,
                 "Stable", userId, now);
+        record.sign("SIG", userId, now);
         record.lock(userId, now);
         record = MedicalRecord.restore(recordId, record.getVisitId(), record.getChiefComplaint(), record.getSymptoms(),
                 record.getMedicalHistory(), record.getPhysicalExamination(), record.getClinicalProgress(), record.getTreatmentPlan(),
@@ -80,6 +81,7 @@ class AmendMedicalRecordServiceTest {
         Instant now = Instant.parse("2026-08-20T02:00:00Z");
         MedicalRecord draft = MedicalRecord.create(visitId, "Headache", null, null, null, null, null, null,
                 "Stable", userId, now);
+        draft.sign("SIG", userId, now);
         draft.lock(userId, now);
         MedicalRecord record = MedicalRecord.restore(recordId, draft.getVisitId(), draft.getChiefComplaint(),
                 draft.getSymptoms(), draft.getMedicalHistory(), draft.getPhysicalExamination(),

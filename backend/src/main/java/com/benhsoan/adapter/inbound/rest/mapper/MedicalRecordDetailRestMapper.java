@@ -35,7 +35,8 @@ public class MedicalRecordDetailRestMapper {
                 result.medicalRecordId(), result.chiefComplaint(), result.symptoms(),
                 result.medicalHistory(), result.physicalExamination(), result.clinicalProgress(),
                 result.treatmentPlan(), result.doctorInstructions(), result.conclusion(),
-                result.status(), result.lockedAt(), result.lockedBy(),
+                result.status(), result.signatureData(), result.signedAt(), result.signedBy(),
+                result.lockedAt(), result.lockedBy(),
                 result.primaryIcdCode(), result.primaryIcdName(), result.secondaryIcdCodes(),
                 diagnoses
         );

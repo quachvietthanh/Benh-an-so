@@ -1,9 +1,10 @@
 import React from 'react'
-import { AppstoreOutlined, DatabaseOutlined, KeyOutlined, SafetyCertificateOutlined, SettingOutlined, TeamOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, CloudServerOutlined, DatabaseOutlined, KeyOutlined, SafetyCertificateOutlined, SettingOutlined, TeamOutlined } from '@ant-design/icons'
 import { Tabs, Typography } from 'antd'
 import BackupRestorePage from './BackupRestorePage'
 import ClinicConfigurationPage from './ClinicConfigurationPage'
 import MedicalRecordAccessLogsPage from './MedicalRecordAccessLogsPage'
+import PrescriptionInterconnectionPage from './PrescriptionInterconnectionPage'
 import RolePermissionsPage from './RolePermissionsPage'
 import ServicesPage from './ServicesPage'
 import UsersPage from './UsersPage'
@@ -23,8 +24,14 @@ function SystemManagementPage() {
   const canViewServices = userPermissions.includes('SERVICE_CATALOG_READ') || isAdmin
   const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || isAdmin
   const canViewBackup = userPermissions.includes('BACKUP_READ') || isAdmin
+  const canViewInterconnections = userPermissions.includes('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin || userRoles.includes('manager') || userRoles.includes('clinic_manager')
 
   const tabItems = [
+    canViewInterconnections && {
+      key: 'interconnections',
+      label: <span><CloudServerOutlined /> Liên thông đơn thuốc</span>,
+      children: <PrescriptionInterconnectionPage />,
+    },
     canViewConfig && {
       key: 'clinic-config',
       label: <span><SettingOutlined /> Cấu hình phòng khám</span>,

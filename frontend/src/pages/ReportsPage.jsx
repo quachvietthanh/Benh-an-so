@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Button,
   Card,
   DatePicker,
+  Radio,
   Select,
   Space,
   Tabs,
+  Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd'
@@ -18,6 +22,7 @@ import {
   FileSearchOutlined,
   LineChartOutlined,
   MedicineBoxOutlined,
+  PrinterOutlined,
   ReloadOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -34,7 +39,7 @@ import {
   validateExportParams,
 } from '../utils/reportExportHelpers'
 import ReportStatCards from '../components/reporting/ReportStatCards'
-import ManagerPermissionAlert from '../components/reporting/ManagerPermissionAlert'
+import ReportPrintTemplateModal from '../components/reporting/ReportPrintTemplateModal'
 import OverviewReportView from '../components/reporting/OverviewReportView'
 import VisitReportView from '../components/reporting/VisitReportView'
 import DoctorVisitsReportView from '../components/reporting/DoctorVisitsReportView'
@@ -51,10 +56,13 @@ import {
 } from '../utils/storageHelpers'
 
 const { RangePicker } = DatePicker
-const { Title, Paragraph } = Typography
+const { Title, Paragraph, Text } = Typography
+
+const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit']
 
 function ReportsPage() {
   const { user } = useAuthContext()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -63,10 +71,24 @@ function ReportsPage() {
   const canViewReports = userPermissions.includes('REPORT_VIEW')
   const canExportReports = userPermissions.includes('REPORT_EXPORT')
 
-  const [range, setRange] = useState([dayjs().subtract(29, 'day'), dayjs()])
+  // URL parameters parsing
+  const urlTab = searchParams.get('tab')
+  const initialTab = VALID_TABS.includes(urlTab) ? urlTab : 'visits'
+
+  const urlFrom = searchParams.get('from')
+  const urlTo = searchParams.get('to')
+  const initialRange = useMemo(() => {
+    if (urlFrom && urlTo && dayjs(urlFrom).isValid() && dayjs(urlTo).isValid()) {
+      return [dayjs(urlFrom), dayjs(urlTo)]
+    }
+    return [dayjs().subtract(29, 'day'), dayjs()]
+  }, [urlFrom, urlTo])
+
+  const [range, setRange] = useState(initialRange)
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [activeTab, setActiveTab] = useState('visits')
+  const [printModalOpen, setPrintModalOpen] = useState(false)
   const [loadError, setLoadError] = useState('')
 
   const [summary, setSummary] = useState({
@@ -89,6 +111,46 @@ function ReportsPage() {
     () => (range?.[1] ? range[1].format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')),
     [range],
   )
+
+  // Synchronize state with URL query parameters
+  const updateUrlParams = useCallback((newTab, newRange) => {
+    const from = newRange?.[0] ? newRange[0].format('YYYY-MM-DD') : fromStr
+    const to = newRange?.[1] ? newRange[1].format('YYYY-MM-DD') : toStr
+    setSearchParams(
+      {
+        tab: newTab || activeTab,
+        from,
+        to,
+      },
+      { replace: true },
+    )
+  }, [activeTab, fromStr, toStr, setSearchParams])
+
+  const handleRangeChange = (newRange) => {
+    if (newRange && newRange[0] && newRange[1]) {
+      setRange(newRange)
+      updateUrlParams(activeTab, newRange)
+    }
+  }
+
+  const handleQuickPreset = (presetType) => {
+    let newRange = [dayjs().subtract(29, 'day'), dayjs()]
+    if (presetType === 'TODAY') {
+      newRange = [dayjs().startOf('day'), dayjs().endOf('day')]
+    } else if (presetType === 'YESTERDAY') {
+      newRange = [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')]
+    } else if (presetType === '7DAYS') {
+      newRange = [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')]
+    } else if (presetType === '30DAYS') {
+      newRange = [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')]
+    } else if (presetType === 'THIS_MONTH') {
+      newRange = [dayjs().startOf('month'), dayjs().endOf('month')]
+    } else if (presetType === 'THIS_YEAR') {
+      newRange = [dayjs().startOf('year'), dayjs().endOf('year')]
+    }
+    setRange(newRange)
+    updateUrlParams(activeTab, newRange)
+  }
 
   const getParams = useCallback(() => ({
     from: fromStr,
@@ -238,6 +300,7 @@ function ReportsPage() {
 
   const handleTabChange = (key) => {
     setActiveTab(key)
+    updateUrlParams(key, range)
     if (key === 'visits') {
       setSelectedReportType('VISIT_REPORT')
     } else if (key === 'revenue') {
@@ -295,6 +358,7 @@ function ReportsPage() {
 
   return (
     <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '16px 20px', paddingBottom: 40 }}>
+      {/* Header Block */}
       <div
         style={{
           display: 'flex',
@@ -328,9 +392,11 @@ function ReportsPage() {
           <RangePicker
             value={range}
             format="DD/MM/YYYY"
-            onChange={(val) => val && setRange(val)}
+            onChange={handleRangeChange}
             allowClear={false}
             presets={[
+              { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+              { label: 'Hôm qua', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
               { label: '7 ngày qua', value: [dayjs().subtract(6, 'day'), dayjs()] },
               { label: '30 ngày qua', value: [dayjs().subtract(29, 'day'), dayjs()] },
               { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
@@ -342,12 +408,21 @@ function ReportsPage() {
                 ],
               },
               { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
+              { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
             ]}
             style={{ borderRadius: 8, padding: '6px 12px' }}
           />
 
           <Button icon={<ReloadOutlined />} loading={loading} onClick={loadData}>
             Làm mới
+          </Button>
+
+          <Button
+            icon={<PrinterOutlined />}
+            onClick={() => setPrintModalOpen(true)}
+            style={{ borderRadius: 8 }}
+          >
+            In báo cáo
           </Button>
 
           {canExportReports && (
@@ -364,6 +439,34 @@ function ReportsPage() {
           )}
         </Space>
       </div>
+
+      {/* Quick Date Presets Bar */}
+      <Card
+        size="small"
+        style={{
+          marginBottom: 16,
+          borderRadius: 10,
+          background: '#ffffff',
+          borderColor: '#e2e8f0',
+        }}
+        styles={{ body: { padding: '8px 14px' } }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <Space size={6} align="center" wrap>
+            <CalendarOutlined style={{ color: '#2563eb', marginRight: 4 }} />
+            <Text strong style={{ fontSize: 13, color: '#334155' }}>Chọn nhanh thời gian:</Text>
+            <Button size="small" onClick={() => handleQuickPreset('TODAY')}>Hôm nay</Button>
+            <Button size="small" onClick={() => handleQuickPreset('7DAYS')}>7 ngày</Button>
+            <Button size="small" onClick={() => handleQuickPreset('30DAYS')}>30 ngày</Button>
+            <Button size="small" onClick={() => handleQuickPreset('THIS_MONTH')}>Tháng này</Button>
+            <Button size="small" onClick={() => handleQuickPreset('THIS_YEAR')}>Năm nay</Button>
+          </Space>
+
+          <div style={{ fontSize: 12.5, color: '#64748b' }}>
+            Khoảng thời gian đang chọn: <Text strong style={{ color: '#2563eb' }}>{fromStr}</Text> đến <Text strong style={{ color: '#2563eb' }}>{toStr}</Text>
+          </div>
+        </div>
+      </Card>
 
       {!canViewReports && (
         <Alert
@@ -386,8 +489,14 @@ function ReportsPage() {
         />
       ) : null}
 
-      <ReportStatCards summary={summary} />
+      {/* Interactive KPI Stat Cards (Click switches active tab) */}
+      <ReportStatCards
+        summary={summary}
+        activeTab={activeTab}
+        onSelectTab={handleTabChange}
+      />
 
+      {/* Main Tabs Navigation */}
       <Card
         style={{
           borderRadius: 14,
@@ -395,7 +504,7 @@ function ReportsPage() {
           border: '1px solid #f1f5f9',
           marginBottom: 20,
         }}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
       >
         <Tabs
           activeKey={activeTab}
@@ -405,7 +514,7 @@ function ReportsPage() {
             {
               key: 'overview',
               label: (
-                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                   <DashboardOutlined /> Tổng quan vận hành
                 </span>
               ),
@@ -413,7 +522,7 @@ function ReportsPage() {
             {
               key: 'visits',
               label: (
-                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                   <LineChartOutlined /> Báo cáo lượt khám
                 </span>
               ),
@@ -421,7 +530,7 @@ function ReportsPage() {
             {
               key: 'doctor-visits',
               label: (
-                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                   <UserOutlined /> Lượt khám theo bác sĩ
                 </span>
               ),
@@ -429,7 +538,7 @@ function ReportsPage() {
             {
               key: 'revenue',
               label: (
-                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                   <DollarCircleOutlined /> Báo cáo doanh thu
                 </span>
               ),
@@ -437,7 +546,7 @@ function ReportsPage() {
             {
               key: 'medicines',
               label: (
-                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                   <MedicineBoxOutlined /> Báo cáo thuốc dùng nhiều
                 </span>
               ),
@@ -445,7 +554,7 @@ function ReportsPage() {
             {
               key: 'audit',
               label: (
-                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                   <FileSearchOutlined /> Nhật ký truy cập bệnh án
                 </span>
               ),
@@ -454,6 +563,7 @@ function ReportsPage() {
         />
       </Card>
 
+      {/* Tab Views */}
       <div>
         {activeTab === 'overview' && (
           <OverviewReportView summary={summary} />
@@ -468,13 +578,16 @@ function ReportsPage() {
         )}
 
         {activeTab === 'doctor-visits' && (
-          <DoctorVisitsReportView initialRange={range} />
+          <DoctorVisitsReportView
+            range={range}
+            initialRange={range}
+          />
         )}
 
         {activeTab === 'revenue' && (
           <RevenueReportView
             range={range}
-            onRangeChange={setRange}
+            onRangeChange={handleRangeChange}
             invoices={invoicesList}
             loading={loading}
             onRefresh={loadData}
@@ -495,6 +608,18 @@ function ReportsPage() {
           />
         )}
       </div>
+
+      {/* Print Report Preview Modal */}
+      <ReportPrintTemplateModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        activeTab={activeTab}
+        range={range}
+        summary={summary}
+        timeline={timeline}
+        topMedicines={topMedicines}
+        invoices={invoicesList}
+      />
     </div>
   )
 }

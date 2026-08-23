@@ -33,6 +33,7 @@ import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
+import com.benhsoan.port.dto.result.MedicalRecordResult;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
@@ -41,6 +42,7 @@ import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -66,6 +68,8 @@ class MedicalRecordControllerTest {
     private UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
     @MockitoBean
     private LockMedicalRecordUseCase lockMedicalRecordUseCase;
+    @MockitoBean
+    private SignMedicalRecordUseCase signMedicalRecordUseCase;
     @MockitoBean
     private AmendMedicalRecordUseCase amendMedicalRecordUseCase;
     @MockitoBean
@@ -103,7 +107,7 @@ class MedicalRecordControllerTest {
                 new MedicalRecordDetailResult.VisitInfo(visitId, "VS-0001", VisitType.WALK_IN,
                         VisitStatus.COMPLETED, now, now, now, "Exam", null, doctorId, "Dr. Tran B"),
                 recordId, "Headache", "Pain", "None", "Normal", "Stable", "Rest",
-                "Follow-up", "Migraine", MedicalRecordStatus.OPEN, null, null,
+                "Follow-up", "Migraine", MedicalRecordStatus.OPEN, null, null, null, null, null,
                 "G43", "Migraine", List.of("J00"), List.of());
     }
 
@@ -205,5 +209,27 @@ class MedicalRecordControllerTest {
                 .andExpect(jsonPath("$.content[0].medicalRecordId").value(recordId.toString()))
                 .andExpect(jsonPath("$.content[0].action").value("VIEW"))
                 .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("POST /medical-records/{id}/sign - 200 OK with signed response")
+    void signMedicalRecordReturnsSignedResponse() throws Exception {
+        when(signMedicalRecordUseCase.sign(org.mockito.ArgumentMatchers.eq(recordId), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new MedicalRecordResult(
+                        recordId, visitId, "Headache", "Pain", "None", "Normal", "Stable",
+                        "Rest", "Follow-up", "Migraine", MedicalRecordStatus.SIGNED,
+                        "DR_SIM_SIG", now, doctorId, null, null, doctorId, now, doctorId, now
+                ));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/medical-records/{medicalRecordId}/sign", recordId)
+                        .contentType("application/json")
+                        .content("""
+                                {"signatureData":"DR_SIM_SIG"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(recordId.toString()))
+                .andExpect(jsonPath("$.status").value("SIGNED"))
+                .andExpect(jsonPath("$.signatureData").value("DR_SIM_SIG"))
+                .andExpect(jsonPath("$.signedBy").value(doctorId.toString()));
     }
 }

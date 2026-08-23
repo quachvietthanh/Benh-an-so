@@ -39,6 +39,7 @@ import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
 
@@ -55,6 +56,7 @@ public class MedicalRecordController {
     private final GetMedicalRecordUseCase getMedicalRecordUseCase;
     private final UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
     private final LockMedicalRecordUseCase lockMedicalRecordUseCase;
+    private final SignMedicalRecordUseCase signMedicalRecordUseCase;
     private final ArchiveMedicalRecordUseCase archiveMedicalRecordUseCase;
     private final DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
     private final AmendMedicalRecordUseCase amendMedicalRecordUseCase;
@@ -111,6 +113,15 @@ public class MedicalRecordController {
         return diagnosisMapper.toResponses(replaceMedicalRecordDiagnosesUseCase.replace(
                 medicalRecordId, diagnosisMapper.toCommand(request)
         ));
+    }
+
+    @PostMapping("/{medicalRecordId}/sign")
+    @RequirePermission("MEDICAL_RECORD_UPDATE_STATUS")
+    public MedicalRecordResponse sign(
+            @PathVariable UUID medicalRecordId,
+            @RequestBody(required = false) com.benhsoan.adapter.inbound.rest.request.medicalrecord.SignMedicalRecordRequest request
+    ) {
+        return mapper.toResponse(signMedicalRecordUseCase.sign(medicalRecordId, mapper.toCommand(request)));
     }
 
     @PostMapping("/{medicalRecordId}/lock")

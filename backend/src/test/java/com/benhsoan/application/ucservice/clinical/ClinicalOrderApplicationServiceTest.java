@@ -98,6 +98,7 @@ class ClinicalOrderApplicationServiceTest {
         UUID visitId = UUID.randomUUID();
         UUID actorId = UUID.randomUUID();
         MedicalRecord record = editableMedicalRecord(visitId, actorId);
+        record.sign("SIG", actorId, NOW);
         record.lock(actorId, NOW);
         when(authorizationService.requireWriteAccess()).thenReturn(actorId);
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(activeVisit(visitId, UUID.randomUUID(), actorId)));

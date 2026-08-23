@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidStatusException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotSignedException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
 import lombok.AccessLevel;
@@ -19,23 +20,48 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MedicalRecord {
 
-    private UUID id, visitId, lockedBy, createdBy, updatedBy;
+    private UUID id, visitId, signedBy, lockedBy, createdBy, updatedBy;
     private String chiefComplaint, symptoms, medicalHistory, physicalExamination, clinicalProgress, treatmentPlan, doctorInstructions, conclusion;
+    private String signatureData;
     private MedicalRecordStatus status;
-    private Instant lockedAt, createdAt, updatedAt;
+    private Instant signedAt, lockedAt, createdAt, updatedAt;
 
-    private MedicalRecord(UUID id, UUID visitId, String a, String b, String c, String d, String e, String f, String g, String h, MedicalRecordStatus status, Instant lockedAt, UUID lockedBy, UUID createdBy, Instant createdAt, UUID updatedBy, Instant updatedAt) {
+    private MedicalRecord(
+            UUID id,
+            UUID visitId,
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            MedicalRecordStatus status,
+            String signatureData,
+            Instant signedAt,
+            UUID signedBy,
+            Instant lockedAt,
+            UUID lockedBy,
+            UUID createdBy,
+            Instant createdAt,
+            UUID updatedBy,
+            Instant updatedAt
+    ) {
         this.id = Objects.requireNonNull(id);
         this.visitId = Objects.requireNonNull(visitId);
-        chiefComplaint = a;
-        symptoms = b;
-        medicalHistory = c;
-        physicalExamination = d;
-        clinicalProgress = e;
-        treatmentPlan = f;
-        doctorInstructions = g;
-        conclusion = h;
+        this.chiefComplaint = chiefComplaint;
+        this.symptoms = symptoms;
+        this.medicalHistory = medicalHistory;
+        this.physicalExamination = physicalExamination;
+        this.clinicalProgress = clinicalProgress;
+        this.treatmentPlan = treatmentPlan;
+        this.doctorInstructions = doctorInstructions;
+        this.conclusion = conclusion;
         this.status = Objects.requireNonNull(status);
+        this.signatureData = signatureData;
+        this.signedAt = signedAt;
+        this.signedBy = signedBy;
         this.lockedAt = lockedAt;
         this.lockedBy = lockedBy;
         this.createdBy = Objects.requireNonNull(createdBy);
@@ -44,47 +70,251 @@ public class MedicalRecord {
         this.updatedAt = updatedAt;
     }
 
-    public static MedicalRecord create(UUID visitId, String a, String b, String c, String d, String e, String f, String g, String h, UUID createdBy, Instant createdAt) {
-        return new MedicalRecord(UUID.randomUUID(), visitId, a, b, c, d, e, f, g, h, MedicalRecordStatus.DRAFT, null, null, createdBy, Objects.requireNonNull(createdAt), null, null);
+    public static MedicalRecord create(
+            UUID visitId,
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            UUID createdBy,
+            Instant createdAt
+    ) {
+        return new MedicalRecord(
+                UUID.randomUUID(),
+                visitId,
+                chiefComplaint,
+                symptoms,
+                medicalHistory,
+                physicalExamination,
+                clinicalProgress,
+                treatmentPlan,
+                doctorInstructions,
+                conclusion,
+                MedicalRecordStatus.DRAFT,
+                null,
+                null,
+                null,
+                null,
+                null,
+                createdBy,
+                Objects.requireNonNull(createdAt),
+                null,
+                null
+        );
     }
 
-    public static MedicalRecord restore(UUID id, UUID visitId, String a, String b, String c, String d, String e, String f, String g, String h, MedicalRecordStatus s, Instant l, UUID lb, UUID cb, Instant ca, UUID ub, Instant ua) {
-        return new MedicalRecord(id, visitId, a, b, c, d, e, f, g, h, s, l, lb, cb, ca, ub, ua);
+    public static MedicalRecord restore(
+            UUID id,
+            UUID visitId,
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            MedicalRecordStatus status,
+            String signatureData,
+            Instant signedAt,
+            UUID signedBy,
+            Instant lockedAt,
+            UUID lockedBy,
+            UUID createdBy,
+            Instant createdAt,
+            UUID updatedBy,
+            Instant updatedAt
+    ) {
+        return new MedicalRecord(
+                id,
+                visitId,
+                chiefComplaint,
+                symptoms,
+                medicalHistory,
+                physicalExamination,
+                clinicalProgress,
+                treatmentPlan,
+                doctorInstructions,
+                conclusion,
+                status,
+                signatureData,
+                signedAt,
+                signedBy,
+                lockedAt,
+                lockedBy,
+                createdBy,
+                createdAt,
+                updatedBy,
+                updatedAt
+        );
+    }
+
+    public static MedicalRecord restore(
+            UUID id,
+            UUID visitId,
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            MedicalRecordStatus status,
+            String signatureData,
+            Instant lockedAt,
+            UUID lockedBy,
+            UUID createdBy,
+            Instant createdAt,
+            UUID updatedBy,
+            Instant updatedAt
+    ) {
+        return new MedicalRecord(
+                id,
+                visitId,
+                chiefComplaint,
+                symptoms,
+                medicalHistory,
+                physicalExamination,
+                clinicalProgress,
+                treatmentPlan,
+                doctorInstructions,
+                conclusion,
+                status,
+                signatureData,
+                null,
+                null,
+                lockedAt,
+                lockedBy,
+                createdBy,
+                createdAt,
+                updatedBy,
+                updatedAt
+        );
+    }
+
+    public static MedicalRecord restore(
+            UUID id,
+            UUID visitId,
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            MedicalRecordStatus status,
+            Instant lockedAt,
+            UUID lockedBy,
+            UUID createdBy,
+            Instant createdAt,
+            UUID updatedBy,
+            Instant updatedAt
+    ) {
+        return new MedicalRecord(
+                id,
+                visitId,
+                chiefComplaint,
+                symptoms,
+                medicalHistory,
+                physicalExamination,
+                clinicalProgress,
+                treatmentPlan,
+                doctorInstructions,
+                conclusion,
+                status,
+                null,
+                null,
+                null,
+                lockedAt,
+                lockedBy,
+                createdBy,
+                createdAt,
+                updatedBy,
+                updatedAt
+        );
     }
 
     public void open(UUID by, Instant at) {
         if (status != MedicalRecordStatus.DRAFT) {
             conflict("Only draft records can be opened.");
-        
-        }status = MedicalRecordStatus.OPEN;
+        }
+        status = MedicalRecordStatus.OPEN;
         updatedBy = Objects.requireNonNull(by);
         updatedAt = Objects.requireNonNull(at);
     }
 
-    public void updateContent(String a, String b, String c, String d, String e, String f, String g, String h, UUID by, Instant at) {
+    public void updateContent(
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            UUID by,
+            Instant at
+    ) {
         ensureEditable();
-        chiefComplaint = a;
-        symptoms = b;
-        medicalHistory = c;
-        physicalExamination = d;
-        clinicalProgress = e;
-        treatmentPlan = f;
-        doctorInstructions = g;
-        conclusion = h;
-        updatedBy = Objects.requireNonNull(by);
-        updatedAt = Objects.requireNonNull(at);
+        this.chiefComplaint = chiefComplaint;
+        this.symptoms = symptoms;
+        this.medicalHistory = medicalHistory;
+        this.physicalExamination = physicalExamination;
+        this.clinicalProgress = clinicalProgress;
+        this.treatmentPlan = treatmentPlan;
+        this.doctorInstructions = doctorInstructions;
+        this.conclusion = conclusion;
+        this.updatedBy = Objects.requireNonNull(by);
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void sign(String signatureData, UUID doctorId, Instant at) {
+        if (isContentLocked()) {
+            throw new MedicalRecordAlreadyLockedException();
+        }
+        ensureLockableContent();
+        this.status = MedicalRecordStatus.SIGNED;
+        this.signatureData = signatureData;
+        this.signedBy = Objects.requireNonNull(doctorId);
+        this.signedAt = Objects.requireNonNull(at);
+        this.updatedBy = doctorId;
+        this.updatedAt = at;
     }
 
     public void lock(UUID by, Instant at) {
-        ensureEditable();
-        ensureLockableContent();
-        status = MedicalRecordStatus.LOCKED;
-        lockedBy = updatedBy = Objects.requireNonNull(by);
-        lockedAt = updatedAt = Objects.requireNonNull(at);
+        if (this.status == MedicalRecordStatus.LOCKED) {
+            throw new MedicalRecordAlreadyLockedException();
+        }
+        if (this.status != MedicalRecordStatus.SIGNED) {
+            throw new MedicalRecordNotSignedException(this.id);
+        }
+        this.status = MedicalRecordStatus.LOCKED;
+        this.lockedBy = Objects.requireNonNull(by);
+        this.lockedAt = Objects.requireNonNull(at);
+        this.updatedBy = by;
+        this.updatedAt = at;
+    }
+
+    public boolean isSigned() {
+        return status == MedicalRecordStatus.SIGNED;
     }
 
     public boolean isLocked() {
         return status == MedicalRecordStatus.LOCKED;
+    }
+
+    public boolean isArchived() {
+        return status == MedicalRecordStatus.ARCHIVED;
+    }
+
+    public boolean isContentLocked() {
+        return isSigned() || isLocked() || isArchived();
     }
 
     public void archive(UUID by, Instant at) {
@@ -96,16 +326,9 @@ public class MedicalRecord {
         updatedAt = Objects.requireNonNull(at);
     }
 
-    public boolean isArchived() {
-        return status == MedicalRecordStatus.ARCHIVED;
-    }
-
     public void ensureEditable() {
-        if (isLocked()) {
+        if (isContentLocked()) {
             throw new MedicalRecordAlreadyLockedException();
-        }
-        if (isArchived()) {
-            throw new MedicalRecordInvalidStatusException("Archived medical records are read-only.");
         }
     }
 
@@ -119,7 +342,7 @@ public class MedicalRecord {
     }
 
     private void conflict(String message) {
-        if (isLocked()) {
+        if (isContentLocked()) {
             throw new MedicalRecordAlreadyLockedException();
         }
         throw new MedicalRecordInvalidStatusException(message);

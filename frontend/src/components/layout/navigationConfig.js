@@ -1,6 +1,7 @@
 import {
   AppstoreOutlined,
   CalendarOutlined,
+  CloudServerOutlined,
   CopyOutlined,
   DashboardOutlined,
   FileTextOutlined,
@@ -30,7 +31,7 @@ export const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system-management'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system-management', '/prescription-interconnections'] },
 ]
 
 export const getNavigationItems = (roles = [], permissions = []) => {
@@ -60,6 +61,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, check: () => !isAdmin && (hasPerm('INVOICE_READ') || hasPerm('INVOICE_CREATE') || hasRole('manager') || hasRole('receptionist')) },
     { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, check: () => hasPerm('REPORT_VIEW') || isAdmin || hasRole('manager') },
     { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || isAdmin || hasRole('manager') || hasRole('clinic_manager') },
+    { key: '/prescription-interconnections', label: 'Liên thông đơn thuốc', icon: CloudServerOutlined, check: () => hasPerm('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin || hasRole('manager') || hasRole('clinic_manager') },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => hasPerm('ROLE_READ') || hasPerm('CLINIC_CONFIGURATION_READ') || hasPerm('USER_READ') || hasPerm('AUDIT_READ') || hasPerm('BACKUP_READ') || isAdmin || hasRole('manager') || hasRole('clinic_manager') },
   ]
 
