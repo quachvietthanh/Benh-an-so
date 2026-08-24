@@ -25,6 +25,14 @@ public class MedicalRecordAuthorizationService {
         return currentUserPort.getCurrentUserId();
     }
 
+    public UUID requireVersionHistoryReadAccess() {
+        if (!currentUserPort.hasRole("ADMIN")
+                && !currentUserPort.hasRole("MANAGER")) {
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return currentUserPort.getCurrentUserId();
+    }
+
     public UUID requireWriteAccess() {
         if (!currentUserPort.hasRole("ADMIN") && !currentUserPort.hasRole("DOCTOR")) {
             throw new MedicalRecordAccessDeniedException();

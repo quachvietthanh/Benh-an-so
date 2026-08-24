@@ -41,6 +41,7 @@ import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordVersionHistoryUseCase;
 import com.benhsoan.port.inbound.medicalrecord.IssueMedicalRecordCopyUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
@@ -88,6 +89,7 @@ class MedicalRecordAuditLogSecurityIntegrationTest {
     @MockitoBean private ArchiveMedicalRecordUseCase archiveMedicalRecordUseCase;
     @MockitoBean private DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
     @MockitoBean private IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
+    @MockitoBean private GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
