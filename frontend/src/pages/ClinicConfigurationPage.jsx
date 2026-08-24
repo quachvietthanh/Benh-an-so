@@ -82,7 +82,8 @@ function ClinicConfigurationPage() {
       console.error('[ClinicConfigurationPage] Lỗi tải cấu hình phòng khám:', err)
       const status = err?.response?.status
       if (status === 403) {
-        setConfigErrorMsg('Bạn không có quyền truy cập cấu hình phòng khám (403 Forbidden).')
+        // Silently ignore or don't set harsh red error alert for unprivileged users
+        setConfigErrorMsg('')
       } else if (status === 401) {
         setConfigErrorMsg('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
       } else {

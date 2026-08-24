@@ -67,7 +67,6 @@ function RolePermissionsPage() {
   // Load data from Backend
   const loadData = useCallback(async () => {
     if (!canRead) {
-      setError('Bạn không có quyền xem danh sách vai trò hoặc danh mục quyền.')
       return
     }
 
@@ -410,14 +409,10 @@ function RolePermissionsPage() {
   // If user does not have permission to view
   if (!canRead) {
     return (
-      <Card style={{ margin: '16px 0', borderRadius: 12 }}>
-        <Alert
-          type="error"
-          showIcon
-          icon={<LockOutlined />}
-          message="Từ chối truy cập"
-          description="Bạn không có quyền xem hoặc quản lý phân quyền vai trò hệ thống (Yêu cầu quyền ROLE_READ hoặc PERMISSION_READ)."
-        />
+      <Card style={{ margin: '16px 0', borderRadius: 12, textAlign: 'center', padding: '40px 20px' }}>
+        <div style={{ color: '#64748b', fontSize: 14 }}>
+          Tài khoản của bạn chưa được phân quyền xem hoặc cấu hình phân quyền vai trò hệ thống.
+        </div>
       </Card>
     )
   }

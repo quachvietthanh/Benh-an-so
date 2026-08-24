@@ -44,5 +44,9 @@ export const getApiErrorMessage = (error, fallbackMessage) => {
   return normalized.firstFieldError || normalized.message
 }
 
-export const isAccessDeniedApiError = (apiError) =>
-  apiError?.code === 'ACCESS_DENIED' || apiError?.status === 403
+export const isAccessDeniedApiError = (error) => {
+  if (!error) return false
+  const status = error?.status || error?.response?.status || error?.apiError?.status
+  const code = error?.code || error?.response?.data?.code || error?.apiError?.code
+  return status === 403 || code === 'ACCESS_DENIED'
+}

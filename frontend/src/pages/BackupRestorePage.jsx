@@ -99,17 +99,21 @@ function BackupRestorePage() {
       const status = err?.response?.status
       const msg = err?.response?.data?.message
 
-      setLoadError(true)
-      setBackups(null)
       if (status === 403) {
-        setApiError('Bạn không có quyền thực hiện thao tác này (403 Forbidden).')
-      } else if (status === 404) {
-        setIsBackendAvailable(false)
-        setApiError('Hệ thống Backend hiện tại chưa tìm thấy REST Endpoint /backups (404 Not Found).')
-      } else if (status === 409) {
-        setApiError('Hệ thống đang thực hiện một tiến trình sao lưu/phục hồi khác (409 Conflict).')
+        setLoadError(false)
+        setBackups([])
+        setApiError('')
       } else {
-        setApiError(msg || 'Không thể tải danh sách bản sao lưu từ hệ thống. Backend phản hồi lỗi xử lý.')
+        setLoadError(true)
+        setBackups(null)
+        if (status === 404) {
+          setIsBackendAvailable(false)
+          setApiError('Hệ thống Backend hiện tại chưa tìm thấy REST Endpoint /backups (404 Not Found).')
+        } else if (status === 409) {
+          setApiError('Hệ thống đang thực hiện một tiến trình sao lưu/phục hồi khác (409 Conflict).')
+        } else {
+          setApiError(msg || 'Không thể tải danh sách bản sao lưu từ hệ thống. Backend phản hồi lỗi xử lý.')
+        }
       }
     } finally {
       setLoading(false)

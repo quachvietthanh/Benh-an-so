@@ -59,6 +59,12 @@ const medicalRecordApi = {
   delete: (recordId) => {
     return axiosClient.delete(`/medical-records/${recordId}`)
   },
+  amend: (recordId, data) => {
+    return axiosClient.post(`/medical-records/${recordId}/amendments`, data)
+  },
+  getVersionHistory: (recordId) => {
+    return axiosClient.get(`/medical-records/${recordId}/versions`)
+  },
   createClinicalOrder: (visitId, data) => {
     return axiosClient.post(`/clinical-orders/visits/${visitId}`, data)
   },

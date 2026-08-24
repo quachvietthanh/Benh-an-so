@@ -98,7 +98,7 @@ export default function DoctorVisitsReportView({
       console.error('Lỗi khi tải báo cáo lượt khám theo bác sĩ:', err)
       const status = err?.response?.status
       if (status === 403) {
-        setErrorMsg('Bạn không có quyền xem báo cáo này.')
+        setErrorMsg('')
       } else if (status === 400) {
         setErrorMsg(
           err?.response?.data?.message || 'Khoảng thời gian không hợp lệ.',
