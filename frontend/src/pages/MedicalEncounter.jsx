@@ -31,6 +31,7 @@ import {
   SafetyCertificateOutlined,
   SafetyCertificateFilled,
   LockOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
@@ -41,7 +42,9 @@ import visitApi from '../api/visitApi'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
 import MedicalRecordSignatureStamp from '../components/clinical/MedicalRecordSignatureStamp'
+import MedicalRecordVersionHistoryModal from '../components/medicalRecord/MedicalRecordVersionHistoryModal'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
+import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
 import { useAuthContext } from '../context/AuthContext'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
@@ -118,11 +121,14 @@ function MedicalEncounter() {
     [user?.roles],
   )
   const canEditEncounter = roles.includes('doctor') || roles.includes('admin')
+  const canViewVersionHistory = canViewMedicalRecordVersionHistory(roles, user?.permissions)
 
   const [encounter, setEncounter] = useState(null)
   const [currentRecordId, setCurrentRecordId] = useState(null)
   const [medicalRecord, setMedicalRecord] = useState(null)
   const [signModalOpen, setSignModalOpen] = useState(false)
+  const [versionModalOpen, setVersionModalOpen] = useState(false)
+  const [selectedVersionRecord, setSelectedVersionRecord] = useState(null)
   const [records, setRecords] = useState([])
   const [clinicalServices, setClinicalServices] = useState([])
   const [serviceCatalogError, setServiceCatalogError] = useState('')
@@ -801,9 +807,23 @@ function MedicalEncounter() {
     {
       title: '',
       render: (_, record) => (
-        <Button size="small" icon={<EyeOutlined />} onClick={() => setViewing(record)}>
-          Xem
-        </Button>
+        <Space size="small">
+          <Button size="small" icon={<EyeOutlined />} onClick={() => setViewing(record)}>
+            Xem
+          </Button>
+          {canViewVersionHistory && (
+            <Button
+              size="small"
+              icon={<HistoryOutlined />}
+              onClick={() => {
+                setSelectedVersionRecord(record)
+                setVersionModalOpen(true)
+              }}
+            >
+              Phiên bản
+            </Button>
+          )}
+        </Space>
       ),
     },
   ]
@@ -852,6 +872,23 @@ function MedicalEncounter() {
             {selectedOrders.length > 0 && (
               <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
                 In phiếu chỉ định
+              </Button>
+            )}
+            {currentRecordId && canViewVersionHistory && (
+              <Button
+                icon={<HistoryOutlined />}
+                onClick={() => {
+                  setSelectedVersionRecord({
+                    id: currentRecordId,
+                    medicalRecordId: currentRecordId,
+                    recordCode: encounter?.visit?.visitCode || `BA-${String(currentRecordId).substring(0, 8).toUpperCase()}`,
+                    patientName: encounter?.patient?.fullName,
+                    patientCode: encounter?.patient?.patientCode,
+                  })
+                  setVersionModalOpen(true)
+                }}
+              >
+                Lịch sử phiên bản
               </Button>
             )}
             {currentRecordId && !prescriptionBlockReason && (
@@ -1210,6 +1247,18 @@ function MedicalEncounter() {
           />
         </React.Suspense>
       )}
+
+      <MedicalRecordVersionHistoryModal
+        open={versionModalOpen}
+        onClose={() => {
+          setVersionModalOpen(false)
+          setSelectedVersionRecord(null)
+        }}
+        medicalRecordId={selectedVersionRecord?.id || selectedVersionRecord?.medicalRecordId || currentRecordId}
+        recordCode={selectedVersionRecord?.recordCode || encounter?.visit?.visitCode || (currentRecordId ? `BA-${String(currentRecordId).substring(0, 8).toUpperCase()}` : '')}
+        patientName={selectedVersionRecord?.patientName || encounter?.patient?.fullName}
+        patientCode={selectedVersionRecord?.patientCode || encounter?.patient?.patientCode}
+      />
     </div>
   )
 }
