@@ -14,16 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordAmendment;
+import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
+import com.benhsoan.port.dto.result.MedicalRecordClinicalSnapshot;
 import com.benhsoan.port.dto.result.MedicalRecordVersion;
 import com.benhsoan.port.dto.result.MedicalRecordVersionHistoryResult;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordVersionHistoryUseCase;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAmendmentRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -43,6 +46,7 @@ public class GetMedicalRecordVersionHistoryService implements GetMedicalRecordVe
 
     private final MedicalRecordRepository medicalRecordRepository;
     private final MedicalRecordAmendmentRepository amendmentRepository;
+    private final MedicalRecordDiagnosisRepository diagnosisRepository;
     private final VisitRepository visitRepository;
     private final UserRepository userRepository;
     private final MedicalRecordAuthorizationService authorizationService;
@@ -71,8 +75,11 @@ public class GetMedicalRecordVersionHistoryService implements GetMedicalRecordVe
 
         Map<UUID, String> names = resolveNames(record, amendments);
 
+        List<MedicalRecordDiagnosis> diagnoses = diagnosisRepository.findByMedicalRecordId(record.getId());
+
         MedicalRecordVersion originalVersion = new MedicalRecordVersion(
-                1, names.get(record.getCreatedBy()), record.getCreatedAt(), null, null);
+                1, names.get(record.getCreatedBy()), record.getCreatedAt(), null, null,
+                toSnapshot(record, diagnoses));
 
         List<MedicalRecordVersion> amendmentVersions = new ArrayList<>();
         for (int index = 0; index < amendments.size(); index++) {
@@ -82,7 +89,8 @@ public class GetMedicalRecordVersionHistoryService implements GetMedicalRecordVe
                     names.get(amendment.getAmendedBy()),
                     amendment.getAmendedAt(),
                     amendment.getReason(),
-                    amendment.getContent()));
+                    amendment.getContent(),
+                    null));
         }
 
         return new MedicalRecordVersionHistoryResult(amendments.isEmpty(), originalVersion, amendmentVersions);
@@ -90,12 +98,30 @@ public class GetMedicalRecordVersionHistoryService implements GetMedicalRecordVe
 
     private UUID authorizeVersionHistoryRead(MedicalRecord record) {
         try {
-            return authorizationService.requireReadAccess();
+            return authorizationService.requireVersionHistoryReadAccess();
         } catch (MedicalRecordAccessDeniedException denied) {
             denialAuditWriter.writeDenied(currentUserPort.getCurrentUserId(), record.getId(),
                     "Medical record version history access denied.", clockPort.now());
             throw denied;
         }
+    }
+
+    private MedicalRecordClinicalSnapshot toSnapshot(MedicalRecord record, List<MedicalRecordDiagnosis> diagnoses) {
+        List<String> diagnosisLabels = diagnoses.stream()
+                .map(this::toDiagnosisLabel)
+                .toList();
+        return new MedicalRecordClinicalSnapshot(
+                record.getChiefComplaint(), record.getSymptoms(), record.getMedicalHistory(),
+                record.getPhysicalExamination(), record.getClinicalProgress(), record.getTreatmentPlan(),
+                record.getDoctorInstructions(), record.getConclusion(), diagnosisLabels
+        );
+    }
+
+    private String toDiagnosisLabel(MedicalRecordDiagnosis diagnosis) {
+        String code = diagnosis.getDiagnosisCode() == null ? "" : diagnosis.getDiagnosisCode();
+        return code.isBlank()
+                ? diagnosis.getDiagnosisName()
+                : code + " - " + diagnosis.getDiagnosisName();
     }
 
     private Map<UUID, String> resolveNames(MedicalRecord record, List<MedicalRecordAmendment> amendments) {

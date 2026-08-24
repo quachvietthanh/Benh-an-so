@@ -100,23 +100,53 @@ class MedicalRecordVersionHistorySecurityIntegrationTest {
     private final UUID recordId = UUID.randomUUID();
 
     @Test
-    void doctorWithMedicalRecordReadPermissionReturns200() throws Exception {
-        MedicalRecordVersionHistoryResult result = new MedicalRecordVersionHistoryResult(
-                true,
-                new MedicalRecordVersion(1, "Dr. Creator", Instant.parse("2026-08-21T00:00:00Z"), null, null),
-                List.of());
-        when(getMedicalRecordVersionHistoryUseCase.getVersionHistory(recordId)).thenReturn(result);
+    void managerWithVersionHistoryPermissionReturns200() throws Exception {
+        when(getMedicalRecordVersionHistoryUseCase.getVersionHistory(recordId)).thenReturn(result());
 
         mockMvc.perform(get("/medical-records/{medicalRecordId}/versions", recordId)
-                        .with(SecurityMockMvcRequestPostProcessors.user("doctor")
-                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_READ"))))
+                        .with(SecurityMockMvcRequestPostProcessors.user("manager")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_VERSION_HISTORY_READ"))))
                 .andExpect(status().isOk());
     }
 
     @Test
-    void receptionistWithoutMedicalRecordReadPermissionReturns403() throws Exception {
+    void adminWithVersionHistoryPermissionReturns200() throws Exception {
+        when(getMedicalRecordVersionHistoryUseCase.getVersionHistory(recordId)).thenReturn(result());
+
+        mockMvc.perform(get("/medical-records/{medicalRecordId}/versions", recordId)
+                        .with(SecurityMockMvcRequestPostProcessors.user("admin")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_VERSION_HISTORY_READ"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void doctorWithoutVersionHistoryPermissionReturns403() throws Exception {
+        mockMvc.perform(get("/medical-records/{medicalRecordId}/versions", recordId)
+                        .with(SecurityMockMvcRequestPostProcessors.user("doctor")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void receptionistWithoutVersionHistoryPermissionReturns403() throws Exception {
         mockMvc.perform(get("/medical-records/{medicalRecordId}/versions", recordId)
                         .with(SecurityMockMvcRequestPostProcessors.user("receptionist")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void pharmacistWithoutVersionHistoryPermissionReturns403() throws Exception {
+        mockMvc.perform(get("/medical-records/{medicalRecordId}/versions", recordId)
+                        .with(SecurityMockMvcRequestPostProcessors.user("pharmacist")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICINE_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void patientWithoutVersionHistoryPermissionReturns403() throws Exception {
+        mockMvc.perform(get("/medical-records/{medicalRecordId}/versions", recordId)
+                        .with(SecurityMockMvcRequestPostProcessors.user("patient")
                                 .authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
                 .andExpect(status().isForbidden());
     }
@@ -125,5 +155,12 @@ class MedicalRecordVersionHistorySecurityIntegrationTest {
     void unauthenticatedUserReturns401() throws Exception {
         mockMvc.perform(get("/medical-records/{medicalRecordId}/versions", recordId))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private MedicalRecordVersionHistoryResult result() {
+        return new MedicalRecordVersionHistoryResult(
+                true,
+                new MedicalRecordVersion(1, "Dr. Creator", Instant.parse("2026-08-21T00:00:00Z"), null, null, null),
+                List.of());
     }
 }

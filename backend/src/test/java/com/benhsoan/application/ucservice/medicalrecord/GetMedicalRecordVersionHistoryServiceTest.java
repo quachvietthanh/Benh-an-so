@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.medicalrecord;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,6 +36,7 @@ import com.benhsoan.port.dto.result.MedicalRecordVersionHistoryResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAmendmentRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -57,6 +59,8 @@ class GetMedicalRecordVersionHistoryServiceTest {
     @Mock
     private MedicalRecordAmendmentRepository amendmentRepository;
     @Mock
+    private MedicalRecordDiagnosisRepository diagnosisRepository;
+    @Mock
     private VisitRepository visitRepository;
     @Mock
     private UserRepository userRepository;
@@ -73,7 +77,7 @@ class GetMedicalRecordVersionHistoryServiceTest {
 
     private GetMedicalRecordVersionHistoryService service() {
         return new GetMedicalRecordVersionHistoryService(
-                medicalRecordRepository, amendmentRepository, visitRepository, userRepository,
+                medicalRecordRepository, amendmentRepository, diagnosisRepository, visitRepository, userRepository,
                 authorizationService, accessAuditService,
                 new MedicalRecordVersionHistoryAuditWriter(auditLogRepository),
                 currentUserPort, clockPort);
@@ -126,12 +130,17 @@ class GetMedicalRecordVersionHistoryServiceTest {
         assertEquals("Dr. Creator", result.originalVersion().modifiedBy());
         assertNull(result.originalVersion().reason());
         assertNull(result.originalVersion().content());
+
+        assertNotNull(result.originalVersion().snapshot());
+        assertEquals("c", result.originalVersion().snapshot().chiefComplaint());
+        assertEquals("s", result.originalVersion().snapshot().symptoms());
+        assertEquals("co", result.originalVersion().snapshot().conclusion());
     }
 
     @Test
     void rejectsUnauthorizedAccessAndWritesDenialAudit() {
         when(medicalRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record()));
-        when(authorizationService.requireReadAccess()).thenThrow(new MedicalRecordAccessDeniedException());
+        when(authorizationService.requireVersionHistoryReadAccess()).thenThrow(new MedicalRecordAccessDeniedException());
         when(currentUserPort.getCurrentUserId()).thenReturn(CREATOR_ID);
         when(clockPort.now()).thenReturn(NOW);
 
@@ -158,7 +167,8 @@ class GetMedicalRecordVersionHistoryServiceTest {
 
     private void stubAuthorizedRecord() {
         when(medicalRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record()));
-        when(authorizationService.requireReadAccess()).thenReturn(CREATOR_ID);
+        when(authorizationService.requireVersionHistoryReadAccess()).thenReturn(CREATOR_ID);
+        when(diagnosisRepository.findByMedicalRecordId(RECORD_ID)).thenReturn(List.of());
         when(clockPort.now()).thenReturn(NOW);
         Visit visit = Visit.restore(VISIT_ID, "V001", PATIENT_ID, CREATOR_ID, null, null, VisitType.WALK_IN,
                 VisitStatus.COMPLETED, NOW.minusSeconds(3600), NOW.minusSeconds(1800), NOW,

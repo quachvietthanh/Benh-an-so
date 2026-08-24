@@ -12,6 +12,7 @@ import com.benhsoan.adapter.inbound.rest.request.medicalrecord.IssueMedicalRecor
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordClinicalSnapshotResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordVersionHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordVersionResponse;
@@ -22,6 +23,7 @@ import com.benhsoan.port.dto.command.medicalrecord.IssueMedicalRecordCopyCommand
 import com.benhsoan.port.dto.command.medicalrecord.UpdateMedicalRecordCommand;
 import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordAmendmentResult;
+import com.benhsoan.port.dto.result.MedicalRecordClinicalSnapshot;
 import com.benhsoan.port.dto.result.MedicalRecordResult;
 import com.benhsoan.port.dto.result.MedicalRecordVersion;
 import com.benhsoan.port.dto.result.MedicalRecordVersionHistoryResult;
@@ -96,7 +98,18 @@ public class MedicalRecordRestMapper {
     private MedicalRecordVersionResponse toResponse(MedicalRecordVersion version) {
         return new MedicalRecordVersionResponse(
                 version.versionNumber(), version.modifiedBy(), version.modifiedAt(),
-                version.reason(), version.content()
+                version.reason(), version.content(), toResponse(version.snapshot())
+        );
+    }
+
+    private MedicalRecordClinicalSnapshotResponse toResponse(MedicalRecordClinicalSnapshot snapshot) {
+        if (snapshot == null) {
+            return null;
+        }
+        return new MedicalRecordClinicalSnapshotResponse(
+                snapshot.chiefComplaint(), snapshot.symptoms(), snapshot.medicalHistory(),
+                snapshot.physicalExamination(), snapshot.clinicalProgress(), snapshot.treatmentPlan(),
+                snapshot.doctorInstructions(), snapshot.conclusion(), snapshot.diagnoses()
         );
     }
 

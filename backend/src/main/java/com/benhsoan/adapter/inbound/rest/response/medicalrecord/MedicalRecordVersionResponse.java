@@ -7,6 +7,7 @@ public record MedicalRecordVersionResponse(
         String modifiedBy,
         Instant modifiedAt,
         String reason,
-        String content
+        String content,
+        MedicalRecordClinicalSnapshotResponse snapshot
 ) {
 }

@@ -175,7 +175,7 @@ public class MedicalRecordController {
     }
 
     @GetMapping("/{medicalRecordId}/versions")
-    @RequirePermission("MEDICAL_RECORD_READ")
+    @RequirePermission("MEDICAL_RECORD_VERSION_HISTORY_READ")
     public MedicalRecordVersionHistoryResponse getVersionHistory(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(getMedicalRecordVersionHistoryUseCase.getVersionHistory(medicalRecordId));
     }
