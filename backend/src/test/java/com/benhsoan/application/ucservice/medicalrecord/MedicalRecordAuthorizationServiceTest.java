@@ -76,4 +76,46 @@ class MedicalRecordAuthorizationServiceTest {
 
         assertThrows(MedicalRecordAccessDeniedException.class, service::requireReadAccess);
     }
+
+    @Test
+    @DisplayName("amend access is allowed for the assigned doctor")
+    void allowsAssignedDoctorAmendAccess() {
+        UUID userId = UUID.randomUUID();
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireAmendAccess(userId));
+    }
+
+    @Test
+    @DisplayName("amend access is denied for a non-assigned doctor")
+    void deniesNonAssignedDoctorAmendAccess() {
+        UUID userId = UUID.randomUUID();
+        UUID assignedDoctorId = UUID.randomUUID();
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, () -> service.requireAmendAccess(assignedDoctorId));
+    }
+
+    @Test
+    @DisplayName("amend access is allowed for ADMIN regardless of assigned doctor")
+    void allowsAdminAmendAccess() {
+        UUID userId = UUID.randomUUID();
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireAmendAccess(UUID.randomUUID()));
+    }
+
+    @Test
+    @DisplayName("amend access is denied for non-doctor roles (e.g. MANAGER)")
+    void deniesNonDoctorAmendAccess() {
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, () -> service.requireAmendAccess(UUID.randomUUID()));
+    }
 }
