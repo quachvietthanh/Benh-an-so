@@ -35,6 +35,7 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAme
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDiagnosisResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordVersionHistoryResponse;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
@@ -42,6 +43,7 @@ import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordVersionHistoryUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.IssueMedicalRecordCopyUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
@@ -70,6 +72,7 @@ public class MedicalRecordController {
     private final GetMedicalRecordDiagnosesUseCase getMedicalRecordDiagnosesUseCase;
     private final ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
     private final IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
+    private final GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
     private final MedicalRecordDiagnosisRestMapper diagnosisMapper;
@@ -169,6 +172,12 @@ public class MedicalRecordController {
     @RequirePermission("MEDICAL_RECORD_UPDATE")
     public MedicalRecordAmendmentResponse amend(@PathVariable UUID medicalRecordId, @Valid @RequestBody AmendMedicalRecordRequest request) {
         return mapper.toResponse(amendMedicalRecordUseCase.amend(medicalRecordId, mapper.toCommand(request)));
+    }
+
+    @GetMapping("/{medicalRecordId}/versions")
+    @RequirePermission("MEDICAL_RECORD_READ")
+    public MedicalRecordVersionHistoryResponse getVersionHistory(@PathVariable UUID medicalRecordId) {
+        return mapper.toResponse(getMedicalRecordVersionHistoryUseCase.getVersionHistory(medicalRecordId));
     }
 
     @GetMapping("/{medicalRecordId}/access-logs")

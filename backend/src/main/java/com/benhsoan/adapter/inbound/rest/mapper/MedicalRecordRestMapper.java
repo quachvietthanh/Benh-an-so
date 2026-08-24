@@ -13,6 +13,8 @@ import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalReco
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordVersionHistoryResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordVersionResponse;
 import com.benhsoan.port.dto.command.medicalrecord.AmendMedicalRecordCommand;
 import com.benhsoan.port.dto.command.medicalrecord.CreateMedicalRecordCommand;
 import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
@@ -21,6 +23,8 @@ import com.benhsoan.port.dto.command.medicalrecord.UpdateMedicalRecordCommand;
 import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordAmendmentResult;
 import com.benhsoan.port.dto.result.MedicalRecordResult;
+import com.benhsoan.port.dto.result.MedicalRecordVersion;
+import com.benhsoan.port.dto.result.MedicalRecordVersionHistoryResult;
 
 @Component
 public class MedicalRecordRestMapper {
@@ -79,6 +83,21 @@ public class MedicalRecordRestMapper {
     public MedicalRecordAmendmentResponse toResponse(MedicalRecordAmendmentResult result) {
         return new MedicalRecordAmendmentResponse(result.id(), result.medicalRecordId(), result.content(),
                 result.reason(), result.amendedBy(), result.amendedAt());
+    }
+
+    public MedicalRecordVersionHistoryResponse toResponse(MedicalRecordVersionHistoryResult result) {
+        return new MedicalRecordVersionHistoryResponse(
+                result.originalOnly(),
+                toResponse(result.originalVersion()),
+                result.amendments().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private MedicalRecordVersionResponse toResponse(MedicalRecordVersion version) {
+        return new MedicalRecordVersionResponse(
+                version.versionNumber(), version.modifiedBy(), version.modifiedAt(),
+                version.reason(), version.content()
+        );
     }
 
     public Page<MedicalRecordAccessLogResponse> toAccessLogResponse(Page<MedicalRecordAccessLogResult> resultPage) {
