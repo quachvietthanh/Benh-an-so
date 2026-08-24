@@ -459,14 +459,9 @@ function MedicineCatalogPage() {
   if (!canManageMedicineCatalog) {
     return (
       <div style={{ padding: 24 }}>
-        <Alert
-          type="error"
-          showIcon
-          icon={<StopOutlined />}
-          message="Từ chối truy cập"
-          description="Bạn không có quyền quản lý danh mục và ngưỡng tồn thuốc. Chức năng này dành cho Dược sĩ hoặc Quản trị viên."
-          style={{ maxWidth: 600, margin: '40px auto' }}
-        />
+        <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px', maxWidth: 600, margin: '40px auto' }}>
+          <Empty description="Tài khoản của bạn không có quyền quản lý danh mục và ngưỡng tồn thuốc." />
+        </Card>
       </div>
     )
   }
