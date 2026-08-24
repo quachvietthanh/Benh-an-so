@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.IssueMedicalRecordCopyRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
@@ -15,6 +16,7 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordRes
 import com.benhsoan.port.dto.command.medicalrecord.AmendMedicalRecordCommand;
 import com.benhsoan.port.dto.command.medicalrecord.CreateMedicalRecordCommand;
 import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
+import com.benhsoan.port.dto.command.medicalrecord.IssueMedicalRecordCopyCommand;
 import com.benhsoan.port.dto.command.medicalrecord.UpdateMedicalRecordCommand;
 import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordAmendmentResult;
@@ -45,6 +47,12 @@ public class MedicalRecordRestMapper {
         return new com.benhsoan.port.dto.command.medicalrecord.SignMedicalRecordCommand(
                 request == null ? null : request.signatureData()
         );
+    }
+
+    public IssueMedicalRecordCopyCommand toCommand(UUID medicalRecordId, IssueMedicalRecordCopyRequest request) {
+        return new IssueMedicalRecordCopyCommand(medicalRecordId, request.recipientType(),
+                request.recipientName(), request.recipientIdentityNumber(),
+                request.requestReason(), request.authorizationDocumentNumber());
     }
 
     public GetMedicalRecordAccessLogsQuery toQuery(
