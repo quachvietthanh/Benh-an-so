@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Alert, Table, Button, Tag, Typography, Space, Popconfirm, message, Modal, Tooltip } from 'antd'
-import { EyeOutlined, InboxOutlined, DeleteOutlined, HistoryOutlined } from '@ant-design/icons'
+import { EyeOutlined, InboxOutlined, DeleteOutlined, HistoryOutlined, EditOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import medicalRecordApi from '../api/medicalRecordApi'
+import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
+import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordModal'
 import { formatDateTime, formatRecordStatus } from '../utils/helpers'
+import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { normalizeMedicalRecordDetail } from '../utils/workflowContract'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
-import MedicalRecordVersionHistoryModal from '../components/medicalRecord/MedicalRecordVersionHistoryModal'
 import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
 
 const { Title } = Typography
@@ -18,8 +20,8 @@ function MedicalRecordList({ patientId }) {
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState([])
   const [actionLoadingId, setActionLoadingId] = useState(null)
+  const [selectedRecordForVersion, setSelectedRecordForVersion] = useState(null)
   const [versionModalOpen, setVersionModalOpen] = useState(false)
-  const [selectedVersionRecord, setSelectedVersionRecord] = useState(null)
 
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -171,6 +173,7 @@ function MedicalRecordList({ patientId }) {
       render: (_, record) => {
         const recordId = record.id || record.medicalRecordId
         const isArchived = record.status === 'ARCHIVED'
+        const isSigned = isMedicalRecordSigned(record.status)
         const isBusy = actionLoadingId === recordId
 
         return (
@@ -184,14 +187,14 @@ function MedicalRecordList({ patientId }) {
             >
               Xem
             </Button>
-            {canViewVersionHistory && (
+            {(canViewVersionHistory || isSigned) && (
               <Button
                 type="link"
                 size="small"
                 icon={<HistoryOutlined />}
                 style={{ color: '#4f46e5' }}
                 onClick={() => {
-                  setSelectedVersionRecord(record)
+                  setSelectedRecordForVersion(recordId)
                   setVersionModalOpen(true)
                 }}
               >
@@ -273,17 +276,17 @@ function MedicalRecordList({ patientId }) {
         }}
       />
 
-      <MedicalRecordVersionHistoryModal
-        open={versionModalOpen}
-        onClose={() => {
-          setVersionModalOpen(false)
-          setSelectedVersionRecord(null)
-        }}
-        medicalRecordId={selectedVersionRecord?.id || selectedVersionRecord?.medicalRecordId}
-        recordCode={selectedVersionRecord?.recordCode}
-        patientName={selectedVersionRecord?.patientName}
-        patientCode={selectedVersionRecord?.patientCode}
-      />
+      {versionModalOpen && selectedRecordForVersion && (
+        <MedicalRecordVersionHistoryModal
+          open={versionModalOpen}
+          onClose={() => {
+            setVersionModalOpen(false)
+            setSelectedRecordForVersion(null)
+          }}
+          recordId={selectedRecordForVersion}
+          canAmend={false}
+        />
+      )}
     </div>
   )
 }

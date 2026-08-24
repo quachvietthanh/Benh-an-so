@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   DatePicker,
+  Empty,
   Radio,
   Select,
   Space,
@@ -64,12 +65,18 @@ function ReportsPage() {
   const { user } = useAuthContext()
   const [searchParams, setSearchParams] = useSearchParams()
 
+  const userRoles = useMemo(() => {
+    return (user?.roles || [user?.role || '']).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user])
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
 
-  const canViewReports = userPermissions.includes('REPORT_VIEW')
-  const canExportReports = userPermissions.includes('REPORT_EXPORT')
+  const isAdmin = userRoles.includes('admin')
+  const isManager = userRoles.includes('manager') || userRoles.includes('clinic_manager')
+
+  const canViewReports = userPermissions.includes('REPORT_VIEW') || isAdmin || isManager
+  const canExportReports = userPermissions.includes('REPORT_EXPORT') || isAdmin || isManager
 
   // URL parameters parsing
   const urlTab = searchParams.get('tab')
@@ -282,10 +289,10 @@ function ReportsPage() {
     } catch (err) {
       console.error('Lỗi tải báo cáo vận hành:', err)
       const apiError = err.apiError || normalizeApiError(err, 'Không thể tải báo cáo.')
-      if (isAccessDeniedApiError(apiError)) {
-        setLoadError('PERMISSION_DENIED_NOT_MANAGER')
+      if (!isAccessDeniedApiError(apiError)) {
+        setLoadError(getApiErrorMessage(err, 'Không thể tải dữ liệu báo cáo từ máy chủ.'))
       } else {
-        setLoadError(getApiErrorMessage(err, 'Không thể tải báo cáo.'))
+        setLoadError('')
       }
     } finally {
       setLoading(false)
@@ -307,57 +314,68 @@ function ReportsPage() {
       setSelectedReportType('REVENUE_REPORT')
     } else if (key === 'overview') {
       setSelectedReportType('OPERATIONAL_REPORT')
+    } else if (key === 'doctor-visits') {
+      setSelectedReportType('DOCTOR_VISITS_REPORT')
+    } else if (key === 'medicines') {
+      setSelectedReportType('TOP_MEDICINES_REPORT')
+    } else if (key === 'audit') {
+      setSelectedReportType('ACCESS_LOG_REPORT')
     }
   }
 
-  const handleExportCSV = async () => {
-    if (!canExportReports) {
-      message.error('Bạn không có quyền xuất báo cáo.')
-      return
-    }
-
-    if (exporting) return
-
-    const fromVal = range?.[0] ? range[0].format('YYYY-MM-DD') : ''
-    const toVal = range?.[1] ? range[1].format('YYYY-MM-DD') : ''
-
-    const validation = validateExportParams(fromVal, toVal)
+  const handleExport = async () => {
+    const params = getParams()
+    const validation = validateExportParams(params)
     if (!validation.isValid) {
-      message.error(validation.message)
+      message.error(validation.errorMessage)
       return
     }
 
     setExporting(true)
     try {
-      const response = await reportApi.exportReport({
-        reportType: selectedReportType,
-        from: validation.from,
-        to: validation.to,
-      })
+      let response
+      if (selectedReportType === 'OPERATIONAL_REPORT') {
+        response = await reportApi.exportOperational(params)
+      } else if (selectedReportType === 'VISIT_REPORT' || selectedReportType === 'DOCTOR_VISITS_REPORT') {
+        response = await reportApi.exportVisits(params)
+      } else if (selectedReportType === 'REVENUE_REPORT') {
+        response = await reportApi.exportRevenue(params)
+      } else {
+        response = await reportApi.exportVisits(params)
+      }
 
-      const contentDisposition =
-        response.headers?.['content-disposition'] ||
-        response.headers?.['Content-Disposition'] ||
-        ''
-      const fileName = getExportFilename(
-        contentDisposition,
-        selectedReportType,
-        validation.from,
-        validation.to,
-      )
-
-      downloadCsvBlob(response.data, fileName)
-      message.success('Xuất báo cáo thành công.')
+      const filename = getExportFilename(selectedReportType, params)
+      downloadCsvBlob(response.data, filename)
+      message.success(`Đã xuất báo cáo ${filename} thành công!`)
     } catch (err) {
-      const errorMessage = await getExportErrorMessage(err)
-      message.error(errorMessage)
+      console.error('Lỗi xuất báo cáo CSV:', err)
+      message.error(getExportErrorMessage(err))
     } finally {
       setExporting(false)
     }
   }
 
+  if (!canViewReports) {
+    return (
+      <div style={{ paddingBottom: 32 }}>
+        <div style={{ marginBottom: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>
+            <LineChartOutlined style={{ marginRight: 10, color: '#2563eb' }} />
+            Báo cáo Vận hành & Doanh thu
+          </Title>
+          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+            Theo dõi số liệu khám bệnh, doanh thu tài chính, thuốc và nhật ký truy cập y tế theo thời gian thực.
+          </Paragraph>
+        </div>
+        <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px', marginTop: 16 }}>
+          <Empty description="Tài khoản của bạn chưa được phân quyền xem Báo cáo vận hành & doanh thu." />
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '16px 20px', paddingBottom: 40 }}>
+    <div style={{ paddingBottom: 32 }}>
       {/* Header Block */}
       <div
         style={{
@@ -370,8 +388,8 @@ function ReportsPage() {
         }}
       >
         <div>
-          <Title level={2} style={{ margin: 0, color: '#0f172a' }}>
-            <LineChartOutlined style={{ marginRight: 8, color: '#1677ff' }} />
+          <Title level={2} style={{ margin: 0 }}>
+            <LineChartOutlined style={{ marginRight: 10, color: '#2563eb' }} />
             Báo cáo Vận hành & Doanh thu
           </Title>
           <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
@@ -379,38 +397,26 @@ function ReportsPage() {
           </Paragraph>
         </div>
 
-        <Space wrap size="middle">
+        <Space wrap>
           <Select
             value={selectedReportType}
-            onChange={setSelectedReportType}
-            options={REPORT_TYPES}
-            style={{ width: 220, borderRadius: 8 }}
-            disabled={!canExportReports || exporting}
-            aria-label="Chọn loại báo cáo xuất"
+            onChange={(val) => {
+              setSelectedReportType(val)
+              const matchedType = REPORT_TYPES.find((t) => t.value === val)
+              if (matchedType) {
+                setActiveTab(matchedType.tabKey)
+                updateUrlParams(matchedType.tabKey, range)
+              }
+            }}
+            options={REPORT_TYPES.map((t) => ({ label: t.label, value: t.value }))}
+            style={{ width: 180 }}
           />
 
           <RangePicker
             value={range}
-            format="DD/MM/YYYY"
             onChange={handleRangeChange}
+            format="DD/MM/YYYY"
             allowClear={false}
-            presets={[
-              { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
-              { label: 'Hôm qua', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
-              { label: '7 ngày qua', value: [dayjs().subtract(6, 'day'), dayjs()] },
-              { label: '30 ngày qua', value: [dayjs().subtract(29, 'day'), dayjs()] },
-              { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-              {
-                label: 'Tháng trước',
-                value: [
-                  dayjs().subtract(1, 'month').startOf('month'),
-                  dayjs().subtract(1, 'month').endOf('month'),
-                ],
-              },
-              { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
-              { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
-            ]}
-            style={{ borderRadius: 8, padding: '6px 12px' }}
           />
 
           <Button icon={<ReloadOutlined />} loading={loading} onClick={loadData}>
@@ -420,7 +426,6 @@ function ReportsPage() {
           <Button
             icon={<PrinterOutlined />}
             onClick={() => setPrintModalOpen(true)}
-            style={{ borderRadius: 8 }}
           >
             In báo cáo
           </Button>
@@ -430,9 +435,7 @@ function ReportsPage() {
               type="primary"
               icon={<DownloadOutlined />}
               loading={exporting}
-              disabled={!canExportReports || exporting || !range || !range[0] || !range[1]}
-              onClick={handleExportCSV}
-              style={{ borderRadius: 8, background: '#1677ff', fontWeight: 600 }}
+              onClick={handleExport}
             >
               Xuất CSV
             </Button>
@@ -440,21 +443,13 @@ function ReportsPage() {
         </Space>
       </div>
 
-      {/* Quick Date Presets Bar */}
-      <Card
-        size="small"
-        style={{
-          marginBottom: 16,
-          borderRadius: 10,
-          background: '#ffffff',
-          borderColor: '#e2e8f0',
-        }}
-        styles={{ body: { padding: '8px 14px' } }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-          <Space size={6} align="center" wrap>
-            <CalendarOutlined style={{ color: '#2563eb', marginRight: 4 }} />
-            <Text strong style={{ fontSize: 13, color: '#334155' }}>Chọn nhanh thời gian:</Text>
+      {/* Date Presets Toolbar */}
+      <Card size="small" style={{ marginBottom: 16, borderRadius: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <Space wrap size={6}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginRight: 4 }}>
+              <CalendarOutlined style={{ marginRight: 4 }} /> Chọn nhanh thời gian:
+            </span>
             <Button size="small" onClick={() => handleQuickPreset('TODAY')}>Hôm nay</Button>
             <Button size="small" onClick={() => handleQuickPreset('7DAYS')}>7 ngày</Button>
             <Button size="small" onClick={() => handleQuickPreset('30DAYS')}>30 ngày</Button>
@@ -468,17 +463,7 @@ function ReportsPage() {
         </div>
       </Card>
 
-      {!canViewReports && (
-        <Alert
-          type="error"
-          showIcon
-          message="Không có quyền xem báo cáo"
-          description="Bạn không có quyền truy cập module Báo cáo vận hành (Yêu cầu quyền REPORT_VIEW)."
-          style={{ marginBottom: 16 }}
-        />
-      )}
-
-      {loadError && canViewReports ? (
+      {loadError ? (
         <Alert
           type="error"
           showIcon

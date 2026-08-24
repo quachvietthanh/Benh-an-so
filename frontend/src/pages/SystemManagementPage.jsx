@@ -1,12 +1,10 @@
 import React from 'react'
-import { AppstoreOutlined, CloudServerOutlined, DatabaseOutlined, KeyOutlined, SafetyCertificateOutlined, SettingOutlined, TeamOutlined } from '@ant-design/icons'
-import { Tabs, Typography } from 'antd'
+import { DatabaseOutlined, KeyOutlined, SafetyCertificateOutlined, SettingOutlined, TeamOutlined } from '@ant-design/icons'
+import { Card, Empty, Tabs, Typography } from 'antd'
 import BackupRestorePage from './BackupRestorePage'
 import ClinicConfigurationPage from './ClinicConfigurationPage'
 import MedicalRecordAccessLogsPage from './MedicalRecordAccessLogsPage'
-import PrescriptionInterconnectionPage from './PrescriptionInterconnectionPage'
 import RolePermissionsPage from './RolePermissionsPage'
-import ServicesPage from './ServicesPage'
 import UsersPage from './UsersPage'
 import { useAuthContext } from '../context/AuthContext'
 
@@ -20,18 +18,11 @@ function SystemManagementPage() {
 
   const canViewConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || isAdmin
   const canViewUsers = userPermissions.includes('USER_READ') || isAdmin
-  const canViewRolePermissions = userPermissions.includes('ROLE_READ') || userPermissions.includes('PERMISSION_READ')
-  const canViewServices = userPermissions.includes('SERVICE_CATALOG_READ') || isAdmin
+  const canViewRolePermissions = userPermissions.includes('ROLE_READ') || userPermissions.includes('PERMISSION_READ') || isAdmin
   const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || isAdmin
   const canViewBackup = userPermissions.includes('BACKUP_READ') || isAdmin
-  const canViewInterconnections = userPermissions.includes('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin || userRoles.includes('manager') || userRoles.includes('clinic_manager')
 
   const tabItems = [
-    canViewInterconnections && {
-      key: 'interconnections',
-      label: <span><CloudServerOutlined /> Liên thông đơn thuốc</span>,
-      children: <PrescriptionInterconnectionPage />,
-    },
     canViewConfig && {
       key: 'clinic-config',
       label: <span><SettingOutlined /> Cấu hình phòng khám</span>,
@@ -47,11 +38,6 @@ function SystemManagementPage() {
       label: <span><KeyOutlined /> Phân quyền vai trò</span>,
       children: <RolePermissionsPage />,
     },
-    canViewServices && {
-      key: 'services',
-      label: <span><AppstoreOutlined /> Danh mục dịch vụ</span>,
-      children: <ServicesPage />,
-    },
     canViewAccessLogs && {
       key: 'access-logs',
       label: <span><SafetyCertificateOutlined /> Nhật ký truy cập bệnh án</span>,
@@ -64,6 +50,20 @@ function SystemManagementPage() {
     },
   ].filter(Boolean)
 
+  if (tabItems.length === 0) {
+    return (
+      <div className="system-management-page">
+        <div className="page-heading-block">
+          <Title level={3}>Quản trị hệ thống & Giám sát an toàn dữ liệu</Title>
+          <Text type="secondary">Quản lý tài khoản, phân quyền, cấu hình thông tin phòng khám, sao lưu dữ liệu và kiểm toán nhật ký truy cập bệnh án.</Text>
+        </div>
+        <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px', marginTop: 16 }}>
+          <Empty description="Tài khoản của bạn hiện chưa có quyền truy cập vào các module quản trị hệ thống." />
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="system-management-page">
       <div className="page-heading-block">
@@ -72,7 +72,7 @@ function SystemManagementPage() {
       </div>
       <Tabs
         className="system-tabs"
-        defaultActiveKey="clinic-config"
+        defaultActiveKey={tabItems[0]?.key || 'clinic-config'}
         items={tabItems}
       />
     </div>

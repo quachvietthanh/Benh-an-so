@@ -40,6 +40,14 @@ public class MedicalRecordAuthorizationService {
         return currentUserPort.getCurrentUserId();
     }
 
+    public UUID requireAmendAccess(UUID visitDoctorId) {
+        UUID userId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("DOCTOR") || !visitDoctorId.equals(userId)) {
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return userId;
+    }
+
     public UUID requireAuditReadAccess() {
         if (!permissionEvaluator.hasPermission("AUDIT_READ")) {
             throw new MedicalRecordAccessDeniedException();

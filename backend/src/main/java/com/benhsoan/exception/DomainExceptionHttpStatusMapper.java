@@ -53,6 +53,7 @@ final class DomainExceptionHttpStatusMapper {
                     INVALID_BACKUP_STATUS,
                     MEDICAL_RECORD_MISSING_AUTHORIZATION,
                     MEDICAL_RECORD_MISSING_DIAGNOSIS,
+                    MEDICAL_RECORD_NOT_LOCKED,
                     MEDICAL_RECORD_NOT_SIGNED,
                     PAYMENT_AMOUNT_MISMATCH,
                     SELF_DRUG_INTERACTION,
