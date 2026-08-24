@@ -1,14 +1,5 @@
 import dayjs from 'dayjs'
 
-/**
- * Checks if the current user has permission to view the medical record version history.
- * Authorized roles: ADMIN, MANAGER, CLINIC_MANAGER
- * Authorized permissions: MEDICAL_RECORD_VERSION_HISTORY_READ, AUDIT_READ
- *
- * @param {Array<string>} roles
- * @param {Array<string>} permissions
- * @returns {boolean}
- */
 export const canViewMedicalRecordVersionHistory = (roles = [], permissions = []) => {
   const normalizedRoles = (Array.isArray(roles) ? roles : [roles])
     .map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
@@ -36,12 +27,6 @@ export const canViewMedicalRecordVersionHistory = (roles = [], permissions = [])
   return false
 }
 
-/**
- * Normalizes and formats the raw backend version history response into a display-friendly structure.
- *
- * @param {Object} rawData - Response from GET /medical-records/{id}/versions
- * @returns {Object} Normalized version history data
- */
 export const normalizeVersionHistoryData = (rawData) => {
   if (!rawData) {
     return {
@@ -95,12 +80,6 @@ export const normalizeVersionHistoryData = (rawData) => {
   }
 }
 
-/**
- * Validates whether a record has sufficient information for version history query.
- *
- * @param {Object|string} recordOrId
- * @returns {{ valid: boolean, recordId: string|null, error: string|null }}
- */
 export const validateVersionHistoryQuery = (recordOrId) => {
   if (!recordOrId) {
     return { valid: false, recordId: null, error: 'Mã hồ sơ bệnh án không hợp lệ hoặc để trống.' }

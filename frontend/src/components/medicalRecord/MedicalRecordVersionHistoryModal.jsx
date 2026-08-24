@@ -33,10 +33,6 @@ import { getApiErrorMessage } from '../../utils/apiError'
 
 const { Title, Text, Paragraph } = Typography
 
-/**
- * Component Modal hiển thị chi tiết Toàn bộ Lịch sử Phiên bản của Hồ sơ Bệnh án.
- * Phục vụ cho vai trò Quản lý phòng khám đối soát, kiểm tra tính minh bạch của hồ sơ khi có khiếu nại.
- */
 const MedicalRecordVersionHistoryModal = ({
   open,
   onClose,
@@ -281,7 +277,6 @@ const MedicalRecordVersionHistoryModal = ({
       destroyOnClose
     >
       <div style={{ marginTop: 8 }}>
-        {/* Header thông tin hồ sơ */}
         <Card
           size="small"
           style={{

@@ -79,7 +79,6 @@ function MedicalRecordVersionHistoryPage() {
 
   const [searchKeyword, setSearchKeyword] = useState('')
 
-  // 1. Tải danh sách bệnh nhân
   const loadPatients = useCallback(async () => {
     setPatientLoading(true)
     try {
@@ -105,7 +104,6 @@ function MedicalRecordVersionHistoryPage() {
     loadPatients()
   }, [loadPatients])
 
-  // 2. Tải danh sách bệnh án theo bệnh nhân
   const loadPatientRecords = useCallback(async (patientId) => {
     if (!patientId) {
       setRecords([])
@@ -142,7 +140,6 @@ function MedicalRecordVersionHistoryPage() {
     }
   }, [selectedPatientId, loadPatientRecords])
 
-  // 3. Tải lịch sử phiên bản của bệnh án được chọn
   const loadVersionHistory = useCallback(async (record) => {
     const { valid, recordId, error } = validateVersionHistoryQuery(record)
     if (!valid || !recordId) {
@@ -183,7 +180,6 @@ function MedicalRecordVersionHistoryPage() {
     }
   }, [selectedRecord, loadVersionHistory])
 
-  // Lọc bệnh nhân
   const filteredPatients = useMemo(() => {
     if (!searchKeyword.trim()) return patients
     const q = searchKeyword.toLowerCase()
@@ -195,7 +191,6 @@ function MedicalRecordVersionHistoryPage() {
     )
   }, [patients, searchKeyword])
 
-  // Cột bảng bệnh án được thiết kế cân đối, không bị chật chội
   const recordColumns = [
     {
       title: 'Hồ sơ bệnh án',
@@ -430,7 +425,6 @@ function MedicalRecordVersionHistoryPage() {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <Title level={3} style={{ margin: 0, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
           <HistoryOutlined style={{ color: '#4f46e5' }} /> Lịch sử phiên bản bệnh án
@@ -441,7 +435,6 @@ function MedicalRecordVersionHistoryPage() {
       </div>
 
       <Row gutter={[16, 16]}>
-        {/* Cột trái: Chọn bệnh nhân & Bệnh án */}
         <Col xs={24} lg={10} xl={9}>
           <Card
             title={
@@ -544,7 +537,6 @@ function MedicalRecordVersionHistoryPage() {
           </Card>
         </Col>
 
-        {/* Cột phải: Dòng thời gian Lịch sử phiên bản */}
         <Col xs={24} lg={14} xl={15}>
           <Card
             title={
@@ -578,7 +570,6 @@ function MedicalRecordVersionHistoryPage() {
 
             {selectedRecord && (
               <div>
-                {/* Thẻ tóm tắt bệnh án */}
                 <Card
                   size="small"
                   style={{

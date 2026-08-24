@@ -7,21 +7,18 @@ import {
 } from '../utils/medicalRecordVersionHelpers.js'
 
 test('1. KIỂM THỬ PHÂN QUYỀN TRUY CẬP LỊCH SỬ PHIÊN BẢN (RBAC & Permissions)', () => {
-  // 1.1 Vai trò được phép theo nghiệp vụ: Quản lý phòng khám, Quản lý, Admin
   assert.equal(canViewMedicalRecordVersionHistory(['manager']), true, 'Manager phải có quyền xem lịch sử phiên bản')
   assert.equal(canViewMedicalRecordVersionHistory(['clinic_manager']), true, 'Clinic manager phải có quyền xem lịch sử phiên bản')
   assert.equal(canViewMedicalRecordVersionHistory(['admin']), true, 'Admin phải có quyền xem lịch sử phiên bản')
   assert.equal(canViewMedicalRecordVersionHistory(['ROLE_CLINIC_MANAGER']), true, 'ROLE_ prefix phải được chuẩn hóa đúng')
   assert.equal(canViewMedicalRecordVersionHistory(['ROLE_MANAGER']), true, 'ROLE_ prefix phải được chuẩn hóa đúng')
 
-  // 1.2 Vai trò không có quyền mặc định (Bác sĩ, Lễ tân, Dược sĩ...)
   assert.equal(canViewMedicalRecordVersionHistory(['doctor']), false, 'Bác sĩ không có quyền mặc định xem toàn bộ lịch sử quản lý nếu không cấp permission')
   assert.equal(canViewMedicalRecordVersionHistory(['receptionist']), false, 'Lễ tân không có quyền')
   assert.equal(canViewMedicalRecordVersionHistory(['pharmacist']), false, 'Dược sĩ không có quyền')
   assert.equal(canViewMedicalRecordVersionHistory(['nurse']), false, 'Điều dưỡng không có quyền')
   assert.equal(canViewMedicalRecordVersionHistory([]), false, 'Không có vai trò phải bị từ chối')
 
-  // 1.3 Phân quyền trực tiếp qua permission (MEDICAL_RECORD_VERSION_HISTORY_READ)
   assert.equal(
     canViewMedicalRecordVersionHistory(['doctor'], ['MEDICAL_RECORD_VERSION_HISTORY_READ']),
     true,
@@ -40,7 +37,6 @@ test('1. KIỂM THỬ PHÂN QUYỀN TRUY CẬP LỊCH SỬ PHIÊN BẢN (RBAC & 
 })
 
 test('2. KIỂM THỬ ĐIỀU KIỆN TRUY VẤN LỊCH SỬ PHIÊN BẢN', () => {
-  // 2.1 Mã hồ sơ hợp lệ
   const validQuery1 = validateVersionHistoryQuery('e0000000-0000-0000-0000-000000000009')
   assert.equal(validQuery1.valid, true)
   assert.equal(validQuery1.recordId, 'e0000000-0000-0000-0000-000000000009')
@@ -54,7 +50,6 @@ test('2. KIỂM THỬ ĐIỀU KIỆN TRUY VẤN LỊCH SỬ PHIÊN BẢN', () =>
   assert.equal(validQuery3.valid, true)
   assert.equal(validQuery3.recordId, 'mr-456')
 
-  // 2.2 Mã hồ sơ không hợp lệ / để trống
   const invalidQuery1 = validateVersionHistoryQuery(null)
   assert.equal(invalidQuery1.valid, false)
   assert.match(invalidQuery1.error, /không hợp lệ/)
@@ -95,7 +90,6 @@ test('3. KIỂM THỬ HIỂN THỊ HỒ SƠ CHỈ CÓ BẢN GỐC (Chưa có b�
   assert.equal(result.totalVersions, 1, 'Tổng số phiên bản là 1')
   assert.equal(result.amendments.length, 0, 'Danh sách đính chính rỗng')
 
-  // Kiểm tra phiên bản gốc v1
   assert.equal(result.originalVersion.versionNumber, 1)
   assert.equal(result.originalVersion.isOriginal, true)
   assert.equal(result.originalVersion.modifiedBy, 'BS. Lê Minh Hoàng')
@@ -153,7 +147,6 @@ test('4. KIỂM THỬ HIỂN THỊ HỒ SƠ ĐÃ CÓ BẢN ĐÍNH CHÍNH (Transp
   assert.equal(result.totalVersions, 3, 'Tổng số phiên bản là 3 (1 gốc + 2 đính chính)')
   assert.equal(result.amendments.length, 2, 'Có 2 bản đính chính')
 
-  // 4.2 Kiểm tra thứ tự và thông tin bản đính chính 1 (v2)
   const amendment1 = result.amendments[0]
   assert.equal(amendment1.versionNumber, 2)
   assert.equal(amendment1.isOriginal, false)
@@ -161,7 +154,6 @@ test('4. KIỂM THỬ HIỂN THỊ HỒ SƠ ĐÃ CÓ BẢN ĐÍNH CHÍNH (Transp
   assert.equal(amendment1.reason, 'Bổ sung chẩn đoán sau khi có kết quả X-Quang phổi')
   assert.match(amendment1.content, /Viêm phổi mắc phải cộng đồng/)
 
-  // 4.3 Kiểm tra thứ tự và thông tin bản đính chính 2 (v3)
   const amendment2 = result.amendments[1]
   assert.equal(amendment2.versionNumber, 3)
   assert.equal(amendment2.isOriginal, false)
@@ -169,7 +161,6 @@ test('4. KIỂM THỬ HIỂN THỊ HỒ SƠ ĐÃ CÓ BẢN ĐÍNH CHÍNH (Transp
   assert.equal(amendment2.reason, 'Đính chính sai sót chính tả thông tin tiền sử dị ứng theo khiếu nại của bệnh nhân')
   assert.match(amendment2.content, /dị ứng Penicillin/)
 
-  // 4.4 Kiểm tra toàn bộ danh sách phiên bản allVersions
   assert.equal(result.allVersions.length, 3)
   assert.equal(result.allVersions[0].versionNumber, 1, 'Phiên bản đầu tiên trong danh sách phải là v1 (bản gốc)')
   assert.equal(result.allVersions[1].versionNumber, 2, 'Phiên bản thứ hai là v2 (đính chính 1)')
