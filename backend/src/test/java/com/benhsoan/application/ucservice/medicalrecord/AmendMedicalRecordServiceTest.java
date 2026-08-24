@@ -21,7 +21,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordAmendment;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAmendmentRequiresCompletedVisitException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotLockedException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
@@ -29,10 +33,13 @@ import com.benhsoan.port.dto.command.medicalrecord.AmendMedicalRecordCommand;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAmendmentRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)
 class AmendMedicalRecordServiceTest {
+
+    private static final Instant NOW = Instant.parse("2026-08-20T02:00:00Z");
 
     @Mock private MedicalRecordRepository medicalRecordRepository;
     @Mock private MedicalRecordAmendmentRepository amendmentRepository;
@@ -40,37 +47,118 @@ class AmendMedicalRecordServiceTest {
     @Mock private MedicalRecordAuthorizationService authorizationService;
     @Mock private MedicalRecordAccessAuditService accessAuditService;
     @Mock private ClockPort clockPort;
+    @Mock private CurrentUserPort currentUserPort;
+    @Mock private MedicalRecordAmendmentAuditWriter amendmentAuditWriter;
     @Spy private MedicalRecordResultMapper resultMapper = new MedicalRecordResultMapper();
     @InjectMocks private AmendMedicalRecordService service;
 
     @Test
-    void amendsLockedRecordAndWritesAmendAudit() {
+    void amendsSignedRecordAndWritesAmendAndAccessAudits() {
         UUID recordId = UUID.randomUUID();
         UUID visitId = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Instant now = Instant.parse("2026-08-20T02:00:00Z");
-        MedicalRecord record = MedicalRecord.create(visitId, "Headache", null, null, null, null, null, null,
-                "Stable", userId, now);
-        record.sign("SIG", userId, now);
-        record.lock(userId, now);
-        record = MedicalRecord.restore(recordId, record.getVisitId(), record.getChiefComplaint(), record.getSymptoms(),
-                record.getMedicalHistory(), record.getPhysicalExamination(), record.getClinicalProgress(), record.getTreatmentPlan(),
-                record.getDoctorInstructions(), record.getConclusion(), record.getStatus(), record.getLockedAt(), record.getLockedBy(),
-                record.getCreatedBy(), record.getCreatedAt(), record.getUpdatedBy(), record.getUpdatedAt());
-        Visit visit = Visit.restore(visitId, "VIS-001", patientId, UUID.randomUUID(), null, null,
-                VisitType.WALK_IN, VisitStatus.COMPLETED, now, now, now, "Consultation", null, userId, now, now);
-        when(authorizationService.requireWriteAccess()).thenReturn(userId);
+        MedicalRecord record = record(recordId, visitId, userId, MedicalRecordStatus.LOCKED);
+        Visit visit = visit(visitId, patientId, userId, VisitStatus.COMPLETED);
+
         when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
-        when(clockPort.now()).thenReturn(now);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(clockPort.now()).thenReturn(NOW);
         when(amendmentRepository.save(any(MedicalRecordAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var result = service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification"));
 
         assertEquals(recordId, result.medicalRecordId());
+        verify(amendmentAuditWriter).writeAmended(userId, recordId, "Clarification", NOW);
         verify(accessAuditService).recordRecordAccess(patientId, visitId, recordId, userId,
-                MedicalRecordAccessAction.AMEND, "Medical record amended", now);
+                MedicalRecordAccessAction.AMEND, "Medical record amended", NOW);
+    }
+
+    @Test
+    void rejectsAmendmentWithBlankReason() {
+        UUID recordId = UUID.randomUUID();
+        when(medicalRecordRepository.findById(recordId))
+                .thenReturn(Optional.of(record(recordId, UUID.randomUUID(), UUID.randomUUID(), MedicalRecordStatus.LOCKED)));
+
+        assertThrows(ValidationException.class,
+                () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", " ")));
+
+        verifyNoInteractions(authorizationService, currentUserPort, amendmentRepository, accessAuditService, amendmentAuditWriter);
+    }
+
+    @Test
+    void rejectsAmendmentForUnsignedDraftRecord() {
+        UUID recordId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(medicalRecordRepository.findById(recordId))
+                .thenReturn(Optional.of(record(recordId, UUID.randomUUID(), userId, MedicalRecordStatus.DRAFT)));
+
+        assertThrows(MedicalRecordNotLockedException.class,
+                () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
+
+        verifyNoInteractions(amendmentRepository, accessAuditService, amendmentAuditWriter, authorizationService);
+    }
+
+    @Test
+    void rejectsAmendmentForArchivedRecord() {
+        UUID recordId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(medicalRecordRepository.findById(recordId))
+                .thenReturn(Optional.of(record(recordId, UUID.randomUUID(), userId, MedicalRecordStatus.ARCHIVED)));
+
+        assertThrows(MedicalRecordNotLockedException.class,
+                () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
+
+        verifyNoInteractions(amendmentRepository, accessAuditService, amendmentAuditWriter, authorizationService);
+    }
+
+    @Test
+    void rejectsAmendmentByAdminAndWritesDenialAudit() {
+        UUID recordId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID assignedDoctorId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        MedicalRecord record = record(recordId, visitId, assignedDoctorId, MedicalRecordStatus.LOCKED);
+        Visit visit = visit(visitId, patientId, assignedDoctorId, VisitStatus.COMPLETED);
+
+        when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(currentUserPort.getCurrentUserId()).thenReturn(adminId);
+        when(authorizationService.requireAmendAccess(assignedDoctorId)).thenThrow(new MedicalRecordAccessDeniedException());
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(MedicalRecordAccessDeniedException.class,
+                () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
+
+        verify(amendmentAuditWriter).writeDenied(adminId, recordId,
+                "Medical record amendment denied: not the responsible doctor.", NOW);
+        verifyNoInteractions(amendmentRepository, accessAuditService);
+    }
+
+    @Test
+    void rejectsAmendmentForNonAssignedDoctorAndWritesDenialAudit() {
+        UUID recordId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID assignedDoctorId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        MedicalRecord record = record(recordId, visitId, assignedDoctorId, MedicalRecordStatus.LOCKED);
+        Visit visit = visit(visitId, patientId, assignedDoctorId, VisitStatus.COMPLETED);
+
+        when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(authorizationService.requireAmendAccess(assignedDoctorId)).thenThrow(new MedicalRecordAccessDeniedException());
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(MedicalRecordAccessDeniedException.class,
+                () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
+
+        verify(amendmentAuditWriter).writeDenied(actorId, recordId,
+                "Medical record amendment denied: not the responsible doctor.", NOW);
+        verifyNoInteractions(amendmentRepository, accessAuditService);
     }
 
     @Test
@@ -78,25 +166,25 @@ class AmendMedicalRecordServiceTest {
         UUID recordId = UUID.randomUUID();
         UUID visitId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Instant now = Instant.parse("2026-08-20T02:00:00Z");
-        MedicalRecord draft = MedicalRecord.create(visitId, "Headache", null, null, null, null, null, null,
-                "Stable", userId, now);
-        draft.sign("SIG", userId, now);
-        draft.lock(userId, now);
-        MedicalRecord record = MedicalRecord.restore(recordId, draft.getVisitId(), draft.getChiefComplaint(),
-                draft.getSymptoms(), draft.getMedicalHistory(), draft.getPhysicalExamination(),
-                draft.getClinicalProgress(), draft.getTreatmentPlan(), draft.getDoctorInstructions(),
-                draft.getConclusion(), draft.getStatus(), draft.getLockedAt(), draft.getLockedBy(),
-                draft.getCreatedBy(), draft.getCreatedAt(), draft.getUpdatedBy(), draft.getUpdatedAt());
-        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null,
-                VisitType.WALK_IN, VisitStatus.CANCELLED, now, null, null, "Consultation", null, userId, now, now);
-        when(authorizationService.requireWriteAccess()).thenReturn(userId);
+        MedicalRecord record = record(recordId, visitId, userId, MedicalRecordStatus.LOCKED);
+        Visit visit = visit(visitId, UUID.randomUUID(), userId, VisitStatus.CANCELLED);
+
         when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
 
         assertThrows(MedicalRecordAmendmentRequiresCompletedVisitException.class,
                 () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
 
-        verifyNoInteractions(amendmentRepository, accessAuditService);
+        verifyNoInteractions(amendmentRepository, accessAuditService, amendmentAuditWriter, authorizationService);
+    }
+
+    private MedicalRecord record(UUID recordId, UUID visitId, UUID creatorId, MedicalRecordStatus status) {
+        return MedicalRecord.restore(recordId, visitId, "c", "s", "h", "p", "cp", "tp", "di", "co",
+                status, status == MedicalRecordStatus.LOCKED ? NOW : null, creatorId, creatorId, NOW, null, null);
+    }
+
+    private Visit visit(UUID visitId, UUID patientId, UUID doctorId, VisitStatus status) {
+        return Visit.restore(visitId, "VIS-001", patientId, doctorId, null, null, VisitType.WALK_IN, status,
+                NOW, NOW, NOW, "Consultation", null, doctorId, NOW, NOW);
     }
 }
