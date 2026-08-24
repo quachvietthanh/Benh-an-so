@@ -116,6 +116,17 @@ class MedicalRecordAmendmentSecurityIntegrationTest {
     }
 
     @Test
+    void adminWithoutMedicalRecordUpdatePermissionReturns403() throws Exception {
+        mockMvc.perform(post("/medical-records/{medicalRecordId}/amendments", recordId)
+                        .with(user("admin").authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"Correction","reason":"Clarification"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void receptionistWithoutMedicalRecordUpdatePermissionReturns403() throws Exception {
         mockMvc.perform(post("/medical-records/{medicalRecordId}/amendments", recordId)
                         .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ")))

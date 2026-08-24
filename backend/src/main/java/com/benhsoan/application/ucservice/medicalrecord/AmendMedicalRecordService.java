@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordAmendment;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAmendmentRequiresCompletedVisitException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
@@ -49,7 +50,8 @@ public class AmendMedicalRecordService implements AmendMedicalRecordUseCase {
 
         validateCommand(command);
 
-        if (!record.isContentLocked()) {
+        if (record.getStatus() != MedicalRecordStatus.SIGNED
+                && record.getStatus() != MedicalRecordStatus.LOCKED) {
             throw new MedicalRecordNotLockedException();
         }
 

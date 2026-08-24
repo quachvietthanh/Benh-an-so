@@ -101,6 +101,43 @@ class AmendMedicalRecordServiceTest {
     }
 
     @Test
+    void rejectsAmendmentForArchivedRecord() {
+        UUID recordId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(medicalRecordRepository.findById(recordId))
+                .thenReturn(Optional.of(record(recordId, UUID.randomUUID(), userId, MedicalRecordStatus.ARCHIVED)));
+
+        assertThrows(MedicalRecordNotLockedException.class,
+                () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
+
+        verifyNoInteractions(amendmentRepository, accessAuditService, amendmentAuditWriter, authorizationService);
+    }
+
+    @Test
+    void rejectsAmendmentByAdminAndWritesDenialAudit() {
+        UUID recordId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID assignedDoctorId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        MedicalRecord record = record(recordId, visitId, assignedDoctorId, MedicalRecordStatus.LOCKED);
+        Visit visit = visit(visitId, patientId, assignedDoctorId, VisitStatus.COMPLETED);
+
+        when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(currentUserPort.getCurrentUserId()).thenReturn(adminId);
+        when(authorizationService.requireAmendAccess(assignedDoctorId)).thenThrow(new MedicalRecordAccessDeniedException());
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(MedicalRecordAccessDeniedException.class,
+                () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
+
+        verify(amendmentAuditWriter).writeDenied(adminId, recordId,
+                "Medical record amendment denied: not the responsible doctor.", NOW);
+        verifyNoInteractions(amendmentRepository, accessAuditService);
+    }
+
+    @Test
     void rejectsAmendmentForNonAssignedDoctorAndWritesDenialAudit() {
         UUID recordId = UUID.randomUUID();
         UUID visitId = UUID.randomUUID();

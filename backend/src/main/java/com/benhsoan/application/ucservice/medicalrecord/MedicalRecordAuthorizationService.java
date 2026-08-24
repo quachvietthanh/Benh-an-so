@@ -41,8 +41,8 @@ public class MedicalRecordAuthorizationService {
     }
 
     public UUID requireAmendAccess(UUID visitDoctorId) {
-        UUID userId = requireWriteAccess();
-        if (!currentUserPort.hasRole("ADMIN") && !visitDoctorId.equals(userId)) {
+        UUID userId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("DOCTOR") || !visitDoctorId.equals(userId)) {
             throw new MedicalRecordAccessDeniedException();
         }
         return userId;
