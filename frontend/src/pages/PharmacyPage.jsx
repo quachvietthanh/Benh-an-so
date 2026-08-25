@@ -777,17 +777,16 @@ function PharmacyPage() {
                     cancelText="Kiểm tra lại"
                     okButtonProps={{
                       type: 'primary',
-                      size: 'large',
                       icon: <CheckCircleOutlined />,
-                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 600 },
+                      style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                     }}
                     cancelButtonProps={{
-                      size: 'large',
                       icon: <RollbackOutlined />,
-                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 500 },
+                      style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                     }}
                     onConfirm={handleDispense}
                     disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                    overlayClassName="dispense-confirm-popconfirm"
                     overlayStyle={{ maxWidth: 500 }}
                   >
                     <Button

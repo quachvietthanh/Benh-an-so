@@ -902,11 +902,10 @@ function MedicalRecordCopyPage() {
                         <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
                           <Button
                             type="primary"
-                            size="large"
                             icon={<EyeOutlined />}
                             disabled={!selectedRecord || selectedRecord.status !== 'LOCKED' || !canUseFeature}
                             onClick={handleOpenPreview}
-                            style={{ backgroundColor: '#2563eb', height: 44, fontWeight: 600 }}
+                            style={{ backgroundColor: '#2563eb', fontWeight: 600 }}
                           >
                             Xem trước & Xuất bản sao
                           </Button>

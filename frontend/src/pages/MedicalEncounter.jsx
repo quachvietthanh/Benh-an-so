@@ -907,7 +907,6 @@ function MedicalEncounter() {
               <>
                 <Button
                   type="primary"
-                  size="large"
                   loading={saving}
                   icon={<CheckCircleOutlined />}
                   onClick={() => saveRecord()}
@@ -916,7 +915,6 @@ function MedicalEncounter() {
                 </Button>
                 <Button
                   type="primary"
-                  size="large"
                   icon={<SafetyCertificateOutlined />}
                   onClick={handleOpenSignFlow}
                   style={{
