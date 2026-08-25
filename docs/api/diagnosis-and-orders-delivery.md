@@ -33,6 +33,7 @@ Authorization: Bearer <token>
     "id": "a1000000-0000-0000-0000-000000000019",
     "code": "J00",
     "name": "Common cold",
+    "diseaseGroup": "Hệ hô hấp",
     "description": "Viêm mũi hầu cấp tính",
     "active": true,
     "createdAt": "2026-07-30T01:00:00Z",

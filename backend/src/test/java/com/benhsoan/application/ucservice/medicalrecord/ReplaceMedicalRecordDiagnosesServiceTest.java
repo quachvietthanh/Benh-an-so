@@ -62,8 +62,8 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
         MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
         Visit visit = Visit.restore(visitId, "VIS-001", patientId, UUID.randomUUID(), null, null, VisitType.WALK_IN,
                 VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
-        DiagnosisCatalog primary = DiagnosisCatalog.restore(primaryCatalogId, "J06.9", "Upper respiratory infection", null, true, now, null);
-        DiagnosisCatalog secondary = DiagnosisCatalog.restore(secondaryCatalogId, "R50.9", "Fever", null, true, now, null);
+        DiagnosisCatalog primary = DiagnosisCatalog.restore(primaryCatalogId, "J06.9", "Upper respiratory infection", "Respiratory", null, true, now, null);
+        DiagnosisCatalog secondary = DiagnosisCatalog.restore(secondaryCatalogId, "R50.9", "Fever", "Symptoms and signs", null, true, now, null);
         when(authorizationService.requireWriteAccess()).thenReturn(actorId);
         when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
@@ -137,6 +137,35 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
     }
 
     @Test
+    void rejectsInactiveCatalogForPrimaryDiagnosis() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID catalogId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
+        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
+                VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
+        DiagnosisCatalog inactiveCatalog = DiagnosisCatalog.restore(
+                catalogId, "J06.9", "Upper respiratory infection", "Respiratory", null, false, now, null
+        );
+        when(authorizationService.requireWriteAccess()).thenReturn(actorId);
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(clockPort.now()).thenReturn(now);
+        when(diagnosisCatalogRepository.findById(catalogId)).thenReturn(Optional.of(inactiveCatalog));
+
+        assertThrows(ValidationException.class, () -> service.replace(record.getId(),
+                new ReplaceMedicalRecordDiagnosesCommand(
+                        new ReplaceMedicalRecordDiagnosesCommand.DiagnosisCommand(
+                                catalogId, "J06.9", "Upper respiratory infection", null
+                        ),
+                        List.of()
+                )));
+
+        verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
+    }
+
+    @Test
     void doesNotWriteAuditWhenReplacingDiagnosesFails() {
         UUID actorId = UUID.randomUUID();
         UUID visitId = UUID.randomUUID();
@@ -145,7 +174,7 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
         MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
         Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
                 VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
-        DiagnosisCatalog catalog = DiagnosisCatalog.restore(catalogId, "J06.9", "Upper respiratory infection", null, true, now, null);
+        DiagnosisCatalog catalog = DiagnosisCatalog.restore(catalogId, "J06.9", "Upper respiratory infection", "Respiratory", null, true, now, null);
         when(authorizationService.requireWriteAccess()).thenReturn(actorId);
         when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));

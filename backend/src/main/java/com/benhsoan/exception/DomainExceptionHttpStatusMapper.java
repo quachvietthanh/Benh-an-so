@@ -17,6 +17,7 @@ final class DomainExceptionHttpStatusMapper {
                     CLINICAL_ATTACHMENT_NOT_FOUND,
                     CLINICAL_ORDER_ITEM_NOT_FOUND,
                     CLINICAL_RESULT_NOT_FOUND,
+                    DIAGNOSIS_CATALOG_NOT_FOUND,
                     DOCTOR_NOT_FOUND,
                     DRUG_INTERACTION_NOT_FOUND,
                     FOLLOW_UP_REMINDER_NOT_FOUND,

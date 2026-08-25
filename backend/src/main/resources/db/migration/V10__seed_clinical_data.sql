@@ -337,6 +337,33 @@ INSERT INTO diagnosis_catalog (id, code, name, description, active, created_at, 
 (UUID_TO_BIN('a1000000-0000-0000-0000-00000000004f'), 'Z23', 'Tiêm chủng', 'Tiêm chủng vắc xin', TRUE, NOW(), NULL),
 (UUID_TO_BIN('a1000000-0000-0000-0000-000000000050'), 'Z30.0', 'Kế hoạch hóa gia đình', 'Tư vấn và dịch vụ kế hoạch hóa gia đình', TRUE, NOW(), NULL);
 
+-- Categorize all diagnosis seeds, including R51.9 inserted earlier in this migration.
+UPDATE diagnosis_catalog
+SET disease_group = CASE LEFT(code, 1)
+    WHEN 'A' THEN 'Nhiễm trùng và ký sinh trùng'
+    WHEN 'B' THEN 'Nhiễm trùng và ký sinh trùng'
+    WHEN 'C' THEN 'Khối u'
+    WHEN 'D' THEN 'Khối u'
+    WHEN 'E' THEN 'Nội tiết, dinh dưỡng và chuyển hóa'
+    WHEN 'F' THEN 'Rối loạn tâm thần và hành vi'
+    WHEN 'G' THEN 'Hệ thần kinh'
+    WHEN 'H' THEN 'Mắt, tai và phần phụ'
+    WHEN 'I' THEN 'Hệ tuần hoàn'
+    WHEN 'J' THEN 'Hệ hô hấp'
+    WHEN 'K' THEN 'Hệ tiêu hóa'
+    WHEN 'L' THEN 'Da và mô dưới da'
+    WHEN 'M' THEN 'Cơ xương khớp và mô liên kết'
+    WHEN 'N' THEN 'Hệ tiết niệu sinh dục'
+    WHEN 'R' THEN 'Triệu chứng, dấu hiệu và bất thường lâm sàng'
+    WHEN 'S' THEN 'Chấn thương và ngộ độc'
+    WHEN 'T' THEN 'Chấn thương và ngộ độc'
+    WHEN 'Z' THEN 'Yếu tố ảnh hưởng tình trạng sức khỏe'
+    ELSE 'Khác'
+END;
+
+ALTER TABLE diagnosis_catalog
+    MODIFY COLUMN disease_group VARCHAR(100) NOT NULL;
+
 
 -- =====================================================
 -- V16 - Seed Clinical Service Catalog

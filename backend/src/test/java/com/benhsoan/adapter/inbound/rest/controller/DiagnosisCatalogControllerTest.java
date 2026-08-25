@@ -61,13 +61,14 @@ class DiagnosisCatalogControllerTest {
     void searchReturnsResults() throws Exception {
         when(getDiagnosisCatalogUseCase.search("cold"))
                 .thenReturn(List.of(new DiagnosisCatalogResult(
-                        id, "J00", "Common cold", "Desc", true, Instant.now(), null)));
+                        id, "J00", "Common cold", "Respiratory", "Desc", true, Instant.now(), null)));
 
         mockMvc.perform(get("/diagnosis-catalog")
                         .param("search", "cold"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("J00"))
-                .andExpect(jsonPath("$[0].name").value("Common cold"));
+                .andExpect(jsonPath("$[0].name").value("Common cold"))
+                .andExpect(jsonPath("$[0].diseaseGroup").value("Respiratory"));
     }
 
     @Test

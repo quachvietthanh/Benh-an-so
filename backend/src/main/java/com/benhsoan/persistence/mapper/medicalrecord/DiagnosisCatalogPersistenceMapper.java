@@ -8,10 +8,16 @@ import com.benhsoan.persistence.entity.medicalrecord.DiagnosisCatalogEntity;
 public class DiagnosisCatalogPersistenceMapper {
 
     public DiagnosisCatalog toDomain(DiagnosisCatalogEntity e) {
-        return e == null ? null : DiagnosisCatalog.restore(e.getId(), e.getCode(), e.getName(), e.getDescription(), e.isActive(), e.getCreatedAt(), e.getUpdatedAt());
+        return e == null ? null : DiagnosisCatalog.restore(
+                e.getId(), e.getCode(), e.getName(), e.getDiseaseGroup(), e.getDescription(),
+                e.isActive(), e.getCreatedAt(), e.getUpdatedAt()
+        );
     }
 
     public DiagnosisCatalogEntity toEntity(DiagnosisCatalog d) {
-        return d == null ? null : DiagnosisCatalogEntity.builder().id(d.getId()).code(d.getCode()).name(d.getName()).description(d.getDescription()).active(d.isActive()).createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt()).build();
+        return d == null ? null : DiagnosisCatalogEntity.builder()
+                .id(d.getId()).code(d.getCode()).name(d.getName()).diseaseGroup(d.getDiseaseGroup())
+                .description(d.getDescription()).active(d.isActive()).createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt())
+                .build();
     }
 }
