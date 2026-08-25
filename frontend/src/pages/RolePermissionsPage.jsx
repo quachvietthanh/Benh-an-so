@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Button,
@@ -23,6 +23,7 @@ import {
 import RoleOverviewCards from '../components/rolePermissions/RoleOverviewCards'
 import RolePermissionsFilterBar from '../components/rolePermissions/RolePermissionsFilterBar'
 import RolePermissionsMatrixTable from '../components/rolePermissions/RolePermissionsMatrixTable'
+import RolePermissionsSingleRoleView from '../components/rolePermissions/RolePermissionsSingleRoleView'
 import RolePermissionsMobileView from '../components/rolePermissions/RolePermissionsMobileView'
 import RolePermissionsConfirmModal from '../components/rolePermissions/RolePermissionsConfirmModal'
 
@@ -51,6 +52,14 @@ function RolePermissionsPage() {
 
   // Saving state tracking per roleId
   const [savingRoleId, setSavingRoleId] = useState(null)
+
+  // View Mode: 'matrix' (Ma trận 5 cột) | 'single' (Xem theo từng vai trò)
+  const [viewMode, setViewMode] = useState('matrix')
+  const [selectedRoleId, setSelectedRoleId] = useState(null)
+
+  // Accordion Expand/Collapse state: Set of expanded module keys
+  const [expandedModules, setExpandedModules] = useState(new Set())
+  const hasInitializedExpanded = useRef(false)
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('')
@@ -85,8 +94,13 @@ function RolePermissionsPage() {
       setRoles(fetchedRoles)
       setPermissions(fetchedPermissions)
 
-      if (fetchedRoles.length > 0 && !mobileSelectedRoleId) {
-        setMobileSelectedRoleId(fetchedRoles[0].id)
+      if (fetchedRoles.length > 0) {
+        if (!selectedRoleId) {
+          setSelectedRoleId(fetchedRoles[0].id)
+        }
+        if (!mobileSelectedRoleId) {
+          setMobileSelectedRoleId(fetchedRoles[0].id)
+        }
       }
 
       // Build Set maps for original and draft
@@ -111,11 +125,25 @@ function RolePermissionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [canRead, mobileSelectedRoleId])
+  }, [canRead, selectedRoleId, mobileSelectedRoleId])
 
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Extract all distinct modules
+  const modules = useMemo(() => {
+    const set = new Set(permissions.map((p) => p.module).filter(Boolean))
+    return Array.from(set).sort()
+  }, [permissions])
+
+  // Initialize expanded modules once data arrives
+  useEffect(() => {
+    if (modules.length > 0 && !hasInitializedExpanded.current) {
+      setExpandedModules(new Set(modules))
+      hasInitializedExpanded.current = true
+    }
+  }, [modules])
 
   // Check if a specific role has unsaved changes
   const isRoleDirty = useCallback(
@@ -195,8 +223,8 @@ function RolePermissionsPage() {
         setRoles((prev) => prev.map((role) => (role.id === roleId ? savedRole : role)))
         return true
       } catch (err) {
-        const errorMsg = err.response?.data?.message || 'KhÃ´ng thá»ƒ lÆ°u phÃ¢n quyá»n lÃªn há»‡ thá»‘ng.'
-        message.error(`Lá»—i cáº­p nháº­t phÃ¢n quyá»n: ${errorMsg}`)
+        const errorMsg = err.response?.data?.message || 'Không thể lưu phân quyền lên hệ thống.'
+        message.error(`Lỗi cập nhật phân quyền: ${errorMsg}`)
         return false
       } finally {
         setSavingRoleId(null)
@@ -261,6 +289,29 @@ function RolePermissionsPage() {
     },
     [draftPermissionsByRole],
   )
+
+  // Toggle expand/collapse for a single module
+  const handleToggleExpandModule = useCallback((modKey) => {
+    setExpandedModules((prev) => {
+      const next = new Set(prev)
+      if (next.has(modKey)) {
+        next.delete(modKey)
+      } else {
+        next.add(modKey)
+      }
+      return next
+    })
+  }, [])
+
+  // Expand all modules
+  const handleExpandAll = useCallback(() => {
+    setExpandedModules(new Set(modules))
+  }, [modules])
+
+  // Collapse all modules
+  const handleCollapseAll = useCallback(() => {
+    setExpandedModules(new Set())
+  }, [])
 
   // Reset a role back to original backend state
   const handleResetRole = useCallback(
@@ -328,7 +379,7 @@ function RolePermissionsPage() {
         setSavingRoleId(null)
       }
     },
-    [draftPermissionsByRole],
+    [draftPermissionsByRole, user, updateCurrentUserPermissions],
   )
 
   // Confirm save from modal
@@ -359,12 +410,6 @@ function RolePermissionsPage() {
     }
   }, [hasAnyDirtyRole, loadData])
 
-  // Extract all distinct modules
-  const modules = useMemo(() => {
-    const set = new Set(permissions.map((p) => p.module).filter(Boolean))
-    return Array.from(set).sort()
-  }, [permissions])
-
   // Filter permissions based on search keyword and module
   const filteredPermissions = useMemo(() => {
     return permissions.filter((perm) => {
@@ -390,7 +435,7 @@ function RolePermissionsPage() {
     })
   }, [permissions, selectedModule, searchTerm, onlyShowDirty, isPermissionDirtyInAnyRole])
 
-  // Group filtered permissions by module for structured table rendering
+  // Group filtered permissions by module for structured rendering
   const groupedPermissions = useMemo(() => {
     const map = {}
     filteredPermissions.forEach((p) => {
@@ -400,6 +445,14 @@ function RolePermissionsPage() {
     })
     return map
   }, [filteredPermissions])
+
+  // Auto-expand modules that have search matches
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const matchingModuleKeys = Object.keys(groupedPermissions)
+      setExpandedModules((prev) => new Set([...prev, ...matchingModuleKeys]))
+    }
+  }, [searchTerm, groupedPermissions])
 
   // Mobile selected role object
   const mobileRole = useMemo(() => {
@@ -426,17 +479,11 @@ function RolePermissionsPage() {
         .hidden-mobile {
           display: block;
         }
-        .role-matrix-table th, .role-matrix-table td {
-          transition: background-color 0.15s ease;
-        }
-        .perm-row-hover:hover {
-          background-color: #f1f5f9 !important;
-        }
         @media (max-width: 860px) {
           .visible-mobile {
             display: block;
           }
-          .hidden-mobile, .role-matrix-desktop-container {
+          .hidden-mobile, .role-matrix-desktop-container, .role-permissions-single-view {
             display: none;
           }
         }
@@ -539,7 +586,7 @@ function RolePermissionsPage() {
         onSaveRole={handleRequestSaveRole}
       />
 
-      {/* FILTER & SEARCH TOOLBAR */}
+      {/* FILTER & SEARCH TOOLBAR WITH VIEW MODE AND EXPAND/COLLAPSE */}
       <RolePermissionsFilterBar
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -554,25 +601,56 @@ function RolePermissionsPage() {
         canUpdate={canUpdate}
         filteredCount={filteredPermissions.length}
         totalCount={permissions.length}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        onExpandAll={handleExpandAll}
+        onCollapseAll={handleCollapseAll}
         onSaveAllDirty={handleSaveAllDirty}
         onResetAllDirty={handleResetAllDirty}
       />
 
-      {/* DESKTOP MATRIX TABLE */}
-      <RolePermissionsMatrixTable
-        roles={roles}
-        groupedPermissions={groupedPermissions}
-        originalPermissionsByRole={originalPermissionsByRole}
-        draftPermissionsByRole={draftPermissionsByRole}
-        isRoleDirty={isRoleDirty}
-        isPermissionDirtyInRole={isPermissionDirtyInRole}
-        savingRoleId={savingRoleId}
-        canUpdate={canUpdate}
-        getModuleCheckState={getModuleCheckState}
-        onToggleModuleForRole={handleToggleModuleForRole}
-        onTogglePermission={handleTogglePermission}
-        onSaveRole={handleRequestSaveRole}
-      />
+      {/* DESKTOP CONTENT (MATRIX VIEW OR SINGLE ROLE VIEW) */}
+      <div className="hidden-mobile">
+        {viewMode === 'matrix' ? (
+          <RolePermissionsMatrixTable
+            roles={roles}
+            groupedPermissions={groupedPermissions}
+            expandedModules={expandedModules}
+            onToggleExpandModule={handleToggleExpandModule}
+            originalPermissionsByRole={originalPermissionsByRole}
+            draftPermissionsByRole={draftPermissionsByRole}
+            isRoleDirty={isRoleDirty}
+            isPermissionDirtyInRole={isPermissionDirtyInRole}
+            savingRoleId={savingRoleId}
+            canUpdate={canUpdate}
+            getModuleCheckState={getModuleCheckState}
+            onToggleModuleForRole={handleToggleModuleForRole}
+            onTogglePermission={handleTogglePermission}
+            onSaveRole={handleRequestSaveRole}
+          />
+        ) : (
+          <RolePermissionsSingleRoleView
+            roles={roles}
+            permissions={permissions}
+            selectedRoleId={selectedRoleId || roles[0]?.id}
+            onSelectRoleId={setSelectedRoleId}
+            groupedPermissions={groupedPermissions}
+            expandedModules={expandedModules}
+            onToggleExpandModule={handleToggleExpandModule}
+            originalPermissionsByRole={originalPermissionsByRole}
+            draftPermissionsByRole={draftPermissionsByRole}
+            isRoleDirty={isRoleDirty}
+            isPermissionDirtyInRole={isPermissionDirtyInRole}
+            savingRoleId={savingRoleId}
+            canUpdate={canUpdate}
+            getModuleCheckState={getModuleCheckState}
+            onToggleModuleForRole={handleToggleModuleForRole}
+            onTogglePermission={handleTogglePermission}
+            onResetRole={handleResetRole}
+            onSaveRole={handleRequestSaveRole}
+          />
+        )}
+      </div>
 
       {/* MOBILE ACCORDION VIEW */}
       <RolePermissionsMobileView
@@ -582,6 +660,8 @@ function RolePermissionsPage() {
         setMobileSelectedRoleId={setMobileSelectedRoleId}
         mobileRole={mobileRole}
         groupedPermissions={groupedPermissions}
+        expandedModules={expandedModules}
+        onToggleExpandModule={handleToggleExpandModule}
         originalPermissionsByRole={originalPermissionsByRole}
         draftPermissionsByRole={draftPermissionsByRole}
         isRoleDirty={isRoleDirty}

@@ -1,12 +1,34 @@
 import React from 'react'
-import { Alert, Button, Card, Col, Input, Row, Select, Space, Switch, Typography } from 'antd'
 import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Input,
+  Radio,
+  Row,
+  Segmented,
+  Select,
+  Space,
+  Switch,
+  Tooltip,
+  Typography,
+} from 'antd'
+import {
+  AppstoreOutlined,
+  BarsOutlined,
+  DownSquareOutlined,
   ExclamationCircleOutlined,
   FilterOutlined,
+  FolderOpenOutlined,
+  FolderOutlined,
   ReloadOutlined,
   SaveOutlined,
   SearchOutlined,
+  TableOutlined,
   UndoOutlined,
+  UpSquareOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import { MODULE_DISPLAY_NAMES } from './rolePermissionsConstants'
 
@@ -27,6 +49,10 @@ function RolePermissionsFilterBar({
   canUpdate,
   filteredCount,
   totalCount,
+  viewMode,
+  setViewMode,
+  onExpandAll,
+  onCollapseAll,
   onSaveAllDirty,
   onResetAllDirty,
 }) {
@@ -46,7 +72,15 @@ function RolePermissionsFilterBar({
             boxShadow: '0 4px 14px rgba(245, 158, 11, 0.15)',
           }}
           message={
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12,
+              }}
+            >
               <div>
                 <Text strong style={{ color: '#92400e', fontSize: 14 }}>
                   Có {dirtyRoles.length} vai trò đang có thay đổi quyền chưa được lưu vào Backend!
@@ -72,7 +106,12 @@ function RolePermissionsFilterBar({
                   loading={savingRoleId !== null}
                   disabled={!canUpdate}
                   onClick={onSaveAllDirty}
-                  style={{ borderRadius: 6, backgroundColor: '#d97706', borderColor: '#d97706', fontWeight: 600 }}
+                  style={{
+                    borderRadius: 6,
+                    backgroundColor: '#d97706',
+                    borderColor: '#d97706',
+                    fontWeight: 600,
+                  }}
                 >
                   Lưu tất cả vai trò ({dirtyRoles.length})
                 </Button>
@@ -82,7 +121,7 @@ function RolePermissionsFilterBar({
         />
       )}
 
-      {/* FILTER & SEARCH TOOLBAR */}
+      {/* FILTER & TOOLBAR CARD */}
       <Card
         size="small"
         style={{
@@ -90,19 +129,21 @@ function RolePermissionsFilterBar({
           borderRadius: 10,
           border: '1px solid #e2e8f0',
           boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          backgroundColor: '#ffffff',
         }}
-        bodyStyle={{ padding: '12px 16px' }}
+        bodyStyle={{ padding: '14px 18px' }}
       >
-        <Row gutter={[12, 12]} align="middle" justify="space-between">
-          <Col xs={24} md={14} lg={12}>
+        <Row gutter={[14, 14]} align="middle" justify="space-between">
+          {/* Left Controls: Search & Module Filter */}
+          <Col xs={24} lg={12}>
             <Space wrap size="middle" style={{ width: '100%' }}>
               <Input
-                placeholder="Tìm kiếm mã quyền, tên chức năng, phân hệ..."
+                placeholder="Tìm tên quyền, mã code (VD: APPOINTMENT_CREATE)..."
                 prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 allowClear
-                style={{ width: 280, borderRadius: 8 }}
+                style={{ width: 300, borderRadius: 8 }}
               />
 
               <Select
@@ -121,23 +162,94 @@ function RolePermissionsFilterBar({
             </Space>
           </Col>
 
-          <Col xs={24} md={10} lg={12} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <Space align="center">
+          {/* Right Controls: View Mode, Expand/Collapse, Dirty filter */}
+          <Col
+            xs={24}
+            lg={12}
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            {/* VIEW MODE SWITCHER */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Segmented
+                value={viewMode}
+                onChange={(val) => setViewMode(val)}
+                options={[
+                  {
+                    label: 'Ma trận tổng thể',
+                    value: 'matrix',
+                    icon: <TableOutlined />,
+                  },
+                  {
+                    label: 'Từng vai trò',
+                    value: 'single',
+                    icon: <UserOutlined />,
+                  },
+                ]}
+                style={{
+                  backgroundColor: '#f1f5f9',
+                  padding: 3,
+                  borderRadius: 8,
+                  fontWeight: 500,
+                }}
+              />
+            </div>
+
+            {/* EXPAND / COLLAPSE BUTTONS */}
+            <Space size="small">
+              <Tooltip title="Mở rộng tất cả các nhóm phân hệ">
+                <Button
+                  size="small"
+                  icon={<FolderOpenOutlined />}
+                  onClick={onExpandAll}
+                  style={{ fontSize: 12, borderRadius: 6 }}
+                >
+                  Mở tất cả
+                </Button>
+              </Tooltip>
+
+              <Tooltip title="Thu gọn tất cả các nhóm phân hệ">
+                <Button
+                  size="small"
+                  icon={<FolderOutlined />}
+                  onClick={onCollapseAll}
+                  style={{ fontSize: 12, borderRadius: 6 }}
+                >
+                  Thu gọn
+                </Button>
+              </Tooltip>
+            </Space>
+
+            {/* ONLY DIRTY SWITCH */}
+            <Space align="center" size="small">
               <Switch
                 size="small"
                 checked={onlyShowDirty}
                 onChange={(val) => setOnlyShowDirty(val)}
                 disabled={!hasAnyDirtyRole}
               />
-              <span style={{ fontSize: 13, color: hasAnyDirtyRole ? '#334155' : '#94a3b8' }}>
-                Chỉ hiện quyền có thay đổi
+              <span
+                style={{
+                  fontSize: 12,
+                  color: hasAnyDirtyRole ? '#334155' : '#94a3b8',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Chỉ quyền đã sửa
               </span>
             </Space>
 
-            <div style={{ fontSize: 12, color: '#64748b' }}>
-              Hiển thị: <strong>{filteredCount}</strong> / {totalCount} quyền
+            {/* RESULTS COUNTER */}
+            <div style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
+              <strong>{filteredCount}</strong>/{totalCount} quyền
             </div>
 
+            {/* RESET FILTER LINK */}
             {(searchTerm || selectedModule !== 'ALL' || onlyShowDirty) && (
               <Button
                 type="link"
@@ -149,7 +261,7 @@ function RolePermissionsFilterBar({
                 }}
                 style={{ padding: 0, fontSize: 12 }}
               >
-                Đặt lại bộ lọc
+                Đặt lại
               </Button>
             )}
           </Col>
