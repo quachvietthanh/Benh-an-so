@@ -85,6 +85,12 @@ const medicalRecordApi = {
       responseType: 'blob',
     })
   },
+  getVersionHistory: (medicalRecordId) => {
+    return axiosClient.get(`/medical-records/${medicalRecordId}/versions`)
+  },
+  amendRecord: (medicalRecordId, data) => {
+    return axiosClient.post(`/medical-records/${medicalRecordId}/amendments`, data)
+  },
 }
 
 export default medicalRecordApi

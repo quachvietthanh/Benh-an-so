@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Col,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -30,6 +31,7 @@ import {
   ControlOutlined,
   DashboardOutlined,
   EditOutlined,
+  EllipsisOutlined,
   ExclamationCircleOutlined,
   InboxOutlined,
   MedicineBoxOutlined,
@@ -615,50 +617,57 @@ function MedicineCatalogPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 220,
+      width: 90,
       align: 'center',
-      render: (_, record) => (
-        <Space size="small" wrap>
-          <Tooltip title="Thiết lập chi tiết ngưỡng tồn kho & xem trước cảnh báo">
-            <Button
-              size="small"
-              icon={<ControlOutlined />}
-              onClick={() => openThresholdModal(record)}
-            >
-              Ngưỡng tồn
-            </Button>
-          </Tooltip>
+      render: (_, record) => {
+        const menuItems = [
+          {
+            key: 'threshold',
+            icon: <ControlOutlined style={{ color: '#2563eb' }} />,
+            label: 'Thiết lập ngưỡng tồn',
+            onClick: () => openThresholdModal(record),
+          },
+          {
+            key: 'edit',
+            icon: <EditOutlined style={{ color: '#0284c7' }} />,
+            label: 'Sửa thông tin thuốc',
+            onClick: () => openEditModal(record),
+          },
+          {
+            type: 'divider',
+          },
+          record.active !== false
+            ? {
+                key: 'deactivate',
+                icon: <StopOutlined />,
+                danger: true,
+                label: 'Ngừng sử dụng',
+                onClick: () => setDeactivatingMedicine(record),
+              }
+            : {
+                key: 'activate',
+                icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
+                label: 'Kích hoạt sử dụng',
+                onClick: () => handleToggleStatus(record, true),
+              },
+        ]
 
-          <Button
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => openEditModal(record)}
-          >
-            Sửa
-          </Button>
-
-          {record.active !== false ? (
+        return (
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
             <Button
-              danger
               size="small"
-              icon={<StopOutlined />}
-              onClick={() => setDeactivatingMedicine(record)}
-            >
-              Ngừng
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              ghost
-              size="small"
-              icon={<CheckCircleOutlined />}
-              onClick={() => handleToggleStatus(record, true)}
-            >
-              Kích hoạt
-            </Button>
-          )}
-        </Space>
-      ),
+              icon={<EllipsisOutlined />}
+              title="Thao tác"
+              style={{
+                borderRadius: 6,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            />
+          </Dropdown>
+        )
+      },
     },
   ]
 

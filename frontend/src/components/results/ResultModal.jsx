@@ -140,31 +140,29 @@ export const ResultModal = ({
       destroyOnClose
       footer={
         isConfirmed || isCancelled ? [
-          <Button key="close" type="primary" size="large" onClick={onClose} style={{ borderRadius: 8 }}>
+          <Button key="close" type="primary" onClick={onClose}>
             Đóng
           </Button>,
         ] : [
-          <Button key="cancel" size="large" onClick={onClose} style={{ borderRadius: 8 }}>
+          <Button key="cancel" onClick={onClose}>
             Hủy bỏ
           </Button>,
           <Button
             key="saveResult"
-            size="large"
             icon={<SaveOutlined />}
             loading={saving}
             onClick={() => handleSaveResult('RESULTED')}
-            style={{ borderRadius: 8, borderColor: '#2563eb', color: '#2563eb' }}
+            style={{ borderColor: '#2563eb', color: '#2563eb' }}
           >
             Lưu kết quả
           </Button>,
           <Button
             key="saveConfirm"
             type="primary"
-            size="large"
             icon={<SafetyCertificateOutlined />}
             loading={saving}
             onClick={() => handleSaveResult('CONFIRMED')}
-            style={{ borderRadius: 8, background: '#16a34a', borderColor: '#16a34a' }}
+            style={{ background: '#16a34a', borderColor: '#16a34a' }}
           >
             Bác sĩ xác nhận & Khóa
           </Button>,

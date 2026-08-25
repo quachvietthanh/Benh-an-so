@@ -10,6 +10,7 @@ import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { normalizeMedicalRecordDetail } from '../utils/workflowContract'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
+import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
 
 const { Title } = Typography
 
@@ -32,6 +33,7 @@ function MedicalRecordList({ patientId }) {
 
   const canDeleteRecord = userPermissions.includes('MEDICAL_RECORD_DELETE') || userPermissions.includes('RECORD_DELETE') || userRoles.includes('admin')
   const canArchiveRecord = userPermissions.includes('MEDICAL_RECORD_UPDATE_STATUS') || userPermissions.includes('MEDICAL_RECORD_UPDATE') || userPermissions.includes('RECORD_UPDATE_STATUS') || userRoles.includes('admin') || userRoles.includes('doctor')
+  const canViewVersionHistory = canViewMedicalRecordVersionHistory(userRoles, userPermissions)
 
   const fetchRecords = useCallback(async () => {
     if (!patientId) {
@@ -167,7 +169,7 @@ function MedicalRecordList({ patientId }) {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 250,
+      width: 280,
       render: (_, record) => {
         const recordId = record.id || record.medicalRecordId
         const isArchived = record.status === 'ARCHIVED'
@@ -185,12 +187,12 @@ function MedicalRecordList({ patientId }) {
             >
               Xem
             </Button>
-            {isSigned && (
+            {(canViewVersionHistory || isSigned) && (
               <Button
                 type="link"
                 size="small"
                 icon={<HistoryOutlined />}
-                style={{ color: '#d97706' }}
+                style={{ color: '#4f46e5' }}
                 onClick={() => {
                   setSelectedRecordForVersion(recordId)
                   setVersionModalOpen(true)
