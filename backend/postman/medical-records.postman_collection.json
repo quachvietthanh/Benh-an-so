@@ -2,18 +2,21 @@
   "info": {
     "name": "Benh So An - Medical Records",
     "_postman_id": "f2c28d57-1e65-4707-b3bf-2e98c810d013",
-    "description": "Run requests in order against a fresh database migrated through V12.",
+    "description": "Run requests in order against a fresh database migrated through V26.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
     { "key": "adminUsername", "value": "admin" },
+    { "key": "doctorUsername", "value": "doctor1" },
     { "key": "receptionistUsername", "value": "receptionist1" },
     { "key": "seededPassword", "value": "password" },
     { "key": "visitWithoutRecordId", "value": "d0000000-0000-0000-0000-000000000002" },
     { "key": "seededPatientId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001" },
     { "key": "accessToken", "value": "" },
-    { "key": "medicalRecordId", "value": "" }
+    { "key": "medicalRecordId", "value": "" },
+    { "key": "primaryDiagnosisCatalogId", "value": "a1000000-0000-0000-0000-000000000019" },
+    { "key": "secondaryDiagnosisCatalogId", "value": "a1000000-0000-0000-0000-000000000020" }
   ],
   "item": [
     {
@@ -67,6 +70,63 @@
         "pm.test('Update succeeds', function () { pm.response.to.have.status(200); });",
         "pm.test('Content is updated', function () { pm.expect(pm.response.json().conclusion).to.eql('Da on dinh'); });"
       ]}}]
+    },
+    {
+      "name": "Diagnosis recording (run after 4, before 5)",
+      "item": [
+        {
+          "name": "Login as Doctor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{doctorUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Doctor login succeeds', function () { pm.response.to.have.status(200); });",
+            "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+          ]}}]
+        },
+        {
+          "name": "Replace Diagnoses as Doctor",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"primaryDiagnosis\": {\n    \"diagnosisCatalogId\": \"{{primaryDiagnosisCatalogId}}\",\n    \"note\": \"Mild symptoms\"\n  },\n  \"secondaryDiagnoses\": [\n    {\n      \"diagnosisCatalogId\": \"{{secondaryDiagnosisCatalogId}}\",\n      \"note\": \"Associated fever\"\n    },\n    {\n      \"name\": \"Clinical observation not yet coded\",\n      \"note\": \"Monitor at follow-up\"\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/diagnoses"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Diagnoses are saved', function () { pm.response.to.have.status(200); });",
+            "pm.test('Catalog code is resolved by the server', function () { pm.expect(pm.response.json()[0].diagnosisCode).to.eql('J00'); });",
+            "pm.test('Free-text secondary has no diagnosis code', function () { pm.expect(pm.response.json()[2].diagnosisCode).to.eql(null); });"
+          ]}}]
+        },
+        {
+          "name": "Get Diagnoses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/diagnoses"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Persisted diagnoses are returned', function () { pm.response.to.have.status(200); });",
+            "pm.test('Primary and two secondary diagnoses are returned', function () { pm.expect(pm.response.json()).to.have.length(3); });"
+          ]}}]
+        },
+        {
+          "name": "Restore Admin Session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Admin login succeeds', function () { pm.response.to.have.status(200); });",
+            "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+          ]}}]
+        }
+      ]
     },
     {
       "name": "5. Lock Medical Record",

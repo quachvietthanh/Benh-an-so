@@ -7,6 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,7 +15,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "diagnosis_catalog")
+@Table(
+        name = "diagnosis_catalog",
+        uniqueConstraints = @UniqueConstraint(name = "uk_diagnosis_catalog_code", columnNames = "code")
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,6 +33,8 @@ public class DiagnosisCatalogEntity {
     String code;
     @Column(nullable = false, length = 150)
     String name;
+    @Column(name = "disease_group", nullable = false, length = 100)
+    String diseaseGroup;
     @Column(columnDefinition = "TEXT")
     String description;
     @Column(nullable = false)

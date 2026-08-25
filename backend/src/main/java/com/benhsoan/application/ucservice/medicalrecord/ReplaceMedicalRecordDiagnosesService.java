@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -50,12 +49,13 @@ public class ReplaceMedicalRecordDiagnosesService implements ReplaceMedicalRecor
             UUID medicalRecordId,
             ReplaceMedicalRecordDiagnosesCommand command
     ) {
-        UUID actorId = authorizationService.requireWriteAccess();
+        UUID actorId = authorizationService.requireDiagnosisWriteAccess(medicalRecordId);
         MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
         record.ensureEditable();
         var visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
+        authorizationService.requireDiagnosisVisitWriteAccess(actorId, visit.getDoctorId(), record.getId());
         if (!visit.isActive()) {
             throw new MedicalRecordInvalidVisitException(visit.getId());
         }
@@ -77,56 +77,86 @@ public class ReplaceMedicalRecordDiagnosesService implements ReplaceMedicalRecor
         if (command == null || command.primaryDiagnosis() == null) {
             throw new ValidationException("Primary diagnosis is required.");
         }
-        List<ReplaceMedicalRecordDiagnosesCommand.DiagnosisCommand> requested = new ArrayList<>();
-        requested.add(command.primaryDiagnosis());
-        if (command.secondaryDiagnoses() != null) {
-            requested.addAll(command.secondaryDiagnoses());
-        }
-        validateNoDuplicates(requested);
+        List<ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand> secondaryDiagnoses = command.secondaryDiagnoses() == null
+                ? List.of()
+                : command.secondaryDiagnoses();
+        validateNoDuplicateCatalogIds(command.primaryDiagnosis(), secondaryDiagnoses);
 
         List<MedicalRecordDiagnosis> diagnoses = new ArrayList<>();
-        diagnoses.add(toDiagnosis(medicalRecordId, command.primaryDiagnosis(), DiagnosisType.PRIMARY, actorId, diagnosedAt));
-        for (ReplaceMedicalRecordDiagnosesCommand.DiagnosisCommand secondary : requested.subList(1, requested.size())) {
-            diagnoses.add(toDiagnosis(medicalRecordId, secondary, DiagnosisType.SECONDARY, actorId, diagnosedAt));
+        diagnoses.add(toPrimaryDiagnosis(medicalRecordId, command.primaryDiagnosis(), actorId, diagnosedAt));
+        for (ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand secondary : secondaryDiagnoses) {
+            diagnoses.add(toSecondaryDiagnosis(medicalRecordId, secondary, actorId, diagnosedAt));
         }
         return diagnoses;
     }
 
-    private MedicalRecordDiagnosis toDiagnosis(
+    private MedicalRecordDiagnosis toPrimaryDiagnosis(
             UUID medicalRecordId,
-            ReplaceMedicalRecordDiagnosesCommand.DiagnosisCommand command,
-            DiagnosisType type,
+            ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand command,
             UUID actorId,
             Instant diagnosedAt
     ) {
         if (command == null || command.diagnosisCatalogId() == null) {
             throw new ValidationException("Diagnosis catalog is required.");
         }
-        DiagnosisCatalog catalog = diagnosisCatalogRepository.findById(command.diagnosisCatalogId())
-                .filter(DiagnosisCatalog::isActive)
-                .orElseThrow(() -> new ValidationException("Diagnosis catalog is unavailable."));
-        if (!normalize(command.code()).equals(normalize(catalog.getCode()))
-                || !normalize(command.name()).equals(normalize(catalog.getName()))) {
-            throw new ValidationException("Diagnosis code and name must match the diagnosis catalog.");
-        }
-        return MedicalRecordDiagnosis.create(medicalRecordId, catalog.getId(), catalog.getCode(), catalog.getName(),
-                type, command.note(), actorId, diagnosedAt);
+        return toCatalogDiagnosis(medicalRecordId, command.diagnosisCatalogId(), DiagnosisType.PRIMARY, command.note(), actorId, diagnosedAt);
     }
 
-    private void validateNoDuplicates(List<ReplaceMedicalRecordDiagnosesCommand.DiagnosisCommand> diagnoses) {
-        Set<UUID> catalogIds = new HashSet<>();
-        Set<String> codes = new HashSet<>();
-        for (ReplaceMedicalRecordDiagnosesCommand.DiagnosisCommand diagnosis : diagnoses) {
-            if (diagnosis == null || diagnosis.diagnosisCatalogId() == null || normalize(diagnosis.code()).isEmpty()) {
-                throw new ValidationException("Diagnosis catalog and code are required.");
+    private MedicalRecordDiagnosis toSecondaryDiagnosis(
+            UUID medicalRecordId,
+            ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand command,
+            UUID actorId,
+            Instant diagnosedAt
+    ) {
+        if (command == null) {
+            throw new ValidationException("Secondary diagnosis is required.");
+        }
+        if (command.diagnosisCatalogId() != null) {
+            if (hasText(command.name())) {
+                throw new ValidationException("Secondary diagnosis must use either a catalog entry or free-text name.");
             }
-            if (!catalogIds.add(diagnosis.diagnosisCatalogId()) || !codes.add(normalize(diagnosis.code()))) {
+            return toCatalogDiagnosis(medicalRecordId, command.diagnosisCatalogId(), DiagnosisType.SECONDARY,
+                    command.note(), actorId, diagnosedAt);
+        }
+        if (!hasText(command.name())) {
+            throw new ValidationException("Secondary diagnosis name is required when no catalog entry is selected.");
+        }
+        return MedicalRecordDiagnosis.create(medicalRecordId, null, null, command.name().trim(), DiagnosisType.SECONDARY,
+                command.note(), actorId, diagnosedAt);
+    }
+
+    private MedicalRecordDiagnosis toCatalogDiagnosis(
+            UUID medicalRecordId,
+            UUID diagnosisCatalogId,
+            DiagnosisType type,
+            String note,
+            UUID actorId,
+            Instant diagnosedAt
+    ) {
+        DiagnosisCatalog catalog = diagnosisCatalogRepository.findById(diagnosisCatalogId)
+                .filter(DiagnosisCatalog::isActive)
+                .orElseThrow(() -> new ValidationException("Diagnosis catalog is unavailable."));
+        return MedicalRecordDiagnosis.create(medicalRecordId, catalog.getId(), catalog.getCode(), catalog.getName(),
+                type, note, actorId, diagnosedAt);
+    }
+
+    private void validateNoDuplicateCatalogIds(
+            ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand primary,
+            List<ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand> secondaryDiagnoses
+    ) {
+        if (primary.diagnosisCatalogId() == null) {
+            throw new ValidationException("Diagnosis catalog is required.");
+        }
+        Set<UUID> catalogIds = new HashSet<>();
+        catalogIds.add(primary.diagnosisCatalogId());
+        for (ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand secondary : secondaryDiagnoses) {
+            if (secondary != null && secondary.diagnosisCatalogId() != null && !catalogIds.add(secondary.diagnosisCatalogId())) {
                 throw new ValidationException("A diagnosis cannot be repeated in the same medical record.");
             }
         }
     }
 
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
