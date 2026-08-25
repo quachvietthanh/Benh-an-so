@@ -48,7 +48,6 @@ function RolePermissionsMobileView({
 
   return (
     <div className="visible-mobile">
-      {/* MOBILE ROLE SELECTOR TABS */}
       <div
         style={{
           display: 'flex',
@@ -111,7 +110,6 @@ function RolePermissionsMobileView({
         })}
       </div>
 
-      {/* MOBILE ACTIVE ROLE BANNER */}
       {mobileRole && (
         <Card
           size="small"
@@ -174,10 +172,9 @@ function RolePermissionsMobileView({
         </Card>
       )}
 
-      {/* MOBILE MODULES & PERMISSION ACCORDIONS */}
       {moduleKeys.length === 0 ? (
         <Card style={{ borderRadius: 10, textAlign: 'center', padding: '24px 0' }}>
-          <Empty description="Không tìm thấy quyền chức năng nào." />
+          <Empty description="Không tìm thấy quyền chức nào." />
         </Card>
       ) : (
         moduleKeys.map((modKey) => {
@@ -198,7 +195,6 @@ function RolePermissionsMobileView({
               }}
               bodyStyle={{ padding: 0 }}
             >
-              {/* Module Header */}
               <div
                 style={{
                   padding: '10px 14px',
@@ -241,7 +237,6 @@ function RolePermissionsMobileView({
                 )}
               </div>
 
-              {/* Permissions list (Expanded) */}
               {isExpanded && (
                 <div style={{ padding: '4px 14px' }}>
                   {permsInMod.map((perm, idx) => {

@@ -87,7 +87,6 @@ function RolePermissionsSingleRoleView({
         }
       `}</style>
 
-      {/* ROLE SELECTOR PILLS */}
       <div
         style={{
           display: 'flex',
@@ -166,7 +165,6 @@ function RolePermissionsSingleRoleView({
         })}
       </div>
 
-      {/* ACTIVE ROLE SUMMARY BANNER */}
       <Card
         size="small"
         style={{
@@ -238,7 +236,6 @@ function RolePermissionsSingleRoleView({
             </div>
           </div>
 
-          {/* Action buttons */}
           <Space>
             {isDirty && (
               <Button
@@ -268,7 +265,6 @@ function RolePermissionsSingleRoleView({
           </Space>
         </div>
 
-        {/* Progress bar */}
         <div style={{ marginTop: 12 }}>
           <Progress
             percent={percent}
@@ -280,7 +276,6 @@ function RolePermissionsSingleRoleView({
         </div>
       </Card>
 
-      {/* MODULE ACCORDION LIST */}
       {moduleKeys.length === 0 ? (
         <Card style={{ borderRadius: 12, textAlign: 'center', padding: '36px 0' }}>
           <Empty description="Không tìm thấy quyền chức năng nào phù hợp với bộ lọc." />
@@ -309,7 +304,6 @@ function RolePermissionsSingleRoleView({
                 }}
                 bodyStyle={{ padding: 0 }}
               >
-                {/* MODULE HEADER ROW */}
                 <div
                   style={{
                     padding: '12px 18px',
@@ -351,7 +345,6 @@ function RolePermissionsSingleRoleView({
                     )}
                   </div>
 
-                  {/* Right side: Module batch toggle checkbox */}
                   <div
                     onClick={(e) => e.stopPropagation()}
                     style={{ display: 'flex', alignItems: 'center', gap: 12 }}
@@ -377,7 +370,6 @@ function RolePermissionsSingleRoleView({
                   </div>
                 </div>
 
-                {/* MODULE PERMISSION LIST (EXPANDED) */}
                 {isExpanded && (
                   <div style={{ padding: '4px 18px 8px' }}>
                     {permsInMod.map((perm, idx) => {
@@ -402,7 +394,6 @@ function RolePermissionsSingleRoleView({
                             transition: 'background-color 0.15s ease',
                           }}
                         >
-                          {/* Permission info */}
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <Text strong style={{ fontSize: 13, color: '#0f172a' }}>
@@ -433,7 +424,6 @@ function RolePermissionsSingleRoleView({
                             </div>
                           </div>
 
-                          {/* Permission toggle switch */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                             <Tooltip
                               title={

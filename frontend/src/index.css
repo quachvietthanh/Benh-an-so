@@ -142,7 +142,6 @@ textarea {
   margin: 0 !important;
 }
 
-/* Popconfirm buttons */
 .ant-popconfirm .ant-popconfirm-buttons {
   display: flex !important;
   align-items: center !important;
@@ -160,7 +159,6 @@ textarea {
   margin: 0 !important;
 }
 
-/* Dialog xác nhận cấp phát FEFO cân đối 50/50 */
 .dispense-confirm-popconfirm .ant-popconfirm-buttons {
   display: flex !important;
   width: 100% !important;

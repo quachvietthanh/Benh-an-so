@@ -32,7 +32,6 @@ const { Title } = Typography
 function RolePermissionsPage() {
   const { user, updateCurrentUserPermissions } = useAuthContext()
 
-  // Strict authorization check based on technical permissions
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
@@ -46,34 +45,26 @@ function RolePermissionsPage() {
   const [roles, setRoles] = useState([])
   const [permissions, setPermissions] = useState([])
 
-  // State maps: roleId -> Set of permission codes
   const [originalPermissionsByRole, setOriginalPermissionsByRole] = useState({})
   const [draftPermissionsByRole, setDraftPermissionsByRole] = useState({})
 
-  // Saving state tracking per roleId
   const [savingRoleId, setSavingRoleId] = useState(null)
 
-  // View Mode: 'matrix' (Ma trận 5 cột) | 'single' (Xem theo từng vai trò)
   const [viewMode, setViewMode] = useState('matrix')
   const [selectedRoleId, setSelectedRoleId] = useState(null)
 
-  // Accordion Expand/Collapse state: Set of expanded module keys
   const [expandedModules, setExpandedModules] = useState(new Set())
   const hasInitializedExpanded = useRef(false)
 
-  // Filters & Search
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedModule, setSelectedModule] = useState('ALL')
   const [onlyShowDirty, setOnlyShowDirty] = useState(false)
 
-  // Mobile selected role view
   const [mobileSelectedRoleId, setMobileSelectedRoleId] = useState(null)
 
-  // Confirmation modal states
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [targetRoleForSave, setTargetRoleForSave] = useState(null)
 
-  // Load data from Backend
   const loadData = useCallback(async () => {
     if (!canRead) {
       return
@@ -103,7 +94,6 @@ function RolePermissionsPage() {
         }
       }
 
-      // Build Set maps for original and draft
       const origMap = {}
       const draftMap = {}
 
@@ -131,13 +121,11 @@ function RolePermissionsPage() {
     loadData()
   }, [loadData])
 
-  // Extract all distinct modules
   const modules = useMemo(() => {
     const set = new Set(permissions.map((p) => p.module).filter(Boolean))
     return Array.from(set).sort()
   }, [permissions])
 
-  // Initialize expanded modules once data arrives
   useEffect(() => {
     if (modules.length > 0 && !hasInitializedExpanded.current) {
       setExpandedModules(new Set(modules))
@@ -145,7 +133,6 @@ function RolePermissionsPage() {
     }
   }, [modules])
 
-  // Check if a specific role has unsaved changes
   const isRoleDirty = useCallback(
     (roleId) => {
       const orig = originalPermissionsByRole[roleId] || new Set()
@@ -159,14 +146,12 @@ function RolePermissionsPage() {
     [originalPermissionsByRole, draftPermissionsByRole],
   )
 
-  // Get all dirty roles
   const dirtyRoles = useMemo(() => {
     return roles.filter((role) => isRoleDirty(role.id))
   }, [roles, isRoleDirty])
 
   const hasAnyDirtyRole = dirtyRoles.length > 0
 
-  // Check if a specific permission is dirty in any role
   const isPermissionDirtyInAnyRole = useCallback(
     (permissionCode) => {
       return roles.some((role) => {
@@ -187,7 +172,6 @@ function RolePermissionsPage() {
     [originalPermissionsByRole, draftPermissionsByRole],
   )
 
-  // Calculate diff for confirmation modal
   const getRoleDiff = useCallback(
     (roleId) => {
       const orig = originalPermissionsByRole[roleId] || new Set()
@@ -209,7 +193,6 @@ function RolePermissionsPage() {
     [originalPermissionsByRole, draftPermissionsByRole],
   )
 
-  // Persist the complete set for a role so every toggle updates Backend immediately.
   const persistRolePermissions = useCallback(
     async (roleId, permissionCodes) => {
       setSavingRoleId(roleId)
@@ -233,7 +216,6 @@ function RolePermissionsPage() {
     [],
   )
 
-  // Toggle single permission for a role and persist it immediately.
   const handleTogglePermission = useCallback(
     (roleId, permissionCode, permissionActive) => {
       if (!canUpdate || permissionActive === false || savingRoleId === roleId) return
@@ -246,7 +228,6 @@ function RolePermissionsPage() {
     [canUpdate, draftPermissionsByRole, persistRolePermissions, savingRoleId],
   )
 
-  // Toggle all permissions in a module for a role and persist them in one request.
   const handleToggleModuleForRole = useCallback(
     (roleId, permsInModule) => {
       if (!canUpdate || savingRoleId === roleId) return
@@ -265,7 +246,6 @@ function RolePermissionsPage() {
     [canUpdate, draftPermissionsByRole, persistRolePermissions, savingRoleId],
   )
 
-  // Helper to get 3-state checkbox status for a module in a role
   const getModuleCheckState = useCallback(
     (roleId, permsInModule) => {
       const currentSet = draftPermissionsByRole[roleId] || new Set()
@@ -290,7 +270,6 @@ function RolePermissionsPage() {
     [draftPermissionsByRole],
   )
 
-  // Toggle expand/collapse for a single module
   const handleToggleExpandModule = useCallback((modKey) => {
     setExpandedModules((prev) => {
       const next = new Set(prev)
@@ -303,17 +282,14 @@ function RolePermissionsPage() {
     })
   }, [])
 
-  // Expand all modules
   const handleExpandAll = useCallback(() => {
     setExpandedModules(new Set(modules))
   }, [modules])
 
-  // Collapse all modules
   const handleCollapseAll = useCallback(() => {
     setExpandedModules(new Set())
   }, [])
 
-  // Reset a role back to original backend state
   const handleResetRole = useCallback(
     (roleId) => {
       const orig = originalPermissionsByRole[roleId] || new Set()
@@ -326,7 +302,6 @@ function RolePermissionsPage() {
     [originalPermissionsByRole],
   )
 
-  // Reset all dirty roles
   const handleResetAllDirty = useCallback(() => {
     const freshDraft = {}
     Object.keys(originalPermissionsByRole).forEach((roleId) => {
@@ -336,13 +311,11 @@ function RolePermissionsPage() {
     message.info('Đã hoàn tác tất cả thay đổi chưa lưu.')
   }, [originalPermissionsByRole])
 
-  // Open Save confirmation modal for a specific role
   const handleRequestSaveRole = useCallback((role) => {
     setTargetRoleForSave(role)
     setConfirmModalOpen(true)
   }, [])
 
-  // Execute Save Role permissions to Backend (PUT /api/v1/roles/{roleId}/permissions)
   const executeSaveRolePermissions = useCallback(
     async (role) => {
       const roleId = role.id
@@ -382,7 +355,6 @@ function RolePermissionsPage() {
     [draftPermissionsByRole, user, updateCurrentUserPermissions],
   )
 
-  // Confirm save from modal
   const handleConfirmSave = useCallback(async () => {
     if (!targetRoleForSave) return
     setConfirmModalOpen(false)
@@ -390,7 +362,6 @@ function RolePermissionsPage() {
     setTargetRoleForSave(null)
   }, [targetRoleForSave, executeSaveRolePermissions])
 
-  // Save all dirty roles sequentially
   const handleSaveAllDirty = useCallback(async () => {
     if (dirtyRoles.length === 0) return
 
@@ -399,7 +370,6 @@ function RolePermissionsPage() {
     }
   }, [dirtyRoles, executeSaveRolePermissions])
 
-  // Refresh data from server (with dirty check)
   const handleRefresh = useCallback(() => {
     if (hasAnyDirtyRole) {
       if (window.confirm('Bạn có các thay đổi chưa lưu. Làm mới sẽ xóa các thay đổi này. Bạn có muốn tiếp tục?')) {
@@ -410,7 +380,6 @@ function RolePermissionsPage() {
     }
   }, [hasAnyDirtyRole, loadData])
 
-  // Filter permissions based on search keyword and module
   const filteredPermissions = useMemo(() => {
     return permissions.filter((perm) => {
       if (selectedModule !== 'ALL' && perm.module !== selectedModule) {
@@ -435,7 +404,6 @@ function RolePermissionsPage() {
     })
   }, [permissions, selectedModule, searchTerm, onlyShowDirty, isPermissionDirtyInAnyRole])
 
-  // Group filtered permissions by module for structured rendering
   const groupedPermissions = useMemo(() => {
     const map = {}
     filteredPermissions.forEach((p) => {
@@ -446,7 +414,6 @@ function RolePermissionsPage() {
     return map
   }, [filteredPermissions])
 
-  // Auto-expand modules that have search matches
   useEffect(() => {
     if (searchTerm.trim()) {
       const matchingModuleKeys = Object.keys(groupedPermissions)
@@ -454,12 +421,10 @@ function RolePermissionsPage() {
     }
   }, [searchTerm, groupedPermissions])
 
-  // Mobile selected role object
   const mobileRole = useMemo(() => {
     return roles.find((r) => r.id === mobileSelectedRoleId) || roles[0]
   }, [roles, mobileSelectedRoleId])
 
-  // If user does not have permission to view
   if (!canRead) {
     return (
       <Card style={{ margin: '16px 0', borderRadius: 12, textAlign: 'center', padding: '40px 20px' }}>
@@ -489,7 +454,6 @@ function RolePermissionsPage() {
         }
       `}</style>
 
-      {/* HEADER BANNER */}
       <Card
         style={{
           marginBottom: 16,
@@ -558,7 +522,6 @@ function RolePermissionsPage() {
         </div>
       </Card>
 
-      {/* ERROR ALERT */}
       {error && (
         <Alert
           type="error"
@@ -574,7 +537,6 @@ function RolePermissionsPage() {
         />
       )}
 
-      {/* ROLE OVERVIEW CARDS (DESKTOP) */}
       <RoleOverviewCards
         roles={roles}
         permissions={permissions}
@@ -586,7 +548,6 @@ function RolePermissionsPage() {
         onSaveRole={handleRequestSaveRole}
       />
 
-      {/* FILTER & SEARCH TOOLBAR WITH VIEW MODE AND EXPAND/COLLAPSE */}
       <RolePermissionsFilterBar
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -609,7 +570,6 @@ function RolePermissionsPage() {
         onResetAllDirty={handleResetAllDirty}
       />
 
-      {/* DESKTOP CONTENT (MATRIX VIEW OR SINGLE ROLE VIEW) */}
       <div className="hidden-mobile">
         {viewMode === 'matrix' ? (
           <RolePermissionsMatrixTable
@@ -652,7 +612,6 @@ function RolePermissionsPage() {
         )}
       </div>
 
-      {/* MOBILE ACCORDION VIEW */}
       <RolePermissionsMobileView
         roles={roles}
         permissions={permissions}
@@ -675,7 +634,6 @@ function RolePermissionsPage() {
         onSaveRole={handleRequestSaveRole}
       />
 
-      {/* CONFIRMATION SAVE MODAL */}
       <RolePermissionsConfirmModal
         confirmModalOpen={confirmModalOpen}
         targetRoleForSave={targetRoleForSave}

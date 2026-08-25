@@ -58,7 +58,6 @@ function RolePermissionsFilterBar({
 }) {
   return (
     <>
-      {/* UNSAVED CHANGES GLOBAL BANNER */}
       {hasAnyDirtyRole && (
         <Alert
           type="warning"
@@ -121,7 +120,6 @@ function RolePermissionsFilterBar({
         />
       )}
 
-      {/* FILTER & TOOLBAR CARD */}
       <Card
         size="small"
         style={{
@@ -134,7 +132,6 @@ function RolePermissionsFilterBar({
         bodyStyle={{ padding: '14px 18px' }}
       >
         <Row gutter={[14, 14]} align="middle" justify="space-between">
-          {/* Left Controls: Search & Module Filter */}
           <Col xs={24} lg={12}>
             <Space wrap size="middle" style={{ width: '100%' }}>
               <Input
@@ -162,7 +159,6 @@ function RolePermissionsFilterBar({
             </Space>
           </Col>
 
-          {/* Right Controls: View Mode, Expand/Collapse, Dirty filter */}
           <Col
             xs={24}
             lg={12}
@@ -174,7 +170,6 @@ function RolePermissionsFilterBar({
               flexWrap: 'wrap',
             }}
           >
-            {/* VIEW MODE SWITCHER */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Segmented
                 value={viewMode}
@@ -200,7 +195,6 @@ function RolePermissionsFilterBar({
               />
             </div>
 
-            {/* EXPAND / COLLAPSE BUTTONS */}
             <Space size="small">
               <Tooltip title="Mở rộng tất cả các nhóm phân hệ">
                 <Button
@@ -225,7 +219,6 @@ function RolePermissionsFilterBar({
               </Tooltip>
             </Space>
 
-            {/* ONLY DIRTY SWITCH */}
             <Space align="center" size="small">
               <Switch
                 size="small"
@@ -244,12 +237,10 @@ function RolePermissionsFilterBar({
               </span>
             </Space>
 
-            {/* RESULTS COUNTER */}
             <div style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
               <strong>{filteredCount}</strong>/{totalCount} quyền
             </div>
 
-            {/* RESET FILTER LINK */}
             {(searchTerm || selectedModule !== 'ALL' || onlyShowDirty) && (
               <Button
                 type="link"

@@ -189,7 +189,6 @@ function RolePermissionsMatrixTable({
 
               return (
                 <React.Fragment key={modKey}>
-                  {/* MODULE GROUP HEADER ROW */}
                   <tr
                     className="module-header-row"
                     onClick={() => onToggleExpandModule && onToggleExpandModule(modKey)}
@@ -277,7 +276,6 @@ function RolePermissionsMatrixTable({
                     })}
                   </tr>
 
-                  {/* PERMISSION CHILD ROWS (ONLY RENDERED WHEN EXPANDED) */}
                   {isExpanded &&
                     permsInMod.map((perm, idx) => {
                       const details = getPermissionDetails(perm)
@@ -291,7 +289,6 @@ function RolePermissionsMatrixTable({
                             backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fcfdfd',
                           }}
                         >
-                          {/* Permission Info Column (Indented) */}
                           <td
                             style={{
                               padding: '9px 18px 9px 36px',
@@ -329,7 +326,6 @@ function RolePermissionsMatrixTable({
                             </div>
                           </td>
 
-                          {/* Role Permission Toggles */}
                           {roles.map((role) => {
                             const isAssigned = (draftPermissionsByRole[role.id] || new Set()).has(perm.code)
                             const isDirty = isPermissionDirtyInRole(role.id, perm.code)
