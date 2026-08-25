@@ -58,7 +58,6 @@ function RoleOverviewCards({
                 }}
               >
                 <div>
-                  {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 8, height: 26 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
                       <span style={{ fontSize: 15, flexShrink: 0 }}>{theme.icon}</span>
@@ -98,7 +97,6 @@ function RoleOverviewCards({
                     )}
                   </div>
 
-                  {/* Count & Progress */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                     <span style={{ fontSize: 12, color: '#64748b' }}>Quyền khả dụng:</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
@@ -117,7 +115,6 @@ function RoleOverviewCards({
                   />
                 </div>
 
-                {/* Actions */}
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                   {isDirty && (
                     <Button

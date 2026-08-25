@@ -41,6 +41,7 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import patientApi from '../api/patientApi'
 import userApi from '../api/userApi'
 import MedicalRecordCopyPreviewModal from '../components/medicalRecord/MedicalRecordCopyPreviewModal'
+import MedicalRecordVersionHistoryModal from '../components/medicalRecord/MedicalRecordVersionHistoryModal'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 
@@ -192,6 +193,8 @@ function MedicalRecordCopyPage() {
   const [diagnoses, setDiagnoses] = useState([])
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false)
+  const [versionModalOpen, setVersionModalOpen] = useState(false)
+  const [selectedVersionRecord, setSelectedVersionRecord] = useState(null)
   const [activeTab, setActiveTab] = useState('request')
 
   const [accessLogs, setAccessLogs] = useState([])
@@ -529,26 +532,40 @@ function MedicalRecordCopyPage() {
     {
       title: 'Hành động',
       key: 'action',
-      width: 130,
+      width: 190,
       align: 'center',
       render: (_, r) => {
         const isSelected = (selectedRecord?.medicalRecordId || selectedRecord?.id) === (r.medicalRecordId || r.id)
         const isLocked = r.status === 'LOCKED'
 
         return (
-          <Button
-            type={isSelected ? 'primary' : 'default'}
-            size="small"
-            icon={isSelected ? <CheckCircleOutlined /> : <FileProtectOutlined />}
-            disabled={!isLocked || !canUseFeature}
-            onClick={() => setSelectedRecord(r)}
-            style={{
-              borderColor: isSelected ? undefined : '#2563eb',
-              color: isSelected ? undefined : '#2563eb',
-            }}
-          >
-            {isSelected ? 'Đang chọn' : 'Chọn cấp'}
-          </Button>
+          <Space size="small">
+            <Button
+              type={isSelected ? 'primary' : 'default'}
+              size="small"
+              icon={isSelected ? <CheckCircleOutlined /> : <FileProtectOutlined />}
+              disabled={!isLocked || !canUseFeature}
+              onClick={() => setSelectedRecord(r)}
+              style={{
+                borderColor: isSelected ? undefined : '#2563eb',
+                color: isSelected ? undefined : '#2563eb',
+              }}
+            >
+              {isSelected ? 'Đang chọn' : 'Chọn cấp'}
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              icon={<HistoryOutlined />}
+              style={{ color: '#4f46e5', padding: '0 4px' }}
+              onClick={() => {
+                setSelectedVersionRecord(r)
+                setVersionModalOpen(true)
+              }}
+            >
+              Phiên bản
+            </Button>
+          </Space>
         )
       },
     },
@@ -885,11 +902,10 @@ function MedicalRecordCopyPage() {
                         <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
                           <Button
                             type="primary"
-                            size="large"
                             icon={<EyeOutlined />}
                             disabled={!selectedRecord || selectedRecord.status !== 'LOCKED' || !canUseFeature}
                             onClick={handleOpenPreview}
-                            style={{ backgroundColor: '#2563eb', height: 44, fontWeight: 600 }}
+                            style={{ backgroundColor: '#2563eb', fontWeight: 600 }}
                           >
                             Xem trước & Xuất bản sao
                           </Button>
@@ -957,6 +973,18 @@ function MedicalRecordCopyPage() {
           onIssued={handleCopyIssued}
         />
       )}
+
+      <MedicalRecordVersionHistoryModal
+        open={versionModalOpen}
+        onClose={() => {
+          setVersionModalOpen(false)
+          setSelectedVersionRecord(null)
+        }}
+        medicalRecordId={selectedVersionRecord?.id || selectedVersionRecord?.medicalRecordId}
+        recordCode={selectedVersionRecord?.visitCode || selectedVersionRecord?.recordCode}
+        patientName={selectedPatient?.fullName || selectedVersionRecord?.patientName}
+        patientCode={selectedPatient?.patientCode || selectedVersionRecord?.patientCode}
+      />
     </div>
   )
 }

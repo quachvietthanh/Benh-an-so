@@ -232,7 +232,6 @@ export default function SignMedicalRecordModal({
           key="submit"
           type="primary"
           icon={<CheckCircleOutlined />}
-          size="large"
           loading={submitting}
           disabled={!validationResult.canSign || !agreedToTerms}
           onClick={handleConfirmSign}

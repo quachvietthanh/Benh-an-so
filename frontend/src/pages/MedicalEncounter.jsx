@@ -47,6 +47,7 @@ import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordMo
 import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
 import MedicalRecordSignatureStamp from '../components/clinical/MedicalRecordSignatureStamp'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
+import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
 import { useAuthContext } from '../context/AuthContext'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
@@ -123,6 +124,7 @@ function MedicalEncounter() {
     [user?.roles],
   )
   const canEditEncounter = roles.includes('doctor') || roles.includes('admin')
+  const canViewVersionHistory = canViewMedicalRecordVersionHistory(roles, user?.permissions)
 
   const [encounter, setEncounter] = useState(null)
   const [currentRecordId, setCurrentRecordId] = useState(null)
@@ -816,9 +818,23 @@ function MedicalEncounter() {
     {
       title: '',
       render: (_, record) => (
-        <Button size="small" icon={<EyeOutlined />} onClick={() => setViewing(record)}>
-          Xem
-        </Button>
+        <Space size="small">
+          <Button size="small" icon={<EyeOutlined />} onClick={() => setViewing(record)}>
+            Xem
+          </Button>
+          {canViewVersionHistory && (
+            <Button
+              size="small"
+              icon={<HistoryOutlined />}
+              onClick={() => {
+                setCurrentRecordId(record.id || record.medicalRecordId)
+                setVersionHistoryModalOpen(true)
+              }}
+            >
+              Phiên bản
+            </Button>
+          )}
+        </Space>
       ),
     },
   ]
@@ -869,6 +885,16 @@ function MedicalEncounter() {
                 In phiếu chỉ định
               </Button>
             )}
+            {currentRecordId && canViewVersionHistory && (
+              <Button
+                icon={<HistoryOutlined />}
+                onClick={() => {
+                  setVersionHistoryModalOpen(true)
+                }}
+              >
+                Lịch sử phiên bản
+              </Button>
+            )}
             {currentRecordId && !prescriptionBlockReason && (
               <Button
                 icon={<MedicineBoxOutlined />}
@@ -881,7 +907,6 @@ function MedicalEncounter() {
               <>
                 <Button
                   type="primary"
-                  size="large"
                   loading={saving}
                   icon={<CheckCircleOutlined />}
                   onClick={() => saveRecord()}
@@ -890,7 +915,6 @@ function MedicalEncounter() {
                 </Button>
                 <Button
                   type="primary"
-                  size="large"
                   icon={<SafetyCertificateOutlined />}
                   onClick={handleOpenSignFlow}
                   style={{

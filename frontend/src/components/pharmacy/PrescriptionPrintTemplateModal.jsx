@@ -195,7 +195,7 @@ function PrescriptionPrintTemplateModal({
             <Button onClick={onClose} icon={<CloseOutlined />}>
               Đóng
             </Button>
-            <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrint} size="large">
+            <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
               In đơn thuốc
             </Button>
           </Space>
