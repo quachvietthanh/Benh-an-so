@@ -2,6 +2,7 @@ package com.benhsoan.persistence.jpaRepository.medicalrecord;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -59,6 +60,20 @@ class DiagnosisCatalogJpaIntegrationTest {
 
         assertTrue(medicalRecordDiagnosisRepository.existsByDiagnosisCatalogId(catalog.getId()));
         assertFalse(medicalRecordDiagnosisRepository.existsByDiagnosisCatalogId(unusedCatalogId));
+    }
+
+    @Test
+    void persistsFreeTextSecondaryDiagnosisWithoutCatalogOrCode() {
+        UUID diagnosisId = UUID.randomUUID();
+        medicalRecordDiagnosisRepository.saveAndFlush(MedicalRecordDiagnosisEntity.builder()
+                .id(diagnosisId).medicalRecordId(UUID.randomUUID()).diagnosisCatalogId(null)
+                .diagnosisCode(null).diagnosisName("Clinical observation").diagnosisType(DiagnosisType.SECONDARY)
+                .diagnosedBy(UUID.randomUUID()).diagnosedAt(NOW).createdAt(NOW).build());
+
+        MedicalRecordDiagnosisEntity persisted = medicalRecordDiagnosisRepository.findById(diagnosisId).orElseThrow();
+        assertNull(persisted.getDiagnosisCatalogId());
+        assertNull(persisted.getDiagnosisCode());
+        assertEquals("Clinical observation", persisted.getDiagnosisName());
     }
 
     @Test

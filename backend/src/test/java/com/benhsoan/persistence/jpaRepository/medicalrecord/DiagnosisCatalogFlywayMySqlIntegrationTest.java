@@ -68,4 +68,25 @@ class DiagnosisCatalogFlywayMySqlIntegrationTest {
                 Integer.class
         ));
     }
+
+    @Test
+    void flywayKeepsFreeTextSecondaryDiagnosisColumnsNullableAndIndexed() {
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'medical_record_diagnoses' "
+                        + "AND column_name IN ('diagnosis_catalog_id', 'diagnosis_code') AND is_nullable = 'YES'",
+                Integer.class
+        ));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.referential_constraints "
+                        + "WHERE constraint_schema = DATABASE() AND constraint_name = 'fk_diagnoses_catalog'",
+                Integer.class
+        ));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.statistics "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'medical_record_diagnoses' "
+                        + "AND index_name = 'idx_diagnoses_catalog'",
+                Integer.class
+        ));
+    }
 }
