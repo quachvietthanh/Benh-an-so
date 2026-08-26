@@ -557,10 +557,23 @@
     padding: 12px 14px !important;
   }
 
+  .patient-list-header .ant-btn {
+    width: 100% !important;
+    height: 38px !important;
+    font-size: 13.5px !important;
+    border-radius: 8px !important;
+  }
+
   .patient-filter-bar {
     grid-template-columns: 1fr 1fr !important;
     gap: 8px !important;
     padding: 10px 14px !important;
+  }
+
+  .patient-filter-bar > .ant-btn {
+    height: 38px !important;
+    font-size: 13.5px !important;
+    border-radius: 8px !important;
   }
 
   .patient-filter-bar > :first-child {
