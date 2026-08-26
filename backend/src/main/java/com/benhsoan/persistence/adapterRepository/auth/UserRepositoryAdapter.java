@@ -43,6 +43,12 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByPhone(String phone) {
+        return jpaRepository.findByPhone(phone)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<User> findByEmail(String email) {
         return jpaRepository.findByEmail(email)
                 .map(mapper::toDomain);
@@ -58,6 +64,11 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public boolean existsByUsername(String username) {
         return jpaRepository.existsByUsername(username);
+    }
+
+    @Override
+    public boolean existsByPhone(String phone) {
+        return phone != null && jpaRepository.existsByPhone(phone);
     }
 
     @Override

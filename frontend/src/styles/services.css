@@ -456,7 +456,7 @@
 .clinic-config-header p {
   margin: 3px 0 0;
   color: #7f8c9e;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .clinic-form {
@@ -496,8 +496,8 @@
 
 .clinic-form-actions .ant-btn {
   min-width: 132px;
-  height: 39px;
-  font-size: 10px;
+  height: 38px;
+  font-size: 13.5px;
   font-weight: 620;
   border-radius: 8px;
   box-shadow: 0 6px 14px rgba(22, 110, 232, 0.14);
@@ -702,7 +702,7 @@
 
   .system-tabs > .ant-tabs-nav .ant-tabs-tab {
     padding-block: 13px;
-    font-size: 10px;
+    font-size: 13px;
   }
 
   .system-tabs > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab {
@@ -1644,6 +1644,9 @@
   .btn-services-refresh,
   .btn-services-create {
     width: 100% !important;
+    height: 38px !important;
+    font-size: 13.5px !important;
+    border-radius: 8px !important;
     justify-content: center !important;
   }
 

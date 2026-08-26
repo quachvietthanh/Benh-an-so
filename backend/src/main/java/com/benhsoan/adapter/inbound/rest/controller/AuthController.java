@@ -11,15 +11,21 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.AuthRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.auth.LoginRequest;
+import com.benhsoan.adapter.inbound.rest.request.auth.PatientLoginRequest;
 import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
+import com.benhsoan.adapter.inbound.rest.response.auth.PatientLoginResponse;
 import com.benhsoan.port.dto.result.LoginResult;
+import com.benhsoan.port.dto.result.PatientLoginResult;
 import com.benhsoan.port.dto.command.auth.LogoutCommand;
+import com.benhsoan.port.dto.command.auth.PatientLoginCommand;
 import com.benhsoan.port.inbound.auth.LoginUseCase;
 import com.benhsoan.port.inbound.auth.LogoutUseCase;
+import com.benhsoan.port.inbound.auth.PatientLoginUseCase;
 import com.benhsoan.port.inbound.auth.RefreshTokenUseCase;
 import com.benhsoan.domain.auth.exception.TokenInvalidException;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -32,6 +38,7 @@ public class AuthController {
     private final LoginUseCase loginUseCase;
     private final LogoutUseCase logoutUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
+    private final PatientLoginUseCase patientLoginUseCase;
 
     private final AuthRestMapper authRestMapper;
 
@@ -48,6 +55,24 @@ public class AuthController {
                 authRestMapper.toResponse(result));
     }
 
+    @PostMapping("/patient/login")
+    public ResponseEntity<PatientLoginResponse> patientLogin(
+            @Valid @RequestBody PatientLoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+
+        PatientLoginResult result =
+                patientLoginUseCase.login(
+                        new PatientLoginCommand(
+                                request.phone(),
+                                request.password(),
+                                resolveIp(httpRequest),
+                                httpRequest.getHeader("User-Agent")));
+
+        return ResponseEntity.ok(
+                authRestMapper.toResponse(result));
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
@@ -57,6 +82,14 @@ public class AuthController {
                 new LogoutCommand(extractBearerToken(authorization)));
 
         return ResponseEntity.noContent().build();
+    }
+
+    private String resolveIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     private String extractBearerToken(String authorization) {
