@@ -9,7 +9,8 @@ import {
   getRoleTheme,
   getModuleDisplayName,
   getPermissionDetails,
-} from '../components/rolePermissions/rolePermissionsConstants.jsx'
+} from '../components/rolePermissions/rolePermissionsConstants.js'
+
 
 test('TC01: Kiểm tra mapping tên hiển thị của các vai trò chuẩn', () => {
   assert.equal(getRoleDisplayName({ name: 'ADMIN' }), 'Quản trị viên')

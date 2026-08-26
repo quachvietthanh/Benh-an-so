@@ -32,7 +32,10 @@ public class MedicalRecordPersistenceMapper {
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
                 entity.getUpdatedBy(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getAppliedTemplateVersionId(),
+                entity.getTemplateAppliedBy(),
+                entity.getTemplateAppliedAt()
         );
     }
 
@@ -40,27 +43,17 @@ public class MedicalRecordPersistenceMapper {
         if (domain == null) {
             return null;
         }
-        return new MedicalRecordEntity(
-                domain.getId(),
-                domain.getVisitId(),
-                domain.getChiefComplaint(),
-                domain.getSymptoms(),
-                domain.getMedicalHistory(),
-                domain.getPhysicalExamination(),
-                domain.getClinicalProgress(),
-                domain.getTreatmentPlan(),
-                domain.getDoctorInstructions(),
-                domain.getConclusion(),
-                domain.getStatus(),
-                domain.getSignatureData(),
-                domain.getSignedAt(),
-                domain.getSignedBy(),
-                domain.getLockedAt(),
-                domain.getLockedBy(),
-                domain.getCreatedBy(),
-                domain.getCreatedAt(),
-                domain.getUpdatedBy(),
-                domain.getUpdatedAt()
-        );
+        return MedicalRecordEntity.builder()
+                .id(domain.getId()).visitId(domain.getVisitId()).chiefComplaint(domain.getChiefComplaint())
+                .symptoms(domain.getSymptoms()).medicalHistory(domain.getMedicalHistory())
+                .physicalExamination(domain.getPhysicalExamination()).clinicalProgress(domain.getClinicalProgress())
+                .treatmentPlan(domain.getTreatmentPlan()).doctorInstructions(domain.getDoctorInstructions())
+                .conclusion(domain.getConclusion()).status(domain.getStatus()).signatureData(domain.getSignatureData())
+                .signedAt(domain.getSignedAt()).signedBy(domain.getSignedBy()).lockedAt(domain.getLockedAt())
+                .lockedBy(domain.getLockedBy()).createdBy(domain.getCreatedBy()).createdAt(domain.getCreatedAt())
+                .updatedBy(domain.getUpdatedBy()).updatedAt(domain.getUpdatedAt())
+                .appliedTemplateVersionId(domain.getAppliedTemplateVersionId())
+                .templateAppliedBy(domain.getTemplateAppliedBy()).templateAppliedAt(domain.getTemplateAppliedAt())
+                .build();
     }
 }

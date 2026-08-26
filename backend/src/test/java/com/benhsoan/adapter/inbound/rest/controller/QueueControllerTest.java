@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,11 +22,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.QueueRestMapper;
+import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
+import com.benhsoan.domain.specialty.exception.SpecialtyNotFoundException;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.dto.result.QueueItemResult;
+import com.benhsoan.port.dto.command.queue.CheckInWalkInCommand;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -43,7 +47,7 @@ import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 
 @WebMvcTest(controllers = QueueController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(QueueRestMapper.class)
+@Import({QueueRestMapper.class, GlobalExceptionHandler.class})
 class QueueControllerTest {
 
     @Autowired private MockMvc mockMvc;
@@ -80,6 +84,69 @@ class QueueControllerTest {
                 .andExpect(jsonPath("$.appointmentId").value(appointmentId.toString()))
                 .andExpect(jsonPath("$.visitCode").value("VIS000120"))
                 .andExpect(jsonPath("$.sourceType").value("APPOINTMENT"));
+    }
+
+    @Test
+    void acceptsLegacyWalkInPayloadWithoutSpecialty() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        when(checkInWalkInUseCase.checkIn(any())).thenReturn(new QueueCheckInResult(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "VIS000121", null,
+                patientId, doctorId, UUID.randomUUID(), 4, LocalDate.of(2026, 8, 9),
+                QueueItemSourceType.WALK_IN, QueueItemStatus.WAITING, VisitStatus.WAITING,
+                Instant.parse("2026-08-09T02:00:00Z")
+        ));
+
+        mockMvc.perform(post("/queue-items/walk-in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"patientId\":\"" + patientId + "\",\"doctorId\":\"" + doctorId
+                                + "\",\"reason\":\"Kham tong quat\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.visitCode").value("VIS000121"));
+
+        ArgumentCaptor<CheckInWalkInCommand> captor = ArgumentCaptor.forClass(CheckInWalkInCommand.class);
+        org.mockito.Mockito.verify(checkInWalkInUseCase).checkIn(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(null, captor.getValue().specialtyId());
+    }
+
+    @Test
+    void forwardsSpecialtyFromWalkInPayload() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID specialtyId = UUID.randomUUID();
+        when(checkInWalkInUseCase.checkIn(any())).thenReturn(new QueueCheckInResult(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "VIS000122", null,
+                patientId, doctorId, UUID.randomUUID(), 4, LocalDate.of(2026, 8, 9),
+                QueueItemSourceType.WALK_IN, QueueItemStatus.WAITING, VisitStatus.WAITING,
+                Instant.parse("2026-08-09T02:00:00Z")
+        ));
+
+        mockMvc.perform(post("/queue-items/walk-in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"patientId\":\"" + patientId + "\",\"doctorId\":\"" + doctorId
+                                + "\",\"reason\":\"Kham noi\",\"specialtyId\":\"" + specialtyId + "\"}"))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<CheckInWalkInCommand> captor = ArgumentCaptor.forClass(CheckInWalkInCommand.class);
+        org.mockito.Mockito.verify(checkInWalkInUseCase).checkIn(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(specialtyId, captor.getValue().specialtyId());
+    }
+
+    @Test
+    void returnsTheStandardNotFoundErrorForUnknownOrInactiveSpecialty() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID specialtyId = UUID.randomUUID();
+        when(checkInWalkInUseCase.checkIn(any())).thenThrow(new SpecialtyNotFoundException(specialtyId));
+
+        for (UUID invalidSpecialtyId : java.util.List.of(specialtyId, UUID.randomUUID())) {
+            mockMvc.perform(post("/queue-items/walk-in")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"patientId\":\"" + patientId + "\",\"doctorId\":\"" + doctorId
+                                    + "\",\"reason\":\"Kham noi\",\"specialtyId\":\"" + invalidSpecialtyId + "\"}"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("SPECIALTY_NOT_FOUND"));
+        }
     }
 
     @Test

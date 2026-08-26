@@ -26,7 +26,7 @@ public class CheckInWalkInService implements CheckInWalkInUseCase {
     public QueueCheckInResult checkIn(CheckInWalkInCommand command) {
         requireReceptionPermission();
         return queueCheckInCoordinator.checkIn(command.patientId(), command.doctorId(), null,
-                QueueItemSourceType.WALK_IN, command.reason(), command.note(), currentUserPort.getCurrentUserId(),
+                QueueItemSourceType.WALK_IN, command.reason(), command.note(), command.specialtyId(), currentUserPort.getCurrentUserId(),
                 clockPort.now());
     }
 

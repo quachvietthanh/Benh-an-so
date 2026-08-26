@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const frontendDir = path.resolve('frontend')
+const frontendDir = fs.existsSync(path.resolve('src')) ? process.cwd() : path.resolve('frontend')
+
 
 test('App.jsx has standardized button theme tokens', () => {
   const appContent = fs.readFileSync(path.join(frontendDir, 'src/App.jsx'), 'utf-8')

@@ -37,7 +37,9 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
             .withPassword("backup_test");
 
     private static final BackupRestorePlan BACKUP_PLAN = new BackupRestorePlan(
-            List.of("clinic_configuration", "rooms", "diagnosis_catalog", "clinical_service_catalog", "invoice_lines", "invoices",
+            List.of("clinic_configuration", "rooms", "diagnosis_catalog", "specialties", "medical_record_templates",
+                    "medical_record_template_versions", "medical_record_template_sections", "medical_records",
+                    "clinical_service_catalog", "invoice_lines", "invoices",
                     "payments", "prescription_dispense_items", "prescriptions", "medicine_batches", "medicines",
                     "queue_items", "visits"),
             Set.of(),
@@ -50,6 +52,13 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
                     dependency("invoices", "original_invoice_id", "invoices"),
                     dependency("invoice_lines", "invoice_id", "invoices"),
                     dependency("queue_items", "visit_id", "visits"),
+                    dependency("visits", "specialty_id", "specialties"),
+                    dependency("medical_record_templates", "specialty_id", "specialties"),
+                    dependency("medical_record_template_versions", "template_id", "medical_record_templates"),
+                    dependency("medical_record_template_versions", "specialty_id", "specialties"),
+                    dependency("medical_record_template_sections", "template_version_id", "medical_record_template_versions"),
+                    dependency("medical_records", "visit_id", "visits"),
+                    dependency("medical_records", "applied_template_version_id", "medical_record_template_versions"),
                     dependency("visits", "queue_item_id", "queue_items")
             ),
             Set.of(
@@ -91,6 +100,9 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         jdbc.update("UPDATE medicines SET medicine_name = ? WHERE id = ?", "CORRUPTED", fixture.medicineId());
         jdbc.update("UPDATE invoice_lines SET amount = ? WHERE id = ?", new BigDecimal("999.00"), fixture.lineId());
         jdbc.update("DELETE FROM diagnosis_catalog");
+        jdbc.update("UPDATE medical_record_templates SET template_name = ? WHERE id = ?", "CORRUPTED", fixture.templateId());
+        jdbc.update("UPDATE medical_record_template_versions SET template_name = ? WHERE id = ?", "CORRUPTED", fixture.templateVersionId());
+        jdbc.update("UPDATE medical_record_template_sections SET label = ? WHERE id = ?", "CORRUPTED", fixture.templateSectionId());
         jdbc.update("UPDATE visits SET queue_item_id = NULL WHERE id = ?", fixture.visitId());
         jdbc.update("UPDATE invoices SET original_invoice_id = NULL WHERE id = ?", fixture.adjustmentInvoiceId());
 
@@ -101,6 +113,12 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         assertEquals("D-001", value("SELECT diagnosis_code FROM diagnosis_catalog"));
         assertEquals(0, new BigDecimal("100.00").compareTo(jdbc.queryForObject(
                 "SELECT amount FROM invoice_lines WHERE id = ?", BigDecimal.class, fixture.lineId())));
+        assertEquals("General examination", value("SELECT template_name FROM medical_record_templates WHERE id = ?", fixture.templateId()));
+        assertEquals("General examination v1", value(
+                "SELECT template_name FROM medical_record_template_versions WHERE id = ?", fixture.templateVersionId()));
+        assertEquals("Chief complaint", value("SELECT label FROM medical_record_template_sections WHERE id = ?", fixture.templateSectionId()));
+        assertEquals(fixture.templateVersionId(), value(
+                "SELECT applied_template_version_id FROM medical_records WHERE id = ?", fixture.medicalRecordId()));
         assertEquals(fixture.queueItemId(), value("SELECT queue_item_id FROM visits WHERE id = ?", fixture.visitId()));
         assertEquals(fixture.invoiceId(), value("SELECT original_invoice_id FROM invoices WHERE id = ?", fixture.adjustmentInvoiceId()));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payments", Integer.class));
@@ -170,22 +188,34 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         String lineId = UUID.randomUUID().toString();
         String visitId = UUID.randomUUID().toString();
         String queueItemId = UUID.randomUUID().toString();
+        String specialtyId = UUID.randomUUID().toString();
+        String templateId = UUID.randomUUID().toString();
+        String templateVersionId = UUID.randomUUID().toString();
+        String templateSectionId = UUID.randomUUID().toString();
+        String medicalRecordId = UUID.randomUUID().toString();
 
         jdbc.update("INSERT INTO rooms VALUES (?, ?)", UUID.randomUUID().toString(), "ROOM-001");
         jdbc.update("INSERT INTO diagnosis_catalog VALUES (?, ?)", UUID.randomUUID().toString(), "D-001");
         jdbc.update("INSERT INTO clinical_service_catalog VALUES (?, ?)", UUID.randomUUID().toString(), "S-001");
+        jdbc.update("INSERT INTO specialties VALUES (?, ?)", specialtyId, "GENERAL");
+        jdbc.update("INSERT INTO medical_record_templates VALUES (?, ?, ?)", templateId, specialtyId, "General examination");
+        jdbc.update("INSERT INTO medical_record_template_versions VALUES (?, ?, ?, ?)", templateVersionId, templateId, specialtyId,
+                "General examination v1");
+        jdbc.update("INSERT INTO medical_record_template_sections VALUES (?, ?, ?)", templateSectionId, templateVersionId, "Chief complaint");
         jdbc.update("INSERT INTO medicines VALUES (?, ?, ?)", medicineId, "MED-001", "Paracetamol 500 mg");
         jdbc.update("INSERT INTO medicine_batches VALUES (?, ?, ?)", batchId, medicineId, "BATCH-001");
         jdbc.update("INSERT INTO prescriptions VALUES (?, ?, ?)", prescriptionId, medicineId, "RX-001");
         jdbc.update("INSERT INTO prescription_dispense_items VALUES (?, ?, ?)", dispenseId, prescriptionId, batchId);
-        jdbc.update("INSERT INTO visits VALUES (?, ?)", visitId, null);
+        jdbc.update("INSERT INTO visits VALUES (?, ?, ?)", visitId, null, specialtyId);
         jdbc.update("INSERT INTO queue_items VALUES (?, ?)", queueItemId, visitId);
         jdbc.update("UPDATE visits SET queue_item_id = ? WHERE id = ?", queueItemId, visitId);
+        jdbc.update("INSERT INTO medical_records VALUES (?, ?, ?)", medicalRecordId, visitId, templateVersionId);
         jdbc.update("INSERT INTO payments VALUES (?)", paymentId);
         jdbc.update("INSERT INTO invoices VALUES (?, ?, ?, ?, ?)", invoiceId, "INV-001", paymentId, null, "ORIGINAL");
         jdbc.update("INSERT INTO invoices VALUES (?, ?, ?, ?, ?)", adjustmentInvoiceId, "INV-002", null, invoiceId, "ADJUSTMENT");
         jdbc.update("INSERT INTO invoice_lines VALUES (?, ?, ?)", lineId, invoiceId, new BigDecimal("100.00"));
-        return new Fixture(medicineId, invoiceId, adjustmentInvoiceId, lineId, visitId, queueItemId);
+        return new Fixture(medicineId, invoiceId, adjustmentInvoiceId, lineId, visitId, queueItemId,
+                templateId, templateVersionId, templateSectionId, medicalRecordId);
     }
 
     private String value(String sql, Object... arguments) {
@@ -210,9 +240,14 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
         jdbc.execute("CREATE TABLE rooms (id VARCHAR(36) PRIMARY KEY, room_code VARCHAR(30) NOT NULL) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE diagnosis_catalog (id VARCHAR(36) PRIMARY KEY, diagnosis_code VARCHAR(30) NOT NULL) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE clinical_service_catalog (id VARCHAR(36) PRIMARY KEY, service_code VARCHAR(30) NOT NULL) ENGINE=InnoDB");
-        jdbc.execute("CREATE TABLE visits (id VARCHAR(36) PRIMARY KEY, queue_item_id VARCHAR(36)) ENGINE=InnoDB");
+        jdbc.execute("CREATE TABLE specialties (id VARCHAR(36) PRIMARY KEY, code VARCHAR(30) NOT NULL) ENGINE=InnoDB");
+        jdbc.execute("CREATE TABLE visits (id VARCHAR(36) PRIMARY KEY, queue_item_id VARCHAR(36), specialty_id VARCHAR(36) NOT NULL, FOREIGN KEY (specialty_id) REFERENCES specialties(id)) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE queue_items (id VARCHAR(36) PRIMARY KEY, visit_id VARCHAR(36) NOT NULL, FOREIGN KEY (visit_id) REFERENCES visits(id)) ENGINE=InnoDB");
         jdbc.execute("ALTER TABLE visits ADD FOREIGN KEY (queue_item_id) REFERENCES queue_items(id)");
+        jdbc.execute("CREATE TABLE medical_record_templates (id VARCHAR(36) PRIMARY KEY, specialty_id VARCHAR(36) NOT NULL, template_name VARCHAR(150) NOT NULL, FOREIGN KEY (specialty_id) REFERENCES specialties(id)) ENGINE=InnoDB");
+        jdbc.execute("CREATE TABLE medical_record_template_versions (id VARCHAR(36) PRIMARY KEY, template_id VARCHAR(36) NOT NULL, specialty_id VARCHAR(36) NOT NULL, template_name VARCHAR(150) NOT NULL, FOREIGN KEY (template_id) REFERENCES medical_record_templates(id), FOREIGN KEY (specialty_id) REFERENCES specialties(id)) ENGINE=InnoDB");
+        jdbc.execute("CREATE TABLE medical_record_template_sections (id VARCHAR(36) PRIMARY KEY, template_version_id VARCHAR(36) NOT NULL, label VARCHAR(150) NOT NULL, FOREIGN KEY (template_version_id) REFERENCES medical_record_template_versions(id)) ENGINE=InnoDB");
+        jdbc.execute("CREATE TABLE medical_records (id VARCHAR(36) PRIMARY KEY, visit_id VARCHAR(36) NOT NULL, applied_template_version_id VARCHAR(36), FOREIGN KEY (visit_id) REFERENCES visits(id), FOREIGN KEY (applied_template_version_id) REFERENCES medical_record_template_versions(id)) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE medicines (id VARCHAR(36) PRIMARY KEY, medicine_code VARCHAR(30) NOT NULL, medicine_name VARCHAR(150) NOT NULL) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE medicine_batches (id VARCHAR(36) PRIMARY KEY, medicine_id VARCHAR(36) NOT NULL, batch_number VARCHAR(50) NOT NULL, FOREIGN KEY (medicine_id) REFERENCES medicines(id)) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE prescriptions (id VARCHAR(36) PRIMARY KEY, medicine_id VARCHAR(36) NOT NULL, prescription_code VARCHAR(30) NOT NULL, FOREIGN KEY (medicine_id) REFERENCES medicines(id)) ENGINE=InnoDB");
@@ -227,6 +262,8 @@ class JsonDatabaseBackupStorageAdapterIntegrationTest {
     }
 
     private record Fixture(String medicineId, String invoiceId, String adjustmentInvoiceId,
-                           String lineId, String visitId, String queueItemId) {
+                           String lineId, String visitId, String queueItemId,
+                           String templateId, String templateVersionId, String templateSectionId,
+                           String medicalRecordId) {
     }
 }

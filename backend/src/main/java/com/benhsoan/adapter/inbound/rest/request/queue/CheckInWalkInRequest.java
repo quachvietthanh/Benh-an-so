@@ -9,6 +9,10 @@ public record CheckInWalkInRequest(
         @NotNull UUID patientId,
         @NotNull UUID doctorId,
         @NotBlank String reason,
-        String note
+        String note,
+        UUID specialtyId
 ) {
+    public CheckInWalkInRequest(UUID patientId, UUID doctorId, String reason, String note) {
+        this(patientId, doctorId, reason, note, null);
+    }
 }

@@ -21,7 +21,8 @@ class BackupRestorePlanTest {
         BackupRestorePlan plan = new BackupStorageConfiguration().fullBackupRestorePlan();
 
         assertTrue(plan.allowedTables().containsAll(List.of(
-                "clinic_configuration", "diagnosis_catalog", "service_catalog", "service_price", "clinical_service_catalog",
+                "clinic_configuration", "diagnosis_catalog", "specialties", "medical_record_templates",
+                "medical_record_template_versions", "medical_record_template_sections", "service_catalog", "service_price", "clinical_service_catalog",
                 "drug_interaction_rules", "prescription_code_sequences", "invoice_code_sequences",
                 "prescription_interconnection_logs", "payments", "payment_service_fees"
         )));
@@ -48,6 +49,27 @@ class BackupRestorePlanTest {
         assertTrue(plan.snapshotTables().contains("prescription_interconnection_logs"));
         assertTrue(plan.dependencies().contains(new ForeignKeyDependency(
                 "prescription_interconnection_logs", "prescription_id", "prescriptions"
+        )));
+    }
+
+    @Test
+    void templateTablesAndForeignKeyDependenciesAreIncluded() {
+        BackupRestorePlan plan = new BackupStorageConfiguration().fullBackupRestorePlan();
+
+        assertTrue(plan.dependencies().contains(new ForeignKeyDependency(
+                "visits", "specialty_id", "specialties"
+        )));
+        assertTrue(plan.dependencies().contains(new ForeignKeyDependency(
+                "medical_record_templates", "specialty_id", "specialties"
+        )));
+        assertTrue(plan.dependencies().contains(new ForeignKeyDependency(
+                "medical_record_template_versions", "template_id", "medical_record_templates"
+        )));
+        assertTrue(plan.dependencies().contains(new ForeignKeyDependency(
+                "medical_record_template_sections", "template_version_id", "medical_record_template_versions"
+        )));
+        assertTrue(plan.dependencies().contains(new ForeignKeyDependency(
+                "medical_records", "applied_template_version_id", "medical_record_template_versions"
         )));
     }
 

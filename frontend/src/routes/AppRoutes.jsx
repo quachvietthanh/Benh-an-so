@@ -23,7 +23,9 @@ const ServicesPage = React.lazy(() => import('../pages/ServicesPage'))
 const ResultPage = React.lazy(() => import('../pages/ResultPage'))
 const PublicLookupPage = React.lazy(() => import('../pages/PublicLookupPage'))
 const SystemManagementPage = React.lazy(() => import('../pages/SystemManagementPage'))
+const DiagnosisCatalogPage = React.lazy(() => import('../pages/DiagnosisCatalogPage'))
 const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
+
 const MedicalRecordAccessLogsPage = React.lazy(() => import('../pages/MedicalRecordAccessLogsPage'))
 const MedicalRecordCopyPage = React.lazy(() => import('../pages/MedicalRecordCopyPage'))
 const MedicalRecordVersionHistoryPage = React.lazy(() => import('../pages/MedicalRecordVersionHistoryPage'))
@@ -31,7 +33,7 @@ const PrescriptionInterconnectionPage = React.lazy(() => import('../pages/Prescr
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
-  <React.Suspense fallback={<Loading />}>
+  <React.Suspense fallback={<Loading tip="Đang tải trang..." minHeight={320} />}>
     {children}
   </React.Suspense>
 )
@@ -40,8 +42,9 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
   const { isAuthenticated, loading, user } = useAuthContext()
 
   if (loading) {
-    return <div style={{ padding: 24 }}>Đang tải...</div>
+    return <Loading fullPage tip="Đang kiểm tra quyền truy cập..." subtip="Đang xác thực thông tin tài khoản..." />
   }
+
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
@@ -50,18 +53,16 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
   const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const userPerms = (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
 
-  // Admin has access to all routes by default
   const isAdmin = userRoles.includes('admin')
 
-  // Check role match
   const hasRoleMatch = allowedRoles.length > 0 && allowedRoles.some((role) =>
     userRoles.includes(String(role).toLowerCase().replace(/^role_/, ''))
   )
 
-  // Check permission match
   const hasPermMatch = allowedPermissions.length > 0 && allowedPermissions.some((perm) =>
     userPerms.includes(String(perm).toUpperCase().replace(/^PERMISSION_/, ''))
   )
+
 
   if (allowedRoles.length === 0 && allowedPermissions.length === 0) {
     return children
@@ -123,7 +124,10 @@ function AppRoutes() {
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedPermissions={['AUDIT_READ']} allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute allowedPermissions={['USER_READ', 'USER_CREATE', 'USER_UPDATE']} allowedRoles={['admin']}><LazyPage><UsersPage /></LazyPage></PrivateRoute>} />
         <Route path="services" element={<PrivateRoute allowedPermissions={['SERVICE_CATALOG_READ', 'SERVICE_CATALOG_CREATE', 'SERVICE_CATALOG_UPDATE', 'SERVICE_PRICE_MANAGE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><ServicesPage /></LazyPage></PrivateRoute>} />
+        <Route path="system/diagnosis-catalog" element={<PrivateRoute allowedPermissions={['DIAGNOSIS_CATALOG_MANAGE', 'SERVICE_CATALOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><DiagnosisCatalogPage /></LazyPage></PrivateRoute>} />
+        <Route path="diagnosis-catalog" element={<Navigate to="/system/diagnosis-catalog" replace />} />
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
+
       </Route>
 
       <Route path="*" element={<LazyPage><NotFound /></LazyPage>} />
