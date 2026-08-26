@@ -12,16 +12,20 @@ import org.springframework.web.bind.annotation.RestController;
 import com.benhsoan.adapter.inbound.rest.mapper.AuthRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.auth.LoginRequest;
 import com.benhsoan.adapter.inbound.rest.request.auth.PatientLoginRequest;
+import com.benhsoan.adapter.inbound.rest.request.auth.PatientRegistrationRequest;
 import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientLoginResponse;
+import com.benhsoan.adapter.inbound.rest.response.auth.PatientRegistrationResponse;
 import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.dto.result.PatientLoginResult;
+import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
 import com.benhsoan.port.dto.command.auth.LogoutCommand;
 import com.benhsoan.port.dto.command.auth.PatientLoginCommand;
 import com.benhsoan.port.inbound.auth.LoginUseCase;
 import com.benhsoan.port.inbound.auth.LogoutUseCase;
 import com.benhsoan.port.inbound.auth.PatientLoginUseCase;
+import com.benhsoan.port.inbound.auth.PatientPortalRegistrationUseCase;
 import com.benhsoan.port.inbound.auth.RefreshTokenUseCase;
 import com.benhsoan.domain.auth.exception.TokenInvalidException;
 
@@ -39,6 +43,7 @@ public class AuthController {
     private final LogoutUseCase logoutUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final PatientLoginUseCase patientLoginUseCase;
+    private final PatientPortalRegistrationUseCase patientPortalRegistrationUseCase;
 
     private final AuthRestMapper authRestMapper;
 
@@ -71,6 +76,20 @@ public class AuthController {
 
         return ResponseEntity.ok(
                 authRestMapper.toResponse(result));
+    }
+
+    @PostMapping("/patient/register")
+    public ResponseEntity<PatientRegistrationResponse> patientRegister(
+            @Valid @RequestBody PatientRegistrationRequest request
+    ) {
+
+        PatientPortalRegistrationResult result =
+                patientPortalRegistrationUseCase.register(
+                        authRestMapper.toCommand(request));
+
+        return ResponseEntity
+                .status(org.springframework.http.HttpStatus.CREATED)
+                .body(authRestMapper.toResponse(result));
     }
 
     @PostMapping("/logout")

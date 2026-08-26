@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.patient;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +28,8 @@ public interface PatientRepository {
     boolean existsByIdentityNumberAndIdNot( String identityNumber, UUID id);
 
     Optional<Patient> findByUserId(UUID userId);
+
+    List<Patient> findAllByPhone(String phone);
 
     Optional<Patient> findByIdForUpdate(UUID patientId);
     
