@@ -1,0 +1,113 @@
+{
+  "info": {
+    "name": "Benh So An - Medical Record Templates (Contract)",
+    "_postman_id": "e948f013-7a4e-475a-a66b-4b235737e6f1",
+    "description": "Implemented NCL-13-CN-003 contract. Requires a database migrated through V27 and MEDICAL_RECORD_TEMPLATE_MANAGE.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "specialtyId", "value": "" },
+    { "key": "templateId", "value": "" },
+    { "key": "replacementTemplateId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "List active specialties",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/system/specialties?active=true"
+      }
+    },
+    {
+      "name": "Create template",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"specialtyId\": \"{{specialtyId}}\",\n  \"name\": \"Internal medicine initial examination\",\n  \"makeDefault\": true,\n  \"sections\": [\n    { \"fieldCode\": \"CHIEF_COMPLAINT\", \"label\": \"Chief complaint\", \"required\": true, \"displayOrder\": 1 },\n    { \"fieldCode\": \"SYMPTOMS\", \"label\": \"Symptoms\", \"required\": true, \"displayOrder\": 2 },\n    { \"fieldCode\": \"MEDICAL_HISTORY\", \"label\": \"Medical history\", \"required\": false, \"displayOrder\": 3 },\n    { \"fieldCode\": \"PHYSICAL_EXAMINATION\", \"label\": \"Physical examination\", \"required\": true, \"displayOrder\": 4 },\n    { \"fieldCode\": \"TREATMENT_PLAN\", \"label\": \"Treatment plan\", \"required\": true, \"displayOrder\": 5 },\n    { \"fieldCode\": \"CONCLUSION\", \"label\": \"Conclusion\", \"required\": true, \"displayOrder\": 6 }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/system/medical-record-templates"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Template is created', function () { pm.response.to.have.status(201); });",
+        "pm.collectionVariables.set('templateId', pm.response.json().id);"
+      ]}}]
+    },
+    {
+      "name": "List templates",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/system/medical-record-templates?specialtyId={{specialtyId}}&active=true"
+      }
+    },
+    {
+      "name": "Get template",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/system/medical-record-templates/{{templateId}}"
+      }
+    },
+    {
+      "name": "Update template (creates a new version)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Internal medicine follow-up examination\",\n  \"changeNote\": \"Clarify follow-up fields\",\n  \"sections\": [\n    { \"fieldCode\": \"CHIEF_COMPLAINT\", \"label\": \"Chief complaint\", \"required\": true, \"displayOrder\": 1 },\n    { \"fieldCode\": \"CONCLUSION\", \"label\": \"Conclusion\", \"required\": true, \"displayOrder\": 2 }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/system/medical-record-templates/{{templateId}}"
+      }
+    },
+    {
+      "name": "Reject duplicate template name",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"specialtyId\": \"{{specialtyId}}\",\n  \"name\": \"  internal medicine initial examination  \",\n  \"sections\": [\n    { \"fieldCode\": \"CHIEF_COMPLAINT\", \"label\": \"Chief complaint\", \"required\": true, \"displayOrder\": 1 }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/system/medical-record-templates"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Duplicate normalized name is rejected', function () { pm.response.to.have.status(409); });"
+      ]}}]
+    },
+    {
+      "name": "Set template as default",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/system/medical-record-templates/{{templateId}}/default"
+      }
+    },
+    {
+      "name": "Deactivate template",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"active\": false,\n  \"replacementTemplateId\": \"{{replacementTemplateId}}\"\n}" },
+        "url": "{{baseUrl}}/system/medical-record-templates/{{templateId}}/status"
+      }
+    }
+  ]
+}

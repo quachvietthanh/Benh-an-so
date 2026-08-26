@@ -31,10 +31,10 @@ prescription or invoice code to collide with restored data.
 
 | Group | Tables |
 | --- | --- |
-| Operational reference data | `clinic_configuration`, `rooms`, `medicines`, `diagnosis_catalog`, `clinical_service_catalog`, `drug_interaction_rules`, `prescription_code_sequences`, `invoice_code_sequences` |
+| Operational reference data | `clinic_configuration`, `rooms`, `medicines`, `diagnosis_catalog`, `specialties`, `medical_record_templates`, `medical_record_template_versions`, `medical_record_template_sections`, `clinical_service_catalog`, `drug_interaction_rules`, `prescription_code_sequences`, `invoice_code_sequences` |
 | Patient and appointment | `patients`, `patient_change_logs`, `appointments`, `appointment_notification_logs` |
-| Queue and visit | `doctor_room_assignments`, `medical_queues`, `queue_items`, `visits` |
-| Medical record | `medical_records`, `medical_record_diagnoses`, `medical_record_amendments`, `medical_record_access_logs` |
+| Queue and visit | `doctor_room_assignments`, `medical_queues`, `queue_items`, `visits` (including `specialty_id`) |
+| Medical record | `medical_records` (including `applied_template_version_id`), `medical_record_diagnoses`, `medical_record_amendments`, `medical_record_access_logs` |
 | Clinical workflow | `clinical_orders`, `clinical_order_items`, `clinical_results`, `clinical_result_histories`, `medical_attachments` |
 | Prescription and dispensing | `prescriptions`, `prescription_items`, `prescription_dispense_items`, `prescription_amendments`, `prescription_warning_logs` |
 | Inventory | `medicine_batches`, `inventory_receipts`, `inventory_receipt_items`, `stock_movements`, `inventory_alert_logs` |
@@ -63,7 +63,11 @@ prescription or invoice code to collide with restored data.
    explicit restore phases, not as arbitrary list ordering:
    - `queue_items.visit_id -> visits.id` and `visits.queue_item_id -> queue_items.id`
    - `invoices.original_invoice_id -> invoices.id`
-5. Insert order, delete order, and snapshot scope are separate concerns. They
+5. Template data is restored in parent-first order: `specialties` ->
+   `medical_record_templates` -> `medical_record_template_versions` ->
+   `medical_record_template_sections`; `medical_records.applied_template_version_id`
+   is restored only after its template version exists.
+6. Insert order, delete order, and snapshot scope are separate concerns. They
    must not be represented by one shared ordered list.
 
 ## Snapshot Format and Compatibility
@@ -106,8 +110,10 @@ mode. CI must provide a Docker daemon and execute these cases:
    foreign key.
 3. Restore catalog data (`rooms`, `diagnosis_catalog`, and
    `clinical_service_catalog`) together with the operational records.
-4. Persist `FAILED` when snapshot export throws.
-5. Roll back every delete and insert when a restore fails after it has started.
+4. Restore specialty, template, immutable template version, section, and the
+   medical record's applied-template-version reference without data loss.
+5. Persist `FAILED` when snapshot export throws.
+6. Roll back every delete and insert when a restore fails after it has started.
 
 ## Consequences
 
@@ -139,4 +145,4 @@ mode. CI must provide a Docker daemon and execute these cases:
 - Acceptance criteria: successful timestamped backup; block failed/in-progress
   restore; admin-only access; audit backup and restore actor/time.
 - Schema sources: `backend/src/main/resources/db/migration/V1`, `V4`, `V6`,
-  `V8` through `V11`, `V16`, `V18`, `V19`, `V21`, `V23`, and `V28`.
+  `V8` through `V11`, `V16`, `V18`, `V19`, `V21`, `V23`, and `V27`.

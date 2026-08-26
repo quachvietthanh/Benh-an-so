@@ -29,6 +29,7 @@ import com.benhsoan.port.dto.result.PatientLoginResult;
 import com.benhsoan.port.inbound.auth.LoginUseCase;
 import com.benhsoan.port.inbound.auth.LogoutUseCase;
 import com.benhsoan.port.inbound.auth.PatientLoginUseCase;
+import com.benhsoan.port.inbound.auth.PatientPortalRegistrationUseCase;
 import com.benhsoan.port.inbound.auth.RefreshTokenUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -54,6 +55,7 @@ class PatientAuthSecurityIntegrationTest {
     @MockitoBean private LogoutUseCase logoutUseCase;
     @MockitoBean private RefreshTokenUseCase refreshTokenUseCase;
     @MockitoBean private PatientLoginUseCase patientLoginUseCase;
+    @MockitoBean private PatientPortalRegistrationUseCase patientPortalRegistrationUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;

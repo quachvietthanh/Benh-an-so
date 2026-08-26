@@ -20,6 +20,8 @@ import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
 import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
+import com.benhsoan.domain.specialty.Specialty;
+import com.benhsoan.domain.specialty.exception.SpecialtyNotFoundException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
@@ -34,6 +36,7 @@ import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.specialty.SpecialtyRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -56,14 +59,16 @@ class QueueCheckInCoordinator {
     private final VisitRepository visitRepository;
     private final VisitCodeGenerator visitCodeGenerator;
     private final AuditLogRepository auditLogRepository;
+    private final SpecialtyRepository specialtyRepository;
 
     QueueCheckInResult checkIn(UUID patientId, UUID doctorId, UUID appointmentId, QueueItemSourceType sourceType,
-            String reason, String note, UUID actorId, Instant checkedInAt) {
+            String reason, String note, UUID specialtyId, UUID actorId, Instant checkedInAt) {
         var patient = patientRepository.findByIdForUpdate(patientId)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
         if (!patient.isActive()) {
             throw new CheckInConflictException("Inactive patients cannot be checked in.");
         }
+        UUID resolvedSpecialtyId = requireActiveSpecialty(specialtyId);
 
         LocalDate queueDate = checkedInAt.atZone(CLINIC_ZONE_ID).toLocalDate();
         ensurePatientHasNoActiveCareFlow(patientId, queueDate);
@@ -80,7 +85,7 @@ class QueueCheckInCoordinator {
                 .orElseThrow(() -> new DoctorNotAssignedToRoomException(doctorId));
 
         MedicalQueue medicalQueue = getOrCreateOpenQueue(doctorId, assignment.getRoomId(), queueDate, checkedInAt);
-        Visit visit = Visit.create(visitCodeGenerator.generate(), patientId, doctorId, appointmentId, null,
+        Visit visit = Visit.create(visitCodeGenerator.generate(), patientId, doctorId, appointmentId, null, resolvedSpecialtyId,
                 sourceType == QueueItemSourceType.APPOINTMENT ? VisitType.APPOINTMENT : VisitType.WALK_IN,
                 checkedInAt, reason, note, actorId, checkedInAt);
         Visit savedVisit = visitRepository.save(visit);
@@ -100,6 +105,11 @@ class QueueCheckInCoordinator {
         return new QueueCheckInResult(savedQueueItem.getId(), medicalQueue.getId(), linkedVisit.getId(),
                 linkedVisit.getVisitCode(), appointmentId, patientId, doctorId, assignment.getRoomId(), queueNumber,
                 queueDate, sourceType, savedQueueItem.getStatus(), linkedVisit.getStatus(), checkedInAt);
+    }
+
+    QueueCheckInResult checkIn(UUID patientId, UUID doctorId, UUID appointmentId, QueueItemSourceType sourceType,
+            String reason, String note, UUID actorId, Instant checkedInAt) {
+        return checkIn(patientId, doctorId, appointmentId, sourceType, reason, note, null, actorId, checkedInAt);
     }
 
     void requireAppointmentOnQueueDate(Instant appointmentStartTime, Instant checkedInAt) {
@@ -134,5 +144,12 @@ class QueueCheckInCoordinator {
             throw new CheckInConflictException("Doctor queue is closed for the selected date.");
         }
         return medicalQueue;
+    }
+
+    private UUID requireActiveSpecialty(UUID specialtyId) {
+        UUID resolvedSpecialtyId = specialtyId == null ? Specialty.GENERAL_ID : specialtyId;
+        return specialtyRepository.findById(resolvedSpecialtyId).filter(Specialty::isActive)
+                .map(Specialty::getId)
+                .orElseThrow(() -> new SpecialtyNotFoundException(resolvedSpecialtyId));
     }
 }
