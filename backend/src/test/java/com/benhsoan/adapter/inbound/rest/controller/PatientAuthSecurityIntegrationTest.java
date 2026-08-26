@@ -3,6 +3,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -89,13 +90,16 @@ class PatientAuthSecurityIntegrationTest {
     }
 
     @Test
-    void patientLoginLockedReturns429() throws Exception {
+    void patientLoginLockedReturns429WithRetryAfter() throws Exception {
         when(patientLoginUseCase.login(any(PatientLoginCommand.class)))
-                .thenThrow(new TooManyLoginAttemptsException());
+                .thenThrow(new TooManyLoginAttemptsException(45, Instant.now().plusSeconds(45)));
 
         mockMvc.perform(post("/auth/patient/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"phone\":\"0901111222\",\"password\":\"secret\"}"))
-                .andExpect(status().isTooManyRequests());
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "45"))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_LOGIN_ATTEMPTS"))
+                .andExpect(jsonPath("$.details.retryAfterSeconds").value(45));
     }
 }

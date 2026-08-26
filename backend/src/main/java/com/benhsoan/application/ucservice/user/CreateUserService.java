@@ -9,6 +9,7 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.EmailAlreadyExistsException;
+import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.auth.exception.UserAlreadyExistsException;
 import com.benhsoan.port.dto.command.user.CreateUserCommand;
@@ -53,6 +54,12 @@ public class CreateUserService implements CreateUserUseCase {
 
         if (userRepository.existsByEmail(command.email())) {
             throw new EmailAlreadyExistsException();
+        }
+
+        if (command.phone() != null
+                && !command.phone().isBlank()
+                && userRepository.existsByPhone(command.phone())) {
+            throw new PhoneAlreadyExistsException();
         }
 
         Role role = roleRepository.findByName(command.roleName())

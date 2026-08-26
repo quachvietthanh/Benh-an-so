@@ -148,11 +148,17 @@ class PatientLoginServiceTest {
     }
 
     @Test
-    void blockedPhoneThrowsLockout() {
+    void blockedPhoneThrowsLockoutWithRetryAfterSeconds() {
         when(loginAttemptPort.isBlocked(PHONE)).thenReturn(true);
+        when(loginAttemptPort.getRetryAfterSeconds(PHONE)).thenReturn(42L);
+        when(loginAttemptPort.getBlockedUntil(PHONE)).thenReturn(NOW.plusSeconds(42));
 
-        assertThrows(TooManyLoginAttemptsException.class,
+        TooManyLoginAttemptsException ex = assertThrows(
+                TooManyLoginAttemptsException.class,
                 () -> service.login(new PatientLoginCommand(PHONE, PASSWORD, null, null)));
+
+        assertEquals(42L, ex.getRetryAfterSeconds());
+        assertEquals(NOW.plusSeconds(42), ex.getBlockedUntil());
     }
 
     @Test

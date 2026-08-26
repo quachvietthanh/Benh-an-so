@@ -11,6 +11,7 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.EmailAlreadyExistsException;
+import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
 import com.benhsoan.port.dto.command.user.UpdateUserCommand;
@@ -50,6 +51,13 @@ public class UpdateUserService implements UpdateUserUseCase {
         if (!user.getEmail().equals(command.email())
                 && userRepository.existsByEmail(command.email())) {
             throw new EmailAlreadyExistsException();
+        }
+
+        if (command.phone() != null
+                && !command.phone().isBlank()
+                && !command.phone().equals(user.getPhone())
+                && userRepository.existsByPhone(command.phone())) {
+            throw new PhoneAlreadyExistsException();
         }
 
         Role role = roleRepository.findByName(command.roleName())

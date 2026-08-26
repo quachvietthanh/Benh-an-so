@@ -70,7 +70,9 @@ public class PatientLoginService implements PatientLoginUseCase {
         String phone = command.phone();
 
         if (loginAttemptPort.isBlocked(phone)) {
-            throw new TooManyLoginAttemptsException();
+            throw new TooManyLoginAttemptsException(
+                    loginAttemptPort.getRetryAfterSeconds(phone),
+                    loginAttemptPort.getBlockedUntil(phone));
         }
 
         User user = userRepository.findByPhone(phone)

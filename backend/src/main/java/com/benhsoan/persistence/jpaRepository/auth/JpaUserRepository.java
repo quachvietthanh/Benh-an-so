@@ -18,6 +18,8 @@ public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByUsername(String username);
 
+    boolean existsByPhone(String phone);
+
     boolean existsByEmail(String email);
 
     List<UserEntity> findAllByRoleIdAndActiveTrue(UUID roleId);

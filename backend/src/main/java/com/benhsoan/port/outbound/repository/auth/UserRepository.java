@@ -21,6 +21,8 @@ public interface UserRepository {
 
     boolean existsByUsername(String username);
 
+    boolean existsByPhone(String phone);
+
     boolean existsByEmail(String email);
 
     List<User> findAllById(List<UUID> ids);
