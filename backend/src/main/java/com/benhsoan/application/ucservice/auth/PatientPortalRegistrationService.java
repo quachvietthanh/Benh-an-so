@@ -154,6 +154,7 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
             return new PatientPortalRegistrationResult(
                     savedUser.getId(),
                     saved.getId(),
+                    saved.getPatientCode(),
                     phone,
                     saved.getFullName(),
                     accessToken,

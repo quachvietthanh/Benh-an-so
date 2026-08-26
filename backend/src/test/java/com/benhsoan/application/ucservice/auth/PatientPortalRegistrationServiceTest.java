@@ -36,6 +36,7 @@ import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.infrastructure.security.generator.DatabasePatientCodeGenerator;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -156,6 +157,7 @@ class PatientPortalRegistrationServiceTest {
         assertNotNull(result.patientId());
         assertNotNull(result.accessToken());
         assertNotNull(result.refreshToken());
+        assertEquals("BN000123", result.patientCode());
 
         ArgumentCaptor<Patient> captor = ArgumentCaptor.forClass(Patient.class);
         verify(patientRepository).save(captor.capture());
@@ -364,5 +366,41 @@ class PatientPortalRegistrationServiceTest {
                         LocalDate.of(1990, 1, 1), Gender.FEMALE, null, "patient@example.com")));
 
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void toleratesNonStandardPatientCodesInDatabase() {
+        UUID roleId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
+
+        Patient legacy = mock(Patient.class);
+        when(legacy.getPatientCode()).thenReturn("PATIENT-LEGACY");
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of());
+        when(patientRepository.findTopByOrderByPatientCodeDesc()).thenReturn(Optional.of(legacy));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
+
+        PatientPortalRegistrationService realGeneratorService = new PatientPortalRegistrationService(
+                userRepository, roleRepository, patientRepository, passwordEncoderPort,
+                new DatabasePatientCodeGenerator(patientRepository),
+                auditLogRepository, clockPort, objectMapper,
+                jwtTokenPort, refreshTokenGeneratorPort, tokenHashPort, userSessionRepository);
+
+        PatientPortalRegistrationResult result = realGeneratorService.register(command());
+
+        assertNotNull(result.patientId());
+        assertEquals("BN000001", result.patientCode());
+        assertNotNull(result.accessToken());
+        assertNotNull(result.refreshToken());
     }
 }
