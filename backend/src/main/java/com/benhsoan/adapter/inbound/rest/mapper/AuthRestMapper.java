@@ -76,6 +76,7 @@ public class AuthRestMapper {
         return new PatientRegistrationResponse(
                 result.userId(),
                 result.patientId(),
+                result.patientCode(),
                 result.phone(),
                 result.fullName(),
                 result.accessToken(),

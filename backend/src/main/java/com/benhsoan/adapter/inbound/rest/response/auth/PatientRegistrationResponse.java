@@ -8,6 +8,8 @@ public record PatientRegistrationResponse(
 
         UUID patientId,
 
+        String patientCode,
+
         String phone,
 
         String fullName,

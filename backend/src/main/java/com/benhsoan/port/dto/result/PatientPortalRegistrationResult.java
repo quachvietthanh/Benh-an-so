@@ -8,6 +8,8 @@ public record PatientPortalRegistrationResult(
 
         UUID patientId,
 
+        String patientCode,
+
         String phone,
 
         String fullName,

@@ -69,7 +69,7 @@ class PatientRegistrationControllerTest {
 
         when(patientPortalRegistrationUseCase.register(any(PatientPortalRegistrationCommand.class)))
                 .thenReturn(new PatientPortalRegistrationResult(
-                        userId, patientId, "0345678910", "Nguyen Van A",
+                        userId, patientId, "BN000123", "0345678910", "Nguyen Van A",
                         "access-token", "refresh-token", "Bearer"));
 
         mockMvc.perform(post("/auth/patient/register")
@@ -86,6 +86,7 @@ class PatientRegistrationControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userId").value(userId.toString()))
                 .andExpect(jsonPath("$.patientId").value(patientId.toString()))
+                .andExpect(jsonPath("$.patientCode").value("BN000123"))
                 .andExpect(jsonPath("$.phone").value("0345678910"))
                 .andExpect(jsonPath("$.fullName").value("Nguyen Van A"))
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
@@ -100,7 +101,7 @@ class PatientRegistrationControllerTest {
 
         when(patientPortalRegistrationUseCase.register(any(PatientPortalRegistrationCommand.class)))
                 .thenReturn(new PatientPortalRegistrationResult(
-                        userId, patientId, "0345678910", "Nguyen Van A",
+                        userId, patientId, "BN000123", "0345678910", "Nguyen Van A",
                         "access-token", "refresh-token", "Bearer"));
 
         mockMvc.perform(post("/auth/patient/register")
@@ -117,6 +118,36 @@ class PatientRegistrationControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").value("access-token"));
+    }
+
+    @Test
+    void registersFullPayloadReturns201WithPatientCode() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        when(patientPortalRegistrationUseCase.register(any(PatientPortalRegistrationCommand.class)))
+                .thenReturn(new PatientPortalRegistrationResult(
+                        userId, patientId, "BN000123", "0398318090", "Huy Phạm Văn",
+                        "access-token", "refresh-token", "Bearer"));
+
+        mockMvc.perform(post("/auth/patient/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Huy Phạm Văn",
+                                  "phone": "0398318090",
+                                  "email": "phamvanhuylop11b2@gmail.com",
+                                  "dateOfBirth": "2020-08-26",
+                                  "gender": "MALE",
+                                  "identityNumber": "011209003677",
+                                  "password": "password123"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.patientId").value(patientId.toString()))
+                .andExpect(jsonPath("$.patientCode").value("BN000123"))
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
     }
 
     @Test
