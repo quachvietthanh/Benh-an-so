@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { normalizeApiError } from '../utils/apiError.js'
-
 import { API_TIMEOUT } from '../utils/constants.js'
+import loadingManager from '../utils/loadingManager.js'
 
 const configuredBaseUrl = import.meta.env?.VITE_API_BASE_URL
 
@@ -15,6 +15,9 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
   (config) => {
+    if (!config?.skipGlobalLoading) {
+      loadingManager.start()
+    }
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -22,13 +25,24 @@ axiosClient.interceptors.request.use(
     return config
   },
   (error) => {
+    if (!error?.config?.skipGlobalLoading) {
+      loadingManager.stop()
+    }
     return Promise.reject(error)
   }
 )
 
 axiosClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (!response?.config?.skipGlobalLoading) {
+      loadingManager.stop()
+    }
+    return response
+  },
   (error) => {
+    if (!error?.config?.skipGlobalLoading) {
+      loadingManager.stop()
+    }
     if (error && typeof error === 'object') {
       error.apiError = normalizeApiError(error)
     }
@@ -44,3 +58,4 @@ axiosClient.interceptors.response.use(
 )
 
 export default axiosClient
+

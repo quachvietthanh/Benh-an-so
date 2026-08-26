@@ -61,7 +61,9 @@ import visitApi from '../api/visitApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
+import Loading from '../components/common/Loading'
 import { useAuthContext } from '../context/AuthContext'
+
 import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import {
@@ -1236,7 +1238,10 @@ function PrescriptionPage() {
     )
   }
 
-  if (loading && !record) return <Spin fullscreen tip="Đang tải bệnh án và đơn thuốc..." />
+  if (loading && !record) {
+    return <Loading fullPage tip="Đang tải bệnh án và đơn thuốc..." subtip="Đang nạp thông tin đơn thuốc, danh mục thuốc và kiểm tra tồn kho..." />
+  }
+
 
   if (loadError) {
     const isAccessDenied = isAccessDeniedApiError(loadError.apiError)

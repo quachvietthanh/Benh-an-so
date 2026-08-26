@@ -38,11 +38,13 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import queueApi from '../api/queueApi'
 import systemApi from '../api/systemApi'
 import visitApi from '../api/visitApi'
+import Loading from '../components/common/Loading'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
 import MedicalRecordSignatureStamp from '../components/clinical/MedicalRecordSignatureStamp'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { useAuthContext } from '../context/AuthContext'
+
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
@@ -823,8 +825,9 @@ function MedicalEncounter() {
   }
 
   if (loading && !encounter) {
-    return <Spin fullscreen tip="Đang tải ngữ cảnh lượt khám..." />
+    return <Loading fullPage tip="Đang tải ngữ cảnh lượt khám..." subtip="Đang tải thông tin bệnh án, chẩn đoán ICD-10 và dịch vụ chỉ định..." />
   }
+
 
   if (loadError) {
     return (

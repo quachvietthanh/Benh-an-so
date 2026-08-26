@@ -30,7 +30,7 @@ const PrescriptionInterconnectionPage = React.lazy(() => import('../pages/Prescr
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
-  <React.Suspense fallback={<Loading />}>
+  <React.Suspense fallback={<Loading tip="Đang tải trang..." minHeight={320} />}>
     {children}
   </React.Suspense>
 )
@@ -39,8 +39,9 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
   const { isAuthenticated, loading, user } = useAuthContext()
 
   if (loading) {
-    return <div style={{ padding: 24 }}>Đang tải...</div>
+    return <Loading fullPage tip="Đang kiểm tra quyền truy cập..." subtip="Đang xác thực thông tin tài khoản..." />
   }
+
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
