@@ -187,6 +187,11 @@ public class Patient {
         this.updatedAt = Instant.now();
     }
 
+    public void linkUser(UUID userId) {
+        this.userId = java.util.Objects.requireNonNull(userId, "User id");
+        this.updatedAt = Instant.now();
+    }
+
     public void deactivate() {
         this.active = false;
         this.updatedAt = Instant.now();
