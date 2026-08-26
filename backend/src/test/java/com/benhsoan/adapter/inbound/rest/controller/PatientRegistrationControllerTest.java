@@ -69,7 +69,8 @@ class PatientRegistrationControllerTest {
 
         when(patientPortalRegistrationUseCase.register(any(PatientPortalRegistrationCommand.class)))
                 .thenReturn(new PatientPortalRegistrationResult(
-                        userId, patientId, "0345678910", "Nguyen Van A"));
+                        userId, patientId, "0345678910", "Nguyen Van A",
+                        "access-token", "refresh-token", "Bearer"));
 
         mockMvc.perform(post("/auth/patient/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +87,54 @@ class PatientRegistrationControllerTest {
                 .andExpect(jsonPath("$.userId").value(userId.toString()))
                 .andExpect(jsonPath("$.patientId").value(patientId.toString()))
                 .andExpect(jsonPath("$.phone").value("0345678910"))
-                .andExpect(jsonPath("$.fullName").value("Nguyen Van A"));
+                .andExpect(jsonPath("$.fullName").value("Nguyen Van A"))
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+    }
+
+    @Test
+    void registersWithOptionalEmailReturns201() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        when(patientPortalRegistrationUseCase.register(any(PatientPortalRegistrationCommand.class)))
+                .thenReturn(new PatientPortalRegistrationResult(
+                        userId, patientId, "0345678910", "Nguyen Van A",
+                        "access-token", "refresh-token", "Bearer"));
+
+        mockMvc.perform(post("/auth/patient/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "0345678910",
+                                  "password": "secret",
+                                  "fullName": "Nguyen Van A",
+                                  "dateOfBirth": "1990-01-01",
+                                  "gender": "FEMALE",
+                                  "email": "patient@example.com"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accessToken").value("access-token"));
+    }
+
+    @Test
+    void shortPasswordReturns400() throws Exception {
+        mockMvc.perform(post("/auth/patient/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "0345678910",
+                                  "password": "123",
+                                  "fullName": "Nguyen Van A",
+                                  "dateOfBirth": "1990-01-01",
+                                  "gender": "FEMALE"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.details.fields.password").value("Mật khẩu phải từ 6 đến 50 ký tự."));
     }
 
     @Test

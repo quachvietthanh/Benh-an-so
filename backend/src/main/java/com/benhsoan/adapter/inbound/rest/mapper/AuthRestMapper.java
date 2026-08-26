@@ -66,7 +66,8 @@ public class AuthRestMapper {
                 request.fullName(),
                 request.dateOfBirth(),
                 request.gender(),
-                request.identityNumber()
+                request.identityNumber(),
+                request.email()
         );
     }
 
@@ -76,7 +77,10 @@ public class AuthRestMapper {
                 result.userId(),
                 result.patientId(),
                 result.phone(),
-                result.fullName()
+                result.fullName(),
+                result.accessToken(),
+                result.refreshToken(),
+                result.tokenType()
         );
     }
 }

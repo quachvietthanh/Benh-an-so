@@ -10,7 +10,13 @@ public record PatientRegistrationResponse(
 
         String phone,
 
-        String fullName
+        String fullName,
+
+        String accessToken,
+
+        String refreshToken,
+
+        String tokenType
 
 ) {
 }
