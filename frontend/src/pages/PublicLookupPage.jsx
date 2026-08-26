@@ -265,6 +265,9 @@ function PublicLookupPage() {
             <span className="public-lookup-secure">
               <SafetyCertificateOutlined /> Tra cứu an toàn
             </span>
+            <Link className="public-lookup-login" to="/portal/login" style={{ background: '#e6f7ff', borderColor: '#91d5ff', color: '#096dd9' }}>
+              <UserOutlined /> Đăng nhập Bệnh nhân
+            </Link>
             <Link className="public-lookup-login" to="/login">
               <LoginOutlined /> Đăng nhập nhân viên
             </Link>

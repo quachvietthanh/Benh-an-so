@@ -129,6 +129,50 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const patientLogin = async (credentials) => {
+    try {
+      const response = await authApi.patientLogin(credentials)
+      const data = response.data
+
+      const payload = getJwtPayload(data.accessToken)
+      const rawRoles = payload?.role || (data.role ? [data.role] : ['PATIENT'])
+      const username = payload?.username || data.username || credentials.phone
+
+      const normalizedUser = {
+        id: data.userId || payload?.userId || payload?.sub,
+        patientId: data.patientId || payload?.patientId,
+        username: username,
+        fullName: username,
+        roles: normalizeRoles(rawRoles),
+        permissions: normalizePermissions(payload?.permissions || []),
+        expiredAt: data.expiredAt,
+        refreshToken: data.refreshToken,
+      }
+
+      localStorage.setItem('token', data.accessToken)
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+      setUser(normalizedUser)
+
+      return { success: true, data: normalizedUser }
+    } catch (error) {
+      const status = error.response?.status
+      const errorData = error.response?.data
+      return {
+        success: false,
+        status,
+        data: errorData,
+        message:
+          status === 429
+            ? 'Tài khoản tạm thời bị khóa do nhập sai mật khẩu nhiều lần.'
+            : status === 403
+              ? 'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ phòng khám để được hỗ trợ.'
+              : status === 401 || status === 400
+                ? (errorData?.message || 'Số điện thoại hoặc mật khẩu không đúng.')
+                : (error.message || 'Không thể kết nối đến máy chủ.'),
+      }
+    }
+  }
+
   const updateCurrentUserPermissions = (newPermissions) => {
     if (!user) return
     const normalized = normalizePermissions(newPermissions)
@@ -165,7 +209,7 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!user
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, loading, isAuthenticated, updateCurrentUserPermissions }}>
+    <AuthContext.Provider value={{ user, setUser, login, patientLogin, logout, loading, isAuthenticated, updateCurrentUserPermissions }}>
       {children}
     </AuthContext.Provider>
   )

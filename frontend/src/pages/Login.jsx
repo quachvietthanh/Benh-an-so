@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Form, Input, Button, message } from 'antd'
-import { UserOutlined, LockOutlined } from '@ant-design/icons'
+import { UserOutlined, LockOutlined, SearchOutlined } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
 import './login.css'
 
@@ -49,7 +49,6 @@ function Login() {
         <div className="bsa2-title">Bệnh Án Số</div>
         <p className="bsa2-sub">Đăng nhập hệ thống khám chữa bệnh</p>
 
-
         <Form
           className="bsa2-form"
           name="login"
@@ -92,12 +91,22 @@ function Login() {
           </Form.Item>
         </Form>
 
-        <p className="bsa2-foot">
-          <Link className="bsa2-lookup-link" to="/public-lookup">
-            Tra cứu lịch hẹn dành cho bệnh nhân
+        <div className="bsa2-patient-divider">
+          <span>Dành cho bệnh nhân</span>
+        </div>
+
+        <div className="bsa2-patient-actions">
+          <Link className="bsa2-patient-btn primary" to="/portal/login">
+            <UserOutlined /> Đăng nhập Cổng bệnh nhân
           </Link>
+          <Link className="bsa2-patient-btn secondary" to="/public-lookup">
+            <SearchOutlined /> Tra cứu lịch hẹn
+          </Link>
+        </div>
+
+        <div className="bsa2-foot">
           <span>Phiên bản nội bộ · Bệnh Án Số</span>
-        </p>
+        </div>
       </div>
     </div>
   )
