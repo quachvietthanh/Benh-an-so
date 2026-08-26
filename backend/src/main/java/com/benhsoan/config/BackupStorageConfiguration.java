@@ -22,7 +22,9 @@ public class BackupStorageConfiguration {
     public BackupRestorePlan fullBackupRestorePlan() {
         return new BackupRestorePlan(
                 List.of(
-                        "clinic_configuration", "rooms", "medicines", "diagnosis_catalog", "service_catalog", "service_price",
+                        "clinic_configuration", "rooms", "medicines", "diagnosis_catalog", "specialties",
+                        "medical_record_templates", "medical_record_template_versions", "medical_record_template_sections",
+                        "service_catalog", "service_price",
                         "clinical_service_catalog",
                         "drug_interaction_rules", "prescription_code_sequences", "invoice_code_sequences",
                         "patients", "patient_change_logs", "appointments", "appointment_notification_logs",
@@ -49,6 +51,7 @@ public class BackupStorageConfiguration {
                         dependency("queue_items", "patient_id", "patients"),
                         dependency("queue_items", "appointment_id", "appointments"),
                         dependency("queue_items", "visit_id", "visits"),
+                        dependency("visits", "specialty_id", "specialties"),
                         dependency("visits", "patient_id", "patients"),
                         dependency("visits", "appointment_id", "appointments"),
                         dependency("visits", "queue_item_id", "queue_items"),
@@ -59,6 +62,11 @@ public class BackupStorageConfiguration {
                         dependency("post_care_logs", "reminder_id", "follow_up_reminders"),
                         dependency("post_care_logs", "visit_id", "visits"),
                         dependency("medical_records", "visit_id", "visits"),
+                        dependency("medical_records", "applied_template_version_id", "medical_record_template_versions"),
+                        dependency("medical_record_templates", "specialty_id", "specialties"),
+                        dependency("medical_record_template_versions", "template_id", "medical_record_templates"),
+                        dependency("medical_record_template_versions", "specialty_id", "specialties"),
+                        dependency("medical_record_template_sections", "template_version_id", "medical_record_template_versions"),
                         dependency("medical_record_diagnoses", "medical_record_id", "medical_records"),
                         dependency("medical_record_diagnoses", "diagnosis_catalog_id", "diagnosis_catalog"),
                         dependency("medical_record_amendments", "medical_record_id", "medical_records"),

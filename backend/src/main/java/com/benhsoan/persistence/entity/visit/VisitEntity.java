@@ -40,6 +40,8 @@ public class VisitEntity {
     private UUID appointmentId;
     @Column(name = "queue_item_id", columnDefinition = "BINARY(16)")
     private UUID queueItemId;
+    @Column(name = "specialty_id", columnDefinition = "BINARY(16)")
+    private UUID specialtyId;
     @Enumerated(EnumType.STRING)
     @Column(name = "visit_type", nullable = false, length = 30)
     private VisitType visitType;

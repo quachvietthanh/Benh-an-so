@@ -16,6 +16,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.auth.User;
@@ -27,6 +28,8 @@ import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
 import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
 import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.specialty.Specialty;
+import com.benhsoan.domain.specialty.exception.SpecialtyNotFoundException;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.outbound.generator.VisitCodeGenerator;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
@@ -37,6 +40,7 @@ import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.queue.RoomRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.specialty.SpecialtyRepository;
 
 class QueueCheckInCoordinatorTest {
 
@@ -49,13 +53,17 @@ class QueueCheckInCoordinatorTest {
     private final VisitRepository visitRepository = mock(VisitRepository.class);
     private final VisitCodeGenerator visitCodeGenerator = mock(VisitCodeGenerator.class);
     private final AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+    private final SpecialtyRepository specialtyRepository = mock(SpecialtyRepository.class);
 
     private QueueCheckInCoordinator coordinator;
 
     @BeforeEach
     void setUp() {
         coordinator = new QueueCheckInCoordinator(patientRepository, userRepository, assignmentRepository, roomRepository,
-                medicalQueueRepository, queueItemRepository, visitRepository, visitCodeGenerator, auditLogRepository);
+                medicalQueueRepository, queueItemRepository, visitRepository, visitCodeGenerator, auditLogRepository,
+                specialtyRepository);
+        when(specialtyRepository.findById(Specialty.GENERAL_ID)).thenReturn(Optional.of(
+                Specialty.restore(Specialty.GENERAL_ID, "GENERAL", "General", true, Instant.EPOCH, null)));
     }
 
     @Test
@@ -92,9 +100,48 @@ class QueueCheckInCoordinatorTest {
         assertEquals(5, result.queueNumber());
         assertEquals(QueueItemSourceType.WALK_IN, result.sourceType());
         assertEquals("VIS000003", result.visitCode());
-        verify(visitRepository, times(2)).save(any(Visit.class));
+        ArgumentCaptor<Visit> visitCaptor = ArgumentCaptor.forClass(Visit.class);
+        verify(visitRepository, times(2)).save(visitCaptor.capture());
+        assertEquals(Specialty.GENERAL_ID, visitCaptor.getAllValues().get(0).getSpecialtyId());
         verify(queueItemRepository).save(any(QueueItem.class));
         verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    void rejectsUnknownAndInactiveSpecialties() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID roomId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-07-31T02:00:00Z");
+        MedicalQueue queue = MedicalQueue.create(doctorId, roomId, LocalDate.of(2026, 7, 31), now);
+        Patient patient = mock(Patient.class);
+        User doctor = mock(User.class);
+        when(patient.isActive()).thenReturn(true);
+        when(doctor.isActive()).thenReturn(true);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(patient));
+        when(visitRepository.existsByPatientIdAndStatusInAndVisitAtBetween(any(), any(), any(), any())).thenReturn(false);
+        when(queueItemRepository.existsByPatientIdAndQueueDateAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+        when(assignmentRepository.findByDoctorIdForUpdate(doctorId)).thenReturn(Optional.of(
+                DoctorRoomAssignment.restore(UUID.randomUUID(), doctorId, roomId, actorId, now)));
+        when(roomRepository.findActiveById(roomId)).thenReturn(Optional.of(
+                Room.restore(roomId, "P101", "Phong 101", true, now, now)));
+        when(medicalQueueRepository.findByDoctorIdAndQueueDateForUpdate(doctorId, LocalDate.of(2026, 7, 31)))
+                .thenReturn(Optional.of(queue));
+
+        UUID unknownSpecialtyId = UUID.randomUUID();
+        UUID inactiveSpecialtyId = UUID.randomUUID();
+        when(specialtyRepository.findById(unknownSpecialtyId)).thenReturn(Optional.empty());
+        when(specialtyRepository.findById(inactiveSpecialtyId)).thenReturn(Optional.of(
+                Specialty.restore(inactiveSpecialtyId, "INACTIVE", "Inactive", false, now, now)));
+
+        assertThrows(SpecialtyNotFoundException.class,
+                () -> coordinator.checkIn(patientId, doctorId, null, QueueItemSourceType.WALK_IN,
+                        "Kham tong quat", null, unknownSpecialtyId, actorId, now));
+        assertThrows(SpecialtyNotFoundException.class,
+                () -> coordinator.checkIn(patientId, doctorId, null, QueueItemSourceType.WALK_IN,
+                        "Kham tong quat", null, inactiveSpecialtyId, actorId, now));
     }
 
     @Test

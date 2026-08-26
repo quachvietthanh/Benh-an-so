@@ -20,6 +20,8 @@ public enum ResourceType {
 
     MEDICAL_RECORD,
 
+    MEDICAL_RECORD_TEMPLATE,
+
     PRESCRIPTION,
 
     MEDICINE,
