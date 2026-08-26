@@ -924,6 +924,9 @@
   .appointment-list-header .ant-input-affix-wrapper,
   .appointment-list-header .ant-btn {
     width: 100%;
+    height: 38px !important;
+    font-size: 13.5px !important;
+    border-radius: 8px !important;
   }
 
   .appointment-form-grid,

@@ -5,9 +5,11 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.adapter.inbound.rest.request.auth.LoginRequest;
 import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
+import com.benhsoan.adapter.inbound.rest.response.auth.PatientLoginResponse;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
 import com.benhsoan.port.dto.result.LoginResult;
+import com.benhsoan.port.dto.result.PatientLoginResult;
 
 @Component
 public class AuthRestMapper {
@@ -36,6 +38,19 @@ public class AuthRestMapper {
                 result.refreshToken(),
                 result.role(),
                 result.expiredAt()
+        );
+    }
+
+    public PatientLoginResponse toResponse(PatientLoginResult result) {
+
+        return new PatientLoginResponse(
+                result.userId(),
+                result.username(),
+                result.accessToken(),
+                result.refreshToken(),
+                result.role(),
+                result.expiredAt(),
+                result.patientId()
         );
     }
 }

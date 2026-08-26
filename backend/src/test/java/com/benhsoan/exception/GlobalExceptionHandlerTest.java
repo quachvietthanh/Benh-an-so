@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,6 +29,7 @@ import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
+import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
 import com.benhsoan.domain.clinical.exception.ClinicalAttachmentNotFoundException;
 import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
@@ -240,6 +242,18 @@ class GlobalExceptionHandlerTest {
         assertEquals(7, ((Map<?, ?>) ((List<?>) stock.details().get("shortages")).getFirst()).get("shortageQuantity"));
         assertEquals(InteractionSeverity.SEVERE,
                 ((Map<?, ?>) ((List<?>) interaction.details().get("warnings")).getFirst()).get("severity"));
+    }
+
+    @Test
+    void returns429WithRetryAfterForTooManyLoginAttempts() {
+        TooManyLoginAttemptsException ex =
+                new TooManyLoginAttemptsException(30, Instant.now().plusSeconds(30));
+
+        var response = handler.handleTooManyLoginAttempts(ex, request);
+
+        assertEquals(429, response.getStatusCode().value());
+        assertEquals("30", response.getHeaders().getFirst("Retry-After"));
+        assertEquals(30L, ((Number) response.getBody().details().get("retryAfterSeconds")).longValue());
     }
 
     private ApiErrorResponse assertContract(

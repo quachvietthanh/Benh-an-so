@@ -14,6 +14,15 @@ public interface JwtTokenPort {
             Set<String> permissions
     );
 
+    String generateToken(
+            UUID userId,
+            UUID sessionId,
+            String username,
+            String role,
+            Set<String> permissions,
+            UUID patientId
+    );
+
     UUID getUserId(String token);
 
     String getUsername(String token);
@@ -23,6 +32,8 @@ public interface JwtTokenPort {
     Set<String> getPermissions(String token);
 
     UUID getSessionId(String token);
+
+    UUID getPatientId(String token);
 
     Instant getExpiredAt(String token);
 

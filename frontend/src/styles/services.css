@@ -279,7 +279,7 @@
 .service-modal-title .ant-typography-secondary {
   margin: 4px 38px 0 0;
   color: #79879a;
-  font-size: 13px;
+  font-size: 10px;
   line-height: 1.5;
 }
 
@@ -319,7 +319,7 @@
 .clinic-form .ant-form-item-label > label {
   height: auto;
   color: #3f4f66;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 620;
 }
 
@@ -456,7 +456,7 @@
 .clinic-config-header p {
   margin: 3px 0 0;
   color: #7f8c9e;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .clinic-form {
@@ -496,7 +496,7 @@
 
 .clinic-form-actions .ant-btn {
   min-width: 132px;
-  height: 39px;
+  height: 38px;
   font-size: 13.5px;
   font-weight: 620;
   border-radius: 8px;
@@ -1644,6 +1644,9 @@
   .btn-services-refresh,
   .btn-services-create {
     width: 100% !important;
+    height: 38px !important;
+    font-size: 13.5px !important;
+    border-radius: 8px !important;
     justify-content: center !important;
   }
 

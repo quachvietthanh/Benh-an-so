@@ -42,6 +42,18 @@ public class JwtTokenAdapter implements JwtTokenPort {
             String role,
             Set<String> permissions
     ) {
+        return generateToken(userId, sessionId, username, role, permissions, null);
+    }
+
+    @Override
+    public String generateToken(
+            UUID userId,
+            UUID sessionId,
+            String username,
+            String role,
+            Set<String> permissions,
+            UUID patientId
+    ) {
 
         Date now = new Date();
 
@@ -49,13 +61,19 @@ public class JwtTokenAdapter implements JwtTokenPort {
                 now.getTime() + expiration
         );
 
-        return Jwts.builder()
+        io.jsonwebtoken.JwtBuilder builder = Jwts.builder()
                 .subject(userId.toString())
                 .claim("sessionId", sessionId.toString())
                 .claim("userId", userId.toString())
                 .claim("username", username)
                 .claim("role", role)
-                .claim("permissions", permissions)
+                .claim("permissions", permissions);
+
+        if (patientId != null) {
+            builder.claim("patientId", patientId.toString());
+        }
+
+        return builder
                 .issuedAt(now)
                 .expiration(expired)
                 .signWith(secretKey)
@@ -92,6 +110,12 @@ public class JwtTokenAdapter implements JwtTokenPort {
     @Override
     public UUID getSessionId(String token) {
         return UUID.fromString(getClaims(token).get("sessionId", String.class));
+    }
+
+    @Override
+    public UUID getPatientId(String token) {
+        String value = getClaims(token).get("patientId", String.class);
+        return value == null ? null : UUID.fromString(value);
     }
 
     @Override

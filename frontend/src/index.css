@@ -241,6 +241,101 @@ textarea {
   .ant-tabs-nav-list {
     flex-wrap: wrap;
   }
+
+  .ant-btn:not(.ant-btn-sm):not(.ant-btn-lg) {
+    height: 38px !important;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+  }
+
+  .ant-btn-sm {
+    height: 30px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+  }
+
+  .ant-list-item {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    align-items: stretch !important;
+  }
+
+  .ant-list-item-main {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ant-list-item-action {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-top: 8px !important;
+    gap: 8px !important;
+  }
+
+  .ant-list-item-action > li {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+  }
+
+  .ant-list-item-action > li > .ant-btn,
+  .ant-list-item-action > li > .ant-dropdown-trigger {
+    width: 100% !important;
+    height: 38px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 12px !important;
+  }
+
+  .ant-list-item-action-split {
+    display: none !important;
+  }
+
+  .ant-modal-footer {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: stretch !important;
+    gap: 8px !important;
+    padding: 12px 14px !important;
+    margin-top: 14px !important;
+  }
+
+  .ant-modal-footer .ant-btn {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    padding: 0 12px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .admin-more-button.ant-btn,
+  .patient-action-button.ant-btn,
+  .btn-table-action.ant-btn,
+  .appointment-action-button.ant-btn {
+    height: 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+  }
 }
 
 .billing-action-btn.ant-btn {

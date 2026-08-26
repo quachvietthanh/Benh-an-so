@@ -1318,7 +1318,6 @@ function PrescriptionPage() {
             <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
               <Button
                 type="primary"
-                size="large"
                 loading={saving || checkingInteractions}
                 disabled={!canSubmit}
                 icon={<CheckCircleOutlined />}
