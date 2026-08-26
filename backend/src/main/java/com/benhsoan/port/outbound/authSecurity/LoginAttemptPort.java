@@ -1,12 +1,18 @@
 package com.benhsoan.port.outbound.authSecurity;
 
+import java.time.Instant;
+
 public interface LoginAttemptPort {
 
-    void loginSucceeded(String username);
+    void loginSucceeded(String identifier);
 
-    void loginFailed(String username);
+    void loginFailed(String identifier);
 
-    boolean isBlocked(String username);
+    boolean isBlocked(String identifier);
 
-    int getAttemptCount(String username);
+    long getRetryAfterSeconds(String identifier);
+
+    Instant getBlockedUntil(String identifier);
+
+    int getAttemptCount(String identifier);
 }

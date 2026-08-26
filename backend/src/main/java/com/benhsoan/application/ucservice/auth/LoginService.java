@@ -64,7 +64,9 @@ public class LoginService implements LoginUseCase {
         String username = command.username();
 
         if (loginAttemptPort.isBlocked(username)) {
-            throw new TooManyLoginAttemptsException();
+            throw new TooManyLoginAttemptsException(
+                    loginAttemptPort.getRetryAfterSeconds(username),
+                    loginAttemptPort.getBlockedUntil(username));
         }
 
         User user = userRepository.findByUsername(username)

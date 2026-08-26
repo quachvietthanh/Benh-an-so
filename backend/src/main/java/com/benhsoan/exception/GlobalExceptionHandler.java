@@ -3,6 +3,7 @@ package com.benhsoan.exception;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
@@ -49,6 +51,26 @@ public class GlobalExceptionHandler {
     ) {
 
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    public ResponseEntity<ApiErrorResponse> handleTooManyLoginAttempts(
+            TooManyLoginAttemptsException ex,
+            HttpServletRequest request
+    ) {
+
+        HttpStatus status = DomainExceptionHttpStatusMapper.statusFor(ex.getCode());
+        long retryAfterSeconds = Math.max(0, ex.getRetryAfterSeconds());
+
+        return ResponseEntity
+                .status(status)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
+                .body(ApiErrorResponseFactory.create(
+                        status,
+                        ex.getCode().name(),
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        Map.of("retryAfterSeconds", retryAfterSeconds)));
     }
 
     @ExceptionHandler(PrescriptionInteractionConfirmationRequiredException.class)
