@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.patient;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,7 +35,7 @@ public interface JpaPatientRepository extends JpaRepository<PatientEntity, UUID>
 
     Optional<PatientEntity> findByUserId(UUID userId);
 
-    Optional<PatientEntity> findByPhone(String phone);
+    List<PatientEntity> findAllByPhone(String phone);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select patient from PatientEntity patient where patient.id = :patientId")

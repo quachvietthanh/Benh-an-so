@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
@@ -29,6 +31,7 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
@@ -91,7 +94,7 @@ class PatientPortalRegistrationServiceTest {
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(patientRepository.findByPhone(PHONE)).thenReturn(Optional.of(existing));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
 
@@ -115,7 +118,7 @@ class PatientPortalRegistrationServiceTest {
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(patientRepository.findByPhone(PHONE)).thenReturn(Optional.empty());
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of());
         when(patientCodeGenerator.generate()).thenReturn("BN000123");
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
@@ -168,7 +171,7 @@ class PatientPortalRegistrationServiceTest {
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(patientRepository.findByPhone(PHONE)).thenReturn(Optional.of(existing));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
 
@@ -186,5 +189,96 @@ class PatientPortalRegistrationServiceTest {
         assertEquals(PHONE, node.get("phone").asText());
         assertEquals(patientId.toString(), node.get("patientId").asText());
         assertEquals(NOW.toString(), node.get("registeredAt").asText());
+    }
+
+    @Test
+    void normalizesPlus84PhoneAndLinksCandidate() {
+        UUID roleId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+
+        Patient existing = mock(Patient.class);
+        when(existing.getUserId()).thenReturn(null);
+        when(existing.getId()).thenReturn(patientId);
+        when(existing.getFullName()).thenReturn(FULL_NAME);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+
+        PatientPortalRegistrationResult result = service.register(
+                new PatientPortalRegistrationCommand(
+                        "+84345678910", PASSWORD, FULL_NAME,
+                        LocalDate.of(1990, 1, 1), Gender.FEMALE, null));
+
+        assertEquals(patientId, result.patientId());
+        assertEquals(PHONE, result.phone());
+        verify(existing).linkUser(any(UUID.class));
+    }
+
+    @Test
+    void rejectsDuplicateIdentityNumberWithConflict() {
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(patientRepository.existsByIdentityNumber("001122334455")).thenReturn(true);
+
+        assertThrows(PatientAlreadyExistsException.class,
+                () -> service.register(new PatientPortalRegistrationCommand(
+                        PHONE, PASSWORD, FULL_NAME,
+                        LocalDate.of(1990, 1, 1), Gender.FEMALE, "001122334455")));
+    }
+
+    @Test
+    void resolvesMultipleCandidatesDeterministically() {
+        UUID roleId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+
+        Patient byIdentity = mock(Patient.class);
+        when(byIdentity.getUserId()).thenReturn(null);
+        when(byIdentity.getIdentityNumber()).thenReturn("001122334455");
+        when(byIdentity.getId()).thenReturn(UUID.randomUUID());
+        when(byIdentity.getFullName()).thenReturn(FULL_NAME);
+
+        Patient other = mock(Patient.class);
+        when(other.getUserId()).thenReturn(null);
+        when(other.getIdentityNumber()).thenReturn(null);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(other, byIdentity));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+
+        service.register(new PatientPortalRegistrationCommand(
+                PHONE, PASSWORD, FULL_NAME,
+                LocalDate.of(1990, 1, 1), Gender.FEMALE, "001122334455"));
+
+        verify(byIdentity).linkUser(any(UUID.class));
+        verify(other, never()).linkUser(any(UUID.class));
+    }
+
+    @Test
+    void mapsDataIntegrityViolationToConflict() {
+        UUID roleId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class)))
+                .thenThrow(new DataIntegrityViolationException("uk_users_phone"));
+
+        assertThrows(PhoneAlreadyExistsException.class, () -> service.register(command()));
     }
 }

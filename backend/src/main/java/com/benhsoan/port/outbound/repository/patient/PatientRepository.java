@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.patient;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,7 +29,7 @@ public interface PatientRepository {
 
     Optional<Patient> findByUserId(UUID userId);
 
-    Optional<Patient> findByPhone(String phone);
+    List<Patient> findAllByPhone(String phone);
 
     Optional<Patient> findByIdForUpdate(UUID patientId);
     

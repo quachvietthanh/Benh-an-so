@@ -60,7 +60,7 @@ public class RegisterPatientService
                         command.fullName(),
                         command.dateOfBirth(),
                         command.gender(),
-                        command.phone(),
+                        normalizePhone(command.phone()),
                         command.email(),
                         command.address(),
                         command.identityNumber(),
@@ -116,5 +116,17 @@ public class RegisterPatientService
                     "identity number"
             );
         }
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return phone;
+        }
+
+        String trimmed = phone.trim();
+
+        return trimmed.startsWith("+84")
+                ? "0" + trimmed.substring(3)
+                : trimmed;
     }
 }

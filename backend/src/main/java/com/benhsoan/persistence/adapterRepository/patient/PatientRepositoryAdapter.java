@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.patient;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -90,9 +91,10 @@ public class PatientRepositoryAdapter implements PatientRepository {
     }
 
     @Override
-    public Optional<Patient> findByPhone(String phone) {
-        return jpaRepository.findByPhone(phone)
-                .map(mapper::toDomain);
+    public List<Patient> findAllByPhone(String phone) {
+        return jpaRepository.findAllByPhone(phone).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override
