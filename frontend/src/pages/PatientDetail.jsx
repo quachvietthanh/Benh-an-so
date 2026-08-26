@@ -9,6 +9,8 @@ import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
 import MedicalRecordList from './MedicalRecordList'
+import Loading from '../components/common/Loading'
+
 
 const { Title } = Typography
 const phoneRule = { pattern: /^0\d{9}$/, message: 'Số điện thoại phải gồm 10 số và bắt đầu bằng 0' }
@@ -112,8 +114,9 @@ function PatientDetail() {
     }
   }
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 100 }}><Spin size="large" /></div>
+  if (loading) return <Loading tip="Đang tải thông tin chi tiết bệnh nhân..." minHeight={380} />
   if (!patient) return <div>Không tìm thấy bệnh nhân</div>
+
 
   const historyColumns = [
     { title: 'Mã lượt khám', dataIndex: 'visitCode', render: (value) => <Tag color="green">{value}</Tag> },

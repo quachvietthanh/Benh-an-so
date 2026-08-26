@@ -3,10 +3,12 @@ import { DatabaseOutlined, KeyOutlined, SafetyCertificateOutlined, SettingOutlin
 import { Card, Empty, Tabs, Typography } from 'antd'
 import BackupRestorePage from './BackupRestorePage'
 import ClinicConfigurationPage from './ClinicConfigurationPage'
+import DiagnosisCatalogPage from './DiagnosisCatalogPage'
 import MedicalRecordAccessLogsPage from './MedicalRecordAccessLogsPage'
 import RolePermissionsPage from './RolePermissionsPage'
 import UsersPage from './UsersPage'
 import { useAuthContext } from '../context/AuthContext'
+import { ExperimentOutlined } from '@ant-design/icons'
 
 const { Title, Text } = Typography
 
@@ -15,8 +17,10 @@ function SystemManagementPage() {
   const userPermissions = (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const isAdmin = userRoles.includes('admin')
+  const isManager = userRoles.includes('manager') || userRoles.includes('clinic_manager')
 
-  const canViewConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || isAdmin
+  const canViewConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || isAdmin || isManager
+  const canViewDiagnosisCatalog = userPermissions.includes('DIAGNOSIS_CATALOG_MANAGE') || userPermissions.includes('SERVICE_CATALOG_READ') || isAdmin || isManager
   const canViewUsers = userPermissions.includes('USER_READ') || isAdmin
   const canViewRolePermissions = userPermissions.includes('ROLE_READ') || userPermissions.includes('PERMISSION_READ') || isAdmin
   const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || isAdmin
@@ -27,6 +31,11 @@ function SystemManagementPage() {
       key: 'clinic-config',
       label: <span><SettingOutlined /> Cấu hình phòng khám</span>,
       children: <ClinicConfigurationPage />,
+    },
+    canViewDiagnosisCatalog && {
+      key: 'diagnosis-catalog',
+      label: <span><ExperimentOutlined /> Danh mục mã bệnh (ICD-10)</span>,
+      children: <DiagnosisCatalogPage />,
     },
     canViewUsers && {
       key: 'users',
@@ -49,6 +58,7 @@ function SystemManagementPage() {
       children: <BackupRestorePage />,
     },
   ].filter(Boolean)
+
 
   if (tabItems.length === 0) {
     return (
