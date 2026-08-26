@@ -23,7 +23,9 @@ const ServicesPage = React.lazy(() => import('../pages/ServicesPage'))
 const ResultPage = React.lazy(() => import('../pages/ResultPage'))
 const PublicLookupPage = React.lazy(() => import('../pages/PublicLookupPage'))
 const SystemManagementPage = React.lazy(() => import('../pages/SystemManagementPage'))
+const DiagnosisCatalogPage = React.lazy(() => import('../pages/DiagnosisCatalogPage'))
 const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
+
 const MedicalRecordAccessLogsPage = React.lazy(() => import('../pages/MedicalRecordAccessLogsPage'))
 const MedicalRecordCopyPage = React.lazy(() => import('../pages/MedicalRecordCopyPage'))
 const MedicalRecordVersionHistoryPage = React.lazy(() => import('../pages/MedicalRecordVersionHistoryPage'))
@@ -124,7 +126,10 @@ function AppRoutes() {
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedPermissions={['AUDIT_READ']} allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute allowedPermissions={['USER_READ', 'USER_CREATE', 'USER_UPDATE']} allowedRoles={['admin']}><LazyPage><UsersPage /></LazyPage></PrivateRoute>} />
         <Route path="services" element={<PrivateRoute allowedPermissions={['SERVICE_CATALOG_READ', 'SERVICE_CATALOG_CREATE', 'SERVICE_CATALOG_UPDATE', 'SERVICE_PRICE_MANAGE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><ServicesPage /></LazyPage></PrivateRoute>} />
+        <Route path="system/diagnosis-catalog" element={<PrivateRoute allowedPermissions={['DIAGNOSIS_CATALOG_MANAGE', 'SERVICE_CATALOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><DiagnosisCatalogPage /></LazyPage></PrivateRoute>} />
+        <Route path="diagnosis-catalog" element={<Navigate to="/system/diagnosis-catalog" replace />} />
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
+
       </Route>
 
       <Route path="*" element={<LazyPage><NotFound /></LazyPage>} />
