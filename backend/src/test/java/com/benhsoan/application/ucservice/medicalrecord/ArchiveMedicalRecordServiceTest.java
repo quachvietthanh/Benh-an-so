@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -42,9 +43,13 @@ class ArchiveMedicalRecordServiceTest {
     @Mock
     private MedicalRecordAccessAuditService accessAuditService;
     @Mock
+    private MedicalRecordTemplateApplicationMapper templateMapper;
+    @Mock
     private MedicalRecordResultMapper resultMapper;
     @Mock
     private ClockPort clockPort;
+    @InjectMocks
+    private ArchiveMedicalRecordService service;
 
     @Test
     void archivesLockedRecordAndWritesAccessLog() {
@@ -53,7 +58,7 @@ class ArchiveMedicalRecordServiceTest {
 
         MedicalRecord record = MedicalRecord.restore(RECORD_ID, VISIT_ID, "c", "s", "h", "p", "cp", "tp", "di", "co",
                 MedicalRecordStatus.LOCKED, NOW, DOCTOR_ID, DOCTOR_ID, NOW, null, null);
-        when(medicalRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(record));
         when(medicalRecordRepository.save(record)).thenReturn(record);
 
         Visit visit = Visit.restore(VISIT_ID, "V001", PATIENT_ID, DOCTOR_ID, null, null, VisitType.WALK_IN,
@@ -61,13 +66,9 @@ class ArchiveMedicalRecordServiceTest {
                 "Checkup", null, DOCTOR_ID, NOW.minusSeconds(3600), NOW);
         when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
 
-        when(resultMapper.toResult(record)).thenReturn(new MedicalRecordResult(
+        when(resultMapper.toResult(record, null)).thenReturn(new MedicalRecordResult(
                 RECORD_ID, VISIT_ID, "c", "s", "h", "p", "cp", "tp", "di", "co",
                 MedicalRecordStatus.ARCHIVED, null, null, null, NOW, DOCTOR_ID, DOCTOR_ID, NOW, DOCTOR_ID, NOW));
-
-        ArchiveMedicalRecordService service = new ArchiveMedicalRecordService(
-                medicalRecordRepository, visitRepository, authorizationService,
-                accessAuditService, resultMapper, clockPort);
 
         MedicalRecordResult result = service.archive(RECORD_ID);
 

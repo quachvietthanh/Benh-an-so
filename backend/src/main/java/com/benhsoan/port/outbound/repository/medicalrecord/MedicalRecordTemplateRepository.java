@@ -6,12 +6,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordTemplate;
+import com.benhsoan.domain.medicalrecord.MedicalRecordTemplateVersion;
 
 public interface MedicalRecordTemplateRepository {
 
     MedicalRecordTemplate save(MedicalRecordTemplate template);
 
     Optional<MedicalRecordTemplate> findById(UUID id);
+
+    Optional<MedicalRecordTemplate> findByIdForUpdate(UUID id);
+
+    Optional<MedicalRecordTemplateVersion> findVersionById(UUID id);
 
     List<MedicalRecordTemplate> findBySpecialtyIdAndActive(UUID specialtyId, boolean active);
 

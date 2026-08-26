@@ -10,6 +10,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidVisitException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
+import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.medicalrecord.UpdateMedicalRecordCommand;
 import com.benhsoan.port.dto.result.MedicalRecordResult;
@@ -29,16 +30,19 @@ public class UpdateMedicalRecordService implements UpdateMedicalRecordUseCase {
     private final VisitRepository visitRepository;
     private final MedicalRecordAuthorizationService authorizationService;
     private final MedicalRecordAccessAuditService accessAuditService;
+    private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final MedicalRecordResultMapper resultMapper;
     private final ClockPort clockPort;
 
     @Override
     public MedicalRecordResult update(UUID medicalRecordId, UpdateMedicalRecordCommand command) {
-        UUID userId = authorizationService.requireWriteAccess();
-        MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
+        UUID userId = authorizationService.requireContentWriteAccess(medicalRecordId);
+        MedicalRecord record = medicalRecordRepository.findByIdForUpdate(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
-        var visit = visitRepository.findById(record.getVisitId())
+        record.ensureEditable();
+        Visit visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
+        authorizationService.requireContentVisitWriteAccess(userId, visit.getDoctorId(), record.getId());
         if (!visit.isActive()) {
             throw new MedicalRecordInvalidVisitException(visit.getId());
         }
@@ -49,6 +53,6 @@ public class UpdateMedicalRecordService implements UpdateMedicalRecordUseCase {
         MedicalRecord saved = medicalRecordRepository.save(record);
         accessAuditService.recordRecordAccess(visit.getPatientId(), visit.getId(), saved.getId(), userId,
                 MedicalRecordAccessAction.UPDATE, "Medical record updated", now);
-        return resultMapper.toResult(saved);
+        return resultMapper.toResult(saved, templateMapper.resolveApplied(saved, visit));
     }
 }

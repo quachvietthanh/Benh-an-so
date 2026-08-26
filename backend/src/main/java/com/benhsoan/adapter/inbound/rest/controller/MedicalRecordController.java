@@ -26,6 +26,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ApplyMedicalRecordTemplateRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.IssueMedicalRecordCopyRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
@@ -35,14 +36,17 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAme
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDiagnosisResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordTemplateSelectionResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordVersionHistoryResponse;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ApplyMedicalRecordTemplateUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordTemplateSelectionUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordVersionHistoryUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.IssueMedicalRecordCopyUseCase;
@@ -62,6 +66,8 @@ public class MedicalRecordController {
 
     private final CreateMedicalRecordUseCase createMedicalRecordUseCase;
     private final GetMedicalRecordUseCase getMedicalRecordUseCase;
+    private final GetMedicalRecordTemplateSelectionUseCase getMedicalRecordTemplateSelectionUseCase;
+    private final ApplyMedicalRecordTemplateUseCase applyMedicalRecordTemplateUseCase;
     private final UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
     private final LockMedicalRecordUseCase lockMedicalRecordUseCase;
     private final SignMedicalRecordUseCase signMedicalRecordUseCase;
@@ -90,6 +96,18 @@ public class MedicalRecordController {
         return mapper.toResponse(getMedicalRecordUseCase.getById(medicalRecordId));
     }
 
+    @GetMapping("/{medicalRecordId}/template-options")
+    @RequirePermission("MEDICAL_RECORD_READ")
+    public MedicalRecordTemplateSelectionResponse getTemplateOptions(@PathVariable UUID medicalRecordId) {
+        return mapper.toResponse(getMedicalRecordTemplateSelectionUseCase.getForMedicalRecord(medicalRecordId));
+    }
+
+    @GetMapping("/visits/{visitId}/template-options")
+    @RequirePermission("MEDICAL_RECORD_READ")
+    public MedicalRecordTemplateSelectionResponse getTemplateOptionsByVisit(@PathVariable UUID visitId) {
+        return mapper.toResponse(getMedicalRecordTemplateSelectionUseCase.getForVisit(visitId));
+    }
+
     @GetMapping("/{medicalRecordId}/diagnoses")
     @RequirePermission("MEDICAL_RECORD_READ")
     public List<MedicalRecordDiagnosisResponse> getDiagnoses(@PathVariable UUID medicalRecordId) {
@@ -112,6 +130,15 @@ public class MedicalRecordController {
     @RequirePermission("MEDICAL_RECORD_UPDATE")
     public MedicalRecordResponse update(@PathVariable UUID medicalRecordId, @RequestBody UpdateMedicalRecordRequest request) {
         return mapper.toResponse(updateMedicalRecordUseCase.update(medicalRecordId, mapper.toCommand(request)));
+    }
+
+    @PutMapping("/{medicalRecordId}/template")
+    @RequirePermission("MEDICAL_RECORD_UPDATE")
+    public MedicalRecordResponse applyTemplate(
+            @PathVariable UUID medicalRecordId,
+            @Valid @RequestBody ApplyMedicalRecordTemplateRequest request
+    ) {
+        return mapper.toResponse(applyMedicalRecordTemplateUseCase.apply(medicalRecordId, mapper.toCommand(request)));
     }
 
     @PutMapping("/{medicalRecordId}/diagnoses")

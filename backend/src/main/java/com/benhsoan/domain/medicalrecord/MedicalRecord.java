@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordFieldCode;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidStatusException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotSignedException;
@@ -280,6 +281,12 @@ public class MedicalRecord {
         this.updatedAt = appliedAt;
     }
 
+    public boolean hasClinicalContent() {
+        return hasText(chiefComplaint) || hasText(symptoms) || hasText(medicalHistory)
+                || hasText(physicalExamination) || hasText(clinicalProgress) || hasText(treatmentPlan)
+                || hasText(doctorInstructions) || hasText(conclusion);
+    }
+
     public void open(UUID by, Instant at) {
         if (status != MedicalRecordStatus.DRAFT) {
             conflict("Only draft records can be opened.");
@@ -386,5 +393,35 @@ public class MedicalRecord {
             throw new MedicalRecordAlreadyLockedException();
         }
         throw new MedicalRecordInvalidStatusException(message);
+    }
+
+    /**
+     * Checks the immutable version that was applied to this record. This is deliberately
+     * called only when signing: a draft may be incomplete while the doctor is working.
+     */
+    public void ensureRequiredTemplateSections(MedicalRecordTemplateVersion templateVersion) {
+        Objects.requireNonNull(templateVersion, "templateVersion");
+        for (MedicalRecordTemplateSection section : templateVersion.getSections()) {
+            if (section.isRequired() && !hasText(valueOf(section.getFieldCode()))) {
+                throw new ValidationException("Required template section is missing: " + section.getFieldCode());
+            }
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String valueOf(MedicalRecordFieldCode fieldCode) {
+        return switch (fieldCode) {
+            case CHIEF_COMPLAINT -> chiefComplaint;
+            case SYMPTOMS -> symptoms;
+            case MEDICAL_HISTORY -> medicalHistory;
+            case PHYSICAL_EXAMINATION -> physicalExamination;
+            case CLINICAL_PROGRESS -> clinicalProgress;
+            case TREATMENT_PLAN -> treatmentPlan;
+            case DOCTOR_INSTRUCTIONS -> doctorInstructions;
+            case CONCLUSION -> conclusion;
+        };
     }
 }

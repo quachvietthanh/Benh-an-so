@@ -8,6 +8,10 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDet
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse.PatientInfo;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse.VisitInfo;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDiagnosisResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.AppliedMedicalRecordTemplateResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordTemplateSectionResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.SpecialtyResponse;
+import com.benhsoan.port.dto.result.AppliedMedicalRecordTemplateResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 
@@ -38,7 +42,8 @@ public class MedicalRecordDetailRestMapper {
                 result.status(), result.signatureData(), result.signedAt(), result.signedBy(),
                 result.lockedAt(), result.lockedBy(),
                 result.primaryIcdCode(), result.primaryIcdName(), result.secondaryIcdCodes(),
-                diagnoses
+                diagnoses,
+                toAppliedTemplateResponse(result.appliedTemplate())
         );
     }
 
@@ -50,5 +55,15 @@ public class MedicalRecordDetailRestMapper {
         return new MedicalRecordDiagnosisResponse(
                 d.id(), d.medicalRecordId(), d.diagnosisCode(), d.diagnosisName(),
                 d.diagnosisType(), d.note(), d.diagnosedBy(), d.diagnosedAt());
+    }
+
+    private AppliedMedicalRecordTemplateResponse toAppliedTemplateResponse(AppliedMedicalRecordTemplateResult result) {
+        if (result == null) return null;
+        SpecialtyResponse specialty = new SpecialtyResponse(result.specialty().id(), result.specialty().code(),
+                result.specialty().name(), result.specialty().active());
+        var sections = result.sections().stream().map(section -> new MedicalRecordTemplateSectionResponse(
+                section.fieldCode(), section.label(), section.required(), section.displayOrder())).toList();
+        return new AppliedMedicalRecordTemplateResponse(result.templateId(), result.templateVersionId(), specialty,
+                result.name(), result.versionNo(), sections, result.appliedBy(), result.appliedAt(), result.fallback());
     }
 }

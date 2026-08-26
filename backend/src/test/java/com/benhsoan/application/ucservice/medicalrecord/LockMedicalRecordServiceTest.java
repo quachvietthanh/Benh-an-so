@@ -39,6 +39,7 @@ class LockMedicalRecordServiceTest {
     @Mock private VisitRepository visitRepository;
     @Mock private MedicalRecordAuthorizationService authorizationService;
     @Mock private MedicalRecordAccessAuditService accessAuditService;
+    @Mock private MedicalRecordTemplateApplicationMapper templateMapper;
     @Mock private ClockPort clockPort;
     @Spy private MedicalRecordResultMapper resultMapper = new MedicalRecordResultMapper();
     @InjectMocks private LockMedicalRecordService service;
@@ -61,7 +62,7 @@ class LockMedicalRecordServiceTest {
                 VisitType.WALK_IN, VisitStatus.IN_PROGRESS, now, now, null, "Consultation", null, userId, now, now);
 
         when(authorizationService.requireWriteAccess()).thenReturn(userId);
-        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
         when(clockPort.now()).thenReturn(now);
         when(medicalRecordRepository.save(any(MedicalRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -93,7 +94,7 @@ class LockMedicalRecordServiceTest {
                 VisitType.WALK_IN, VisitStatus.IN_PROGRESS, now, now, null, "Consultation", null, userId, now, now);
 
         when(authorizationService.requireWriteAccess()).thenReturn(userId);
-        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
         when(clockPort.now()).thenReturn(now);
 
@@ -117,7 +118,7 @@ class LockMedicalRecordServiceTest {
                 VisitType.WALK_IN, VisitStatus.CANCELLED, now, null, null, "Consultation", null, userId, now, now);
 
         when(authorizationService.requireWriteAccess()).thenReturn(userId);
-        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
 
         assertThrows(MedicalRecordInvalidVisitException.class, () -> service.lock(record.getId()));
