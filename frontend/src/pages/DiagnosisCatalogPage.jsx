@@ -112,13 +112,11 @@ function DiagnosisCatalogPage() {
     loadData()
   }, [loadData])
 
-  // Client-side group filter & calculation
   const filteredData = useMemo(() => {
     if (groupFilter === 'ALL') return data
     return data.filter((item) => (item.diseaseGroup || '').trim() === groupFilter)
   }, [data, groupFilter])
 
-  // Extract distinct disease groups for filter dropdown
   const distinctGroups = useMemo(() => {
     const groups = new Set()
     data.forEach((item) => {
@@ -127,7 +125,6 @@ function DiagnosisCatalogPage() {
     return Array.from(groups).sort()
   }, [data])
 
-  // Stats calculation
   const stats = useMemo(() => {
     const total = data.length
     const active = data.filter((item) => item.active).length
@@ -355,7 +352,6 @@ function DiagnosisCatalogPage() {
         />
       )}
 
-      {/* KPI Stats */}
       <div className="diagnosis-stats-grid">
         <div className="diagnosis-stat-card">
           <div className="diagnosis-stat-icon blue">
@@ -398,7 +394,6 @@ function DiagnosisCatalogPage() {
         </div>
       </div>
 
-      {/* Toolbar & Filters */}
       <div className="diagnosis-toolbar-card">
         <div className="diagnosis-toolbar-left">
           <Input
@@ -441,7 +436,6 @@ function DiagnosisCatalogPage() {
         </div>
       </div>
 
-      {/* Main Table */}
       <Card bodyStyle={{ padding: 0 }} style={{ borderRadius: 12, overflow: 'hidden' }}>
         {loading && data.length === 0 ? (
           <div style={{ padding: 24 }}>
@@ -474,7 +468,6 @@ function DiagnosisCatalogPage() {
         )}
       </Card>
 
-      {/* Modals */}
       <DiagnosisCatalogCreateModal
         open={createModalOpen}
         onCancel={() => setCreateModalOpen(false)}
@@ -502,4 +495,3 @@ function DiagnosisCatalogPage() {
 }
 
 export default DiagnosisCatalogPage
-

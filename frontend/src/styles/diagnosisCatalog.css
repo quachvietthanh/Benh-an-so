@@ -1,7 +1,3 @@
-/* ==========================================================================
-   Diagnosis (ICD-10) Catalog Management Styles - Bệnh Án Số
-   ========================================================================== */
-
 .diagnosis-catalog-page {
   padding: 0;
   width: 100%;
@@ -35,7 +31,6 @@
   gap: 10px;
 }
 
-/* Stat Cards Grid */
 .diagnosis-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -110,7 +105,6 @@
   line-height: 1.2;
 }
 
-/* Toolbar & Filters */
 .diagnosis-toolbar-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -143,7 +137,6 @@
   max-width: 380px;
 }
 
-/* Table Enhancements */
 .diagnosis-code-tag {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-weight: 700;
@@ -166,7 +159,6 @@
   gap: 8px;
 }
 
-/* Modal Form Styles */
 .diagnosis-form-hint {
   display: flex;
   align-items: flex-start;

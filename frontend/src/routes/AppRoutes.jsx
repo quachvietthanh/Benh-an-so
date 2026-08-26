@@ -53,18 +53,16 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
   const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const userPerms = (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
 
-  // Admin has access to all routes by default
   const isAdmin = userRoles.includes('admin')
 
-  // Check role match
   const hasRoleMatch = allowedRoles.length > 0 && allowedRoles.some((role) =>
     userRoles.includes(String(role).toLowerCase().replace(/^role_/, ''))
   )
 
-  // Check permission match
   const hasPermMatch = allowedPermissions.length > 0 && allowedPermissions.some((perm) =>
     userPerms.includes(String(perm).toUpperCase().replace(/^PERMISSION_/, ''))
   )
+
 
   if (allowedRoles.length === 0 && allowedPermissions.length === 0) {
     return children

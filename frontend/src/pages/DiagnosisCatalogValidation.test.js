@@ -68,20 +68,16 @@ test('TC04: Kiểm thử lọc danh sách mã bệnh theo từ khóa và trạng
     })
   }
 
-  // Filter by keyword 'J'
   const jResults = filterCatalogs(sampleList, 'J', 'ALL', 'ALL')
   assert.strictEqual(jResults.length, 2)
 
-  // Filter by active status
   const activeResults = filterCatalogs(sampleList, '', 'ACTIVE', 'ALL')
   assert.strictEqual(activeResults.length, 3)
 
-  // Filter by inactive status
   const inactiveResults = filterCatalogs(sampleList, '', 'INACTIVE', 'ALL')
   assert.strictEqual(inactiveResults.length, 1)
   assert.strictEqual(inactiveResults[0].code, 'J02.9')
 
-  // Filter by disease group 'Tiêu hóa'
   const digestiveResults = filterCatalogs(sampleList, '', 'ALL', 'Tiêu hóa')
   assert.strictEqual(digestiveResults.length, 1)
   assert.strictEqual(digestiveResults[0].code, 'K29.7')
