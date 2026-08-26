@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { getCategoryFromIcdCode, getDiseaseGroupName } from '../utils/icd10Data.js'
 
 export const isDoctorRole = (roles = []) => {
   const allowed = ['admin', 'doctor', 'role_admin', 'role_doctor']
@@ -27,6 +28,26 @@ export const validateMedicalEncounter = (visitId, formValues, primaryIcd) => {
 
 export const calculateTotalOrderFee = (orders = []) => {
   return orders.reduce((sum, item) => sum + (Number(item.price) || 0), 0)
+}
+
+export const filterIcdOptions = (options = [], query = '') => {
+  const q = String(query || '').toLowerCase().trim()
+  if (!q) return options
+  return options.filter((item) => {
+    const code = (item.code || '').toLowerCase()
+    const name = (item.name || '').toLowerCase()
+    const group = (item.diseaseGroup || item.category || '').toLowerCase()
+    return code.includes(q) || name.includes(q) || group.includes(q)
+  })
+}
+
+export const buildDiagnosisSummary = (primaryIcd, secondaryIcds = []) => {
+  if (!primaryIcd?.code) return ''
+  const primaryText = `[${primaryIcd.code}] ${primaryIcd.name}`
+  const secondaryTexts = (secondaryIcds || [])
+    .filter((item) => item?.code)
+    .map((item) => `[${item.code}] ${item.name}`)
+  return [primaryText, ...secondaryTexts].join('; ')
 }
 
 test('1. Kiểm thử THIẾU CHẨN ĐOÁN (Missing Diagnosis Validation)', () => {
@@ -84,4 +105,48 @@ test('3. Kiểm thử TÍNH TỔNG CHI PHÍ CHỈ ĐỊNH CẬN LÂM SÀNG', () 
   ]
   const total = calculateTotalOrderFee(sampleOrders)
   assert.equal(total, 365000)
+})
+
+test('5. Kiểm thử tra cứu mã bệnh ICD-10 và mapping nhóm bệnh', () => {
+  const catalog = [
+    { id: '1', code: 'J00', name: 'Cảm lạnh thông thường', diseaseGroup: 'Hô hấp' },
+    { id: '2', code: 'J06.9', name: 'Nhiễm trùng hô hấp trên cấp', diseaseGroup: 'Hô hấp' },
+    { id: '3', code: 'I10', name: 'Tăng huyết áp vô căn', diseaseGroup: 'Tim mạch' },
+    { id: '4', code: 'K29.7', name: 'Viêm dạ dày', diseaseGroup: 'Tiêu hóa' },
+    { id: '5', code: 'E11.9', name: 'Đái tháo đường típ 2', diseaseGroup: 'Nội tiết' },
+  ]
+
+  const searchByCode = filterIcdOptions(catalog, 'j0')
+  assert.equal(searchByCode.length, 2)
+  assert.equal(searchByCode[0].code, 'J00')
+  assert.equal(searchByCode[1].code, 'J06.9')
+
+  const searchByName = filterIcdOptions(catalog, 'dạ dày')
+  assert.equal(searchByName.length, 1)
+  assert.equal(searchByName[0].code, 'K29.7')
+
+  const searchByGroup = filterIcdOptions(catalog, 'tim mạch')
+  assert.equal(searchByGroup.length, 1)
+  assert.equal(searchByGroup[0].code, 'I10')
+
+  assert.equal(getDiseaseGroupName('J00', 'Hô hấp'), 'Hô hấp')
+  assert.equal(getDiseaseGroupName('I10', ''), 'Tim mạch - Mạch máu')
+  assert.equal(getDiseaseGroupName('K29.7', null), 'Tiêu hóa')
+})
+
+test('6. Kiểm thử đóng gói kết luận chẩn đoán kèm mã ICD chính và phụ', () => {
+  const primary = { code: 'I10', name: 'Tăng huyết áp vô căn' }
+  const secondary = [
+    { code: 'E11.9', name: 'Đái tháo đường típ 2 không có biến chứng' },
+    { code: 'E78.0', name: 'Tăng cholesterol máu' },
+  ]
+
+  const summary = buildDiagnosisSummary(primary, secondary)
+  assert.equal(
+    summary,
+    '[I10] Tăng huyết áp vô căn; [E11.9] Đái tháo đường típ 2 không có biến chứng; [E78.0] Tăng cholesterol máu',
+  )
+
+  const singleSummary = buildDiagnosisSummary(primary, [])
+  assert.equal(singleSummary, '[I10] Tăng huyết áp vô căn')
 })

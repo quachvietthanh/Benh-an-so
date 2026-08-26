@@ -59,16 +59,27 @@ export const buildMedicalRecordPayload = ({ visitId, values = {}, vitalSigns = {
 export const buildDiagnosisPayload = ({ primaryDiagnosis, secondaryDiagnoses = [], note = '' }) => {
   if (!primaryDiagnosis?.id) throw new Error('primary diagnosisCatalogId is required')
 
-  const toDiagnosis = (diagnosis) => ({
+  const toPrimary = (diagnosis) => ({
     diagnosisCatalogId: diagnosis.id,
-    code: diagnosis.code,
-    name: diagnosis.rawName || diagnosis.name,
     note: diagnosis.note || note || '',
   })
 
+  const toSecondary = (diagnosis) => {
+    if (diagnosis.id) {
+      return {
+        diagnosisCatalogId: diagnosis.id,
+        note: diagnosis.note || '',
+      }
+    }
+    return {
+      name: diagnosis.rawName || diagnosis.name || diagnosis.code || '',
+      note: diagnosis.note || '',
+    }
+  }
+
   return {
-    primaryDiagnosis: toDiagnosis(primaryDiagnosis),
-    secondaryDiagnoses: secondaryDiagnoses.map(toDiagnosis),
+    primaryDiagnosis: toPrimary(primaryDiagnosis),
+    secondaryDiagnoses: secondaryDiagnoses.map(toSecondary),
   }
 }
 

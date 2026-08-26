@@ -186,6 +186,7 @@ function MedicalEncounter() {
                 code: item.code,
                 rawName: item.name,
                 name: fixMojibake(item.name),
+                diseaseGroup: item.diseaseGroup ? fixMojibake(item.diseaseGroup) : null,
                 description: fixMojibake(item.description || ''),
                 category: getCategoryFromIcdCode(item.code),
               })
@@ -395,6 +396,7 @@ function MedicalEncounter() {
             code: item.code,
             rawName: item.name,
             name: fixMojibake(item.name),
+            diseaseGroup: item.diseaseGroup ? fixMojibake(item.diseaseGroup) : null,
             description: fixMojibake(item.description || ''),
             category: getCategoryFromIcdCode(item.code),
           })),
@@ -465,6 +467,8 @@ function MedicalEncounter() {
         id: icd.id || backendItem?.id,
         code: backendItem?.code || icd.code,
         name: fixMojibake(backendItem?.name || icd.name),
+        diseaseGroup: backendItem?.diseaseGroup || icd.diseaseGroup || null,
+        category: backendItem?.category || icd.category || getCategoryFromIcdCode(backendItem?.code || icd.code),
         note: icd.note,
       }
       setPrimaryIcd(cleanIcd)
@@ -500,6 +504,8 @@ function MedicalEncounter() {
         id: icd.id || backendItem?.id,
         code: backendItem?.code || icd.code,
         name: fixMojibake(backendItem?.name || icd.name),
+        diseaseGroup: backendItem?.diseaseGroup || icd.diseaseGroup || null,
+        category: backendItem?.category || icd.category || getCategoryFromIcdCode(backendItem?.code || icd.code),
         note: icd.note,
       }
       setSecondaryIcds((prev) => {
