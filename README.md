@@ -350,44 +350,30 @@ npm run dev
 | `PUT` | `/medical-records/{id}` | Cập nhật hồ sơ | ✅ |
 | `DELETE` | `/medical-records/{id}` | Xóa hồ sơ | ✅ |
 
-### 🩺 Diagnosis Catalog & Clinical Orders (Epic NCL-04)
+### 🩺 Diagnosis Catalog & Medical-record Diagnoses (NCL-13-CN-002)
 
 | Method | Endpoint | Mô tả | Xác thực | Vai trò |
 |--------|----------|-------|----------|---------|
-| `GET` | `/diagnosis-catalog?search={query}` | Tra cứu danh mục ICD-10 | ✅ | ADMIN, DOCTOR |
-| `POST` | `/examinations/{examinationId}/diagnosis` | Ghi/nhập chẩn đoán chính & phụ | ✅ | ADMIN, DOCTOR |
-| `GET` | `/examinations/{examinationId}/diagnosis` | Xem chẩn đoán & chỉ định | ✅ | ADMIN, DOCTOR, NURSE |
-| `POST` | `/examinations/{examinationId}/clinical-orders` | Tạo chỉ định cận lâm sàng | ✅ | ADMIN, DOCTOR |
+| `GET` | `/diagnosis-catalog?search={query}` | Tra cứu danh mục mã bệnh | ✅ | ADMIN, DOCTOR |
+| `PUT` | `/medical-records/{medicalRecordId}/diagnoses` | Thay thế chẩn đoán chính/phụ của bệnh án | ✅ | DOCTOR (ADMIN bị loại trừ) |
+| `GET` | `/medical-records/{medicalRecordId}/diagnoses` | Xem chẩn đoán đã lưu | ✅ | Theo `MEDICAL_RECORD_READ` |
+| `POST` | `/clinical-orders/visits/{visitId}` | Tạo chỉ định cận lâm sàng | ✅ | Theo `CLINICAL_ORDER_CREATE` |
 
 **Business Rules (QTN):**
-- **QTN-07:** Khóa chẩn đoán/chỉ định khi lượt khám kết thúc (COMPLETED/CANCELLED)
-- **QTN-11:** Chỉ DOCTOR được phép ghi chẩn đoán và chỉ định
-- **QTN-13:** Mỗi chỉ định cận lâm sàng gắn liền với một lượt khám
+- **QTN-11:** Chỉ DOCTOR được phép ghi chẩn đoán; ADMIN bị loại trừ.
+- **QTN-22:** Chẩn đoán chính bắt buộc chọn mã bệnh đang dùng; chẩn đoán phụ là danh sách tùy chọn và có thể chọn mã hoặc nhập tự do.
 
 **Sample Payloads (chi tiết xem tại [`docs/api/diagnosis-and-orders-delivery.md`](docs/api/diagnosis-and-orders-delivery.md)):**
 
-**POST /examinations/{id}/diagnosis**
+**PUT /medical-records/{medicalRecordId}/diagnoses**
 ```json
 {
-  "primaryIcdCode": "J00",
-  "primaryIcdName": "Common cold",
-  "secondaryIcdCodes": [
-    { "code": "R50.9", "name": "Fever" }
-  ],
-  "clinicalNotes": "Patient has runny nose"
-}
-```
-
-**POST /examinations/{id}/clinical-orders**
-```json
-{
-  "clinicalReason": "Check glucose",
-  "items": [
-    {
-      "serviceCode": "LAB-GLU",
-      "serviceName": "Blood glucose",
-      "instruction": "Fasting"
-    }
+  "primaryDiagnosis": {
+    "diagnosisCatalogId": "a1000000-0000-0000-0000-000000000019",
+    "note": "Patient has runny nose"
+  },
+  "secondaryDiagnoses": [
+    { "name": "Fever", "note": "Monitor" }
   ]
 }
 ```

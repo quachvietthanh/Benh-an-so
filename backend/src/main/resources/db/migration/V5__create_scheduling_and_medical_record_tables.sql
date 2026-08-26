@@ -371,6 +371,7 @@ CREATE TABLE diagnosis_catalog (
 
     code VARCHAR(30) NOT NULL,
     name VARCHAR(150) NOT NULL,
+    disease_group VARCHAR(100) NULL,
     description TEXT NULL,
 
     active BOOLEAN NOT NULL,

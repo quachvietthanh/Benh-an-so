@@ -976,7 +976,6 @@ function InventoryReceiptPage() {
 
                     <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                       <Button
-                        size="large"
                         onClick={() => {
                           form.resetFields()
                           form.setFieldsValue({ items: [{ ...EMPTY_RECEIPT_ITEM }] })
@@ -987,7 +986,6 @@ function InventoryReceiptPage() {
                       <Button
                         type="primary"
                         htmlType="submit"
-                        size="large"
                         icon={<SaveOutlined />}
                         loading={submitting}
                         disabled={loading || medicines.length === 0}

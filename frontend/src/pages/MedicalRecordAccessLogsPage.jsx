@@ -200,7 +200,11 @@ function MedicalRecordAccessLogsPage() {
 
       setAccessLogs(rawLogs)
     } catch (error) {
-      setLoadError(getErrorMessage(error, 'Không thể tải nhật ký truy cập bệnh án.'))
+      if (error?.response?.status !== 403) {
+        setLoadError(getErrorMessage(error, 'Không thể tải nhật ký truy cập bệnh án.'))
+      } else {
+        setLoadError('')
+      }
       setAccessLogs([])
     } finally {
       setLoading(false)

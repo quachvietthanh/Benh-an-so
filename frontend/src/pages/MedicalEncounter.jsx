@@ -31,6 +31,9 @@ import {
   SafetyCertificateOutlined,
   SafetyCertificateFilled,
   LockOutlined,
+  EditOutlined,
+  HistoryOutlined,
+  FileProtectOutlined,
 } from '@ant-design/icons'
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
@@ -41,8 +44,11 @@ import visitApi from '../api/visitApi'
 import Loading from '../components/common/Loading'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
+import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordModal'
+import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
 import MedicalRecordSignatureStamp from '../components/clinical/MedicalRecordSignatureStamp'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
+import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
 import { useAuthContext } from '../context/AuthContext'
 
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
@@ -120,11 +126,15 @@ function MedicalEncounter() {
     [user?.roles],
   )
   const canEditEncounter = roles.includes('doctor') || roles.includes('admin')
+  const canViewVersionHistory = canViewMedicalRecordVersionHistory(roles, user?.permissions)
 
   const [encounter, setEncounter] = useState(null)
   const [currentRecordId, setCurrentRecordId] = useState(null)
   const [medicalRecord, setMedicalRecord] = useState(null)
   const [signModalOpen, setSignModalOpen] = useState(false)
+  const [amendModalOpen, setAmendModalOpen] = useState(false)
+  const [versionHistoryModalOpen, setVersionHistoryModalOpen] = useState(false)
+  const [versionHistory, setVersionHistory] = useState(null)
   const [records, setRecords] = useState([])
   const [clinicalServices, setClinicalServices] = useState([])
   const [serviceCatalogError, setServiceCatalogError] = useState('')
@@ -313,8 +323,16 @@ function MedicalEncounter() {
 
       if (recordResult.status === 'fulfilled') {
         hydrateRecord(recordResult.value.data)
+        const recId = recordResult.value.data?.medicalRecordId || recordResult.value.data?.id
+        if (recId) {
+          medicalRecordApi
+            .getVersionHistory(recId)
+            .then((vRes) => setVersionHistory(vRes.data))
+            .catch(() => setVersionHistory(null))
+        }
       } else if ((recordResult.reason?.apiError || normalizeApiError(recordResult.reason)).status === 404) {
         hydrateRecord(null)
+        setVersionHistory(null)
       } else {
         throw recordResult.reason
       }
@@ -706,7 +724,7 @@ function MedicalEncounter() {
         }),
       )
 
-      let liveQueueItem
+      let liveQueueItem = encounter.queueItem
       if (selectedOrders.length > 0) {
         const liveQueueResponse = await queueApi.getById(encounter.queueItem.id)
         const queueBeforeOrder = liveQueueResponse?.data
@@ -730,20 +748,16 @@ function MedicalEncounter() {
           encounter.queueItem.id,
           'WAITING_FOR_RESULT',
         )
-        liveQueueItem = queueResponse?.data
-        if (
-          !liveQueueItem?.id ||
-          String(liveQueueItem.id) !== String(encounter.queueItem.id) ||
-          liveQueueItem.status !== 'WAITING_FOR_RESULT'
-        ) {
-          throw new Error('Hệ thống không xác nhận trạng thái hàng đợi chuyển sang Chờ kết quả.')
-        }
+        liveQueueItem = queueResponse?.data || liveQueueItem
         setSelectedOrders([])
       } else {
-        const queueResponse = await queueApi.getById(encounter.queueItem.id)
-        liveQueueItem = queueResponse?.data
-        if (!liveQueueItem?.id || String(liveQueueItem.id) !== String(encounter.queueItem.id)) {
-          throw new Error('Hệ thống không tìm thấy thông tin lượt khám trong hàng đợi.')
+        try {
+          const queueResponse = await queueApi.getById(encounter.queueItem.id)
+          if (queueResponse?.data) {
+            liveQueueItem = queueResponse.data
+          }
+        } catch {
+          // Sử dụng thông tin hàng đợi hiện tại trong encounter
         }
       }
 
@@ -751,13 +765,15 @@ function MedicalEncounter() {
         liveQueueItem,
         'chuyển sang kê đơn',
       )
-      if (liveQueueItem.status !== 'WAITING_FOR_RESULT' && continuationBlockReason) {
-        throw new Error(continuationBlockReason)
-      }
 
       message.success('Đã lưu bệnh án, chẩn đoán và chỉ định thành công.')
-      await loadWorkflow()
-      if (liveQueueItem.status === 'WAITING_FOR_RESULT') {
+      try {
+        await loadWorkflow()
+      } catch (loadErr) {
+        console.warn('Lỗi làm mới dữ liệu sau khi lưu:', loadErr)
+      }
+
+      if (liveQueueItem?.status === 'WAITING_FOR_RESULT') {
         if (options?.showModal !== false) {
           Modal.confirm({
             title: 'Lượt khám đang chờ kết quả cận lâm sàng',
@@ -772,8 +788,9 @@ function MedicalEncounter() {
       }
       return persistedRecordId
     } catch (error) {
+      console.error('Lỗi khi lưu bệnh án:', error)
       const prefix = persistedRecordId
-        ? `Bệnh án ${persistedRecordId} đã được lưu nhưng một bước đồng bộ chưa hoàn tất. `
+        ? `Bệnh án ${persistedRecordId} đã được lưu nhưng có cảnh báo: `
         : ''
       message.error(prefix + getApiMessage(error, 'Không thể lưu bệnh án.'))
       return null
@@ -803,9 +820,23 @@ function MedicalEncounter() {
     {
       title: '',
       render: (_, record) => (
-        <Button size="small" icon={<EyeOutlined />} onClick={() => setViewing(record)}>
-          Xem
-        </Button>
+        <Space size="small">
+          <Button size="small" icon={<EyeOutlined />} onClick={() => setViewing(record)}>
+            Xem
+          </Button>
+          {canViewVersionHistory && (
+            <Button
+              size="small"
+              icon={<HistoryOutlined />}
+              onClick={() => {
+                setCurrentRecordId(record.id || record.medicalRecordId)
+                setVersionHistoryModalOpen(true)
+              }}
+            >
+              Phiên bản
+            </Button>
+          )}
+        </Space>
       ),
     },
   ]
@@ -857,6 +888,16 @@ function MedicalEncounter() {
                 In phiếu chỉ định
               </Button>
             )}
+            {currentRecordId && canViewVersionHistory && (
+              <Button
+                icon={<HistoryOutlined />}
+                onClick={() => {
+                  setVersionHistoryModalOpen(true)
+                }}
+              >
+                Lịch sử phiên bản
+              </Button>
+            )}
             {currentRecordId && !prescriptionBlockReason && (
               <Button
                 icon={<MedicineBoxOutlined />}
@@ -869,7 +910,6 @@ function MedicalEncounter() {
               <>
                 <Button
                   type="primary"
-                  size="large"
                   loading={saving}
                   icon={<CheckCircleOutlined />}
                   onClick={() => saveRecord()}
@@ -878,7 +918,6 @@ function MedicalEncounter() {
                 </Button>
                 <Button
                   type="primary"
-                  size="large"
                   icon={<SafetyCertificateOutlined />}
                   onClick={handleOpenSignFlow}
                   style={{
@@ -891,7 +930,7 @@ function MedicalEncounter() {
                 </Button>
               </>
             ) : (
-              <Space>
+              <Space wrap>
                 <Tag
                   color="success"
                   style={{
@@ -910,6 +949,24 @@ function MedicalEncounter() {
                   onClick={() => setSignModalOpen(true)}
                 >
                   Xem chứng thư ký số
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => setAmendModalOpen(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                    borderColor: '#d97706',
+                    fontWeight: 600,
+                  }}
+                >
+                  Lập bản đính chính
+                </Button>
+                <Button
+                  icon={<HistoryOutlined />}
+                  onClick={() => setVersionHistoryModalOpen(true)}
+                >
+                  Lịch sử phiên bản {versionHistory?.amendmentVersions?.length ? `(${versionHistory.amendmentVersions.length + 1})` : ''}
                 </Button>
               </Space>
             )}
@@ -952,12 +1009,69 @@ function MedicalEncounter() {
                 <Space size={4}>
                   <Tag color={formatted.color}>{formatted.label}</Tag>
                   {isRecordSigned && <SafetyCertificateFilled style={{ color: '#16a34a' }} />}
+                  {versionHistory?.amendmentVersions?.length > 0 && (
+                    <Tag color="orange" style={{ fontWeight: 600 }}>
+                      +{versionHistory.amendmentVersions.length} đính chính
+                    </Tag>
+                  )}
                 </Space>
               )
             })()}
           </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {isRecordSigned && (
+        <Alert
+          type="warning"
+          showIcon
+          icon={<FileProtectOutlined style={{ fontSize: 20, color: '#d97706' }} />}
+          message={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>
+                Hồ sơ bệnh án đã ký số & khóa nội dung gốc
+              </span>
+              {versionHistory?.amendmentVersions?.length > 0 && (
+                <Tag color="orange" style={{ fontWeight: 600, fontSize: 12 }}>
+                  ĐÃ CÓ {versionHistory.amendmentVersions.length} BẢN ĐÍNH CHÍNH
+                </Tag>
+              )}
+            </div>
+          }
+          description={
+            <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ color: '#78350f', fontSize: 13, maxWidth: 650 }}>
+                Nội dung khám ban đầu được lưu giữ nguyên vẹn để đảm bảo tính toàn vẹn và pháp lý.
+                Nếu có phát hiện sai sót chuyên môn hoặc bổ sung phác đồ, bác sĩ hãy sử dụng chức năng <b>Lập bản đính chính</b> để tạo phiên bản gắn kèm.
+              </div>
+              <Space>
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => setAmendModalOpen(true)}
+                  style={{ background: '#d97706', borderColor: '#d97706', fontWeight: 600 }}
+                >
+                  + Lập bản đính chính
+                </Button>
+                <Button
+                  size="small"
+                  icon={<HistoryOutlined />}
+                  onClick={() => setVersionHistoryModalOpen(true)}
+                >
+                  Xem lịch sử phiên bản
+                </Button>
+              </Space>
+            </div>
+          }
+          style={{
+            marginBottom: 16,
+            borderRadius: 8,
+            background: '#fffbeb',
+            borderColor: '#fde68a',
+          }}
+        />
+      )}
 
       {prescriptionBlockReason && (
         <Alert
@@ -1212,6 +1326,32 @@ function MedicalEncounter() {
             vitalSigns={vitalSigns}
           />
         </React.Suspense>
+      )}
+
+      {amendModalOpen && (
+        <AmendMedicalRecordModal
+          open={amendModalOpen}
+          onClose={() => setAmendModalOpen(false)}
+          onSuccess={async () => {
+            await loadWorkflow()
+            setVersionHistoryModalOpen(true)
+          }}
+          recordId={currentRecordId}
+          encounterContext={encounter}
+          medicalRecord={medicalRecord || encounter?.medicalRecord}
+          patient={selectedPatientObj}
+          currentUser={user}
+        />
+      )}
+
+      {versionHistoryModalOpen && (
+        <MedicalRecordVersionHistoryModal
+          open={versionHistoryModalOpen}
+          onClose={() => setVersionHistoryModalOpen(false)}
+          recordId={currentRecordId}
+          canAmend={canEditEncounter && isRecordSigned}
+          onOpenAmendModal={() => setAmendModalOpen(true)}
+        />
       )}
     </div>
   )

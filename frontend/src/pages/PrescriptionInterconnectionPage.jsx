@@ -49,7 +49,7 @@ import dayjs from 'dayjs'
 import pharmacyApi from '../api/pharmacyApi'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import { useAuthContext } from '../context/AuthContext'
-import { getApiErrorMessage as getApiMessage } from '../utils/apiError'
+import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError } from '../utils/apiError'
 import {
   formatPrescriptionCode,
   getInterconnectionStatusInfo,
@@ -77,9 +77,8 @@ function PrescriptionInterconnectionPage() {
   }, [user])
 
   const isAdmin = userRoles.includes('admin')
-  const isManager = userRoles.includes('manager') || userRoles.includes('clinic_manager')
-  const canRead = userPermissions.includes('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin || isManager
-  const canRetry = userPermissions.includes('PRESCRIPTION_INTERCONNECTION_RETRY') || isAdmin || isManager
+  const canRead = userPermissions.includes('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin
+  const canRetry = userPermissions.includes('PRESCRIPTION_INTERCONNECTION_RETRY') || isAdmin
 
   // Filter states
   const [currentTabStatus, setCurrentTabStatus] = useState('FAILED') // 'FAILED' | 'NOT_SENT' | 'SUCCESS'
@@ -166,7 +165,11 @@ function PrescriptionInterconnectionPage() {
       setDataList(items)
       fetchStatusCounts()
     } catch (err) {
-      setLoadError(getApiMessage(err, 'Không thể tải danh sách liên thông đơn thuốc từ máy chủ.'))
+      if (!isAccessDeniedApiError(err)) {
+        setLoadError(getApiMessage(err, 'Không thể tải danh sách liên thông đơn thuốc từ máy chủ.'))
+      } else {
+        setLoadError(null)
+      }
       setDataList([])
     } finally {
       setLoading(false)
@@ -491,6 +494,25 @@ function PrescriptionInterconnectionPage() {
       },
     },
   ]
+
+  if (!canRead) {
+    return (
+      <div style={{ paddingBottom: 32 }}>
+        <div style={{ marginBottom: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>
+            <CloudServerOutlined style={{ marginRight: 10, color: '#0284c7' }} />
+            Tra cứu & Giám sát Liên thông Đơn thuốc
+          </Title>
+          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+            Theo dõi tập trung tình trạng gửi đơn thuốc lên Cổng liên thông Quốc gia (mô phỏng).
+          </Paragraph>
+        </div>
+        <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px' }}>
+          <Empty description="Tài khoản của bạn chưa được phân quyền xem dữ liệu liên thông đơn thuốc." />
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div style={{ paddingBottom: 32 }}>

@@ -175,11 +175,42 @@ class MedicalRecordControllerTest {
         mockMvc.perform(put("/medical-records/{medicalRecordId}/diagnoses", recordId)
                         .contentType("application/json")
                         .content("""
-                                {"primaryDiagnosis":{"diagnosisCatalogId":"%s","code":"J06.9","name":"Acute upper respiratory infection","note":"Monitor symptoms"},"secondaryDiagnoses":[]}
+                                {"primaryDiagnosis":{"diagnosisCatalogId":"%s","note":"Monitor symptoms"},"secondaryDiagnoses":[]}
                                 """.formatted(catalogId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].medicalRecordId").value(recordId.toString()))
                 .andExpect(jsonPath("$[0].diagnosisType").value("PRIMARY"));
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/diagnoses - rejects a primary diagnosis without catalog ID")
+    void replaceDiagnosesRejectsPrimaryWithoutCatalogId() throws Exception {
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/diagnoses", recordId)
+                        .contentType("application/json")
+                        .content("""
+                                {"primaryDiagnosis":{},"secondaryDiagnoses":[]}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/diagnoses - requires exactly one secondary diagnosis source")
+    void replaceDiagnosesRequiresExactlyOneSecondaryDiagnosisSource() throws Exception {
+        UUID catalogId = UUID.randomUUID();
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/diagnoses", recordId)
+                        .contentType("application/json")
+                        .content("""
+                                {"primaryDiagnosis":{"diagnosisCatalogId":"%s"},"secondaryDiagnoses":[{}]}
+                                """.formatted(catalogId)))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/diagnoses", recordId)
+                        .contentType("application/json")
+                        .content("""
+                                {"primaryDiagnosis":{"diagnosisCatalogId":"%s"},"secondaryDiagnoses":[{"diagnosisCatalogId":"%s","name":"Clinical observation"}]}
+                                """.formatted(catalogId, UUID.randomUUID())))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

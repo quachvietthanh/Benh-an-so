@@ -253,7 +253,7 @@ function MedicalRecordCopyPreviewModal({
             >
               Tải file PDF
             </Button>
-            <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrint} size="large">
+            <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>
               In bản sao
             </Button>
           </Space>

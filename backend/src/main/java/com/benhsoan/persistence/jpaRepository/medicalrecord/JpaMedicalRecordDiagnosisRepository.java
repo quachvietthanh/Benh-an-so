@@ -14,6 +14,8 @@ public interface JpaMedicalRecordDiagnosisRepository extends JpaRepository<Medic
 
     boolean existsByMedicalRecordId(UUID medicalRecordId);
 
+    boolean existsByDiagnosisCatalogId(UUID diagnosisCatalogId);
+
     @Modifying
     void deleteByMedicalRecordId(UUID medicalRecordId);
 }

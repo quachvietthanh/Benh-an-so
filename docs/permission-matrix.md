@@ -34,6 +34,8 @@
 | `/api/v1/medical-records/{id}` | GET | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}` | PUT | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}/diagnoses` | PUT | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}/diagnoses` | GET | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}/sign` | POST | ❌ | ✅ (chỉ bác sĩ phụ trách lượt khám) | ❌ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}/status` | PATCH | ✅ | ✅ | ✅ | ❌ | ❌ |
 | | | | | | | |
@@ -62,9 +64,8 @@
 | `/api/v1/vital-signs/{id}` | PUT | ✅ | ✅ | ✅ | ❌ | ❌ |
 | | | | | | | |
 | **Diagnoses** | | | | | | |
-| `/api/v1/diagnoses` | GET | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/diagnoses` | POST | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/diagnoses/{id}` | PUT | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/diagnosis-catalog` | GET | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/system/diagnosis-catalog/**` | ALL | ✅ | ❌ | ❌ | ❌ | ❌ |
 | | | | | | | |
 | **Pharmacy / Inventory** | | | | | | |
 | `/api/v1/pharmacy/inventory` | GET | ✅ | ❌ | ❌ | ❌ | ✅ |

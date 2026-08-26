@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Alert, Table, Button, Tag, Typography, Space, Popconfirm, message, Modal, Tooltip } from 'antd'
-import { EyeOutlined, InboxOutlined, DeleteOutlined } from '@ant-design/icons'
+import { EyeOutlined, InboxOutlined, DeleteOutlined, HistoryOutlined, EditOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import medicalRecordApi from '../api/medicalRecordApi'
+import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
+import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordModal'
 import { formatDateTime, formatRecordStatus } from '../utils/helpers'
+import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { normalizeMedicalRecordDetail } from '../utils/workflowContract'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
+import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
 
 const { Title } = Typography
 
@@ -16,6 +20,8 @@ function MedicalRecordList({ patientId }) {
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState([])
   const [actionLoadingId, setActionLoadingId] = useState(null)
+  const [selectedRecordForVersion, setSelectedRecordForVersion] = useState(null)
+  const [versionModalOpen, setVersionModalOpen] = useState(false)
 
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -27,6 +33,7 @@ function MedicalRecordList({ patientId }) {
 
   const canDeleteRecord = userPermissions.includes('MEDICAL_RECORD_DELETE') || userPermissions.includes('RECORD_DELETE') || userRoles.includes('admin')
   const canArchiveRecord = userPermissions.includes('MEDICAL_RECORD_UPDATE_STATUS') || userPermissions.includes('MEDICAL_RECORD_UPDATE') || userPermissions.includes('RECORD_UPDATE_STATUS') || userRoles.includes('admin') || userRoles.includes('doctor')
+  const canViewVersionHistory = canViewMedicalRecordVersionHistory(userRoles, userPermissions)
 
   const fetchRecords = useCallback(async () => {
     if (!patientId) {
@@ -162,10 +169,11 @@ function MedicalRecordList({ patientId }) {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 220,
+      width: 280,
       render: (_, record) => {
         const recordId = record.id || record.medicalRecordId
         const isArchived = record.status === 'ARCHIVED'
+        const isSigned = isMedicalRecordSigned(record.status)
         const isBusy = actionLoadingId === recordId
 
         return (
@@ -179,6 +187,20 @@ function MedicalRecordList({ patientId }) {
             >
               Xem
             </Button>
+            {(canViewVersionHistory || isSigned) && (
+              <Button
+                type="link"
+                size="small"
+                icon={<HistoryOutlined />}
+                style={{ color: '#4f46e5' }}
+                onClick={() => {
+                  setSelectedRecordForVersion(recordId)
+                  setVersionModalOpen(true)
+                }}
+              >
+                Phiên bản
+              </Button>
+            )}
             {canArchiveRecord && !isArchived && (
               <Popconfirm
                 title="Lưu trữ hồ sơ bệnh án?"
@@ -253,6 +275,18 @@ function MedicalRecordList({ patientId }) {
           showTotal: (total) => `Tổng số: ${total} hồ sơ`,
         }}
       />
+
+      {versionModalOpen && selectedRecordForVersion && (
+        <MedicalRecordVersionHistoryModal
+          open={versionModalOpen}
+          onClose={() => {
+            setVersionModalOpen(false)
+            setSelectedRecordForVersion(null)
+          }}
+          recordId={selectedRecordForVersion}
+          canAmend={false}
+        />
+      )}
     </div>
   )
 }

@@ -125,11 +125,10 @@ function ServiceEditModal({
         </div>
 
         <div className="service-modal-actions">
-          <Button size="large" onClick={onCancel} disabled={loading}>
+          <Button onClick={onCancel} disabled={loading}>
             Hủy bỏ
           </Button>
           <Button
-            size="large"
             type="primary"
             htmlType="submit"
             loading={loading}

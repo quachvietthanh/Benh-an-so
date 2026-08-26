@@ -1510,7 +1510,6 @@ function BillingPage() {
                                   <div style={{ marginTop: 6 }}>
                                     <Button
                                       type="primary"
-                                      size="large"
                                       icon={<FileTextOutlined />}
                                       loading={submittingInvoice}
                                       disabled={!canCollectPayment || submittingInvoice}
@@ -1560,7 +1559,6 @@ function BillingPage() {
                                       value={paymentMethod}
                                       onChange={setPaymentMethod}
                                       options={PAYMENT_METHODS}
-                                      size="large"
                                       disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
                                     />
                                   </Form.Item>
@@ -1583,7 +1581,6 @@ function BillingPage() {
                                         >
                                           <Button
                                             type="primary"
-                                            size="large"
                                             icon={<DollarCircleOutlined />}
                                             loading={submittingPayment}
                                             disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
@@ -1637,7 +1634,6 @@ function BillingPage() {
                                       >
                                         <Button
                                           type="primary"
-                                          size="large"
                                           icon={<CheckCircleOutlined />}
                                           loading={submittingPayment}
                                           disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
@@ -1673,7 +1669,6 @@ function BillingPage() {
                                         >
                                           <Button
                                             type="primary"
-                                            size="large"
                                             icon={<CreditCardOutlined />}
                                             loading={submittingPayment}
                                             disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}

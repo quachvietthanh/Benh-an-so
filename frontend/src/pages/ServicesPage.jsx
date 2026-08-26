@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AppstoreOutlined,
+  CheckCircleOutlined,
   DollarOutlined,
   EditOutlined,
   HistoryOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  StopOutlined,
+  TagOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -382,12 +385,13 @@ function ServicesPage() {
       width: 180,
       align: 'center',
       render: (_, record) => (
-        <Space size="small">
+        <Space size="small" className="service-table-actions">
           <Tooltip title="Xem lịch sử điều chỉnh giá">
             <Button
-              type="text"
+              className="btn-table-action btn-table-history"
+              type="default"
               size="small"
-              icon={<HistoryOutlined style={{ color: '#2563eb' }} />}
+              icon={<HistoryOutlined />}
               onClick={() => handleOpenPriceHistory(record)}
             >
               Lịch sử giá
@@ -396,9 +400,10 @@ function ServicesPage() {
           {canManage && (
             <Tooltip title="Cập nhật thông tin & giá">
               <Button
-                type="text"
+                className="btn-table-action btn-table-edit"
+                type="default"
                 size="small"
-                icon={<EditOutlined style={{ color: '#0f766e' }} />}
+                icon={<EditOutlined />}
                 onClick={() => handleOpenEditModal(record)}
               >
                 Sửa
@@ -414,9 +419,12 @@ function ServicesPage() {
     <div className="services-page-container">
       {/* Page Header */}
       <div className="services-page-header">
-        <div>
+        <div className="services-header-content">
+          <div className="services-header-badge">
+            <AppstoreOutlined />
+            <span>Danh mục Y tế & Viện phí</span>
+          </div>
           <Title level={3} className="services-header-title">
-            <AppstoreOutlined style={{ marginRight: 10, color: '#2563eb' }} />
             Danh mục Dịch vụ Kỹ thuật & Bảng giá
           </Title>
           <Paragraph type="secondary" className="services-header-desc">
@@ -424,15 +432,20 @@ function ServicesPage() {
           </Paragraph>
         </div>
         <div className="services-header-actions">
-          <Button icon={<ReloadOutlined />} loading={loading} onClick={loadServices}>
+          <Button
+            className="btn-services-refresh"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={loadServices}
+          >
             Làm mới
           </Button>
           {canManage && (
             <Button
+              className="btn-services-create"
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleOpenCreateModal}
-              style={{ background: '#2563eb', fontWeight: 600 }}
             >
               Thêm dịch vụ mới
             </Button>
@@ -446,6 +459,7 @@ function ServicesPage() {
           <div className="service-stat-info">
             <div className="service-stat-label">Tổng số dịch vụ</div>
             <div className="service-stat-value">{stats.total}</div>
+            <div className="service-stat-hint">Toàn bộ danh mục</div>
           </div>
           <div className="service-stat-icon is-blue">
             <AppstoreOutlined />
@@ -456,19 +470,21 @@ function ServicesPage() {
           <div className="service-stat-info">
             <div className="service-stat-label">Đang áp dụng</div>
             <div className="service-stat-value is-active">{stats.active}</div>
+            <div className="service-stat-hint is-active">Sẵn sàng chỉ định</div>
           </div>
           <div className="service-stat-icon is-green">
-            <DollarOutlined />
+            <CheckCircleOutlined />
           </div>
         </div>
 
         <div className="service-stat-card">
           <div className="service-stat-info">
             <div className="service-stat-label">Đã cấu hình giá</div>
-            <div className="service-stat-value">{stats.priced}</div>
+            <div className="service-stat-value is-priced">{stats.priced}</div>
+            <div className="service-stat-hint">Có mức giá niêm yết</div>
           </div>
           <div className="service-stat-icon is-cyan">
-            <HistoryOutlined />
+            <DollarOutlined />
           </div>
         </div>
 
@@ -476,9 +492,10 @@ function ServicesPage() {
           <div className="service-stat-info">
             <div className="service-stat-label">Tạm ngừng</div>
             <div className="service-stat-value is-inactive">{stats.inactive}</div>
+            <div className="service-stat-hint is-inactive">Chưa kích hoạt</div>
           </div>
           <div className="service-stat-icon is-red">
-            <EditOutlined />
+            <StopOutlined />
           </div>
         </div>
       </div>
@@ -487,7 +504,7 @@ function ServicesPage() {
       <div className="services-toolbar">
         <div className="services-search-box">
           <Input
-            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            prefix={<SearchOutlined className="services-search-icon" />}
             placeholder="Tìm theo tên dịch vụ hoặc mã dịch vụ..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -502,6 +519,7 @@ function ServicesPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             buttonStyle="solid"
             size="middle"
+            className="services-filter-radio"
           >
             <Radio.Button value="ALL">Tất cả ({services.length})</Radio.Button>
             <Radio.Button value="ACTIVE">Đang áp dụng ({stats.active})</Radio.Button>
@@ -511,7 +529,7 @@ function ServicesPage() {
           <Select
             value={sortBy}
             onChange={setSortBy}
-            style={{ width: 170 }}
+            className="services-sort-select"
             size="middle"
             placeholder="Sắp xếp"
           >

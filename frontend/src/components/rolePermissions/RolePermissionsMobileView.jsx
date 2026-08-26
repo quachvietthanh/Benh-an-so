@@ -1,6 +1,13 @@
 import React from 'react'
 import { Badge, Button, Card, Checkbox, Empty, Progress, Space, Switch, Tag, Typography } from 'antd'
-import { CheckCircleFilled, SaveOutlined, UndoOutlined } from '@ant-design/icons'
+import {
+  CheckCircleFilled,
+  DownOutlined,
+  RightOutlined,
+  SaveOutlined,
+  SettingOutlined,
+  UndoOutlined,
+} from '@ant-design/icons'
 import {
   MODULE_ICONS,
   getModuleDisplayName,
@@ -18,6 +25,8 @@ function RolePermissionsMobileView({
   setMobileSelectedRoleId,
   mobileRole,
   groupedPermissions,
+  expandedModules,
+  onToggleExpandModule,
   originalPermissionsByRole,
   draftPermissionsByRole,
   isRoleDirty,
@@ -39,7 +48,6 @@ function RolePermissionsMobileView({
 
   return (
     <div className="visible-mobile">
-      {/* MOBILE ROLE SELECTOR TABS */}
       <div
         style={{
           display: 'flex',
@@ -102,7 +110,6 @@ function RolePermissionsMobileView({
         })}
       </div>
 
-      {/* MOBILE ACTIVE ROLE BANNER */}
       {mobileRole && (
         <Card
           size="small"
@@ -165,16 +172,16 @@ function RolePermissionsMobileView({
         </Card>
       )}
 
-      {/* MOBILE MODULES & PERMISSION ACCORDIONS */}
       {moduleKeys.length === 0 ? (
         <Card style={{ borderRadius: 10, textAlign: 'center', padding: '24px 0' }}>
-          <Empty description="Không tìm thấy quyền chức năng nào." />
+          <Empty description="Không tìm thấy quyền chức nào." />
         </Card>
       ) : (
         moduleKeys.map((modKey) => {
           const permsInMod = groupedPermissions[modKey] || []
           const modTitle = getModuleDisplayName(modKey)
-          const modIcon = MODULE_ICONS[modKey] || <CheckCircleFilled />
+          const modIcon = MODULE_ICONS[modKey] || <SettingOutlined />
+          const isExpanded = expandedModules ? expandedModules.has(modKey) : true
           const checkState = mobileRole ? getModuleCheckState(mobileRole.id, permsInMod) : {}
 
           return (
@@ -188,91 +195,102 @@ function RolePermissionsMobileView({
               }}
               bodyStyle={{ padding: 0 }}
             >
-              {/* Module Header */}
               <div
                 style={{
                   padding: '10px 14px',
                   backgroundColor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0',
+                  borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none',
                 }}
+                onClick={() => onToggleExpandModule && onToggleExpandModule(modKey)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center' }}>
+                    {isExpanded ? <DownOutlined /> : <RightOutlined />}
+                  </span>
                   <span>{modIcon}</span>
                   <Text strong style={{ fontSize: 13, color: '#1e293b' }}>
                     {modTitle}
                   </Text>
+                  <Tag style={{ margin: 0, fontSize: 10, borderRadius: 8 }}>
+                    {permsInMod.length}
+                  </Tag>
                 </div>
 
                 {mobileRole && (
-                  <Checkbox
-                    checked={checkState.all}
-                    indeterminate={checkState.indeterminate}
-                    disabled={!canUpdate || isSaving}
-                    onChange={() => onToggleModuleForRole(mobileRole.id, permsInMod)}
-                  >
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
-                      {checkState.checkedCount}/{checkState.total}
-                    </span>
-                  </Checkbox>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={checkState.all}
+                      indeterminate={checkState.indeterminate}
+                      disabled={!canUpdate || isSaving}
+                      onChange={() => onToggleModuleForRole(mobileRole.id, permsInMod)}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        {checkState.checkedCount}/{checkState.total}
+                      </span>
+                    </Checkbox>
+                  </div>
                 )}
               </div>
 
-              {/* Permissions list */}
-              <div style={{ padding: '4px 14px' }}>
-                {permsInMod.map((perm, idx) => {
-                  const details = getPermissionDetails(perm)
-                  const isAssigned = mobileRole
-                    ? (draftPermissionsByRole[mobileRole.id] || new Set()).has(perm.code)
-                    : false
-                  const isPermDirty = mobileRole ? isPermissionDirtyInRole(mobileRole.id, perm.code) : false
-                  const isLast = idx === permsInMod.length - 1
+              {isExpanded && (
+                <div style={{ padding: '4px 14px' }}>
+                  {permsInMod.map((perm, idx) => {
+                    const details = getPermissionDetails(perm)
+                    const isAssigned = mobileRole
+                      ? (draftPermissionsByRole[mobileRole.id] || new Set()).has(perm.code)
+                      : false
+                    const isPermDirty = mobileRole ? isPermissionDirtyInRole(mobileRole.id, perm.code) : false
+                    const isLast = idx === permsInMod.length - 1
 
-                  return (
-                    <div
-                      key={perm.id || perm.code}
-                      style={{
-                        padding: '10px 0',
-                        borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 12,
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <Text strong style={{ fontSize: 13, color: '#0f172a' }}>
-                            {details.title}
-                          </Text>
-                          <Tag style={{ fontSize: 10, fontFamily: 'monospace', margin: 0 }}>
-                            {perm.code}
-                          </Tag>
+                    return (
+                      <div
+                        key={perm.id || perm.code}
+                        style={{
+                          padding: '10px 0',
+                          borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text strong style={{ fontSize: 13, color: '#0f172a' }}>
+                              {details.title}
+                            </Text>
+                            <Tag style={{ fontSize: 10, fontFamily: 'monospace', margin: 0 }}>
+                              {perm.code}
+                            </Tag>
+                          </div>
+                          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                            {details.desc}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                          {details.desc}
-                        </div>
+
+                        {mobileRole && (
+                          <Switch
+                            size="small"
+                            checked={isAssigned}
+                            disabled={!canUpdate || perm.active === false || isSaving}
+                            onChange={() => onTogglePermission(mobileRole.id, perm.code, perm.active)}
+                            style={{
+                              backgroundColor: isAssigned ? '#2563eb' : '#cbd5e1',
+                              boxShadow: isPermDirty ? '0 0 0 2px #f59e0b' : undefined,
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
                       </div>
-
-                      {mobileRole && (
-                        <Switch
-                          size="small"
-                          checked={isAssigned}
-                          disabled={!canUpdate || perm.active === false || isSaving}
-                          onChange={() => onTogglePermission(mobileRole.id, perm.code, perm.active)}
-                          style={{
-                            backgroundColor: isAssigned ? '#2563eb' : '#cbd5e1',
-                            boxShadow: isPermDirty ? '0 0 0 2px #f59e0b' : undefined,
-                            flexShrink: 0,
-                          }}
-                        />
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </Card>
           )
         })

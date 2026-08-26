@@ -85,7 +85,7 @@ function PharmacyPage() {
   const userPermissions = useMemo(() => {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
-  const canDispense = userPermissions.includes('PHARMACY_READ') || userPermissions.includes('PRESCRIPTION_READ') || roles.includes('pharmacist') || roles.includes('admin')
+  const canDispense = (userPermissions.includes('PHARMACY_READ') || roles.includes('pharmacist') || roles.includes('admin')) && !roles.includes('doctor')
 
   const [prescriptions, setPrescriptions] = useState([])
   const [prescriptionPage, setPrescriptionPage] = useState(0)
@@ -108,6 +108,7 @@ function PharmacyPage() {
   const inventoryRequestIdRef = useRef(0)
 
   const loadPrescriptionPage = useCallback(async (pageNumber) => {
+    if (!canDispense) return
     const requestId = prescriptionRequestIdRef.current + 1
     prescriptionRequestIdRef.current = requestId
     setPrescriptionLoading(true)
@@ -162,16 +163,19 @@ function PharmacyPage() {
       })
     } catch (error) {
       if (requestId === prescriptionRequestIdRef.current) {
-        setPrescriptionLoadError(getErrorMessage(error, 'Không thể tải danh sách đơn chờ cấp phát.'))
+        if (error?.response?.status !== 403) {
+          setPrescriptionLoadError(getErrorMessage(error, 'Không thể tải danh sách đơn chờ cấp phát.'))
+        }
       }
     } finally {
       if (requestId === prescriptionRequestIdRef.current) {
         setPrescriptionLoading(false)
       }
     }
-  }, [])
+  }, [canDispense])
 
   const loadInventoryData = useCallback(async () => {
+    if (!canDispense) return
     const requestId = inventoryRequestIdRef.current + 1
     inventoryRequestIdRef.current = requestId
     setInventoryLoading(true)
@@ -199,14 +203,16 @@ function PharmacyPage() {
       }
     } catch (error) {
       if (requestId === inventoryRequestIdRef.current) {
-        setInventoryLoadError(getErrorMessage(error, 'Không thể tải dữ liệu tồn kho từ máy chủ.'))
+        if (error?.response?.status !== 403) {
+          setInventoryLoadError(getErrorMessage(error, 'Không thể tải dữ liệu tồn kho từ máy chủ.'))
+        }
       }
     } finally {
       if (requestId === inventoryRequestIdRef.current) {
         setInventoryLoading(false)
       }
     }
-  }, [])
+  }, [canDispense])
 
   const loadData = useCallback(() => Promise.all([
     loadPrescriptionPage(prescriptionPage),
@@ -214,12 +220,16 @@ function PharmacyPage() {
   ]), [loadInventoryData, loadPrescriptionPage, prescriptionPage])
 
   useEffect(() => {
-    loadPrescriptionPage(prescriptionPage)
-  }, [loadPrescriptionPage, prescriptionPage])
+    if (canDispense) {
+      loadPrescriptionPage(prescriptionPage)
+    }
+  }, [canDispense, loadPrescriptionPage, prescriptionPage])
 
   useEffect(() => {
-    loadInventoryData()
-  }, [loadInventoryData])
+    if (canDispense) {
+      loadInventoryData()
+    }
+  }, [canDispense, loadInventoryData])
 
   const loading = prescriptionLoading || inventoryLoading
   const loadError = [prescriptionLoadError, inventoryLoadError].filter(Boolean).join(' ')
@@ -381,6 +391,24 @@ function PharmacyPage() {
   ]
 
   const eligibleBatchCount = batches.filter((batch) => batch.eligibleForDispense !== false && batch.status !== 'EXPIRED').length
+
+  if (!canDispense) {
+    return (
+      <div style={{ paddingBottom: 32 }}>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+          <div>
+            <Title level={2} style={{ margin: 0 }}>
+              <MedicineBoxOutlined /> Cấp phát thuốc
+            </Title>
+            <Text type="secondary">Xử lý đơn chờ cấp phát và xem trước phân bổ lô theo FEFO.</Text>
+          </div>
+        </div>
+        <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px', marginTop: 16 }}>
+          <Empty description="Tài khoản của bạn không có quyền truy cập nghiệp vụ Cấp phát thuốc." />
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -749,17 +777,16 @@ function PharmacyPage() {
                     cancelText="Kiểm tra lại"
                     okButtonProps={{
                       type: 'primary',
-                      size: 'large',
                       icon: <CheckCircleOutlined />,
-                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 600 },
+                      style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                     }}
                     cancelButtonProps={{
-                      size: 'large',
                       icon: <RollbackOutlined />,
-                      style: { height: 40, minWidth: 170, borderRadius: 8, fontWeight: 500 },
+                      style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                     }}
                     onConfirm={handleDispense}
                     disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                    overlayClassName="dispense-confirm-popconfirm"
                     overlayStyle={{ maxWidth: 500 }}
                   >
                     <Button

@@ -4,13 +4,18 @@ import java.util.List;
 import java.util.UUID;
 
 public record ReplaceMedicalRecordDiagnosesCommand(
-        DiagnosisCommand primaryDiagnosis,
-        List<DiagnosisCommand> secondaryDiagnoses
+        PrimaryDiagnosisCommand primaryDiagnosis,
+        List<SecondaryDiagnosisCommand> secondaryDiagnoses
 ) {
 
-    public record DiagnosisCommand(
+    public record PrimaryDiagnosisCommand(
             UUID diagnosisCatalogId,
-            String code,
+            String note
+    ) {
+    }
+
+    public record SecondaryDiagnosisCommand(
+            UUID diagnosisCatalogId,
             String name,
             String note
     ) {

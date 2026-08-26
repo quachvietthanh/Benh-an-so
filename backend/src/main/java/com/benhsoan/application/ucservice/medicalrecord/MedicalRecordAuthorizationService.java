@@ -16,6 +16,7 @@ public class MedicalRecordAuthorizationService {
 
     private final CurrentUserPort currentUserPort;
     private final PermissionEvaluator permissionEvaluator;
+    private final MedicalRecordAuthorizationAuditService authorizationAuditService;
 
     public UUID requireReadAccess() {
         if (!currentUserPort.hasRole("ADMIN")
@@ -38,6 +39,30 @@ public class MedicalRecordAuthorizationService {
             throw new MedicalRecordAccessDeniedException();
         }
         return currentUserPort.getCurrentUserId();
+    }
+
+    public UUID requireDiagnosisWriteAccess(UUID medicalRecordId) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("DOCTOR") || currentUserPort.hasRole("ADMIN")) {
+            authorizationAuditService.recordDiagnosisWriteDenied(actorId, medicalRecordId);
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return actorId;
+    }
+
+    public void requireDiagnosisVisitWriteAccess(UUID actorId, UUID visitDoctorId, UUID medicalRecordId) {
+        if (!actorId.equals(visitDoctorId)) {
+            authorizationAuditService.recordDiagnosisWriteDenied(actorId, medicalRecordId);
+            throw new MedicalRecordAccessDeniedException();
+        }
+    }
+
+    public UUID requireAmendAccess(UUID visitDoctorId) {
+        UUID userId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("DOCTOR") || !visitDoctorId.equals(userId)) {
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return userId;
     }
 
     public UUID requireAuditReadAccess() {
