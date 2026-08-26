@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,8 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.auth.UserSession;
+import com.benhsoan.domain.auth.exception.EmailAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.enums.Gender;
@@ -35,11 +38,15 @@ import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
+import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.authSecurity.PasswordEncoderPort;
+import com.benhsoan.port.outbound.authSecurity.RefreshTokenGeneratorPort;
+import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
 import com.benhsoan.port.outbound.generator.PatientCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -60,6 +67,10 @@ class PatientPortalRegistrationServiceTest {
     @Mock private PatientCodeGenerator patientCodeGenerator;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private ClockPort clockPort;
+    @Mock private JwtTokenPort jwtTokenPort;
+    @Mock private RefreshTokenGeneratorPort refreshTokenGeneratorPort;
+    @Mock private TokenHashPort tokenHashPort;
+    @Mock private UserSessionRepository userSessionRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -69,12 +80,20 @@ class PatientPortalRegistrationServiceTest {
     void setUp() {
         service = new PatientPortalRegistrationService(
                 userRepository, roleRepository, patientRepository, passwordEncoderPort,
-                patientCodeGenerator, auditLogRepository, clockPort, objectMapper);
+                patientCodeGenerator, auditLogRepository, clockPort, objectMapper,
+                jwtTokenPort, refreshTokenGeneratorPort, tokenHashPort, userSessionRepository);
     }
 
     private PatientPortalRegistrationCommand command() {
         return new PatientPortalRegistrationCommand(
-                PHONE, PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null);
+                PHONE, PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null, null);
+    }
+
+    private void stubTokenIssuance() {
+        when(refreshTokenGeneratorPort.generate()).thenReturn("refresh-token");
+        when(tokenHashPort.hash("refresh-token")).thenReturn("hashed-refresh");
+        when(userSessionRepository.save(any(UserSession.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtTokenPort.generateToken(any(), any(), any(), any(), any(), any())).thenReturn("access-token");
     }
 
     @Test
@@ -84,6 +103,7 @@ class PatientPortalRegistrationServiceTest {
 
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
 
         Patient existing = mock(Patient.class);
         when(existing.getUserId()).thenReturn(null);
@@ -91,17 +111,22 @@ class PatientPortalRegistrationServiceTest {
         when(existing.getFullName()).thenReturn(FULL_NAME);
 
         when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
 
         PatientPortalRegistrationResult result = service.register(command());
 
         assertEquals(patientId, result.patientId());
         assertEquals(PHONE, result.phone());
+        assertNotNull(result.accessToken());
+        assertNotNull(result.refreshToken());
+        assertEquals("Bearer", result.tokenType());
 
         verify(existing).linkUser(any(UUID.class));
         verify(patientRepository).save(existing);
@@ -113,8 +138,10 @@ class PatientPortalRegistrationServiceTest {
 
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
 
         when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -122,10 +149,13 @@ class PatientPortalRegistrationServiceTest {
         when(patientCodeGenerator.generate()).thenReturn("BN000123");
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
 
         PatientPortalRegistrationResult result = service.register(command());
 
         assertNotNull(result.patientId());
+        assertNotNull(result.accessToken());
+        assertNotNull(result.refreshToken());
 
         ArgumentCaptor<Patient> captor = ArgumentCaptor.forClass(Patient.class);
         verify(patientRepository).save(captor.capture());
@@ -151,7 +181,7 @@ class PatientPortalRegistrationServiceTest {
     void rejectsInvalidPhoneFormat() {
         assertThrows(ValidationException.class,
                 () -> service.register(new PatientPortalRegistrationCommand(
-                        "12345", PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null)));
+                        "12345", PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null, null)));
     }
 
     @Test
@@ -161,6 +191,7 @@ class PatientPortalRegistrationServiceTest {
 
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
 
         Patient existing = mock(Patient.class);
         when(existing.getUserId()).thenReturn(null);
@@ -168,12 +199,14 @@ class PatientPortalRegistrationServiceTest {
         when(existing.getFullName()).thenReturn(FULL_NAME);
 
         when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
 
         service.register(command());
 
@@ -198,6 +231,7 @@ class PatientPortalRegistrationServiceTest {
 
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
 
         Patient existing = mock(Patient.class);
         when(existing.getUserId()).thenReturn(null);
@@ -205,17 +239,19 @@ class PatientPortalRegistrationServiceTest {
         when(existing.getFullName()).thenReturn(FULL_NAME);
 
         when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
 
         PatientPortalRegistrationResult result = service.register(
                 new PatientPortalRegistrationCommand(
                         "+84345678910", PASSWORD, FULL_NAME,
-                        LocalDate.of(1990, 1, 1), Gender.FEMALE, null));
+                        LocalDate.of(1990, 1, 1), Gender.FEMALE, null, null));
 
         assertEquals(patientId, result.patientId());
         assertEquals(PHONE, result.phone());
@@ -230,7 +266,7 @@ class PatientPortalRegistrationServiceTest {
         assertThrows(PatientAlreadyExistsException.class,
                 () -> service.register(new PatientPortalRegistrationCommand(
                         PHONE, PASSWORD, FULL_NAME,
-                        LocalDate.of(1990, 1, 1), Gender.FEMALE, "001122334455")));
+                        LocalDate.of(1990, 1, 1), Gender.FEMALE, "001122334455", null)));
     }
 
     @Test
@@ -239,6 +275,7 @@ class PatientPortalRegistrationServiceTest {
 
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
 
         Patient byIdentity = mock(Patient.class);
         when(byIdentity.getUserId()).thenReturn(null);
@@ -251,16 +288,18 @@ class PatientPortalRegistrationServiceTest {
         when(other.getIdentityNumber()).thenReturn(null);
 
         when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(other, byIdentity));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
 
         service.register(new PatientPortalRegistrationCommand(
                 PHONE, PASSWORD, FULL_NAME,
-                LocalDate.of(1990, 1, 1), Gender.FEMALE, "001122334455"));
+                LocalDate.of(1990, 1, 1), Gender.FEMALE, "001122334455", null));
 
         verify(byIdentity).linkUser(any(UUID.class));
         verify(other, never()).linkUser(any(UUID.class));
@@ -280,5 +319,50 @@ class PatientPortalRegistrationServiceTest {
                 .thenThrow(new DataIntegrityViolationException("uk_users_phone"));
 
         assertThrows(PhoneAlreadyExistsException.class, () -> service.register(command()));
+    }
+
+    @Test
+    void registersWithCustomEmail() {
+        UUID roleId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail("patient@example.com")).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of());
+        when(patientCodeGenerator.generate()).thenReturn("BN000123");
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
+
+        PatientPortalRegistrationResult result = service.register(
+                new PatientPortalRegistrationCommand(
+                        PHONE, PASSWORD, FULL_NAME,
+                        LocalDate.of(1990, 1, 1), Gender.FEMALE, null, "patient@example.com"));
+
+        assertNotNull(result.accessToken());
+        assertNotNull(result.refreshToken());
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals("patient@example.com", captor.getValue().getEmail());
+    }
+
+    @Test
+    void rejectsDuplicateCustomEmailWithConflict() {
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail("patient@example.com")).thenReturn(true);
+
+        assertThrows(EmailAlreadyExistsException.class,
+                () -> service.register(new PatientPortalRegistrationCommand(
+                        PHONE, PASSWORD, FULL_NAME,
+                        LocalDate.of(1990, 1, 1), Gender.FEMALE, null, "patient@example.com")));
+
+        verify(userRepository, never()).save(any(User.class));
     }
 }

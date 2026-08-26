@@ -16,7 +16,9 @@ public record PatientPortalRegistrationCommand(
 
         Gender gender,
 
-        String identityNumber
+        String identityNumber,
+
+        String email
 
 ) {
 }

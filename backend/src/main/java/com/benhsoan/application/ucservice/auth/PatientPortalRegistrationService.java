@@ -1,5 +1,7 @@
 package com.benhsoan.application.ucservice.auth;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +19,8 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.auth.UserSession;
+import com.benhsoan.domain.auth.exception.EmailAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.patient.Patient;
@@ -25,11 +29,15 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
 import com.benhsoan.port.inbound.auth.PatientPortalRegistrationUseCase;
+import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.authSecurity.PasswordEncoderPort;
+import com.benhsoan.port.outbound.authSecurity.RefreshTokenGeneratorPort;
+import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
 import com.benhsoan.port.outbound.generator.PatientCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -49,8 +57,10 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
 
     private static final String PATIENT_ROLE = "PATIENT";
     private static final String REGISTRATION_METHOD = "SELF_PORTAL_REGISTRATION";
+    private static final String TOKEN_TYPE = "Bearer";
     private static final String DUPLICATE_PHONE_MESSAGE =
             "Số điện thoại đã được đăng ký tài khoản. Vui lòng đăng nhập.";
+    private static final Duration REFRESH_TOKEN_TIMEOUT = Duration.ofDays(7);
     private static final Pattern VIETNAMESE_MOBILE =
             Pattern.compile("^(0|\\+84)(3|5|7|8|9)[0-9]{8}$");
 
@@ -62,14 +72,23 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
     private final AuditLogRepository auditLogRepository;
     private final ClockPort clockPort;
     private final ObjectMapper objectMapper;
+    private final JwtTokenPort jwtTokenPort;
+    private final RefreshTokenGeneratorPort refreshTokenGeneratorPort;
+    private final TokenHashPort tokenHashPort;
+    private final UserSessionRepository userSessionRepository;
 
     @Override
     public PatientPortalRegistrationResult register(PatientPortalRegistrationCommand command) {
 
         String phone = normalizePhone(command.phone());
+        String email = resolveEmail(command, phone);
 
         if (userRepository.existsByPhone(phone)) {
             throw new PhoneAlreadyExistsException(DUPLICATE_PHONE_MESSAGE);
+        }
+
+        if (userRepository.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException();
         }
 
         if (command.identityNumber() != null
@@ -87,7 +106,7 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
                     phone,
                     passwordEncoderPort.encode(command.password()),
                     command.fullName(),
-                    phone + "@benhsoan.com",
+                    email,
                     phone,
                     role.getId()
             );
@@ -103,6 +122,25 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
 
             Patient saved = patientRepository.save(patient);
 
+            Instant now = clockPort.now();
+
+            String refreshToken = refreshTokenGeneratorPort.generate();
+            UserSession session = UserSession.create(
+                    savedUser.getId(),
+                    tokenHashPort.hash(refreshToken),
+                    now.plus(REFRESH_TOKEN_TIMEOUT)
+            );
+            userSessionRepository.save(session);
+
+            String accessToken = jwtTokenPort.generateToken(
+                    savedUser.getId(),
+                    session.getId(),
+                    savedUser.getUsername(),
+                    role.getName(),
+                    role.getPermissions().stream().map(permission -> permission.getCode()).collect(java.util.stream.Collectors.toSet()),
+                    saved.getId()
+            );
+
             auditLogRepository.save(AuditLog.create(
                     savedUser.getId(),
                     ActionType.CREATE,
@@ -110,19 +148,29 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
                     saved.getId(),
                     auditDetail(saved, phone),
                     null,
-                    clockPort.now()
+                    now
             ));
 
             return new PatientPortalRegistrationResult(
                     savedUser.getId(),
                     saved.getId(),
                     phone,
-                    saved.getFullName()
+                    saved.getFullName(),
+                    accessToken,
+                    refreshToken,
+                    TOKEN_TYPE
             );
 
         } catch (DataIntegrityViolationException ex) {
             throw new PhoneAlreadyExistsException(DUPLICATE_PHONE_MESSAGE);
         }
+    }
+
+    private String resolveEmail(PatientPortalRegistrationCommand command, String phone) {
+        if (command.email() != null && !command.email().isBlank()) {
+            return command.email().trim();
+        }
+        return phone + "@benhsoan.com";
     }
 
     private Patient linkCandidate(Patient candidate, UUID userId) {
