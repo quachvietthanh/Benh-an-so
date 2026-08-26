@@ -43,6 +43,12 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByPhone(String phone) {
+        return jpaRepository.findByPhone(phone)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<User> findByEmail(String email) {
         return jpaRepository.findByEmail(email)
                 .map(mapper::toDomain);
