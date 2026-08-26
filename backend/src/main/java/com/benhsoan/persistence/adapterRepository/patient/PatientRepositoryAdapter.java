@@ -90,6 +90,12 @@ public class PatientRepositoryAdapter implements PatientRepository {
     }
 
     @Override
+    public Optional<Patient> findByPhone(String phone) {
+        return jpaRepository.findByPhone(phone)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Patient> findByIdForUpdate(UUID patientId) {
         return jpaRepository.findByIdForUpdate(patientId)
                 .map(mapper::toDomain);

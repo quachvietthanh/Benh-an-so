@@ -28,6 +28,8 @@ public interface PatientRepository {
 
     Optional<Patient> findByUserId(UUID userId);
 
+    Optional<Patient> findByPhone(String phone);
+
     Optional<Patient> findByIdForUpdate(UUID patientId);
     
     Page<Patient> search( SearchPatientCommand command);

@@ -1,0 +1,190 @@
+package com.benhsoan.application.ucservice.auth;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.auth.Role;
+import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
+import com.benhsoan.domain.patient.Patient;
+import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
+import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
+import com.benhsoan.port.outbound.authSecurity.PasswordEncoderPort;
+import com.benhsoan.port.outbound.generator.PatientCodeGenerator;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
+import com.benhsoan.port.outbound.time.ClockPort;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+@ExtendWith(MockitoExtension.class)
+class PatientPortalRegistrationServiceTest {
+
+    private static final Instant NOW = Instant.parse("2026-08-26T02:00:00Z");
+    private static final String PHONE = "0345678910";
+    private static final String PASSWORD = "secret";
+    private static final String FULL_NAME = "Nguyen Van A";
+
+    @Mock private UserRepository userRepository;
+    @Mock private RoleRepository roleRepository;
+    @Mock private PatientRepository patientRepository;
+    @Mock private PasswordEncoderPort passwordEncoderPort;
+    @Mock private PatientCodeGenerator patientCodeGenerator;
+    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private ClockPort clockPort;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private PatientPortalRegistrationService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new PatientPortalRegistrationService(
+                userRepository, roleRepository, patientRepository, passwordEncoderPort,
+                patientCodeGenerator, auditLogRepository, clockPort, objectMapper);
+    }
+
+    private PatientPortalRegistrationCommand command() {
+        return new PatientPortalRegistrationCommand(
+                PHONE, PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null);
+    }
+
+    @Test
+    void linksExistingPatientWhenPhoneMatches() throws Exception {
+        UUID roleId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+
+        Patient existing = mock(Patient.class);
+        when(existing.getUserId()).thenReturn(null);
+        when(existing.getId()).thenReturn(patientId);
+        when(existing.getFullName()).thenReturn(FULL_NAME);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findByPhone(PHONE)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+
+        PatientPortalRegistrationResult result = service.register(command());
+
+        assertEquals(patientId, result.patientId());
+        assertEquals(PHONE, result.phone());
+
+        verify(existing).linkUser(any(UUID.class));
+        verify(patientRepository).save(existing);
+    }
+
+    @Test
+    void createsNewPatientWhenPhoneNotRegistered() throws Exception {
+        UUID roleId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findByPhone(PHONE)).thenReturn(Optional.empty());
+        when(patientCodeGenerator.generate()).thenReturn("BN000123");
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+
+        PatientPortalRegistrationResult result = service.register(command());
+
+        assertNotNull(result.patientId());
+
+        ArgumentCaptor<Patient> captor = ArgumentCaptor.forClass(Patient.class);
+        verify(patientRepository).save(captor.capture());
+        Patient created = captor.getValue();
+        assertEquals("BN000123", created.getPatientCode());
+        assertNotNull(created.getUserId());
+        assertEquals(PHONE, created.getPhone());
+    }
+
+    @Test
+    void rejectsDuplicatePhoneWithConflict() {
+        when(userRepository.existsByPhone(PHONE)).thenReturn(true);
+
+        PhoneAlreadyExistsException ex = assertThrows(
+                PhoneAlreadyExistsException.class,
+                () -> service.register(command()));
+
+        assertEquals("Số điện thoại đã được đăng ký tài khoản. Vui lòng đăng nhập.", ex.getMessage());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void rejectsInvalidPhoneFormat() {
+        assertThrows(ValidationException.class,
+                () -> service.register(new PatientPortalRegistrationCommand(
+                        "12345", PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null)));
+    }
+
+    @Test
+    void recordsRegistrationAuditLog() throws Exception {
+        UUID roleId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+
+        Patient existing = mock(Patient.class);
+        when(existing.getUserId()).thenReturn(null);
+        when(existing.getId()).thenReturn(patientId);
+        when(existing.getFullName()).thenReturn(FULL_NAME);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findByPhone(PHONE)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+
+        service.register(command());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        AuditLog log = captor.getValue();
+        assertEquals(ActionType.CREATE, log.getActionType());
+        assertEquals(ResourceType.PATIENT_PORTAL, log.getResourceType());
+        assertEquals(patientId, log.getResourceId());
+
+        JsonNode node = objectMapper.readTree(log.getDetail());
+        assertEquals("SELF_PORTAL_REGISTRATION", node.get("method").asText());
+        assertEquals(PHONE, node.get("phone").asText());
+        assertEquals(patientId.toString(), node.get("patientId").asText());
+        assertEquals(NOW.toString(), node.get("registeredAt").asText());
+    }
+}
