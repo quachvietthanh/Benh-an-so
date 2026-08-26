@@ -20,11 +20,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MedicalRecord {
 
-    private UUID id, visitId, signedBy, lockedBy, createdBy, updatedBy;
+    private UUID id, visitId, signedBy, lockedBy, createdBy, updatedBy, appliedTemplateVersionId, templateAppliedBy;
     private String chiefComplaint, symptoms, medicalHistory, physicalExamination, clinicalProgress, treatmentPlan, doctorInstructions, conclusion;
     private String signatureData;
     private MedicalRecordStatus status;
-    private Instant signedAt, lockedAt, createdAt, updatedAt;
+    private Instant signedAt, lockedAt, createdAt, updatedAt, templateAppliedAt;
 
     private MedicalRecord(
             UUID id,
@@ -46,7 +46,10 @@ public class MedicalRecord {
             UUID createdBy,
             Instant createdAt,
             UUID updatedBy,
-            Instant updatedAt
+            Instant updatedAt,
+            UUID appliedTemplateVersionId,
+            UUID templateAppliedBy,
+            Instant templateAppliedAt
     ) {
         this.id = Objects.requireNonNull(id);
         this.visitId = Objects.requireNonNull(visitId);
@@ -68,6 +71,9 @@ public class MedicalRecord {
         this.createdAt = Objects.requireNonNull(createdAt);
         this.updatedBy = updatedBy;
         this.updatedAt = updatedAt;
+        this.appliedTemplateVersionId = appliedTemplateVersionId;
+        this.templateAppliedBy = templateAppliedBy;
+        this.templateAppliedAt = templateAppliedAt;
     }
 
     public static MedicalRecord create(
@@ -102,6 +108,9 @@ public class MedicalRecord {
                 null,
                 createdBy,
                 Objects.requireNonNull(createdAt),
+                null,
+                null,
+                null,
                 null,
                 null
         );
@@ -149,8 +158,24 @@ public class MedicalRecord {
                 createdBy,
                 createdAt,
                 updatedBy,
-                updatedAt
+                updatedAt,
+                null,
+                null,
+                null
         );
+    }
+
+    public static MedicalRecord restore(
+            UUID id, UUID visitId, String chiefComplaint, String symptoms, String medicalHistory,
+            String physicalExamination, String clinicalProgress, String treatmentPlan, String doctorInstructions,
+            String conclusion, MedicalRecordStatus status, String signatureData, Instant signedAt, UUID signedBy,
+            Instant lockedAt, UUID lockedBy, UUID createdBy, Instant createdAt, UUID updatedBy, Instant updatedAt,
+            UUID appliedTemplateVersionId, UUID templateAppliedBy, Instant templateAppliedAt
+    ) {
+        return new MedicalRecord(id, visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, status, signatureData, signedAt,
+                signedBy, lockedAt, lockedBy, createdBy, createdAt, updatedBy, updatedAt, appliedTemplateVersionId,
+                templateAppliedBy, templateAppliedAt);
     }
 
     public static MedicalRecord restore(
@@ -193,7 +218,10 @@ public class MedicalRecord {
                 createdBy,
                 createdAt,
                 updatedBy,
-                updatedAt
+                updatedAt,
+                null,
+                null,
+                null
         );
     }
 
@@ -236,8 +264,20 @@ public class MedicalRecord {
                 createdBy,
                 createdAt,
                 updatedBy,
-                updatedAt
+                updatedAt,
+                null,
+                null,
+                null
         );
+    }
+
+    public void applyTemplateVersion(UUID templateVersionId, UUID appliedBy, Instant appliedAt) {
+        ensureEditable();
+        this.appliedTemplateVersionId = Objects.requireNonNull(templateVersionId);
+        this.templateAppliedBy = Objects.requireNonNull(appliedBy);
+        this.templateAppliedAt = Objects.requireNonNull(appliedAt);
+        this.updatedBy = appliedBy;
+        this.updatedAt = appliedAt;
     }
 
     public void open(UUID by, Instant at) {

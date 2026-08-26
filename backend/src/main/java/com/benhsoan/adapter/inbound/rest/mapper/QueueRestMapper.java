@@ -19,7 +19,8 @@ import com.benhsoan.port.dto.result.QueueItemResult;
 public class QueueRestMapper {
 
     public CheckInWalkInCommand toCommand(CheckInWalkInRequest request) {
-        return new CheckInWalkInCommand(request.patientId(), request.doctorId(), request.reason(), request.note());
+        return new CheckInWalkInCommand(request.patientId(), request.doctorId(), request.reason(), request.note(),
+                request.specialtyId());
     }
 
     public UpdateQueueItemStatusCommand toCommand(UUID queueItemId, UpdateQueueItemStatusRequest request) {

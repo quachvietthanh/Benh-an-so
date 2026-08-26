@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.benhsoan.domain.shared.Guard.Guard;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.specialty.Specialty;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.domain.visit.exception.VisitAlreadyCancelledException;
@@ -28,6 +29,7 @@ public class Visit {
     private UUID doctorId;
     private UUID appointmentId;
     private UUID queueItemId;
+    private UUID specialtyId;
     private VisitType visitType;
     private VisitStatus status;
     private Instant visitAt;
@@ -39,7 +41,7 @@ public class Visit {
     private Instant createdAt;
     private Instant updatedAt;
 
-    private Visit(UUID id, String visitCode, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+    private Visit(UUID id, String visitCode, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, UUID specialtyId,
             VisitType visitType, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
             String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id);
@@ -48,6 +50,7 @@ public class Visit {
         this.doctorId = Objects.requireNonNull(doctorId);
         this.appointmentId = appointmentId;
         this.queueItemId = queueItemId;
+        this.specialtyId = Objects.requireNonNull(specialtyId);
         this.visitType = Objects.requireNonNull(visitType);
         this.status = Objects.requireNonNull(status);
         this.visitAt = Objects.requireNonNull(visitAt);
@@ -61,18 +64,38 @@ public class Visit {
     }
 
     public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy) {
-        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, type, VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy, Instant.now(), null);
+        return create(code, patientId, doctorId, appointmentId, queueItemId, Specialty.GENERAL_ID, type, visitAt, reason, note, createdBy);
+    }
+
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy) {
+        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, specialtyId,
+                type, VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy, Instant.now(), null);
     }
 
     public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
             VisitType type, Instant visitAt, String reason, String note, UUID createdBy, Instant createdAt) {
-        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, type,
+        return create(code, patientId, doctorId, appointmentId, queueItemId, Specialty.GENERAL_ID, type, visitAt,
+                reason, note, createdBy, createdAt);
+    }
+
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy, Instant createdAt) {
+        return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, specialtyId, type,
                 VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy,
                 Objects.requireNonNull(createdAt), null);
     }
 
     public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt, String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
-        return new Visit(id, code, patientId, doctorId, appointmentId, queueItemId, type, status, visitAt, startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
+        return restore(id, code, patientId, doctorId, appointmentId, queueItemId, Specialty.GENERAL_ID, type, status,
+                visitAt, startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
+    }
+
+    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
+            String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return new Visit(id, code, patientId, doctorId, appointmentId, queueItemId, specialtyId, type, status, visitAt,
+                startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
     }
 
     public void start(Instant at) {

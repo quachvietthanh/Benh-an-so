@@ -87,4 +87,13 @@ public class MedicalRecordEntity {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Column(name = "applied_template_version_id", columnDefinition = "BINARY(16)")
+    private UUID appliedTemplateVersionId;
+
+    @Column(name = "template_applied_by", columnDefinition = "BINARY(16)")
+    private UUID templateAppliedBy;
+
+    @Column(name = "template_applied_at")
+    private Instant templateAppliedAt;
 }
