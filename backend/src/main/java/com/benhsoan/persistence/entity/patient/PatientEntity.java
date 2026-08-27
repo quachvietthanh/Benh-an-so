@@ -84,4 +84,25 @@ public class PatientEntity {
 
     @Column(name = "created_by", nullable = false, columnDefinition = "BINARY(16)")
     private UUID createdBy;
+
+    @Column(name = "consent_agreed", nullable = false)
+    private boolean consentAgreed;
+
+    @Column(name = "consent_agreed_at")
+    private Instant consentAgreedAt;
+
+    @Column(name = "consent_version", length = 30)
+    private String consentVersion;
+
+    @Column(name = "consent_withdrawn", nullable = false)
+    private boolean consentWithdrawn;
+
+    @Column(name = "consent_withdrawn_at")
+    private Instant consentWithdrawnAt;
+
+    @Column(name = "consent_withdrawn_reason", length = 500)
+    private String consentWithdrawnReason;
+
+    @Column(name = "non_medical_use_restricted", nullable = false)
+    private boolean nonMedicalUseRestricted;
 }

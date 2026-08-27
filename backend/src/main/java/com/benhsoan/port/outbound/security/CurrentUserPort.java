@@ -10,4 +10,8 @@ public interface CurrentUserPort {
     Set<String> getCurrentUserRoles();
     
     boolean hasRole(String role);
+
+    Set<String> getCurrentUserPermissions();
+
+    boolean hasPermission(String permission);
 }

@@ -108,4 +108,22 @@ public class PatientController {
         return patientRestMapper.toResponse(result);
     }
 
+    @PutMapping("/{patientId}/consent")
+    @RequirePermission("PATIENT_CONSENT_UPDATE")
+    public PatientResponse updateConsent(
+            @PathVariable
+            UUID patientId,
+
+            @Valid
+            @RequestBody
+            com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientConsentRequest request
+    ) {
+        PatientResult result =
+                updatePatientUseCase.update(
+                        patientId,
+                        patientRestMapper.toConsentCommand(request));
+
+        return patientRestMapper.toResponse(result);
+    }
+
 }

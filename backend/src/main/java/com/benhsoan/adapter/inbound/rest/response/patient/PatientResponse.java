@@ -39,6 +39,20 @@ public record PatientResponse(
 
         Instant createdAt,
 
-        Instant updatedAt
+        Instant updatedAt,
+
+        boolean consentAgreed,
+
+        Instant consentAgreedAt,
+
+        String consentVersion,
+
+        boolean consentWithdrawn,
+
+        Instant consentWithdrawnAt,
+
+        String consentWithdrawnReason,
+
+        boolean nonMedicalUseRestricted
 
 ) {}

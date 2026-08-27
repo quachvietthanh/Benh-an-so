@@ -89,7 +89,14 @@ class PatientSecurityIntegrationTest {
                 null,
                 true,
                 Instant.parse("2026-08-12T02:00:00Z"),
-                Instant.parse("2026-08-12T02:00:00Z")
+                Instant.parse("2026-08-12T02:00:00Z"),
+                true,
+                Instant.parse("2026-08-12T02:00:00Z"),
+                "v1.0",
+                false,
+                null,
+                null,
+                false
         );
 
         when(searchPatientUseCase.search(any())).thenReturn(new PageImpl<>(
@@ -136,13 +143,14 @@ class PatientSecurityIntegrationTest {
 
     private static String patientRequest() {
         return """
-                {"fullName":"Nguyen Van A","dateOfBirth":"1995-05-10","gender":"MALE","phone":"0909000001","active":true}
+                {"fullName":"Nguyen Van A","dateOfBirth":"1995-05-10","gender":"MALE","phone":"0909000001","active":true,"consentAgreed":true,"consentVersion":"v1.0"}
                 """;
     }
 
     private static PatientResult patient() {
         return new PatientResult(UUID.randomUUID(), "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10),
                 Gender.MALE, "0909000001", null, "HCM", null, null, null, null, null, true,
-                Instant.parse("2026-08-12T02:00:00Z"), Instant.parse("2026-08-12T02:00:00Z"));
+                Instant.parse("2026-08-12T02:00:00Z"), Instant.parse("2026-08-12T02:00:00Z"),
+                true, Instant.parse("2026-08-12T02:00:00Z"), "v1.0", false, null, null, false);
     }
 }

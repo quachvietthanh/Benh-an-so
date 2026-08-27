@@ -12,6 +12,7 @@ import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.enums.PatientChangeAction;
 import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
+import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
 import com.benhsoan.port.dto.command.patient.RegisterPatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
@@ -54,6 +55,10 @@ public class RegisterPatientService
         String patientCode =
                 patientCodeGenerator.generate();
 
+        boolean consentAgreed = Boolean.TRUE.equals(command.consentAgreed());
+
+        String identityNumber = normalizeIdentityNumber(command.identityNumber());
+
         Patient patient =
                 Patient.create(
                         patientCode,
@@ -63,11 +68,13 @@ public class RegisterPatientService
                         normalizePhone(command.phone()),
                         command.email(),
                         command.address(),
-                        command.identityNumber(),
+                        identityNumber,
                         command.insuranceNumber(),
                         command.bloodType(),
                         command.emergencyContact(),
                         command.emergencyPhone(),
+                        consentAgreed,
+                        command.consentVersion(),
                         currentUserId
                 );
 
@@ -95,27 +102,42 @@ public class RegisterPatientService
                         """
                         {
                         "patientCode":"%s",
-                        "fullName":"%s"
+                        "fullName":"%s",
+                        "consentAgreed":%s,
+                        "consentVersion":"%s"
                         }
                         """
-                        .formatted( patient.getPatientCode(), patient.getFullName()),
+                        .formatted(saved.getPatientCode(), saved.getFullName(), saved.isConsentAgreed(), saved.getConsentVersion()),
                         null
                 )
         );
 
-        return patientResultMapper.toResult(patient);
+        return patientResultMapper.toResult(saved);
     }
 
     private void validate(RegisterPatientCommand command) {
 
-        if (command.identityNumber() != null
-                && patientRepository.existsByIdentityNumber(
-                        command.identityNumber())) {
+        // QTN-24: Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân
+        if (command.consentAgreed() == null || !command.consentAgreed()) {
+            throw new PatientConsentRequiredException("Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân (QTN-24).");
+        }
+
+        String identityNumber = normalizeIdentityNumber(command.identityNumber());
+
+        if (identityNumber != null
+                && patientRepository.existsByIdentityNumber(identityNumber)) {
 
             throw new PatientAlreadyExistsException(
                     "identity number"
             );
         }
+    }
+
+    private String normalizeIdentityNumber(String identityNumber) {
+        if (identityNumber == null || identityNumber.isBlank()) {
+            return null;
+        }
+        return identityNumber.trim();
     }
 
     private String normalizePhone(String phone) {

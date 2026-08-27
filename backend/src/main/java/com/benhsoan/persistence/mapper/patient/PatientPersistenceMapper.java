@@ -32,7 +32,14 @@ public class PatientPersistenceMapper {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 entity.getUserId(),
-                entity.getCreatedBy()
+                entity.getCreatedBy(),
+                entity.isConsentAgreed(),
+                entity.getConsentAgreedAt(),
+                entity.getConsentVersion(),
+                entity.isConsentWithdrawn(),
+                entity.getConsentWithdrawnAt(),
+                entity.getConsentWithdrawnReason(),
+                entity.isNonMedicalUseRestricted()
         );
     }
 
@@ -61,6 +68,13 @@ public class PatientPersistenceMapper {
                 .updatedAt(domain.getUpdatedAt())
                 .userId(domain.getUserId())
                 .createdBy(domain.getCreatedBy())
+                .consentAgreed(domain.isConsentAgreed())
+                .consentAgreedAt(domain.getConsentAgreedAt())
+                .consentVersion(domain.getConsentVersion())
+                .consentWithdrawn(domain.isConsentWithdrawn())
+                .consentWithdrawnAt(domain.getConsentWithdrawnAt())
+                .consentWithdrawnReason(domain.getConsentWithdrawnReason())
+                .nonMedicalUseRestricted(domain.isNonMedicalUseRestricted())
                 .build();
     }
 }

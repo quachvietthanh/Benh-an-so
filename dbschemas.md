@@ -87,6 +87,13 @@ Tài liệu này mô tả schema đang thực sự tồn tại trong repo hiện
 | created_by | UUID FK |
 | created_at | TIMESTAMP |
 | updated_at | TIMESTAMP |
+| consent_agreed | BOOLEAN |
+| consent_agreed_at | TIMESTAMP |
+| consent_version | VARCHAR |
+| consent_withdrawn | BOOLEAN |
+| consent_withdrawn_at | TIMESTAMP |
+| consent_withdrawn_reason | VARCHAR |
+| non_medical_use_restricted | BOOLEAN |
 
 ### visits
 
