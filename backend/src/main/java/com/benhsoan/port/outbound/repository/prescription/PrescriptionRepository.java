@@ -1,6 +1,8 @@
 package com.benhsoan.port.outbound.repository.prescription;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.time.Instant;
 import java.util.UUID;
@@ -24,6 +26,8 @@ public interface PrescriptionRepository {
     Optional<Prescription> findTopByOrderByPrescriptionCodeDesc();
 
     List<Prescription> findByMedicalRecordId(UUID medicalRecordId);
+
+    Map<UUID, Long> countByMedicalRecordIdIn(Collection<UUID> medicalRecordIds);
 
     Page<Prescription> findByStatus(PrescriptionStatus status, Pageable pageable);
 

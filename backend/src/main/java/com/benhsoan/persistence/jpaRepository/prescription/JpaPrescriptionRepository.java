@@ -59,6 +59,18 @@ public interface JpaPrescriptionRepository
             + "where prescription.medicalRecordId = :medicalRecordId")
     List<UUID> findIdsByMedicalRecordId(@Param("medicalRecordId") UUID medicalRecordId);
 
+    @Query("""
+            select new com.benhsoan.persistence.jpaRepository.prescription.PrescriptionCountProjection(
+                prescription.medicalRecordId, count(prescription)
+            )
+            from PrescriptionEntity prescription
+            where prescription.medicalRecordId in :medicalRecordIds
+            group by prescription.medicalRecordId
+            """)
+    List<PrescriptionCountProjection> countByMedicalRecordIdIn(
+            @Param("medicalRecordIds") java.util.Collection<UUID> medicalRecordIds
+    );
+
     @Modifying
     @Query("delete from PrescriptionEntity prescription where prescription.medicalRecordId = :medicalRecordId")
     void deleteByMedicalRecordId(@Param("medicalRecordId") UUID medicalRecordId);

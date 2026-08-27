@@ -1,5 +1,7 @@
 package com.benhsoan.persistence.adapterRepository.medicalrecord;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,6 +44,16 @@ public class MedicalRecordRepositoryAdapter implements MedicalRecordRepository {
     @Override
     public Optional<MedicalRecord> findByVisitId(UUID visitId) {
         return jpaRepository.findByVisitId(visitId).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<MedicalRecord> findByVisitIdIn(Collection<UUID> visitIds) {
+        if (visitIds == null || visitIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findByVisitIdIn(visitIds).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override
