@@ -237,4 +237,25 @@ class PatientConsentIntegrationTest {
 
         verify(updatePatientUseCase).update(any(UUID.class), any(UpdatePatientCommand.class));
     }
+
+    @Test
+    @DisplayName("P2: Người dùng không có quyền PATIENT_UPDATE bị từ chối với 403 Forbidden")
+    void rejectsUpdateWithoutPermissionReturns403() throws Exception {
+        UUID patientId = UUID.randomUUID();
+
+        mockMvc.perform(put("/patients/{patientId}", patientId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Nguyen Van A",
+                                  "dateOfBirth": "1995-05-10",
+                                  "gender": "MALE",
+                                  "phone": "0909000001",
+                                  "active": true,
+                                  "consentWithdrawn": true
+                                }
+                                """)
+                        .with(user("guest").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
+                .andExpect(status().isForbidden());
+    }
 }

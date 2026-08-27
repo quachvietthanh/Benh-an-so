@@ -146,4 +146,40 @@ class PatientTest {
         assertNull(patient.getConsentWithdrawnReason());
         assertFalse(patient.isNonMedicalUseRestricted());
     }
+
+    @Test
+    @DisplayName("P1 Fix: Khôi phục hồ sơ bệnh nhân lịch sử mặc định trạng thái unconsented")
+    void restoreHistoricalPatientDefaultsToUnconsentedState() {
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.now();
+        Patient restored = Patient.restore(
+                id,
+                "BN-OLD-01",
+                "Tran Thi C",
+                LocalDate.of(1985, 3, 15),
+                Gender.FEMALE,
+                "0908887766",
+                "c@example.com",
+                "456 Street",
+                "079085009999",
+                "DN4790850099999",
+                BloodType.A_POSITIVE,
+                "Tran Van D",
+                "0907776655",
+                true,
+                now,
+                now,
+                null,
+                createdBy
+        );
+
+        assertNotNull(restored);
+        assertEquals(id, restored.getId());
+        assertEquals("BN-OLD-01", restored.getPatientCode());
+        assertFalse(restored.isConsentAgreed(), "Dữ liệu lịch sử chưa có consent phải là false");
+        assertNull(restored.getConsentAgreedAt(), "Dữ liệu lịch sử chưa có consentAgreedAt phải là null");
+        assertNull(restored.getConsentVersion());
+        assertFalse(restored.isConsentWithdrawn());
+        assertFalse(restored.isNonMedicalUseRestricted());
+    }
 }

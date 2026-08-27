@@ -107,6 +107,18 @@ public class UpdatePatientService
         }
 
         // Handle consent withdrawal (NCL-15-CN-001-TC-03) or renewal
+        boolean isModifyingConsent = command.consentWithdrawn() != null || command.consentAgreed() != null;
+        if (isModifyingConsent) {
+            boolean isAuthorized = currentUserPort.hasRole("RECEPTIONIST")
+                    || currentUserPort.hasRole("ADMIN")
+                    || currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE");
+            if (!isAuthorized) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Chỉ Lễ tân hoặc Quản trị viên mới có quyền cập nhật hoặc rút phiếu đồng ý xử lý dữ liệu (QTN-24)."
+                );
+            }
+        }
+
         if (Boolean.TRUE.equals(command.consentWithdrawn()) && !patient.isConsentWithdrawn()) {
             patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
         } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {

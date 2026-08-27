@@ -14,6 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.patient.PatientChangeDetailBuilder;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
@@ -24,7 +25,10 @@ import com.benhsoan.domain.auth.exception.EmailAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.patient.Patient;
+import com.benhsoan.domain.patient.PatientChangeLog;
+import com.benhsoan.domain.patient.enums.PatientChangeAction;
 import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
+import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
@@ -38,6 +42,7 @@ import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -46,9 +51,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Patient portal self-registration (NCL-14-CN-001 / QTN-23). Creates a PATIENT {@link User},
- * links it to an existing {@link Patient} by phone or creates a basic patient record, and writes
- * an audit trail (TC-04).
+ * Patient portal self-registration (NCL-14-CN-001 / QTN-23, NCL-15-CN-001 / QTN-24).
+ * Creates a PATIENT {@link User}, links it to an existing {@link Patient} by phone or
+ * creates a basic patient record with validated consent (TC-01..04), and writes audit trails.
  */
 @Service
 @RequiredArgsConstructor
@@ -67,6 +72,8 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PatientRepository patientRepository;
+    private final PatientChangeLogRepository patientChangeLogRepository;
+    private final PatientChangeDetailBuilder patientChangeDetailBuilder;
     private final PasswordEncoderPort passwordEncoderPort;
     private final PatientCodeGenerator patientCodeGenerator;
     private final AuditLogRepository auditLogRepository;
@@ -116,11 +123,23 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
 
             List<Patient> candidates = patientRepository.findAllByPhone(phone);
 
-            Patient patient = candidates.isEmpty()
+            boolean isNewPatient = candidates.isEmpty();
+            Patient patient = isNewPatient
                     ? createPatient(command, phone, userId)
                     : linkCandidate(resolveCandidate(candidates, command), userId);
 
             Patient saved = patientRepository.save(patient);
+
+            if (isNewPatient) {
+                String changeDetail = patientChangeDetailBuilder.forCreate(saved);
+                PatientChangeLog changeLog = PatientChangeLog.create(
+                        saved.getId(),
+                        userId,
+                        PatientChangeAction.CREATE,
+                        changeDetail
+                );
+                patientChangeLogRepository.save(changeLog);
+            }
 
             Instant now = clockPort.now();
 
@@ -204,9 +223,10 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
             }
         }
 
-        if (command.dateOfBirth() != null) {
+        if (command.fullName() != null && command.dateOfBirth() != null) {
             Optional<Patient> byDemographics = unlinked.stream()
-                    .filter(candidate -> command.fullName() != null
+                    .filter(candidate -> candidate.getFullName() != null
+                            && candidate.getDateOfBirth() != null
                             && command.fullName().equalsIgnoreCase(candidate.getFullName())
                             && command.dateOfBirth().equals(candidate.getDateOfBirth()))
                     .findFirst();
@@ -232,6 +252,15 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
             throw new ValidationException("Gender is required.");
         }
 
+        // QTN-24: Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân
+        if (command.consentAgreed() == null || !command.consentAgreed()) {
+            throw new PatientConsentRequiredException("Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân (QTN-24).");
+        }
+
+        String consentVersion = command.consentVersion() != null && !command.consentVersion().isBlank()
+                ? command.consentVersion()
+                : "v1.0";
+
         Patient patient = Patient.create(
                 patientCodeGenerator.generate(),
                 command.fullName(),
@@ -245,6 +274,8 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
                 null,
                 null,
                 null,
+                true,
+                consentVersion,
                 userId
         );
         patient.linkUser(userId);
@@ -268,15 +299,17 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
     }
 
     private String auditDetail(Patient patient, String phone) {
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("method", REGISTRATION_METHOD);
-        detail.put("phone", phone);
-        detail.put("patientId", patient.getId().toString());
-        detail.put("registeredAt", clockPort.now().toString());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("patientId", patient.getId());
+        payload.put("patientCode", patient.getPatientCode());
+        payload.put("phone", phone);
+        payload.put("registrationMethod", REGISTRATION_METHOD);
+        payload.put("consentAgreed", patient.isConsentAgreed());
+        payload.put("consentVersion", patient.getConsentVersion());
         try {
-            return objectMapper.writeValueAsString(detail);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Could not serialize patient registration audit detail.", exception);
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Cannot serialize portal registration audit payload.", ex);
         }
     }
 }

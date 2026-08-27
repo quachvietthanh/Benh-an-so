@@ -2,8 +2,10 @@ package com.benhsoan.application.ucservice.patient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.patient.Patient;
@@ -32,7 +35,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("UpdatePatientService - Unit Tests (NCL-15-CN-001 / TC-03, TC-04)")
+@DisplayName("UpdatePatientService - Unit Tests (NCL-15-CN-001 / TC-03, TC-04, P2)")
 class UpdatePatientServiceTest {
 
     @Mock private PatientRepository patientRepository;
@@ -57,12 +60,12 @@ class UpdatePatientServiceTest {
                 auditLogRepository
         );
 
-        when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+        lenient().when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
     }
 
     @Test
-    @DisplayName("TC-03: Ghi nhận rút lại sự đồng ý, cập nhật nonMedicalUseRestricted = true")
-    void withdrawsConsentSuccessfully() {
+    @DisplayName("TC-03: Lễ tân rút lại sự đồng ý, cập nhật nonMedicalUseRestricted = true")
+    void withdrawsConsentSuccessfullyWhenAuthorized() {
         UUID patientId = UUID.randomUUID();
         Patient existing = Patient.create(
                 "BN000001",
@@ -82,6 +85,7 @@ class UpdatePatientServiceTest {
                 currentUserId
         );
 
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -107,5 +111,45 @@ class UpdatePatientServiceTest {
         verify(patientRepository).save(any(Patient.class));
         verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
         verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("P2: Bác sĩ không có quyền consent thì không được phép thay đổi consent (403 AccessDenied)")
+    void rejectsConsentModificationWhenUserIsUnauthorized() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001",
+                "Nguyen Van A",
+                LocalDate.of(1995, 5, 10),
+                Gender.MALE,
+                "0909000001",
+                "a@example.com",
+                "123 Street",
+                "079095001234",
+                "DN4790123456789",
+                BloodType.O_POSITIVE,
+                "Nguyen Van B",
+                "0909998877",
+                true,
+                "v1.0",
+                currentUserId
+        );
+
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(false);
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .active(true)
+                .consentWithdrawn(true)
+                .consentWithdrawnReason("Bac si tu y rut consent")
+                .build();
+
+        assertThrows(AccessDeniedException.class, () -> service.update(patientId, command));
     }
 }

@@ -18,7 +18,11 @@ public record PatientPortalRegistrationCommand(
 
         String identityNumber,
 
-        String email
+        String email,
+
+        Boolean consentAgreed,
+
+        String consentVersion
 
 ) {
 }

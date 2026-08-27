@@ -1,8 +1,8 @@
 # API Contract: Phiếu đồng ý xử lý dữ liệu cá nhân (Patient Data Processing Consent)
 
-> **User Story:** NCL-15-CN-001  
-> **Business Rule:** QTN-24 (*Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân*)  
-> **Acceptance Criteria:** NCL-15-CN-001-TC-01, NCL-15-CN-001-TC-02, NCL-15-CN-001-TC-03, NCL-15-CN-001-TC-04  
+> **User Story:** NCL-15-CN-001
+> **Business Rule:** QTN-24 (*Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân*)
+> **Acceptance Criteria:** NCL-15-CN-001-TC-01, NCL-15-CN-001-TC-02, NCL-15-CN-001-TC-03, NCL-15-CN-001-TC-04
 
 ---
 
@@ -11,14 +11,14 @@
 Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo lập phải ghi nhận sự đồng ý của người bệnh về việc xử lý dữ liệu cá nhân.
 
 1. **Ghi nhận đồng ý khi lập hồ sơ mới (TC-01)**:
-   - Endpoint: `POST /api/v1/patients`
-   - Quyền: `PATIENT_CREATE` (RECEPTIONIST, ADMIN)
+   - Endpoint: `POST /api/v1/patients` (Quầy tiếp đón) hoặc `POST /api/v1/auth/patients/register` (Cổng bệnh nhân).
+   - Quyền quầy tiếp đón: `PATIENT_CREATE` (chỉ cấp cho `RECEPTIONIST`, `ADMIN`).
    - Payload bắt buộc phải có `consentAgreed: true`.
 2. **Chặn lưu khi thiếu đồng ý (TC-02)**:
    - Nếu `consentAgreed` là `false`, `null` hoặc không gửi, hệ thống trả về mã lỗi `400 Bad Request` (`VALIDATION_FAILED` hoặc `PATIENT_CONSENT_REQUIRED`).
 3. **Rút lại sự đồng ý (TC-03)**:
    - Endpoint: `PUT /api/v1/patients/{patientId}`
-   - Quyền: `PATIENT_UPDATE` (RECEPTIONIST, ADMIN)
+   - Quyền: `PATIENT_CONSENT_UPDATE` (chỉ dành riêng cho `RECEPTIONIST`, `ADMIN`). Vai trò Bác sĩ (`DOCTOR`) không được phép can thiệp vào consent hành chính (HTTP 403).
    - Khi `consentWithdrawn: true`, hệ thống tự động cập nhật:
      - `consent_withdrawn = true`
      - `consent_withdrawn_at = <thời điểm>`
@@ -29,12 +29,23 @@ Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo
 
 ---
 
-## 2. API Endpoints
+## 2. Nội dung Phiếu đồng ý mẫu (Mã phiên bản v1.0 - CV-01)
 
-### 2.1. Đăng ký bệnh nhân mới kèm ghi nhận đồng ý
+- **Mã phiên bản**: `v1.0`
+- **Tên điều khoản**: Phiếu Đồng Ý Xử Lý Dữ Liệu Cá Nhân Trong Hoạt Động Khám Chữa Bệnh
+- **Nội dung tóm tắt**:
+  1. Tôi đồng ý cung cấp thông tin cá nhân và dữ liệu sức khỏe phục vụ công tác quản lý hồ sơ y tế, chẩn đoán, điều trị và chăm sóc sức khỏe.
+  2. Dữ liệu y tế phục vụ khám chữa bệnh sẽ được lưu trữ và bảo mật theo quy định của Luật Khám bệnh, chữa bệnh.
+  3. Tôi hiểu rằng có quyền rút lại sự đồng ý đối với các mục đích phi y tế (nhận thông báo tiếp thị, khảo sát dịch vụ, nghiên cứu thống kê không bắt buộc) bất kỳ lúc nào tại quầy tiếp đón.
+
+---
+
+## 3. API Endpoints
+
+### 3.1. Đăng ký bệnh nhân mới tại quầy tiếp đón
 - **Method**: `POST`
 - **Path**: `/api/v1/patients`
-- **Permission**: `PATIENT_CREATE`
+- **Permission**: `PATIENT_CREATE` (RECEPTIONIST, ADMIN)
 
 #### Request Body
 ```json
@@ -101,10 +112,32 @@ Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo
 
 ---
 
-### 2.2. Rút lại sự đồng ý xử lý dữ liệu
+### 3.2. Đăng ký tài khoản qua Cổng bệnh nhân (Patient Portal)
+- **Method**: `POST`
+- **Path**: `/api/v1/auth/patients/register`
+- **Permission**: Public
+
+#### Request Body
+```json
+{
+  "phone": "0901234567",
+  "password": "Password123@",
+  "fullName": "Nguyễn Văn A",
+  "dateOfBirth": "1990-01-15",
+  "gender": "MALE",
+  "identityNumber": "079090001234",
+  "email": "nguyenvana@example.com",
+  "consentAgreed": true,
+  "consentVersion": "v1.0"
+}
+```
+
+---
+
+### 3.3. Rút lại sự đồng ý xử lý dữ liệu
 - **Method**: `PUT`
 - **Path**: `/api/v1/patients/{patientId}`
-- **Permission**: `PATIENT_UPDATE`
+- **Permission**: `PATIENT_CONSENT_UPDATE` (RECEPTIONIST, ADMIN)
 
 #### Request Body
 ```json

@@ -132,7 +132,7 @@ public class Patient {
 
         this.consentAgreed = consentAgreed;
         this.consentAgreedAt = consentAgreedAt;
-        this.consentVersion = consentVersion != null ? consentVersion : "v1.0";
+        this.consentVersion = consentVersion;
         this.consentWithdrawn = consentWithdrawn;
         this.consentWithdrawnAt = consentWithdrawnAt;
         this.consentWithdrawnReason = consentWithdrawnReason;
@@ -188,40 +188,6 @@ public class Patient {
                 null,
                 null,
                 false
-        );
-    }
-
-    public static Patient create(
-            String patientCode,
-            String fullName,
-            LocalDate dateOfBirth,
-            Gender gender,
-            String phone,
-            String email,
-            String address,
-            String identityNumber,
-            String insuranceNumber,
-            BloodType bloodType,
-            String emergencyContact,
-            String emergencyPhone,
-            UUID createdBy
-    ) {
-        return create(
-                patientCode,
-                fullName,
-                dateOfBirth,
-                gender,
-                phone,
-                email,
-                address,
-                identityNumber,
-                insuranceNumber,
-                bloodType,
-                emergencyContact,
-                emergencyPhone,
-                true,
-                "v1.0",
-                createdBy
         );
     }
 
@@ -391,9 +357,9 @@ public class Patient {
                 updatedAt,
                 userId,
                 createdBy,
-                true,
-                createdAt,
-                "v1.0",
+                false,
+                null,
+                null,
                 false,
                 null,
                 null,
