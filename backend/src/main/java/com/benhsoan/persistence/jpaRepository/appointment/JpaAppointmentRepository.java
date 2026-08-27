@@ -30,6 +30,13 @@ public interface JpaAppointmentRepository
 
     List<AppointmentEntity> findByPatientId(UUID patientId);
 
+    List<AppointmentEntity> findByPatientIdOrderByStartTimeAsc(UUID patientId);
+
+    List<AppointmentEntity> findByPatientIdAndStatusInOrderByStartTimeAsc(
+            UUID patientId,
+            Collection<AppointmentStatus> statuses
+    );
+
     Optional<AppointmentEntity> findTopByOrderByAppointmentCodeDesc();
 
     @Query(value = """

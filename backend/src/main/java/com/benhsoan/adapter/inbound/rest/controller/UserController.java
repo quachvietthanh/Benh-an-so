@@ -66,7 +66,6 @@ public class UserController {
     }
 
     @GetMapping("/doctors")
-    @RequirePermission("USER_READ")
     public List<UserResponse> getDoctors() {
 
         return userRestMapper.toResponse(

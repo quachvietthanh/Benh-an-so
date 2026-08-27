@@ -14,6 +14,8 @@ import {
   ArrowRightOutlined,
   HeartFilled,
   BarcodeOutlined,
+  CalendarOutlined,
+  ScheduleOutlined,
 } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
 import './portalDashboard.css'
@@ -55,18 +57,25 @@ function PortalDashboard() {
           </Link>
 
           <div className="portal-dashboard-user-bar">
-            <div className="portal-dashboard-user-info">
-              <span className="portal-dashboard-user-name">
-                <UserOutlined style={{ marginRight: 6, color: '#1677ff' }} />
-                {user?.username || 'Bệnh nhân'}
-              </span>
-              <span className="portal-badge-patient">
-                Tài khoản Bệnh nhân
-              </span>
+            <div className="portal-user-chip">
+              <div className="portal-user-avatar">
+                <UserOutlined />
+              </div>
+              <div className="portal-user-meta">
+                <span className="portal-user-phone-name">
+                  {user?.fullName && user.fullName !== user.username
+                    ? user.fullName
+                    : (user?.username || 'Bệnh nhân')}
+                </span>
+                <span className="portal-user-role-badge">
+                  <span className="portal-role-dot" />
+                  Bệnh nhân
+                </span>
+              </div>
             </div>
+
             <Button
               className="portal-logout-btn"
-              danger
               icon={<LogoutOutlined />}
               onClick={handleLogout}
             >
@@ -102,6 +111,53 @@ function PortalDashboard() {
         </div>
 
         <div className="portal-dashboard-grid">
+          {/* Card 1: Đặt lịch khám trực tuyến */}
+          <div className="portal-dashboard-card portal-card-booking" style={{ borderColor: '#bfdbfe' }}>
+            <div className="portal-dashboard-card-top">
+              <div className="portal-dashboard-card-icon blue">
+                <CalendarOutlined />
+              </div>
+              <div className="portal-card-header-text">
+                <h3>Đặt lịch khám trực tuyến</h3>
+                <span className="portal-card-tag blue">Chủ động</span>
+              </div>
+            </div>
+            <p className="portal-card-desc">
+              Chọn chuyên khoa, bác sĩ và khung giờ khám còn trống thuận tiện mà không cần chờ đợi.
+            </p>
+            <div className="portal-card-action">
+              <Link to="/portal/book-appointment" style={{ width: '100%', display: 'block' }}>
+                <Button type="primary" className="portal-btn-primary" block>
+                  Đặt lịch khám ngay <ArrowRightOutlined />
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 2: Lịch hẹn của tôi */}
+          <div className="portal-dashboard-card portal-card-appointments">
+            <div className="portal-dashboard-card-top">
+              <div className="portal-dashboard-card-icon blue" style={{ background: '#f0fdf4', color: '#16a34a' }}>
+                <ScheduleOutlined />
+              </div>
+              <div className="portal-card-header-text">
+                <h3>Lịch hẹn của tôi</h3>
+                <span className="portal-card-tag green">Theo dõi</span>
+              </div>
+            </div>
+            <p className="portal-card-desc">
+              Xem danh sách lịch hẹn khám đã đặt, trạng thái tiếp nhận và hủy lịch khi có nhu cầu.
+            </p>
+            <div className="portal-card-action">
+              <Link to="/portal/my-appointments" style={{ width: '100%', display: 'block' }}>
+                <Button className="portal-btn-outline" block>
+                  Xem danh sách lịch hẹn <ArrowRightOutlined />
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 3: Tra cứu kết quả khám */}
           <div className="portal-dashboard-card portal-card-lookup">
             <div className="portal-dashboard-card-top">
               <div className="portal-dashboard-card-icon blue">
@@ -116,14 +172,15 @@ function PortalDashboard() {
               Tra cứu trực tuyến kết quả cận lâm sàng, xét nghiệm và chẩn đoán theo mã lịch hẹn.
             </p>
             <div className="portal-card-action">
-              <Link to="/portal" style={{ width: '100%' }}>
-                <Button type="primary" className="portal-btn-primary" block>
+              <Link to="/portal" style={{ width: '100%', display: 'block' }}>
+                <Button type="link" className="portal-btn-link">
                   Đến trang tra cứu <ArrowRightOutlined />
                 </Button>
               </Link>
             </div>
           </div>
 
+          {/* Card 4: Hồ sơ bệnh nhân */}
           <div className="portal-dashboard-card portal-card-patient">
             <div className="portal-dashboard-card-top">
               <div className="portal-dashboard-card-icon green">

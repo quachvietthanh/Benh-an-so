@@ -1,9 +1,12 @@
 package com.benhsoan.persistence.adapterRepository.prescription;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +20,7 @@ import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionItemEntity;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionItemRepository;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionRepository;
+import com.benhsoan.persistence.jpaRepository.prescription.PrescriptionCountProjection;
 import com.benhsoan.persistence.mapper.prescription.PrescriptionItemPersistenceMapper;
 import com.benhsoan.persistence.mapper.prescription.PrescriptionPersistenceMapper;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
@@ -90,6 +94,19 @@ public class PrescriptionRepositoryAdapter
                 .stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> countByMedicalRecordIdIn(Collection<UUID> medicalRecordIds) {
+        if (medicalRecordIds == null || medicalRecordIds.isEmpty()) {
+            return Map.of();
+        }
+        return jpaRepository.countByMedicalRecordIdIn(medicalRecordIds).stream()
+                .collect(Collectors.toMap(
+                        PrescriptionCountProjection::medicalRecordId,
+                        PrescriptionCountProjection::count
+                ));
     }
 
     @Override

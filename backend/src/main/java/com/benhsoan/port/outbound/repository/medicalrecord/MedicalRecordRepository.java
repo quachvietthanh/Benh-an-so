@@ -1,5 +1,7 @@
 package com.benhsoan.port.outbound.repository.medicalrecord;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,6 +15,8 @@ public interface MedicalRecordRepository {
     MedicalRecord save(MedicalRecord medicalRecord);
 
     Optional<MedicalRecord> findByVisitId(UUID visitId);
+
+    List<MedicalRecord> findByVisitIdIn(Collection<UUID> visitIds);
 
     boolean existsByVisitId(UUID visitId);
 
