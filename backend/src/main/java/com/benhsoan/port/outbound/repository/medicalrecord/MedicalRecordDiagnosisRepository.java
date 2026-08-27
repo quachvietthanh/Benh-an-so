@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.medicalrecord;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,8 @@ public interface MedicalRecordDiagnosisRepository {
     boolean existsByDiagnosisCatalogId(UUID diagnosisCatalogId);
 
     List<MedicalRecordDiagnosis> findByMedicalRecordId(UUID medicalRecordId);
+
+    List<MedicalRecordDiagnosis> findByMedicalRecordIdIn(Collection<UUID> medicalRecordIds);
 
     List<MedicalRecordDiagnosis> replaceForMedicalRecord(
             UUID medicalRecordId,

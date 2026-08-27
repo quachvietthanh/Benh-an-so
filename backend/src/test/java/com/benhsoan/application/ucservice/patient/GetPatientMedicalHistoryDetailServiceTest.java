@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
+import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAuditService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
@@ -56,6 +57,7 @@ class GetPatientMedicalHistoryDetailServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private SpecialtyRepository specialtyRepository;
     @Mock private PatientAccessGuard patientAccessGuard;
+    @Mock private MedicalRecordAccessAuditService medicalRecordAccessAuditService;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private ClockPort clockPort;
@@ -73,6 +75,7 @@ class GetPatientMedicalHistoryDetailServiceTest {
                 userRepository,
                 specialtyRepository,
                 patientAccessGuard,
+                medicalRecordAccessAuditService,
                 auditLogRepository,
                 currentUserPort,
                 clockPort,
@@ -152,6 +155,8 @@ class GetPatientMedicalHistoryDetailServiceTest {
         assertEquals(ResourceType.MEDICAL_RECORD, audit.getResourceType());
         assertEquals(recordId, audit.getResourceId());
         assertEquals(actorId, audit.getUserId());
+
+        verify(medicalRecordAccessAuditService).recordRecordView(patientId, visitId, recordId, actorId, NOW);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.medicalrecord;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,6 +12,8 @@ import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordDiagnosisEntit
 public interface JpaMedicalRecordDiagnosisRepository extends JpaRepository<MedicalRecordDiagnosisEntity, UUID> {
 
     List<MedicalRecordDiagnosisEntity> findByMedicalRecordId(UUID medicalRecordId);
+
+    List<MedicalRecordDiagnosisEntity> findByMedicalRecordIdIn(Collection<UUID> medicalRecordIds);
 
     boolean existsByMedicalRecordId(UUID medicalRecordId);
 

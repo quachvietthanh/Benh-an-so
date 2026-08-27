@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
+import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAuditService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
@@ -58,6 +59,7 @@ public class GetPatientMedicalHistoryDetailService implements GetPatientMedicalH
     private final UserRepository userRepository;
     private final SpecialtyRepository specialtyRepository;
     private final PatientAccessGuard patientAccessGuard;
+    private final MedicalRecordAccessAuditService medicalRecordAccessAuditService;
     private final AuditLogRepository auditLogRepository;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
@@ -93,6 +95,17 @@ public class GetPatientMedicalHistoryDetailService implements GetPatientMedicalH
                 .toList();
 
         Instant viewedAt = clockPort.now();
+
+        // TC-04: standard medical record access ledger (REQUIRES_NEW) — mandatory.
+        medicalRecordAccessAuditService.recordRecordView(
+                visit.getPatientId(),
+                visit.getId(),
+                record.getId(),
+                currentUserPort.getCurrentUserId(),
+                viewedAt
+        );
+
+        // Supplementary generic audit with portal channel metadata.
         auditLogRepository.save(AuditLog.create(
                 currentUserPort.getCurrentUserId(),
                 ActionType.READ,

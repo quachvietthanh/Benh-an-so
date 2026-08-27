@@ -1,5 +1,7 @@
 package com.benhsoan.persistence.jpaRepository.medicalrecord;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,6 +17,8 @@ import jakarta.persistence.LockModeType;
 public interface JpaMedicalRecordRepository extends JpaRepository<MedicalRecordEntity, UUID> {
 
     Optional<MedicalRecordEntity> findByVisitId(UUID visitId);
+
+    List<MedicalRecordEntity> findByVisitIdIn(Collection<UUID> visitIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select medicalRecord from MedicalRecordEntity medicalRecord where medicalRecord.id = :id")

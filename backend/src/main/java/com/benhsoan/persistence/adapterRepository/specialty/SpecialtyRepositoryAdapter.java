@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.specialty;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,6 +24,16 @@ public class SpecialtyRepositoryAdapter implements SpecialtyRepository {
     @Override
     public Optional<Specialty> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Specialty> findAllById(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findAllById(ids).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override

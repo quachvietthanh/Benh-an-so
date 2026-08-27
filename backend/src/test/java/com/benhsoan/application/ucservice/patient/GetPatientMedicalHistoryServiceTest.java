@@ -2,11 +2,13 @@ package com.benhsoan.application.ucservice.patient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -76,44 +78,50 @@ class GetPatientMedicalHistoryServiceTest {
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
 
         Visit signedVisit = mock(Visit.class);
-        when(signedVisit.isCompleted()).thenReturn(true);
         when(signedVisit.getId()).thenReturn(signedVisitId);
         when(signedVisit.getDoctorId()).thenReturn(doctorId);
         when(signedVisit.getSpecialtyId()).thenReturn(specialtyId);
         when(signedVisit.getVisitAt()).thenReturn(Instant.parse("2099-01-10T02:00:00Z"));
 
         Visit draftVisit = mock(Visit.class);
-        when(draftVisit.isCompleted()).thenReturn(true);
         when(draftVisit.getId()).thenReturn(draftVisitId);
+        when(draftVisit.getDoctorId()).thenReturn(doctorId);
+        when(draftVisit.getSpecialtyId()).thenReturn(specialtyId);
 
         when(visitRepository.findByPatientIdOrderByVisitAtDesc(patientId))
                 .thenReturn(List.of(signedVisit, draftVisit));
 
         MedicalRecord signedRecord = mock(MedicalRecord.class);
         when(signedRecord.isContentLocked()).thenReturn(true);
+        when(signedRecord.getVisitId()).thenReturn(signedVisitId);
         when(signedRecord.getId()).thenReturn(signedRecordId);
 
         MedicalRecord draftRecord = mock(MedicalRecord.class);
         when(draftRecord.isContentLocked()).thenReturn(false);
 
-        when(medicalRecordRepository.findByVisitId(signedVisitId)).thenReturn(Optional.of(signedRecord));
-        when(medicalRecordRepository.findByVisitId(draftVisitId)).thenReturn(Optional.of(draftRecord));
+        when(medicalRecordRepository.findByVisitIdIn(anyList()))
+                .thenReturn(List.of(signedRecord, draftRecord));
 
         MedicalRecordDiagnosis d1 = mock(MedicalRecordDiagnosis.class);
+        when(d1.getMedicalRecordId()).thenReturn(signedRecordId);
         when(d1.getDiagnosisName()).thenReturn("Hypertension");
         MedicalRecordDiagnosis d2 = mock(MedicalRecordDiagnosis.class);
+        when(d2.getMedicalRecordId()).thenReturn(signedRecordId);
         when(d2.getDiagnosisName()).thenReturn("Diabetes");
-        when(diagnosisRepository.findByMedicalRecordId(signedRecordId)).thenReturn(List.of(d1, d2));
+        when(diagnosisRepository.findByMedicalRecordIdIn(anyList())).thenReturn(List.of(d1, d2));
 
-        when(prescriptionRepository.findByMedicalRecordId(signedRecordId)).thenReturn(List.of(mock(), mock()));
+        when(prescriptionRepository.countByMedicalRecordIdIn(anyList()))
+                .thenReturn(Map.of(signedRecordId, 2L));
 
         User doctor = mock(User.class);
+        when(doctor.getId()).thenReturn(doctorId);
         when(doctor.getFullName()).thenReturn("Dr. A");
-        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+        when(userRepository.findAllById(anyList())).thenReturn(List.of(doctor));
 
         Specialty specialty = mock(Specialty.class);
+        when(specialty.getId()).thenReturn(specialtyId);
         when(specialty.getName()).thenReturn("Internal Medicine");
-        when(specialtyRepository.findById(specialtyId)).thenReturn(Optional.of(specialty));
+        when(specialtyRepository.findAllById(anyList())).thenReturn(List.of(specialty));
 
         var results = service.getMedicalHistory();
 
@@ -145,6 +153,8 @@ class GetPatientMedicalHistoryServiceTest {
         UUID userId = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
         UUID openVisitId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID specialtyId = UUID.randomUUID();
 
         Patient patient = mock(Patient.class);
         when(patient.getId()).thenReturn(patientId);
@@ -152,15 +162,73 @@ class GetPatientMedicalHistoryServiceTest {
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
 
         Visit openVisit = mock(Visit.class);
-        when(openVisit.isCompleted()).thenReturn(true);
         when(openVisit.getId()).thenReturn(openVisitId);
+        when(openVisit.getDoctorId()).thenReturn(doctorId);
+        when(openVisit.getSpecialtyId()).thenReturn(specialtyId);
         when(visitRepository.findByPatientIdOrderByVisitAtDesc(patientId)).thenReturn(List.of(openVisit));
 
         MedicalRecord openRecord = mock(MedicalRecord.class);
         when(openRecord.isContentLocked()).thenReturn(false);
-        when(medicalRecordRepository.findByVisitId(openVisitId)).thenReturn(Optional.of(openRecord));
+        when(medicalRecordRepository.findByVisitIdIn(anyList())).thenReturn(List.of(openRecord));
+
+        when(diagnosisRepository.findByMedicalRecordIdIn(anyList())).thenReturn(List.of());
+        when(prescriptionRepository.countByMedicalRecordIdIn(anyList())).thenReturn(Map.of());
+        when(userRepository.findAllById(anyList())).thenReturn(List.of());
+        when(specialtyRepository.findAllById(anyList())).thenReturn(List.of());
 
         assertEquals(List.of(), service.getMedicalHistory());
+    }
+
+    @Test
+    void includesInProgressVisitWithSignedRecord() {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID specialtyId = UUID.randomUUID();
+        UUID activeVisitId = UUID.randomUUID();
+        UUID recordId = UUID.randomUUID();
+
+        Patient patient = mock(Patient.class);
+        when(patient.getId()).thenReturn(patientId);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
+
+        // Active (not completed) visit — service must NOT filter by isCompleted.
+        Visit activeVisit = mock(Visit.class);
+        when(activeVisit.getId()).thenReturn(activeVisitId);
+        when(activeVisit.getDoctorId()).thenReturn(doctorId);
+        when(activeVisit.getSpecialtyId()).thenReturn(specialtyId);
+        when(activeVisit.getVisitAt()).thenReturn(Instant.parse("2099-01-10T02:00:00Z"));
+        when(visitRepository.findByPatientIdOrderByVisitAtDesc(patientId)).thenReturn(List.of(activeVisit));
+
+        MedicalRecord record = mock(MedicalRecord.class);
+        when(record.isContentLocked()).thenReturn(true);
+        when(record.getVisitId()).thenReturn(activeVisitId);
+        when(record.getId()).thenReturn(recordId);
+        when(medicalRecordRepository.findByVisitIdIn(anyList())).thenReturn(List.of(record));
+
+        MedicalRecordDiagnosis d = mock(MedicalRecordDiagnosis.class);
+        when(d.getMedicalRecordId()).thenReturn(recordId);
+        when(d.getDiagnosisName()).thenReturn("Common cold");
+        when(diagnosisRepository.findByMedicalRecordIdIn(anyList())).thenReturn(List.of(d));
+
+        when(prescriptionRepository.countByMedicalRecordIdIn(anyList())).thenReturn(Map.of(recordId, 1L));
+
+        User doctor = mock(User.class);
+        when(doctor.getId()).thenReturn(doctorId);
+        when(doctor.getFullName()).thenReturn("Dr. A");
+        when(userRepository.findAllById(anyList())).thenReturn(List.of(doctor));
+
+        Specialty specialty = mock(Specialty.class);
+        when(specialty.getId()).thenReturn(specialtyId);
+        when(specialty.getName()).thenReturn("General");
+        when(specialtyRepository.findAllById(anyList())).thenReturn(List.of(specialty));
+
+        var results = service.getMedicalHistory();
+
+        assertEquals(1, results.size());
+        assertEquals(activeVisitId, results.get(0).visitId());
+        assertEquals("Common cold", results.get(0).diagnosisSummary());
     }
 
     @Test
