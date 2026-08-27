@@ -34,7 +34,6 @@ import medicalRecordTemplateApi from '../api/medicalRecordTemplateApi'
 import TemplateFormModal from '../components/medicalRecordTemplate/TemplateFormModal'
 import StatusToggleModal from '../components/medicalRecordTemplate/StatusToggleModal'
 import { useAuthContext } from '../context/AuthContext'
-import './medicalRecordTemplateManagement.css'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -49,25 +48,21 @@ function MedicalRecordTemplateManagementPage() {
   const isAdmin = userRoles.includes('admin')
   const canManage = userPermissions.includes('MEDICAL_RECORD_TEMPLATE_MANAGE') || isAdmin
 
-  // State
   const [specialties, setSpecialties] = useState([])
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(false)
   const [specialtyLoading, setSpecialtyLoading] = useState(false)
 
-  // Filters
   const [selectedSpecialty, setSelectedSpecialty] = useState('ALL')
   const [selectedStatus, setSelectedStatus] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Modals state
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [statusTargetTemplate, setStatusTargetTemplate] = useState(null)
   const [modalLoading, setModalLoading] = useState(false)
 
-  // 1. Fetch Specialties
   const fetchSpecialties = useCallback(async () => {
     setSpecialtyLoading(true)
     try {
@@ -81,7 +76,6 @@ function MedicalRecordTemplateManagementPage() {
     }
   }, [])
 
-  // 2. Fetch Templates
   const fetchTemplates = useCallback(async () => {
     setLoading(true)
     try {
@@ -112,7 +106,6 @@ function MedicalRecordTemplateManagementPage() {
     fetchTemplates()
   }, [fetchTemplates])
 
-  // Filtered templates by search query
   const filteredTemplates = useMemo(() => {
     let result = templates || []
     if (searchQuery.trim()) {
@@ -127,7 +120,6 @@ function MedicalRecordTemplateManagementPage() {
     return result
   }, [templates, searchQuery])
 
-  // Handlers
   const handleOpenCreateModal = () => {
     setEditingTemplate(null)
     setFormModalOpen(true)
@@ -198,7 +190,6 @@ function MedicalRecordTemplateManagementPage() {
     }
   }
 
-  // Table Columns
   const columns = [
     {
       title: 'Tên mẫu bệnh án',
@@ -277,7 +268,6 @@ function MedicalRecordTemplateManagementPage() {
       align: 'right',
       render: (_, record) => (
         <Space size={6}>
-          {/* Sửa */}
           <Tooltip title="Chỉnh sửa cấu hình trường và tạo phiên bản mới">
             <Button
               type="link"
@@ -290,7 +280,6 @@ function MedicalRecordTemplateManagementPage() {
             </Button>
           </Tooltip>
 
-          {/* Đặt mặc định */}
           {!record.defaultTemplate && record.active && (
             <Popconfirm
               title="Đặt làm mẫu mặc định?"
@@ -314,7 +303,6 @@ function MedicalRecordTemplateManagementPage() {
             </Popconfirm>
           )}
 
-          {/* Bật / Tắt */}
           <Tooltip title={record.active ? 'Ngừng áp dụng mẫu này' : 'Kích hoạt lại mẫu này'}>
             <Button
               type="link"
@@ -333,7 +321,6 @@ function MedicalRecordTemplateManagementPage() {
 
   return (
     <div className="template-management-page">
-      {/* Page Header */}
       <div className="template-management-header">
         <Row justify="space-between" align="middle" gutter={[16, 16]}>
           <Col>
@@ -381,7 +368,6 @@ function MedicalRecordTemplateManagementPage() {
         />
       )}
 
-      {/* Filter Card */}
       <Card className="template-filter-card" bodyStyle={{ padding: '16px 20px' }}>
         <Row gutter={[16, 12]} align="middle">
           <Col xs={24} sm={8} md={6}>
@@ -440,7 +426,6 @@ function MedicalRecordTemplateManagementPage() {
         </Row>
       </Card>
 
-      {/* Templates Table Card */}
       <Card className="template-table-card" bodyStyle={{ padding: 0 }}>
         <Table
           columns={columns}
@@ -474,7 +459,6 @@ function MedicalRecordTemplateManagementPage() {
         />
       </Card>
 
-      {/* Modal Tạo mới / Chỉnh sửa */}
       <TemplateFormModal
         open={formModalOpen}
         onClose={() => {
@@ -487,7 +471,6 @@ function MedicalRecordTemplateManagementPage() {
         loading={modalLoading}
       />
 
-      {/* Modal Bật / Tắt trạng thái */}
       <StatusToggleModal
         open={statusModalOpen}
         onClose={() => {

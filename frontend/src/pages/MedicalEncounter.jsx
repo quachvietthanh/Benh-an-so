@@ -207,7 +207,6 @@ function MedicalEncounter() {
     loadAllBackendDiagnoses()
   }, [loadAllBackendDiagnoses])
 
-  // Quản lý Chuyên khoa & Mẫu bệnh án theo chuyên khoa
   const [specialties, setSpecialties] = useState([])
   const [selectedSpecialtyId, setSelectedSpecialtyId] = useState('')
   const [availableTemplates, setAvailableTemplates] = useState([])
@@ -248,7 +247,6 @@ function MedicalEncounter() {
         const detailRes = await medicalRecordTemplateApi.getTemplateById(defaultTmpl.id)
         setCurrentTemplate(detailRes.data)
       } else {
-        // Fallback to General templates if this specialty has no active templates
         const generalSpecialty = specialties.find((s) => s.code === 'GENERAL')
         if (generalSpecialty && generalSpecialty.id !== specialtyId) {
           const fallbackRes = await medicalRecordTemplateApi.searchTemplates({

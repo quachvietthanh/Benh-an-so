@@ -5,8 +5,6 @@ import {
   Empty,
   Input,
   Select,
-  Space,
-  Tag,
   Tooltip,
   Typography,
 } from 'antd'
@@ -27,10 +25,7 @@ function SectionConfigEditor({ sections = [], onChange }) {
   const [draggedIndex, setDraggedIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
 
-  // Find which fieldCodes are already used
   const usedFieldCodes = new Set(sections.map((s) => s.fieldCode))
-
-  // Available unused field options
   const unusedFieldOptions = MEDICAL_RECORD_FIELD_CODES.filter(
     (item) => !usedFieldCodes.has(item.code)
   )
@@ -97,7 +92,6 @@ function SectionConfigEditor({ sections = [], onChange }) {
     onChange(updated)
   }
 
-  // Drag and Drop handlers
   const handleDragStart = (e, index) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', String(index))
@@ -239,7 +233,6 @@ function SectionConfigEditor({ sections = [], onChange }) {
                       transition: 'background 0.15s ease',
                     }}
                   >
-                    {/* Drag handle */}
                     <td
                       style={{
                         padding: '6px 4px',
@@ -252,12 +245,10 @@ function SectionConfigEditor({ sections = [], onChange }) {
                       <HolderOutlined style={{ fontSize: 14 }} />
                     </td>
 
-                    {/* Order index */}
                     <td style={{ padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: '#64748b' }}>
                       {index + 1}
                     </td>
 
-                    {/* Field Code selector */}
                     <td style={{ padding: '6px 8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Select
@@ -275,7 +266,6 @@ function SectionConfigEditor({ sections = [], onChange }) {
                       </div>
                     </td>
 
-                    {/* Label input */}
                     <td style={{ padding: '6px 8px' }}>
                       <Input
                         size="small"
@@ -286,7 +276,6 @@ function SectionConfigEditor({ sections = [], onChange }) {
                       />
                     </td>
 
-                    {/* Required Checkbox */}
                     <td style={{ padding: '6px 4px', textAlign: 'center' }}>
                       <Checkbox
                         checked={Boolean(section.required)}
@@ -294,7 +283,6 @@ function SectionConfigEditor({ sections = [], onChange }) {
                       />
                     </td>
 
-                    {/* Delete button */}
                     <td style={{ padding: '6px 4px', textAlign: 'center' }}>
                       <Tooltip title="Xóa trường khỏi mẫu">
                         <Button

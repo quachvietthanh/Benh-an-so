@@ -10,7 +10,6 @@ import {
   Row,
   Select,
   Tooltip,
-  Typography,
   message,
 } from 'antd'
 import {
@@ -81,7 +80,6 @@ function TemplateFormModal({
         return
       }
 
-      // Check unique fieldCodes
       const codeSet = new Set()
       for (const s of sections) {
         if (codeSet.has(s.fieldCode)) {
@@ -174,7 +172,6 @@ function TemplateFormModal({
       )}
 
       <Form form={form} layout="vertical" requiredMark="optional">
-        {/* Hàng 1: Chuyên khoa áp dụng & Tên mẫu bệnh án (2 cột) */}
         <Row gutter={12}>
           <Col xs={24} sm={10}>
             <Form.Item
@@ -217,7 +214,6 @@ function TemplateFormModal({
           </Col>
         </Row>
 
-        {/* Hàng 2: Checkbox Mẫu mặc định (1 dòng ngắn gọn với tooltip) */}
         {!isEdit && (
           <Form.Item name="makeDefault" valuePropName="checked" style={{ marginBottom: 10 }}>
             <Checkbox>
@@ -231,7 +227,6 @@ function TemplateFormModal({
           </Form.Item>
         )}
 
-        {/* Khi Sửa: Ghi chú thay đổi */}
         {isEdit && (
           <Form.Item
             name="changeNote"
@@ -248,7 +243,6 @@ function TemplateFormModal({
 
         <Divider style={{ margin: '8px 0 12px 0' }} />
 
-        {/* Section Config Editor dạng bảng compact */}
         <SectionConfigEditor sections={sections} onChange={setSections} />
       </Form>
     </Modal>

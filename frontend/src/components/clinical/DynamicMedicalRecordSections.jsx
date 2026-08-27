@@ -2,7 +2,6 @@ import React from 'react'
 import {
   Card,
   Col,
-  Empty,
   Form,
   Input,
   Row,
@@ -18,7 +17,6 @@ import {
   getFieldMeta,
 } from '../../constants/medicalRecordTemplateConstants'
 
-// Mapping from backend fieldCode to Form field name
 export const FIELD_CODE_TO_FORM_NAME = {
   CHIEF_COMPLAINT: 'chiefComplaint',
   SYMPTOMS: 'symptoms',

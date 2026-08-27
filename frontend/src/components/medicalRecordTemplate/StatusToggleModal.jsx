@@ -30,7 +30,6 @@ function StatusToggleModal({
   const isDefault = Boolean(template?.defaultTemplate)
   const targetActive = !isCurrentActive
 
-  // If we are deactivating a default template, find available active replacement templates in same specialty
   const availableReplacements = otherTemplatesInSpecialty.filter(
     (t) => t.id !== template?.id && t.active
   )

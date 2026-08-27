@@ -261,7 +261,6 @@ function MedicalEncounterForm({
         </Col>
 
         <Col xs={24} lg={16}>
-          {/* Thanh chọn Chuyên khoa & Mẫu bệnh án */}
           <Card
             size="small"
             style={{
@@ -315,7 +314,6 @@ function MedicalEncounterForm({
             </Row>
           </Card>
 
-          {/* Form nhập liệu động theo cấu hình sections của mẫu bệnh án */}
           <DynamicMedicalRecordSections
             sections={currentTemplate?.sections}
             template={currentTemplate}
