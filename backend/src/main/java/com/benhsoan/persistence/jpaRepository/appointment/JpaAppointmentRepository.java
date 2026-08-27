@@ -54,4 +54,16 @@ public interface JpaAppointmentRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select appointment from AppointmentEntity appointment where appointment.id = :id")
     Optional<AppointmentEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    @Query("select appointment from AppointmentEntity appointment "
+            + "where appointment.doctorId = :doctorId "
+            + "and appointment.status in :statuses "
+            + "and appointment.startTime < :to "
+            + "and appointment.endTime > :from")
+    List<AppointmentEntity> findActiveForDoctorBetween(
+            @Param("doctorId") UUID doctorId,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            @Param("statuses") Collection<AppointmentStatus> statuses
+    );
 }

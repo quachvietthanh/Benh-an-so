@@ -52,6 +52,8 @@ public class Appointment {
 
     private Instant createdAt;
 
+    private String bookingChannel;
+
     private static final Duration NO_SHOW_THRESHOLD = Duration.ofMinutes(15);
     
     private Appointment(
@@ -67,7 +69,8 @@ public class Appointment {
             Instant checkedInAt,
             Instant completedAt,
             UUID createdBy,
-            Instant createdAt
+            Instant createdAt,
+            String bookingChannel
     ) {
 
         this.id = Objects.requireNonNull(id);
@@ -83,6 +86,7 @@ public class Appointment {
         this.completedAt = completedAt;
         this.createdBy = Objects.requireNonNull(createdBy);
         this.createdAt = Objects.requireNonNull(createdAt);
+        this.bookingChannel = bookingChannel;
     }
 
     public static Appointment create(
@@ -93,6 +97,19 @@ public class Appointment {
             Instant endTime,
             String reason,
             UUID createdBy
+    ) {
+        return create(appointmentCode, patientId, doctorId, startTime, endTime, reason, createdBy, null);
+    }
+
+    public static Appointment create(
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            String reason,
+            UUID createdBy,
+            String bookingChannel
     ) {
          if (!endTime.isAfter(startTime)) 
             throw new ValidationException("End time must be after start time.");
@@ -112,7 +129,8 @@ public class Appointment {
                 null,
                 null,
                 createdBy,
-                Instant.now()
+                Instant.now(),
+                bookingChannel
         );
     }
 
@@ -131,6 +149,26 @@ public class Appointment {
             UUID createdBy,
             Instant createdAt
     ) {
+        return restore(id, appointmentCode, patientId, doctorId, startTime, endTime,
+                status, reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, null);
+    }
+
+        public static Appointment restore(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            String bookingChannel
+    ) {
         return new Appointment(
                 id,
                 appointmentCode,
@@ -144,7 +182,8 @@ public class Appointment {
                 checkedInAt,
                 completedAt,
                 createdBy,
-                createdAt
+                createdAt,
+                bookingChannel
         );
     }
 

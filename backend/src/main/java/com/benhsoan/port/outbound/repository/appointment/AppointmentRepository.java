@@ -30,6 +30,12 @@ public interface AppointmentRepository {
 
     boolean existsActiveAppointmentConflict( UUID doctorId, Instant startTime, Instant endTime);
 
+    List<Appointment> findActiveAppointmentsForDoctorBetween(
+            UUID doctorId,
+            Instant from,
+            Instant to
+    );
+
     Page<Appointment> findOverdue( Instant threshold, Pageable pageable );
 
     List<UUID> findDueReminderIds(

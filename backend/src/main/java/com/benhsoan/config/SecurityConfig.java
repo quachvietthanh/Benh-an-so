@@ -108,6 +108,9 @@ public class SecurityConfig {
                                                 // ===== APPOINTMENTS =====
                                                 .requestMatchers("/appointments/**").authenticated()
 
+                                                // ===== PATIENT PORTAL =====
+                                                .requestMatchers("/patient-portal/**").hasRole("PATIENT")
+
                                                 // ===== REPORTS =====
                                                 .requestMatchers("/reports/**").authenticated()
 
