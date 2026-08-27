@@ -6,7 +6,10 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,12 +18,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PatientPortalAppointmentRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.appointment.PatientBookAppointmentRequest;
+import com.benhsoan.adapter.inbound.rest.request.appointment.PatientCancelAppointmentRequest;
+import com.benhsoan.adapter.inbound.rest.request.appointment.PatientRescheduleAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.response.appointment.PatientAppointmentResponse;
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.port.dto.query.appointment.GetDoctorAvailableSlotsQuery;
 import com.benhsoan.port.dto.result.appointment.DoctorAvailableSlotResult;
 import com.benhsoan.port.dto.result.appointment.PatientAppointmentResult;
 import com.benhsoan.port.inbound.appointment.GetDoctorAvailableSlotsUseCase;
+import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentDetailUseCase;
+import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.PatientBookAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.PatientCancelAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.PatientRescheduleAppointmentUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +44,29 @@ public class PatientPortalAppointmentController {
 
     private final PatientBookAppointmentUseCase patientBookAppointmentUseCase;
 
+    private final PatientCancelAppointmentUseCase patientCancelAppointmentUseCase;
+
+    private final PatientRescheduleAppointmentUseCase patientRescheduleAppointmentUseCase;
+
+    private final GetPatientPortalAppointmentsUseCase getPatientPortalAppointmentsUseCase;
+
+    private final GetPatientPortalAppointmentDetailUseCase getPatientPortalAppointmentDetailUseCase;
+
     private final PatientPortalAppointmentRestMapper mapper;
+
+    @GetMapping
+    public List<PatientAppointmentResponse> getAppointments(
+            @RequestParam(required = false) AppointmentStatus status
+    ) {
+        return getPatientPortalAppointmentsUseCase.getAppointments(status).stream()
+                .map(mapper::toResponse)
+                .toList();
+    }
+
+    @GetMapping("/{id}")
+    public PatientAppointmentResponse getAppointment(@PathVariable UUID id) {
+        return mapper.toResponse(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(id));
+    }
 
     @GetMapping("/available-slots")
     public List<DoctorAvailableSlotResult> getAvailableSlots(
@@ -53,6 +85,28 @@ public class PatientPortalAppointmentController {
     ) {
         PatientAppointmentResult result =
                 patientBookAppointmentUseCase.book(mapper.toCommand(request));
+
+        return mapper.toResponse(result);
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public PatientAppointmentResponse cancel(
+            @PathVariable UUID id,
+            @Valid @RequestBody PatientCancelAppointmentRequest request
+    ) {
+        PatientAppointmentResult result =
+                patientCancelAppointmentUseCase.cancel(id, mapper.toCommand(request));
+
+        return mapper.toResponse(result);
+    }
+
+    @PutMapping("/{id}/reschedule")
+    public PatientAppointmentResponse reschedule(
+            @PathVariable UUID id,
+            @Valid @RequestBody PatientRescheduleAppointmentRequest request
+    ) {
+        PatientAppointmentResult result =
+                patientRescheduleAppointmentUseCase.reschedule(id, mapper.toCommand(request));
 
         return mapper.toResponse(result);
     }

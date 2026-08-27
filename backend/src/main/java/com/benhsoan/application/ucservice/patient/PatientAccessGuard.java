@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -27,12 +28,20 @@ public class PatientAccessGuard {
     private final ClockPort clockPort;
 
     public Patient requirePatientOwnership(UUID targetPatientId) {
+        return requirePatientOwnership(targetPatientId, ResourceType.PATIENT, targetPatientId);
+    }
+
+    public Patient requirePatientOwnership(
+            UUID targetPatientId,
+            ResourceType resourceType,
+            UUID resourceId
+    ) {
         UUID userId = currentUserPort.getCurrentUserId();
 
         Patient own = patientRepository.findByUserId(userId).orElse(null);
 
         if (own == null || !own.getId().equals(targetPatientId)) {
-            denialAuditWriter.writeDenied(userId, targetPatientId, clockPort.now());
+            denialAuditWriter.writeDenied(userId, targetPatientId, clockPort.now(), resourceType, resourceId);
             throw new AccessDeniedException("Patient may only access their own data.");
         }
 
