@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public record PatientBookAppointmentRequest(
 
@@ -21,6 +22,7 @@ public record PatientBookAppointmentRequest(
         @JsonFormat(pattern = "HH:mm")
         LocalTime startTime,
 
+        @Size(max = 500, message = "Lý do khám không được vượt quá 500 ký tự.")
         String reason
 
 ) {

@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.benhsoan.adapter.inbound.rest.mapper.PatientPortalAppointmentRestMapper;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.port.dto.command.appointment.PatientBookAppointmentCommand;
@@ -126,5 +127,45 @@ class PatientPortalAppointmentControllerTest {
                         .with(user("patient").roles("PATIENT")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void bookWithLongReasonReturns400() throws Exception {
+        String longReason = "x".repeat(501);
+
+        mockMvc.perform(post("/patient-portal/appointments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "doctorId": "%s",
+                                  "appointmentDate": "2099-08-10",
+                                  "startTime": "09:00",
+                                  "reason": "%s"
+                                }
+                                """.formatted(UUID.randomUUID(), longReason))
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.details.fields.reason").value("Lý do khám không được vượt quá 500 ký tự."));
+    }
+
+    @Test
+    void bookWithUnalignedSlotReturns400() throws Exception {
+        when(patientBookAppointmentUseCase.book(any(PatientBookAppointmentCommand.class)))
+                .thenThrow(new InvalidAppointmentTimeException("Khung giờ đặt lịch phải theo mốc 30 phút."));
+
+        mockMvc.perform(post("/patient-portal/appointments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "doctorId": "%s",
+                                  "appointmentDate": "2099-08-10",
+                                  "startTime": "09:17",
+                                  "reason": "Đau đầu"
+                                }
+                                """.formatted(UUID.randomUUID()))
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("APPOINTMENT_TIME_IN_PAST"));
     }
 }

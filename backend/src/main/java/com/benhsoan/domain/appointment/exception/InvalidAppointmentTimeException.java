@@ -13,4 +13,8 @@ public class InvalidAppointmentTimeException extends AppointmentException {
         );
     }
 
+    public InvalidAppointmentTimeException(String message) {
+        super(DomainErrorCode.APPOINTMENT_TIME_IN_PAST, message);
+    }
+
 }

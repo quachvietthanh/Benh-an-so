@@ -15,13 +15,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.appointment.Appointment;
+import com.benhsoan.domain.appointment.DoctorSchedule;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
 import com.benhsoan.domain.appointment.exception.DoctorNotFoundException;
+import com.benhsoan.domain.appointment.exception.DoctorScheduleNotFoundException;
+import com.benhsoan.domain.appointment.exception.DoctorUnavailableException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
+import com.benhsoan.domain.appointment.exception.InvalidDoctorRoleException;
 import com.benhsoan.domain.appointment.exception.SlotAlreadyBookedException;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -32,6 +37,7 @@ import com.benhsoan.port.outbound.generator.AppointmentCodeGenerator;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.repository.appointment.DoctorScheduleRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -69,6 +75,8 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
 
     private final UserRepository userRepository;
 
+    private final RoleRepository roleRepository;
+
     private final CurrentUserPort currentUserPort;
 
     private final AuditLogRepository auditLogRepository;
@@ -89,6 +97,10 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
         Instant startTime = toInstant(command.appointmentDate(), command.startTime());
         Instant endTime = startTime.plus(SLOT_DURATION);
 
+        if (!isAlignedToSlot(command.startTime())) {
+            throw new InvalidAppointmentTimeException("Khung giờ đặt lịch phải theo mốc 30 phút.");
+        }
+
         if (!startTime.isAfter(now)) {
             throw new InvalidAppointmentTimeException();
         }
@@ -99,18 +111,27 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
                         "No patient profile is linked to the authenticated user."));
         UUID patientId = patient.getId();
 
-        User doctor = userRepository.findById(command.doctorId())
+        // QTN-04: lock the doctor's user row so portal and reception serialize appointment
+        // creation per doctor before the overlap check and insert.
+        User doctor = userRepository.findByIdForUpdate(command.doctorId())
                 .orElseThrow(() -> new DoctorNotFoundException(command.doctorId()));
         if (!doctor.isActive()) {
             throw new DoctorInactiveException(doctor.getId());
         }
+        requireDoctorRole(doctor);
 
-        // QTN-04: pessimistically lock the doctor's schedule row for the date (when present)
-        // to serialize concurrent online bookings for the same doctor and date.
-        doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(
-                command.doctorId(),
-                command.appointmentDate()
-        );
+        DoctorSchedule schedule = doctorScheduleRepository
+                .findByDoctorIdAndScheduleDateForUpdate(command.doctorId(), command.appointmentDate())
+                .orElseThrow(() -> new DoctorScheduleNotFoundException(command.doctorId(), command.appointmentDate()));
+        if (!schedule.isActive()) {
+            throw new DoctorUnavailableException(command.doctorId(), command.appointmentDate());
+        }
+
+        LocalTime slotEndTime = command.startTime().plus(SLOT_DURATION);
+        if (command.startTime().isBefore(schedule.getStartTime())
+                || slotEndTime.isAfter(schedule.getEndTime())) {
+            throw new InvalidAppointmentTimeException("Khung giờ đặt lịch nằm ngoài giờ làm việc của bác sĩ.");
+        }
 
         if (!appointmentRepository.findActiveAppointmentsForDoctorBetween(
                         command.doctorId(),
@@ -154,6 +175,20 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
 
     private Instant toInstant(LocalDate date, LocalTime time) {
         return ZonedDateTime.of(date, time, CLINIC_ZONE).toInstant();
+    }
+
+    private void requireDoctorRole(User doctor) {
+        Role doctorRole = roleRepository.findByName("DOCTOR")
+                .orElseThrow(() -> new IllegalStateException("DOCTOR role is not configured."));
+        if (!doctorRole.getId().equals(doctor.getRoleId())) {
+            throw new InvalidDoctorRoleException(doctor.getId());
+        }
+    }
+
+    private boolean isAlignedToSlot(LocalTime startTime) {
+        return startTime.getMinute() % 30 == 0
+                && startTime.getSecond() == 0
+                && startTime.getNano() == 0;
     }
 
     private String auditDetail(Appointment appointment, Instant bookedAt) {
