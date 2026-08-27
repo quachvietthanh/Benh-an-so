@@ -46,9 +46,9 @@ export const buildMedicalRecordPayload = ({ visitId, values = {}, vitalSigns = {
   return {
     visitId,
     chiefComplaint: values.chiefComplaint || values.symptoms || '',
-    symptoms: values.symptoms || '',
+    symptoms: values.symptoms || values.chiefComplaint || '',
     medicalHistory: values.medicalHistory || '',
-    physicalExamination: compactText([values.examinationNote, vitalNarrative]),
+    physicalExamination: compactText([values.physicalExamination || values.examinationNote, vitalNarrative]),
     clinicalProgress: values.clinicalProgress || '',
     treatmentPlan: values.treatmentPlan || '',
     doctorInstructions: values.doctorInstructions || values.treatmentPlan || '',

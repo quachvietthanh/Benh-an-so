@@ -120,6 +120,7 @@ export const PERMISSION_DETAILS = {
   MEDICAL_RECORD_UPDATE: { title: 'Cập nhật diễn tiến bệnh án', desc: 'Bác sĩ chỉnh sửa triệu chứng, khám lâm sàng và hướng điều trị' },
   MEDICAL_RECORD_DELETE: { title: 'Hủy / Xóa hồ sơ bệnh án', desc: 'Hủy bệnh án tạo nhầm khi chưa khóa khám' },
   MEDICAL_RECORD_UPDATE_STATUS: { title: 'Khóa bệnh án & Hoàn tất khám', desc: 'Khóa dữ liệu bệnh án và kết thúc ca khám bệnh của người bệnh' },
+  MEDICAL_RECORD_TEMPLATE_MANAGE: { title: 'Quản lý mẫu bệnh án theo chuyên khoa', desc: 'Tạo, sửa, đặt mặc định, cấu hình các trường và bật/tắt mẫu bệnh án chuyên khoa' },
 
   APPOINTMENT_CREATE: { title: 'Đặt lịch hẹn khám mới', desc: 'Tạo phiếu hẹn ngày giờ khám bệnh cho bệnh nhân' },
   APPOINTMENT_READ: { title: 'Xem danh sách lịch hẹn khám', desc: 'Tra cứu danh sách các ca hẹn khám theo ngày và theo bác sĩ' },
