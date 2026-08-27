@@ -44,6 +44,7 @@ public class GetMedicalRecordService implements GetMedicalRecordUseCase {
     private final UserRepository userRepository;
     private final MedicalRecordAuthorizationService authorizationService;
     private final MedicalRecordAccessAuditService accessAuditService;
+    private final MedicalRecordTemplateApplicationMapper templateApplicationMapper;
     private final MedicalRecordResultMapper resultMapper;
     private final ClockPort clockPort;
 
@@ -88,7 +89,8 @@ public class GetMedicalRecordService implements GetMedicalRecordUseCase {
         var visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
         accessAuditService.recordRecordView(visit.getPatientId(), visit.getId(), record.getId(), userId, clockPort.now());
-        return resultMapper.toResult(record);
+        var appliedTemplate = templateApplicationMapper.resolveApplied(record, visit);
+        return appliedTemplate == null ? resultMapper.toResult(record) : resultMapper.toResult(record, appliedTemplate);
     }
 
     private MedicalRecordDetailResult getMedicalRecordDetail(MedicalRecord record) {
@@ -100,9 +102,10 @@ public class GetMedicalRecordService implements GetMedicalRecordUseCase {
         User doctor = userRepository.findById(visit.getDoctorId())
                 .orElseThrow(() -> new UserNotFoundException(visit.getDoctorId().toString()));
         accessAuditService.recordRecordView(visit.getPatientId(), visit.getId(), record.getId(), userId, clockPort.now());
-        return resultMapper.toDetailResult(
-                record, visit, patient, doctor,
-                medicalRecordDiagnosisRepository.findByMedicalRecordId(record.getId())
-        );
+        var diagnoses = medicalRecordDiagnosisRepository.findByMedicalRecordId(record.getId());
+        var appliedTemplate = templateApplicationMapper.resolveApplied(record, visit);
+        return appliedTemplate == null
+                ? resultMapper.toDetailResult(record, visit, patient, doctor, diagnoses)
+                : resultMapper.toDetailResult(record, visit, patient, doctor, diagnoses, appliedTemplate);
     }
 }

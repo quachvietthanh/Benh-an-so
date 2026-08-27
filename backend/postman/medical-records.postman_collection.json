@@ -2,7 +2,7 @@
   "info": {
     "name": "Benh So An - Medical Records",
     "_postman_id": "f2c28d57-1e65-4707-b3bf-2e98c810d013",
-    "description": "Run requests in order against a fresh database migrated through V26.",
+    "description": "Run requests in order against a fresh database migrated through V30.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -15,10 +15,43 @@
     { "key": "seededPatientId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001" },
     { "key": "accessToken", "value": "" },
     { "key": "medicalRecordId", "value": "" },
+    { "key": "draftMedicalRecordId", "value": "", "description": "An empty DRAFT/OPEN record for which the logged-in doctor is responsible." },
+    { "key": "templateId", "value": "", "description": "An active template compatible with the draft record visit specialty." },
     { "key": "primaryDiagnosisCatalogId", "value": "a1000000-0000-0000-0000-000000000019" },
     { "key": "secondaryDiagnosisCatalogId", "value": "a1000000-0000-0000-0000-000000000020" }
   ],
   "item": [
+    {
+      "name": "Template application (run as responsible doctor on empty draft)",
+      "description": "Template application never overwrites clinical content. Use a DRAFT/OPEN record whose clinical fields are blank, then select an active specialty template or the GENERAL default fallback.",
+      "item": [
+        {
+          "name": "Get available and effective template",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/medical-records/{{draftMedicalRecordId}}/template-options"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Template options are returned', function () { pm.response.to.have.status(200); });",
+            "pm.test('Effective template is resolved', function () { pm.expect(pm.response.json().effectiveTemplate).to.not.eql(null); });"
+          ]}}]
+        },
+        {
+          "name": "Apply template (server resolves immutable current version)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"templateId\": \"{{templateId}}\"\n}" },
+            "url": "{{baseUrl}}/medical-records/{{draftMedicalRecordId}}/template"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Template is applied', function () { pm.response.to.have.status(200); });",
+            "pm.test('Applied immutable version is returned', function () { pm.expect(pm.response.json().appliedTemplate.templateVersionId).to.be.a('string'); });"
+          ]}}]
+        }
+      ]
+    },
     {
       "name": "1. Login as Admin",
       "request": {

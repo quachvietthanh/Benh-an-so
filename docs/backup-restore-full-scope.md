@@ -145,4 +145,4 @@ mode. CI must provide a Docker daemon and execute these cases:
 - Acceptance criteria: successful timestamped backup; block failed/in-progress
   restore; admin-only access; audit backup and restore actor/time.
 - Schema sources: `backend/src/main/resources/db/migration/V1`, `V4`, `V6`,
-  `V8` through `V11`, `V16`, `V18`, `V19`, `V21`, `V23`, and `V27`.
+  `V8` through `V11`, `V16`, `V18`, `V19`, `V21`, `V23`, `V29`, and `V30`.

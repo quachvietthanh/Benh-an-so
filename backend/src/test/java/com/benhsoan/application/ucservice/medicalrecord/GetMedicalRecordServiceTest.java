@@ -60,6 +60,8 @@ class GetMedicalRecordServiceTest {
     @Mock
     private MedicalRecordAccessAuditService accessAuditService;
     @Mock
+    private MedicalRecordTemplateApplicationMapper templateApplicationMapper;
+    @Mock
     private MedicalRecordResultMapper resultMapper;
     @Mock
     private ClockPort clockPort;

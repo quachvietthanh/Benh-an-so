@@ -41,6 +41,22 @@ public class MedicalRecordAuthorizationService {
         return currentUserPort.getCurrentUserId();
     }
 
+    public UUID requireContentWriteAccess(UUID medicalRecordId) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("DOCTOR") || currentUserPort.hasRole("ADMIN")) {
+            authorizationAuditService.recordContentWriteDenied(actorId, medicalRecordId);
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return actorId;
+    }
+
+    public void requireContentVisitWriteAccess(UUID actorId, UUID visitDoctorId, UUID medicalRecordId) {
+        if (!actorId.equals(visitDoctorId)) {
+            authorizationAuditService.recordContentWriteDenied(actorId, medicalRecordId);
+            throw new MedicalRecordAccessDeniedException();
+        }
+    }
+
     public UUID requireDiagnosisWriteAccess(UUID medicalRecordId) {
         UUID actorId = currentUserPort.getCurrentUserId();
         if (!currentUserPort.hasRole("DOCTOR") || currentUserPort.hasRole("ADMIN")) {
@@ -48,6 +64,22 @@ public class MedicalRecordAuthorizationService {
             throw new MedicalRecordAccessDeniedException();
         }
         return actorId;
+    }
+
+    public UUID requireTemplateReadAccess(UUID medicalRecordId) {
+        return requireDoctorTemplateAccess(medicalRecordId);
+    }
+
+    public UUID requireTemplateWriteAccess(UUID medicalRecordId) {
+        return requireDoctorTemplateAccess(medicalRecordId);
+    }
+
+    public void requireTemplateVisitAccess(UUID actorId, UUID visitDoctorId, UUID medicalRecordId) {
+        if (!actorId.equals(visitDoctorId)) {
+            authorizationAuditService.recordTemplateAccessDenied(actorId, medicalRecordId,
+                    "Medical record template access denied");
+            throw new MedicalRecordAccessDeniedException();
+        }
     }
 
     public void requireDiagnosisVisitWriteAccess(UUID actorId, UUID visitDoctorId, UUID medicalRecordId) {
@@ -70,5 +102,15 @@ public class MedicalRecordAuthorizationService {
             throw new MedicalRecordAccessDeniedException();
         }
         return currentUserPort.getCurrentUserId();
+    }
+
+    private UUID requireDoctorTemplateAccess(UUID medicalRecordId) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("DOCTOR") || currentUserPort.hasRole("ADMIN")) {
+            authorizationAuditService.recordTemplateAccessDenied(actorId, medicalRecordId,
+                    "Medical record template access denied");
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return actorId;
     }
 }

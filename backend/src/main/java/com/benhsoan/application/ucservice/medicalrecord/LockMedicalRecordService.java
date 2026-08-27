@@ -10,6 +10,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidVisitException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
+import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.result.MedicalRecordResult;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
@@ -28,15 +29,16 @@ public class LockMedicalRecordService implements LockMedicalRecordUseCase {
     private final VisitRepository visitRepository;
     private final MedicalRecordAuthorizationService authorizationService;
     private final MedicalRecordAccessAuditService accessAuditService;
+    private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final MedicalRecordResultMapper resultMapper;
     private final ClockPort clockPort;
 
     @Override
     public MedicalRecordResult lock(UUID medicalRecordId) {
         UUID userId = authorizationService.requireWriteAccess();
-        MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
+        MedicalRecord record = medicalRecordRepository.findByIdForUpdate(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
-        var visit = visitRepository.findById(record.getVisitId())
+        Visit visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
         if (!visit.isActive()) {
             throw new MedicalRecordInvalidVisitException(visit.getId());
@@ -46,6 +48,6 @@ public class LockMedicalRecordService implements LockMedicalRecordUseCase {
         MedicalRecord saved = medicalRecordRepository.save(record);
         accessAuditService.recordRecordAccess(visit.getPatientId(), visit.getId(), saved.getId(), userId,
                 MedicalRecordAccessAction.LOCK, "Medical record locked", now);
-        return resultMapper.toResult(saved);
+        return resultMapper.toResult(saved, templateMapper.resolveApplied(saved, visit));
     }
 }
