@@ -127,9 +127,11 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
             Instant now = clockPort.now();
 
             boolean isNewPatient = candidates.isEmpty();
-            Patient existingPatient = isNewPatient ? null : resolveCandidate(candidates, command);
+            Patient existingPatient = isNewPatient
+                    ? null
+                    : findCandidateForUpdate(resolveCandidate(candidates, command));
             boolean recordsLegacyConsent = existingPatient != null
-                    && (!existingPatient.isConsentAgreed() || existingPatient.isConsentWithdrawn());
+                    && !existingPatient.isConsentAgreed();
             Patient patient = isNewPatient
                     ? createPatient(command, phone, userId, consentVersion)
                     : linkCandidate(existingPatient, userId, consentVersion, now, recordsLegacyConsent);
@@ -217,6 +219,17 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
             candidate.renewConsent(consentVersion, now);
         }
         return candidate;
+    }
+
+    private Patient findCandidateForUpdate(Patient candidate) {
+        Patient lockedCandidate = patientRepository.findByIdForUpdate(candidate.getId())
+                .orElseThrow(() -> new PhoneAlreadyExistsException(DUPLICATE_PHONE_MESSAGE));
+
+        if (lockedCandidate.getUserId() != null) {
+            throw new PhoneAlreadyExistsException(DUPLICATE_PHONE_MESSAGE);
+        }
+
+        return lockedCandidate;
     }
 
     private Patient resolveCandidate(

@@ -49,7 +49,7 @@ public class UpdatePatientService
     @Override
     public PatientResult update( UUID patientId, UpdatePatientCommand command ) {
 
-        Patient patient = patientRepository.findById(patientId)
+        Patient patient = patientRepository.findByIdForUpdate(patientId)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
 
         validate(
@@ -131,6 +131,13 @@ public class UpdatePatientService
             if (!currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")) {
                 throw new PatientConsentAccessDeniedException();
             }
+        }
+
+        if (Boolean.FALSE.equals(command.consentAgreed())
+                && !Boolean.TRUE.equals(command.consentWithdrawn())) {
+            throw new ValidationException(
+                    "consentAgreed=false requires consentWithdrawn=true to withdraw consent."
+            );
         }
 
         if (Boolean.TRUE.equals(command.consentWithdrawn())) {

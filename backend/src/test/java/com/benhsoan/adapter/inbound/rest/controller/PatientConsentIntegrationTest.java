@@ -29,6 +29,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.PatientRestMapper;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
@@ -352,6 +353,29 @@ class PatientConsentIntegrationTest {
                         .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PATIENT_CONSENT_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("TC-03: consentAgreed=false không kèm consentWithdrawn=true trả 400")
+    void rejectsFalseConsentWithoutWithdrawalRequest() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        when(updatePatientUseCase.update(any(UUID.class), any(UpdatePatientCommand.class)))
+                .thenThrow(new ValidationException(
+                        "consentAgreed=false requires consentWithdrawn=true to withdraw consent."
+                ));
+
+        mockMvc.perform(put("/patients/{patientId}/consent", patientId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "consentAgreed": false
+                                }
+                                """)
+                        .with(user("receptionist").authorities(
+                                new SimpleGrantedAuthority("PERMISSION_PATIENT_CONSENT_UPDATE")
+                        )))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
     @Test

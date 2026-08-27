@@ -90,7 +90,7 @@ class UpdatePatientServiceTest {
         );
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
@@ -113,6 +113,8 @@ class UpdatePatientServiceTest {
         assertTrue(result.active(), "Hồ sơ vẫn active cho khám chữa bệnh");
 
         verify(patientRepository).save(any(Patient.class));
+        verify(patientRepository).findByIdForUpdate(patientId);
+        verify(patientRepository, never()).findById(patientId);
         verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
         verify(auditLogRepository).save(any(AuditLog.class));
     }
@@ -140,7 +142,7 @@ class UpdatePatientServiceTest {
         );
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(false);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
                 .fullName("Nguyen Van A")
@@ -178,7 +180,7 @@ class UpdatePatientServiceTest {
                 currentUserId
         );
 
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
@@ -222,7 +224,7 @@ class UpdatePatientServiceTest {
         );
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
@@ -252,7 +254,7 @@ class UpdatePatientServiceTest {
         existing.withdrawConsent("Nguoi benh da rut consent", null);
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
                 .fullName("Nguyen Van A")
@@ -280,7 +282,7 @@ class UpdatePatientServiceTest {
         existing.withdrawConsent("Nguoi benh da rut consent", null);
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
@@ -320,7 +322,7 @@ class UpdatePatientServiceTest {
         existing.withdrawConsent("Nguoi benh da rut consent", null);
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
                 .fullName("Nguyen Van A")
@@ -348,7 +350,7 @@ class UpdatePatientServiceTest {
                 true, "v1.0", currentUserId
         );
 
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
@@ -387,7 +389,7 @@ class UpdatePatientServiceTest {
         existing.withdrawConsent("Lý do ban đầu", initialWithdrawal);
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
@@ -417,7 +419,7 @@ class UpdatePatientServiceTest {
         existing.withdrawConsent("Lý do ban đầu", java.time.Instant.now());
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(false);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
                 .fullName("Nguyen Van A")
@@ -444,7 +446,7 @@ class UpdatePatientServiceTest {
                 true, "v1.0", currentUserId
         );
 
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePatientCommand command = UpdatePatientCommand.builder()
@@ -461,5 +463,35 @@ class UpdatePatientServiceTest {
         assertNotNull(result);
         verify(patientRepository, never()).existsByIdentityNumberAndIdNot(any(), any());
         verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("TC-03: Từ chối consentAgreed=false khi không yêu cầu rút consent")
+    void rejectsFalseConsentWithoutWithdrawalRequest() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Nguyen Van B", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .consentAgreed(false)
+                .build();
+
+        ValidationException exception = assertThrows(
+                ValidationException.class,
+                () -> service.update(patientId, command)
+        );
+
+        assertEquals(
+                "consentAgreed=false requires consentWithdrawn=true to withdraw consent.",
+                exception.getMessage()
+        );
+        verify(patientRepository, never()).save(any(Patient.class));
     }
 }

@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -125,6 +126,7 @@ class PatientPortalRegistrationServiceTest {
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
         stubTokenIssuance();
@@ -161,6 +163,7 @@ class PatientPortalRegistrationServiceTest {
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
         stubTokenIssuance();
@@ -201,6 +204,7 @@ class PatientPortalRegistrationServiceTest {
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.findByIdForUpdate(existing.getId())).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
         stubTokenIssuance();
@@ -321,6 +325,7 @@ class PatientPortalRegistrationServiceTest {
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
         stubTokenIssuance();
@@ -360,6 +365,7 @@ class PatientPortalRegistrationServiceTest {
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
         stubTokenIssuance();
@@ -409,6 +415,7 @@ class PatientPortalRegistrationServiceTest {
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(other, byIdentity));
+        when(patientRepository.findByIdForUpdate(byIdentity.getId())).thenReturn(Optional.of(byIdentity));
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(clockPort.now()).thenReturn(NOW);
         stubTokenIssuance();
@@ -419,6 +426,45 @@ class PatientPortalRegistrationServiceTest {
 
         verify(byIdentity).linkUser(any(UUID.class));
         verify(other, never()).linkUser(any(UUID.class));
+    }
+
+    @Test
+    void linksTheFreshLockedCandidateWithoutOverwritingWithdrawal() {
+        UUID roleId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
+
+        Patient staleCandidate = Patient.restore(
+                patientId, "BN000001", FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE,
+                PHONE, null, null, null, null, null, null, null, true,
+                NOW.minusSeconds(60), NOW.minusSeconds(60), null, UUID.randomUUID(),
+                true, NOW.minusSeconds(60), "v1.0", false, null, null, false);
+        Patient lockedCandidate = Patient.restore(
+                patientId, "BN000001", FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE,
+                PHONE, null, null, null, null, null, null, null, true,
+                NOW.minusSeconds(60), NOW.minusSeconds(10), null, UUID.randomUUID(),
+                true, NOW.minusSeconds(60), "v1.0", true, NOW.minusSeconds(10), "Withdrawn", true);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(staleCandidate));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(lockedCandidate));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
+
+        service.register(command());
+
+        assertTrue(lockedCandidate.isConsentWithdrawn());
+        assertTrue(lockedCandidate.isNonMedicalUseRestricted());
+        ArgumentCaptor<Patient> savedPatient = ArgumentCaptor.forClass(Patient.class);
+        verify(patientRepository).save(savedPatient.capture());
+        assertSame(lockedCandidate, savedPatient.getValue());
     }
 
     @Test
