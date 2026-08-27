@@ -1,5 +1,6 @@
 import React from 'react'
 import {
+  Alert,
   Button,
   DatePicker,
   Form,
@@ -21,6 +22,8 @@ function ServiceCreateModal({
   onFinish,
   form,
   loading,
+  formError,
+  onClearError,
 }) {
   return (
     <Modal
@@ -52,14 +55,32 @@ function ServiceCreateModal({
         form={form}
         layout="vertical"
         onFinish={onFinish}
+        onValuesChange={onClearError}
       >
+        {formError && (
+          <Alert
+            className="service-modal-alert"
+            type="error"
+            showIcon
+            message={formError}
+            closable
+            onClose={onClearError}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <div className="service-form-grid">
           <Form.Item
             name="serviceCode"
             label="Mã dịch vụ"
+            normalize={(val) => (val ? String(val).toUpperCase() : val)}
             rules={[
               { required: true, message: 'Vui lòng nhập mã dịch vụ' },
               { max: 50, message: 'Mã không quá 50 ký tự' },
+              {
+                pattern: /^[A-Za-z0-9_.-]+$/,
+                message: 'Mã dịch vụ chỉ gồm chữ cái, chữ số, gạch ngang (-) hoặc gạch dưới (_)',
+              },
             ]}
           >
             <Input size="large" placeholder="VD: DV-KHAM-NOI, XQ-TIM-PHOI..." />

@@ -3,15 +3,16 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Form, Input, Button, message } from 'antd'
 import { UserOutlined, LockOutlined, SearchOutlined } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
+import { getDefaultHomePath } from '../components/layout/navigationConfig'
 import './login.css'
 
 function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const { login, isAuthenticated } = useAuthContext()
+  const { login, isAuthenticated, user } = useAuthContext()
 
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />
+  if (isAuthenticated && user) {
+    return <Navigate to={getDefaultHomePath(user?.roles, user?.permissions)} replace />
   }
 
   const handleSubmit = async (values) => {
@@ -20,7 +21,9 @@ function Login() {
       const result = await login(values)
       if (result.success) {
         message.success('Đăng nhập thành công!')
-        navigate('/', { replace: true })
+        const targetUser = result.user || JSON.parse(localStorage.getItem('user') || '{}')
+        const destination = getDefaultHomePath(targetUser?.roles, targetUser?.permissions)
+        navigate(destination, { replace: true })
       } else {
         message.error(result.message || 'Đăng nhập thất bại')
       }

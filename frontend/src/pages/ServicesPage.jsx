@@ -33,6 +33,7 @@ import systemApi from '../api/systemApi'
 import { useAuthContext } from '../context/AuthContext'
 import {
   categorizePriceHistory,
+  extractServiceFormErrors,
   fixMojibake,
   formatDateDisplay,
   formatServiceCurrency,
@@ -63,6 +64,8 @@ function ServicesPage() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingService, setEditingService] = useState(null)
   const [savingService, setSavingService] = useState(false)
+  const [createFormError, setCreateFormError] = useState(null)
+  const [editFormError, setEditFormError] = useState(null)
 
   // Price History Drawer States
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false)
@@ -173,6 +176,7 @@ function ServicesPage() {
 
   // Handle open create modal
   const handleOpenCreateModal = () => {
+    setCreateFormError(null)
     createForm.resetFields()
     createForm.setFieldsValue({
       effectiveFrom: dayjs(),
@@ -183,16 +187,23 @@ function ServicesPage() {
   // Handle submit create service
   const handleCreateService = async (values) => {
     setSavingService(true)
+    setCreateFormError(null)
     try {
       const payload = prepareCreateServicePayload(values)
       await systemApi.createService(payload)
       message.success(`Đã thêm mới dịch vụ "${values.name}" thành công!`)
       setCreateModalOpen(false)
+      setCreateFormError(null)
       createForm.resetFields()
       loadServices()
     } catch (err) {
       console.error('[ServicesPage] Lỗi tạo dịch vụ:', err)
-      message.error(translateServiceErrorMessage(err))
+      const { errorMessage, fieldErrors } = extractServiceFormErrors(err)
+      setCreateFormError(errorMessage)
+      if (fieldErrors && fieldErrors.length > 0) {
+        createForm.setFields(fieldErrors)
+      }
+      message.error(errorMessage)
     } finally {
       setSavingService(false)
     }
@@ -200,6 +211,7 @@ function ServicesPage() {
 
   // Handle open edit modal
   const handleOpenEditModal = (service) => {
+    setEditFormError(null)
     setEditingService(service)
     editForm.resetFields()
     editForm.setFieldsValue({
@@ -216,16 +228,23 @@ function ServicesPage() {
   const handleUpdateService = async (values) => {
     if (!editingService?.id) return
     setSavingService(true)
+    setEditFormError(null)
     try {
       const payload = prepareUpdateServicePayload(values, editingService)
       await systemApi.updateService(editingService.id, payload)
       message.success(`Đã cập nhật dịch vụ "${values.name}" thành công!`)
       setEditModalOpen(false)
+      setEditFormError(null)
       setEditingService(null)
       loadServices()
     } catch (err) {
       console.error('[ServicesPage] Lỗi cập nhật dịch vụ:', err)
-      message.error(translateServiceErrorMessage(err))
+      const { errorMessage, fieldErrors } = extractServiceFormErrors(err)
+      setEditFormError(errorMessage)
+      if (fieldErrors && fieldErrors.length > 0) {
+        editForm.setFields(fieldErrors)
+      }
+      message.error(errorMessage)
     } finally {
       setSavingService(false)
     }
@@ -571,10 +590,15 @@ function ServicesPage() {
       {/* Modal: Thêm dịch vụ mới */}
       <ServiceCreateModal
         open={createModalOpen}
-        onCancel={() => setCreateModalOpen(false)}
+        onCancel={() => {
+          setCreateModalOpen(false)
+          setCreateFormError(null)
+        }}
         onFinish={handleCreateService}
         form={createForm}
         loading={savingService}
+        formError={createFormError}
+        onClearError={() => setCreateFormError(null)}
       />
 
       {/* Modal: Sửa thông tin & Điều chỉnh bảng giá */}
@@ -582,11 +606,14 @@ function ServicesPage() {
         open={editModalOpen}
         onCancel={() => {
           setEditModalOpen(false)
+          setEditFormError(null)
           setEditingService(null)
         }}
         onFinish={handleUpdateService}
         form={editForm}
         loading={savingService}
+        formError={editFormError}
+        onClearError={() => setEditFormError(null)}
       />
 
       {/* Drawer: Lịch sử giá dịch vụ */}

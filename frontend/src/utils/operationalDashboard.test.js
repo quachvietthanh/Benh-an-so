@@ -7,6 +7,7 @@ import {
   getVisitPercentage,
   normalizeOperationalDashboard,
 } from './operationalDashboard.js'
+import { getDefaultHomePath } from './roleRouting.js'
 
 test('normalizes the operational dashboard response from the backend contract', () => {
   const result = normalizeOperationalDashboard({
@@ -98,6 +99,26 @@ test('buildOperationalSnapshotFromReports seamlessly creates snapshot from repor
   assert.equal(snapshot.visitSummary.completed, 15)
   assert.equal(snapshot.visitSummary.cancelled, 1)
   assert.equal(snapshot.visitSummary.total, 18)
+
   assert.equal(snapshot.revenueSummary.totalRevenueToday, 4500000)
   assert.equal(snapshot.inventoryAlertSummary.lowStockCount, 1)
+})
+
+test('getDefaultHomePath directs each role to its primary allowed workspace without showing 403 dashboard', () => {
+  // Admin / Manager / Clinic Manager -> '/' (Dashboard)
+  assert.equal(getDefaultHomePath(['admin']), '/')
+  assert.equal(getDefaultHomePath(['manager']), '/')
+  assert.equal(getDefaultHomePath(['clinic_manager']), '/')
+  assert.equal(getDefaultHomePath([], ['DASHBOARD_OPERATIONAL_READ']), '/')
+
+  // Doctor -> '/medical-records'
+  assert.equal(getDefaultHomePath(['doctor']), '/medical-records')
+  assert.equal(getDefaultHomePath(['ROLE_DOCTOR']), '/medical-records')
+  assert.equal(getDefaultHomePath([], ['MEDICAL_RECORD_READ']), '/medical-records')
+
+  // Receptionist -> '/appointments'
+  assert.equal(getDefaultHomePath(['receptionist']), '/appointments')
+
+  // Pharmacist -> '/pharmacy'
+  assert.equal(getDefaultHomePath(['pharmacist']), '/pharmacy')
 })

@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { Form, Input, Modal, Select, message } from 'antd'
+import { Alert, Form, Input, Modal, Select, message } from 'antd'
 import { InfoCircleOutlined, PlusCircleOutlined } from '@ant-design/icons'
 import diagnosisCatalogApi from '../../api/diagnosisCatalogApi'
-import { getApiErrorMessage } from '../../utils/apiError'
+import { getApiErrorMessage, normalizeApiError } from '../../utils/apiError'
 import { icd10Categories } from '../../utils/icd10Data'
 
 const { TextArea } = Input
@@ -17,9 +17,11 @@ const diseaseGroupOptions = icd10Categories
 function DiagnosisCatalogCreateModal({ open, onCancel, onSuccess }) {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState(null)
 
   const handleFinish = async (values) => {
     setLoading(true)
+    setFormError(null)
     try {
       const payload = {
         code: String(values.code || '').trim().toUpperCase(),
@@ -31,15 +33,42 @@ function DiagnosisCatalogCreateModal({ open, onCancel, onSuccess }) {
       await diagnosisCatalogApi.create(payload)
       message.success(`Đã thêm mã bệnh [${payload.code}] ${payload.name} thành công!`)
       form.resetFields()
+      setFormError(null)
       if (typeof onSuccess === 'function') {
         onSuccess()
       }
     } catch (err) {
-      const apiCode = err?.apiError?.code || err?.response?.data?.code
-      if (apiCode === 'DIAGNOSIS_CATALOG_CODE_EXISTS' || apiCode === 'DUPLICATE_CODE') {
-        message.error(`Mã bệnh [${form.getFieldValue('code')}] đã tồn tại trong danh mục hệ thống.`)
+      const normalized = normalizeApiError(err)
+      const apiCode = normalized.code || err?.apiError?.code || err?.response?.data?.code
+      const codeVal = form.getFieldValue('code') || ''
+
+      let errorText = ''
+      const fieldErrors = []
+
+      if (
+        apiCode === 'DIAGNOSIS_CATALOG_CODE_ALREADY_EXISTS' ||
+        apiCode === 'DIAGNOSIS_CATALOG_CODE_EXISTS' ||
+        apiCode === 'DUPLICATE_CODE' ||
+        (normalized.message && normalized.message.toLowerCase().includes('already exists')) ||
+        (normalized.message && normalized.message.toLowerCase().includes('code'))
+      ) {
+        errorText = `Mã bệnh [${codeVal.toUpperCase()}] đã tồn tại trong danh mục hệ thống. Vui lòng nhập mã bệnh khác.`
+        fieldErrors.push({
+          name: 'code',
+          errors: [`Mã bệnh [${codeVal.toUpperCase()}] đã tồn tại trong danh mục hệ thống.`],
+        })
+      } else if (normalized.fields && Object.keys(normalized.fields).length > 0) {
+        Object.entries(normalized.fields).forEach(([fName, fMsg]) => {
+          fieldErrors.push({ name: fName, errors: [fMsg] })
+        })
+        errorText = Object.values(normalized.fields)[0]
       } else {
-        message.error(getApiErrorMessage(err, 'Không thể tạo mã bệnh mới. Vui lòng kiểm tra lại dữ liệu.'))
+        errorText = getApiErrorMessage(err, 'Không thể tạo mã bệnh mới. Vui lòng kiểm tra lại dữ liệu.')
+      }
+
+      setFormError(errorText)
+      if (fieldErrors.length > 0) {
+        form.setFields(fieldErrors)
       }
     } finally {
       setLoading(false)
@@ -49,6 +78,7 @@ function DiagnosisCatalogCreateModal({ open, onCancel, onSuccess }) {
   const handleModalCancel = () => {
     if (!loading) {
       form.resetFields()
+      setFormError(null)
       if (typeof onCancel === 'function') {
         onCancel()
       }
@@ -82,10 +112,24 @@ function DiagnosisCatalogCreateModal({ open, onCancel, onSuccess }) {
         form={form}
         layout="vertical"
         onFinish={handleFinish}
+        onValuesChange={() => {
+          if (formError) setFormError(null)
+        }}
         initialValues={{
           diseaseGroup: 'Hô hấp',
         }}
       >
+        {formError && (
+          <Alert
+            type="error"
+            showIcon
+            message={formError}
+            closable
+            onClose={() => setFormError(null)}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <Form.Item
           name="code"
           label="Mã bệnh ICD (Mã số)"

@@ -118,7 +118,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       setUser(normalizedUser)
 
-      return { success: true }
+      return { success: true, user: normalizedUser }
     } catch (error) {
       const message =
         error.response?.data?.message ||
