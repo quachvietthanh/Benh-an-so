@@ -1,0 +1,66 @@
+.template-management-page {
+  padding: 24px;
+  max-width: 1380px;
+  margin: 0 auto;
+}
+
+.template-management-header {
+  margin-bottom: 20px;
+}
+
+.template-management-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.template-filter-card {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.template-table-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.template-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.template-name-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-badge-default {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.section-config-editor-compact {
+  background: #ffffff;
+}
+
+.section-config-editor-compact table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.section-config-editor-compact table tbody tr td {
+  vertical-align: middle;
+}

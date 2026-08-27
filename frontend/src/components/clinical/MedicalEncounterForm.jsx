@@ -34,6 +34,7 @@ import { icd10Categories } from '../../utils/icd10Data'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
 import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
+import DynamicMedicalRecordSections from './DynamicMedicalRecordSections'
 
 const { Title, Text } = Typography
 
@@ -85,6 +86,14 @@ function MedicalEncounterForm({
   setPrintModalOpen,
   serviceCatalogError,
   onOpenSignModal,
+  specialties = [],
+  selectedSpecialtyId = '',
+  onSpecialtyChange = () => {},
+  availableTemplates = [],
+  selectedTemplateId = '',
+  onTemplateChange = () => {},
+  currentTemplate = null,
+  templateLoading = false,
 }) {
   const [icdTableSearch, setIcdTableSearch] = useState('')
   const [icdTableCategory, setIcdTableCategory] = useState('ALL')
@@ -253,28 +262,64 @@ function MedicalEncounterForm({
 
         <Col xs={24} lg={16}>
           <Card
-            title={<span style={{ color: '#1E3A8A' }}><MedicineBoxOutlined /> Khám lâm sàng</span>}
-            style={{ marginBottom: 16 }}
-            bordered
+            size="small"
+            style={{
+              marginBottom: 16,
+              background: '#f8fafc',
+              borderColor: '#cbd5e1',
+              borderRadius: 8,
+            }}
+            bodyStyle={{ padding: '10px 14px' }}
           >
-            <Form.Item
-              name="symptoms"
-              label="Lý do khám / Triệu chứng cơ năng"
-              rules={[{ required: true, message: 'Nhập triệu chứng lâm sàng' }]}
-            >
-              <Input.TextArea
-                rows={2}
-                placeholder="Ví dụ: Đau đầu kéo dài, sốt nhẹ 38 độ, ho hắt hơi, đau vùng thượng vị..."
-              />
-            </Form.Item>
-
-            <Form.Item name="examinationNote" label="Khám lâm sàng & Tiền sử bệnh lý">
-              <Input.TextArea
-                rows={3}
-                placeholder="Ghi chép khám tim phổi, bụng, thần kinh, các dấu hiệu thực thể..."
-              />
-            </Form.Item>
+            <Row gutter={[12, 8]} align="middle">
+              <Col xs={24} sm={11}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text strong style={{ fontSize: 13, color: '#334155', minWidth: 85 }}>
+                    Chuyên khoa:
+                  </Text>
+                  <Select
+                    size="middle"
+                    style={{ flex: 1 }}
+                    value={selectedSpecialtyId || undefined}
+                    onChange={onSpecialtyChange}
+                    disabled={!isDoctor || isSigned}
+                    placeholder="Chọn chuyên khoa..."
+                    options={specialties.map((s) => ({
+                      value: s.id,
+                      label: `${s.name} (${s.code})`,
+                    }))}
+                  />
+                </div>
+              </Col>
+              <Col xs={24} sm={13}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text strong style={{ fontSize: 13, color: '#334155', minWidth: 90 }}>
+                    Mẫu bệnh án:
+                  </Text>
+                  <Select
+                    size="middle"
+                    style={{ flex: 1 }}
+                    value={selectedTemplateId || undefined}
+                    onChange={onTemplateChange}
+                    disabled={!isDoctor || isSigned || templateLoading}
+                    loading={templateLoading}
+                    placeholder={templateLoading ? 'Đang nạp mẫu...' : 'Chọn mẫu áp dụng...'}
+                    options={availableTemplates.map((t) => ({
+                      value: t.id,
+                      label: `${t.name} (v${t.currentVersionNo || 1})${t.defaultTemplate ? ' [Mặc định]' : ''}`,
+                    }))}
+                  />
+                </div>
+              </Col>
+            </Row>
           </Card>
+
+          <DynamicMedicalRecordSections
+            sections={currentTemplate?.sections}
+            template={currentTemplate}
+            disabled={!isDoctor || isSigned}
+            loading={templateLoading}
+          />
 
           <Card
             title={
