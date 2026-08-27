@@ -1,5 +1,5 @@
 -- =====================================================
--- V30__add_patient_phone_index.sql
+-- V33__add_patient_phone_index.sql
 -- NCL-14-CN-001 P1: normalize existing patient phone numbers to a canonical
 -- "0..." format and add an index to make phone-based candidate lookup efficient
 -- and deterministic.
