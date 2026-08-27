@@ -26,12 +26,14 @@ import {
   MedicineBoxOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SwapOutlined,
   SyncOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
 import patientPortalAppointmentApi from '../api/patientPortalAppointmentApi'
+import RescheduleAppointmentModal from '../components/portal/RescheduleAppointmentModal'
 import { useAuthContext } from '../context/AuthContext'
 import './patientMyAppointments.css'
 
@@ -56,6 +58,10 @@ function PatientMyAppointmentsPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [targetAppointment, setTargetAppointment] = useState(null)
 
+  // Reschedule Modal State
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false)
+  const [rescheduleTargetAppointment, setRescheduleTargetAppointment] = useState(null)
+
   const patientId = user?.patientId || user?.id
 
   const fetchAppointments = useCallback(async () => {
@@ -68,23 +74,19 @@ function PatientMyAppointmentsPage() {
     }
 
     try {
-      if (patientId) {
-        const res = await patientPortalAppointmentApi.getMyAppointments(patientId)
-        const data = res.data
-        const apiList = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
-        const combined = [...apiList]
-        cachedList.forEach((cached) => {
-          if (!combined.some((item) => item.id === cached.id || (item.appointmentCode && item.appointmentCode === cached.appointmentCode))) {
-            combined.push(cached)
-          }
-        })
-        const sorted = combined.sort((a, b) => new Date(b.startTime || b.createdAt) - new Date(a.startTime || a.createdAt))
-        setAppointments(sorted)
-      } else {
-        setAppointments(cachedList)
-      }
+      const res = await patientPortalAppointmentApi.getMyAppointments(patientId)
+      const data = res.data
+      const apiList = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
+      const combined = [...apiList]
+      cachedList.forEach((cached) => {
+        if (!combined.some((item) => item.id === cached.id || (item.appointmentCode && item.appointmentCode === cached.appointmentCode))) {
+          combined.push(cached)
+        }
+      })
+      const sorted = combined.sort((a, b) => new Date(b.startTime || b.createdAt) - new Date(a.startTime || a.createdAt))
+      setAppointments(sorted)
     } catch {
-      // If API returns 403 Forbidden due to backend permission, fallback to local cache
+      // If API returns error, fallback to local cache
       setAppointments(cachedList)
     } finally {
       setLoading(false)
@@ -109,6 +111,15 @@ function PatientMyAppointmentsPage() {
     return appointments
   }, [appointments, activeTab])
 
+  // Rule: Only SCHEDULED/CONFIRMED appointments in the FUTURE can be rescheduled or cancelled
+  const canModifyAppointment = (apt) => {
+    if (!apt) return false
+    const validStatus = apt.status === 'SCHEDULED' || apt.status === 'CONFIRMED'
+    const isFuture = apt.startTime ? dayjs(apt.startTime).isAfter(dayjs()) : true
+    return validStatus && isFuture
+  }
+
+  // Cancel Handlers
   const handleOpenCancelModal = (apt) => {
     setTargetAppointment(apt)
     setCancelReason('')
@@ -118,14 +129,34 @@ function PatientMyAppointmentsPage() {
   const handleConfirmCancel = async () => {
     if (!targetAppointment) return
     setCancellingId(targetAppointment.id)
+    const oldStartTime = targetAppointment.startTime
+    const oldDoctorId = targetAppointment.doctorId || targetAppointment.doctor?.id
+    const oldDate = oldStartTime ? dayjs(oldStartTime).format('YYYY-MM-DD') : null
+    const oldTimeStr = oldStartTime ? dayjs(oldStartTime).format('HH:mm') : null
+
     try {
       await patientPortalAppointmentApi.cancelAppointment(
         targetAppointment.id,
-        cancelReason.trim() || 'Bệnh nhân chủ động hủy lịch hẹn trên portal'
+        cancelReason.trim() || undefined
       )
-    } catch {
-      // ignore backend error if 403
-    } finally {
+
+      // Verification: verify old slot is released on backend
+      if (oldDoctorId && oldDate) {
+        try {
+          const verifyRes = await patientPortalAppointmentApi.getAvailableSlots(oldDoctorId, oldDate)
+          const freedSlots = verifyRes.data || []
+          const oldSlotObj = freedSlots.find((s) => s.time === oldTimeStr)
+          if (oldSlotObj && oldSlotObj.isAvailable === false) {
+            console.warn(`[Verification] Cảnh báo: Khung giờ cũ ${oldTimeStr} chưa được giải phóng trên Backend!`)
+          } else {
+            console.log(`[Verification] Xác nhận thành công: Khung giờ cũ ${oldTimeStr} đã được giải phóng (isAvailable=true).`)
+          }
+        } catch {
+          // non-blocking
+        }
+      }
+
+      // Update in localStorage
       try {
         const cached = JSON.parse(localStorage.getItem('portal_booked_appointments') || '[]')
         const updated = cached.map((item) =>
@@ -137,6 +168,8 @@ function PatientMyAppointmentsPage() {
       } catch {
         // ignore
       }
+
+      // Update in state
       setAppointments((prev) =>
         prev.map((item) =>
           item.id === targetAppointment.id || item.appointmentCode === targetAppointment.appointmentCode
@@ -144,10 +177,86 @@ function PatientMyAppointmentsPage() {
             : item
         )
       )
+
       message.success('Đã hủy lịch hẹn thành công!')
       setCancelModalOpen(false)
       setTargetAppointment(null)
+    } catch (err) {
+      const status = err?.response?.status
+      if (status === 403) {
+        message.error('Bạn không có quyền thao tác trên lịch hẹn này.')
+      } else if (status === 400) {
+        message.error('Lịch hẹn này không thể đổi/hủy (đã qua giờ hoặc đã được xử lý).')
+        fetchAppointments()
+        setCancelModalOpen(false)
+      } else if (status === 404) {
+        message.warning('Lịch hẹn không tìm thấy trên hệ thống hoặc Backend chưa được khởi động lại để nhận API mới.')
+        // Cập nhật trạng thái cục bộ để không làm nghẽn người dùng
+        try {
+          const cached = JSON.parse(localStorage.getItem('portal_booked_appointments') || '[]')
+          const updated = cached.map((item) =>
+            item.id === targetAppointment.id || item.appointmentCode === targetAppointment.appointmentCode
+              ? { ...item, status: 'CANCELLED' }
+              : item
+          )
+          localStorage.setItem('portal_booked_appointments', JSON.stringify(updated))
+        } catch {
+          // ignore
+        }
+        setAppointments((prev) =>
+          prev.map((item) =>
+            item.id === targetAppointment.id || item.appointmentCode === targetAppointment.appointmentCode
+              ? { ...item, status: 'CANCELLED' }
+              : item
+          )
+        )
+        setCancelModalOpen(false)
+        setTargetAppointment(null)
+      } else {
+        const errorMsg = err?.response?.data?.message || 'Không thể hủy lịch hẹn. Vui lòng thử lại sau.'
+        message.error(errorMsg)
+      }
+    } finally {
       setCancellingId(null)
+    }
+  }
+
+  // Reschedule Handlers
+  const handleOpenRescheduleModal = (apt) => {
+    setRescheduleTargetAppointment(apt)
+    setRescheduleModalOpen(true)
+  }
+
+  const handleRescheduleSuccess = (updatedData) => {
+    if (!updatedData) return
+    setAppointments((prev) =>
+      prev.map((item) =>
+        item.id === updatedData.id || item.appointmentCode === updatedData.appointmentCode
+          ? {
+              ...item,
+              startTime: updatedData.startTime,
+              endTime: updatedData.endTime,
+              reason: updatedData.reason || item.reason,
+            }
+          : item
+      )
+    )
+
+    try {
+      const cached = JSON.parse(localStorage.getItem('portal_booked_appointments') || '[]')
+      const updated = cached.map((item) =>
+        item.id === updatedData.id || item.appointmentCode === updatedData.appointmentCode
+          ? {
+              ...item,
+              startTime: updatedData.startTime,
+              endTime: updatedData.endTime,
+              reason: updatedData.reason || item.reason,
+            }
+          : item
+      )
+      localStorage.setItem('portal_booked_appointments', JSON.stringify(updated))
+    } catch {
+      // ignore
     }
   }
 
@@ -311,18 +420,34 @@ function PatientMyAppointmentsPage() {
                       </Col>
 
                       <Col xs={24} md={8} style={{ textAlign: { xs: 'left', md: 'right' } }}>
-                        {canCancel && (
-                          <Button
-                            danger
-                            size="middle"
-                            onClick={() => handleOpenCancelModal(apt)}
-                          >
-                            Hủy lịch hẹn
-                          </Button>
-                        )}
-                        {!canCancel && (
+                        {canModifyAppointment(apt) ? (
+                          <Space size={8} wrap>
+                            <Button
+                              className="portal-action-btn-reschedule"
+                              icon={<SwapOutlined />}
+                              onClick={() => handleOpenRescheduleModal(apt)}
+                            >
+                              Đổi lịch
+                            </Button>
+                            <Button
+                              className="portal-action-btn-cancel"
+                              icon={<CloseCircleOutlined />}
+                              onClick={() => handleOpenCancelModal(apt)}
+                            >
+                              Hủy lịch
+                            </Button>
+                          </Space>
+                        ) : (
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            {apt.status === 'COMPLETED' ? 'Đã hoàn tất khám bệnh' : 'Lịch hẹn đã kết thúc'}
+                            {apt.status === 'COMPLETED'
+                              ? 'Đã hoàn tất khám bệnh'
+                              : apt.status === 'CANCELLED'
+                              ? 'Lịch hẹn đã hủy'
+                              : apt.status === 'IN_PROGRESS'
+                              ? 'Đang tiến hành khám'
+                              : apt.status === 'NO_SHOW'
+                              ? 'Không đến khám'
+                              : 'Lịch hẹn đã qua giờ khám'}
                           </Text>
                         )}
                       </Col>
@@ -357,16 +482,31 @@ function PatientMyAppointmentsPage() {
         </div>
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-            Lý do hủy lịch (tùy chọn):
+            Lý do hủy lịch (tùy chọn, tối đa 500 ký tự):
           </div>
           <Input.TextArea
             rows={2}
+            maxLength={500}
+            showCount
             placeholder="Nhập lý do bạn muốn hủy lịch hẹn..."
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
+            style={{ borderRadius: 8 }}
           />
         </div>
       </Modal>
+
+      {/* Reschedule Modal */}
+      <RescheduleAppointmentModal
+        open={rescheduleModalOpen}
+        onClose={() => {
+          setRescheduleModalOpen(false)
+          setRescheduleTargetAppointment(null)
+        }}
+        appointment={rescheduleTargetAppointment}
+        onSuccess={handleRescheduleSuccess}
+        onRefreshAppointments={fetchAppointments}
+      />
     </div>
   )
 }

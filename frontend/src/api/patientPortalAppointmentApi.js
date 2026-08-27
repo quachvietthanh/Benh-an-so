@@ -16,14 +16,28 @@ const patientPortalAppointmentApi = {
     return axiosClient.post('/patient-portal/appointments', data)
   },
   getMyAppointments: (patientId) => {
-    return axiosClient.get('/appointments', {
-      params: { patientId, size: 100 },
-    })
+    return axiosClient.get('/patient-portal/appointments')
+      .catch((err) => {
+        if (patientId) {
+          return axiosClient.get('/appointments', {
+            params: { patientId, size: 100 },
+          })
+        }
+        throw err
+      })
   },
-  cancelAppointment: (id, reason) => {
-    return axiosClient.patch(`/appointments/${id}/cancel`, {
-      reason: reason || 'Bệnh nhân yêu cầu hủy lịch trực tuyến',
-    })
+  cancelAppointment: (id, cancellationReason) => {
+    const payload = {}
+    if (cancellationReason && cancellationReason.trim()) {
+      payload.cancellationReason = cancellationReason.trim()
+    }
+    return axiosClient.patch(`/patient-portal/appointments/${id}/cancel`, payload)
+  },
+  rescheduleAppointment: (id, data) => {
+    return axiosClient.put(`/patient-portal/appointments/${id}/reschedule`, data)
+  },
+  getAppointmentDetail: (id) => {
+    return axiosClient.get(`/patient-portal/appointments/${id}`)
   },
 }
 
