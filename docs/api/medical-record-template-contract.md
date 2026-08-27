@@ -1,7 +1,7 @@
 # Medical-record Template Management API
 
 > User Story: **NCL-13-CN-003 — Quản lý mẫu bệnh án theo chuyên khoa**  
-> Status: **Implemented in backend migration V27**  
+> Status: **Implemented in backend migration V29**
 > Base URL: `http://localhost:8080/api/v1`  
 > Auth: Bearer JWT
 
@@ -32,7 +32,7 @@ Every template section must use one of these `fieldCode` values:
 | `DOCTOR_INSTRUCTIONS` | `doctorInstructions` |
 | `CONCLUSION` | `conclusion` |
 
-`label` is the specialty-specific display label. `required` will be enforced when a template is applied and a medical record is completed in NCL-13-CN-004; it is configuration data only in this story.
+`label` is the specialty-specific display label. In NCL-13-CN-004, `required` is checked when the doctor signs a medical record that has applied this immutable version; it does not block saving a draft.
 
 ## 3. Data shape
 

@@ -7,11 +7,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
+import com.benhsoan.domain.medicalrecord.MedicalRecordTemplateVersion;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidVisitException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordMissingDiagnosisException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateNotFoundException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordUnauthorizedSignerException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
@@ -20,6 +22,7 @@ import com.benhsoan.port.dto.result.MedicalRecordResult;
 import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordTemplateRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -33,8 +36,10 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
     private final MedicalRecordRepository medicalRecordRepository;
     private final VisitRepository visitRepository;
     private final MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
+    private final MedicalRecordTemplateRepository medicalRecordTemplateRepository;
     private final MedicalRecordAuthorizationService authorizationService;
     private final MedicalRecordAccessAuditService accessAuditService;
+    private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final MedicalRecordResultMapper resultMapper;
     private final ClockPort clockPort;
 
@@ -42,7 +47,7 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
     public MedicalRecordResult sign(UUID medicalRecordId, SignMedicalRecordCommand command) {
         UUID userId = authorizationService.requireWriteAccess();
 
-        MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
+        MedicalRecord record = medicalRecordRepository.findByIdForUpdate(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
 
         if (record.isContentLocked()) {
@@ -76,6 +81,13 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
             throw new MedicalRecordMissingDiagnosisException(record.getId());
         }
 
+        if (record.getAppliedTemplateVersionId() != null) {
+            MedicalRecordTemplateVersion appliedVersion = medicalRecordTemplateRepository
+                    .findVersionById(record.getAppliedTemplateVersionId())
+                    .orElseThrow(() -> new MedicalRecordTemplateNotFoundException(record.getAppliedTemplateVersionId()));
+            record.ensureRequiredTemplateSections(appliedVersion);
+        }
+
         String signatureData = (command != null && command.signatureData() != null && !command.signatureData().isBlank())
                 ? command.signatureData().trim()
                 : "SIMULATED_SIGNATURE:" + userId + ":" + now.toEpochMilli();
@@ -93,6 +105,6 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
                 now
         );
 
-        return resultMapper.toResult(saved);
+        return resultMapper.toResult(saved, templateMapper.resolveApplied(saved, visit));
     }
 }

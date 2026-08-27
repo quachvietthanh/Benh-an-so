@@ -74,6 +74,8 @@ class MedicalRecordReadSecurityIntegrationTest {
 
     @MockitoBean private CreateMedicalRecordUseCase createMedicalRecordUseCase;
     @MockitoBean private GetMedicalRecordUseCase getMedicalRecordUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordTemplateSelectionUseCase getMedicalRecordTemplateSelectionUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.ApplyMedicalRecordTemplateUseCase applyMedicalRecordTemplateUseCase;
     @MockitoBean private UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
     @MockitoBean private LockMedicalRecordUseCase lockMedicalRecordUseCase;
     @MockitoBean private SignMedicalRecordUseCase signMedicalRecordUseCase;
@@ -108,6 +110,14 @@ class MedicalRecordReadSecurityIntegrationTest {
     @Test
     void receptionistWithoutMedicalRecordReadPermissionReturns403() throws Exception {
         mockMvc.perform(get("/medical-records/patient/{patientId}", patientId)
+                        .with(SecurityMockMvcRequestPostProcessors.user("receptionist")
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void templateOptionsRequiresMedicalRecordReadPermission() throws Exception {
+        mockMvc.perform(get("/medical-records/{medicalRecordId}/template-options", UUID.randomUUID())
                         .with(SecurityMockMvcRequestPostProcessors.user("receptionist")
                                 .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
                 .andExpect(status().isForbidden());

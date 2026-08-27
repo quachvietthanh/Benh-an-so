@@ -12,7 +12,9 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MedicalRecordAuthorizationAuditService {
@@ -21,17 +23,28 @@ public class MedicalRecordAuthorizationAuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordDiagnosisWriteDenied(UUID actorId, UUID medicalRecordId) {
+        recordTemplateAccessDenied(actorId, medicalRecordId, "Diagnosis write access denied");
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordContentWriteDenied(UUID actorId, UUID medicalRecordId) {
+        recordTemplateAccessDenied(actorId, medicalRecordId, "Medical record write access denied");
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordTemplateAccessDenied(UUID actorId, UUID medicalRecordId, String detail) {
         try {
             auditLogRepository.save(AuditLog.create(
                     actorId,
                     ActionType.ACCESS_DENIED,
                     ResourceType.MEDICAL_RECORD,
                     medicalRecordId,
-                    "Diagnosis write access denied",
+                    detail,
                     null
             ));
-        } catch (RuntimeException ignored) {
-            // Authorization must remain denied even if the audit write cannot be completed.
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record access denied audit log for actor {} on medical record {}: {}",
+                    actorId, medicalRecordId, exception.getMessage());
         }
     }
 }
