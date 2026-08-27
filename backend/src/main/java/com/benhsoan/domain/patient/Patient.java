@@ -183,7 +183,7 @@ public class Patient {
                 createdBy,
                 true,
                 now,
-                consentVersion != null && !consentVersion.isBlank() ? consentVersion.trim() : "v1.0",
+                PatientConsentVersion.resolveForNewConsent(consentVersion),
                 false,
                 null,
                 null,
@@ -238,7 +238,7 @@ public class Patient {
     public void renewConsent(String version, Instant agreedAt) {
         this.consentAgreed = true;
         this.consentAgreedAt = agreedAt != null ? agreedAt : Instant.now();
-        this.consentVersion = version != null && !version.isBlank() ? version.trim() : "v1.0";
+        this.consentVersion = PatientConsentVersion.requireSupported(version);
         this.consentWithdrawn = false;
         this.consentWithdrawnAt = null;
         this.consentWithdrawnReason = null;

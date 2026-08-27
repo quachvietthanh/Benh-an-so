@@ -44,6 +44,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_ACCESS_DENIED,
                     MEDICAL_RECORD_UNAUTHORIZED_RECIPIENT,
                     MEDICAL_RECORD_UNAUTHORIZED_SIGNER,
+                    PATIENT_CONSENT_ACCESS_DENIED,
                     PATIENT_INACTIVE,
                     UNAUTHORIZED_APPOINTMENT_OPERATION,
                     UNAUTHORIZED_PRESCRIPTION_AMENDMENT,

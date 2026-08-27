@@ -26,6 +26,7 @@ import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChangeLog;
+import com.benhsoan.domain.patient.PatientConsentVersion;
 import com.benhsoan.domain.patient.enums.PatientChangeAction;
 import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
@@ -89,6 +90,7 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
 
         String phone = normalizePhone(command.phone());
         String email = resolveEmail(command, phone);
+        String consentVersion = requireValidConsent(command);
 
         if (userRepository.existsByPhone(phone)) {
             throw new PhoneAlreadyExistsException(DUPLICATE_PHONE_MESSAGE);
@@ -122,11 +124,15 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
             UUID userId = savedUser.getId();
 
             List<Patient> candidates = patientRepository.findAllByPhone(phone);
+            Instant now = clockPort.now();
 
             boolean isNewPatient = candidates.isEmpty();
+            Patient existingPatient = isNewPatient ? null : resolveCandidate(candidates, command);
+            boolean recordsLegacyConsent = existingPatient != null
+                    && (!existingPatient.isConsentAgreed() || existingPatient.isConsentWithdrawn());
             Patient patient = isNewPatient
-                    ? createPatient(command, phone, userId)
-                    : linkCandidate(resolveCandidate(candidates, command), userId);
+                    ? createPatient(command, phone, userId, consentVersion)
+                    : linkCandidate(existingPatient, userId, consentVersion, now, recordsLegacyConsent);
 
             Patient saved = patientRepository.save(patient);
 
@@ -139,9 +145,15 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
                         changeDetail
                 );
                 patientChangeLogRepository.save(changeLog);
+            } else if (recordsLegacyConsent) {
+                PatientChangeLog changeLog = PatientChangeLog.create(
+                        saved.getId(),
+                        userId,
+                        PatientChangeAction.UPDATE,
+                        patientChangeDetailBuilder.forPortalConsentRecorded(saved)
+                );
+                patientChangeLogRepository.save(changeLog);
             }
-
-            Instant now = clockPort.now();
 
             String refreshToken = refreshTokenGeneratorPort.generate();
             UserSession session = UserSession.create(
@@ -193,8 +205,17 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
         return phone + "@benhsoan.com";
     }
 
-    private Patient linkCandidate(Patient candidate, UUID userId) {
+    private Patient linkCandidate(
+            Patient candidate,
+            UUID userId,
+            String consentVersion,
+            Instant now,
+            boolean recordsLegacyConsent
+    ) {
         candidate.linkUser(userId);
+        if (recordsLegacyConsent) {
+            candidate.renewConsent(consentVersion, now);
+        }
         return candidate;
     }
 
@@ -244,22 +265,18 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
                 .orElseThrow(() -> new PhoneAlreadyExistsException(DUPLICATE_PHONE_MESSAGE));
     }
 
-    private Patient createPatient(PatientPortalRegistrationCommand command, String phone, UUID userId) {
+    private Patient createPatient(
+            PatientPortalRegistrationCommand command,
+            String phone,
+            UUID userId,
+            String consentVersion
+    ) {
         if (command.dateOfBirth() == null) {
             throw new ValidationException("Date of birth is required.");
         }
         if (command.gender() == null) {
             throw new ValidationException("Gender is required.");
         }
-
-        // QTN-24: Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân
-        if (command.consentAgreed() == null || !command.consentAgreed()) {
-            throw new PatientConsentRequiredException("Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân (QTN-24).");
-        }
-
-        String consentVersion = command.consentVersion() != null && !command.consentVersion().isBlank()
-                ? command.consentVersion()
-                : "v1.0";
 
         Patient patient = Patient.create(
                 patientCodeGenerator.generate(),
@@ -280,6 +297,16 @@ public class PatientPortalRegistrationService implements PatientPortalRegistrati
         );
         patient.linkUser(userId);
         return patient;
+    }
+
+    private String requireValidConsent(PatientPortalRegistrationCommand command) {
+        if (!Boolean.TRUE.equals(command.consentAgreed())) {
+            throw new PatientConsentRequiredException(
+                    "Phải có phiếu đồng ý trước khi đăng ký tài khoản và xử lý dữ liệu cá nhân (QTN-24)."
+            );
+        }
+
+        return PatientConsentVersion.resolveForNewConsent(command.consentVersion());
     }
 
     private String normalizePhone(String phone) {

@@ -11,15 +11,18 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChangeLog;
+import com.benhsoan.domain.patient.PatientConsentVersion;
 import com.benhsoan.domain.patient.enums.PatientChangeAction;
 import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
+import com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
-import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;
@@ -84,47 +87,49 @@ public class UpdatePatientService
         UUID currentUserId =
                 currentUserPort.getCurrentUserId();
 
-        patient.updateProfile(
-                command.fullName(),
-                command.dateOfBirth(),
-                command.gender(),
-                command.phone(),
-                command.email(),
-                command.address(),
-                command.identityNumber(),
-                command.insuranceNumber(),
-                command.bloodType(),
-                command.emergencyContact(),
-                command.emergencyPhone()
-        );
+        if (command.fullName() != null) {
+            patient.updateProfile(
+                    command.fullName(),
+                    command.dateOfBirth(),
+                    command.gender(),
+                    command.phone(),
+                    command.email(),
+                    command.address(),
+                    command.identityNumber(),
+                    command.insuranceNumber(),
+                    command.bloodType(),
+                    command.emergencyContact(),
+                    command.emergencyPhone()
+            );
 
-        if (command.active() && !patient.isActive()) {
-            patient.activate();
-        }
+            if (command.active() && !patient.isActive()) {
+                patient.activate();
+            }
 
-        if (!command.active() && patient.isActive()) {
-            patient.deactivate();
+            if (!command.active() && patient.isActive()) {
+                patient.deactivate();
+            }
         }
 
         // Handle consent withdrawal (NCL-15-CN-001-TC-03) or renewal
         boolean isModifyingConsent = command.consentWithdrawn() != null || command.consentAgreed() != null;
         if (isModifyingConsent) {
-            boolean isAuthorized = currentUserPort.hasRole("RECEPTIONIST")
-                    || currentUserPort.hasRole("ADMIN")
-                    || currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE");
-            if (!isAuthorized) {
-                throw new org.springframework.security.access.AccessDeniedException(
-                        "Chỉ Lễ tân hoặc Quản trị viên mới có quyền cập nhật hoặc rút phiếu đồng ý xử lý dữ liệu (QTN-24)."
-                );
+            if (!currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")) {
+                throw new PatientConsentAccessDeniedException();
             }
         }
 
         if (Boolean.TRUE.equals(command.consentWithdrawn()) && !patient.isConsentWithdrawn()) {
             patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
         } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {
-            patient.renewConsent(command.consentVersion(), Instant.now());
+            if (!Boolean.TRUE.equals(command.consentAgreed())) {
+                throw new ValidationException(
+                        "Phải ghi nhận sự đồng ý mới trước khi gia hạn xử lý dữ liệu cá nhân (QTN-24)."
+                );
+            }
+            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
         } else if (Boolean.TRUE.equals(command.consentAgreed()) && !patient.isConsentAgreed()) {
-            patient.renewConsent(command.consentVersion(), Instant.now());
+            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
         }
 
         String detail = changeDetailBuilder.forUpdate( oldPatient, patient );
@@ -151,6 +156,8 @@ public class UpdatePatientService
                         {
                         "patientCode":"%s",
                         "fullName":"%s",
+                        "consentAgreed":%s,
+                        "consentVersion":"%s",
                         "consentWithdrawn":%s,
                         "nonMedicalUseRestricted":%s
                         }
@@ -158,6 +165,8 @@ public class UpdatePatientService
                         .formatted(
                                 patient.getPatientCode(),
                                 patient.getFullName(),
+                                patient.isConsentAgreed(),
+                                patient.getConsentVersion(),
                                 patient.isConsentWithdrawn(),
                                 patient.isNonMedicalUseRestricted()
                         ),
@@ -187,4 +196,5 @@ public class UpdatePatientService
             );
         }
     }
+
 }

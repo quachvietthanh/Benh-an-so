@@ -136,11 +136,11 @@ class PatientTest {
         assertTrue(patient.isNonMedicalUseRestricted());
 
         Instant renewTime = Instant.now();
-        patient.renewConsent("v2.0", renewTime);
+        patient.renewConsent("v1.0", renewTime);
 
         assertTrue(patient.isConsentAgreed());
         assertEquals(renewTime, patient.getConsentAgreedAt());
-        assertEquals("v2.0", patient.getConsentVersion());
+        assertEquals("v1.0", patient.getConsentVersion());
         assertFalse(patient.isConsentWithdrawn());
         assertNull(patient.getConsentWithdrawnAt());
         assertNull(patient.getConsentWithdrawnReason());

@@ -11,14 +11,14 @@
 Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo lập phải ghi nhận sự đồng ý của người bệnh về việc xử lý dữ liệu cá nhân.
 
 1. **Ghi nhận đồng ý khi lập hồ sơ mới (TC-01)**:
-   - Endpoint: `POST /api/v1/patients` (Quầy tiếp đón) hoặc `POST /api/v1/auth/patients/register` (Cổng bệnh nhân).
+   - Endpoint: `POST /api/v1/patients` (Quầy tiếp đón) hoặc `POST /api/v1/auth/patient/register` (Cổng bệnh nhân).
    - Quyền quầy tiếp đón: `PATIENT_CREATE` (chỉ cấp cho `RECEPTIONIST`, `ADMIN`).
-   - Payload bắt buộc phải có `consentAgreed: true`.
+   - Payload bắt buộc phải có `consentAgreed: true`. `consentVersion` là tùy chọn (mặc định là `v1.0`).
 2. **Chặn lưu khi thiếu đồng ý (TC-02)**:
    - Nếu `consentAgreed` là `false`, `null` hoặc không gửi, hệ thống trả về mã lỗi `400 Bad Request` (`VALIDATION_FAILED` hoặc `PATIENT_CONSENT_REQUIRED`).
 3. **Rút lại sự đồng ý (TC-03)**:
-   - Endpoint: `PUT /api/v1/patients/{patientId}`
-   - Quyền: `PATIENT_CONSENT_UPDATE` (chỉ dành riêng cho `RECEPTIONIST`, `ADMIN`). Vai trò Bác sĩ (`DOCTOR`) không được phép can thiệp vào consent hành chính (HTTP 403).
+   - Endpoint: `PUT /api/v1/patients/{patientId}/consent` hoặc `PUT /api/v1/patients/{patientId}`
+   - Quyền: `PATIENT_CONSENT_UPDATE` (chỉ dành riêng cho `RECEPTIONIST`, `ADMIN`). Vai trò Bác sĩ (`DOCTOR`) không được phép can thiệp vào consent hành chính (HTTP 403 Forbidden).
    - Khi `consentWithdrawn: true`, hệ thống tự động cập nhật:
      - `consent_withdrawn = true`
      - `consent_withdrawn_at = <thời điểm>`
@@ -114,7 +114,7 @@ Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo
 
 ### 3.2. Đăng ký tài khoản qua Cổng bệnh nhân (Patient Portal)
 - **Method**: `POST`
-- **Path**: `/api/v1/auth/patients/register`
+- **Path**: `/api/v1/auth/patient/register`
 - **Permission**: Public
 
 #### Request Body
@@ -134,10 +134,10 @@ Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo
 
 ---
 
-### 3.3. Rút lại sự đồng ý xử lý dữ liệu
+### 3.3. Cập nhật hồ sơ bệnh nhân kèm trạng thái đồng ý
 - **Method**: `PUT`
 - **Path**: `/api/v1/patients/{patientId}`
-- **Permission**: `PATIENT_CONSENT_UPDATE` (RECEPTIONIST, ADMIN)
+- **Permission**: `PATIENT_UPDATE` (và `PATIENT_CONSENT_UPDATE` nếu có sửa đổi consent)
 
 #### Request Body
 ```json
@@ -154,6 +154,21 @@ Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo
   "emergencyContact": "Nguyễn Thị B",
   "emergencyPhone": "0909998877",
   "active": true,
+  "consentWithdrawn": true,
+  "consentWithdrawnReason": "Người bệnh yêu cầu ngừng nhận thông báo tiếp thị và nghiên cứu"
+}
+```
+
+---
+
+### 3.4. Cập nhật trạng thái Consent qua endpoint chuyên biệt
+- **Method**: `PUT`
+- **Path**: `/api/v1/patients/{patientId}/consent`
+- **Permission**: `PATIENT_CONSENT_UPDATE` (RECEPTIONIST, ADMIN)
+
+#### Request Body
+```json
+{
   "consentWithdrawn": true,
   "consentWithdrawnReason": "Người bệnh yêu cầu ngừng nhận thông báo tiếp thị và nghiên cứu"
 }

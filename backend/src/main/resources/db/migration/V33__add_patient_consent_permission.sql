@@ -4,8 +4,15 @@
 -- Restricts consent recording/withdrawal to RECEPTIONIST and ADMIN roles.
 -- =====================================================
 
-INSERT INTO permissions (id, code, module, created_at, updated_at)
-SELECT UUID_TO_BIN(UUID()), 'PATIENT_CONSENT_UPDATE', 'PATIENT', NOW(), NOW()
+INSERT INTO permissions (id, code, name, module, description, active, created_at, updated_at)
+SELECT UUID_TO_BIN(UUID()),
+       'PATIENT_CONSENT_UPDATE',
+       'PATIENT CONSENT UPDATE',
+       'PATIENT',
+       'Record or withdraw patient personal-data-processing consent',
+       TRUE,
+       NOW(),
+       NOW()
 FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1 FROM permissions WHERE code = 'PATIENT_CONSENT_UPDATE'

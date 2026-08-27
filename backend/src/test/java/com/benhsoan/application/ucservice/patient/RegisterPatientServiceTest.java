@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,6 +26,7 @@ import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.patient.RegisterPatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.outbound.generator.PatientCodeGenerator;
@@ -122,5 +124,22 @@ class RegisterPatientServiceTest {
                 .build();
 
         assertThrows(PatientConsentRequiredException.class, () -> service.register(command));
+    }
+
+    @Test
+    @DisplayName("QTN-24: Chặn version consent không thuộc danh sách server quản lý")
+    void rejectsRegistrationWhenConsentVersionIsUnsupported() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .consentAgreed(true)
+                .consentVersion("client-defined-v2")
+                .build();
+
+        assertThrows(ValidationException.class, () -> service.register(command));
+        verify(patientRepository, never()).save(any(Patient.class));
+        verify(auditLogRepository, never()).save(any(AuditLog.class));
     }
 }

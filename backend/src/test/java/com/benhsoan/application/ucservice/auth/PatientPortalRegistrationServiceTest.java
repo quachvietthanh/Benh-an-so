@@ -142,6 +142,78 @@ class PatientPortalRegistrationServiceTest {
     }
 
     @Test
+    void recordsConsentForExistingPatientWithoutConsentWhenLinkingPortalAccount() {
+        UUID roleId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
+
+        Patient existing = Patient.restore(
+                patientId, "BN000001", FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE,
+                PHONE, null, null, null, null, null, null, null, true,
+                NOW.minusSeconds(60), NOW.minusSeconds(60), null, UUID.randomUUID(),
+                false, null, null, false, null, null, false);
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
+
+        service.register(command());
+
+        assertTrue(existing.isConsentAgreed());
+        assertEquals(NOW, existing.getConsentAgreedAt());
+        assertEquals("v1.0", existing.getConsentVersion());
+        ArgumentCaptor<PatientChangeLog> changeLogCaptor = ArgumentCaptor.forClass(PatientChangeLog.class);
+        verify(patientChangeLogRepository).save(changeLogCaptor.capture());
+        assertTrue(changeLogCaptor.getValue().getChangeDetail().contains("PORTAL_CONSENT_RECORDED"));
+        assertTrue(changeLogCaptor.getValue().getChangeDetail().contains("consentAgreedAt"));
+        verify(patientRepository).save(existing);
+
+        ArgumentCaptor<AuditLog> auditLogCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        assertTrue(auditLogCaptor.getValue().getDetail().contains("\"consentAgreed\":true"));
+        assertTrue(auditLogCaptor.getValue().getDetail().contains("\"consentVersion\":\"v1.0\""));
+    }
+
+    @Test
+    void linksExistingPatientWithConsentWithoutRenewingOrAddingConsentHistory() {
+        UUID roleId = UUID.randomUUID();
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
+
+        Patient existing = Patient.create(
+                "BN000001", FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE,
+                PHONE, null, null, null, null, null, null, null,
+                true, "v1.0", UUID.randomUUID());
+        Instant agreedAt = existing.getConsentAgreedAt();
+
+        when(userRepository.existsByPhone(PHONE)).thenReturn(false);
+        when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(role));
+        when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
+
+        service.register(command());
+
+        assertTrue(existing.isConsentAgreed());
+        assertEquals(agreedAt, existing.getConsentAgreedAt());
+        assertEquals("v1.0", existing.getConsentVersion());
+        verify(patientChangeLogRepository, never()).save(any(PatientChangeLog.class));
+    }
+
+    @Test
     void createsNewPatientWhenPhoneNotRegistered() throws Exception {
         UUID roleId = UUID.randomUUID();
 
@@ -171,10 +243,12 @@ class PatientPortalRegistrationServiceTest {
     }
 
     @Test
-    void rejectsNewPatientCreationWhenConsentIsMissingOrFalse() {
+    void createsNewPatientWhenConsentVersionIsOmittedDefaultsToV10() throws Exception {
         UUID roleId = UUID.randomUUID();
+
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(roleId);
+        when(role.getPermissions()).thenReturn(Set.of());
 
         when(userRepository.existsByPhone(PHONE)).thenReturn(false);
         when(userRepository.existsByEmail(PHONE + "@benhsoan.com")).thenReturn(false);
@@ -182,11 +256,42 @@ class PatientPortalRegistrationServiceTest {
         when(passwordEncoderPort.encode(PASSWORD)).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(patientRepository.findAllByPhone(PHONE)).thenReturn(List.of());
+        when(patientCodeGenerator.generate()).thenReturn("BN000123");
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(clockPort.now()).thenReturn(NOW);
+        stubTokenIssuance();
 
+        PatientPortalRegistrationCommand commandWithoutVersion = new PatientPortalRegistrationCommand(
+                PHONE, PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null, null, true, null);
+
+        PatientPortalRegistrationResult result = service.register(commandWithoutVersion);
+
+        assertNotNull(result.patientId());
+        assertEquals("BN000123", result.patientCode());
+
+        ArgumentCaptor<Patient> patientCaptor = ArgumentCaptor.forClass(Patient.class);
+        verify(patientRepository).save(patientCaptor.capture());
+        Patient created = patientCaptor.getValue();
+        assertTrue(created.isConsentAgreed());
+        assertEquals("v1.0", created.getConsentVersion());
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+    }
+
+    @Test
+    void rejectsNewPatientCreationWhenConsentIsMissingOrFalse() {
         PatientPortalRegistrationCommand withoutConsent = new PatientPortalRegistrationCommand(
                 PHONE, PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null, null, false, null);
 
         assertThrows(PatientConsentRequiredException.class, () -> service.register(withoutConsent));
+    }
+
+    @Test
+    void rejectsPortalRegistrationWhenConsentVersionIsUnsupported() {
+        PatientPortalRegistrationCommand unsupportedVersion = new PatientPortalRegistrationCommand(
+                PHONE, PASSWORD, FULL_NAME, LocalDate.of(1990, 1, 1), Gender.FEMALE, null, null, true, "v2.0");
+
+        assertThrows(ValidationException.class, () -> service.register(unsupportedVersion));
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test

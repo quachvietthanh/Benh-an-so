@@ -57,6 +57,16 @@ public class PatientRestMapper {
                 .build();
     }
 
+    public UpdatePatientCommand toConsentCommand(com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientConsentRequest request) {
+
+        return UpdatePatientCommand.builder()
+                .consentAgreed(request.consentAgreed())
+                .consentWithdrawn(request.consentWithdrawn())
+                .consentWithdrawnReason(request.consentWithdrawnReason())
+                .consentVersion(request.consentVersion())
+                .build();
+    }
+
     public PatientResponse toResponse(PatientResult result) {
 
         return new PatientResponse(

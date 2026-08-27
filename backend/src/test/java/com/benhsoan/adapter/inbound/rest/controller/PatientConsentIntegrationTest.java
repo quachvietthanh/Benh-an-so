@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.benhsoan.adapter.inbound.rest.mapper.PatientRestMapper;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
@@ -228,7 +229,10 @@ class PatientConsentIntegrationTest {
                                   "consentWithdrawnReason": "Người bệnh yêu cầu rút lại sự đồng ý"
                                 }
                                 """)
-                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
+                        .with(user("receptionist").authorities(
+                                new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"),
+                                new SimpleGrantedAuthority("PERMISSION_PATIENT_CONSENT_UPDATE")
+                        )))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.consentWithdrawn").value(true))
                 .andExpect(jsonPath("$.consentWithdrawnReason").value("Người bệnh yêu cầu rút lại sự đồng ý"))
@@ -236,6 +240,73 @@ class PatientConsentIntegrationTest {
                 .andExpect(jsonPath("$.active").value(true));
 
         verify(updatePatientUseCase).update(any(UUID.class), any(UpdatePatientCommand.class));
+    }
+
+    @Test
+    @DisplayName("P1: Rút lại sự đồng ý qua dedicated endpoint PUT /patients/{id}/consent thành công")
+    void withdrawsConsentViaDedicatedConsentEndpointSuccessfully() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        PatientResult result = new PatientResult(
+                patientId,
+                "BN000001",
+                "Nguyen Van A",
+                LocalDate.of(1995, 5, 10),
+                Gender.MALE,
+                "0909000001",
+                "a@example.com",
+                "123 Street",
+                "079095001234",
+                "DN4790123456789",
+                null,
+                "Nguyen Van B",
+                "0909998877",
+                true,
+                now,
+                now,
+                true,
+                now,
+                "v1.0",
+                true,
+                now,
+                "Người bệnh yêu cầu rút lại sự đồng ý",
+                true
+        );
+
+        when(updatePatientUseCase.update(any(UUID.class), any(UpdatePatientCommand.class))).thenReturn(result);
+
+        mockMvc.perform(put("/patients/{patientId}/consent", patientId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "consentWithdrawn": true,
+                                  "consentWithdrawnReason": "Người bệnh yêu cầu rút lại sự đồng ý"
+                                }
+                                """)
+                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_CONSENT_UPDATE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.consentWithdrawn").value(true))
+                .andExpect(jsonPath("$.nonMedicalUseRestricted").value(true));
+
+        verify(updatePatientUseCase).update(any(UUID.class), any(UpdatePatientCommand.class));
+    }
+
+    @Test
+    @DisplayName("P1: Gọi dedicated endpoint PUT /patients/{id}/consent khi thiếu quyền PATIENT_CONSENT_UPDATE bị 403")
+    void rejectsDedicatedConsentEndpointWhenMissingPermission() throws Exception {
+        UUID patientId = UUID.randomUUID();
+
+        mockMvc.perform(put("/patients/{patientId}/consent", patientId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "consentWithdrawn": true,
+                                  "consentWithdrawnReason": "Người bệnh yêu cầu rút lại sự đồng ý"
+                                }
+                                """)
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -257,5 +328,29 @@ class PatientConsentIntegrationTest {
                                 """)
                         .with(user("guest").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("QTN-24 / P1: Người dùng có PATIENT_UPDATE nhưng thiếu PATIENT_CONSENT_UPDATE bị service từ chối 403")
+    void mapsConsentAccessDeniedToStableForbiddenError() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        when(updatePatientUseCase.update(any(UUID.class), any(UpdatePatientCommand.class)))
+                .thenThrow(new PatientConsentAccessDeniedException());
+
+        mockMvc.perform(put("/patients/{patientId}", patientId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Nguyen Van A",
+                                  "dateOfBirth": "1995-05-10",
+                                  "gender": "MALE",
+                                  "phone": "0909000001",
+                                  "active": true,
+                                  "consentWithdrawn": true
+                                }
+                                """)
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PATIENT_CONSENT_ACCESS_DENIED"));
     }
 }

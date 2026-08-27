@@ -111,9 +111,21 @@ public class PatientChangeDetailBuilder {
                 oldPatient.isConsentAgreed(),
                 newPatient.isConsentAgreed());
 
+        addChange(changes, "consentAgreedAt",
+                formatInstant(oldPatient.getConsentAgreedAt()),
+                formatInstant(newPatient.getConsentAgreedAt()));
+
+        addChange(changes, "consentVersion",
+                oldPatient.getConsentVersion(),
+                newPatient.getConsentVersion());
+
         addChange(changes, "consentWithdrawn",
                 oldPatient.isConsentWithdrawn(),
                 newPatient.isConsentWithdrawn());
+
+        addChange(changes, "consentWithdrawnAt",
+                formatInstant(oldPatient.getConsentWithdrawnAt()),
+                formatInstant(newPatient.getConsentWithdrawnAt()));
 
         addChange(changes, "consentWithdrawnReason",
                 oldPatient.getConsentWithdrawnReason(),
@@ -128,6 +140,25 @@ public class PatientChangeDetailBuilder {
         detail.put("action", "UPDATE");
         detail.put("entity", "PATIENT");
         detail.put("changes", changes);
+
+        return toJson(detail);
+    }
+
+    public String forPortalConsentRecorded(Patient patient) {
+
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("consentAgreed", patient.isConsentAgreed());
+        values.put("consentAgreedAt", formatInstant(patient.getConsentAgreedAt()));
+        values.put("consentVersion", patient.getConsentVersion());
+        values.put("consentWithdrawn", patient.isConsentWithdrawn());
+        values.put("consentWithdrawnAt", formatInstant(patient.getConsentWithdrawnAt()));
+        values.put("consentWithdrawnReason", patient.getConsentWithdrawnReason());
+        values.put("nonMedicalUseRestricted", patient.isNonMedicalUseRestricted());
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("action", "PORTAL_CONSENT_RECORDED");
+        detail.put("entity", "PATIENT");
+        detail.put("values", values);
 
         return toJson(detail);
     }
@@ -150,6 +181,10 @@ public class PatientChangeDetailBuilder {
         item.put("newValue", newValue);
 
         changes.add(item);
+    }
+
+    private String formatInstant(java.time.Instant value) {
+        return value != null ? value.toString() : null;
     }
 
     private String toJson(Map<String, Object> detail) {
