@@ -67,7 +67,9 @@ public class AuthRestMapper {
                 request.dateOfBirth(),
                 request.gender(),
                 request.identityNumber(),
-                request.email()
+                request.email(),
+                request.consentAgreed(),
+                request.consentVersion()
         );
     }
 

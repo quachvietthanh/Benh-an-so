@@ -32,7 +32,15 @@ public record UpdatePatientCommand(
 
         String emergencyPhone,
 
-        boolean active
+        boolean active,
+
+        Boolean consentAgreed,
+
+        Boolean consentWithdrawn,
+
+        String consentWithdrawnReason,
+
+        String consentVersion
 
 ) {
 }

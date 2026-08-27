@@ -30,6 +30,8 @@ public class PatientRestMapper {
                 .bloodType(request.bloodType())
                 .emergencyContact(request.emergencyContact())
                 .emergencyPhone(request.emergencyPhone())
+                .consentAgreed(request.consentAgreed())
+                .consentVersion(request.consentVersion())
                 .build();
     }
 
@@ -48,6 +50,20 @@ public class PatientRestMapper {
                 .emergencyContact(request.emergencyContact())
                 .emergencyPhone(request.emergencyPhone())
                 .active(request.active())
+                .consentAgreed(request.consentAgreed())
+                .consentWithdrawn(request.consentWithdrawn())
+                .consentWithdrawnReason(request.consentWithdrawnReason())
+                .consentVersion(request.consentVersion())
+                .build();
+    }
+
+    public UpdatePatientCommand toConsentCommand(com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientConsentRequest request) {
+
+        return UpdatePatientCommand.builder()
+                .consentAgreed(request.consentAgreed())
+                .consentWithdrawn(request.consentWithdrawn())
+                .consentWithdrawnReason(request.consentWithdrawnReason())
+                .consentVersion(request.consentVersion())
                 .build();
     }
 
@@ -69,7 +85,14 @@ public class PatientRestMapper {
                 result.emergencyPhone(),
                 result.active(),
                 result.createdAt(),
-                result.updatedAt()
+                result.updatedAt(),
+                result.consentAgreed(),
+                result.consentAgreedAt(),
+                result.consentVersion(),
+                result.consentWithdrawn(),
+                result.consentWithdrawnAt(),
+                result.consentWithdrawnReason(),
+                result.nonMedicalUseRestricted()
         );
     }
 

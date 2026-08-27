@@ -69,4 +69,31 @@ public class CurrentUserAdapter implements CurrentUserPort {
     public boolean hasRole(String role) {
         return getCurrentUserRoles().contains(role);
     }
+
+    @Override
+    public Set<String> getCurrentUserPermissions() {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getPrincipal() == null
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+
+            return Collections.emptySet();
+        }
+
+        return authentication.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(authority -> authority.startsWith("PERMISSION_"))
+                .map(authority -> authority.substring(11))
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public boolean hasPermission(String permission) {
+        return getCurrentUserPermissions().contains(permission);
+    }
 }

@@ -80,7 +80,9 @@ class PatientRegistrationControllerTest {
                                   "password": "secret",
                                   "fullName": "Nguyen Van A",
                                   "dateOfBirth": "1990-01-01",
-                                  "gender": "FEMALE"
+                                  "gender": "FEMALE",
+                                  "consentAgreed": true,
+                                  "consentVersion": "v1.0"
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -113,7 +115,9 @@ class PatientRegistrationControllerTest {
                                   "fullName": "Nguyen Van A",
                                   "dateOfBirth": "1990-01-01",
                                   "gender": "FEMALE",
-                                  "email": "patient@example.com"
+                                  "email": "patient@example.com",
+                                  "consentAgreed": true,
+                                  "consentVersion": "v1.0"
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -140,7 +144,9 @@ class PatientRegistrationControllerTest {
                                   "dateOfBirth": "2020-08-26",
                                   "gender": "MALE",
                                   "identityNumber": "011209003677",
-                                  "password": "password123"
+                                  "password": "password123",
+                                  "consentAgreed": true,
+                                  "consentVersion": "v1.0"
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -148,6 +154,43 @@ class PatientRegistrationControllerTest {
                 .andExpect(jsonPath("$.patientCode").value("BN000123"))
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+    }
+
+    @Test
+    void missingConsentReturns400() throws Exception {
+        mockMvc.perform(post("/auth/patient/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "0345678910",
+                                  "password": "secret",
+                                  "fullName": "Nguyen Van A",
+                                  "dateOfBirth": "1990-01-01",
+                                  "gender": "FEMALE"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.details.fields.consentAgreed").exists());
+    }
+
+    @Test
+    void falseConsentReturns400() throws Exception {
+        mockMvc.perform(post("/auth/patient/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phone": "0345678910",
+                                  "password": "secret",
+                                  "fullName": "Nguyen Van A",
+                                  "dateOfBirth": "1990-01-01",
+                                  "gender": "FEMALE",
+                                  "consentAgreed": false
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.details.fields.consentAgreed").exists());
     }
 
     @Test
@@ -160,7 +203,8 @@ class PatientRegistrationControllerTest {
                                   "password": "123",
                                   "fullName": "Nguyen Van A",
                                   "dateOfBirth": "1990-01-01",
-                                  "gender": "FEMALE"
+                                  "gender": "FEMALE",
+                                  "consentAgreed": true
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -182,7 +226,8 @@ class PatientRegistrationControllerTest {
                                   "password": "secret",
                                   "fullName": "Nguyen Van A",
                                   "dateOfBirth": "1990-01-01",
-                                  "gender": "FEMALE"
+                                  "gender": "FEMALE",
+                                  "consentAgreed": true
                                 }
                                 """))
                 .andExpect(status().isConflict())
@@ -202,7 +247,8 @@ class PatientRegistrationControllerTest {
                                   "password": "secret",
                                   "fullName": "Nguyen Van A",
                                   "dateOfBirth": "1990-01-01",
-                                  "gender": "FEMALE"
+                                  "gender": "FEMALE",
+                                  "consentAgreed": true
                                 }
                                 """))
                 .andExpect(status().isBadRequest())

@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
 import com.benhsoan.domain.shared.Guard.Guard;
 
 import lombok.AccessLevel;
@@ -57,6 +58,21 @@ public class Patient {
 
     private UUID createdBy;
 
+    // Consent fields for personal data protection (NCL-15-CN-001 / QTN-24)
+    private boolean consentAgreed;
+
+    private Instant consentAgreedAt;
+
+    private String consentVersion;
+
+    private boolean consentWithdrawn;
+
+    private Instant consentWithdrawnAt;
+
+    private String consentWithdrawnReason;
+
+    private boolean nonMedicalUseRestricted;
+
     private Patient(
             UUID id,
             String patientCode,
@@ -75,7 +91,14 @@ public class Patient {
             Instant createdAt,
             Instant updatedAt,
             UUID userId,
-            UUID createdBy
+            UUID createdBy,
+            boolean consentAgreed,
+            Instant consentAgreedAt,
+            String consentVersion,
+            boolean consentWithdrawn,
+            Instant consentWithdrawnAt,
+            String consentWithdrawnReason,
+            boolean nonMedicalUseRestricted
     ) {
 
         this.id = Objects.requireNonNull(id);
@@ -106,6 +129,14 @@ public class Patient {
         this.updatedAt = updatedAt;
         this.userId = userId;
         this.createdBy = Objects.requireNonNull(createdBy);
+
+        this.consentAgreed = consentAgreed;
+        this.consentAgreedAt = consentAgreedAt;
+        this.consentVersion = consentVersion;
+        this.consentWithdrawn = consentWithdrawn;
+        this.consentWithdrawnAt = consentWithdrawnAt;
+        this.consentWithdrawnReason = consentWithdrawnReason;
+        this.nonMedicalUseRestricted = nonMedicalUseRestricted;
     }
 
     public static Patient create(
@@ -121,8 +152,15 @@ public class Patient {
             BloodType bloodType,
             String emergencyContact,
             String emergencyPhone,
+            boolean consentAgreed,
+            String consentVersion,
             UUID createdBy
     ) {
+        if (!consentAgreed) {
+            throw new PatientConsentRequiredException();
+        }
+
+        Instant now = Instant.now();
 
         return new Patient(
                 UUID.randomUUID(),
@@ -139,10 +177,17 @@ public class Patient {
                 emergencyContact,
                 emergencyPhone,
                 true,
-                Instant.now(),
-                Instant.now(),
+                now,
+                now,
                 null,
-                createdBy
+                createdBy,
+                true,
+                now,
+                PatientConsentVersion.resolveForNewConsent(consentVersion),
+                false,
+                null,
+                null,
+                false
         );
     }
 
@@ -182,6 +227,27 @@ public class Patient {
         this.updatedAt = Instant.now();
     }
 
+    public void withdrawConsent(String reason, Instant withdrawnAt) {
+        this.consentWithdrawn = true;
+        if (this.consentWithdrawnAt == null || withdrawnAt != null) {
+            this.consentWithdrawnAt = withdrawnAt != null ? withdrawnAt : Instant.now();
+        }
+        this.consentWithdrawnReason = reason;
+        this.nonMedicalUseRestricted = true;
+        this.updatedAt = Instant.now();
+    }
+
+    public void renewConsent(String version, Instant agreedAt) {
+        this.consentAgreed = true;
+        this.consentAgreedAt = agreedAt != null ? agreedAt : Instant.now();
+        this.consentVersion = PatientConsentVersion.requireSupported(version);
+        this.consentWithdrawn = false;
+        this.consentWithdrawnAt = null;
+        this.consentWithdrawnReason = null;
+        this.nonMedicalUseRestricted = false;
+        this.updatedAt = Instant.now();
+    }
+
     public void activate() {
         this.active = true;
         this.updatedAt = Instant.now();
@@ -215,7 +281,14 @@ public class Patient {
             Instant createdAt,
             Instant updatedAt,
             UUID userId,
-            UUID createdBy
+            UUID createdBy,
+            boolean consentAgreed,
+            Instant consentAgreedAt,
+            String consentVersion,
+            boolean consentWithdrawn,
+            Instant consentWithdrawnAt,
+            String consentWithdrawnReason,
+            boolean nonMedicalUseRestricted
     ) {
 
         return new Patient(
@@ -236,7 +309,63 @@ public class Patient {
                 createdAt,
                 updatedAt,
                 userId,
-                createdBy
+                createdBy,
+                consentAgreed,
+                consentAgreedAt,
+                consentVersion,
+                consentWithdrawn,
+                consentWithdrawnAt,
+                consentWithdrawnReason,
+                nonMedicalUseRestricted
+        );
+    }
+
+    public static Patient restore(
+            UUID id,
+            String patientCode,
+            String fullName,
+            LocalDate dateOfBirth,
+            Gender gender,
+            String phone,
+            String email,
+            String address,
+            String identityNumber,
+            String insuranceNumber,
+            BloodType bloodType,
+            String emergencyContact,
+            String emergencyPhone,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt,
+            UUID userId,
+            UUID createdBy
+    ) {
+        return restore(
+                id,
+                patientCode,
+                fullName,
+                dateOfBirth,
+                gender,
+                phone,
+                email,
+                address,
+                identityNumber,
+                insuranceNumber,
+                bloodType,
+                emergencyContact,
+                emergencyPhone,
+                active,
+                createdAt,
+                updatedAt,
+                userId,
+                createdBy,
+                false,
+                null,
+                null,
+                false,
+                null,
+                null,
+                false
         );
     }
 }

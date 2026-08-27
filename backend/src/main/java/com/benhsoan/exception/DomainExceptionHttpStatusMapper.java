@@ -44,6 +44,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_ACCESS_DENIED,
                     MEDICAL_RECORD_UNAUTHORIZED_RECIPIENT,
                     MEDICAL_RECORD_UNAUTHORIZED_SIGNER,
+                    PATIENT_CONSENT_ACCESS_DENIED,
                     PATIENT_INACTIVE,
                     UNAUTHORIZED_APPOINTMENT_OPERATION,
                     UNAUTHORIZED_PRESCRIPTION_AMENDMENT,
@@ -61,6 +62,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_MISSING_DIAGNOSIS,
                     MEDICAL_RECORD_NOT_LOCKED,
                     MEDICAL_RECORD_NOT_SIGNED,
+                    PATIENT_CONSENT_REQUIRED,
                     PAYMENT_AMOUNT_MISMATCH,
                     SELF_DRUG_INTERACTION,
                     VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;
