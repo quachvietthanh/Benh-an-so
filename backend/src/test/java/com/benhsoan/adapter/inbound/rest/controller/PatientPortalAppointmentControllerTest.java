@@ -1,10 +1,13 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,15 +26,20 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.benhsoan.adapter.inbound.rest.mapper.PatientPortalAppointmentRestMapper;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.appointment.exception.AppointmentPastCutoffException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.port.dto.command.appointment.PatientBookAppointmentCommand;
+import com.benhsoan.port.dto.command.appointment.PatientCancelAppointmentCommand;
+import com.benhsoan.port.dto.command.appointment.PatientRescheduleAppointmentCommand;
 import com.benhsoan.port.dto.query.appointment.GetDoctorAvailableSlotsQuery;
 import com.benhsoan.port.dto.result.appointment.DoctorAvailableSlotResult;
 import com.benhsoan.port.dto.result.appointment.PatientAppointmentResult;
 import com.benhsoan.port.inbound.appointment.GetDoctorAvailableSlotsUseCase;
 import com.benhsoan.port.inbound.appointment.PatientBookAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.PatientCancelAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.PatientRescheduleAppointmentUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
@@ -39,6 +47,8 @@ import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
+
+import org.springframework.security.access.AccessDeniedException;
 
 @WebMvcTest(controllers = PatientPortalAppointmentController.class)
 @Import({
@@ -54,6 +64,8 @@ class PatientPortalAppointmentControllerTest {
 
     @MockitoBean private GetDoctorAvailableSlotsUseCase getDoctorAvailableSlotsUseCase;
     @MockitoBean private PatientBookAppointmentUseCase patientBookAppointmentUseCase;
+    @MockitoBean private PatientCancelAppointmentUseCase patientCancelAppointmentUseCase;
+    @MockitoBean private PatientRescheduleAppointmentUseCase patientRescheduleAppointmentUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -168,4 +180,112 @@ class PatientPortalAppointmentControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("APPOINTMENT_TIME_IN_PAST"));
     }
+
+    @Test
+    void cancelReturns200WithCancelledStatus() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+
+        when(patientCancelAppointmentUseCase.cancel(eq(appointmentId), any(PatientCancelAppointmentCommand.class)))
+                .thenReturn(new PatientAppointmentResult(
+                        appointmentId, "APT000100", patientId, doctorId,
+                        Instant.parse("2099-08-10T02:00:00Z"),
+                        Instant.parse("2099-08-10T02:30:00Z"),
+                        AppointmentStatus.CANCELLED,
+                        "Khám tổng quát",
+                        "ONLINE_PORTAL",
+                        Instant.parse("2026-08-26T02:00:00Z")));
+
+        mockMvc.perform(patch("/patient-portal/appointments/{id}/cancel", appointmentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cancellationReason\":\"Bận việc\"}")
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void cancelPastAppointmentReturns400() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+
+        when(patientCancelAppointmentUseCase.cancel(eq(appointmentId), any(PatientCancelAppointmentCommand.class)))
+                .thenThrow(new AppointmentPastCutoffException());
+
+        mockMvc.perform(patch("/patient-portal/appointments/{id}/cancel", appointmentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cancellationReason\":\"Bận việc\"}")
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("APPOINTMENT_PAST_CUTOFF"));
+    }
+
+    @Test
+    void cancelOtherPatientReturns403() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+
+        when(patientCancelAppointmentUseCase.cancel(eq(appointmentId), any(PatientCancelAppointmentCommand.class)))
+                .thenThrow(new AccessDeniedException("Patient may only access their own data."));
+
+        mockMvc.perform(patch("/patient-portal/appointments/{id}/cancel", appointmentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cancellationReason\":\"Bận việc\"}")
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void cancelWithLongReasonReturns400() throws Exception {
+        String longReason = "x".repeat(501);
+
+        mockMvc.perform(patch("/patient-portal/appointments/{id}/cancel", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cancellationReason\":\"%s\"}".formatted(longReason))
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void rescheduleReturns200WithUpdatedSlot() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+
+        when(patientRescheduleAppointmentUseCase.reschedule(eq(appointmentId), any(PatientRescheduleAppointmentCommand.class)))
+                .thenReturn(new PatientAppointmentResult(
+                        appointmentId, "APT000100", patientId, doctorId,
+                        Instant.parse("2099-08-11T03:00:00Z"),
+                        Instant.parse("2099-08-11T03:30:00Z"),
+                        AppointmentStatus.SCHEDULED,
+                        "Đổi lịch",
+                        "ONLINE_PORTAL",
+                        Instant.parse("2026-08-26T02:00:00Z")));
+
+        mockMvc.perform(put("/patient-portal/appointments/{id}/reschedule", appointmentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "newAppointmentDate": "2099-08-11",
+                                  "newStartTime": "10:00",
+                                  "reason": "Đổi lịch"
+                                }
+                                """)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SCHEDULED"))
+                .andExpect(jsonPath("$.startTime").value("2099-08-11T03:00:00Z"));
+    }
+
+    @Test
+    void rescheduleMissingDateReturns400() throws Exception {
+        mockMvc.perform(put("/patient-portal/appointments/{id}/reschedule", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newStartTime\":\"10:00\"}")
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
 }
