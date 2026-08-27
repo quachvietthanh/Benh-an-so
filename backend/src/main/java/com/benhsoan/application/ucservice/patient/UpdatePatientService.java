@@ -1,5 +1,6 @@
 package com.benhsoan.application.ucservice.patient;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -70,7 +71,14 @@ public class UpdatePatientService
                 patient.getCreatedAt(),
                 patient.getUpdatedAt(),
                 patient.getUserId(),
-                patient.getCreatedBy()
+                patient.getCreatedBy(),
+                patient.isConsentAgreed(),
+                patient.getConsentAgreedAt(),
+                patient.getConsentVersion(),
+                patient.isConsentWithdrawn(),
+                patient.getConsentWithdrawnAt(),
+                patient.getConsentWithdrawnReason(),
+                patient.isNonMedicalUseRestricted()
         );
 
         UUID currentUserId =
@@ -98,6 +106,15 @@ public class UpdatePatientService
             patient.deactivate();
         }
 
+        // Handle consent withdrawal (NCL-15-CN-001-TC-03) or renewal
+        if (Boolean.TRUE.equals(command.consentWithdrawn()) && !patient.isConsentWithdrawn()) {
+            patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
+        } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {
+            patient.renewConsent(command.consentVersion(), Instant.now());
+        } else if (Boolean.TRUE.equals(command.consentAgreed()) && !patient.isConsentAgreed()) {
+            patient.renewConsent(command.consentVersion(), Instant.now());
+        }
+
         String detail = changeDetailBuilder.forUpdate( oldPatient, patient );
 
         Patient updatedPatient =
@@ -121,10 +138,17 @@ public class UpdatePatientService
                         """
                         {
                         "patientCode":"%s",
-                        "fullName":"%s"
+                        "fullName":"%s",
+                        "consentWithdrawn":%s,
+                        "nonMedicalUseRestricted":%s
                         }
                         """
-                        .formatted( patient.getPatientCode(), patient.getFullName()),
+                        .formatted(
+                                patient.getPatientCode(),
+                                patient.getFullName(),
+                                patient.isConsentWithdrawn(),
+                                patient.isNonMedicalUseRestricted()
+                        ),
                         null
                 )
         );

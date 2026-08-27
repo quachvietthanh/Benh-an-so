@@ -27,7 +27,14 @@ public class PatientResultMapper {
                 patient.getEmergencyPhone(),
                 patient.isActive(),
                 patient.getCreatedAt(),
-                patient.getUpdatedAt()
+                patient.getUpdatedAt(),
+                patient.isConsentAgreed(),
+                patient.getConsentAgreedAt(),
+                patient.getConsentVersion(),
+                patient.isConsentWithdrawn(),
+                patient.getConsentWithdrawnAt(),
+                patient.getConsentWithdrawnReason(),
+                patient.isNonMedicalUseRestricted()
         );
     }
 

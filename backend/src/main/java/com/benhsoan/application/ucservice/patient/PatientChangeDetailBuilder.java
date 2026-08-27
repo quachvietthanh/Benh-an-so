@@ -26,17 +26,22 @@ public class PatientChangeDetailBuilder {
 
         values.put("patientCode", patient.getPatientCode());
         values.put("fullName", patient.getFullName());
-        values.put("dateOfBirth", patient.getDateOfBirth());
-        values.put("gender", patient.getGender());
+        values.put("dateOfBirth", patient.getDateOfBirth() != null ? patient.getDateOfBirth().toString() : null);
+        values.put("gender", patient.getGender() != null ? patient.getGender().name() : null);
         values.put("phone", patient.getPhone());
         values.put("email", patient.getEmail());
         values.put("address", patient.getAddress());
         values.put("identityNumber", patient.getIdentityNumber());
         values.put("insuranceNumber", patient.getInsuranceNumber());
-        values.put("bloodType", patient.getBloodType());
+        values.put("bloodType", patient.getBloodType() != null ? patient.getBloodType().name() : null);
         values.put("emergencyContact", patient.getEmergencyContact());
         values.put("emergencyPhone", patient.getEmergencyPhone());
         values.put("active", patient.isActive());
+        values.put("consentAgreed", patient.isConsentAgreed());
+        values.put("consentAgreedAt", patient.getConsentAgreedAt() != null ? patient.getConsentAgreedAt().toString() : null);
+        values.put("consentVersion", patient.getConsentVersion());
+        values.put("consentWithdrawn", patient.isConsentWithdrawn());
+        values.put("nonMedicalUseRestricted", patient.isNonMedicalUseRestricted());
 
         Map<String, Object> detail = new LinkedHashMap<>();
 
@@ -59,12 +64,12 @@ public class PatientChangeDetailBuilder {
                 newPatient.getFullName());
 
         addChange(changes, "dateOfBirth",
-                oldPatient.getDateOfBirth(),
-                newPatient.getDateOfBirth());
+                oldPatient.getDateOfBirth() != null ? oldPatient.getDateOfBirth().toString() : null,
+                newPatient.getDateOfBirth() != null ? newPatient.getDateOfBirth().toString() : null);
 
         addChange(changes, "gender",
-                oldPatient.getGender(),
-                newPatient.getGender());
+                oldPatient.getGender() != null ? oldPatient.getGender().name() : null,
+                newPatient.getGender() != null ? newPatient.getGender().name() : null);
 
         addChange(changes, "phone",
                 oldPatient.getPhone(),
@@ -87,8 +92,8 @@ public class PatientChangeDetailBuilder {
                 newPatient.getInsuranceNumber());
 
         addChange(changes, "bloodType",
-                oldPatient.getBloodType(),
-                newPatient.getBloodType());
+                oldPatient.getBloodType() != null ? oldPatient.getBloodType().name() : null,
+                newPatient.getBloodType() != null ? newPatient.getBloodType().name() : null);
 
         addChange(changes, "emergencyContact",
                 oldPatient.getEmergencyContact(),
@@ -101,6 +106,22 @@ public class PatientChangeDetailBuilder {
         addChange(changes, "active",
                 oldPatient.isActive(),
                 newPatient.isActive());
+
+        addChange(changes, "consentAgreed",
+                oldPatient.isConsentAgreed(),
+                newPatient.isConsentAgreed());
+
+        addChange(changes, "consentWithdrawn",
+                oldPatient.isConsentWithdrawn(),
+                newPatient.isConsentWithdrawn());
+
+        addChange(changes, "consentWithdrawnReason",
+                oldPatient.getConsentWithdrawnReason(),
+                newPatient.getConsentWithdrawnReason());
+
+        addChange(changes, "nonMedicalUseRestricted",
+                oldPatient.isNonMedicalUseRestricted(),
+                newPatient.isNonMedicalUseRestricted());
 
         Map<String, Object> detail = new LinkedHashMap<>();
 
