@@ -37,6 +37,8 @@ import com.benhsoan.port.dto.query.appointment.GetDoctorAvailableSlotsQuery;
 import com.benhsoan.port.dto.result.appointment.DoctorAvailableSlotResult;
 import com.benhsoan.port.dto.result.appointment.PatientAppointmentResult;
 import com.benhsoan.port.inbound.appointment.GetDoctorAvailableSlotsUseCase;
+import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentDetailUseCase;
+import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.PatientBookAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientCancelAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientRescheduleAppointmentUseCase;
@@ -66,6 +68,8 @@ class PatientPortalAppointmentControllerTest {
     @MockitoBean private PatientBookAppointmentUseCase patientBookAppointmentUseCase;
     @MockitoBean private PatientCancelAppointmentUseCase patientCancelAppointmentUseCase;
     @MockitoBean private PatientRescheduleAppointmentUseCase patientRescheduleAppointmentUseCase;
+    @MockitoBean private GetPatientPortalAppointmentsUseCase getPatientPortalAppointmentsUseCase;
+    @MockitoBean private GetPatientPortalAppointmentDetailUseCase getPatientPortalAppointmentDetailUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -286,6 +290,63 @@ class PatientPortalAppointmentControllerTest {
                         .with(user("patient").roles("PATIENT")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void listAppointmentsReturns200() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+
+        when(getPatientPortalAppointmentsUseCase.getAppointments(null))
+                .thenReturn(List.of(new PatientAppointmentResult(
+                        UUID.randomUUID(), "APT000100", patientId, doctorId,
+                        Instant.parse("2099-08-10T02:00:00Z"),
+                        Instant.parse("2099-08-10T02:30:00Z"),
+                        AppointmentStatus.SCHEDULED,
+                        "Khám tổng quát",
+                        "ONLINE_PORTAL",
+                        Instant.parse("2026-08-26T02:00:00Z"))));
+
+        mockMvc.perform(get("/patient-portal/appointments")
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].patientId").value(patientId.toString()))
+                .andExpect(jsonPath("$[0].status").value("SCHEDULED"));
+    }
+
+    @Test
+    void getAppointmentDetailReturns200ForOwnedAppointment() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+
+        when(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(appointmentId))
+                .thenReturn(new PatientAppointmentResult(
+                        appointmentId, "APT000100", patientId, doctorId,
+                        Instant.parse("2099-08-10T02:00:00Z"),
+                        Instant.parse("2099-08-10T02:30:00Z"),
+                        AppointmentStatus.SCHEDULED,
+                        "Khám tổng quát",
+                        "ONLINE_PORTAL",
+                        Instant.parse("2026-08-26T02:00:00Z")));
+
+        mockMvc.perform(get("/patient-portal/appointments/{id}", appointmentId)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(appointmentId.toString()));
+    }
+
+    @Test
+    void getAppointmentDetailReturns403ForOtherPatient() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+
+        when(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(appointmentId))
+                .thenThrow(new AccessDeniedException("Patient may only access their own data."));
+
+        mockMvc.perform(get("/patient-portal/appointments/{id}", appointmentId)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
 }

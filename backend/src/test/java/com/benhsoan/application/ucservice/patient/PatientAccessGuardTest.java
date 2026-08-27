@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -65,7 +66,7 @@ class PatientAccessGuardTest {
 
         assertThrows(AccessDeniedException.class, () -> guard.requirePatientOwnership(targetPatientId));
 
-        verify(denialAuditWriter).writeDenied(userId, targetPatientId, NOW);
+        verify(denialAuditWriter).writeDenied(userId, targetPatientId, NOW, ResourceType.PATIENT, targetPatientId);
     }
 
     @Test
@@ -81,6 +82,27 @@ class PatientAccessGuardTest {
 
         assertThrows(AccessDeniedException.class, () -> guard.requirePatientOwnership(targetPatientId));
 
-        verify(denialAuditWriter).writeDenied(userId, targetPatientId, NOW);
+        verify(denialAuditWriter).writeDenied(userId, targetPatientId, NOW, ResourceType.PATIENT, targetPatientId);
+    }
+
+    @Test
+    void appointmentOwnershipMismatchWritesAppointmentDenialAudit() {
+        UUID userId = UUID.randomUUID();
+        UUID targetPatientId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+
+        Patient own = mock(Patient.class);
+        when(own.getId()).thenReturn(UUID.randomUUID());
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(own));
+        when(clockPort.now()).thenReturn(NOW);
+
+        PatientAccessGuard guard = new PatientAccessGuard(currentUserPort, patientRepository, denialAuditWriter, clockPort);
+
+        assertThrows(AccessDeniedException.class,
+                () -> guard.requirePatientOwnership(targetPatientId, ResourceType.APPOINTMENT, appointmentId));
+
+        verify(denialAuditWriter).writeDenied(userId, targetPatientId, NOW, ResourceType.APPOINTMENT, appointmentId);
     }
 }

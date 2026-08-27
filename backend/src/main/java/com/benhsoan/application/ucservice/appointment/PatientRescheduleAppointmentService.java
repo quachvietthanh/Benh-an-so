@@ -95,7 +95,10 @@ public class PatientRescheduleAppointmentService implements PatientRescheduleApp
                 .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
 
         // TC-03 / QTN-23: reject cross-patient access (403) and record ACCESS_DENIED audit.
-        patientAccessGuard.requirePatientOwnership(appointment.getPatientId());
+        patientAccessGuard.requirePatientOwnership(
+                appointment.getPatientId(),
+                ResourceType.APPOINTMENT,
+                appointment.getId());
 
         Instant now = clockPort.now();
 
@@ -158,7 +161,7 @@ public class PatientRescheduleAppointmentService implements PatientRescheduleApp
                 ? DEFAULT_RESCHEDULE_REASON
                 : command.reason();
 
-        appointment.reschedule(doctorId, newStartTime, newEndTime, reason);
+        appointment.reschedule(doctorId, newStartTime, newEndTime, reason, now);
         Appointment saved = appointmentRepository.save(appointment);
 
         auditLogRepository.save(AuditLog.create(

@@ -21,10 +21,13 @@ import com.benhsoan.adapter.inbound.rest.request.appointment.PatientBookAppointm
 import com.benhsoan.adapter.inbound.rest.request.appointment.PatientCancelAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.request.appointment.PatientRescheduleAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.response.appointment.PatientAppointmentResponse;
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.port.dto.query.appointment.GetDoctorAvailableSlotsQuery;
 import com.benhsoan.port.dto.result.appointment.DoctorAvailableSlotResult;
 import com.benhsoan.port.dto.result.appointment.PatientAppointmentResult;
 import com.benhsoan.port.inbound.appointment.GetDoctorAvailableSlotsUseCase;
+import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentDetailUseCase;
+import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.PatientBookAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientCancelAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientRescheduleAppointmentUseCase;
@@ -45,7 +48,25 @@ public class PatientPortalAppointmentController {
 
     private final PatientRescheduleAppointmentUseCase patientRescheduleAppointmentUseCase;
 
+    private final GetPatientPortalAppointmentsUseCase getPatientPortalAppointmentsUseCase;
+
+    private final GetPatientPortalAppointmentDetailUseCase getPatientPortalAppointmentDetailUseCase;
+
     private final PatientPortalAppointmentRestMapper mapper;
+
+    @GetMapping
+    public List<PatientAppointmentResponse> getAppointments(
+            @RequestParam(required = false) AppointmentStatus status
+    ) {
+        return getPatientPortalAppointmentsUseCase.getAppointments(status).stream()
+                .map(mapper::toResponse)
+                .toList();
+    }
+
+    @GetMapping("/{id}")
+    public PatientAppointmentResponse getAppointment(@PathVariable UUID id) {
+        return mapper.toResponse(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(id));
+    }
 
     @GetMapping("/available-slots")
     public List<DoctorAvailableSlotResult> getAvailableSlots(

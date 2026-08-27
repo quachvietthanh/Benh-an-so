@@ -66,7 +66,10 @@ public class PatientCancelAppointmentService implements PatientCancelAppointment
                 .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
 
         // TC-03 / QTN-23: reject cross-patient access (403) and record ACCESS_DENIED audit.
-        patientAccessGuard.requirePatientOwnership(appointment.getPatientId());
+        patientAccessGuard.requirePatientOwnership(
+                appointment.getPatientId(),
+                ResourceType.APPOINTMENT,
+                appointment.getId());
 
         Instant now = clockPort.now();
 

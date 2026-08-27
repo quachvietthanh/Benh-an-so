@@ -74,7 +74,7 @@ class PatientCancelAppointmentServiceTest {
                 null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId)).thenReturn(mock(Patient.class));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
         when(appointmentRepository.save(appointment)).thenReturn(appointment);
@@ -106,7 +106,7 @@ class PatientCancelAppointmentServiceTest {
                 null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId)).thenReturn(mock(Patient.class));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
 
         assertThrows(AppointmentPastCutoffException.class,
@@ -125,11 +125,11 @@ class PatientCancelAppointmentServiceTest {
                 null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId))
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId))
                 .thenThrow(new AccessDeniedException("Patient may only access their own data."));
 
         assertThrows(AccessDeniedException.class,
                 () -> service.cancel(appointmentId, new PatientCancelAppointmentCommand("Bận việc")));
-        verify(patientAccessGuard).requirePatientOwnership(patientId);
+        verify(patientAccessGuard).requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId);
     }
 }

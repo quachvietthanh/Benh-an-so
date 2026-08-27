@@ -98,7 +98,7 @@ class PatientRescheduleAppointmentServiceTest {
         DoctorSchedule schedule = DoctorSchedule.create(doctorId, NEW_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId)).thenReturn(mock(Patient.class));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
         when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, NEW_DATE))
@@ -135,7 +135,7 @@ class PatientRescheduleAppointmentServiceTest {
                 null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId)).thenReturn(mock(Patient.class));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
 
         assertThrows(AppointmentPastCutoffException.class,
@@ -155,7 +155,7 @@ class PatientRescheduleAppointmentServiceTest {
                 null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId))
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId))
                 .thenThrow(new AccessDeniedException("Patient may only access their own data."));
 
         assertThrows(AccessDeniedException.class,
@@ -175,7 +175,7 @@ class PatientRescheduleAppointmentServiceTest {
                 null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId)).thenReturn(mock(Patient.class));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
 
         assertThrows(InvalidAppointmentTimeException.class,
@@ -203,7 +203,7 @@ class PatientRescheduleAppointmentServiceTest {
         DoctorSchedule schedule = DoctorSchedule.create(doctorId, NEW_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
-        when(patientAccessGuard.requirePatientOwnership(patientId)).thenReturn(mock(Patient.class));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
         when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, NEW_DATE))
