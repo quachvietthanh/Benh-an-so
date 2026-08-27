@@ -82,6 +82,44 @@ class MedicalRecordAuthorizationServiceTest {
     }
 
     @Test
+    @DisplayName("content write access is allowed for DOCTOR only")
+    void allowsDoctorContentWriteAccess() {
+        UUID userId = UUID.randomUUID();
+        UUID medicalRecordId = UUID.randomUUID();
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireContentWriteAccess(medicalRecordId));
+    }
+
+    @Test
+    @DisplayName("content write access is denied for ADMIN and non-DOCTOR roles")
+    void deniesAdminAndNonDoctorContentWriteAccess() {
+        UUID userId = UUID.randomUUID();
+        UUID medicalRecordId = UUID.randomUUID();
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, () -> service.requireContentWriteAccess(medicalRecordId));
+        verify(authorizationAuditService).recordContentWriteDenied(userId, medicalRecordId);
+    }
+
+    @Test
+    @DisplayName("content write access is denied for unassigned doctor")
+    void deniesUnassignedDoctorContentVisitWriteAccess() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitDoctorId = UUID.randomUUID();
+        UUID medicalRecordId = UUID.randomUUID();
+
+        assertThrows(MedicalRecordAccessDeniedException.class,
+                () -> service.requireContentVisitWriteAccess(actorId, visitDoctorId, medicalRecordId));
+
+        verify(authorizationAuditService).recordContentWriteDenied(actorId, medicalRecordId);
+    }
+
+    @Test
     @DisplayName("diagnosis write access is allowed for DOCTOR only")
     void allowsDoctorDiagnosisWriteAccess() {
         UUID userId = UUID.randomUUID();
@@ -91,6 +129,33 @@ class MedicalRecordAuthorizationServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
 
         assertEquals(userId, service.requireDiagnosisWriteAccess(medicalRecordId));
+    }
+
+    @Test
+    @DisplayName("template write access is allowed for DOCTOR only")
+    void allowsDoctorTemplateWriteAccess() {
+        UUID userId = UUID.randomUUID();
+        UUID medicalRecordId = UUID.randomUUID();
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireTemplateWriteAccess(medicalRecordId));
+    }
+
+    @Test
+    @DisplayName("template write access denies an ADMIN even with DOCTOR role")
+    void deniesAdminTemplateWriteAccess() {
+        UUID userId = UUID.randomUUID();
+        UUID medicalRecordId = UUID.randomUUID();
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertThrows(MedicalRecordAccessDeniedException.class,
+                () -> service.requireTemplateWriteAccess(medicalRecordId));
+        verify(authorizationAuditService).recordTemplateAccessDenied(userId, medicalRecordId,
+                "Medical record template access denied");
     }
 
     @Test

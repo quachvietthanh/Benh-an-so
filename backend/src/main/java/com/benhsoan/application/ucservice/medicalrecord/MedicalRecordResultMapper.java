@@ -14,6 +14,7 @@ import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordAmendmentResult;
+import com.benhsoan.port.dto.result.AppliedMedicalRecordTemplateResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult.PatientInfo;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult.VisitInfo;
@@ -24,13 +25,17 @@ import com.benhsoan.port.dto.result.MedicalRecordResult;
 public class MedicalRecordResultMapper {
 
     public MedicalRecordResult toResult(MedicalRecord record) {
+        return toResult(record, null);
+    }
+
+    public MedicalRecordResult toResult(MedicalRecord record, AppliedMedicalRecordTemplateResult appliedTemplate) {
         return new MedicalRecordResult(
                 record.getId(), record.getVisitId(), record.getChiefComplaint(), record.getSymptoms(),
                 record.getMedicalHistory(), record.getPhysicalExamination(), record.getClinicalProgress(),
                 record.getTreatmentPlan(), record.getDoctorInstructions(), record.getConclusion(),
                 record.getStatus(), record.getSignatureData(), record.getSignedAt(), record.getSignedBy(),
                 record.getLockedAt(), record.getLockedBy(), record.getCreatedBy(),
-                record.getCreatedAt(), record.getUpdatedBy(), record.getUpdatedAt()
+                record.getCreatedAt(), record.getUpdatedBy(), record.getUpdatedAt(), appliedTemplate
         );
     }
 
@@ -51,6 +56,11 @@ public class MedicalRecordResultMapper {
 
     public MedicalRecordDetailResult toDetailResult(MedicalRecord record, Visit visit, Patient patient,
             User doctor, List<MedicalRecordDiagnosis> diagnoses) {
+        return toDetailResult(record, visit, patient, doctor, diagnoses, null);
+    }
+
+    public MedicalRecordDetailResult toDetailResult(MedicalRecord record, Visit visit, Patient patient,
+            User doctor, List<MedicalRecordDiagnosis> diagnoses, AppliedMedicalRecordTemplateResult appliedTemplate) {
         List<MedicalRecordDiagnosisResult> diagnosisResults = diagnoses.stream()
                 .map(d -> new MedicalRecordDiagnosisResult(
                         d.getId(), d.getMedicalRecordId(), d.getDiagnosisCode(), d.getDiagnosisName(),
@@ -87,7 +97,8 @@ public class MedicalRecordResultMapper {
                 primary == null ? null : primary.getDiagnosisCode(),
                 primary == null ? null : primary.getDiagnosisName(),
                 secondaryIcdCodes,
-                diagnosisResults
+                diagnosisResults,
+                appliedTemplate
         );
     }
 }

@@ -55,6 +55,18 @@ public class MedicalRecordTemplateRepositoryAdapter implements MedicalRecordTemp
     }
 
     @Override
+    public Optional<MedicalRecordTemplate> findByIdForUpdate(UUID id) {
+        return templateJpaRepository.findByIdForUpdate(id).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<MedicalRecordTemplateVersion> findVersionById(UUID id) {
+        return versionJpaRepository.findById(id).map(version -> versionMapper.toDomain(version,
+                sectionJpaRepository.findByTemplateVersionIdOrderByDisplayOrderAsc(version.getId()).stream()
+                        .map(sectionMapper::toDomain).toList()));
+    }
+
+    @Override
     public List<MedicalRecordTemplate> findBySpecialtyIdAndActive(UUID specialtyId, boolean active) {
         return templateJpaRepository.findBySpecialtyIdAndActiveOrderByNameAsc(specialtyId, active).stream()
                 .map(this::toDomain)

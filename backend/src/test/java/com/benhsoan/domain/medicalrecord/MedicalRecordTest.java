@@ -5,12 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordFieldCode;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotSignedException;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -84,6 +86,22 @@ class MedicalRecordTest {
         );
 
         assertThrows(ValidationException.class, () -> record.sign("SIG", UUID.randomUUID(), now));
+    }
+
+    @Test
+    @DisplayName("Required template sections are validated only when the record is signed")
+    void rejectsSigningWhenAppliedTemplateRequiredSectionIsBlank() {
+        MedicalRecord record = recordWithRequiredContent();
+        UUID doctorId = UUID.randomUUID();
+        MedicalRecordTemplateVersion version = MedicalRecordTemplateVersion.create(
+                UUID.randomUUID(), 1, UUID.randomUUID(), "Initial", null, doctorId, now,
+                List.of(new MedicalRecordTemplateVersion.SectionDefinition(
+                        MedicalRecordFieldCode.PHYSICAL_EXAMINATION, "Physical examination", true, 1)));
+
+        record.applyTemplateVersion(version.getId(), doctorId, now);
+
+        assertThrows(ValidationException.class, () -> record.ensureRequiredTemplateSections(version));
+        assertEquals(MedicalRecordStatus.DRAFT, record.getStatus());
     }
 
     private MedicalRecord recordWithRequiredContent() {

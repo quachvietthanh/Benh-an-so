@@ -28,13 +28,14 @@ public class ArchiveMedicalRecordService implements ArchiveMedicalRecordUseCase 
     private final VisitRepository visitRepository;
     private final MedicalRecordAuthorizationService authorizationService;
     private final MedicalRecordAccessAuditService accessAuditService;
+    private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final MedicalRecordResultMapper resultMapper;
     private final ClockPort clockPort;
 
     @Override
     public MedicalRecordResult archive(UUID medicalRecordId) {
         UUID userId = authorizationService.requireWriteAccess();
-        MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
+        MedicalRecord record = medicalRecordRepository.findByIdForUpdate(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
         Visit visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
@@ -45,6 +46,6 @@ public class ArchiveMedicalRecordService implements ArchiveMedicalRecordUseCase 
         accessAuditService.recordRecordAccess(
                 visit.getPatientId(), visit.getId(), saved.getId(), userId,
                 MedicalRecordAccessAction.ARCHIVE, "Medical record archived", now);
-        return resultMapper.toResult(saved);
+        return resultMapper.toResult(saved, templateMapper.resolveApplied(saved, visit));
     }
 }

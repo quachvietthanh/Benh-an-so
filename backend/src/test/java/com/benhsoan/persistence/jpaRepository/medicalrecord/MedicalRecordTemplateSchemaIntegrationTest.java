@@ -52,10 +52,14 @@ class MedicalRecordTemplateSchemaIntegrationTest {
     private MedicalRecordTemplateRepository templateRepository;
 
     @Test
-    void migrationSeedsSpecialtiesBackfillsVisitsAndGrantsOnlyAdminTemplateManagement() {
-        assertEquals(1, count("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '27' AND success = TRUE"));
+    void migrationsSeedSpecialtiesTemplatesAndGrantOnlyAdminTemplateManagement() {
+        assertEquals(1, count("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '29' AND success = TRUE"));
+        assertEquals(1, count("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '30' AND success = TRUE"));
         assertEquals(1, count("SELECT COUNT(*) FROM specialties WHERE code = 'GENERAL' AND active = TRUE"));
         assertEquals(1, count("SELECT COUNT(*) FROM specialties WHERE code = 'INTERNAL_MEDICINE' AND active = TRUE"));
+        assertEquals(4, count("SELECT COUNT(*) FROM medical_record_templates WHERE active = TRUE"));
+        assertEquals(2, count("SELECT COUNT(*) FROM medical_record_templates WHERE active = TRUE AND is_default = TRUE"));
+        assertEquals(29, count("SELECT COUNT(*) FROM medical_record_template_sections"));
         assertEquals(0, count("SELECT COUNT(*) FROM visits WHERE specialty_id IS NULL"));
         assertTrue(count("""
                 SELECT COUNT(*)

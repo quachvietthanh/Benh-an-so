@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,12 +35,18 @@ import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 import com.benhsoan.port.dto.result.MedicalRecordResult;
+import com.benhsoan.port.dto.result.MedicalRecordTemplateOptionResult;
+import com.benhsoan.port.dto.result.MedicalRecordTemplateSelectionResult;
+import com.benhsoan.port.dto.result.SpecialtyResult;
+import com.benhsoan.port.dto.result.AppliedMedicalRecordTemplateResult;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ApplyMedicalRecordTemplateUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordTemplateSelectionUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordVersionHistoryUseCase;
 import com.benhsoan.port.inbound.medicalrecord.IssueMedicalRecordCopyUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
@@ -66,6 +73,10 @@ class MedicalRecordControllerTest {
     private CreateMedicalRecordUseCase createMedicalRecordUseCase;
     @MockitoBean
     private GetMedicalRecordUseCase getMedicalRecordUseCase;
+    @MockitoBean
+    private GetMedicalRecordTemplateSelectionUseCase getMedicalRecordTemplateSelectionUseCase;
+    @MockitoBean
+    private ApplyMedicalRecordTemplateUseCase applyMedicalRecordTemplateUseCase;
     @MockitoBean
     private UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
     @MockitoBean
@@ -268,5 +279,57 @@ class MedicalRecordControllerTest {
                 .andExpect(jsonPath("$.status").value("SIGNED"))
                 .andExpect(jsonPath("$.signatureData").value("DR_SIM_SIG"))
                 .andExpect(jsonPath("$.signedBy").value(doctorId.toString()));
+    }
+
+    @Test
+    @DisplayName("GET /medical-records/{id}/template-options - returns effective template")
+    void getTemplateOptionsReturnsEffectiveTemplate() throws Exception {
+        UUID templateId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        SpecialtyResult specialty = new SpecialtyResult(UUID.randomUUID(), "GENERAL", "General", true);
+        MedicalRecordTemplateOptionResult option = new MedicalRecordTemplateOptionResult(templateId, versionId,
+                specialty, "Initial examination", 2, true, List.of());
+        when(getMedicalRecordTemplateSelectionUseCase.getForMedicalRecord(recordId))
+                .thenReturn(new MedicalRecordTemplateSelectionResult(recordId, visitId, specialty,
+                        List.of(option), option, false));
+
+        mockMvc.perform(get("/medical-records/{medicalRecordId}/template-options", recordId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.effectiveTemplate.templateId").value(templateId.toString()))
+                .andExpect(jsonPath("$.effectiveTemplate.templateVersionId").value(versionId.toString()))
+                .andExpect(jsonPath("$.fallback").value(false));
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/template - returns applied immutable template")
+    void applyTemplateReturnsAppliedTemplate() throws Exception {
+        UUID templateId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        SpecialtyResult specialty = new SpecialtyResult(UUID.randomUUID(), "GENERAL", "General", true);
+        AppliedMedicalRecordTemplateResult applied = new AppliedMedicalRecordTemplateResult(templateId, versionId,
+                specialty, "Initial examination", 2, List.of(), doctorId, now, false);
+        when(applyMedicalRecordTemplateUseCase.apply(org.mockito.ArgumentMatchers.eq(recordId),
+                org.mockito.ArgumentMatchers.any())).thenReturn(new MedicalRecordResult(
+                        recordId, visitId, null, null, null, null, null, null, null, null,
+                        MedicalRecordStatus.DRAFT, null, null, null, null, null, doctorId, now, doctorId, now, applied));
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/template", recordId)
+                        .contentType("application/json")
+                        .content("{\"templateId\":\"" + templateId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appliedTemplate.templateId").value(templateId.toString()))
+                .andExpect(jsonPath("$.appliedTemplate.templateVersionId").value(versionId.toString()))
+                .andExpect(jsonPath("$.appliedTemplate.appliedBy").value(doctorId.toString()));
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/template - rejects a request without templateId")
+    void applyTemplateRejectsMissingTemplateId() throws Exception {
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/template", recordId)
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(applyMedicalRecordTemplateUseCase);
     }
 }
