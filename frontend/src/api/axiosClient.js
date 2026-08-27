@@ -49,7 +49,12 @@ axiosClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      if (window.location.pathname.startsWith('/portal') && window.location.pathname !== '/portal/login' && window.location.pathname !== '/portal') {
+      if (
+        window.location.pathname.startsWith('/portal') &&
+        window.location.pathname !== '/portal/login' &&
+        window.location.pathname !== '/portal' &&
+        window.location.pathname !== '/portal/register'
+      ) {
         window.location.href = '/portal/login'
       } else if (!window.location.pathname.startsWith('/portal') && window.location.pathname !== '/login') {
         window.location.href = '/login'

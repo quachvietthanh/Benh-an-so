@@ -141,6 +141,7 @@ export const AuthProvider = ({ children }) => {
       const normalizedUser = {
         id: data.userId || payload?.userId || payload?.sub,
         patientId: data.patientId || payload?.patientId,
+        patientCode: data.patientCode || payload?.patientCode || null,
         username: username,
         fullName: username,
         roles: normalizeRoles(rawRoles),
@@ -169,6 +170,49 @@ export const AuthProvider = ({ children }) => {
               : status === 401 || status === 400
                 ? (errorData?.message || 'Số điện thoại hoặc mật khẩu không đúng.')
                 : (error.message || 'Không thể kết nối đến máy chủ.'),
+      }
+    }
+  }
+
+  const patientRegister = async (registrationData) => {
+    try {
+      const response = await authApi.patientRegister(registrationData)
+      const data = response.data
+
+      if (data.accessToken) {
+        const payload = getJwtPayload(data.accessToken)
+        const rawRoles = payload?.role || ['PATIENT']
+        const username = payload?.username || data.phone
+
+        const normalizedUser = {
+          id: data.userId || payload?.userId || payload?.sub,
+          patientId: data.patientId || payload?.patientId,
+          patientCode: data.patientCode || payload?.patientCode || null,
+          username: username,
+          fullName: data.fullName || username,
+          roles: normalizeRoles(rawRoles),
+          permissions: normalizePermissions(payload?.permissions || []),
+          expiredAt: payload?.exp ? new Date(payload.exp * 1000).toISOString() : null,
+          refreshToken: data.refreshToken,
+        }
+
+        localStorage.setItem('token', data.accessToken)
+        localStorage.setItem('user', JSON.stringify(normalizedUser))
+        setUser(normalizedUser)
+
+        return { success: true, data: normalizedUser }
+      }
+
+      return { success: true, data }
+    } catch (error) {
+      const status = error.response?.status
+      const errorData = error.response?.data
+      return {
+        success: false,
+        status,
+        data: errorData,
+        error,
+        message: errorData?.message || error.message || 'Đăng ký không thành công.',
       }
     }
   }
@@ -209,7 +253,7 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!user
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, patientLogin, logout, loading, isAuthenticated, updateCurrentUserPermissions }}>
+    <AuthContext.Provider value={{ user, setUser, login, patientLogin, patientRegister, logout, loading, isAuthenticated, updateCurrentUserPermissions }}>
       {children}
     </AuthContext.Provider>
   )
