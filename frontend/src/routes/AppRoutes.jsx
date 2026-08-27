@@ -9,6 +9,7 @@ import PatientRoute from '../components/common/PatientRoute'
 
 const Login = React.lazy(() => import('../pages/Login'))
 const PortalLogin = React.lazy(() => import('../pages/PortalLogin'))
+const PortalRegister = React.lazy(() => import('../pages/PortalRegister'))
 const PortalDashboard = React.lazy(() => import('../pages/PortalDashboard'))
 const Dashboard = React.lazy(() => import('../pages/Dashboard'))
 const PatientList = React.lazy(() => import('../pages/PatientList'))
@@ -88,6 +89,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
       <Route path="/portal/login" element={<LazyPage><PortalLogin /></LazyPage>} />
+      <Route path="/portal/register" element={<LazyPage><PortalRegister /></LazyPage>} />
       <Route path="/portal/dashboard" element={<PatientRoute><LazyPage><PortalDashboard /></LazyPage></PatientRoute>} />
       <Route path="/public-lookup" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/portal" element={<LazyPage><PublicLookupPage /></LazyPage>} />
