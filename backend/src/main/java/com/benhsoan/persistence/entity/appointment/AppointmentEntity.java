@@ -67,4 +67,7 @@ public class AppointmentEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "booking_channel", length = 30)
+    private String bookingChannel;
+
 }

@@ -16,7 +16,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -65,14 +64,13 @@ class SpecialtyControllerTest {
     @MockitoBean private CurrentUserPort currentUserPort;
 
     @Test
-    void listsActiveSpecialtiesForTemplateManagers() throws Exception {
+    void listsActiveSpecialtiesForAnyAuthenticatedUser() throws Exception {
         UUID specialtyId = UUID.randomUUID();
         when(searchSpecialtyUseCase.search(true)).thenReturn(List.of(
                 new SpecialtyResult(specialtyId, "GENERAL", "General", true)));
 
         mockMvc.perform(get("/system/specialties").param("active", "true")
-                        .with(user("admin").roles("ADMIN")
-                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_TEMPLATE_MANAGE"))))
+                        .with(user("patient").roles("PATIENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(specialtyId.toString()))
                 .andExpect(jsonPath("$[0].code").value("GENERAL"));

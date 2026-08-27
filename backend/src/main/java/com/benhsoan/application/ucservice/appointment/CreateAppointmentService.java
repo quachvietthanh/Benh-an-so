@@ -112,7 +112,7 @@ public class CreateAppointmentService
                         new PatientNotFoundException(command.patientId()));
 
         User doctor =
-                userRepository.findById(command.doctorId())
+                userRepository.findByIdForUpdate(command.doctorId())
                         .orElseThrow(() ->
                                 new DoctorNotFoundException(
                                         command.doctorId()));

@@ -9,6 +9,7 @@ import PatientRoute from '../components/common/PatientRoute'
 
 const Login = React.lazy(() => import('../pages/Login'))
 const PortalLogin = React.lazy(() => import('../pages/PortalLogin'))
+const PortalRegister = React.lazy(() => import('../pages/PortalRegister'))
 const PortalDashboard = React.lazy(() => import('../pages/PortalDashboard'))
 const Dashboard = React.lazy(() => import('../pages/Dashboard'))
 const PatientList = React.lazy(() => import('../pages/PatientList'))
@@ -28,6 +29,7 @@ const ResultPage = React.lazy(() => import('../pages/ResultPage'))
 const PublicLookupPage = React.lazy(() => import('../pages/PublicLookupPage'))
 const SystemManagementPage = React.lazy(() => import('../pages/SystemManagementPage'))
 const DiagnosisCatalogPage = React.lazy(() => import('../pages/DiagnosisCatalogPage'))
+const MedicalRecordTemplateManagementPage = React.lazy(() => import('../pages/MedicalRecordTemplateManagementPage'))
 const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
 
 const MedicalRecordAccessLogsPage = React.lazy(() => import('../pages/MedicalRecordAccessLogsPage'))
@@ -88,6 +90,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
       <Route path="/portal/login" element={<LazyPage><PortalLogin /></LazyPage>} />
+      <Route path="/portal/register" element={<LazyPage><PortalRegister /></LazyPage>} />
       <Route path="/portal/dashboard" element={<PatientRoute><LazyPage><PortalDashboard /></LazyPage></PatientRoute>} />
       <Route path="/public-lookup" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/portal" element={<LazyPage><PublicLookupPage /></LazyPage>} />
@@ -132,6 +135,8 @@ function AppRoutes() {
         <Route path="services" element={<PrivateRoute allowedPermissions={['SERVICE_CATALOG_READ', 'SERVICE_CATALOG_CREATE', 'SERVICE_CATALOG_UPDATE', 'SERVICE_PRICE_MANAGE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><ServicesPage /></LazyPage></PrivateRoute>} />
         <Route path="system/diagnosis-catalog" element={<PrivateRoute allowedPermissions={['DIAGNOSIS_CATALOG_MANAGE', 'SERVICE_CATALOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><DiagnosisCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="diagnosis-catalog" element={<Navigate to="/system/diagnosis-catalog" replace />} />
+        <Route path="system/medical-record-templates" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_TEMPLATE_MANAGE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><MedicalRecordTemplateManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="medical-record-templates" element={<Navigate to="/system/medical-record-templates" replace />} />
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
 
       </Route>

@@ -101,10 +101,10 @@ function PortalLogin() {
           </Link>
 
           <div className="portal-login-header-links">
-            <Link className="portal-login-lookup-link" to="/portal">
+            <Link className="portal-header-link" to="/portal">
               <SearchOutlined /> Tra cứu theo mã hẹn
             </Link>
-            <Link className="portal-login-staff-link" to="/login">
+            <Link className="portal-header-link" to="/login">
               <UserOutlined /> Đăng nhập nhân viên
             </Link>
           </div>
@@ -187,14 +187,9 @@ function PortalLogin() {
           </Form>
 
           <div className="portal-login-footer">
-            <div className="portal-login-footer-links">
-              <Link className="portal-login-footer-link" to="/portal">
-                <SearchOutlined /> Tra cứu kết quả bằng mã lịch hẹn (không cần đăng nhập)
-              </Link>
-              <div className="portal-login-footer-secondary">
-                Dành cho Bác sĩ & Nhân viên y tế?{' '}
-                <Link to="/login">Đăng nhập hệ thống nội bộ</Link>
-              </div>
+            <div className="portal-login-footer-text">
+              Chưa có tài khoản Bệnh nhân?{' '}
+              <Link to="/portal/register">Đăng ký ngay</Link>
             </div>
           </div>
         </div>

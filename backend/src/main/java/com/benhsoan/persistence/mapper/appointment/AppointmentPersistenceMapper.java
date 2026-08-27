@@ -26,7 +26,8 @@ public class AppointmentPersistenceMapper {
                 entity.getCheckedInAt(),
                 entity.getCompletedAt(),
                 entity.getCreatedBy(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getBookingChannel()
         );
     }
 
@@ -49,6 +50,7 @@ public class AppointmentPersistenceMapper {
                 .completedAt(domain.getCompletedAt())
                 .createdBy(domain.getCreatedBy())
                 .createdAt(domain.getCreatedAt())
+                .bookingChannel(domain.getBookingChannel())
                 .build();
     }
 

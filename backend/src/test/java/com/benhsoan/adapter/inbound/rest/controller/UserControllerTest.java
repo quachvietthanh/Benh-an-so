@@ -3,6 +3,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -108,6 +109,15 @@ class UserControllerTest {
                 .andExpect(status().isOk());
         mvc.perform(put("/users/{id}", userId).contentType(MediaType.APPLICATION_JSON).content(updateRequest())
                 .with(withPermission("PERMISSION_USER_UPDATE")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void allowsPatientToRetrieveActiveDoctorsWithoutUserReadPermission() throws Exception {
+        UUID doctorId = UUID.randomUUID();
+        when(getDoctorsUseCase.getAllActiveDoctors()).thenReturn(List.of(result(doctorId)));
+
+        mvc.perform(get("/users/doctors").with(user("patient").roles("PATIENT")))
                 .andExpect(status().isOk());
     }
 

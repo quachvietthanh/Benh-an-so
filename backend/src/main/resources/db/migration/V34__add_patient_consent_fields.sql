@@ -1,5 +1,5 @@
 -- =====================================================
--- V32__add_patient_consent_fields.sql
+-- V34__add_patient_consent_fields.sql
 -- NCL-15-CN-001 / QTN-24: Personal data processing consent
 -- Adds consent recording, timestamping, withdrawal status,
 -- and non-medical processing restriction flags.

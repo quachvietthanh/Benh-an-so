@@ -38,6 +38,7 @@ import {
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
 import medicalRecordApi from '../api/medicalRecordApi'
+import medicalRecordTemplateApi from '../api/medicalRecordTemplateApi'
 import queueApi from '../api/queueApi'
 import systemApi from '../api/systemApi'
 import visitApi from '../api/visitApi'
@@ -186,6 +187,7 @@ function MedicalEncounter() {
                 code: item.code,
                 rawName: item.name,
                 name: fixMojibake(item.name),
+                diseaseGroup: item.diseaseGroup ? fixMojibake(item.diseaseGroup) : null,
                 description: fixMojibake(item.description || ''),
                 category: getCategoryFromIcdCode(item.code),
               })
@@ -205,6 +207,97 @@ function MedicalEncounter() {
   useEffect(() => {
     loadAllBackendDiagnoses()
   }, [loadAllBackendDiagnoses])
+
+  const [specialties, setSpecialties] = useState([])
+  const [selectedSpecialtyId, setSelectedSpecialtyId] = useState('')
+  const [availableTemplates, setAvailableTemplates] = useState([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [currentTemplate, setCurrentTemplate] = useState(null)
+  const [templateLoading, setTemplateLoading] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    medicalRecordTemplateApi
+      .getSpecialties({ active: true })
+      .then((res) => {
+        if (mounted && Array.isArray(res.data) && res.data.length > 0) {
+          setSpecialties(res.data)
+          setSelectedSpecialtyId((prev) => prev || res.data[0]?.id)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const loadTemplatesForSpecialty = useCallback(async (specialtyId) => {
+    if (!specialtyId) return
+    setTemplateLoading(true)
+    try {
+      const res = await medicalRecordTemplateApi.searchTemplates({
+        specialtyId,
+        active: true,
+      })
+      const list = res.data || []
+      setAvailableTemplates(list)
+
+      if (list.length > 0) {
+        const defaultTmpl = list.find((t) => t.defaultTemplate) || list[0]
+        setSelectedTemplateId(defaultTmpl.id)
+        const detailRes = await medicalRecordTemplateApi.getTemplateById(defaultTmpl.id)
+        setCurrentTemplate(detailRes.data)
+      } else {
+        const generalSpecialty = specialties.find((s) => s.code === 'GENERAL')
+        if (generalSpecialty && generalSpecialty.id !== specialtyId) {
+          const fallbackRes = await medicalRecordTemplateApi.searchTemplates({
+            specialtyId: generalSpecialty.id,
+            active: true,
+          })
+          const fallbackList = fallbackRes.data || []
+          if (fallbackList.length > 0) {
+            const fallbackDefault = fallbackList.find((t) => t.defaultTemplate) || fallbackList[0]
+            setSelectedTemplateId(fallbackDefault.id)
+            const detailRes = await medicalRecordTemplateApi.getTemplateById(fallbackDefault.id)
+            setCurrentTemplate(detailRes.data)
+            message.info('Chuyên khoa chưa có mẫu riêng, đang áp dụng mẫu Đa khoa mặc định.')
+          } else {
+            setCurrentTemplate(null)
+          }
+        } else {
+          setCurrentTemplate(null)
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải mẫu bệnh án:', err)
+      setCurrentTemplate(null)
+    } finally {
+      setTemplateLoading(false)
+    }
+  }, [specialties])
+
+  useEffect(() => {
+    if (selectedSpecialtyId) {
+      loadTemplatesForSpecialty(selectedSpecialtyId)
+    }
+  }, [selectedSpecialtyId, loadTemplatesForSpecialty])
+
+  const handleSpecialtyChange = (specialtyId) => {
+    setSelectedSpecialtyId(specialtyId)
+  }
+
+  const handleTemplateChange = async (templateId) => {
+    setSelectedTemplateId(templateId)
+    setTemplateLoading(true)
+    try {
+      const detailRes = await medicalRecordTemplateApi.getTemplateById(templateId)
+      setCurrentTemplate(detailRes.data)
+    } catch (err) {
+      message.error('Không thể tải cấu hình mẫu bệnh án đã chọn.')
+    } finally {
+      setTemplateLoading(false)
+    }
+  }
 
   const [selectedOrders, setSelectedOrders] = useState([])
   const [orderCategory, setOrderCategory] = useState('ALL')
@@ -395,6 +488,7 @@ function MedicalEncounter() {
             code: item.code,
             rawName: item.name,
             name: fixMojibake(item.name),
+            diseaseGroup: item.diseaseGroup ? fixMojibake(item.diseaseGroup) : null,
             description: fixMojibake(item.description || ''),
             category: getCategoryFromIcdCode(item.code),
           })),
@@ -465,6 +559,8 @@ function MedicalEncounter() {
         id: icd.id || backendItem?.id,
         code: backendItem?.code || icd.code,
         name: fixMojibake(backendItem?.name || icd.name),
+        diseaseGroup: backendItem?.diseaseGroup || icd.diseaseGroup || null,
+        category: backendItem?.category || icd.category || getCategoryFromIcdCode(backendItem?.code || icd.code),
         note: icd.note,
       }
       setPrimaryIcd(cleanIcd)
@@ -500,6 +596,8 @@ function MedicalEncounter() {
         id: icd.id || backendItem?.id,
         code: backendItem?.code || icd.code,
         name: fixMojibake(backendItem?.name || icd.name),
+        diseaseGroup: backendItem?.diseaseGroup || icd.diseaseGroup || null,
+        category: backendItem?.category || icd.category || getCategoryFromIcdCode(backendItem?.code || icd.code),
         note: icd.note,
       }
       setSecondaryIcds((prev) => {
@@ -1141,6 +1239,14 @@ function MedicalEncounter() {
                 totalOrderFee={totalOrderFee}
                 setPrintModalOpen={setPrintModalOpen}
                 serviceCatalogError={serviceCatalogError}
+                specialties={specialties}
+                selectedSpecialtyId={selectedSpecialtyId}
+                onSpecialtyChange={handleSpecialtyChange}
+                availableTemplates={availableTemplates}
+                selectedTemplateId={selectedTemplateId}
+                onTemplateChange={handleTemplateChange}
+                currentTemplate={currentTemplate}
+                templateLoading={templateLoading}
               />
             ),
           },

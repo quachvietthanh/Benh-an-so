@@ -15,9 +15,11 @@ import {
   SyncOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import dashboardApi from '../api/dashboardApi'
 import reportApi from '../api/reportApi'
+import { useAuthContext } from '../context/AuthContext'
+import { getDefaultHomePath } from '../components/layout/navigationConfig'
 import {
   buildOperationalSnapshotFromReports,
   getActiveQueueCount,
@@ -103,6 +105,21 @@ function DashboardSkeleton() {
 
 function Dashboard() {
   const navigate = useNavigate()
+  const { user } = useAuthContext()
+
+  const userRoles = useMemo(() => {
+    return (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user])
+  const userPerms = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
+  const canViewDashboard =
+    userRoles.includes('admin') ||
+    userRoles.includes('manager') ||
+    userRoles.includes('clinic_manager') ||
+    userPerms.includes('DASHBOARD_OPERATIONAL_READ')
+
   const mountedRef = useRef(true)
   const requestInFlightRef = useRef(false)
   const snapshotRef = useRef(null)
@@ -112,6 +129,7 @@ function Dashboard() {
   const [error, setError] = useState(null)
 
   const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+    if (!canViewDashboard) return
     if (requestInFlightRef.current) return
 
     requestInFlightRef.current = true
@@ -191,6 +209,10 @@ function Dashboard() {
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [loadDashboard])
+
+  if (!canViewDashboard && user) {
+    return <Navigate to={getDefaultHomePath(user.roles, user.permissions)} replace />
+  }
 
   const visitSummary = snapshot?.visitSummary
   const revenueSummary = snapshot?.revenueSummary

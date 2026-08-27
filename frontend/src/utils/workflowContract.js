@@ -46,9 +46,9 @@ export const buildMedicalRecordPayload = ({ visitId, values = {}, vitalSigns = {
   return {
     visitId,
     chiefComplaint: values.chiefComplaint || values.symptoms || '',
-    symptoms: values.symptoms || '',
+    symptoms: values.symptoms || values.chiefComplaint || '',
     medicalHistory: values.medicalHistory || '',
-    physicalExamination: compactText([values.examinationNote, vitalNarrative]),
+    physicalExamination: compactText([values.physicalExamination || values.examinationNote, vitalNarrative]),
     clinicalProgress: values.clinicalProgress || '',
     treatmentPlan: values.treatmentPlan || '',
     doctorInstructions: values.doctorInstructions || values.treatmentPlan || '',
@@ -59,16 +59,27 @@ export const buildMedicalRecordPayload = ({ visitId, values = {}, vitalSigns = {
 export const buildDiagnosisPayload = ({ primaryDiagnosis, secondaryDiagnoses = [], note = '' }) => {
   if (!primaryDiagnosis?.id) throw new Error('primary diagnosisCatalogId is required')
 
-  const toDiagnosis = (diagnosis) => ({
+  const toPrimary = (diagnosis) => ({
     diagnosisCatalogId: diagnosis.id,
-    code: diagnosis.code,
-    name: diagnosis.rawName || diagnosis.name,
     note: diagnosis.note || note || '',
   })
 
+  const toSecondary = (diagnosis) => {
+    if (diagnosis.id) {
+      return {
+        diagnosisCatalogId: diagnosis.id,
+        note: diagnosis.note || '',
+      }
+    }
+    return {
+      name: diagnosis.rawName || diagnosis.name || diagnosis.code || '',
+      note: diagnosis.note || '',
+    }
+  }
+
   return {
-    primaryDiagnosis: toDiagnosis(primaryDiagnosis),
-    secondaryDiagnoses: secondaryDiagnoses.map(toDiagnosis),
+    primaryDiagnosis: toPrimary(primaryDiagnosis),
+    secondaryDiagnoses: secondaryDiagnoses.map(toSecondary),
   }
 }
 

@@ -79,6 +79,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/audit-logs/**").hasRole("ADMIN")
                                                 .requestMatchers("/roles/**", "/permissions/**").authenticated()
                                                 .requestMatchers("/system/services/**").authenticated()
+                                                .requestMatchers("/system/specialties/**").authenticated()
                                                 .requestMatchers("/system/diagnosis-catalog/**").authenticated()
                                                 .requestMatchers("/system/clinic/**").authenticated()
                                                 .requestMatchers("/backups/**").authenticated()
@@ -107,6 +108,9 @@ public class SecurityConfig {
 
                                                 // ===== APPOINTMENTS =====
                                                 .requestMatchers("/appointments/**").authenticated()
+
+                                                // ===== PATIENT PORTAL =====
+                                                .requestMatchers("/patient-portal/**").hasRole("PATIENT")
 
                                                 // ===== REPORTS =====
                                                 .requestMatchers("/reports/**").authenticated()

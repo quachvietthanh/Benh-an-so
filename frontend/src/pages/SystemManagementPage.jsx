@@ -5,10 +5,11 @@ import BackupRestorePage from './BackupRestorePage'
 import ClinicConfigurationPage from './ClinicConfigurationPage'
 import DiagnosisCatalogPage from './DiagnosisCatalogPage'
 import MedicalRecordAccessLogsPage from './MedicalRecordAccessLogsPage'
+import MedicalRecordTemplateManagementPage from './MedicalRecordTemplateManagementPage'
 import RolePermissionsPage from './RolePermissionsPage'
 import UsersPage from './UsersPage'
 import { useAuthContext } from '../context/AuthContext'
-import { ExperimentOutlined } from '@ant-design/icons'
+import { ExperimentOutlined, FileTextOutlined } from '@ant-design/icons'
 
 const { Title, Text } = Typography
 
@@ -21,6 +22,7 @@ function SystemManagementPage() {
 
   const canViewConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || isAdmin || isManager
   const canViewDiagnosisCatalog = userPermissions.includes('DIAGNOSIS_CATALOG_MANAGE') || userPermissions.includes('SERVICE_CATALOG_READ') || isAdmin || isManager
+  const canViewTemplates = userPermissions.includes('MEDICAL_RECORD_TEMPLATE_MANAGE') || isAdmin || isManager
   const canViewUsers = userPermissions.includes('USER_READ') || isAdmin
   const canViewRolePermissions = userPermissions.includes('ROLE_READ') || userPermissions.includes('PERMISSION_READ') || isAdmin
   const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || isAdmin
@@ -36,6 +38,11 @@ function SystemManagementPage() {
       key: 'diagnosis-catalog',
       label: <span><ExperimentOutlined /> Danh mục mã bệnh (ICD-10)</span>,
       children: <DiagnosisCatalogPage />,
+    },
+    canViewTemplates && {
+      key: 'medical-record-templates',
+      label: <span><FileTextOutlined /> Mẫu bệnh án chuyên khoa</span>,
+      children: <MedicalRecordTemplateManagementPage />,
     },
     canViewUsers && {
       key: 'users',

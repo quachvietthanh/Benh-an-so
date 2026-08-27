@@ -1,5 +1,5 @@
 -- =====================================================
--- V33__add_patient_consent_permission.sql
+-- V35__add_patient_consent_permission.sql
 -- NCL-15-CN-001 / QTN-24: Dedicated consent update permission
 -- Restricts consent recording/withdrawal to RECEPTIONIST and ADMIN roles.
 -- =====================================================

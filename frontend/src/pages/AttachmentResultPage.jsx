@@ -13,7 +13,7 @@ function AttachmentResultPage() {
             Quản lý Kết quả cận lâm sàng & Tệp đính kèm
           </Title>
           <Text type="secondary">
-            Lập trình tải lên, xem danh sách kết quả xét nghiệm, X-quang, siêu âm và đính kèm hồ sơ bệnh án
+            Tải lên, xem danh sách kết quả xét nghiệm, X-quang, siêu âm và đính kèm hồ sơ bệnh án
           </Text>
         </div>
       </div>
