@@ -53,7 +53,9 @@ final class DomainExceptionHttpStatusMapper {
                     SESSION_EXPIRED,
                     TOKEN_INVALID -> HttpStatus.UNAUTHORIZED;
             case APPOINTMENT_TIME_IN_PAST,
+                    DOCTOR_SCHEDULE_UNAVAILABLE,
                     INVALID_BACKUP_STATUS,
+                    INVALID_DOCTOR_ROLE,
                     MEDICAL_RECORD_MISSING_AUTHORIZATION,
                     MEDICAL_RECORD_MISSING_DIAGNOSIS,
                     MEDICAL_RECORD_NOT_LOCKED,

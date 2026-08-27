@@ -59,7 +59,7 @@ class CreateAppointmentServiceTest {
         User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com", "0900000001",
                 UUID.randomUUID(), true, null, Instant.parse("2026-08-01T00:00:00Z"));
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
-        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
         when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
         when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
@@ -105,7 +105,7 @@ class CreateAppointmentServiceTest {
         User inactiveDoctor = User.restore(doctorId, "doctor2", "hash", "Doctor Two", "doctor2@example.com",
                 "0900000002", UUID.randomUUID(), false, null, Instant.parse("2026-08-01T00:00:00Z"));
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
-        when(userRepository.findById(doctorId)).thenReturn(Optional.of(inactiveDoctor));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(inactiveDoctor));
 
         assertThrows(DoctorInactiveException.class, () -> service.create(new CreateAppointmentCommand(
                 patientId, doctorId, startTime, endTime, "Tai kham tong quat"
@@ -138,7 +138,7 @@ class CreateAppointmentServiceTest {
         User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com", "0900000001",
                 UUID.randomUUID(), true, null, Instant.parse("2026-08-01T00:00:00Z"));
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
-        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
         when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
         when(appointmentRepository.existsActiveAppointmentConflict(doctorId, startTime, endTime)).thenReturn(true);
 

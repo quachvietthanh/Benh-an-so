@@ -143,4 +143,24 @@ public class AppointmentRepositoryAdapter
         return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
     }
 
+    @Override
+    public List<Appointment> findActiveAppointmentsForDoctorBetween(
+            UUID doctorId,
+            Instant from,
+            Instant to
+    ) {
+        return jpaRepository.findActiveForDoctorBetween(
+                        doctorId,
+                        from,
+                        to,
+                        List.of(
+                                AppointmentStatus.SCHEDULED,
+                                AppointmentStatus.CONFIRMED,
+                                AppointmentStatus.IN_PROGRESS
+                        )
+                ).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
 }

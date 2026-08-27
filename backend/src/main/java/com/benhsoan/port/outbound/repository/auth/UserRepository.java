@@ -9,6 +9,8 @@ import com.benhsoan.domain.auth.User;
 public interface UserRepository {
     Optional<User> findById(UUID id);
 
+    Optional<User> findByIdForUpdate(UUID id);
+
     User save(User user);
 
     List<User> findAll();
