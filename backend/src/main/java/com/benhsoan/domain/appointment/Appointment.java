@@ -191,11 +191,12 @@ public class Appointment {
             UUID doctorId,
             Instant startTime,
             Instant endTime,
-            String reason ) {
+            String reason,
+            Instant now ) {
 
          if (!endTime.isAfter(startTime)) 
             throw new ValidationException("End time must be after start time.");
-        if (startTime.isBefore(Instant.now()))
+        if (startTime.isBefore(now))
             throw new AppointmentTimeInPastException();
         
         if (status == AppointmentStatus.CANCELLED) {
@@ -206,7 +207,7 @@ public class Appointment {
             throw new AppointmentAlreadyCompletedException();
         }
 
-        if (endTime.isBefore(Instant.now())) {
+        if (endTime.isBefore(now)) {
             throw new AppointmentTimeInPastException();
         }
 
