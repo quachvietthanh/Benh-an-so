@@ -13,6 +13,8 @@ import {
   prepareCreateServicePayload,
   prepareUpdateServicePayload,
   translateServiceErrorMessage,
+  extractServiceFormErrors,
+  SERVICE_ERROR_TRANSLATIONS,
 } from '../utils/serviceCatalogValidation.js'
 
 test('TC01: Phân quyền Quản trị viên & Quản lý truy cập Danh mục Dịch vụ', () => {
@@ -182,11 +184,11 @@ test('TC09: Đóng gói Payload UpdateService đúng chuẩn Backend PUT /system
   })
 })
 
-test('TC10: Xử lý lỗi Backend theo code ổn định', () => {
+test('TC10: Xử lý lỗi Backend theo code ổn định và dịch sang Tiếng Việt thân thiện', () => {
   const validationError = {
     response: { status: 400, data: { code: 'VALIDATION_FAILED', message: 'Service code already exists.' } },
   }
-  assert.equal(translateServiceErrorMessage(validationError), 'Service code already exists.')
+  assert.equal(translateServiceErrorMessage(validationError), 'Mã dịch vụ đã tồn tại trong hệ thống.')
 
   const forbiddenError = {
     response: { status: 403, data: { code: 'ACCESS_DENIED', message: 'Access Denied' } },
@@ -194,6 +196,14 @@ test('TC10: Xử lý lỗi Backend theo code ổn định', () => {
   assert.equal(
     translateServiceErrorMessage(forbiddenError),
     'Bạn không có quyền thực hiện thao tác này.'
+  )
+
+  const notFoundError = {
+    response: { status: 404, data: { code: 'RESOURCE_NOT_FOUND', message: 'Service catalog not found: 123' } },
+  }
+  assert.equal(
+    translateServiceErrorMessage(notFoundError),
+    'Không tìm thấy thông tin dịch vụ trong hệ thống.'
   )
 })
 
@@ -206,4 +216,93 @@ test('TC11: Khôi phục và chuẩn hóa chuỗi tiếng Việt bị lỗi font
   // Chuỗi tiếng Việt bình thường không bị thay đổi
   assert.equal(fixMojibake('Khám nội tổng quát'), 'Khám nội tổng quát')
 })
+
+test('TC12: Trích xuất lỗi Form khi trùng mã dịch vụ (Conflict Code)', () => {
+  const duplicateCodeError = {
+    response: {
+      status: 400,
+      data: {
+        code: 'VALIDATION_FAILED',
+        message: 'Service code already exists.',
+      },
+    },
+  }
+
+  const result = extractServiceFormErrors(duplicateCodeError)
+  assert.equal(result.errorMessage, 'Mã dịch vụ đã tồn tại trong hệ thống.')
+  assert.deepEqual(result.fieldErrors, [
+    { name: 'serviceCode', errors: ['Mã dịch vụ đã tồn tại trong hệ thống.'] },
+  ])
+})
+
+test('TC13: Trích xuất lỗi Form khi trùng tên dịch vụ (Conflict Name)', () => {
+  const duplicateNameError = {
+    response: {
+      status: 400,
+      data: {
+        code: 'VALIDATION_FAILED',
+        message: 'Service name already exists.',
+      },
+    },
+  }
+
+  const result = extractServiceFormErrors(duplicateNameError)
+  assert.equal(result.errorMessage, 'Tên dịch vụ đã tồn tại trong hệ thống.')
+  assert.deepEqual(result.fieldErrors, [
+    { name: 'name', errors: ['Tên dịch vụ đã tồn tại trong hệ thống.'] },
+  ])
+})
+
+test('TC14: Trích xuất lỗi Form khi xung đột ngày hiệu lực giá (Price Effective Date Conflict)', () => {
+  const priceConflictError = {
+    response: {
+      status: 400,
+      data: {
+        code: 'VALIDATION_FAILED',
+        message: 'A different service price already exists for this effective date.',
+      },
+    },
+  }
+
+  const result = extractServiceFormErrors(priceConflictError)
+  assert.equal(result.errorMessage, 'Đã tồn tại mức giá khác cho ngày hiệu lực này.')
+  assert.deepEqual(result.fieldErrors, [
+    { name: 'effectiveFrom', errors: ['Đã tồn tại mức giá khác cho ngày hiệu lực này.'] },
+  ])
+})
+
+test('TC15: Trích xuất lỗi chi tiết từng trường từ Backend fields map', () => {
+  const fieldValidationErrors = {
+    response: {
+      status: 400,
+      data: {
+        code: 'VALIDATION_FAILED',
+        message: 'Validation failed.',
+        details: {
+          fields: {
+            serviceCode: 'Service code is required.',
+            price: 'Service price must be greater than or equal to 0.',
+          },
+        },
+      },
+    },
+  }
+
+  const result = extractServiceFormErrors(fieldValidationErrors)
+  assert.equal(result.errorMessage, 'Vui lòng nhập mã dịch vụ.')
+  assert.deepEqual(result.fieldErrors, [
+    { name: 'serviceCode', errors: ['Vui lòng nhập mã dịch vụ.'] },
+    { name: 'price', errors: ['Đơn giá phải lớn hơn hoặc bằng 0.'] },
+  ])
+})
+
+test('TC16: Trích xuất lỗi từ Client-side Validation Error', () => {
+  const clientError = new Error('Mã dịch vụ không được vượt quá 50 ký tự.')
+  const result = extractServiceFormErrors(clientError)
+  assert.equal(result.errorMessage, 'Mã dịch vụ không được vượt quá 50 ký tự.')
+  assert.deepEqual(result.fieldErrors, [
+    { name: 'serviceCode', errors: ['Mã dịch vụ không được vượt quá 50 ký tự.'] },
+  ])
+})
+
 

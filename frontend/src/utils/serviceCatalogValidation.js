@@ -235,23 +235,169 @@ export function prepareUpdateServicePayload(values = {}) {
   }
 }
 
+export const SERVICE_ERROR_TRANSLATIONS = {
+  'Service code is required.': 'Vui lòng nhập mã dịch vụ.',
+  'Service code must not exceed 50 characters.': 'Mã dịch vụ không được vượt quá 50 ký tự.',
+  'Service name is required.': 'Vui lòng nhập tên dịch vụ.',
+  'Service name must not exceed 255 characters.': 'Tên dịch vụ không được vượt quá 255 ký tự.',
+  'Service price is required.': 'Vui lòng nhập đơn giá dịch vụ.',
+  'Service price must be greater than or equal to 0.': 'Đơn giá phải lớn hơn hoặc bằng 0.',
+  'Price effective date is required.': 'Vui lòng chọn ngày hiệu lực của mức giá.',
+  'Service active status is required.': 'Vui lòng chọn trạng thái áp dụng.',
+  'Service code already exists.': 'Mã dịch vụ đã tồn tại trong hệ thống.',
+  'Service name already exists.': 'Tên dịch vụ đã tồn tại trong hệ thống.',
+  'A different service price already exists for this effective date.': 'Đã tồn tại mức giá khác cho ngày hiệu lực này.',
+  'A service price already exists for this effective date.': 'Đã tồn tại mức giá cho ngày hiệu lực này.',
+  'Service catalog data conflicts with an existing record.': 'Dữ liệu dịch vụ bị xung đột với bản ghi hiện có.',
+  'Create service catalog command is required.': 'Dữ liệu tạo dịch vụ không hợp lệ.',
+  'Update service catalog command is required.': 'Dữ liệu cập nhật dịch vụ không hợp lệ.',
+  'Access denied.': 'Bạn không có quyền thực hiện thao tác này.',
+}
+
 /**
- * Translates backend errors using stable response codes.
+ * Translates raw error messages from backend or client validation.
+ */
+export function translateRawMessage(msg) {
+  if (!msg || typeof msg !== 'string') return ''
+  if (SERVICE_ERROR_TRANSLATIONS[msg]) {
+    return SERVICE_ERROR_TRANSLATIONS[msg]
+  }
+  const lower = msg.toLowerCase()
+  if (lower.includes('service code already exists') || lower.includes('uk_service_catalog_code')) {
+    return 'Mã dịch vụ đã tồn tại trong hệ thống.'
+  }
+  if (lower.includes('service name already exists')) {
+    return 'Tên dịch vụ đã tồn tại trong hệ thống.'
+  }
+  if (lower.includes('price already exists') || (lower.includes('effective') && lower.includes('date'))) {
+    return 'Đã tồn tại mức giá cho ngày hiệu lực này.'
+  }
+  if (lower.includes('not found')) {
+    return 'Không tìm thấy thông tin dịch vụ trong hệ thống.'
+  }
+  return msg
+}
+
+function mapMessageToFieldErrors(msg) {
+  if (!msg) return []
+  if (msg.includes('Mã dịch vụ') || msg.toLowerCase().includes('service code')) {
+    return [{ name: 'serviceCode', errors: [msg] }]
+  }
+  if (msg.includes('Tên dịch vụ') || msg.toLowerCase().includes('service name')) {
+    return [{ name: 'name', errors: [msg] }]
+  }
+  if (msg.includes('Đơn giá') || msg.toLowerCase().includes('price')) {
+    return [{ name: 'price', errors: [msg] }]
+  }
+  if (msg.includes('ngày hiệu lực') || msg.includes('Ngày bắt đầu') || msg.toLowerCase().includes('effective')) {
+    return [{ name: 'effectiveFrom', errors: [msg] }]
+  }
+  return []
+}
+
+/**
+ * Extracts in-form error alert message and field-specific errors
+ * formatted for Ant Design form.setFields([{ name, errors: [...] }]).
+ */
+export function extractServiceFormErrors(error) {
+  if (!error) {
+    return { errorMessage: '', fieldErrors: [] }
+  }
+
+  // If string
+  if (typeof error === 'string') {
+    const translated = translateRawMessage(error)
+    const fieldErrors = mapMessageToFieldErrors(translated)
+    return { errorMessage: translated, fieldErrors }
+  }
+
+  // If Error instance without response (Client-side validation error)
+  if (error instanceof Error && !error.response) {
+    const translated = translateRawMessage(error.message)
+    const fieldErrors = mapMessageToFieldErrors(translated)
+    return { errorMessage: translated, fieldErrors }
+  }
+
+  const apiError = normalizeApiError(error)
+  let generalMessage = ''
+  const fieldErrorsMap = {}
+
+  if (apiError.code === 'ACCESS_DENIED' || apiError.status === 403) {
+    return {
+      errorMessage: 'Bạn không có quyền thực hiện thao tác này.',
+      fieldErrors: [],
+    }
+  }
+
+  if (apiError.code === 'AUTHENTICATION_FAILED' || apiError.status === 401) {
+    return {
+      errorMessage: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      fieldErrors: [],
+    }
+  }
+
+  if (apiError.code === 'RESOURCE_NOT_FOUND' || apiError.status === 404) {
+    return {
+      errorMessage: 'Không tìm thấy thông tin dịch vụ trong hệ thống.',
+      fieldErrors: [],
+    }
+  }
+
+  // Map field level errors from backend
+  if (apiError.fields && typeof apiError.fields === 'object') {
+    Object.entries(apiError.fields).forEach(([fieldName, rawMsg]) => {
+      const translated = translateRawMessage(rawMsg)
+      fieldErrorsMap[fieldName] = translated
+    })
+  }
+
+  // Check domain/root error message
+  const rootMsg = translateRawMessage(apiError.message)
+  const isGenericValidation =
+    !rootMsg ||
+    rootMsg.toLowerCase().includes('validation failed') ||
+    rootMsg.toLowerCase().includes('dữ liệu không hợp lệ')
+
+  if (Object.keys(fieldErrorsMap).length > 0) {
+    generalMessage = Object.values(fieldErrorsMap)[0]
+  } else if (!isGenericValidation && rootMsg) {
+    generalMessage = rootMsg
+  }
+
+  if (rootMsg && !isGenericValidation) {
+    if ((rootMsg.includes('Mã dịch vụ') || rootMsg.toLowerCase().includes('service code')) && !fieldErrorsMap.serviceCode) {
+      fieldErrorsMap.serviceCode = rootMsg
+    }
+    if ((rootMsg.includes('Tên dịch vụ') || rootMsg.toLowerCase().includes('service name')) && !fieldErrorsMap.name) {
+      fieldErrorsMap.name = rootMsg
+    }
+    if ((rootMsg.includes('mức giá') || rootMsg.includes('ngày hiệu lực')) && !fieldErrorsMap.effectiveFrom) {
+      fieldErrorsMap.effectiveFrom = rootMsg
+    }
+  }
+
+  const fieldErrors = Object.entries(fieldErrorsMap).map(([name, err]) => ({
+    name,
+    errors: [err],
+  }))
+
+  if (!generalMessage) {
+    generalMessage = apiError.firstFieldError
+      ? translateRawMessage(apiError.firstFieldError)
+      : 'Thao tác không thành công. Vui lòng kiểm tra lại thông tin nhập vào.'
+  }
+
+  return {
+    errorMessage: generalMessage,
+    fieldErrors,
+  }
+}
+
+/**
+ * Translates backend errors using stable response codes into Vietnamese.
  */
 export function translateServiceErrorMessage(error) {
   if (!error) return 'Đã xảy ra lỗi không xác định.'
-  
-  const apiError = normalizeApiError(error)
-
-  if (apiError.code === 'ACCESS_DENIED' || apiError.status === 403) {
-    return 'Bạn không có quyền thực hiện thao tác này.'
-  }
-  if (apiError.code === 'AUTHENTICATION_FAILED' || apiError.status === 401) {
-    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
-  }
-  if (apiError.code === 'RESOURCE_NOT_FOUND' || apiError.status === 404) {
-    return 'Không tìm thấy thông tin dịch vụ trong hệ thống.'
-  }
-
-  return apiError.firstFieldError || apiError.message
+  const { errorMessage } = extractServiceFormErrors(error)
+  return errorMessage || 'Đã xảy ra lỗi không xác định.'
 }

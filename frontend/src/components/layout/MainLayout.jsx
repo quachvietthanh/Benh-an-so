@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons'
 import patientApi from '../../api/patientApi'
 import { useAuthContext } from '../../context/AuthContext'
-import { getNavigationItems, navigationSections, roleNames } from './navigationConfig'
+import { getDefaultHomePath, getNavigationItems, navigationSections, roleNames } from './navigationConfig'
 
 const { Header, Sider, Content } = Layout
 
@@ -220,7 +220,7 @@ function MainLayout() {
         theme="dark"
       >
 
-        <button type="button" className="clinic-brand" onClick={() => navigate('/')}>
+        <button type="button" className="clinic-brand" onClick={() => navigate(getDefaultHomePath(user?.roles, user?.permissions))}>
           <span className="clinic-brand-icon"><MedicineBoxOutlined /></span>
           {!collapsed && (
             <span className="clinic-brand-copy">

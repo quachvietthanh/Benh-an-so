@@ -41,7 +41,16 @@ export const getCategoryFromIcdCode = (code = '') => {
   return 'ALL'
 }
 
-// Dữ liệu mã ICD-10 được tải trực tiếp 100% từ Backend (bảng icd10_catalog)
+export const getDiseaseGroupName = (code = '', backendGroup = '') => {
+  if (backendGroup && String(backendGroup).trim()) return String(backendGroup).trim()
+  const catKey = getCategoryFromIcdCode(code)
+  const found = icd10Categories.find((c) => c.key === catKey)
+  if (found && found.key !== 'ALL') {
+    return found.label.replace(/\s*\([^)]*\)/g, '').trim()
+  }
+  return 'Chung'
+}
+
 export const commonIcd10List = []
 
 export const searchIcd10 = () => []

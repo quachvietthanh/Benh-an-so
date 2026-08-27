@@ -15,6 +15,18 @@ export const DOMAIN_ERROR_MESSAGES = {
     'Bệnh án chưa được ký xác nhận. Vui lòng ký bệnh án trước khi hoàn tất hoặc khóa.',
   MEDICAL_RECORD_INVALID_VISIT:
     'Lượt khám không ở trạng thái hợp lệ để ký hoặc xử lý bệnh án.',
+  DIAGNOSIS_CATALOG_CODE_ALREADY_EXISTS:
+    'Mã bệnh đã tồn tại trong danh mục hệ thống.',
+  DIAGNOSIS_CATALOG_CODE_EXISTS:
+    'Mã bệnh đã tồn tại trong danh mục hệ thống.',
+  DIAGNOSIS_CATALOG_NAME_ALREADY_EXISTS:
+    'Tên bệnh đã tồn tại trong danh mục hệ thống.',
+  DIAGNOSIS_CATALOG_NOT_FOUND:
+    'Không tìm thấy thông tin mã bệnh trong danh mục.',
+  DIAGNOSIS_CATALOG_IN_USE:
+    'Mã bệnh đang được sử dụng trong hồ sơ bệnh án, không thể xóa.',
+  SERVICE_CATALOG_NOT_FOUND:
+    'Không tìm thấy thông tin dịch vụ trong hệ thống.',
 }
 
 export const normalizeApiError = (error, fallbackMessage = DEFAULT_MESSAGE) => {

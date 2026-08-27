@@ -74,3 +74,6 @@ export const getNavigationItems = (roles = [], permissions = []) => {
   return items.filter((item) => item.check())
 }
 
+export { getDefaultHomePath } from '../../utils/roleRouting.js'
+
+

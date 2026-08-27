@@ -30,7 +30,7 @@ import {
   TableOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { icd10Categories } from '../../utils/icd10Data'
+import { getDiseaseGroupName, icd10Categories } from '../../utils/icd10Data'
 import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
 import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
@@ -352,38 +352,78 @@ function MedicalEncounterForm({
 
             <Form.Item label="Chẩn đoán chính (Mã ICD-10)" required>
               {primaryIcd ? (
-                <div style={{ background: '#EFF6FF', padding: 12, borderRadius: 8, border: '1px solid #BFDBFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <Tag color="blue" style={{ fontSize: 14, fontWeight: 700, padding: '4px 8px' }}>
-                      {primaryIcd.code}
-                    </Tag>
-                    <Text strong style={{ fontSize: 14, color: '#1E40AF', marginLeft: 8 }}>
-                      {fixMojibake(primaryIcd.name)}
-                    </Text>
+                <div style={{ background: '#F0FDF4', padding: '12px 16px', borderRadius: 8, border: '1px solid #BBF7D0', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <Space size={8} wrap align="center">
+                      <Tag color="blue" style={{ fontSize: 13.5, fontWeight: 700, padding: '3px 8px', borderRadius: 6, margin: 0 }}>
+                        {primaryIcd.code}
+                      </Tag>
+                      <Text strong style={{ fontSize: 14, color: '#0F172A' }}>
+                        {fixMojibake(primaryIcd.name)}
+                      </Text>
+                      <Tag color={categoryMeta[primaryIcd.category]?.color || 'cyan'} style={{ fontSize: 11.5, fontWeight: 600, margin: 0 }}>
+                        Nhóm: {primaryIcd.diseaseGroup || getDiseaseGroupName(primaryIcd.code, primaryIcd.diseaseGroup)}
+                      </Tag>
+                    </Space>
+                    <Button type="text" danger icon={<DeleteOutlined />} onClick={clearPrimaryDiagnosis} style={{ fontWeight: 600 }}>
+                      Đổi mã
+                    </Button>
                   </div>
-                  <Button type="text" danger icon={<DeleteOutlined />} onClick={clearPrimaryDiagnosis}>
-                    Đổi mã
-                  </Button>
                 </div>
               ) : (
                 <div>
-                  <Form.Item name="diagnosisText" noStyle>
-                    <Input.TextArea
-                      rows={2}
-                      placeholder="Gõ tên bệnh hoặc chọn mã ICD-10 gợi ý bên dưới..."
-                    />
-                  </Form.Item>
+                  <Select
+                    showSearch
+                    allowClear
+                    placeholder="🔍 Tra cứu mã bệnh theo mã ICD (J00, I10...) hoặc tên bệnh (cảm cúm, đau đầu...)"
+                    value={null}
+                    loading={diagnosisSearching}
+                    style={{ width: '100%' }}
+                    filterOption={(input, option) => {
+                      const q = (input || '').toLowerCase().trim()
+                      const code = (option?.data?.code || '').toLowerCase()
+                      const name = (option?.data?.name || '').toLowerCase()
+                      const group = (option?.data?.diseaseGroup || option?.data?.category || '').toLowerCase()
+                      return code.includes(q) || name.includes(q) || group.includes(q)
+                    }}
+                    onSearch={onDiagnosisSearch}
+                    onChange={(code) => {
+                      if (!code) return
+                      const item = diagnosisOptions.find((d) => d.code === code)
+                      if (item) selectPrimaryDiagnosis(item)
+                    }}
+                    notFoundContent={diagnosisSearching ? 'Đang tìm trong danh mục mã bệnh...' : 'Không tìm thấy mã bệnh phù hợp'}
+                    options={diagnosisOptions.map((item) => {
+                      const groupName = item.diseaseGroup || getDiseaseGroupName(item.code, item.diseaseGroup)
+                      const groupColor = categoryMeta[item.category]?.color || 'blue'
+                      return {
+                        value: item.code,
+                        data: item,
+                        label: (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <Tag color="blue" style={{ fontWeight: 700, marginInlineEnd: 6 }}>{item.code}</Tag>
+                              <span>{fixMojibake(item.name)}</span>
+                            </span>
+                            <Tag color={groupColor} style={{ fontSize: 11, margin: 0, flexShrink: 0 }}>
+                              {groupName}
+                            </Tag>
+                          </div>
+                        ),
+                      }
+                    })}
+                  />
 
                   <div style={{ marginTop: 10 }}>
                     <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      10 chẩn đoán gần đây hoặc thường dùng:
+                      Gợi ý chẩn đoán thường gặp / Dùng gần đây:
                     </Text>
-                    <Space wrap>
+                    <Space wrap size={[6, 6]}>
                       {diagnosisOptions.slice(0, 10).map((icd) => (
                         <Tag
                           key={icd.code}
                           color="cyan"
-                          style={{ cursor: 'pointer', padding: '4px 8px', fontSize: 12 }}
+                          style={{ cursor: 'pointer', padding: '3px 8px', fontSize: 12, borderRadius: 6 }}
                           onClick={() => selectPrimaryDiagnosis(icd)}
                         >
                           <b>{icd.code}</b> - {fixMojibake(icd.name)}
@@ -397,32 +437,21 @@ function MedicalEncounterForm({
 
             <Form.Item label="Chẩn đoán kèm theo / Bệnh phụ (Mã ICD-10 phụ)">
               <div>
-                <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${primaryIcd ? '#BFDBFE' : '#FDE68A'}`, background: primaryIcd ? '#EFF6FF' : '#FFFBEB' }}>
-                  <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-                    Chẩn đoán chính đang chọn
-                  </Text>
-                  {primaryIcd ? (
-                    <Space size={6} wrap>
-                      <Tag color="blue" style={{ margin: 0, fontWeight: 700 }}>{primaryIcd.code}</Tag>
-                      <Text strong style={{ color: '#1E40AF' }}>{fixMojibake(primaryIcd.name)}</Text>
-                    </Space>
-                  ) : (
-                    <Text type="warning">Vui lòng chọn chẩn đoán chính trước khi thêm chẩn đoán phụ.</Text>
-                  )}
-                </div>
-
                 {secondaryIcds.length > 0 && (
                   <div style={{ marginBottom: 10 }}>
-                    <Space wrap>
+                    <Space wrap size={[6, 8]}>
                       {secondaryIcds.map((item) => (
                         <Tag
                           key={item.code}
                           color="purple"
                           closable
                           onClose={() => setSecondaryIcds((prev) => prev.filter((i) => i.code !== item.code))}
-                          style={{ fontSize: 13, padding: '4px 10px' }}
+                          style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6 }}
                         >
                           <b>{item.code}</b>: {fixMojibake(item.name)}
+                          <span style={{ color: '#7e22ce', marginLeft: 6, fontSize: 11 }}>
+                            ({item.diseaseGroup || getDiseaseGroupName(item.code, item.diseaseGroup)})
+                          </span>
                         </Tag>
                       ))}
                     </Space>
@@ -431,29 +460,52 @@ function MedicalEncounterForm({
 
                 <Select
                   showSearch
-                  placeholder={primaryIcd ? 'Tìm mã hoặc tên bệnh kèm theo...' : 'Chọn chẩn đoán chính trước'}
+                  allowClear
+                  placeholder={primaryIcd ? '🔍 Tìm mã hoặc tên bệnh kèm theo...' : 'Vui lòng chọn chẩn đoán chính trước'}
                   value={null}
                   disabled={!primaryIcd}
                   loading={diagnosisSearching}
-                  filterOption={false}
+                  style={{ width: '100%' }}
+                  filterOption={(input, option) => {
+                    const q = (input || '').toLowerCase().trim()
+                    const code = (option?.data?.code || '').toLowerCase()
+                    const name = (option?.data?.name || '').toLowerCase()
+                    const group = (option?.data?.diseaseGroup || option?.data?.category || '').toLowerCase()
+                    return code.includes(q) || name.includes(q) || group.includes(q)
+                  }}
                   onSearch={onDiagnosisSearch}
                   onDropdownVisibleChange={(open) => open && onDiagnosisSearch('')}
                   onChange={(code) => {
+                    if (!code) return
                     const item = diagnosisOptions.find((diagnosis) => diagnosis.code === code)
                     if (item) addSecondaryDiagnosis(item)
                   }}
                   notFoundContent={diagnosisSearching ? 'Đang tìm trong danh mục...' : 'Không tìm thấy chẩn đoán phù hợp'}
-                  options={diagnosisOptions.map((item) => ({
-                    value: item.code,
-                    label: `[${item.code}] ${item.name}`,
-                  }))}
+                  options={diagnosisOptions.map((item) => {
+                    const groupName = item.diseaseGroup || getDiseaseGroupName(item.code, item.diseaseGroup)
+                    const groupColor = categoryMeta[item.category]?.color || 'purple'
+                    return {
+                      value: item.code,
+                      data: item,
+                      label: (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <Tag color="purple" style={{ fontWeight: 700, marginInlineEnd: 6 }}>{item.code}</Tag>
+                            <span>{fixMojibake(item.name)}</span>
+                          </span>
+                          <Tag color={groupColor} style={{ fontSize: 11, margin: 0, flexShrink: 0 }}>
+                            {groupName}
+                          </Tag>
+                        </div>
+                      ),
+                    }
+                  })}
                 />
               </div>
             </Form.Item>
 
             <Divider style={{ margin: '16px 0 12px' }} />
 
-            {/* Bảng chọn mã bệnh chẩn đoán (ICD-10) */}
             <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 10, border: '1px solid #E2E8F0', marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -529,24 +581,25 @@ function MedicalEncounterForm({
                         key: 'name',
                         render: (name) => (
                           <Text strong style={{ fontSize: 13, color: '#1E293B' }}>
-                            {name}
+                            {fixMojibake(name)}
                           </Text>
                         ),
                       },
                       {
-                        title: 'Nhóm bệnh',
-                        dataIndex: 'category',
-                        key: 'category',
-                        width: 120,
-                        render: (category) => {
-                          const meta = categoryMeta[category]
-                          return <Tag color={meta?.color || 'default'}>{meta?.label || 'Chung'}</Tag>
+                        title: 'Nhóm bệnh / Chuyên khoa',
+                        dataIndex: 'diseaseGroup',
+                        key: 'diseaseGroup',
+                        width: 170,
+                        render: (_, record) => {
+                          const groupName = record.diseaseGroup || getDiseaseGroupName(record.code, record.diseaseGroup)
+                          const meta = categoryMeta[record.category]
+                          return <Tag color={meta?.color || 'default'} style={{ margin: 0, fontSize: 12 }}>{groupName}</Tag>
                         },
                       },
                       {
                         title: 'Thao tác chọn',
                         key: 'actions',
-                        width: 220,
+                        width: 230,
                         align: 'center',
                         render: (_, record) => {
                           const isPrimary = primaryIcd?.code === record.code
@@ -562,7 +615,7 @@ function MedicalEncounterForm({
                                 <Button
                                   size="small"
                                   type="primary"
-                                  icon={<PlusOutlined />}
+                                  icon={<CheckCircleOutlined />}
                                   onClick={() => selectPrimaryDiagnosis(record)}
                                 >
                                   Chọn CĐ chính
@@ -576,6 +629,7 @@ function MedicalEncounterForm({
                               ) : isPrimary ? null : (
                                 <Button
                                   size="small"
+                                  icon={<PlusOutlined />}
                                   disabled={!primaryIcd}
                                   onClick={() => addSecondaryDiagnosis(record)}
                                 >
@@ -605,7 +659,7 @@ function MedicalEncounterForm({
       <Card
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#16A34A' }}><FileTextOutlined /> Lập Trình & Nhập Chỉ Định Cận Lâm Sàng</span>
+            <span style={{ color: '#16A34A' }}><FileTextOutlined /> Nhập Chỉ Định Cận Lâm Sàng</span>
             {selectedOrders.length > 0 && (
               <Tag color="green" style={{ fontSize: 13, padding: '4px 10px' }}>
                 Tổng chi phí chỉ định: <b>{formatCurrency(totalOrderFee)}</b>

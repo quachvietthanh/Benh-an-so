@@ -29,6 +29,14 @@ test('diagnosis and clinical-order payloads use backend UUID fields', () => {
   })
   assert.equal(diagnosis.primaryDiagnosis.diagnosisCatalogId, 'catalog-1')
   assert.equal(diagnosis.secondaryDiagnoses[0].diagnosisCatalogId, 'catalog-2')
+  assert.equal('name' in diagnosis.secondaryDiagnoses[0], false)
+
+  const freeTextDiagnosis = buildDiagnosisPayload({
+    primaryDiagnosis: { id: 'catalog-1', code: 'J00', name: 'Viêm mũi họng cấp' },
+    secondaryDiagnoses: [{ name: 'Bệnh lý phụ khác' }],
+  })
+  assert.equal('diagnosisCatalogId' in freeTextDiagnosis.secondaryDiagnoses[0], false)
+  assert.equal(freeTextDiagnosis.secondaryDiagnoses[0].name, 'Bệnh lý phụ khác')
 
   const order = buildClinicalOrderPayload({
     clinicalReason: 'Theo dõi',

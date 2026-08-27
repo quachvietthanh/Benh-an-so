@@ -1,5 +1,6 @@
 import React from 'react'
 import {
+  Alert,
   Button,
   DatePicker,
   Form,
@@ -24,6 +25,8 @@ function ServiceEditModal({
   onFinish,
   form,
   loading,
+  formError,
+  onClearError,
 }) {
   return (
     <Modal
@@ -55,7 +58,20 @@ function ServiceEditModal({
         form={form}
         layout="vertical"
         onFinish={onFinish}
+        onValuesChange={onClearError}
       >
+        {formError && (
+          <Alert
+            className="service-modal-alert"
+            type="error"
+            showIcon
+            message={formError}
+            closable
+            onClose={onClearError}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <div className="service-form-grid">
           <Form.Item name="serviceCode" label="Mã dịch vụ">
             <Input size="large" disabled style={{ background: '#f8fafc', color: '#0f172a', fontWeight: 600 }} />

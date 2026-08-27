@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Form, Input, Modal, Select, Tag, message } from 'antd'
+import { Alert, Form, Input, Modal, Select, Tag, message } from 'antd'
 import { EditOutlined, LockOutlined } from '@ant-design/icons'
 import diagnosisCatalogApi from '../../api/diagnosisCatalogApi'
-import { getApiErrorMessage } from '../../utils/apiError'
+import { getApiErrorMessage, normalizeApiError } from '../../utils/apiError'
 import { icd10Categories } from '../../utils/icd10Data'
 
 const { TextArea } = Input
@@ -17,9 +17,11 @@ const diseaseGroupOptions = icd10Categories
 function DiagnosisCatalogEditModal({ open, item, onCancel, onSuccess }) {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState(null)
 
   useEffect(() => {
     if (open && item) {
+      setFormError(null)
       form.setFieldsValue({
         code: item.code,
         name: item.name,
@@ -32,6 +34,7 @@ function DiagnosisCatalogEditModal({ open, item, onCancel, onSuccess }) {
   const handleFinish = async (values) => {
     if (!item?.id) return
     setLoading(true)
+    setFormError(null)
     try {
       const payload = {
         name: String(values.name || '').trim(),
@@ -41,11 +44,28 @@ function DiagnosisCatalogEditModal({ open, item, onCancel, onSuccess }) {
 
       await diagnosisCatalogApi.update(item.id, payload)
       message.success(`Đã cập nhật mã bệnh [${item.code}] thành công!`)
+      setFormError(null)
       if (typeof onSuccess === 'function') {
         onSuccess()
       }
     } catch (err) {
-      message.error(getApiErrorMessage(err, 'Không thể cập nhật thông tin mã bệnh. Vui lòng thử lại.'))
+      const normalized = normalizeApiError(err)
+      let errorText = ''
+      const fieldErrors = []
+
+      if (normalized.fields && Object.keys(normalized.fields).length > 0) {
+        Object.entries(normalized.fields).forEach(([fName, fMsg]) => {
+          fieldErrors.push({ name: fName, errors: [fMsg] })
+        })
+        errorText = Object.values(normalized.fields)[0]
+      } else {
+        errorText = getApiErrorMessage(err, 'Không thể cập nhật thông tin mã bệnh. Vui lòng thử lại.')
+      }
+
+      setFormError(errorText)
+      if (fieldErrors.length > 0) {
+        form.setFields(fieldErrors)
+      }
     } finally {
       setLoading(false)
     }
@@ -54,6 +74,7 @@ function DiagnosisCatalogEditModal({ open, item, onCancel, onSuccess }) {
   const handleModalCancel = () => {
     if (!loading) {
       form.resetFields()
+      setFormError(null)
       if (typeof onCancel === 'function') {
         onCancel()
       }
@@ -88,7 +109,25 @@ function DiagnosisCatalogEditModal({ open, item, onCancel, onSuccess }) {
         </span>
       </div>
 
-      <Form form={form} layout="vertical" onFinish={handleFinish}>
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleFinish}
+        onValuesChange={() => {
+          if (formError) setFormError(null)
+        }}
+      >
+        {formError && (
+          <Alert
+            type="error"
+            showIcon
+            message={formError}
+            closable
+            onClose={() => setFormError(null)}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <Form.Item
           name="name"
           label="Tên bệnh chuẩn hóa"
