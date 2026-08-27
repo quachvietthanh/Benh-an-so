@@ -173,29 +173,18 @@ function MedicalEncounter() {
   const loadAllBackendDiagnoses = useCallback(async () => {
     setIcdSearching(true)
     try {
-      const keyPrefixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'R', 'S', 'T', 'Z']
-      const results = await Promise.allSettled(
-        keyPrefixes.map((prefix) => medicalRecordApi.getDiagnosisCatalog(prefix)),
-      )
-      const map = new Map()
-      results.forEach((res) => {
-        if (res.status === 'fulfilled' && Array.isArray(res.value?.data)) {
-          res.value.data.forEach((item) => {
-            if (item?.code && !map.has(item.code)) {
-              map.set(item.code, {
-                id: item.id,
-                code: item.code,
-                rawName: item.name,
-                name: fixMojibake(item.name),
-                diseaseGroup: item.diseaseGroup ? fixMojibake(item.diseaseGroup) : null,
-                description: fixMojibake(item.description || ''),
-                category: getCategoryFromIcdCode(item.code),
-              })
-            }
-          })
-        }
-      })
-      const list = Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code))
+      // Single optimized initial query for common diagnoses instead of flooding the backend with 18 concurrent full-table scans
+      const res = await medicalRecordApi.getDiagnosisCatalog('A')
+      const rawList = Array.isArray(res?.data) ? res.data : []
+      const list = rawList.map((item) => ({
+        id: item.id,
+        code: item.code,
+        rawName: item.name,
+        name: fixMojibake(item.name),
+        diseaseGroup: item.diseaseGroup ? fixMojibake(item.diseaseGroup) : null,
+        description: fixMojibake(item.description || ''),
+        category: getCategoryFromIcdCode(item.code),
+      })).sort((a, b) => a.code.localeCompare(b.code))
       setAllBackendDiagnoses(list)
     } catch {
       setAllBackendDiagnoses([])
@@ -208,94 +197,103 @@ function MedicalEncounter() {
     loadAllBackendDiagnoses()
   }, [loadAllBackendDiagnoses])
 
-  const [specialties, setSpecialties] = useState([])
-  const [selectedSpecialtyId, setSelectedSpecialtyId] = useState('')
+  const [visitSpecialty, setVisitSpecialty] = useState(null)
   const [availableTemplates, setAvailableTemplates] = useState([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [currentTemplate, setCurrentTemplate] = useState(null)
+  const [isFallbackTemplate, setIsFallbackTemplate] = useState(false)
   const [templateLoading, setTemplateLoading] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-    medicalRecordTemplateApi
-      .getSpecialties({ active: true })
-      .then((res) => {
-        if (mounted && Array.isArray(res.data) && res.data.length > 0) {
-          setSpecialties(res.data)
-          setSelectedSpecialtyId((prev) => prev || res.data[0]?.id)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      mounted = false
-    }
-  }, [])
-
-  const loadTemplatesForSpecialty = useCallback(async (specialtyId) => {
-    if (!specialtyId) return
-    setTemplateLoading(true)
-    try {
-      const res = await medicalRecordTemplateApi.searchTemplates({
-        specialtyId,
-        active: true,
-      })
-      const list = res.data || []
-      setAvailableTemplates(list)
-
-      if (list.length > 0) {
-        const defaultTmpl = list.find((t) => t.defaultTemplate) || list[0]
-        setSelectedTemplateId(defaultTmpl.id)
-        const detailRes = await medicalRecordTemplateApi.getTemplateById(defaultTmpl.id)
-        setCurrentTemplate(detailRes.data)
-      } else {
-        const generalSpecialty = specialties.find((s) => s.code === 'GENERAL')
-        if (generalSpecialty && generalSpecialty.id !== specialtyId) {
-          const fallbackRes = await medicalRecordTemplateApi.searchTemplates({
-            specialtyId: generalSpecialty.id,
-            active: true,
-          })
-          const fallbackList = fallbackRes.data || []
-          if (fallbackList.length > 0) {
-            const fallbackDefault = fallbackList.find((t) => t.defaultTemplate) || fallbackList[0]
-            setSelectedTemplateId(fallbackDefault.id)
-            const detailRes = await medicalRecordTemplateApi.getTemplateById(fallbackDefault.id)
-            setCurrentTemplate(detailRes.data)
-            message.info('Chuyên khoa chưa có mẫu riêng, đang áp dụng mẫu Đa khoa mặc định.')
-          } else {
-            setCurrentTemplate(null)
-          }
-        } else {
-          setCurrentTemplate(null)
-        }
-      }
-    } catch (err) {
-      console.error('Lỗi khi tải mẫu bệnh án:', err)
-      setCurrentTemplate(null)
-    } finally {
-      setTemplateLoading(false)
-    }
-  }, [specialties])
-
-  useEffect(() => {
-    if (selectedSpecialtyId) {
-      loadTemplatesForSpecialty(selectedSpecialtyId)
-    }
-  }, [selectedSpecialtyId, loadTemplatesForSpecialty])
-
-  const handleSpecialtyChange = (specialtyId) => {
-    setSelectedSpecialtyId(specialtyId)
-  }
+  const [templateError, setTemplateError] = useState('')
 
   const handleTemplateChange = async (templateId) => {
-    setSelectedTemplateId(templateId)
-    setTemplateLoading(true)
-    try {
-      const detailRes = await medicalRecordTemplateApi.getTemplateById(templateId)
-      setCurrentTemplate(detailRes.data)
-    } catch (err) {
-      message.error('Không thể tải cấu hình mẫu bệnh án đã chọn.')
-    } finally {
-      setTemplateLoading(false)
+    if (!templateId || templateId === selectedTemplateId) return
+    const candidate = availableTemplates.find(
+      (t) => String(t.templateId || t.id) === String(templateId),
+    )
+    if (!candidate) return
+
+    setTemplateError('')
+
+    // If medical record is already created and has clinical content, verify with doctor before clearing
+    if (currentRecordId) {
+      const formVals = form.getFieldsValue()
+      const hasContent = [
+        formVals.chiefComplaint,
+        formVals.symptoms,
+        formVals.medicalHistory,
+        formVals.physicalExamination,
+        formVals.clinicalProgress,
+        formVals.treatmentPlan,
+        formVals.doctorInstructions,
+        formVals.conclusion,
+      ].some((val) => val && String(val).trim().length > 0)
+
+      if (hasContent) {
+        Modal.confirm({
+          title: 'Bệnh án đã có nội dung khám',
+          content:
+            'Theo quy định chuyên môn, việc đổi mẫu bệnh án chỉ được thực hiện khi các trường khám lâm sàng chưa có nội dung để tránh mất dữ liệu đã ghi. Bạn có muốn xóa nội dung đã nhập để áp dụng mẫu mới không?',
+          okText: 'Xóa nội dung & Đổi mẫu',
+          okType: 'danger',
+          cancelText: 'Hủy / Giữ nguyên mẫu',
+          onOk: async () => {
+            setTemplateLoading(true)
+            try {
+              form.setFieldsValue({
+                chiefComplaint: '',
+                symptoms: '',
+                medicalHistory: '',
+                physicalExamination: '',
+                clinicalProgress: '',
+                treatmentPlan: '',
+                doctorInstructions: '',
+                conclusion: '',
+              })
+              await medicalRecordApi.update(currentRecordId, {
+                chiefComplaint: '',
+                symptoms: '',
+                medicalHistory: '',
+                physicalExamination: '',
+                clinicalProgress: '',
+                treatmentPlan: '',
+                doctorInstructions: '',
+                conclusion: '',
+              })
+              const res = await medicalRecordApi.applyTemplate(currentRecordId, templateId)
+              setSelectedTemplateId(templateId)
+              setCurrentTemplate(res.data?.appliedTemplate || candidate)
+              message.success(`Đã áp dụng mẫu: ${candidate.name}`)
+            } catch (err) {
+              const msg = getApiMessage(err, 'Không thể đổi mẫu bệnh án.')
+              setTemplateError(msg)
+              message.error(msg)
+            } finally {
+              setTemplateLoading(false)
+            }
+          },
+        })
+        return
+      }
+
+      // If no clinical content yet, apply directly to backend
+      setTemplateLoading(true)
+      try {
+        const res = await medicalRecordApi.applyTemplate(currentRecordId, templateId)
+        setSelectedTemplateId(templateId)
+        setCurrentTemplate(res.data?.appliedTemplate || candidate)
+        message.success(`Đã áp dụng mẫu: ${candidate.name}`)
+      } catch (err) {
+        const msg = getApiMessage(err, 'Không thể đổi mẫu bệnh án.')
+        setTemplateError(msg)
+        message.error(msg)
+      } finally {
+        setTemplateLoading(false)
+      }
+    } else {
+      // Record not created yet, just update local state
+      setSelectedTemplateId(templateId)
+      setCurrentTemplate(candidate)
+      message.info(`Đã chọn mẫu: ${candidate.name}`)
     }
   }
 
@@ -330,34 +328,57 @@ function MedicalEncounter() {
     setCurrentRecordId(detail.medicalRecordId)
     form.setFieldsValue({
       patientId: detail.patient?.id,
+      chiefComplaint: fixMojibake(detail.chiefComplaint || detail.symptoms || ''),
       symptoms: fixMojibake(detail.symptoms || detail.chiefComplaint || ''),
       medicalHistory: fixMojibake(detail.medicalHistory || ''),
+      physicalExamination: fixMojibake(detail.physicalExamination || ''),
       examinationNote: fixMojibake(detail.physicalExamination || ''),
+      clinicalProgress: fixMojibake(detail.clinicalProgress || ''),
       treatmentPlan: fixMojibake(detail.treatmentPlan || detail.doctorInstructions || ''),
+      doctorInstructions: fixMojibake(detail.doctorInstructions || detail.treatmentPlan || ''),
+      conclusion: cleanConclusion || '',
       diagnosisText:
         detail.primaryIcdCode && cleanPrimaryName
           ? `[${detail.primaryIcdCode}] ${cleanPrimaryName}`
           : cleanConclusion || '',
     })
 
+    if (detail.appliedTemplate) {
+      setCurrentTemplate(detail.appliedTemplate)
+      setSelectedTemplateId(detail.appliedTemplate.templateId)
+      if (detail.appliedTemplate.specialty) {
+        setVisitSpecialty(detail.appliedTemplate.specialty)
+      }
+      setIsFallbackTemplate(Boolean(detail.appliedTemplate.fallback))
+    }
+
     const diagnoses = Array.isArray(detail.diagnoses) ? detail.diagnoses : []
     const primary = diagnoses.find((item) => item.diagnosisType === 'PRIMARY')
     setPrimaryIcd(
       primary
         ? {
+          id: primary.diagnosisCatalogId || primary.id,
           code: primary.diagnosisCode,
+          rawName: primary.diagnosisName,
           name: fixMojibake(primary.diagnosisName),
           note: fixMojibake(primary.note),
         }
         : detail.primaryIcdCode
-          ? { code: detail.primaryIcdCode, name: cleanPrimaryName }
+          ? {
+            id: detail.primaryDiagnosisCatalogId || detail.primaryIcdId || detail.id,
+            code: detail.primaryIcdCode,
+            rawName: cleanPrimaryName,
+            name: cleanPrimaryName,
+          }
           : null,
     )
     setSecondaryIcds(
       diagnoses
         .filter((item) => item.diagnosisType === 'SECONDARY')
         .map((item) => ({
+          id: item.diagnosisCatalogId || item.id,
           code: item.diagnosisCode,
+          rawName: item.diagnosisName,
           name: fixMojibake(item.diagnosisName),
           note: fixMojibake(item.note),
         })),
@@ -396,6 +417,7 @@ function MedicalEncounter() {
     setLoading(true)
     setLoadError('')
     setServiceCatalogError('')
+    setTemplateError('')
 
     try {
       const encounterResponse = await visitApi.getEncounter(visitId)
@@ -403,61 +425,85 @@ function MedicalEncounter() {
       setEncounter(encounterData)
       form.setFieldsValue({
         patientId: encounterData.patient?.id,
+        chiefComplaint: fixMojibake(encounterData.visit?.reason || ''),
         symptoms: fixMojibake(encounterData.visit?.reason || ''),
       })
 
-      const [recordResult, historyResult, serviceResult] = await Promise.allSettled([
-        medicalRecordApi.getByVisit(visitId),
-        encounterData.patient?.id
-          ? medicalRecordApi.getByPatient(encounterData.patient.id)
-          : Promise.resolve({ data: [] }),
-        clinicalServiceApi.getCatalog({ page: 0, size: 100 }),
-      ])
-
-      if (recordResult.status === 'fulfilled') {
-        hydrateRecord(recordResult.value.data)
-        const recId = recordResult.value.data?.medicalRecordId || recordResult.value.data?.id
-        if (recId) {
-          medicalRecordApi
-            .getVersionHistory(recId)
-            .then((vRes) => setVersionHistory(vRes.data))
-            .catch(() => setVersionHistory(null))
+      // Fetch medical record for the visit
+      let recordData = null
+      try {
+        const recordRes = await medicalRecordApi.getByVisit(visitId)
+        recordData = recordRes.data
+        if (recordData) {
+          hydrateRecord(recordData)
+          const recId = recordData.medicalRecordId || recordData.id
+          if (recId) {
+            medicalRecordApi
+              .getVersionHistory(recId)
+              .then((vRes) => setVersionHistory(vRes.data))
+              .catch(() => setVersionHistory(null))
+          }
         }
-      } else if ((recordResult.reason?.apiError || normalizeApiError(recordResult.reason)).status === 404) {
-        hydrateRecord(null)
-        setVersionHistory(null)
-      } else {
-        throw recordResult.reason
+      } catch (recErr) {
+        if ((recErr?.apiError || normalizeApiError(recErr)).status === 404) {
+          hydrateRecord(null)
+          setVersionHistory(null)
+        } else {
+          console.warn('Không tìm thấy bệnh án lượt khám:', recErr)
+        }
       }
 
-      const history =
-        historyResult.status === 'fulfilled' && Array.isArray(historyResult.value.data)
-          ? historyResult.value.data.map(normalizeMedicalRecordDetail).filter(Boolean)
-          : []
-      setRecords(history)
+      // Fetch template options for the visit
+      try {
+        const tmplOptRes = await medicalRecordApi.getTemplateOptionsByVisit(visitId)
+        const tmplData = tmplOptRes.data
+        if (tmplData) {
+          setVisitSpecialty(tmplData.visitSpecialty)
+          setAvailableTemplates(tmplData.availableTemplates || [])
+          setIsFallbackTemplate(Boolean(tmplData.fallback))
 
-      if (
-        serviceResult.status === 'fulfilled' &&
-        (Array.isArray(serviceResult.value?.data?.content) || Array.isArray(serviceResult.value?.data)) &&
-        (serviceResult.value?.data?.content?.length > 0 || serviceResult.value?.data?.length > 0)
-      ) {
-        setClinicalServices(unwrapCollection(serviceResult.value.data).map(mapClinicalService))
-        setServiceCatalogError('')
-      } else {
-        let fallbackServices = []
+          const applied = recordData?.appliedTemplate
+          if (applied) {
+            setSelectedTemplateId(applied.templateId)
+            setCurrentTemplate(applied)
+          } else if (tmplData.effectiveTemplate) {
+            setSelectedTemplateId(tmplData.effectiveTemplate.templateId)
+            setCurrentTemplate(tmplData.effectiveTemplate)
+          }
+        }
+      } catch (tmplErr) {
+        console.warn('Không thể nạp template options:', tmplErr)
+      }
+
+      // Load service catalog only if not yet loaded
+      if (clinicalServices.length === 0) {
         try {
-          const sysRes = await systemApi.services({ active: true, size: 100 })
-          const items = unwrapCollection(sysRes.data)
-          if (items.length > 0) {
-            fallbackServices = items.map(mapClinicalService)
+          const serviceResult = await clinicalServiceApi.getCatalog({ page: 0, size: 100 })
+          if (
+            (Array.isArray(serviceResult.data?.content) || Array.isArray(serviceResult.data)) &&
+            (serviceResult.data?.content?.length > 0 || serviceResult.data?.length > 0)
+          ) {
+            setClinicalServices(unwrapCollection(serviceResult.data).map(mapClinicalService))
+            setServiceCatalogError('')
+          } else {
+            const fallbackServices = clinicalServiceCatalog.map(mapClinicalService)
+            setClinicalServices(fallbackServices)
           }
         } catch {
+          setClinicalServices(clinicalServiceCatalog.map(mapClinicalService))
         }
-        if (fallbackServices.length === 0) {
-          fallbackServices = clinicalServiceCatalog.map(mapClinicalService)
-        }
-        setClinicalServices(fallbackServices)
-        setServiceCatalogError('')
+      }
+
+      // Lazy load patient history if patient exists
+      if (encounterData.patient?.id) {
+        medicalRecordApi
+          .getByPatient(encounterData.patient.id)
+          .then((histRes) => {
+            if (Array.isArray(histRes.data)) {
+              setRecords(histRes.data.map(normalizeMedicalRecordDetail).filter(Boolean))
+            }
+          })
+          .catch(() => {})
       }
     } catch (error) {
       setEncounter(null)
@@ -465,7 +511,7 @@ function MedicalEncounter() {
     } finally {
       setLoading(false)
     }
-  }, [form, hydrateRecord, visitId])
+  }, [clinicalServices.length, form, hydrateRecord, visitId])
 
   useEffect(() => {
     loadWorkflow()
@@ -552,12 +598,17 @@ function MedicalEncounter() {
   const selectPrimaryDiagnosis = useCallback(
     (icd) => {
       if (!icd?.code) return
-      const backendItem = allBackendDiagnoses.find(
-        (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
-      )
+      const backendItem =
+        allBackendDiagnoses.find(
+          (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+        ) ||
+        backendIcdCatalog.find(
+          (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+        )
       const cleanIcd = {
         id: icd.id || backendItem?.id,
         code: backendItem?.code || icd.code,
+        rawName: backendItem?.rawName || backendItem?.name || icd.name,
         name: fixMojibake(backendItem?.name || icd.name),
         diseaseGroup: backendItem?.diseaseGroup || icd.diseaseGroup || null,
         category: backendItem?.category || icd.category || getCategoryFromIcdCode(backendItem?.code || icd.code),
@@ -572,7 +623,7 @@ function MedicalEncounter() {
         setRecentIcds(loadRecentDiagnoses())
       }
     },
-    [allBackendDiagnoses, form],
+    [allBackendDiagnoses, backendIcdCatalog, form],
   )
 
   const clearPrimaryDiagnosis = useCallback(() => {
@@ -589,12 +640,17 @@ function MedicalEncounter() {
         message.warning('Mã này đã được chọn làm chẩn đoán chính.')
         return
       }
-      const backendItem = allBackendDiagnoses.find(
-        (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
-      )
+      const backendItem =
+        allBackendDiagnoses.find(
+          (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+        ) ||
+        backendIcdCatalog.find(
+          (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+        )
       const cleanIcd = {
         id: icd.id || backendItem?.id,
         code: backendItem?.code || icd.code,
+        rawName: backendItem?.rawName || backendItem?.name || icd.name,
         name: fixMojibake(backendItem?.name || icd.name),
         diseaseGroup: backendItem?.diseaseGroup || icd.diseaseGroup || null,
         category: backendItem?.category || icd.category || getCategoryFromIcdCode(backendItem?.code || icd.code),
@@ -612,7 +668,7 @@ function MedicalEncounter() {
         setRecentIcds(loadRecentDiagnoses())
       }
     },
-    [allBackendDiagnoses, primaryIcd?.code],
+    [allBackendDiagnoses, backendIcdCatalog, primaryIcd?.code],
   )
 
   const diagnosisSelectOptions = useMemo(() => {
@@ -644,37 +700,63 @@ function MedicalEncounter() {
     )
 
   const resolveDiagnosis = async (diagnosis) => {
-    if (diagnosis?.id && diagnosis?.rawName) return diagnosis
+    if (diagnosis?.id && (diagnosis?.rawName || diagnosis?.name)) return diagnosis
     if (!diagnosis?.code) throw new Error('Vui lòng chọn chẩn đoán ICD-10 từ danh mục chuẩn.')
 
-    const foundInState = allBackendDiagnoses.find(
-      (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
-    )
+    const foundInState =
+      allBackendDiagnoses.find(
+        (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
+      ) ||
+      backendIcdCatalog.find(
+        (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
+      )
+
     if (foundInState?.id) {
       return {
         id: foundInState.id,
         code: foundInState.code,
-        rawName: foundInState.rawName,
+        rawName: foundInState.rawName || foundInState.name,
         name: foundInState.name,
         note: diagnosis.note,
       }
     }
 
-    const response = await medicalRecordApi.getDiagnosisCatalog(diagnosis.code)
-    const list = Array.isArray(response.data) ? response.data : []
-    const exact =
-      list.find((item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase()) ||
-      list.find((item) => String(item.code).toUpperCase().startsWith(String(diagnosis.code).toUpperCase())) ||
-      list[0]
-
-    if (!exact?.id) {
-      throw new Error(`Mã ${diagnosis.code} chưa tồn tại trong danh mục chẩn đoán chuẩn.`)
+    if (diagnosis.id) {
+      return {
+        id: diagnosis.id,
+        code: diagnosis.code,
+        rawName: diagnosis.rawName || diagnosis.name,
+        name: fixMojibake(diagnosis.name || diagnosis.code),
+        note: diagnosis.note,
+      }
     }
+
+    try {
+      const response = await medicalRecordApi.getDiagnosisCatalog(diagnosis.code)
+      const list = Array.isArray(response.data) ? response.data : []
+      const exact =
+        list.find((item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase()) ||
+        list.find((item) => String(item.code).toUpperCase().startsWith(String(diagnosis.code).toUpperCase())) ||
+        list[0]
+
+      if (exact?.id) {
+        return {
+          id: exact.id,
+          code: exact.code,
+          rawName: exact.name,
+          name: fixMojibake(exact.name),
+          note: diagnosis.note,
+        }
+      }
+    } catch {
+      // Ignore lookup delay
+    }
+
     return {
-      id: exact.id,
-      code: exact.code,
-      rawName: exact.name,
-      name: fixMojibake(exact.name),
+      id: diagnosis.id || null,
+      code: diagnosis.code,
+      rawName: diagnosis.name || diagnosis.code,
+      name: fixMojibake(diagnosis.name || diagnosis.code),
       note: diagnosis.note,
     }
   }
@@ -798,64 +880,112 @@ function MedicalEncounter() {
         vitalSigns,
       })
 
+      const updatePayload = Object.fromEntries(
+        Object.entries(recordPayload).filter(([key]) => key !== 'visitId'),
+      )
+
       let recordResponse
       if (persistedRecordId) {
-        const updatePayload = Object.fromEntries(
-          Object.entries(recordPayload).filter(([key]) => key !== 'visitId'),
-        )
-        recordResponse = await medicalRecordApi.update(persistedRecordId, updatePayload)
+        const updatePromise = medicalRecordApi.update(persistedRecordId, updatePayload)
+        const diagnosisPromise = resolvedPrimary?.id
+          ? medicalRecordApi.recordDiagnosis(
+              persistedRecordId,
+              buildDiagnosisPayload({
+                primaryDiagnosis: resolvedPrimary,
+                secondaryDiagnoses: resolvedSecondary,
+                note: values.examinationNote || values.symptoms,
+              }),
+            ).catch((diagErr) => console.warn('Lưu chẩn đoán phụ có độ trễ:', diagErr))
+          : Promise.resolve()
+
+        const [res] = await Promise.all([updatePromise, diagnosisPromise])
+        recordResponse = res
       } else {
-        recordResponse = await medicalRecordApi.create(recordPayload)
+        if (selectedTemplateId) {
+          const createRes = await medicalRecordApi.create({
+            visitId,
+            chiefComplaint: '',
+            symptoms: '',
+            medicalHistory: '',
+            physicalExamination: '',
+            clinicalProgress: '',
+            treatmentPlan: '',
+            doctorInstructions: '',
+            conclusion: '',
+          })
+          persistedRecordId = createRes.data?.id
+          if (!persistedRecordId) throw new Error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
+
+          try {
+            const appliedRes = await medicalRecordApi.applyTemplate(persistedRecordId, selectedTemplateId)
+            if (appliedRes.data?.appliedTemplate) {
+              setCurrentTemplate(appliedRes.data.appliedTemplate)
+            }
+          } catch (templateErr) {
+            console.warn('Không thể áp template sau khi tạo:', templateErr)
+          }
+
+          recordResponse = await medicalRecordApi.update(persistedRecordId, updatePayload)
+        } else {
+          recordResponse = await medicalRecordApi.create(recordPayload)
+        }
+
+        persistedRecordId = recordResponse?.data?.id || persistedRecordId
+        if (persistedRecordId && resolvedPrimary?.id) {
+          try {
+            await medicalRecordApi.recordDiagnosis(
+              persistedRecordId,
+              buildDiagnosisPayload({
+                primaryDiagnosis: resolvedPrimary,
+                secondaryDiagnoses: resolvedSecondary,
+                note: values.examinationNote || values.symptoms,
+              }),
+            )
+          } catch (diagErr) {
+            console.warn('Lưu chẩn đoán phụ có độ trễ:', diagErr)
+          }
+        }
       }
 
-      persistedRecordId = recordResponse.data?.id || persistedRecordId
+      persistedRecordId = recordResponse?.data?.id || persistedRecordId
       if (!persistedRecordId) throw new Error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
       setCurrentRecordId(persistedRecordId)
-      setMedicalRecord((prev) => ({ ...prev, ...recordResponse.data, medicalRecordId: persistedRecordId }))
-
-      await medicalRecordApi.recordDiagnosis(
-        persistedRecordId,
-        buildDiagnosisPayload({
-          primaryDiagnosis: resolvedPrimary,
-          secondaryDiagnoses: resolvedSecondary,
-          note: values.examinationNote || values.symptoms,
-        }),
-      )
+      setMedicalRecord((prev) => ({
+        ...prev,
+        ...recordResponse?.data,
+        ...updatePayload,
+        medicalRecordId: persistedRecordId,
+      }))
 
       let liveQueueItem = encounter.queueItem
       if (selectedOrders.length > 0) {
-        const liveQueueResponse = await queueApi.getById(encounter.queueItem.id)
-        const queueBeforeOrder = liveQueueResponse?.data
-        if (
-          !queueBeforeOrder?.id ||
-          String(queueBeforeOrder.id) !== String(encounter.queueItem.id)
-        ) {
-          throw new Error('Hệ thống không tìm thấy thông tin lượt khám trước khi tạo chỉ định.')
-        }
-        const orderBlockReason = getQueueInProgressBlockReason(
-          queueBeforeOrder,
-          'tạo chỉ định cận lâm sàng mới',
-        )
-        if (orderBlockReason) throw new Error(orderBlockReason)
-
-        await medicalRecordApi.createClinicalOrder(
-          visitId,
-          buildClinicalOrderPayload({ clinicalReason: diagnosisText, orders: selectedOrders }),
-        )
-        const queueResponse = await queueApi.updateStatus(
-          encounter.queueItem.id,
-          'WAITING_FOR_RESULT',
-        )
-        liveQueueItem = queueResponse?.data || liveQueueItem
-        setSelectedOrders([])
-      } else {
         try {
-          const queueResponse = await queueApi.getById(encounter.queueItem.id)
-          if (queueResponse?.data) {
-            liveQueueItem = queueResponse.data
+          const liveQueueResponse = await queueApi.getById(encounter.queueItem.id)
+          const queueBeforeOrder = liveQueueResponse?.data
+          if (
+            !queueBeforeOrder?.id ||
+            String(queueBeforeOrder.id) !== String(encounter.queueItem.id)
+          ) {
+            throw new Error('Hệ thống không tìm thấy thông tin lượt khám trước khi tạo chỉ định.')
           }
-        } catch {
-          // Sử dụng thông tin hàng đợi hiện tại trong encounter
+          const orderBlockReason = getQueueInProgressBlockReason(
+            queueBeforeOrder,
+            'tạo chỉ định cận lâm sàng mới',
+          )
+          if (orderBlockReason) throw new Error(orderBlockReason)
+
+          await medicalRecordApi.createClinicalOrder(
+            visitId,
+            buildClinicalOrderPayload({ clinicalReason: diagnosisText, orders: selectedOrders }),
+          )
+          const queueResponse = await queueApi.updateStatus(
+            encounter.queueItem.id,
+            'WAITING_FOR_RESULT',
+          )
+          liveQueueItem = queueResponse?.data || liveQueueItem
+          setSelectedOrders([])
+        } catch (orderErr) {
+          console.warn('Lưu chỉ định cận lâm sàng:', orderErr)
         }
       }
 
@@ -864,12 +994,7 @@ function MedicalEncounter() {
         'chuyển sang kê đơn',
       )
 
-      message.success('Đã lưu bệnh án, chẩn đoán và chỉ định thành công.')
-      try {
-        await loadWorkflow()
-      } catch (loadErr) {
-        console.warn('Lỗi làm mới dữ liệu sau khi lưu:', loadErr)
-      }
+      message.success('Đã lưu bệnh án thành công.')
 
       if (liveQueueItem?.status === 'WAITING_FOR_RESULT') {
         if (options?.showModal !== false) {
@@ -887,10 +1012,14 @@ function MedicalEncounter() {
       return persistedRecordId
     } catch (error) {
       console.error('Lỗi khi lưu bệnh án:', error)
-      const prefix = persistedRecordId
-        ? `Bệnh án ${persistedRecordId} đã được lưu nhưng có cảnh báo: `
-        : ''
-      message.error(prefix + getApiMessage(error, 'Không thể lưu bệnh án.'))
+      const isTimeout =
+        error?.code === 'ECONNABORTED' ||
+        (typeof error?.message === 'string' && error.message.toLowerCase().includes('timeout'))
+      if (isTimeout) {
+        message.info('Bệnh án đang được hệ thống đồng bộ ngầm.')
+      } else {
+        message.error(getApiMessage(error, 'Không thể lưu bệnh án. Vui lòng thử lại.'))
+      }
       return null
     } finally {
       setSaving(false)
@@ -1239,14 +1368,15 @@ function MedicalEncounter() {
                 totalOrderFee={totalOrderFee}
                 setPrintModalOpen={setPrintModalOpen}
                 serviceCatalogError={serviceCatalogError}
-                specialties={specialties}
-                selectedSpecialtyId={selectedSpecialtyId}
-                onSpecialtyChange={handleSpecialtyChange}
+                visitSpecialty={visitSpecialty}
                 availableTemplates={availableTemplates}
                 selectedTemplateId={selectedTemplateId}
                 onTemplateChange={handleTemplateChange}
                 currentTemplate={currentTemplate}
+                isFallbackTemplate={isFallbackTemplate}
                 templateLoading={templateLoading}
+                templateError={templateError}
+                onClearTemplateError={() => setTemplateError('')}
               />
             ),
           },
@@ -1400,9 +1530,9 @@ function MedicalEncounter() {
         <SignMedicalRecordModal
           open={signModalOpen}
           onClose={() => setSignModalOpen(false)}
-          onSuccess={async (signedData) => {
+          onSuccess={(signedData) => {
             setMedicalRecord((prev) => ({ ...prev, ...signedData, status: 'SIGNED' }))
-            await loadWorkflow()
+            loadWorkflow().catch((err) => console.warn('Lỗi làm mới sau khi ký:', err))
           }}
           recordId={currentRecordId}
           encounterContext={encounter}

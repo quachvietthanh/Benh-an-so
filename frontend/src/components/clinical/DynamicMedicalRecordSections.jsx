@@ -14,19 +14,11 @@ import {
 } from '@ant-design/icons'
 import {
   DEFAULT_TEMPLATE_SECTIONS,
+  FIELD_CODE_TO_FORM_NAME,
   getFieldMeta,
 } from '../../constants/medicalRecordTemplateConstants'
 
-export const FIELD_CODE_TO_FORM_NAME = {
-  CHIEF_COMPLAINT: 'chiefComplaint',
-  SYMPTOMS: 'symptoms',
-  MEDICAL_HISTORY: 'medicalHistory',
-  PHYSICAL_EXAMINATION: 'physicalExamination',
-  CLINICAL_PROGRESS: 'clinicalProgress',
-  TREATMENT_PLAN: 'treatmentPlan',
-  DOCTOR_INSTRUCTIONS: 'doctorInstructions',
-  CONCLUSION: 'conclusion',
-}
+export { FIELD_CODE_TO_FORM_NAME }
 
 function DynamicMedicalRecordSections({
   sections = [],
@@ -54,14 +46,15 @@ function DynamicMedicalRecordSections({
             <span>Khám lâm sàng & Diễn biến bệnh</span>
           </span>
           {template && (
-            <Space size={6}>
+            <Space size={6} wrap>
               <Tag color="blue" style={{ fontWeight: 600 }}>
                 Mẫu: {template.name}
               </Tag>
               <Tag color="purple">
-                v{template.currentVersionNo || 1}
+                v{template.versionNo || template.currentVersionNo || 1}
               </Tag>
               {template.defaultTemplate && <Tag color="green">Mặc định</Tag>}
+              {template.fallback && <Tag color="orange">Đa khoa (Fallback)</Tag>}
             </Space>
           )}
         </div>

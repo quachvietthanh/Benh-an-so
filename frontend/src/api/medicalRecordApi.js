@@ -91,6 +91,15 @@ const medicalRecordApi = {
   amendRecord: (medicalRecordId, data) => {
     return axiosClient.post(`/medical-records/${medicalRecordId}/amendments`, data)
   },
+  getTemplateOptions: (medicalRecordId) => {
+    return axiosClient.get(`/medical-records/${medicalRecordId}/template-options`)
+  },
+  getTemplateOptionsByVisit: (visitId) => {
+    return axiosClient.get(`/medical-records/visits/${visitId}/template-options`)
+  },
+  applyTemplate: (medicalRecordId, templateId) => {
+    return axiosClient.put(`/medical-records/${medicalRecordId}/template`, { templateId })
+  },
 }
 
 export default medicalRecordApi

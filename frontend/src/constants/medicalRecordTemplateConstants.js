@@ -91,3 +91,15 @@ export const DEFAULT_TEMPLATE_SECTIONS = [
   { fieldCode: 'DOCTOR_INSTRUCTIONS', label: 'Dặn dò của bác sĩ', required: false, displayOrder: 7 },
   { fieldCode: 'CONCLUSION', label: 'Kết luận', required: false, displayOrder: 8 },
 ]
+
+export const FIELD_CODE_TO_FORM_NAME = {
+  CHIEF_COMPLAINT: 'chiefComplaint',
+  SYMPTOMS: 'symptoms',
+  MEDICAL_HISTORY: 'medicalHistory',
+  PHYSICAL_EXAMINATION: 'physicalExamination',
+  CLINICAL_PROGRESS: 'clinicalProgress',
+  TREATMENT_PLAN: 'treatmentPlan',
+  DOCTOR_INSTRUCTIONS: 'doctorInstructions',
+  CONCLUSION: 'conclusion',
+}
+

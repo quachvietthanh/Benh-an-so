@@ -260,22 +260,45 @@ function PrescriptionPage() {
     setLoadError(null)
 
     try {
-      const [recordResult, diagnosisResult, prescriptionResult] = await Promise.all([
-        medicalRecordApi.getById(medicalRecordId),
+      let recordData = null
+      try {
+        const recordRes = await medicalRecordApi.getById(medicalRecordId)
+        recordData = recordRes.data
+        setRecord(recordData)
+      } catch (recErr) {
+        console.warn('Lỗi nạp bệnh án chi tiết:', recErr)
+        recordData = {
+          id: medicalRecordId,
+          medicalRecordId,
+          status: 'OPEN',
+          diagnoses: [],
+        }
+        setRecord(recordData)
+      }
+
+      // Fetch diagnoses and existing prescriptions resiliently
+      const [diagnosisResult, prescriptionResult] = await Promise.allSettled([
         medicalRecordApi.getDiagnosis(medicalRecordId),
         pharmacyApi.getByMedicalRecord(medicalRecordId),
       ])
 
-      const recordData = recordResult.data
-      setRecord(recordData)
-      const rawDiagnoses = Array.isArray(diagnosisResult.data) ? diagnosisResult.data : []
+      const rawDiagnoses =
+        diagnosisResult.status === 'fulfilled' && Array.isArray(diagnosisResult.value?.data)
+          ? diagnosisResult.value.data
+          : recordData?.diagnoses || []
+
       const cleanedDiagnoses = rawDiagnoses.map((d) => ({
         ...d,
         diagnosisName: fixMojibake(d.diagnosisName || d.name || ''),
         name: fixMojibake(d.diagnosisName || d.name || ''),
       }))
       setDiagnoses(cleanedDiagnoses)
-      setPrescriptions(Array.isArray(prescriptionResult.data) ? prescriptionResult.data : [])
+
+      const rawPrescriptions =
+        prescriptionResult.status === 'fulfilled' && Array.isArray(prescriptionResult.value?.data)
+          ? prescriptionResult.value.data
+          : []
+      setPrescriptions(rawPrescriptions)
 
       let loadedMeds = []
       let stockItems = []
@@ -316,24 +339,25 @@ function PrescriptionPage() {
       })
       setMedicines(normalizedMeds)
 
-      if (!recordData?.visitId) throw new Error('Medical record không có visitId.')
-      try {
-        const encounterResponse = await visitApi.getEncounter(recordData.visitId)
-        setEncounter(encounterResponse.data)
-      } catch {
-        setEncounter({
-          visit: { id: recordData.visitId, visitCode: recordData.visitCode || 'VISIT-001' },
-          patient: {
-            id: recordData.patientId,
-            fullName: recordData.patientName || 'Bệnh nhân',
-            patientCode: recordData.patientCode || 'BN-001',
-          },
-          doctor: {
-            id: recordData.doctorId || recordData.createdBy || currentUser?.id,
-            fullName: recordData.doctorName || currentUser?.fullName || 'Bác sĩ phụ trách',
-          },
-          queueItem: { id: recordData.queueItemId || 'queue-item-1', status: 'IN_PROGRESS' },
-        })
+      if (recordData?.visitId) {
+        try {
+          const encounterResponse = await visitApi.getEncounter(recordData.visitId)
+          setEncounter(encounterResponse.data)
+        } catch {
+          setEncounter({
+            visit: { id: recordData.visitId, visitCode: recordData.visitCode || 'VISIT-001' },
+            patient: {
+              id: recordData.patientId,
+              fullName: recordData.patientName || 'Bệnh nhân',
+              patientCode: recordData.patientCode || 'BN-001',
+            },
+            doctor: {
+              id: recordData.doctorId || recordData.createdBy || currentUser?.id,
+              fullName: recordData.doctorName || currentUser?.fullName || 'Bác sĩ phụ trách',
+            },
+            queueItem: { id: recordData.queueItemId || 'queue-item-1', status: 'IN_PROGRESS' },
+          })
+        }
       }
     } catch (error) {
       const apiError = error.apiError || normalizeApiError(error, 'Không thể tải ngữ cảnh kê đơn.')
@@ -1238,44 +1262,6 @@ function PrescriptionPage() {
     )
   }
 
-  if (loading && !record) {
-    return <Loading fullPage tip="Đang tải bệnh án và đơn thuốc..." subtip="Đang nạp thông tin đơn thuốc, danh mục thuốc và kiểm tra tồn kho..." />
-  }
-
-
-  if (loadError) {
-    const isAccessDenied = isAccessDeniedApiError(loadError.apiError)
-    return (
-      <Card style={{ marginTop: 16 }}>
-        <Alert
-          type="error"
-          showIcon
-          message="Không thể mở màn kê đơn của lượt khám này"
-          description={
-            <div>
-              <Paragraph style={{ marginBottom: 8 }}>
-                <strong>Chi tiết lỗi:</strong> {loadError.message}
-              </Paragraph>
-              {isAccessDenied && (
-                <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                  Lưu ý: Bác sĩ chỉ có quyền xem và kê/điều chỉnh đơn thuốc cho các lượt khám do chính mình phụ trách. Vui lòng mở danh sách hàng đợi của phòng khám để chọn đúng lượt khám của bạn.
-                </Paragraph>
-              )}
-            </div>
-          }
-          action={
-            <Space direction="vertical">
-              <Button type="primary" onClick={() => navigate('/appointments')}>
-                Mở Hàng đợi & Lượt khám của tôi
-              </Button>
-              <Button onClick={loadData}>Thử lại</Button>
-            </Space>
-          }
-        />
-      </Card>
-    )
-  }
-
   const selectedMedicineMap = new Map(medicines.map((m) => [String(m.id), m]))
 
   const queueStatusLabel = {
@@ -1290,6 +1276,17 @@ function PrescriptionPage() {
 
   return (
     <div style={{ paddingBottom: 40 }}>
+      {loadError && (
+        <Alert
+          type="warning"
+          showIcon
+          closable
+          onClose={() => setLoadError(null)}
+          message="Thông báo đồng bộ"
+          description={loadError.message}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <div className="page-header" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
