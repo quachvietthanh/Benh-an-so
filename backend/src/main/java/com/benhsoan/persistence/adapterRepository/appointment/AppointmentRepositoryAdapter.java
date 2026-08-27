@@ -38,6 +38,23 @@ public class AppointmentRepositoryAdapter
     }
 
     @Override
+    public List<Appointment> findByPatientIdOrderByStartTimeAsc(UUID patientId) {
+        return jpaRepository.findByPatientIdOrderByStartTimeAsc(patientId).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Appointment> findByPatientIdAndStatusInOrderByStartTimeAsc(
+            UUID patientId,
+            Collection<AppointmentStatus> statuses
+    ) {
+        return jpaRepository.findByPatientIdAndStatusInOrderByStartTimeAsc(patientId, statuses).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Appointment save(Appointment appointment) {
 
         AppointmentEntity entity

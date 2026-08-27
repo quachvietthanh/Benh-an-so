@@ -31,7 +31,13 @@ public class PatientAccessDeniedAuditWriter {
     private final ObjectMapper objectMapper;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void writeDenied(UUID actorId, UUID targetPatientId, Instant deniedAt) {
+    public void writeDenied(
+            UUID actorId,
+            UUID targetPatientId,
+            Instant deniedAt,
+            ResourceType resourceType,
+            UUID resourceId
+    ) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("action", "ACCESS_DENIED");
         detail.put("targetPatientId", targetPatientId.toString());
@@ -40,8 +46,8 @@ public class PatientAccessDeniedAuditWriter {
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.ACCESS_DENIED,
-                ResourceType.PATIENT,
-                targetPatientId,
+                resourceType,
+                resourceId,
                 toJson(detail),
                 null,
                 deniedAt

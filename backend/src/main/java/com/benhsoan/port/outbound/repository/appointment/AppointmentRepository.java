@@ -16,6 +16,13 @@ public interface AppointmentRepository {
 
     Optional<Appointment> findById(UUID id);
 
+    List<Appointment> findByPatientIdOrderByStartTimeAsc(UUID patientId);
+
+    List<Appointment> findByPatientIdAndStatusInOrderByStartTimeAsc(
+            UUID patientId,
+            Collection<AppointmentStatus> statuses
+    );
+
     Appointment save(Appointment appointment);
 
     Optional<Appointment> findByAppointmentCode(String appointmentCode);
