@@ -353,4 +353,61 @@ class PatientConsentIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PATIENT_CONSENT_ACCESS_DENIED"));
     }
+
+    @Test
+    @DisplayName("Finding 1 Integration Test: Bác sĩ gửi payload chứa consent nguyên trạng được cập nhật thành công 200 OK")
+    void allowsDoctorToUpdatePatientProfileWithUnchangedConsentPayload() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        PatientResult result = new PatientResult(
+                patientId,
+                "BN000001",
+                "Nguyen Van A Updated",
+                LocalDate.of(1995, 5, 10),
+                Gender.MALE,
+                "0909000002",
+                "a@example.com",
+                "456 New Street",
+                "079095001234",
+                "DN4790123456789",
+                null,
+                "Nguyen Van B",
+                "0909998877",
+                true,
+                now,
+                now,
+                true,
+                now,
+                "v1.0",
+                false,
+                null,
+                null,
+                false
+        );
+
+        when(updatePatientUseCase.update(any(UUID.class), any(UpdatePatientCommand.class))).thenReturn(result);
+
+        mockMvc.perform(put("/patients/{patientId}", patientId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Nguyen Van A Updated",
+                                  "dateOfBirth": "1995-05-10",
+                                  "gender": "MALE",
+                                  "phone": "0909000002",
+                                  "address": "456 New Street",
+                                  "active": true,
+                                  "consentAgreed": true,
+                                  "consentWithdrawn": false,
+                                  "consentVersion": "v1.0"
+                                }
+                                """)
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Nguyen Van A Updated"))
+                .andExpect(jsonPath("$.phone").value("0909000002"));
+
+        verify(updatePatientUseCase).update(any(UUID.class), any(UpdatePatientCommand.class));
+    }
 }

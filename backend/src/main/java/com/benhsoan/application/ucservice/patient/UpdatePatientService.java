@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.patient;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -95,7 +96,7 @@ public class UpdatePatientService
                     command.phone(),
                     command.email(),
                     command.address(),
-                    command.identityNumber(),
+                    normalizeIdentityNumber(command.identityNumber()),
                     command.insuranceNumber(),
                     command.bloodType(),
                     command.emergencyContact(),
@@ -112,15 +113,33 @@ public class UpdatePatientService
         }
 
         // Handle consent withdrawal (NCL-15-CN-001-TC-03) or renewal
-        boolean isModifyingConsent = command.consentWithdrawn() != null || command.consentAgreed() != null;
+        boolean isChangingWithdrawal = command.consentWithdrawn() != null
+                && command.consentWithdrawn() != patient.isConsentWithdrawn();
+        boolean isChangingAgreement = command.consentAgreed() != null
+                && command.consentAgreed() != patient.isConsentAgreed();
+        boolean isChangingVersion = command.consentVersion() != null
+                && !Objects.equals(command.consentVersion(), patient.getConsentVersion());
+        boolean isChangingWithdrawReason = command.consentWithdrawnReason() != null
+                && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason());
+
+        boolean isModifyingConsent = isChangingWithdrawal
+                || isChangingAgreement
+                || isChangingVersion
+                || isChangingWithdrawReason;
+
         if (isModifyingConsent) {
             if (!currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")) {
                 throw new PatientConsentAccessDeniedException();
             }
         }
 
-        if (Boolean.TRUE.equals(command.consentWithdrawn()) && !patient.isConsentWithdrawn()) {
-            patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
+        if (Boolean.TRUE.equals(command.consentWithdrawn())) {
+            if (!patient.isConsentWithdrawn()) {
+                patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
+            } else if (command.consentWithdrawnReason() != null
+                    && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason())) {
+                patient.withdrawConsent(command.consentWithdrawnReason(), patient.getConsentWithdrawnAt());
+            }
         } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {
             if (!Boolean.TRUE.equals(command.consentAgreed())) {
                 throw new ValidationException(
@@ -183,7 +202,7 @@ public class UpdatePatientService
     ) {
 
         String identityNumber =
-                command.identityNumber();
+                normalizeIdentityNumber(command.identityNumber());
 
         if (identityNumber != null
                 && patientRepository.existsByIdentityNumberAndIdNot(
@@ -195,6 +214,13 @@ public class UpdatePatientService
                     "Identity number"
             );
         }
+    }
+
+    private String normalizeIdentityNumber(String identityNumber) {
+        if (identityNumber == null || identityNumber.isBlank()) {
+            return null;
+        }
+        return identityNumber.trim();
     }
 
 }

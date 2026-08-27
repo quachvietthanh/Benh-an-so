@@ -57,6 +57,8 @@ public class RegisterPatientService
 
         boolean consentAgreed = Boolean.TRUE.equals(command.consentAgreed());
 
+        String identityNumber = normalizeIdentityNumber(command.identityNumber());
+
         Patient patient =
                 Patient.create(
                         patientCode,
@@ -66,7 +68,7 @@ public class RegisterPatientService
                         normalizePhone(command.phone()),
                         command.email(),
                         command.address(),
-                        command.identityNumber(),
+                        identityNumber,
                         command.insuranceNumber(),
                         command.bloodType(),
                         command.emergencyContact(),
@@ -120,14 +122,22 @@ public class RegisterPatientService
             throw new PatientConsentRequiredException("Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân (QTN-24).");
         }
 
-        if (command.identityNumber() != null
-                && patientRepository.existsByIdentityNumber(
-                        command.identityNumber())) {
+        String identityNumber = normalizeIdentityNumber(command.identityNumber());
+
+        if (identityNumber != null
+                && patientRepository.existsByIdentityNumber(identityNumber)) {
 
             throw new PatientAlreadyExistsException(
                     "identity number"
             );
         }
+    }
+
+    private String normalizeIdentityNumber(String identityNumber) {
+        if (identityNumber == null || identityNumber.isBlank()) {
+            return null;
+        }
+        return identityNumber.trim();
     }
 
     private String normalizePhone(String phone) {

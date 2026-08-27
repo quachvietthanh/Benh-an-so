@@ -229,7 +229,9 @@ public class Patient {
 
     public void withdrawConsent(String reason, Instant withdrawnAt) {
         this.consentWithdrawn = true;
-        this.consentWithdrawnAt = withdrawnAt != null ? withdrawnAt : Instant.now();
+        if (this.consentWithdrawnAt == null || withdrawnAt != null) {
+            this.consentWithdrawnAt = withdrawnAt != null ? withdrawnAt : Instant.now();
+        }
         this.consentWithdrawnReason = reason;
         this.nonMedicalUseRestricted = true;
         this.updatedAt = Instant.now();

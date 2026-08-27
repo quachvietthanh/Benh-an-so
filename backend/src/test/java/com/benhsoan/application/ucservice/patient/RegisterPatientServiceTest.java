@@ -142,4 +142,27 @@ class RegisterPatientServiceTest {
         verify(patientRepository, never()).save(any(Patient.class));
         verify(auditLogRepository, never()).save(any(AuditLog.class));
     }
+
+    @Test
+    @DisplayName("Finding 3 Fix: identityNumber rỗng/khoảng trắng được chuẩn hóa thành null và không query trùng lặp")
+    void registersPatientWithBlankIdentityNumberNormalizesToNull() {
+        when(patientCodeGenerator.generate()).thenReturn("BN000001");
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .identityNumber("   ")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        PatientResult result = service.register(command);
+
+        assertNotNull(result);
+        verify(patientRepository, never()).existsByIdentityNumber(any());
+        verify(patientRepository).save(any(Patient.class));
+    }
 }

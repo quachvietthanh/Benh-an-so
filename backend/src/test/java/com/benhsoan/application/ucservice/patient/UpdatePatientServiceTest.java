@@ -336,4 +336,130 @@ class UpdatePatientServiceTest {
         assertThrows(ValidationException.class, () -> service.update(patientId, command));
         verify(patientRepository, never()).save(any(Patient.class));
     }
+
+    @Test
+    @DisplayName("Finding 1 Fix: Bác sĩ gửi payload chứa consent nguyên trạng không bị chặn bởi PATIENT_CONSENT_UPDATE")
+    void updatesProfileWithUnchangedConsentFieldsDoesNotRequireConsentPermission() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Nguyen Van B", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A Updated")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000002")
+                .address("456 New Street")
+                .active(true)
+                .consentAgreed(true)
+                .consentWithdrawn(false)
+                .consentVersion("v1.0")
+                .consentWithdrawnReason(null)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertEquals("Nguyen Van A Updated", result.fullName());
+        assertEquals("0909000002", result.phone());
+        verify(patientRepository).save(any(Patient.class));
+        verify(currentUserPort, never()).hasPermission("PATIENT_CONSENT_UPDATE");
+    }
+
+    @Test
+    @DisplayName("Finding 2 Fix: Cập nhật consentWithdrawnReason khi đã rút consent thành công và giữ nguyên thời điểm rút")
+    void updatesWithdrawalReasonWhenAlreadyWithdrawn() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Nguyen Van B", "0909998877",
+                true, "v1.0", currentUserId
+        );
+        java.time.Instant initialWithdrawal = java.time.Instant.parse("2026-08-20T10:00:00Z");
+        existing.withdrawConsent("Lý do ban đầu", initialWithdrawal);
+
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .consentWithdrawn(true)
+                .consentWithdrawnReason("Lý do mới bổ sung chi tiết")
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertTrue(result.consentWithdrawn());
+        assertEquals("Lý do mới bổ sung chi tiết", result.consentWithdrawnReason());
+        assertEquals(initialWithdrawal, result.consentWithdrawnAt());
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("Finding 2 Fix: Người dùng thiếu PATIENT_CONSENT_UPDATE cố ý đổi lý do rút consent bị từ chối 403")
+    void rejectsConsentReasonModificationWhenUserLacksConsentPermission() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Nguyen Van B", "0909998877",
+                true, "v1.0", currentUserId
+        );
+        existing.withdrawConsent("Lý do ban đầu", java.time.Instant.now());
+
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(false);
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .active(true)
+                .consentWithdrawn(true)
+                .consentWithdrawnReason("Lý do mới không có quyền sửa")
+                .build();
+
+        assertThrows(PatientConsentAccessDeniedException.class, () -> service.update(patientId, command));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("Finding 3 Fix: identityNumber là chuỗi rỗng/khoảng trắng được chuẩn hóa thành null và không bị báo trùng")
+    void normalizesBlankIdentityNumberToNullOnUpdate() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Nguyen Van B", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .identityNumber("   ")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        verify(patientRepository, never()).existsByIdentityNumberAndIdNot(any(), any());
+        verify(patientRepository).save(any(Patient.class));
+    }
 }
