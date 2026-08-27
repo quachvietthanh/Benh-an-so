@@ -16,6 +16,7 @@ import {
   BarcodeOutlined,
   CalendarOutlined,
   ScheduleOutlined,
+  FileDoneOutlined,
 } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
 import './portalDashboard.css'
@@ -180,39 +181,26 @@ function PortalDashboard() {
             </div>
           </div>
 
-          {/* Card 4: Hồ sơ bệnh nhân */}
+          {/* Card 4: Lịch sử khám & Đơn thuốc */}
           <div className="portal-dashboard-card portal-card-patient">
             <div className="portal-dashboard-card-top">
               <div className="portal-dashboard-card-icon green">
-                <FileTextOutlined />
+                <FileDoneOutlined />
               </div>
               <div className="portal-card-header-text">
-                <h3>Hồ sơ bệnh nhân</h3>
-                <span className="portal-card-tag green">Đã liên kết</span>
+                <h3>Lịch sử khám & Đơn thuốc</h3>
+                <span className="portal-card-tag green">Đã hoàn tất</span>
               </div>
             </div>
             <p className="portal-card-desc">
-              Hồ sơ y tế được mã hóa và đồng bộ trực tiếp với hệ thống phòng khám.
+              Xem lại toàn bộ kết quả chẩn đoán y khoa, đơn thuốc và lời dặn của bác sĩ qua các lần khám.
             </p>
             <div className="portal-card-action">
-              <div className="portal-id-chip-box">
-                <div className="portal-id-chip-content">
-                  <span className="portal-id-chip-label">MÃ HỒ SƠ</span>
-                  <strong className="portal-id-chip-value">
-                    {user?.patientCode ? user.patientCode : displayIdShort}
-                  </strong>
-                </div>
-                {patientIdStr && (
-                  <Tooltip title="Sao chép mã hồ sơ đầy đủ">
-                    <Button
-                      type="text"
-                      className="portal-copy-icon-btn"
-                      icon={<CopyOutlined />}
-                      onClick={() => handleCopy(patientIdStr, 'mã hồ sơ')}
-                    />
-                  </Tooltip>
-                )}
-              </div>
+              <Link to="/portal/medical-history" style={{ width: '100%', display: 'block' }}>
+                <Button className="portal-btn-outline" block>
+                  Xem lịch sử khám <ArrowRightOutlined />
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
