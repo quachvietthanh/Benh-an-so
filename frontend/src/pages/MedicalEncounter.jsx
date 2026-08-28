@@ -766,43 +766,38 @@ function MedicalEncounter() {
       message.error('Chưa có mã bệnh án hợp lệ để chuyển sang kê đơn. Vui lòng bấm "Cập nhật bệnh án" trước.')
       return false
     }
-    if (!primaryIcd?.code) {
-      message.warning('Bệnh án cần có chẩn đoán chính trước khi chuyển sang kê đơn thuốc. Vui lòng chọn chẩn đoán và bấm "Cập nhật bệnh án".')
-      return false
-    }
 
-    const queueItemId = encounter?.queueItem?.id
-    if (!queueItemId) {
-      message.error('Chưa có thông tin hàng đợi hợp lệ để chuyển sang kê đơn.')
-      return false
-    }
-
-    try {
-      const response = await queueApi.getById(queueItemId)
-      const liveQueueItem = response?.data
-      if (!liveQueueItem?.id || String(liveQueueItem.id) !== String(queueItemId)) {
-        throw new Error('Hệ thống không tìm thấy thông tin lượt khám trong hàng đợi.')
+    let liveQueueItem = encounter?.queueItem
+    if (liveQueueItem?.id) {
+      try {
+        const response = await queueApi.getById(liveQueueItem.id)
+        if (response?.data?.id) {
+          liveQueueItem = response.data
+        }
+      } catch {
+        // Continue with current queue item
       }
-
-      const blockReason = getQueueInProgressBlockReason(liveQueueItem, 'chuyển sang kê đơn')
-      if (blockReason) throw new Error(blockReason)
-
-      setEncounter((current) =>
-        current
-          ? { ...current, queueItem: { ...current.queueItem, ...liveQueueItem } }
-          : current,
-      )
-      navigate(`/prescriptions/${medicalRecordId}`, {
-        state: {
-          visitId,
-          queueItemId: liveQueueItem.id,
-        },
-      })
-      return true
-    } catch (error) {
-      message.error(getApiMessage(error, 'Không thể chuyển sang kê đơn.'))
-      return false
     }
+
+    navigate(`/prescriptions/${medicalRecordId}`, {
+      state: {
+        visitId,
+        queueItemId: liveQueueItem?.id,
+        encounter: {
+          ...encounter,
+          queueItem: liveQueueItem,
+          visit: { ...(encounter?.visit || {}), id: visitId },
+          patient: encounter?.patient || selectedPatientObj,
+          doctor: encounter?.doctor || user,
+        },
+        patient: selectedPatientObj,
+        diagnoses: [
+          ...(primaryIcd ? [{ ...primaryIcd, diagnosisType: 'PRIMARY' }] : []),
+          ...secondaryIcds.map((s) => ({ ...s, diagnosisType: 'SECONDARY' })),
+        ],
+      },
+    })
+    return true
   }
 
   const showSuccessModal = (medicalRecordId) => {
@@ -1533,6 +1528,14 @@ function MedicalEncounter() {
           onSuccess={(signedData) => {
             setMedicalRecord((prev) => ({ ...prev, ...signedData, status: 'SIGNED' }))
             loadWorkflow().catch((err) => console.warn('Lỗi làm mới sau khi ký:', err))
+            Modal.confirm({
+              title: 'Bệnh án đã được ký số & hoàn tất thành công',
+              icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
+              content: 'Hồ sơ bệnh án đã được ký số và khóa nội dung an toàn theo quy định. Bạn có thể chuyển tiếp sang bước Kê đơn thuốc ngay bây giờ.',
+              okText: 'Chuyển sang kê đơn thuốc',
+              cancelText: 'Ở lại xem bệnh án',
+              onOk: () => openPrescription(currentRecordId),
+            })
           }}
           recordId={currentRecordId}
           encounterContext={encounter}

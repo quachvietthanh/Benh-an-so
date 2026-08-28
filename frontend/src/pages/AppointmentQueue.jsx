@@ -56,6 +56,7 @@ import {
 import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
 import patientApi from '../api/patientApi'
+import PersonalDataConsentField from '../components/patient/PersonalDataConsentField'
 import queueApi from '../api/queueApi'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
@@ -767,6 +768,8 @@ function AppointmentQueue() {
         gender: values.gender,
         dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD'),
         address: values.address || '',
+        consentAgreed: values.consentAgreed ?? true,
+        consentVersion: 'v1.0',
       }
 
       const response = await patientApi.create(payload)
@@ -1887,6 +1890,7 @@ function AppointmentQueue() {
           <Form.Item name="address" label="Địa chỉ">
             <Input placeholder="Số nhà, tên đường, quận/huyện..." />
           </Form.Item>
+          <PersonalDataConsentField patientName={Form.useWatch('fullName', quickPatientForm)} />
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
               <Button onClick={() => setQuickPatientModalOpen(false)}>Hủy</Button>
