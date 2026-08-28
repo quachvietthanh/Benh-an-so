@@ -142,9 +142,11 @@ function PrescriptionPage() {
     [currentUser],
   )
 
+  const routeState = location.state || {}
+
   const [record, setRecord] = useState(null)
-  const [encounter, setEncounter] = useState(null)
-  const [diagnoses, setDiagnoses] = useState([])
+  const [encounter, setEncounter] = useState(routeState.encounter || null)
+  const [diagnoses, setDiagnoses] = useState(routeState.diagnoses || [])
   const [medicines, setMedicines] = useState([])
   const [prescriptions, setPrescriptions] = useState([])
   const [items, setItems] = useState([createEmptyItem()])
@@ -270,8 +272,11 @@ function PrescriptionPage() {
         recordData = {
           id: medicalRecordId,
           medicalRecordId,
+          visitId: routeState.visitId || routeState.encounter?.visit?.id,
+          patientId: routeState.patient?.id || routeState.encounter?.patient?.id,
+          patientName: routeState.patient?.fullName || routeState.encounter?.patient?.fullName,
           status: 'OPEN',
-          diagnoses: [],
+          diagnoses: routeState.diagnoses || [],
         }
         setRecord(recordData)
       }
@@ -283,9 +288,11 @@ function PrescriptionPage() {
       ])
 
       const rawDiagnoses =
-        diagnosisResult.status === 'fulfilled' && Array.isArray(diagnosisResult.value?.data)
+        diagnosisResult.status === 'fulfilled' && Array.isArray(diagnosisResult.value?.data) && diagnosisResult.value.data.length > 0
           ? diagnosisResult.value.data
-          : recordData?.diagnoses || []
+          : (routeState.diagnoses && routeState.diagnoses.length > 0)
+            ? routeState.diagnoses
+            : recordData?.diagnoses || []
 
       const cleanedDiagnoses = rawDiagnoses.map((d) => ({
         ...d,
@@ -339,25 +346,34 @@ function PrescriptionPage() {
       })
       setMedicines(normalizedMeds)
 
-      if (recordData?.visitId) {
+      const effectiveVisitId = recordData?.visitId || routeState.visitId || routeState.encounter?.visit?.id
+      if (effectiveVisitId) {
         try {
-          const encounterResponse = await visitApi.getEncounter(recordData.visitId)
-          setEncounter(encounterResponse.data)
+          const encounterResponse = await visitApi.getEncounter(effectiveVisitId)
+          if (encounterResponse?.data) {
+            setEncounter(encounterResponse.data)
+          }
         } catch {
-          setEncounter({
-            visit: { id: recordData.visitId, visitCode: recordData.visitCode || 'VISIT-001' },
-            patient: {
-              id: recordData.patientId,
-              fullName: recordData.patientName || 'Bệnh nhân',
-              patientCode: recordData.patientCode || 'BN-001',
-            },
-            doctor: {
-              id: recordData.doctorId || recordData.createdBy || currentUser?.id,
-              fullName: recordData.doctorName || currentUser?.fullName || 'Bác sĩ phụ trách',
-            },
-            queueItem: { id: recordData.queueItemId || 'queue-item-1', status: 'IN_PROGRESS' },
-          })
+          if (routeState.encounter) {
+            setEncounter(routeState.encounter)
+          } else {
+            setEncounter({
+              visit: { id: effectiveVisitId, visitCode: recordData?.visitCode || 'VISIT-001' },
+              patient: {
+                id: recordData?.patientId || 'patient-1',
+                fullName: recordData?.patientName || 'Bệnh nhân',
+                patientCode: recordData?.patientCode || 'BN-001',
+              },
+              doctor: {
+                id: recordData?.doctorId || recordData?.createdBy || currentUser?.id,
+                fullName: recordData?.doctorName || currentUser?.fullName || 'Bác sĩ phụ trách',
+              },
+              queueItem: { id: recordData?.queueItemId || routeState.queueItemId || 'queue-item-1', status: 'IN_PROGRESS' },
+            })
+          }
         }
+      } else if (routeState.encounter) {
+        setEncounter(routeState.encounter)
       }
     } catch (error) {
       const apiError = error.apiError || normalizeApiError(error, 'Không thể tải ngữ cảnh kê đơn.')
@@ -368,7 +384,7 @@ function PrescriptionPage() {
     } finally {
       setLoading(false)
     }
-  }, [medicalRecordId, currentUser])
+  }, [medicalRecordId, currentUser, routeState])
 
   useEffect(() => {
     loadData()

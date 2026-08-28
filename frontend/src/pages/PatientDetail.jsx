@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, DatePicker, Descriptions, Form, Input, message, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
-import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined, FolderOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined, FolderOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
@@ -10,6 +10,8 @@ import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
 import MedicalRecordList from './MedicalRecordList'
 import Loading from '../components/common/Loading'
+import PersonalDataConsentModal from '../components/patient/PersonalDataConsentModal'
+import { getPatientConsentStatus } from '../constants/patientConsentConstants'
 
 
 const { Title } = Typography
@@ -127,6 +129,8 @@ function PatientDetail() {
     { title: 'Ghi chú', dataIndex: 'note', render: (value) => value || '---' },
   ]
 
+  const consentStatus = getPatientConsentStatus(patient)
+
   return (
     <div>
       <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/patients')} style={{ marginBottom: 16 }}>Quay lại</Button>
@@ -143,10 +147,46 @@ function PatientDetail() {
           <Descriptions.Item label="Mã BHYT">{patient.insuranceNumber || '---'}</Descriptions.Item>
           <Descriptions.Item label="Nhóm máu">{patient.bloodType || '---'}</Descriptions.Item>
           <Descriptions.Item label="Trạng thái"><Tag color={patient.active ? 'green' : 'red'}>{patient.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</Tag></Descriptions.Item>
+          <Descriptions.Item label="Phiếu đồng ý DLCN" span={2}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: 8 }}>
+              <Space wrap>
+                <Tag color={consentStatus.color} style={{ fontWeight: 600 }}>
+                  {consentStatus.label}
+                </Tag>
+                {patient.consentAgreedAt && (
+                  <span style={{ fontSize: 13, color: '#4b5563' }}>
+                    Thời điểm đồng ý: <b>{formatDateTime(patient.consentAgreedAt)}</b>
+                  </span>
+                )}
+                {patient.consentWithdrawn && patient.consentWithdrawnAt && (
+                  <span style={{ fontSize: 13, color: '#dc2626' }}>
+                    Rút đồng ý lúc: <b>{formatDateTime(patient.consentWithdrawnAt)}</b> (Lý do: {patient.consentWithdrawnReason || 'Không nêu'})
+                  </span>
+                )}
+              </Space>
+              <Button
+                size="small"
+                type="link"
+                icon={<SafetyCertificateOutlined />}
+                onClick={() => setConsentModalOpen(true)}
+                style={{ fontWeight: 600, color: '#16a34a', padding: 0 }}
+              >
+                Xem phiếu đồng ý
+              </Button>
+            </div>
+          </Descriptions.Item>
           <Descriptions.Item label="Liên hệ khẩn cấp">{patient.emergencyContact || '---'}</Descriptions.Item>
           <Descriptions.Item label="SĐT khẩn cấp">{patient.emergencyPhone || '---'}</Descriptions.Item>
         </Descriptions>
       </Card>
+
+      <PersonalDataConsentModal
+        open={consentModalOpen}
+        onClose={() => setConsentModalOpen(false)}
+        patientName={patient?.fullName}
+        agreedAt={patient?.consentAgreedAt}
+        version={patient?.consentVersion || 'v1.0'}
+      />
 
       {canViewHistory && (
         <Card bodyStyle={{ padding: 16 }}>

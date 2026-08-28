@@ -13,6 +13,7 @@ import {
   Select,
   Space,
   Table,
+  Tag,
 } from 'antd'
 import {
   CalendarOutlined,
@@ -34,6 +35,8 @@ import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
 import { formatDate } from '../utils/helpers'
+import PersonalDataConsentField from '../components/patient/PersonalDataConsentField'
+import { getPatientConsentStatus } from '../constants/patientConsentConstants'
 
 const { RangePicker } = DatePicker
 
@@ -158,6 +161,8 @@ function PatientList() {
         gender: values.gender ? values.gender.toUpperCase() : 'OTHER',
         phone: values.phone || null,
         insuranceNumber: values.insuranceNumber || null,
+        consentAgreed: values.consentAgreed ?? true,
+        consentVersion: 'v1.0',
       }
       const response = await patientApi.create(payload)
       const newPatient = response.data
@@ -352,6 +357,15 @@ ${rowsXml}
       },
     },
     {
+      title: 'Đồng ý DLCN',
+      key: 'consent',
+      width: 140,
+      render: (_, patient) => {
+        const consent = getPatientConsentStatus(patient)
+        return <Tag color={consent.color}>{consent.label}</Tag>
+      },
+    },
+    {
       title: 'Thao tác',
       key: 'actions',
       width: 114,
@@ -496,6 +510,7 @@ ${rowsXml}
             <Form.Item name="emergencyContact" label="Người liên hệ khẩn cấp"><Input placeholder="Họ và tên người liên hệ" /></Form.Item>
             <Form.Item name="emergencyPhone" label="SĐT khẩn cấp"><Input placeholder="Số điện thoại liên hệ" /></Form.Item>
           </div>
+          <PersonalDataConsentField patientName={Form.useWatch('fullName', registerForm)} />
         </Form>
       </Modal>
     </div>
