@@ -13,6 +13,7 @@ const PortalRegister = React.lazy(() => import('../pages/PortalRegister'))
 const PortalDashboard = React.lazy(() => import('../pages/PortalDashboard'))
 const PatientPortalBookingPage = React.lazy(() => import('../pages/PatientPortalBookingPage'))
 const PatientMyAppointmentsPage = React.lazy(() => import('../pages/PatientMyAppointmentsPage'))
+const PatientMedicalHistoryPage = React.lazy(() => import('../pages/PatientMedicalHistoryPage'))
 const Dashboard = React.lazy(() => import('../pages/Dashboard'))
 const PatientList = React.lazy(() => import('../pages/PatientList'))
 const PatientDetail = React.lazy(() => import('../pages/PatientDetail'))
@@ -96,6 +97,7 @@ function AppRoutes() {
       <Route path="/portal/dashboard" element={<PatientRoute><LazyPage><PortalDashboard /></LazyPage></PatientRoute>} />
       <Route path="/portal/book-appointment" element={<PatientRoute><LazyPage><PatientPortalBookingPage /></LazyPage></PatientRoute>} />
       <Route path="/portal/my-appointments" element={<PatientRoute><LazyPage><PatientMyAppointmentsPage /></LazyPage></PatientRoute>} />
+      <Route path="/portal/medical-history" element={<PatientRoute><LazyPage><PatientMedicalHistoryPage /></LazyPage></PatientRoute>} />
       <Route path="/public-lookup" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/portal" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/tra-cuu-ket-qua" element={<LazyPage><PublicLookupPage /></LazyPage>} />
