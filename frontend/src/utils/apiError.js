@@ -27,6 +27,18 @@ export const DOMAIN_ERROR_MESSAGES = {
     'Mã bệnh đang được sử dụng trong hồ sơ bệnh án, không thể xóa.',
   SERVICE_CATALOG_NOT_FOUND:
     'Không tìm thấy thông tin dịch vụ trong hệ thống.',
+  MEDICAL_RECORD_TEMPLATE_CHANGE_WITH_CONTENT:
+    'Bệnh án đã có nội dung khám, không thể đổi sang mẫu khác để bảo toàn dữ liệu. Vui lòng tiếp tục với mẫu hiện tại.',
+  MEDICAL_RECORD_TEMPLATE_SPECIALTY_MISMATCH:
+    'Mẫu bệnh án được chọn không khớp với chuyên khoa của lượt khám.',
+  MEDICAL_RECORD_TEMPLATE_INACTIVE:
+    'Mẫu bệnh án này đang tạm ngưng hoạt động.',
+  MEDICAL_RECORD_TEMPLATE_NOT_FOUND:
+    'Không tìm thấy mẫu bệnh án trong hệ thống.',
+  MEDICAL_RECORD_TEMPLATE_DEFAULT_NOT_CONFIGURED:
+    'Chuyên khoa chưa được cấu hình mẫu mặc định hợp lệ.',
+  REQUEST_TIMEOUT:
+    'Hệ thống đang bận hoặc phản hồi chậm. Dữ liệu đang được đồng bộ.',
 }
 
 export const normalizeApiError = (error, fallbackMessage = DEFAULT_MESSAGE) => {
@@ -38,10 +50,16 @@ export const normalizeApiError = (error, fallbackMessage = DEFAULT_MESSAGE) => {
     : {}
   const fields = details.fields && typeof details.fields === 'object' ? details.fields : {}
 
+  const isTimeout =
+    error?.code === 'ECONNABORTED' ||
+    (typeof error?.message === 'string' && error.message.toLowerCase().includes('timeout'))
+
   return {
     status: body?.status || response?.status || 0,
-    code: body?.code || 'NETWORK_ERROR',
-    message: responseMessage || error?.message || fallbackMessage,
+    code: body?.code || (isTimeout ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR'),
+    message: isTimeout
+      ? 'Hệ thống đang bận hoặc phản hồi chậm. Dữ liệu đang được đồng bộ.'
+      : (responseMessage || error?.message || fallbackMessage),
     details,
     fields,
     firstFieldError: Object.values(fields)[0] || null,
