@@ -22,6 +22,7 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   ExclamationCircleOutlined,
+  FileDoneOutlined,
   HomeOutlined,
   MedicineBoxOutlined,
   PlusOutlined,
@@ -275,10 +276,15 @@ function PatientMyAppointmentsPage() {
             </span>
           </Link>
 
-          <Space size={10}>
+          <Space size={10} wrap>
             <Link to="/portal/book-appointment">
               <Button type="primary" className="portal-header-btn-primary" icon={<PlusOutlined />}>
                 Đặt lịch khám mới
+              </Button>
+            </Link>
+            <Link to="/portal/medical-history">
+              <Button className="portal-header-btn" icon={<FileDoneOutlined style={{ color: '#16a34a' }} />}>
+                Lịch sử khám
               </Button>
             </Link>
             <Link to="/portal/dashboard">

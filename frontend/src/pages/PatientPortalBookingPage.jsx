@@ -10,6 +10,7 @@ import {
   AppstoreOutlined,
   CalendarOutlined,
   CheckOutlined,
+  FileDoneOutlined,
   HomeOutlined,
   MedicineBoxOutlined,
   ScheduleOutlined,
@@ -225,10 +226,15 @@ function PatientPortalBookingPage() {
             </span>
           </Link>
 
-          <Space size={10}>
+          <Space size={10} wrap>
             <Link to="/portal/my-appointments">
               <Button className="portal-header-btn" icon={<ScheduleOutlined style={{ color: '#2563eb' }} />}>
                 Lịch hẹn của tôi
+              </Button>
+            </Link>
+            <Link to="/portal/medical-history">
+              <Button className="portal-header-btn" icon={<FileDoneOutlined style={{ color: '#16a34a' }} />}>
+                Lịch sử khám
               </Button>
             </Link>
             <Link to="/portal/dashboard">
