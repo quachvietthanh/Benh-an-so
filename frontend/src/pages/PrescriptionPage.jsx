@@ -2004,61 +2004,130 @@ function PrescriptionPage() {
       <Modal
         open={issuedPrescriptionModalOpen}
         onCancel={() => setIssuedPrescriptionModalOpen(false)}
-        footer={[
-          justIssuedPrescription?.interconnectionStatus === 'SUCCESS' ? (
-            <Tag key="interconnected" color="success" icon={<CheckCircleOutlined />} style={{ padding: '6px 12px', fontSize: 13 }}>
-              Đã liên thông ({justIssuedPrescription.interconnectionReceiptCode})
-            </Tag>
-          ) : (
-            <Button
-              key="sendInterconnection"
-              type="primary"
-              icon={<CloudUploadOutlined />}
-              loading={sendingInterconnectionId === justIssuedPrescription?.id}
-              onClick={async () => {
-                if (justIssuedPrescription) {
-                  await handleSendPrescriptionToInterconnection(justIssuedPrescription)
-                }
+        footer={
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+              paddingTop: 14,
+              borderTop: '1px solid #f0f0f0',
+              width: '100%',
+            }}
+          >
+            {/* Nhóm trái: Badge trạng thái liên thông */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {justIssuedPrescription?.interconnectionStatus === 'SUCCESS' ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    backgroundColor: '#f0fdf4',
+                    color: '#166534',
+                    border: '1px solid #86efac',
+                    borderRadius: 9999,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <CheckCircleOutlined style={{ color: '#16a34a', fontSize: 14 }} />
+                  Đã liên thông ({justIssuedPrescription.interconnectionReceiptCode})
+                </span>
+              ) : (
+                <Button
+                  type="primary"
+                  icon={<CloudUploadOutlined />}
+                  loading={sendingInterconnectionId === justIssuedPrescription?.id}
+                  onClick={async () => {
+                    if (justIssuedPrescription) {
+                      await handleSendPrescriptionToInterconnection(justIssuedPrescription)
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#0284c7',
+                    borderColor: '#0284c7',
+                    whiteSpace: 'nowrap',
+                    padding: '6px 14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  Gửi liên thông ngay
+                </Button>
+              )}
+            </div>
+
+            {/* Nhóm phải: 3 nút hành động */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
               }}
-              style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
             >
-              Gửi liên thông ngay
-            </Button>
-          ),
-          <Button
-            key="print"
-            type="default"
-            icon={<PrinterOutlined />}
-            onClick={() => {
-              setIssuedPrescriptionModalOpen(false)
-              if (justIssuedPrescription) {
-                setSelectedPrescriptionForPrint(justIssuedPrescription)
-                setPrintModalOpen(true)
-              }
-            }}
-          >
-            In đơn thuốc
-          </Button>,
-          <Button
-            key="detail"
-            icon={<EyeOutlined />}
-            onClick={() => {
-              setIssuedPrescriptionModalOpen(false)
-              if (justIssuedPrescription) {
-                openDetailModal(justIssuedPrescription)
-              }
-            }}
-          >
-            Xem chi tiết đơn
-          </Button>,
-          <Button
-            key="close"
-            onClick={() => setIssuedPrescriptionModalOpen(false)}
-          >
-            Đóng & Tiếp tục
-          </Button>,
-        ]}
-        width={560}
+              <Button
+                key="print"
+                type="default"
+                icon={<PrinterOutlined />}
+                style={{
+                  whiteSpace: 'nowrap',
+                  padding: '6px 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+                onClick={() => {
+                  setIssuedPrescriptionModalOpen(false)
+                  if (justIssuedPrescription) {
+                    setSelectedPrescriptionForPrint(justIssuedPrescription)
+                    setPrintModalOpen(true)
+                  }
+                }}
+              >
+                In đơn
+              </Button>
+              <Button
+                key="detail"
+                type="default"
+                icon={<EyeOutlined />}
+                style={{
+                  whiteSpace: 'nowrap',
+                  padding: '6px 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+                onClick={() => {
+                  setIssuedPrescriptionModalOpen(false)
+                  if (justIssuedPrescription) {
+                    openDetailModal(justIssuedPrescription)
+                  }
+                }}
+              >
+                Xem chi tiết
+              </Button>
+              <Button
+                key="close"
+                type="primary"
+                style={{
+                  whiteSpace: 'nowrap',
+                  padding: '6px 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+                onClick={() => setIssuedPrescriptionModalOpen(false)}
+              >
+                Đóng & Tiếp tục
+              </Button>
+            </div>
+          </div>
+        }
+        width={640}
       >
         <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
           <div style={{ fontSize: 44, marginBottom: 8 }}>🩺</div>
