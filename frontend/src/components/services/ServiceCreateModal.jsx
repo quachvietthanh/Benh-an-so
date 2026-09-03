@@ -7,12 +7,15 @@ import {
   Input,
   InputNumber,
   Modal,
+  Space,
   Typography,
 } from 'antd'
 import {
+  CalendarOutlined,
   InfoCircleOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
+import dayjs from 'dayjs'
 
 const { Title, Text } = Typography
 
@@ -25,6 +28,15 @@ function ServiceCreateModal({
   formError,
   onClearError,
 }) {
+  const handleValuesChange = (changedValues) => {
+    if (onClearError) onClearError()
+    // Clear field-level error for the field that was changed
+    const changedField = Object.keys(changedValues)[0]
+    if (changedField && form) {
+      form.setFields([{ name: changedField, errors: [] }])
+    }
+  }
+
   return (
     <Modal
       className="service-form-modal"
@@ -55,7 +67,7 @@ function ServiceCreateModal({
         form={form}
         layout="vertical"
         onFinish={onFinish}
-        onValuesChange={onClearError}
+        onValuesChange={handleValuesChange}
       >
         {formError && (
           <Alert
@@ -120,12 +132,40 @@ function ServiceCreateModal({
             label="Ngày bắt đầu hiệu lực"
             rules={[{ required: true, message: 'Vui lòng chọn ngày hiệu lực' }]}
           >
-            <DatePicker
-              size="large"
-              format="DD/MM/YYYY"
-              style={{ width: '100%' }}
-              placeholder="Chọn ngày áp dụng"
-            />
+            <div>
+              <DatePicker
+                size="large"
+                format="DD/MM/YYYY"
+                style={{ width: '100%' }}
+                placeholder="Chọn ngày áp dụng"
+              />
+              <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>Chọn nhanh:</Text>
+                <Button
+                  size="small"
+                  type="dashed"
+                  icon={<CalendarOutlined />}
+                  onClick={() => {
+                    form.setFieldsValue({ effectiveFrom: dayjs() })
+                    if (onClearError) onClearError()
+                  }}
+                  style={{ fontSize: 11, height: 24, padding: '0 8px' }}
+                >
+                  Hôm nay
+                </Button>
+                <Button
+                  size="small"
+                  type="dashed"
+                  onClick={() => {
+                    form.setFieldsValue({ effectiveFrom: dayjs().add(1, 'day') })
+                    if (onClearError) onClearError()
+                  }}
+                  style={{ fontSize: 11, height: 24, padding: '0 8px' }}
+                >
+                  Ngày mai
+                </Button>
+              </div>
+            </div>
           </Form.Item>
         </div>
 

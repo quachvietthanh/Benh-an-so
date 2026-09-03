@@ -31,14 +31,17 @@ import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat.js'
 import systemApi from '../api/systemApi'
 import { useAuthContext } from '../context/AuthContext'
+import Loading from '../components/common/Loading'
 import {
   categorizePriceHistory,
   extractServiceFormErrors,
   fixMojibake,
   formatDateDisplay,
   formatServiceCurrency,
+  isEffectiveDateConflicted,
   prepareCreateServicePayload,
   prepareUpdateServicePayload,
+  suggestNextEffectiveDate,
   translateServiceErrorMessage,
 } from '../utils/serviceCatalogValidation'
 import ServiceCreateModal from '../components/services/ServiceCreateModal'
@@ -66,6 +69,7 @@ function ServicesPage() {
   const [savingService, setSavingService] = useState(false)
   const [createFormError, setCreateFormError] = useState(null)
   const [editFormError, setEditFormError] = useState(null)
+  const [editPriceHistory, setEditPriceHistory] = useState([])
 
   // Price History Drawer States
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false)
@@ -213,6 +217,7 @@ function ServicesPage() {
   const handleOpenEditModal = (service) => {
     setEditFormError(null)
     setEditingService(service)
+    setEditPriceHistory([])
     editForm.resetFields()
     editForm.setFieldsValue({
       serviceCode: service.serviceCode,
@@ -222,6 +227,18 @@ function ServicesPage() {
       active: service.active !== false,
     })
     setEditModalOpen(true)
+
+    // Load price history in background for smart conflict detection and suggestions
+    if (service?.id) {
+      systemApi
+        .getServicePriceHistory(service.id)
+        .then((res) => {
+          setEditPriceHistory(res?.data || [])
+        })
+        .catch((err) => {
+          console.warn('[ServicesPage] Không thể nạp lịch sử giá dịch vụ:', err)
+        })
+    }
   }
 
   // Handle submit update service
@@ -229,6 +246,26 @@ function ServicesPage() {
     if (!editingService?.id) return
     setSavingService(true)
     setEditFormError(null)
+
+    // Pre-check date collision on client side to prevent backend 400 rejection
+    const conflict = isEffectiveDateConflicted(
+      values.effectiveFrom,
+      editPriceHistory,
+      values.price,
+      editingService.price,
+    )
+    if (conflict.conflicted) {
+      setEditFormError(conflict.message)
+      editForm.setFields([
+        {
+          name: 'effectiveFrom',
+          errors: [conflict.message],
+        },
+      ])
+      setSavingService(false)
+      return
+    }
+
     try {
       const payload = prepareUpdateServicePayload(values, editingService)
       await systemApi.updateService(editingService.id, payload)
@@ -236,6 +273,7 @@ function ServicesPage() {
       setEditModalOpen(false)
       setEditFormError(null)
       setEditingService(null)
+      setEditPriceHistory([])
       loadServices()
     } catch (err) {
       console.error('[ServicesPage] Lỗi cập nhật dịch vụ:', err)
@@ -562,29 +600,40 @@ function ServicesPage() {
 
       {/* Services Table */}
       <div className="services-table-wrapper">
-        <Table
-          columns={columns}
-          dataSource={filteredServices}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: (total, range) =>
-              `Hiển thị ${range[0]} - ${range[1]} trên tổng số ${total} dịch vụ`,
-          }}
-          locale={{
-            emptyText: (
-              <div className="service-empty-state">
-                <AppstoreOutlined style={{ fontSize: 36, color: '#cbd5e1' }} />
-                <div style={{ marginTop: 8, color: '#64748b', fontWeight: 500 }}>
-                  Không tìm thấy dịch vụ kỹ thuật nào phù hợp
+        {loading && services.length === 0 ? (
+          <div style={{ padding: '36px 20px', background: '#ffffff', borderRadius: 12 }}>
+            <Loading
+              type="table"
+              rows={6}
+              cols={5}
+              tip="Đang tải danh mục dịch vụ kỹ thuật và bảng giá viện phí..."
+            />
+          </div>
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={filteredServices}
+            rowKey="id"
+            loading={loading && services.length > 0}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showTotal: (total, range) =>
+                `Hiển thị ${range[0]} - ${range[1]} trên tổng số ${total} dịch vụ`,
+            }}
+            locale={{
+              emptyText: (
+                <div className="service-empty-state">
+                  <AppstoreOutlined style={{ fontSize: 36, color: '#cbd5e1' }} />
+                  <div style={{ marginTop: 8, color: '#64748b', fontWeight: 500 }}>
+                    Không tìm thấy dịch vụ kỹ thuật nào phù hợp
+                  </div>
                 </div>
-              </div>
-            ),
-          }}
-        />
+              ),
+            }}
+          />
+        )}
       </div>
 
       {/* Modal: Thêm dịch vụ mới */}
@@ -608,12 +657,15 @@ function ServicesPage() {
           setEditModalOpen(false)
           setEditFormError(null)
           setEditingService(null)
+          setEditPriceHistory([])
         }}
         onFinish={handleUpdateService}
         form={editForm}
         loading={savingService}
         formError={editFormError}
         onClearError={() => setEditFormError(null)}
+        editingService={editingService}
+        priceHistory={editPriceHistory}
       />
 
       {/* Drawer: Lịch sử giá dịch vụ */}

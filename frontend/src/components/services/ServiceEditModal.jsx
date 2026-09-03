@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Alert,
   Button,
@@ -8,14 +8,18 @@ import {
   InputNumber,
   Modal,
   Radio,
+  Space,
   Typography,
 } from 'antd'
 import {
+  CalendarOutlined,
   CheckCircleOutlined,
   EditOutlined,
   InfoCircleOutlined,
   StopOutlined,
 } from '@ant-design/icons'
+import dayjs from 'dayjs'
+import { suggestNextEffectiveDate, formatDateDisplay } from '../../utils/serviceCatalogValidation'
 
 const { Title, Text } = Typography
 
@@ -27,7 +31,66 @@ function ServiceEditModal({
   loading,
   formError,
   onClearError,
+  editingService,
+  priceHistory = [],
 }) {
+  const [priceChanged, setPriceChanged] = useState(false)
+
+  // Reset local state when modal opens
+  useEffect(() => {
+    if (open) {
+      setPriceChanged(false)
+    }
+  }, [open])
+
+  const handleValuesChange = (changedValues) => {
+    if (onClearError) onClearError()
+
+    const changedField = Object.keys(changedValues)[0]
+    if (changedField && form) {
+      form.setFields([{ name: changedField, errors: [] }])
+    }
+
+    if (changedValues.price !== undefined) {
+      const origPrice = editingService?.price !== null && editingService?.price !== undefined
+        ? Number(editingService.price)
+        : null
+      const currentPrice = changedValues.price !== null && changedValues.price !== undefined
+        ? Number(changedValues.price)
+        : null
+
+      const isDiff = origPrice !== null && currentPrice !== null && origPrice !== currentPrice
+      setPriceChanged(isDiff)
+
+      // If price changed and date still matches the old effectiveFrom, auto suggest valid new date
+      if (isDiff) {
+        const currentDate = form.getFieldValue('effectiveFrom')
+        const oldDateStr = editingService?.effectiveFrom
+          ? dayjs(editingService.effectiveFrom).format('YYYY-MM-DD')
+          : null
+        const currentDateStr = currentDate && dayjs(currentDate).isValid()
+          ? dayjs(currentDate).format('YYYY-MM-DD')
+          : null
+
+        if (oldDateStr && currentDateStr === oldDateStr) {
+          const nextDate = suggestNextEffectiveDate(priceHistory)
+          form.setFieldsValue({ effectiveFrom: dayjs(nextDate) })
+        }
+      }
+    }
+  }
+
+  const handleApplySuggestedDate = () => {
+    const nextDate = suggestNextEffectiveDate(priceHistory)
+    form.setFieldsValue({ effectiveFrom: dayjs(nextDate) })
+    if (onClearError) onClearError()
+    if (form) {
+      form.setFields([{ name: 'effectiveFrom', errors: [] }])
+    }
+  }
+
+  const suggestedDateStr = suggestNextEffectiveDate(priceHistory)
+
   return (
     <Modal
       className="service-form-modal"
@@ -58,17 +121,47 @@ function ServiceEditModal({
         form={form}
         layout="vertical"
         onFinish={onFinish}
-        onValuesChange={onClearError}
+        onValuesChange={handleValuesChange}
       >
         {formError && (
           <Alert
             className="service-modal-alert"
             type="error"
             showIcon
-            message={formError}
+            message={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div>{formError}</div>
+                {(formError.includes('ngày hiệu lực') || formError.includes('mức giá')) && (
+                  <div>
+                    <Button
+                      size="small"
+                      type="primary"
+                      onClick={handleApplySuggestedDate}
+                      style={{ fontSize: 12, height: 26, padding: '0 10px' }}
+                    >
+                      Áp dụng ngày gợi ý ({formatDateDisplay(suggestedDateStr)})
+                    </Button>
+                  </div>
+                )}
+              </div>
+            }
             closable
             onClose={onClearError}
             style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {priceChanged && (
+          <Alert
+            type="info"
+            showIcon
+            message="Đơn giá niêm yết đã thay đổi"
+            description={
+              <span>
+                Hệ thống sẽ lưu đơn giá mới vào lịch sử giá. Vui lòng kiểm tra ngày áp dụng bên dưới để mốc giá có hiệu lực đúng thời điểm mong muốn.
+              </span>
+            }
+            style={{ marginBottom: 16, borderRadius: 8 }}
           />
         )}
 
@@ -111,12 +204,50 @@ function ServiceEditModal({
             label="Ngày hiệu lực giá"
             rules={[{ required: true, message: 'Vui lòng chọn ngày hiệu lực' }]}
           >
-            <DatePicker
-              size="large"
-              format="DD/MM/YYYY"
-              style={{ width: '100%' }}
-              placeholder="Chọn ngày áp dụng"
-            />
+            <div>
+              <DatePicker
+                size="large"
+                format="DD/MM/YYYY"
+                style={{ width: '100%' }}
+                placeholder="Chọn ngày áp dụng"
+              />
+              <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>Chọn nhanh:</Text>
+                <Button
+                  size="small"
+                  type="dashed"
+                  icon={<CalendarOutlined />}
+                  onClick={() => {
+                    form.setFieldsValue({ effectiveFrom: dayjs() })
+                    if (onClearError) onClearError()
+                    form.setFields([{ name: 'effectiveFrom', errors: [] }])
+                  }}
+                  style={{ fontSize: 11, height: 24, padding: '0 8px' }}
+                >
+                  Hôm nay
+                </Button>
+                <Button
+                  size="small"
+                  type="dashed"
+                  onClick={() => {
+                    form.setFieldsValue({ effectiveFrom: dayjs().add(1, 'day') })
+                    if (onClearError) onClearError()
+                    form.setFields([{ name: 'effectiveFrom', errors: [] }])
+                  }}
+                  style={{ fontSize: 11, height: 24, padding: '0 8px' }}
+                >
+                  Ngày mai
+                </Button>
+                <Button
+                  size="small"
+                  type="dashed"
+                  onClick={handleApplySuggestedDate}
+                  style={{ fontSize: 11, height: 24, padding: '0 8px' }}
+                >
+                  Gợi ý ngày hợp lệ ({formatDateDisplay(suggestedDateStr)})
+                </Button>
+              </div>
+            </div>
           </Form.Item>
 
           <Form.Item className="service-form-full" name="active" label="Trạng thái áp dụng">

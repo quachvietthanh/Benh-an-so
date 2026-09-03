@@ -736,7 +736,7 @@ function MedicalEncounter() {
     }
   }
 
-  const openPrescription = async (targetRecordId) => {
+  async function openPrescription(targetRecordId) {
     let activeRecId = targetRecordId || currentRecordId
     if (!activeRecId) {
       message.loading({ content: 'Đang lưu thông tin bệnh án để mở kê đơn thuốc...', key: 'open_rx_save' })
@@ -771,7 +771,7 @@ function MedicalEncounter() {
           patient: encounter?.patient || selectedPatientObj,
           doctor: encounter?.doctor || user,
         },
-        record: medicalRecord || { id: medicalRecordId, status: isRecordSigned ? 'SIGNED' : 'OPEN' },
+        record: medicalRecord || { id: activeRecId, status: isRecordSigned ? 'SIGNED' : 'OPEN' },
         patient: selectedPatientObj,
         diagnoses: [
           ...(primaryIcd ? [{ ...primaryIcd, diagnosisType: 'PRIMARY' }] : []),
@@ -782,7 +782,7 @@ function MedicalEncounter() {
     return true
   }
 
-  const showSuccessModal = (medicalRecordId) => {
+  function showSuccessModal(medicalRecordId) {
     Modal.confirm({
       title: 'Đã lưu bệnh án theo đúng lượt khám',
       icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
@@ -800,7 +800,7 @@ function MedicalEncounter() {
     })
   }
 
-  const saveRecord = async (options = { showModal: true }) => {
+  async function saveRecord(options = { showModal: true }) {
     if (!visitId || !encounter) {
       message.error('Không có visitId hợp lệ để lưu bệnh án.')
       return null
