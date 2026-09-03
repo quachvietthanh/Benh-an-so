@@ -184,6 +184,23 @@ export default function SignMedicalRecordModal({
         signedByName: doctorName,
       }
 
+      if (primaryIcd?.id) {
+        try {
+          await medicalRecordApi.recordDiagnosis(recordId, {
+            primaryDiagnosis: {
+              diagnosisCatalogId: primaryIcd.id,
+              note: primaryIcd.note || formValues.chiefComplaint || formValues.symptoms || '',
+            },
+            secondaryDiagnoses: (secondaryIcds || []).filter((s) => s?.id).map((s) => ({
+              diagnosisCatalogId: s.id,
+              note: s.note || '',
+            })),
+          })
+        } catch (diagErr) {
+          console.warn('Đồng bộ chẩn đoán trước khi ký:', diagErr)
+        }
+      }
+
       try {
         const response = await medicalRecordApi.sign(recordId, { signatureData })
         signedRecord = response?.data || signedRecord

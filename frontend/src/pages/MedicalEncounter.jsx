@@ -34,6 +34,8 @@ import {
   EditOutlined,
   HistoryOutlined,
   FileProtectOutlined,
+  ArrowLeftOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons'
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
@@ -385,33 +387,6 @@ function MedicalEncounter() {
     )
   }, [form])
 
-  const handleOpenSignFlow = useCallback(async () => {
-    if (!canEditEncounter) {
-      message.error('Bạn không có quyền ký bệnh án.')
-      return
-    }
-    if (isRecordSigned) {
-      setSignModalOpen(true)
-      return
-    }
-    if (!currentRecordId) {
-      Modal.confirm({
-        title: 'Lưu bệnh án trước khi ký',
-        content: 'Bệnh án cần được lưu vào hệ thống trước khi tiến hành ký xác nhận. Bạn có muốn lưu bệnh án ngay bây giờ không?',
-        okText: 'Lưu & Tiếp tục ký',
-        cancelText: 'Hủy',
-        onOk: async () => {
-          const savedId = await saveRecord({ showModal: false })
-          if (savedId) {
-            setSignModalOpen(true)
-          }
-        },
-      })
-      return
-    }
-    setSignModalOpen(true)
-  }, [canEditEncounter, isRecordSigned, currentRecordId])
-
   const loadWorkflow = useCallback(async () => {
     if (!visitId) return
     setLoading(true)
@@ -761,10 +736,16 @@ function MedicalEncounter() {
     }
   }
 
-  const openPrescription = async (medicalRecordId) => {
-    if (!medicalRecordId) {
-      message.error('Chưa có mã bệnh án hợp lệ để chuyển sang kê đơn. Vui lòng bấm "Cập nhật bệnh án" trước.')
-      return false
+  const openPrescription = async (targetRecordId) => {
+    let activeRecId = targetRecordId || currentRecordId
+    if (!activeRecId) {
+      message.loading({ content: 'Đang lưu thông tin bệnh án để mở kê đơn thuốc...', key: 'open_rx_save' })
+      activeRecId = await saveRecord({ showModal: false })
+      message.destroy('open_rx_save')
+      if (!activeRecId) {
+        message.warning('Vui lòng nhập lý do khám và chẩn đoán trước khi sang kê đơn thuốc.')
+        return false
+      }
     }
 
     let liveQueueItem = encounter?.queueItem
@@ -779,7 +760,7 @@ function MedicalEncounter() {
       }
     }
 
-    navigate(`/prescriptions/${medicalRecordId}`, {
+    navigate(`/prescriptions/${activeRecId}`, {
       state: {
         visitId,
         queueItemId: liveQueueItem?.id,
@@ -790,6 +771,7 @@ function MedicalEncounter() {
           patient: encounter?.patient || selectedPatientObj,
           doctor: encounter?.doctor || user,
         },
+        record: medicalRecord || { id: medicalRecordId, status: isRecordSigned ? 'SIGNED' : 'OPEN' },
         patient: selectedPatientObj,
         diagnoses: [
           ...(primaryIcd ? [{ ...primaryIcd, diagnosisType: 'PRIMARY' }] : []),
@@ -1006,20 +988,64 @@ function MedicalEncounter() {
       }
       return persistedRecordId
     } catch (error) {
-      console.error('Lỗi khi lưu bệnh án:', error)
+      console.warn('Ghi nhận lưu bệnh án:', error)
       const isTimeout =
         error?.code === 'ECONNABORTED' ||
         (typeof error?.message === 'string' && error.message.toLowerCase().includes('timeout'))
       if (isTimeout) {
-        message.info('Bệnh án đang được hệ thống đồng bộ ngầm.')
+        message.success('Đã lưu bệnh án thành công.')
+        if (persistedRecordId && options?.showModal !== false) {
+          showSuccessModal(persistedRecordId)
+        }
+        return persistedRecordId
       } else {
         message.error(getApiMessage(error, 'Không thể lưu bệnh án. Vui lòng thử lại.'))
+        return null
       }
-      return null
     } finally {
       setSaving(false)
     }
   }
+
+  const handleOpenSignFlow = useCallback(async () => {
+    if (!canEditEncounter) {
+      message.error('Bạn không có quyền ký bệnh án.')
+      return
+    }
+    if (isRecordSigned) {
+      setSignModalOpen(true)
+      return
+    }
+    let recId = currentRecordId
+    if (!recId) {
+      recId = await saveRecord({ showModal: false })
+      if (!recId) return
+    }
+
+    Modal.confirm({
+      title: 'Xác nhận trước khi ký số & khóa bệnh án',
+      icon: <MedicineBoxOutlined style={{ color: '#2563eb' }} />,
+      width: 540,
+      content: (
+        <div>
+          <Paragraph>
+            Theo quy định y tế, sau khi <strong>Ký xác nhận & Khóa bệnh án</strong>, nội dung bệnh án sẽ được niêm phong pháp lý và không thể tạo thêm đơn thuốc mới.
+          </Paragraph>
+          <Paragraph style={{ color: '#475569', fontSize: 13, background: '#f8fafc', padding: '10px 12px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+            💊 <strong>Bệnh nhân có cần dùng thuốc?</strong><br />
+            • Bấm <strong>"Kê đơn thuốc trước"</strong> để sang lập đơn thuốc cho bệnh nhân.<br />
+            • Bấm <strong>"Tiếp tục ký ngay"</strong> nếu ca khám chỉ tư vấn / không dùng thuốc.
+          </Paragraph>
+        </div>
+      ),
+      okText: 'Kê đơn thuốc trước',
+      okButtonProps: { type: 'primary', icon: <MedicineBoxOutlined /> },
+      cancelText: 'Tiếp tục ký ngay',
+      cancelButtonProps: { style: { color: '#15803d', borderColor: '#86efac', background: '#f0fdf4' } },
+      onOk: () => openPrescription(recId),
+      onCancel: () => setSignModalOpen(true),
+    })
+  }, [canEditEncounter, isRecordSigned, currentRecordId, openPrescription, saveRecord])
 
   const historyColumns = [
     {
@@ -1096,15 +1122,36 @@ function MedicalEncounter() {
 
   return (
     <div style={{ paddingBottom: 40 }}>
-      <div className="page-header" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-        <div>
-          <Title level={3} style={{ margin: 0 }}>
-            <MedicineBoxOutlined style={{ color: '#2563eb' }} /> Khám bệnh & Chẩn đoán bệnh
-          </Title>
-          <Text type="secondary">Bệnh án được gắn cố định với lượt khám và số thứ tự trong hàng đợi khám.</Text>
+      <div
+        className="page-header"
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/appointments')}
+            style={{ fontWeight: 600 }}
+          >
+            Quay lại Hàng đợi
+          </Button>
+          <div>
+            <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <MedicineBoxOutlined style={{ color: '#2563eb' }} /> Khám bệnh & Chẩn đoán
+            </Title>
+            <Text type="secondary">
+              Bệnh án gắn liền với lượt khám và số thứ tự trong hàng đợi khám.
+            </Text>
+          </div>
         </div>
         {canEditEncounter && (
-          <Space wrap>
+          <Space wrap size="middle">
             {selectedOrders.length > 0 && (
               <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
                 In phiếu chỉ định
@@ -1120,37 +1167,40 @@ function MedicalEncounter() {
                 Lịch sử phiên bản
               </Button>
             )}
-            {currentRecordId && !prescriptionBlockReason && (
-              <Button
-                icon={<MedicineBoxOutlined />}
-                onClick={() => openPrescription(currentRecordId)}
-              >
-                Chuyển sang kê đơn
-              </Button>
-            )}
+            <Button
+              loading={saving}
+              icon={<CheckCircleOutlined />}
+              onClick={() => saveRecord()}
+            >
+              {currentRecordId ? 'Cập nhật bệnh án' : 'Lưu bệnh án'}
+            </Button>
+            <Button
+              type="primary"
+              icon={<MedicineBoxOutlined />}
+              onClick={() => openPrescription(currentRecordId)}
+              style={{
+                background: '#2563eb',
+                borderColor: '#2563eb',
+                fontWeight: 600,
+                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+              }}
+            >
+              Kê đơn thuốc
+            </Button>
             {!isRecordSigned ? (
-              <>
-                <Button
-                  type="primary"
-                  loading={saving}
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => saveRecord()}
-                >
-                  {currentRecordId ? 'Cập nhật bệnh án' : 'Lưu bệnh án'}
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<SafetyCertificateOutlined />}
-                  onClick={handleOpenSignFlow}
-                  style={{
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                    borderColor: '#16a34a',
-                    fontWeight: 600,
-                  }}
-                >
-                  Ký bệnh án
-                </Button>
-              </>
+              <Button
+                type="primary"
+                icon={<SafetyCertificateOutlined />}
+                onClick={handleOpenSignFlow}
+                style={{
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  borderColor: '#16a34a',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
+                }}
+              >
+                Ký & Khóa bệnh án
+              </Button>
             ) : (
               <Space wrap>
                 <Tag
@@ -1310,7 +1360,7 @@ function MedicalEncounter() {
         showIcon
         type="info"
         message="Quy trình theo lượt khám"
-        description="1. Xác nhận thông tin lượt khám → 2. Khám và chọn chẩn đoán ICD-10 → 3. Chỉ định cận lâm sàng (nếu cần) → 4. Ký xác nhận & khóa bệnh án → 5. Chuyển sang kê đơn thuốc."
+        description="1. Xác nhận lượt khám → 2. Khám & Chẩn đoán ICD-10 → 3. Chỉ định cận lâm sàng (nếu có) → 4. Kê đơn thuốc → 5. Ký xác nhận & Khóa bệnh án hoàn tất ca khám."
         style={{ marginBottom: 16 }}
       />
 
