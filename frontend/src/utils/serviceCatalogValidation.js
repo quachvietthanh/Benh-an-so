@@ -191,6 +191,65 @@ export function categorizePriceHistory(prices = [], refDate = null) {
 }
 
 /**
+ * Suggest the next valid effective date that does not conflict with existing price versions.
+ * If today has no existing price version, returns today.
+ * If today already exists, advances day by day until finding an unused date.
+ */
+export function suggestNextEffectiveDate(priceHistory = [], refDate = null) {
+  const existingDates = new Set(
+    (priceHistory || [])
+      .map((p) => (p.effectiveFrom ? dayjs(p.effectiveFrom).format('YYYY-MM-DD') : null))
+      .filter(Boolean)
+  )
+
+  let candidate = refDate ? dayjs(refDate) : dayjs()
+  let attempts = 0
+  while (existingDates.has(candidate.format('YYYY-MM-DD')) && attempts < 365) {
+    candidate = candidate.add(1, 'day')
+    attempts++
+  }
+  return candidate.format('YYYY-MM-DD')
+}
+
+/**
+ * Checks if a proposed effective date conflicts with existing price records.
+ */
+export function isEffectiveDateConflicted(date, priceHistory = [], newPrice = null, originalPrice = null) {
+  if (!date) return { conflicted: false }
+  const formattedDate = dayjs(date).isValid() ? dayjs(date).format('YYYY-MM-DD') : String(date)
+
+  // If price didn't change from originalPrice, backend allows same date
+  if (
+    newPrice !== null &&
+    originalPrice !== null &&
+    Number(newPrice) === Number(originalPrice)
+  ) {
+    return { conflicted: false }
+  }
+
+  const existing = (priceHistory || []).find((p) => {
+    const pDate = p.effectiveFrom ? dayjs(p.effectiveFrom).format('YYYY-MM-DD') : ''
+    return pDate === formattedDate
+  })
+
+  if (!existing) {
+    return { conflicted: false }
+  }
+
+  // If existing has the exact same price as newPrice, it won't conflict
+  if (newPrice !== null && Number(existing.price) === Number(newPrice)) {
+    return { conflicted: false }
+  }
+
+  return {
+    conflicted: true,
+    existingPrice: existing.price,
+    date: formattedDate,
+    message: `Đã tồn tại mức giá (${formatServiceCurrency(existing.price)}) cho ngày ${formatDateDisplay(formattedDate)}. Vui lòng chọn ngày hiệu lực mới.`,
+  }
+}
+
+/**
  * Prepares and validates payload for Create Service (POST /system/services)
  */
 export function prepareCreateServicePayload(values = {}) {
@@ -371,8 +430,11 @@ export function extractServiceFormErrors(error) {
     if ((rootMsg.includes('Tên dịch vụ') || rootMsg.toLowerCase().includes('service name')) && !fieldErrorsMap.name) {
       fieldErrorsMap.name = rootMsg
     }
-    if ((rootMsg.includes('mức giá') || rootMsg.includes('ngày hiệu lực')) && !fieldErrorsMap.effectiveFrom) {
+    if ((rootMsg.includes('mức giá') || rootMsg.includes('ngày hiệu lực') || rootMsg.toLowerCase().includes('effective date')) && !fieldErrorsMap.effectiveFrom) {
       fieldErrorsMap.effectiveFrom = rootMsg
+    }
+    if ((rootMsg.includes('Đơn giá') || rootMsg.toLowerCase().includes('service price')) && !rootMsg.includes('ngày hiệu lực') && !fieldErrorsMap.price) {
+      fieldErrorsMap.price = rootMsg
     }
   }
 

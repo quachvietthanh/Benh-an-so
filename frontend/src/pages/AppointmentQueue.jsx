@@ -60,6 +60,7 @@ import PersonalDataConsentField from '../components/patient/PersonalDataConsentF
 import queueApi from '../api/queueApi'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
+import Loading from '../components/common/Loading'
 import {
   APPOINTMENT_STATUS_META,
   QUEUE_STATUS_META,
@@ -1250,11 +1251,21 @@ function AppointmentQueue() {
         </Row>
       </Card>
 
-      <Tabs
-        activeKey={activeMainTab}
-        onChange={setActiveMainTab}
-        type="card"
-        items={[
+      {loading && appointments.length === 0 && queues.length === 0 ? (
+        <Card style={{ borderRadius: 12, padding: '32px 24px', marginTop: 16 }}>
+          <Loading
+            type="table"
+            rows={7}
+            cols={6}
+            tip="Đang nạp dữ liệu lịch hẹn và hàng đợi khám bệnh..."
+          />
+        </Card>
+      ) : (
+        <Tabs
+          activeKey={activeMainTab}
+          onChange={setActiveMainTab}
+          type="card"
+          items={[
           {
             key: 'appointments',
             label: (
@@ -1616,6 +1627,7 @@ function AppointmentQueue() {
           return ['appointments', 'reception_queue'].includes(item.key)
         })}
       />
+      )}
 
       <Modal
         title="Đặt Lịch Hẹn Khám Bệnh Mới"
