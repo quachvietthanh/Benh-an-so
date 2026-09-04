@@ -51,10 +51,9 @@ export default function MedicalRecordVersionHistoryModal({
     try {
       const response = await medicalRecordApi.getVersionHistory(recordId)
       setVersionData(response.data)
-      // Default to the latest amendment version if available, otherwise original (0)
       const amendments = response.data?.amendmentVersions || []
       if (amendments.length > 0) {
-        setSelectedVersionIndex(amendments.length) // latest version index
+        setSelectedVersionIndex(amendments.length)
       } else {
         setSelectedVersionIndex(0)
       }
@@ -162,7 +161,6 @@ export default function MedicalRecordVersionHistoryModal({
           </div>
         ) : (
           <div>
-            {/* Header Tổng quan phiên bản */}
             <div
               style={{
                 display: 'flex',
@@ -199,7 +197,6 @@ export default function MedicalRecordVersionHistoryModal({
               </Tag>
             </div>
 
-            {/* Bộ chọn Version (Tabs / Segmented) */}
             <div style={{ marginBottom: 16 }}>
               <Radio.Group
                 value={selectedVersionIndex}
@@ -235,7 +232,6 @@ export default function MedicalRecordVersionHistoryModal({
               </Radio.Group>
             </div>
 
-            {/* Chi tiết nội dung của phiên bản đang chọn */}
             {currentVersion && (
               <Card
                 bordered
@@ -245,7 +241,6 @@ export default function MedicalRecordVersionHistoryModal({
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }}
               >
-                {/* Meta thông tin phiên bản */}
                 <div
                   style={{
                     display: 'flex',
@@ -280,7 +275,6 @@ export default function MedicalRecordVersionHistoryModal({
                   </Space>
                 </div>
 
-                {/* Nội dung bản gốc (Clinical Snapshot) */}
                 {currentVersion.isOriginal && currentVersion.clinicalSnapshot && (
                   <div>
                     <Descriptions
@@ -323,7 +317,6 @@ export default function MedicalRecordVersionHistoryModal({
                   </div>
                 )}
 
-                {/* Nội dung bản đính chính */}
                 {!currentVersion.isOriginal && (
                   <div>
                     <Alert
@@ -366,7 +359,6 @@ export default function MedicalRecordVersionHistoryModal({
               </Card>
             )}
 
-            {/* Timeline lịch sử thu nhỏ ở dưới */}
             <div style={{ marginTop: 24, padding: '0 8px' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', marginBottom: 12 }}>
                 Dòng thời gian biến động hồ sơ bệnh án:

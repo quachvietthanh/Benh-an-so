@@ -78,7 +78,6 @@ export default function AmendMedicalRecordModal({
   const ensureRecordSignedAndLocked = async () => {
     if (!effectiveRecordId) return
 
-    // 1. Cập nhật nội dung chuyên môn nếu thiếu để đảm bảo điều kiện khóa bệnh án
     try {
       await medicalRecordApi.update(effectiveRecordId, {
         chiefComplaint:
@@ -118,7 +117,6 @@ export default function AmendMedicalRecordModal({
       console.warn('Lưu nội dung bệnh án trước khi ký:', updErr)
     }
 
-    // 2. Đảm bảo chẩn đoán ICD được lưu vào CSDL
     try {
       let catalogId = primaryIcd?.id || primaryIcd?.diagnosisCatalogId
       if (!catalogId) {
@@ -154,7 +152,6 @@ export default function AmendMedicalRecordModal({
       console.warn('Đồng bộ chẩn đoán trước khi ký:', diagErr)
     }
 
-    // 3. Ký số bệnh án
     try {
       const docId = encounterContext?.doctor?.id || currentUser?.id || 'DOC-CURRENT'
       await medicalRecordApi.sign(effectiveRecordId, {
@@ -164,7 +161,6 @@ export default function AmendMedicalRecordModal({
       console.warn('Ký bệnh án trước khi đính chính:', signErr)
     }
 
-    // 4. Khóa bệnh án
     try {
       await medicalRecordApi.lock(effectiveRecordId)
     } catch (lockErr) {
@@ -212,7 +208,6 @@ export default function AmendMedicalRecordModal({
 
       setSubmitting(true)
 
-      // Kiểm tra trạng thái thực tế từ backend
       let currentStatus = medicalRecord?.status || encounterContext?.medicalRecord?.status
       try {
         const recRes = await medicalRecordApi.getById(effectiveRecordId)
@@ -235,7 +230,6 @@ export default function AmendMedicalRecordModal({
         }
       }
 
-      // Đảm bảo lượt khám hoàn tất
       const isVisitDone =
         encounterContext?.visit?.status === 'COMPLETED' ||
         encounterContext?.queueItem?.status === 'COMPLETED'
@@ -254,7 +248,6 @@ export default function AmendMedicalRecordModal({
       } catch (amendErr) {
         const code = amendErr?.response?.data?.code
         if (code === 'MEDICAL_RECORD_NOT_LOCKED' || code === 'MEDICAL_RECORD_NOT_SIGNED') {
-          // Tự động khắc phục trạng thái và thử lại
           await ensureRecordSignedAndLocked()
           await ensureVisitCompleted()
           response = await medicalRecordApi.amend(effectiveRecordId, payload)
@@ -354,7 +347,6 @@ export default function AmendMedicalRecordModal({
       ]}
     >
       <div style={{ marginTop: 8 }}>
-        {/* Thông tin hồ sơ tóm tắt */}
         <Card
           size="small"
           style={{
@@ -395,7 +387,6 @@ export default function AmendMedicalRecordModal({
           </Descriptions>
         </Card>
 
-        {/* Thông báo nguyên tắc pháp lý */}
         <Alert
           type="warning"
           showIcon
@@ -425,7 +416,6 @@ export default function AmendMedicalRecordModal({
           />
         )}
 
-        {/* Form lập đính chính */}
         <Form form={form} layout="vertical">
           <Form.Item
             name="reason"

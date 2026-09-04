@@ -57,7 +57,7 @@ export default function SignMedicalRecordModal({
   selectedOrders = [],
   currentUser,
 }) {
-  const [signingMode, setSigningMode] = useState('SIMULATED') // 'SIMULATED' | 'CANVAS'
+  const [signingMode, setSigningMode] = useState('SIMULATED')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [canvasDrawing, setCanvasDrawing] = useState('')
@@ -66,7 +66,6 @@ export default function SignMedicalRecordModal({
   const canvasRef = useRef(null)
   const isDrawingRef = useRef(false)
 
-  // Cập nhật đồng hồ thời gian ký
   useEffect(() => {
     if (!open) return
     const interval = setInterval(() => {
@@ -75,7 +74,6 @@ export default function SignMedicalRecordModal({
     return () => clearInterval(interval)
   }, [open])
 
-  // Khởi tạo và thiết lập Canvas vẽ chữ ký tay
   useEffect(() => {
     if (signingMode === 'CANVAS' && open) {
       setTimeout(() => {
@@ -92,7 +90,6 @@ export default function SignMedicalRecordModal({
     }
   }, [signingMode, open])
 
-  // Reset form khi mở modal
   useEffect(() => {
     if (open) {
       setAgreedToTerms(false)
@@ -101,7 +98,6 @@ export default function SignMedicalRecordModal({
     }
   }, [open])
 
-  // Canvas drawing handlers
   const startDrawing = (e) => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -160,7 +156,6 @@ export default function SignMedicalRecordModal({
     effectiveRecordStatus === 'LOCKED' ||
     effectiveRecordStatus === 'ARCHIVED'
 
-  // Kiểm tra điều kiện ký
   const validationResult = useMemo(() => {
     return validateMedicalRecordForSigning({
       currentUserId: currentUser?.id,
@@ -209,7 +204,6 @@ export default function SignMedicalRecordModal({
         timestamp: Date.now(),
       })
 
-      // 1. Đồng bộ chẩn đoán ICD vào CSDL nếu chưa có
       if (primaryIcd?.id || primaryIcd?.code) {
         try {
           let catalogId = primaryIcd.id || primaryIcd.diagnosisCatalogId
@@ -247,14 +241,12 @@ export default function SignMedicalRecordModal({
         }
       }
 
-      // 2. Ký số bệnh án
       let signedRecord = null
       try {
         const response = await medicalRecordApi.sign(effectiveRecordId, { signatureData })
         signedRecord = response?.data
       } catch (signErr) {
         const errCode = signErr?.response?.data?.code
-        // Nếu bệnh án đã được ký hoặc khóa trước đó, coi như thành công
         if (
           errCode === 'MEDICAL_RECORD_ALREADY_LOCKED' ||
           errCode === 'MEDICAL_RECORD_LOCKED'
@@ -265,7 +257,6 @@ export default function SignMedicalRecordModal({
         }
       }
 
-      // 3. Khóa bệnh án
       try {
         const lockRes = await medicalRecordApi.lock(effectiveRecordId)
         if (lockRes?.data) signedRecord = lockRes.data
@@ -369,7 +360,6 @@ export default function SignMedicalRecordModal({
       ].filter(Boolean)}
     >
       <div style={{ maxHeight: 'calc(80vh - 120px)', overflowY: 'auto', paddingRight: 6 }}>
-        {/* Status Alert */}
         {isAlreadySigned ? (
           <Alert
             type="success"
@@ -410,7 +400,6 @@ export default function SignMedicalRecordModal({
           />
         ) : null}
 
-        {/* Patient & Visit Header */}
         <Card
           size="small"
           style={{
@@ -442,7 +431,6 @@ export default function SignMedicalRecordModal({
           </Descriptions>
         </Card>
 
-        {/* Section 1: Clinical Content Review */}
         <div style={{ marginBottom: 16 }}>
           <div
             style={{
@@ -459,7 +447,6 @@ export default function SignMedicalRecordModal({
           </div>
 
           <Row gutter={[12, 12]}>
-            {/* Sinh hiệu */}
             <Col span={24}>
               <div
                 style={{
@@ -486,7 +473,6 @@ export default function SignMedicalRecordModal({
               </div>
             </Col>
 
-            {/* Triệu chứng & Khám */}
             <Col xs={24} md={12}>
               <Card size="small" title="Triệu chứng & Lý do khám" style={{ height: '100%' }}>
                 <Paragraph style={{ margin: 0 }}>
@@ -510,7 +496,6 @@ export default function SignMedicalRecordModal({
               </Card>
             </Col>
 
-            {/* Chẩn đoán ICD-10 */}
             <Col span={24}>
               <Card
                 size="small"
@@ -562,7 +547,6 @@ export default function SignMedicalRecordModal({
               </Card>
             </Col>
 
-            {/* Chỉ định CĐLS nếu có */}
             {selectedOrders && selectedOrders.length > 0 && (
               <Col span={24}>
                 <Card size="small" title={`Chỉ định cận lâm sàng (${selectedOrders.length} dịch vụ)`}>
@@ -581,7 +565,6 @@ export default function SignMedicalRecordModal({
 
         <Divider style={{ margin: '16px 0' }} />
 
-        {/* Section 2: Signature Options & Legal Confirmation */}
         <div>
           <div
             style={{
@@ -669,7 +652,6 @@ export default function SignMedicalRecordModal({
             )}
           </Card>
 
-          {/* Legal Compliance Checkbox / Confirmed status */}
           {isAlreadySigned ? (
             <div
               style={{

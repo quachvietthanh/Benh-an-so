@@ -228,7 +228,6 @@ function ServicesPage() {
     })
     setEditModalOpen(true)
 
-    // Load price history in background for smart conflict detection and suggestions
     if (service?.id) {
       systemApi
         .getServicePriceHistory(service.id)
@@ -247,7 +246,6 @@ function ServicesPage() {
     setSavingService(true)
     setEditFormError(null)
 
-    // Pre-check date collision on client side to prevent backend 400 rejection
     const conflict = isEffectiveDateConflicted(
       values.effectiveFrom,
       editPriceHistory,

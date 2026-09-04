@@ -313,11 +313,9 @@ test('TC17: Gợi ý ngày hiệu lực mới không trùng với các mốc gi�
     { effectiveFrom: '2026-09-02', price: 120000 },
   ]
 
-  // Nếu tham chiếu ngày 2026-09-01 (đã có), hàm sẽ nhảy qua ngày 2026-09-02 (đã có) -> chọn 2026-09-03
   const nextDate = suggestNextEffectiveDate(history, '2026-09-01')
   assert.equal(nextDate, '2026-09-03')
 
-  // Nếu tham chiếu ngày chưa có trong lịch sử (VD: 2026-09-05) -> giữ nguyên ngày đó
   const freeDate = suggestNextEffectiveDate(history, '2026-09-05')
   assert.equal(freeDate, '2026-09-05')
 })
@@ -327,16 +325,13 @@ test('TC18: Phát hiện xung đột ngày hiệu lực khi đổi đơn giá (i
     { effectiveFrom: '2026-08-20', price: 150000 },
   ]
 
-  // Trường hợp 1: Đổi đơn giá từ 150.000 lên 200.000 nhưng vẫn chọn ngày 2026-08-20 -> Xung đột!
   const conflict = isEffectiveDateConflicted('2026-08-20', history, 200000, 150000)
   assert.equal(conflict.conflicted, true)
   assert.ok(conflict.message.includes('Đã tồn tại mức giá'))
 
-  // Trường hợp 2: Giữ nguyên đơn giá cũ 150.000 (chỉ sửa tên/trạng thái) -> Không xung đột
   const noConflictSamePrice = isEffectiveDateConflicted('2026-08-20', history, 150000, 150000)
   assert.equal(noConflictSamePrice.conflicted, false)
 
-  // Trường hợp 3: Đổi đơn giá sang 200.000 và chọn ngày mới chưa có giá (2026-08-21) -> Không xung đột
   const noConflictNewDate = isEffectiveDateConflicted('2026-08-21', history, 200000, 150000)
   assert.equal(noConflictNewDate.conflicted, false)
 })
