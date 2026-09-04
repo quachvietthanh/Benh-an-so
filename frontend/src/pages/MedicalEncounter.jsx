@@ -327,7 +327,7 @@ function MedicalEncounter() {
     const cleanPrimaryName = fixMojibake(detail.primaryIcdName)
     const cleanConclusion = fixMojibake(detail.conclusion)
 
-    setCurrentRecordId(detail.medicalRecordId)
+    setCurrentRecordId(detail.medicalRecordId || detail.id)
     form.setFieldsValue({
       patientId: detail.patient?.id,
       chiefComplaint: fixMojibake(detail.chiefComplaint || detail.symptoms || ''),
@@ -800,6 +800,24 @@ function MedicalEncounter() {
     })
   }
 
+  const handleCompleteVisit = async () => {
+    if (!encounter?.queueItem?.id) {
+      message.warning('Không tìm thấy thông tin lượt khám trong hàng đợi để hoàn tất.')
+      return
+    }
+    try {
+      setSaving(true)
+      await queueApi.complete(encounter.queueItem.id)
+      message.success('Đã hoàn tất ca khám thành công!')
+      await loadWorkflow()
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Không thể hoàn tất ca khám.')
+      message.error(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function saveRecord(options = { showModal: true }) {
     if (!visitId || !encounter) {
       message.error('Không có visitId hợp lệ để lưu bệnh án.')
@@ -1216,6 +1234,21 @@ function MedicalEncounter() {
                 >
                   <SafetyCertificateFilled /> BỆNH ÁN ĐÃ KÝ & KHÓA
                 </Tag>
+                {encounter?.queueItem?.status !== 'COMPLETED' && encounter?.queueItem?.id && (
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleCompleteVisit}
+                    loading={saving}
+                    style={{
+                      background: '#16a34a',
+                      borderColor: '#16a34a',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Hoàn tất ca khám
+                  </Button>
+                )}
                 <Button
                   icon={<SafetyCertificateOutlined />}
                   onClick={() => setSignModalOpen(true)}
@@ -1317,6 +1350,18 @@ function MedicalEncounter() {
                 Nếu có phát hiện sai sót chuyên môn hoặc bổ sung phác đồ, bác sĩ hãy sử dụng chức năng <b>Lập bản đính chính</b> để tạo phiên bản gắn kèm.
               </div>
               <Space>
+                {encounter?.queueItem?.status !== 'COMPLETED' && encounter?.queueItem?.id && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleCompleteVisit}
+                    loading={saving}
+                    style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 600 }}
+                  >
+                    Hoàn tất ca khám
+                  </Button>
+                )}
                 <Button
                   type="primary"
                   size="small"
@@ -1576,7 +1621,7 @@ function MedicalEncounter() {
           open={signModalOpen}
           onClose={() => setSignModalOpen(false)}
           onSuccess={(signedData) => {
-            setMedicalRecord((prev) => ({ ...prev, ...signedData, status: 'SIGNED' }))
+            setMedicalRecord((prev) => ({ ...prev, ...signedData, status: 'LOCKED' }))
             loadWorkflow().catch((err) => console.warn('Lỗi làm mới sau khi ký:', err))
             Modal.confirm({
               title: 'Bệnh án đã được ký số & hoàn tất thành công',
@@ -1587,8 +1632,9 @@ function MedicalEncounter() {
               onOk: () => openPrescription(currentRecordId),
             })
           }}
-          recordId={currentRecordId}
+          recordId={currentRecordId || medicalRecord?.medicalRecordId || medicalRecord?.id || encounter?.medicalRecord?.id}
           encounterContext={encounter}
+          medicalRecord={medicalRecord || encounter?.medicalRecord}
           patient={selectedPatientObj}
           formValues={form.getFieldsValue()}
           vitalSigns={vitalSigns}
@@ -1597,6 +1643,10 @@ function MedicalEncounter() {
           secondaryIcds={secondaryIcds}
           selectedOrders={selectedOrders}
           currentUser={user}
+          onOpenAmend={() => {
+            setSignModalOpen(false)
+            setAmendModalOpen(true)
+          }}
         />
       )}
 
@@ -1621,15 +1671,42 @@ function MedicalEncounter() {
         <AmendMedicalRecordModal
           open={amendModalOpen}
           onClose={() => setAmendModalOpen(false)}
-          onSuccess={async () => {
+          onSuccess={async (amendmentData) => {
             await loadWorkflow()
-            setVersionHistoryModalOpen(true)
+            const canViewHistory = canViewMedicalRecordVersionHistory(user?.roles, user?.permissions)
+            if (canViewHistory) {
+              setVersionHistoryModalOpen(true)
+            } else {
+              Modal.success({
+                title: 'Lập bản đính chính bệnh án thành công!',
+                icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
+                content: (
+                  <div style={{ marginTop: 8 }}>
+                    <p>
+                      Phiên bản đính chính <b>v{amendmentData?.versionNumber || 2}</b> đã được hệ thống lưu vết an toàn và gắn liền với hồ sơ bệnh án gốc theo quy định.
+                    </p>
+                    {amendmentData?.reason && (
+                      <p style={{ fontSize: 13, color: '#475569', marginBottom: 6 }}>
+                        <b>Lý do đính chính:</b> <i>"{amendmentData.reason}"</i>
+                      </p>
+                    )}
+                    <p style={{ fontSize: 12, color: '#64748b', marginBottom: 0 }}>
+                      Nhật ký tra cứu chi tiết toàn bộ lịch sử các phiên bản được phân quyền cho Quản lý phòng khám (Manager) và Quản trị viên (Admin).
+                    </p>
+                  </div>
+                ),
+                okText: 'Đã hiểu',
+              })
+            }
           }}
-          recordId={currentRecordId}
+          recordId={currentRecordId || medicalRecord?.medicalRecordId || medicalRecord?.id || encounter?.medicalRecord?.id}
           encounterContext={encounter}
           medicalRecord={medicalRecord || encounter?.medicalRecord}
           patient={selectedPatientObj}
           currentUser={user}
+          primaryIcd={primaryIcd}
+          secondaryIcds={secondaryIcds}
+          formValues={form.getFieldsValue()}
         />
       )}
 
@@ -1637,7 +1714,7 @@ function MedicalEncounter() {
         <MedicalRecordVersionHistoryModal
           open={versionHistoryModalOpen}
           onClose={() => setVersionHistoryModalOpen(false)}
-          recordId={currentRecordId}
+          recordId={currentRecordId || medicalRecord?.medicalRecordId || medicalRecord?.id || encounter?.medicalRecord?.id}
           canAmend={canEditEncounter && isRecordSigned}
           onOpenAmendModal={() => setAmendModalOpen(true)}
         />

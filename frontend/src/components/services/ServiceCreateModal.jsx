@@ -30,7 +30,6 @@ function ServiceCreateModal({
 }) {
   const handleValuesChange = (changedValues) => {
     if (onClearError) onClearError()
-    // Clear field-level error for the field that was changed
     const changedField = Object.keys(changedValues)[0]
     if (changedField && form) {
       form.setFields([{ name: changedField, errors: [] }])

@@ -51,10 +51,9 @@ export default function MedicalRecordVersionHistoryModal({
     try {
       const response = await medicalRecordApi.getVersionHistory(recordId)
       setVersionData(response.data)
-      // Default to the latest amendment version if available, otherwise original (0)
       const amendments = response.data?.amendmentVersions || []
       if (amendments.length > 0) {
-        setSelectedVersionIndex(amendments.length) // latest version index
+        setSelectedVersionIndex(amendments.length)
       } else {
         setSelectedVersionIndex(0)
       }
@@ -141,13 +140,27 @@ export default function MedicalRecordVersionHistoryModal({
     >
       <Spin spinning={loading}>
         {allVersions.length === 0 ? (
-          <Empty
-            style={{ margin: '40px 0' }}
-            description="Chưa có dữ liệu lịch sử phiên bản hoặc tài khoản chưa có quyền đọc nhật ký phiên bản."
-          />
+          <div style={{ margin: '30px 16px' }}>
+            <Alert
+              type="info"
+              showIcon
+              icon={<SafetyCertificateFilled style={{ color: '#0284c7' }} />}
+              message="Đã ghi nhận bản đính chính vào hồ sơ bệnh án"
+              description={
+                <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>
+                  <p style={{ margin: '0 0 6px' }}>
+                    Các bản đính chính chuyên môn do bác sĩ lập đã được hệ thống lưu vết kiểm toán vĩnh viễn và gắn liền với hồ sơ gốc.
+                  </p>
+                  <p style={{ margin: 0, color: '#64748b' }}>
+                    Theo quy định phân quyền hồ sơ bệnh án điện tử (<strong>NCL-11-CN-003</strong>), tính năng tra cứu chi tiết toàn bộ cây lịch sử kiểm toán các phiên bản được phân quyền cho <strong>Quản lý phòng khám (Manager)</strong> và <strong>Quản trị viên (Admin)</strong>.
+                  </p>
+                </div>
+              }
+              style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}
+            />
+          </div>
         ) : (
           <div>
-            {/* Header Tổng quan phiên bản */}
             <div
               style={{
                 display: 'flex',
@@ -184,7 +197,6 @@ export default function MedicalRecordVersionHistoryModal({
               </Tag>
             </div>
 
-            {/* Bộ chọn Version (Tabs / Segmented) */}
             <div style={{ marginBottom: 16 }}>
               <Radio.Group
                 value={selectedVersionIndex}
@@ -220,7 +232,6 @@ export default function MedicalRecordVersionHistoryModal({
               </Radio.Group>
             </div>
 
-            {/* Chi tiết nội dung của phiên bản đang chọn */}
             {currentVersion && (
               <Card
                 bordered
@@ -230,7 +241,6 @@ export default function MedicalRecordVersionHistoryModal({
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }}
               >
-                {/* Meta thông tin phiên bản */}
                 <div
                   style={{
                     display: 'flex',
@@ -265,7 +275,6 @@ export default function MedicalRecordVersionHistoryModal({
                   </Space>
                 </div>
 
-                {/* Nội dung bản gốc (Clinical Snapshot) */}
                 {currentVersion.isOriginal && currentVersion.clinicalSnapshot && (
                   <div>
                     <Descriptions
@@ -308,7 +317,6 @@ export default function MedicalRecordVersionHistoryModal({
                   </div>
                 )}
 
-                {/* Nội dung bản đính chính */}
                 {!currentVersion.isOriginal && (
                   <div>
                     <Alert
@@ -351,7 +359,6 @@ export default function MedicalRecordVersionHistoryModal({
               </Card>
             )}
 
-            {/* Timeline lịch sử thu nhỏ ở dưới */}
             <div style={{ marginTop: 24, padding: '0 8px' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', marginBottom: 12 }}>
                 Dòng thời gian biến động hồ sơ bệnh án:
