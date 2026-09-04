@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordTemplate;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
@@ -39,6 +40,7 @@ public class ApplyMedicalRecordTemplateService implements ApplyMedicalRecordTemp
     private final VisitRepository visitRepository;
     private final MedicalRecordTemplateRepository templateRepository;
     private final MedicalRecordAuthorizationService authorizationService;
+    private final MedicalRecordAuthorizationAuditService authorizationAuditService;
     private final MedicalRecordAccessAuditService accessAuditService;
     private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final MedicalRecordResultMapper resultMapper;
@@ -60,7 +62,7 @@ public class ApplyMedicalRecordTemplateService implements ApplyMedicalRecordTemp
         MedicalRecordTemplate selected = templateRepository.findByIdForUpdate(command.templateId())
                 .orElseThrow(() -> new MedicalRecordTemplateNotFoundException(command.templateId()));
         if (!selected.isActive()) throw new MedicalRecordTemplateInactiveException();
-        boolean fallback = validateTemplateForVisit(selected, visit);
+        boolean fallback = validateTemplateForVisit(selected, visit, actorId, record.getId());
         if (record.hasClinicalContent()) {
             throw new MedicalRecordTemplateChangeWithContentException();
         }
@@ -75,7 +77,7 @@ public class ApplyMedicalRecordTemplateService implements ApplyMedicalRecordTemp
         return resultMapper.toResult(saved, templateMapper.resolveApplied(saved, visit));
     }
 
-    private boolean validateTemplateForVisit(MedicalRecordTemplate selected, Visit visit) {
+    private boolean validateTemplateForVisit(MedicalRecordTemplate selected, Visit visit, UUID actorId, UUID recordId) {
         List<MedicalRecordTemplate> applicable = templateRepository.findBySpecialtyIdAndActive(visit.getSpecialtyId(), true);
         if (!applicable.isEmpty()) {
             if (!selected.getSpecialtyId().equals(visit.getSpecialtyId())) throw new MedicalRecordTemplateSpecialtyMismatchException();
@@ -83,7 +85,11 @@ public class ApplyMedicalRecordTemplateService implements ApplyMedicalRecordTemp
         }
         List<MedicalRecordTemplate> general = templateRepository.findBySpecialtyIdAndActive(Specialty.GENERAL_ID, true);
         List<MedicalRecordTemplate> defaults = general.stream().filter(MedicalRecordTemplate::isDefaultTemplate).toList();
-        if (defaults.size() != 1) throw new MedicalRecordTemplateDefaultNotConfiguredException();
+        if (defaults.size() != 1) {
+            authorizationAuditService.recordTemplateConfigurationFailure(actorId, recordId, ResourceType.MEDICAL_RECORD,
+                    "Default template not configured for specialty GENERAL during apply");
+            throw new MedicalRecordTemplateDefaultNotConfiguredException();
+        }
         if (!selected.getId().equals(defaults.getFirst().getId())) throw new MedicalRecordTemplateSpecialtyMismatchException();
         return true;
     }

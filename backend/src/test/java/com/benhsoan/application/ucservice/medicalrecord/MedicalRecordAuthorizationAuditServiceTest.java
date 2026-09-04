@@ -38,4 +38,40 @@ class MedicalRecordAuthorizationAuditServiceTest {
         assertEquals(ResourceType.MEDICAL_RECORD, audit.getResourceType());
         assertEquals(medicalRecordId, audit.getResourceId());
     }
+
+    @Test
+    void recordsDeniedVisitTemplateAccessAgainstVisit() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        String detail = "User lacks read permission on visit template options";
+
+        service.recordVisitTemplateAccessDenied(actorId, visitId, detail);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        assertEquals(actorId, audit.getUserId());
+        assertEquals(ActionType.ACCESS_DENIED, audit.getActionType());
+        assertEquals(ResourceType.VISIT, audit.getResourceType());
+        assertEquals(visitId, audit.getResourceId());
+        assertEquals(detail, audit.getDetail());
+    }
+
+    @Test
+    void recordsTemplateConfigurationFailureAgainstGivenResource() {
+        UUID actorId = UUID.randomUUID();
+        UUID resourceId = UUID.randomUUID();
+        String detail = "Default template not configured for specialty GENERAL";
+
+        service.recordTemplateConfigurationFailure(actorId, resourceId, ResourceType.VISIT, detail);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        assertEquals(actorId, audit.getUserId());
+        assertEquals(ActionType.ACCESS_DENIED, audit.getActionType());
+        assertEquals(ResourceType.VISIT, audit.getResourceType());
+        assertEquals(resourceId, audit.getResourceId());
+        assertEquals(detail, audit.getDetail());
+    }
 }

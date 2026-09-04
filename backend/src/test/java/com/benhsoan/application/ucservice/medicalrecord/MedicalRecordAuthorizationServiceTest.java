@@ -234,4 +234,51 @@ class MedicalRecordAuthorizationServiceTest {
 
         assertThrows(MedicalRecordAccessDeniedException.class, () -> service.requireAmendAccess(UUID.randomUUID()));
     }
+
+    @Test
+    @DisplayName("visit template read access is allowed for DOCTOR")
+    void allowsDoctorVisitTemplateReadAccess() {
+        UUID userId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireVisitTemplateReadAccess(visitId));
+    }
+
+    @Test
+    @DisplayName("visit template read access is denied for non-DOCTOR and audits ResourceType.VISIT")
+    void deniesNonDoctorVisitTemplateReadAccessAndAudits() {
+        UUID userId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, () -> service.requireVisitTemplateReadAccess(visitId));
+
+        verify(authorizationAuditService).recordVisitTemplateAccessDenied(userId, visitId, "Medical record template access denied");
+    }
+
+    @Test
+    @DisplayName("visit template access by visit doctor is allowed")
+    void allowsResponsibleDoctorVisitTemplateAccess() {
+        UUID doctorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+
+        service.requireVisitTemplateVisitAccess(doctorId, doctorId, visitId);
+    }
+
+    @Test
+    @DisplayName("visit template access by non-responsible doctor is denied and audits ResourceType.VISIT")
+    void deniesNonResponsibleDoctorVisitTemplateAccessAndAudits() {
+        UUID actorId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+
+        assertThrows(MedicalRecordAccessDeniedException.class,
+                () -> service.requireVisitTemplateVisitAccess(actorId, doctorId, visitId));
+
+        verify(authorizationAuditService).recordVisitTemplateAccessDenied(actorId, visitId, "Medical record template access denied");
+    }
 }

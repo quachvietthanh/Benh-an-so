@@ -54,9 +54,13 @@ Thứ tự xác định mẫu hiệu lực khi mở bệnh án:
 
 1. Bác sĩ được hiển thị các mẫu active của specialty thuộc lượt khám.
 2. Nếu specialty đó không có mẫu active, server chọn default active của
-   `GENERAL`, đánh dấu `fallback=true` và trả thông báo cho client.
+   `GENERAL`, đánh dấu `fallback=true` và trả thông báo cho client. Khi ở chế độ
+   fallback, danh sách mẫu có thể chọn (`availableTemplates`) chỉ trả về duy nhất
+   mẫu default này để đồng bộ và tránh trường hợp bác sĩ chọn mẫu khác của `GENERAL`
+   rồi bị API áp mẫu từ chối.
 3. Nếu `GENERAL` không có đúng một default active, thao tác không được suy
-   đoán; trả `409 Conflict` với lỗi cấu hình và ghi audit thất bại.
+   đoán; trả `409 Conflict` với lỗi cấu hình và ghi audit thất bại với `ResourceType`
+   tương ứng theo ngữ cảnh gọi (`MEDICAL_RECORD` hoặc `VISIT`).
 
 Môi trường triển khai phải có ít nhất một template active/default cho
 `GENERAL`. Việc tạo template này là dữ liệu cấu hình/seed vận hành, không
@@ -165,7 +169,7 @@ GET /medical-records/visits/{visitId}/template-options
 
 For the responsible `DOCTOR` only. It returns the visit specialty, all selectable active
 templates, and the effective default. `fallback=true` means no active template exists for
-the visit specialty and the response was resolved from `GENERAL`.
+the visit specialty and the response was resolved from `GENERAL` (in fallback mode, `availableTemplates` contains only the single effective default template of `GENERAL` allowed by the application policy).
 
 ### Apply a template
 

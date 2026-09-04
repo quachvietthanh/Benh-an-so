@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordTemplate;
 import com.benhsoan.domain.medicalrecord.MedicalRecordTemplateVersion.SectionDefinition;
@@ -28,6 +29,7 @@ import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidVisitException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateDefaultNotConfiguredException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateInactiveException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateSpecialtyMismatchException;
 import com.benhsoan.domain.specialty.Specialty;
@@ -46,6 +48,7 @@ class ApplyMedicalRecordTemplateServiceTest {
     @Mock private VisitRepository visitRepository;
     @Mock private MedicalRecordTemplateRepository templateRepository;
     @Mock private MedicalRecordAuthorizationService authorizationService;
+    @Mock private MedicalRecordAuthorizationAuditService authorizationAuditService;
     @Mock private MedicalRecordAccessAuditService accessAuditService;
     @Mock private MedicalRecordTemplateApplicationMapper templateMapper;
     @Mock private MedicalRecordResultMapper resultMapper;
@@ -212,6 +215,29 @@ class ApplyMedicalRecordTemplateServiceTest {
         assertThrows(com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateChangeWithContentException.class,
                 () -> service.apply(record.getId(), new ApplyMedicalRecordTemplateCommand(template.getId())));
 
+        verifyNoInteractions(accessAuditService);
+    }
+
+    @Test
+    void generalMissingDefaultAuditsAndThrowsConflictOnApply() {
+        UUID visitSpecialtyId = UUID.randomUUID();
+        Visit visit = visit(visitSpecialtyId);
+        MedicalRecord record = emptyRecord(visit);
+        MedicalRecordTemplate generalNonDefault = template(Specialty.GENERAL_ID, false);
+
+        when(authorizationService.requireTemplateWriteAccess(record.getId())).thenReturn(actorId);
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visit.getId())).thenReturn(Optional.of(visit));
+        when(templateRepository.findByIdForUpdate(generalNonDefault.getId())).thenReturn(Optional.of(generalNonDefault));
+        when(templateRepository.findBySpecialtyIdAndActive(visitSpecialtyId, true)).thenReturn(List.of());
+        when(templateRepository.findBySpecialtyIdAndActive(Specialty.GENERAL_ID, true)).thenReturn(List.of(generalNonDefault));
+
+        assertThrows(MedicalRecordTemplateDefaultNotConfiguredException.class,
+                () -> service.apply(record.getId(), new ApplyMedicalRecordTemplateCommand(generalNonDefault.getId())));
+
+        verify(authorizationAuditService).recordTemplateConfigurationFailure(
+                actorId, record.getId(), ResourceType.MEDICAL_RECORD,
+                "Default template not configured for specialty GENERAL during apply");
         verifyNoInteractions(accessAuditService);
     }
 

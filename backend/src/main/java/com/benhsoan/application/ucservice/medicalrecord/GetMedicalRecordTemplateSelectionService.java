@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordTemplate;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
@@ -34,6 +35,7 @@ public class GetMedicalRecordTemplateSelectionService implements GetMedicalRecor
     private final SpecialtyRepository specialtyRepository;
     private final MedicalRecordTemplateRepository templateRepository;
     private final MedicalRecordAuthorizationService authorizationService;
+    private final MedicalRecordAuthorizationAuditService authorizationAuditService;
     private final MedicalRecordAccessAuditService accessAuditService;
     private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final ClockPort clockPort;
@@ -56,9 +58,14 @@ public class GetMedicalRecordTemplateSelectionService implements GetMedicalRecor
     }
 
     private MedicalRecordTemplateSelectionResult select(Visit visit, MedicalRecord record) {
-        UUID resourceId = record != null ? record.getId() : visit.getId();
-        UUID actorId = authorizationService.requireTemplateReadAccess(resourceId);
-        authorizationService.requireTemplateVisitAccess(actorId, visit.getDoctorId(), resourceId);
+        UUID actorId;
+        if (record != null) {
+            actorId = authorizationService.requireTemplateReadAccess(record.getId());
+            authorizationService.requireTemplateVisitAccess(actorId, visit.getDoctorId(), record.getId());
+        } else {
+            actorId = authorizationService.requireVisitTemplateReadAccess(visit.getId());
+            authorizationService.requireVisitTemplateVisitAccess(actorId, visit.getDoctorId(), visit.getId());
+        }
 
         var visitSpecialty = specialtyRepository.findById(visit.getSpecialtyId())
                 .orElseThrow(() -> new com.benhsoan.domain.specialty.exception.SpecialtyNotFoundException(visit.getSpecialtyId()));
@@ -67,7 +74,29 @@ public class GetMedicalRecordTemplateSelectionService implements GetMedicalRecor
         List<MedicalRecordTemplate> available = fallback
                 ? templateRepository.findBySpecialtyIdAndActive(com.benhsoan.domain.specialty.Specialty.GENERAL_ID, true)
                 : applicable;
-        MedicalRecordTemplate effective = requireSingleDefault(available);
+
+        MedicalRecordTemplate effective;
+        if (fallback) {
+            List<MedicalRecordTemplate> defaults = available.stream().filter(MedicalRecordTemplate::isDefaultTemplate).toList();
+            if (defaults.size() != 1) {
+                UUID resId = record != null ? record.getId() : visit.getId();
+                ResourceType resType = record != null ? ResourceType.MEDICAL_RECORD : ResourceType.VISIT;
+                authorizationAuditService.recordTemplateConfigurationFailure(actorId, resId, resType,
+                        "Default template not configured for specialty GENERAL in fallback mode");
+                throw new MedicalRecordTemplateDefaultNotConfiguredException();
+            }
+            effective = defaults.getFirst();
+        } else {
+            List<MedicalRecordTemplate> defaults = available.stream().filter(MedicalRecordTemplate::isDefaultTemplate).toList();
+            if (!defaults.isEmpty()) {
+                effective = defaults.getFirst();
+            } else {
+                effective = available.getFirst();
+            }
+        }
+
+        List<MedicalRecordTemplate> optionsToReturn = fallback ? List.of(effective) : available;
+
         if (record != null) {
             accessAuditService.recordRecordView(visit.getPatientId(), visit.getId(), record.getId(), actorId, clockPort.now());
         }
@@ -75,15 +104,9 @@ public class GetMedicalRecordTemplateSelectionService implements GetMedicalRecor
                 record != null ? record.getId() : null,
                 visit.getId(),
                 templateMapper.toSpecialty(visitSpecialty),
-                available.stream().map(templateMapper::toOption).toList(),
+                optionsToReturn.stream().map(templateMapper::toOption).toList(),
                 templateMapper.toOption(effective),
                 fallback
         );
-    }
-
-    private MedicalRecordTemplate requireSingleDefault(List<MedicalRecordTemplate> templates) {
-        List<MedicalRecordTemplate> defaults = templates.stream().filter(MedicalRecordTemplate::isDefaultTemplate).toList();
-        if (defaults.size() != 1) throw new MedicalRecordTemplateDefaultNotConfiguredException();
-        return defaults.getFirst();
     }
 }

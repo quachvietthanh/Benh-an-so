@@ -82,6 +82,24 @@ public class MedicalRecordAuthorizationService {
         }
     }
 
+    public UUID requireVisitTemplateReadAccess(UUID visitId) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("DOCTOR") || currentUserPort.hasRole("ADMIN")) {
+            authorizationAuditService.recordVisitTemplateAccessDenied(actorId, visitId,
+                    "Medical record template access denied");
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return actorId;
+    }
+
+    public void requireVisitTemplateVisitAccess(UUID actorId, UUID visitDoctorId, UUID visitId) {
+        if (!actorId.equals(visitDoctorId)) {
+            authorizationAuditService.recordVisitTemplateAccessDenied(actorId, visitId,
+                    "Medical record template access denied");
+            throw new MedicalRecordAccessDeniedException();
+        }
+    }
+
     public void requireDiagnosisVisitWriteAccess(UUID actorId, UUID visitDoctorId, UUID medicalRecordId) {
         if (!actorId.equals(visitDoctorId)) {
             authorizationAuditService.recordDiagnosisWriteDenied(actorId, medicalRecordId);

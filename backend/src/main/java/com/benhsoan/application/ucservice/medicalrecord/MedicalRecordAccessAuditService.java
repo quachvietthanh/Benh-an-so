@@ -36,7 +36,7 @@ public class MedicalRecordAccessAuditService {
         recordRecordAccess(patientId, visitId, medicalRecordId, accessedBy, MedicalRecordAccessAction.VIEW, "Medical record viewed", accessedAt);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void recordRecordAccess(UUID patientId, UUID visitId, UUID medicalRecordId, UUID accessedBy, MedicalRecordAccessAction action, String detail, Instant accessedAt) {
         medicalRecordAccessLogRepository.save(MedicalRecordAccessLog.createRecordAccess(
                 patientId, visitId, medicalRecordId, accessedBy, action, detail, accessedAt
@@ -53,8 +53,6 @@ public class MedicalRecordAccessAuditService {
             String detail,
             Instant accessedAt
     ) {
-        medicalRecordAccessLogRepository.save(MedicalRecordAccessLog.createRecordAccess(
-                patientId, visitId, medicalRecordId, accessedBy, action, detail, accessedAt
-        ));
+        recordRecordAccess(patientId, visitId, medicalRecordId, accessedBy, action, detail, accessedAt);
     }
 }
