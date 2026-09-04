@@ -32,6 +32,7 @@ function PatientDetail() {
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [consentModalOpen, setConsentModalOpen] = useState(false)
   const [form] = Form.useForm()
 
   const loadData = useCallback(async () => {
