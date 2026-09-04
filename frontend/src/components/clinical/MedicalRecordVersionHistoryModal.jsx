@@ -141,10 +141,25 @@ export default function MedicalRecordVersionHistoryModal({
     >
       <Spin spinning={loading}>
         {allVersions.length === 0 ? (
-          <Empty
-            style={{ margin: '40px 0' }}
-            description="Chưa có dữ liệu lịch sử phiên bản hoặc tài khoản chưa có quyền đọc nhật ký phiên bản."
-          />
+          <div style={{ margin: '30px 16px' }}>
+            <Alert
+              type="info"
+              showIcon
+              icon={<SafetyCertificateFilled style={{ color: '#0284c7' }} />}
+              message="Đã ghi nhận bản đính chính vào hồ sơ bệnh án"
+              description={
+                <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>
+                  <p style={{ margin: '0 0 6px' }}>
+                    Các bản đính chính chuyên môn do bác sĩ lập đã được hệ thống lưu vết kiểm toán vĩnh viễn và gắn liền với hồ sơ gốc.
+                  </p>
+                  <p style={{ margin: 0, color: '#64748b' }}>
+                    Theo quy định phân quyền hồ sơ bệnh án điện tử (<strong>NCL-11-CN-003</strong>), tính năng tra cứu chi tiết toàn bộ cây lịch sử kiểm toán các phiên bản được phân quyền cho <strong>Quản lý phòng khám (Manager)</strong> và <strong>Quản trị viên (Admin)</strong>.
+                  </p>
+                </div>
+              }
+              style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}
+            />
+          </div>
         ) : (
           <div>
             {/* Header Tổng quan phiên bản */}

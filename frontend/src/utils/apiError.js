@@ -11,6 +11,12 @@ export const DOMAIN_ERROR_MESSAGES = {
     'Hồ sơ bệnh án đã được ký hoặc khóa, không thể chỉnh sửa trực tiếp.',
   MEDICAL_RECORD_ALREADY_LOCKED:
     'Hồ sơ bệnh án đã được ký hoặc khóa, không thể chỉnh sửa trực tiếp.',
+  MEDICAL_RECORD_AMENDMENT_REQUIRES_COMPLETED_VISIT:
+    'Hồ sơ bệnh án chỉ có thể lập bản đính chính sau khi ca khám đã hoàn tất (COMPLETED).',
+  MEDICAL_RECORD_ACCESS_DENIED:
+    'Chỉ bác sĩ phụ trách lượt khám mới có quyền lập bản đính chính cho hồ sơ này.',
+  MEDICAL_RECORD_NOT_LOCKED:
+    'Hồ sơ bệnh án phải ở trạng thái ĐÃ KÝ hoặc ĐÃ KHÓA mới có thể lập bản đính chính.',
   MEDICAL_RECORD_NOT_SIGNED:
     'Bệnh án chưa được ký xác nhận. Vui lòng ký bệnh án trước khi hoàn tất hoặc khóa.',
   MEDICAL_RECORD_INVALID_VISIT:

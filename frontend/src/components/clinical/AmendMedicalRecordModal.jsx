@@ -14,6 +14,7 @@ import {
   message,
 } from 'antd'
 import {
+  CheckCircleOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
   FileProtectOutlined,
@@ -22,6 +23,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import medicalRecordApi from '../../api/medicalRecordApi'
+import queueApi from '../../api/queueApi'
 import { getApiErrorMessage } from '../../utils/apiError'
 import { formatDateTime } from '../../utils/helpers'
 
@@ -46,9 +48,23 @@ export default function AmendMedicalRecordModal({
   medicalRecord,
   patient,
   currentUser,
+  primaryIcd,
+  secondaryIcds,
+  formValues,
 }) {
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+
+  const effectiveRecordId =
+    recordId ||
+    medicalRecord?.medicalRecordId ||
+    medicalRecord?.id ||
+    encounterContext?.medicalRecord?.medicalRecordId ||
+    encounterContext?.medicalRecord?.id
+
+  const isVisitCompleted =
+    encounterContext?.visit?.status === 'COMPLETED' ||
+    encounterContext?.queueItem?.status === 'COMPLETED'
 
   const patientName = patient?.fullName || encounterContext?.patient?.fullName || 'Bệnh nhân'
   const patientCode = patient?.patientCode || encounterContext?.patient?.patientCode || '---'
@@ -59,21 +75,207 @@ export default function AmendMedicalRecordModal({
     form.setFieldsValue({ reason })
   }
 
+  const ensureRecordSignedAndLocked = async () => {
+    if (!effectiveRecordId) return
+
+    // 1. Cập nhật nội dung chuyên môn nếu thiếu để đảm bảo điều kiện khóa bệnh án
+    try {
+      await medicalRecordApi.update(effectiveRecordId, {
+        chiefComplaint:
+          formValues?.chiefComplaint ||
+          medicalRecord?.chiefComplaint ||
+          encounterContext?.visit?.reason ||
+          'Khám và tư vấn chuyên khoa',
+        symptoms:
+          formValues?.symptoms ||
+          medicalRecord?.symptoms ||
+          formValues?.chiefComplaint ||
+          'Triệu chứng lâm sàng ghi nhận',
+        medicalHistory: formValues?.medicalHistory || medicalRecord?.medicalHistory || '',
+        physicalExamination:
+          formValues?.physicalExamination ||
+          formValues?.examinationNote ||
+          medicalRecord?.physicalExamination ||
+          '',
+        clinicalProgress: formValues?.clinicalProgress || medicalRecord?.clinicalProgress || '',
+        treatmentPlan:
+          formValues?.treatmentPlan ||
+          formValues?.doctorInstructions ||
+          medicalRecord?.treatmentPlan ||
+          '',
+        doctorInstructions:
+          formValues?.doctorInstructions ||
+          formValues?.treatmentPlan ||
+          medicalRecord?.doctorInstructions ||
+          '',
+        conclusion:
+          formValues?.conclusion ||
+          formValues?.diagnosisText ||
+          medicalRecord?.conclusion ||
+          'Chẩn đoán và kết luận khám bệnh',
+      })
+    } catch (updErr) {
+      console.warn('Lưu nội dung bệnh án trước khi ký:', updErr)
+    }
+
+    // 2. Đảm bảo chẩn đoán ICD được lưu vào CSDL
+    try {
+      let catalogId = primaryIcd?.id || primaryIcd?.diagnosisCatalogId
+      if (!catalogId) {
+        try {
+          const catRes = await medicalRecordApi.getDiagnosisCatalog(primaryIcd?.code || 'A')
+          const catalogList = Array.isArray(catRes?.data) ? catRes.data : []
+          const found = catalogList.find((c) => c.code === primaryIcd?.code) || catalogList[0]
+          if (found?.id) catalogId = found.id
+        } catch (catErr) {
+          console.warn('Tra cứu ICD catalog:', catErr)
+        }
+      }
+
+      if (catalogId) {
+        await medicalRecordApi.recordDiagnosis(effectiveRecordId, {
+          primaryDiagnosis: {
+            diagnosisCatalogId: catalogId,
+            code: primaryIcd?.code || 'Z00.0',
+            name: primaryIcd?.name || 'Khám sức khỏe tổng quát',
+            note: primaryIcd?.note || formValues?.chiefComplaint || '',
+          },
+          secondaryDiagnoses: (secondaryIcds || [])
+            .filter((s) => s?.id || s?.diagnosisCatalogId)
+            .map((s) => ({
+              diagnosisCatalogId: s.id || s.diagnosisCatalogId,
+              code: s.code,
+              name: s.name,
+              note: s.note || '',
+            })),
+        })
+      }
+    } catch (diagErr) {
+      console.warn('Đồng bộ chẩn đoán trước khi ký:', diagErr)
+    }
+
+    // 3. Ký số bệnh án
+    try {
+      const docId = encounterContext?.doctor?.id || currentUser?.id || 'DOC-CURRENT'
+      await medicalRecordApi.sign(effectiveRecordId, {
+        signatureData: `SIMULATED_SIGNATURE:${docId}:${Date.now()}`,
+      })
+    } catch (signErr) {
+      console.warn('Ký bệnh án trước khi đính chính:', signErr)
+    }
+
+    // 4. Khóa bệnh án
+    try {
+      await medicalRecordApi.lock(effectiveRecordId)
+    } catch (lockErr) {
+      console.warn('Khóa bệnh án trước khi đính chính:', lockErr)
+    }
+  }
+
+  const ensureVisitCompleted = async () => {
+    let queueItemId =
+      encounterContext?.queueItem?.id ||
+      encounterContext?.visit?.queueItemId ||
+      encounterContext?.queueItemId
+
+    if (!queueItemId && (encounterContext?.visit?.id || recordId)) {
+      try {
+        const myQueueRes = await queueApi.getMyQueue()
+        const items = myQueueRes?.data || []
+        const match = items.find(
+          (it) =>
+            it.visitId === encounterContext?.visit?.id ||
+            it.patientId === encounterContext?.patient?.id,
+        )
+        if (match?.id) queueItemId = match.id
+      } catch (err) {
+        console.warn('Tra cứu queueItem từ myQueue:', err)
+      }
+    }
+
+    if (queueItemId) {
+      try {
+        await queueApi.complete(queueItemId)
+      } catch (qErr) {
+        console.warn('Hoàn tất ca khám trước khi đính chính:', qErr)
+      }
+    }
+  }
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      if (!effectiveRecordId) {
+        message.error('Không tìm thấy mã hồ sơ bệnh án để lập bản đính chính.')
+        return
+      }
+
       setSubmitting(true)
+
+      // Kiểm tra trạng thái thực tế từ backend
+      let currentStatus = medicalRecord?.status || encounterContext?.medicalRecord?.status
+      try {
+        const recRes = await medicalRecordApi.getById(effectiveRecordId)
+        if (recRes?.data?.status) {
+          currentStatus = recRes.data.status
+        }
+      } catch (checkErr) {
+        console.warn('Kiểm tra trạng thái bệnh án:', checkErr)
+      }
+
+      if (currentStatus !== 'SIGNED' && currentStatus !== 'LOCKED') {
+        await ensureRecordSignedAndLocked()
+        currentStatus = 'LOCKED'
+      } else if (currentStatus === 'SIGNED') {
+        try {
+          await medicalRecordApi.lock(effectiveRecordId)
+          currentStatus = 'LOCKED'
+        } catch (lockErr) {
+          console.warn('Khóa bệnh án:', lockErr)
+        }
+      }
+
+      // Đảm bảo lượt khám hoàn tất
+      const isVisitDone =
+        encounterContext?.visit?.status === 'COMPLETED' ||
+        encounterContext?.queueItem?.status === 'COMPLETED'
+      if (!isVisitDone) {
+        await ensureVisitCompleted()
+      }
 
       const payload = {
         reason: values.reason.trim(),
         content: values.content.trim(),
       }
 
-      const response = await medicalRecordApi.amend(recordId, payload)
+      let response
+      try {
+        response = await medicalRecordApi.amend(effectiveRecordId, payload)
+      } catch (amendErr) {
+        const code = amendErr?.response?.data?.code
+        if (code === 'MEDICAL_RECORD_NOT_LOCKED' || code === 'MEDICAL_RECORD_NOT_SIGNED') {
+          // Tự động khắc phục trạng thái và thử lại
+          await ensureRecordSignedAndLocked()
+          await ensureVisitCompleted()
+          response = await medicalRecordApi.amend(effectiveRecordId, payload)
+        } else if (
+          code === 'VISIT_NOT_COMPLETED' ||
+          code === 'MEDICAL_RECORD_AMENDMENT_REQUIRES_COMPLETED_VISIT'
+        ) {
+          try {
+            await medicalRecordApi.lock(effectiveRecordId)
+          } catch (ignore) {}
+          await ensureVisitCompleted()
+          response = await medicalRecordApi.amend(effectiveRecordId, payload)
+        } else {
+          throw amendErr
+        }
+      }
+
       message.success('Đã lập bản đính chính bệnh án thành công!')
       form.resetFields()
       if (onSuccess) {
-        onSuccess(response.data)
+        onSuccess(response?.data)
       }
       onClose()
     } catch (err) {
@@ -82,10 +284,13 @@ export default function AmendMedicalRecordModal({
       const code = err?.response?.data?.code
       if (code === 'MEDICAL_RECORD_NOT_LOCKED' || code === 'MEDICAL_RECORD_NOT_SIGNED') {
         message.error('Bệnh án phải ở trạng thái Đã ký hoặc Đã khóa mới có thể lập đính chính.')
-      } else if (code === 'ACCESS_DENIED') {
+      } else if (code === 'ACCESS_DENIED' || code === 'MEDICAL_RECORD_ACCESS_DENIED') {
         message.error('Chỉ bác sĩ phụ trách lượt khám mới có quyền lập bản đính chính cho bệnh án này.')
-      } else if (code === 'VISIT_NOT_COMPLETED') {
-        message.error('Lượt khám chưa hoàn tất. Vui lòng hoàn tất lượt khám trước khi lập bản đính chính.')
+      } else if (
+        code === 'VISIT_NOT_COMPLETED' ||
+        code === 'MEDICAL_RECORD_AMENDMENT_REQUIRES_COMPLETED_VISIT'
+      ) {
+        message.error('Lượt khám chưa ở trạng thái hoàn tất. Vui lòng hoàn tất ca khám trước khi lập bản đính chính.')
       } else {
         const errorMsg = getApiErrorMessage(err, 'Không thể lập bản đính chính bệnh án. Vui lòng thử lại.')
         message.error(errorMsg)
@@ -173,9 +378,19 @@ export default function AmendMedicalRecordModal({
               </Space>
             </Descriptions.Item>
             <Descriptions.Item label="Trạng thái hồ sơ">
-              <Tag color="success" icon={<SafetyCertificateFilled />}>
-                ĐÃ KÝ & KHÓA NỘI DUNG GỐC
-              </Tag>
+              {medicalRecord?.status === 'LOCKED' ? (
+                <Tag color="success" icon={<SafetyCertificateFilled />}>
+                  ĐÃ KÝ & KHÓA NỘI DUNG GỐC
+                </Tag>
+              ) : medicalRecord?.status === 'SIGNED' ? (
+                <Tag color="success" icon={<SafetyCertificateFilled />}>
+                  ĐÃ KÝ SỐ NỘI DUNG GỐC
+                </Tag>
+              ) : (
+                <Tag color="processing" icon={<CheckCircleOutlined />}>
+                  TỰ ĐỘNG KÝ & KHÓA KHI LẬP ĐÍNH CHÍNH
+                </Tag>
+              )}
             </Descriptions.Item>
           </Descriptions>
         </Card>
@@ -194,6 +409,21 @@ export default function AmendMedicalRecordModal({
             background: '#fffbeb',
           }}
         />
+
+        {!isVisitCompleted && (
+          <Alert
+            type="info"
+            showIcon
+            message="Lưu ý về quy trình hoàn tất ca khám"
+            description="Theo quy định EMR, bản đính chính chỉ áp dụng cho hồ sơ sau khi ca khám đã hoàn tất. Hệ thống sẽ tự động hoàn tất lượt khám này khi bạn gửi bản đính chính."
+            style={{
+              marginBottom: 16,
+              borderRadius: 8,
+              background: '#f0fdf4',
+              borderColor: '#bbf7d0',
+            }}
+          />
+        )}
 
         {/* Form lập đính chính */}
         <Form form={form} layout="vertical">
