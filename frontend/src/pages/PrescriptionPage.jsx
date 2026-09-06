@@ -63,11 +63,13 @@ import visitApi from '../api/visitApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
+import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
 import Loading from '../components/common/Loading'
 import { useAuthContext } from '../context/AuthContext'
 
 import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
+import { formatRecordCode, formatVisitCode } from '../utils/helpers'
 import {
   canSubmitPrescription,
   areAllInteractionsHandled,
@@ -176,6 +178,7 @@ function PrescriptionPage() {
   const [prescriptionSearchText, setPrescriptionSearchText] = useState('')
   const [issuedPrescriptionModalOpen, setIssuedPrescriptionModalOpen] = useState(false)
   const [justIssuedPrescription, setJustIssuedPrescription] = useState(null)
+  const [signModalOpen, setSignModalOpen] = useState(false)
 
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -199,6 +202,8 @@ function PrescriptionPage() {
     (currentUser?.id && encounter?.doctor?.id && String(currentUser.id) === String(encounter.doctor.id)),
   )
   const recordLocked = record?.status === 'LOCKED'
+  const isRecordSigned = record?.status === 'SIGNED' || record?.status === 'LOCKED'
+  const targetVisitId = encounter?.visit?.id || routeState.visitId || location.state?.visitId || record?.visitId
   const prescriptionBlockReason = getQueueInProgressBlockReason(
     encounter?.queueItem,
     'kê đơn, khóa bệnh án hoặc hoàn tất lượt khám',
@@ -259,6 +264,36 @@ function PrescriptionPage() {
     return filterPrescriptionsByKeyword(prescriptions, prescriptionSearchText)
   }, [prescriptions, prescriptionSearchText])
 
+  const primaryIcd = useMemo(() => {
+    const primary = diagnoses.find((d) => d.diagnosisType === 'PRIMARY') || diagnoses[0]
+    if (!primary) return null
+    return {
+      id: primary.id || primary.diagnosisCatalogId,
+      diagnosisCatalogId: primary.diagnosisCatalogId || primary.id,
+      code: primary.diagnosisCode || primary.code || 'Z00.0',
+      name: fixMojibake(primary.diagnosisName || primary.name || 'Khám bệnh và theo dõi điều trị'),
+      note: primary.note || '',
+    }
+  }, [diagnoses])
+
+  const secondaryIcds = useMemo(() => {
+    const secondaries = diagnoses.filter((d) => d.diagnosisType !== 'PRIMARY')
+    return secondaries.map((d) => ({
+      id: d.id || d.diagnosisCatalogId,
+      diagnosisCatalogId: d.diagnosisCatalogId || d.id,
+      code: d.diagnosisCode || d.code || '',
+      name: fixMojibake(d.diagnosisName || d.name || ''),
+      note: d.note || '',
+    }))
+  }, [diagnoses])
+
+  const signFormValues = useMemo(() => ({
+    symptoms: record?.symptoms || encounter?.visit?.reason || '',
+    chiefComplaint: record?.chiefComplaint || record?.symptoms || encounter?.visit?.reason || '',
+    conclusion: record?.conclusion || diagnosisSummary || primaryIcd?.name || '',
+    diagnosisText: record?.conclusion || diagnosisSummary || primaryIcd?.name || '',
+  }), [record, encounter, diagnosisSummary, primaryIcd])
+
   const loadData = useCallback(async () => {
     if (!medicalRecordId) return
     setLoading(true)
@@ -284,7 +319,6 @@ function PrescriptionPage() {
         setRecord(recordData)
       }
 
-      // Fetch diagnoses and existing prescriptions resiliently
       const [diagnosisResult, prescriptionResult] = await Promise.allSettled([
         medicalRecordApi.getDiagnosis(medicalRecordId),
         pharmacyApi.getByMedicalRecord(medicalRecordId),
@@ -361,17 +395,17 @@ function PrescriptionPage() {
             setEncounter(routeState.encounter)
           } else {
             setEncounter({
-              visit: { id: effectiveVisitId, visitCode: recordData?.visitCode || 'VISIT-001' },
+              visit: { id: effectiveVisitId, visitCode: recordData?.visitCode || '' },
               patient: {
-                id: recordData?.patientId || 'patient-1',
-                fullName: recordData?.patientName || 'Bệnh nhân',
-                patientCode: recordData?.patientCode || 'BN-001',
+                id: recordData?.patientId || '',
+                fullName: recordData?.patientName || '',
+                patientCode: recordData?.patientCode || '',
               },
               doctor: {
-                id: recordData?.doctorId || recordData?.createdBy || currentUser?.id,
-                fullName: recordData?.doctorName || currentUser?.fullName || 'Bác sĩ phụ trách',
+                id: recordData?.doctorId || recordData?.createdBy || currentUser?.id || '',
+                fullName: recordData?.doctorName || currentUser?.fullName || '',
               },
-              queueItem: { id: recordData?.queueItemId || routeState.queueItemId || 'queue-item-1', status: 'IN_PROGRESS' },
+              queueItem: { id: recordData?.queueItemId || routeState.queueItemId || '', status: 'IN_PROGRESS' },
             })
           }
         }
@@ -417,7 +451,6 @@ function PrescriptionPage() {
       if (err?.message && err.message.includes('WAITING_FOR_RESULT')) {
         throw err
       }
-      // Khi API queue lỗi (ví dụ mã queue không đúng chuẩn UUID backend), tiếp tục với trạng thái lượt khám hiện tại
     }
 
     const blockReason = getQueueInProgressBlockReason(encounter?.queueItem, action)
@@ -889,41 +922,59 @@ function PrescriptionPage() {
       message.error(finalizeBlockReason)
       return
     }
+
+    if (!isRecordSigned) {
+      Modal.warning({
+        title: 'Bệnh án chưa được ký số — Không thể khóa hoàn tất',
+        icon: <ExclamationCircleOutlined style={{ color: '#ea580c' }} />,
+        width: 520,
+        content: (
+          <div style={{ marginTop: 12 }}>
+            <Paragraph style={{ marginBottom: 8, fontSize: 13, lineHeight: 1.6 }}>
+              Theo quy chế hồ sơ bệnh án điện tử (<strong>Thông tư 46/2018/TT-BYT</strong>), hồ sơ bệnh án bắt buộc phải được Bác sĩ kiểm tra lâm sàng và <strong>Ký số xác nhận</strong> trước khi Khóa hồ sơ và Hoàn tất ca khám.
+            </Paragraph>
+            <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 13 }}>
+              Trạng thái hiện tại: <strong style={{ color: '#ea580c' }}>Bản nháp (Chưa ký số)</strong>. Vui lòng quay lại màn hình Khám bệnh để thực hiện Ký số bệnh án.
+            </Paragraph>
+          </div>
+        ),
+        okText: 'Quay lại Khám bệnh để ký số',
+        okButtonProps: {
+          type: 'primary',
+          style: { background: '#1d4ed8', borderColor: '#1d4ed8' },
+        },
+        closable: true,
+        maskClosable: true,
+        onOk: () => {
+          if (targetVisitId) {
+            navigate(`/medical-records/visits/${targetVisitId}`)
+          } else {
+            navigate('/appointments')
+          }
+        },
+      })
+      return
+    }
+
     const hasPrescription = prescriptions.some((p) => p.status === 'PENDING_DISPENSE' || p.status === 'DISPENSED')
 
     Modal.confirm({
       title: 'Khóa bệnh án và hoàn tất lượt khám?',
       content: hasPrescription
-        ? 'Sau khi khóa, bác sĩ không thể kê thêm hoặc điều chỉnh đơn thuốc. Lượt khám sẽ chuyển sang trạng thái Hoàn tất.'
-        : 'Lượt khám này chưa có đơn thuốc. Bạn có muốn khóa bệnh án và hoàn tất ca khám luôn không?',
+        ? 'Bệnh án đã được ký số hợp lệ. Sau khi khóa, bác sĩ không thể kê thêm hoặc điều chỉnh đơn thuốc. Lượt khám sẽ chuyển sang trạng thái Hoàn tất.'
+        : 'Lượt khám này chưa có đơn thuốc. Bệnh án đã được ký số, bạn có muốn khóa bệnh án và hoàn tất ca khám luôn không?',
       okText: 'Khóa & hoàn tất',
       okType: 'danger',
       cancelText: 'Chưa hoàn tất',
       onOk: async () => {
         setFinalizing(true)
-        let locked = recordLocked
         try {
           const liveQueueItem = await requireLiveInProgressQueue(
             'khóa bệnh án và hoàn tất lượt khám',
           )
-          if (!locked) {
-            try {
-              const lockResponse = await medicalRecordApi.lock(medicalRecordId)
-              locked = lockResponse.data?.status === 'LOCKED'
-              setRecord((current) => ({ ...current, ...lockResponse.data, status: 'LOCKED' }))
-            } catch (lockErr) {
-              console.warn('Thử khóa trực tiếp chưa thành công, thử ký số trước:', lockErr)
-              try {
-                await medicalRecordApi.sign(medicalRecordId, {
-                  signatureData: `SIMULATED_SIGNATURE:${currentUser?.id || 'DOCTOR'}:${Date.now()}`,
-                })
-                const retryLock = await medicalRecordApi.lock(medicalRecordId)
-                locked = retryLock.data?.status === 'LOCKED'
-                setRecord((current) => ({ ...current, ...retryLock.data, status: 'LOCKED' }))
-              } catch (signLockErr) {
-                console.warn('Lỗi khi ký và khóa:', signLockErr)
-              }
-            }
+          if (!recordLocked) {
+            const lockResponse = await medicalRecordApi.lock(medicalRecordId)
+            setRecord((current) => ({ ...current, ...lockResponse.data, status: 'LOCKED' }))
           }
 
           if (liveQueueItem?.id) {
@@ -945,13 +996,38 @@ function PrescriptionPage() {
           message.success('Đã khóa bệnh án và hoàn tất lượt khám thành công.')
           navigate('/appointments')
         } catch (error) {
-          console.warn('Lỗi hoàn tất ca khám:', error)
-          message.success('Đã khóa bệnh án và hoàn tất lượt khám thành công.')
-          navigate('/appointments')
+          console.error('Lỗi khi khóa bệnh án và hoàn tất ca khám:', error)
+          const errorMsg = getApiMessage(error, 'Không thể khóa bệnh án. Vui lòng kiểm tra lại trạng thái ký số và quyền hạn.')
+          message.error(errorMsg)
         } finally {
           setFinalizing(false)
         }
       },
+    })
+  }
+
+  const handleSignSuccess = async (signedData) => {
+    const nextStatus = signedData?.status || 'SIGNED'
+    setRecord((current) => ({
+      ...current,
+      ...signedData,
+      status: nextStatus,
+    }))
+
+    Modal.success({
+      title: 'Ký số bệnh án thành công!',
+      icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
+      content: (
+        <div>
+          <Paragraph style={{ marginBottom: 8 }}>
+            Hồ sơ bệnh án đã được Bác sĩ ký số xác nhận hợp lệ (trạng thái: <strong style={{ color: '#0284c7' }}>ĐÃ KÝ SỐ</strong>).
+          </Paragraph>
+          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            Bác sĩ có thể tiếp tục rà soát đơn thuốc và bấm nút <strong>"Khóa bệnh án & hoàn tất khám"</strong> để khóa hồ sơ và kết thúc ca khám.
+          </Paragraph>
+        </div>
+      ),
+      okText: 'Tiếp tục rà soát đơn thuốc',
     })
   }
 
@@ -1297,7 +1373,11 @@ function PrescriptionPage() {
     SKIPPED: 'Đã bỏ qua',
   }[encounter?.queueItem?.status] || encounter?.queueItem?.status || 'Chưa xác định'
 
-  const recordStatusLabel = recordLocked ? 'Đã khóa' : (record?.status === 'DRAFT' ? 'Đang mở (Bản nháp)' : (record?.status || 'Đang mở'))
+  const recordStatusLabel = recordLocked
+    ? 'Đã khóa hồ sơ'
+    : (record?.status === 'SIGNED'
+      ? 'Đã ký số (Chờ khóa)'
+      : (record?.status === 'DRAFT' ? 'Chưa ký số (Bản nháp)' : (record?.status ? `Chưa ký số (${record.status})` : 'Chưa ký số')))
 
   return (
     <div style={{ paddingBottom: 40 }}>
@@ -1312,6 +1392,52 @@ function PrescriptionPage() {
           style={{ marginBottom: 16 }}
         />
       )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <Button
+          type="text"
+          size="small"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => {
+            if (targetVisitId) {
+              navigate(`/medical-records/visits/${targetVisitId}`)
+            } else {
+              navigate('/appointments')
+            }
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            borderRadius: 6,
+            background: '#F1F5F9',
+            color: '#1E293B',
+            fontWeight: 500,
+            fontSize: 13,
+            padding: '2px 10px',
+          }}
+        >
+          Quay lại Khám bệnh
+        </Button>
+        <span style={{ color: '#CBD5E1' }}>•</span>
+        <Button
+          type="text"
+          size="small"
+          icon={<UnorderedListOutlined />}
+          onClick={() => navigate('/appointments')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            borderRadius: 6,
+            color: '#64748B',
+            fontSize: 13,
+            padding: '2px 8px',
+          }}
+        >
+          Hàng đợi khám
+        </Button>
+      </div>
+
       <div
         className="page-header"
         style={{
@@ -1323,44 +1449,22 @@ function PrescriptionPage() {
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => {
-              const targetVisitId = encounter?.visit?.id || location.state?.visitId || record?.visitId
-              if (targetVisitId) {
-                navigate(`/medical-records/visits/${targetVisitId}`)
-              } else {
-                navigate('/appointments')
-              }
-            }}
-            style={{ fontWeight: 600 }}
-          >
-            Quay lại Khám bệnh
-          </Button>
-          <Button
-            icon={<UnorderedListOutlined />}
-            onClick={() => navigate('/appointments')}
-          >
-            Về Hàng đợi
-          </Button>
-          <div>
-            <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <MedicineBoxOutlined style={{ color: '#2563eb' }} />
-              {editingPrescription ? (
-                <span>
-                  Điều chỉnh Đơn thuốc <Text code style={{ color: '#2563eb', fontSize: 20 }}>{editingPrescription.prescriptionCode}</Text>
-                </span>
-              ) : (
-                'Kê đơn thuốc theo bệnh án'
-              )}
-            </Title>
-            <Text type="secondary">
-              {editingPrescription
-                ? 'Sửa đổi liều dùng, số lượng hoặc thêm/bớt thuốc khi đơn đang ở trạng thái chờ cấp phát.'
-                : 'Hồ sơ gắn liền với bệnh án hiện tại, đảm bảo an toàn thông tin điều trị.'}
-            </Text>
-          </div>
+        <div>
+          <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <MedicineBoxOutlined style={{ color: '#2563eb' }} />
+            {editingPrescription ? (
+              <span>
+                Điều chỉnh Đơn thuốc <Text code style={{ color: '#2563eb', fontSize: 20 }}>{editingPrescription.prescriptionCode}</Text>
+              </span>
+            ) : (
+              'Kê đơn thuốc theo bệnh án'
+            )}
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            {editingPrescription
+              ? 'Sửa đổi liều dùng, số lượng hoặc thêm/bớt thuốc khi đơn đang ở trạng thái chờ cấp phát.'
+              : 'Hồ sơ gắn liền với bệnh án hiện tại, đảm bảo an toàn thông tin điều trị.'}
+          </Text>
         </div>
         <Space wrap size="middle">
           {editingPrescription && (
@@ -1383,38 +1487,120 @@ function PrescriptionPage() {
             </Tooltip>
           )}
           {isDoctor && !recordLocked && !editingPrescription && (
-            <Button
-              danger
-              type="primary"
-              icon={<LockOutlined />}
-              loading={finalizing}
-              disabled={Boolean(prescriptionBlockReason)}
-              onClick={finalizeEncounter}
-              style={{
-                fontWeight: 700,
-                background: '#dc2626',
-                borderColor: '#dc2626',
-                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)',
-              }}
-            >
-              Khóa bệnh án & hoàn tất khám
-            </Button>
+            <>
+              <Tooltip title={isRecordSigned ? 'Bệnh án đã được ký số hợp lệ (Bấm để xem chứng thư)' : 'Mở hộp thoại ký số xác nhận bệnh án điện tử'}>
+                <Button
+                  type={!isRecordSigned ? 'primary' : 'default'}
+                  icon={isRecordSigned ? <CheckCircleOutlined style={{ color: '#16a34a' }} /> : <EditOutlined />}
+                  loading={finalizing}
+                  disabled={Boolean(prescriptionBlockReason)}
+                  onClick={() => setSignModalOpen(true)}
+                  style={{
+                    fontWeight: 700,
+                    ...(isRecordSigned
+                      ? { color: '#15803d', borderColor: '#86efac', background: '#f0fdf4' }
+                      : { background: '#0284c7', borderColor: '#0284c7', boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)' }
+                    ),
+                  }}
+                >
+                  {isRecordSigned ? 'Đã ký số' : 'Ký số bệnh án'}
+                </Button>
+              </Tooltip>
+
+              <Tooltip
+                title={
+                  !isRecordSigned
+                    ? 'Bệnh án cần được Ký số xác nhận trước khi Khóa'
+                    : 'Khóa hồ sơ bệnh án và hoàn tất lượt khám'
+                }
+              >
+                <span>
+                  <Button
+                    danger={isRecordSigned}
+                    type="primary"
+                    icon={<LockOutlined />}
+                    loading={finalizing}
+                    disabled={Boolean(prescriptionBlockReason) || !isRecordSigned}
+                    onClick={finalizeEncounter}
+                    style={{
+                      fontWeight: 700,
+                      ...(isRecordSigned
+                        ? { background: '#dc2626', borderColor: '#dc2626', boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)' }
+                        : {}
+                      ),
+                    }}
+                  >
+                    Khóa bệnh án
+                  </Button>
+                </span>
+              </Tooltip>
+            </>
           )}
         </Space>
       </div>
 
-      <Alert
-        showIcon
-        type="info"
-        message="Quy trình điều trị theo lượt khám"
-        description="1. Khám lâm sàng & Chẩn đoán ICD-10 → 2. Kê đơn thuốc → 3. Khóa bệnh án & Hoàn tất ca khám."
-        style={{ marginBottom: 16 }}
-      />
-
       <Card style={{ marginBottom: 16, borderRadius: 8 }}>
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 4 }}>
-          <Descriptions.Item label="Mã bệnh án"><Text code>{medicalRecordId}</Text></Descriptions.Item>
-          <Descriptions.Item label="Mã lượt khám">{encounter?.visit?.visitCode || record?.visitId || '—'}</Descriptions.Item>
+          <Descriptions.Item label="Mã bệnh án">
+            {medicalRecordId ? (
+              <Space size={4} align="center">
+                <Tag
+                  color="geekblue"
+                  style={{
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    padding: '1px 8px',
+                    borderRadius: 4,
+                    margin: 0,
+                  }}
+                >
+                  {formatRecordCode(medicalRecordId)}
+                </Tag>
+                <Tooltip title={`Mã UUID đầy đủ: ${medicalRecordId}`}>
+                  <Typography.Text
+                    copyable={{
+                      text: String(medicalRecordId),
+                      tooltips: ['Sao chép mã UUID', 'Đã sao chép!'],
+                    }}
+                    type="secondary"
+                    style={{ fontSize: 11 }}
+                  />
+                </Tooltip>
+              </Space>
+            ) : (
+              '—'
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label="Mã lượt khám">
+            <Space size={4} align="center">
+              <Tag
+                color="blue"
+                style={{
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  padding: '1px 8px',
+                  borderRadius: 4,
+                  margin: 0,
+                }}
+              >
+                {formatVisitCode(encounter?.visit?.visitCode, record?.visitId)}
+              </Tag>
+              {(encounter?.visit?.visitCode || record?.visitId) && (
+                <Tooltip title={`Mã lượt khám đầy đủ: ${encounter?.visit?.visitCode || record?.visitId}`}>
+                  <Typography.Text
+                    copyable={{
+                      text: String(encounter?.visit?.visitCode || record?.visitId),
+                      tooltips: ['Sao chép mã', 'Đã sao chép!'],
+                    }}
+                    type="secondary"
+                    style={{ fontSize: 11 }}
+                  />
+                </Tooltip>
+              )}
+            </Space>
+          </Descriptions.Item>
           <Descriptions.Item label="Bệnh nhân">
             <Text strong>{encounter?.patient?.fullName || record?.patientName || '—'}</Text> ({encounter?.patient?.patientCode || record?.patientCode || 'BN'})
           </Descriptions.Item>
@@ -1422,8 +1608,30 @@ function PrescriptionPage() {
           <Descriptions.Item label="Chẩn đoán chính" span={2}>
             <Text strong style={{ color: '#1e40af' }}>{diagnosisSummary}</Text>
           </Descriptions.Item>
-          <Descriptions.Item label="Mã hàng đợi">
-            <Text code>{encounter?.queueItem?.id || '—'}</Text>
+          <Descriptions.Item label="Hàng đợi / STT">
+            {encounter?.queueItem ? (
+              <Space size={4} align="center">
+                <Tag color="blue" style={{ fontWeight: 700, borderRadius: 10 }}>
+                  STT #{encounter.queueItem.queueNumber || 1}
+                </Tag>
+                {encounter.queueItem.id && (
+                  <Tooltip title={`Mã hàng đợi đầy đủ: ${encounter.queueItem.id}`}>
+                    <Typography.Text
+                      type="secondary"
+                      copyable={{
+                        text: String(encounter.queueItem.id),
+                        tooltips: ['Sao chép mã', 'Đã sao chép!'],
+                      }}
+                      style={{ fontSize: 11, fontFamily: 'monospace' }}
+                    >
+                      #{String(encounter.queueItem.id).slice(0, 8)}
+                    </Typography.Text>
+                  </Tooltip>
+                )}
+              </Space>
+            ) : (
+              '—'
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="Trạng thái lượt khám">
             <Tag color={encounter?.queueItem?.status === 'IN_PROGRESS' ? 'processing' : (encounter?.queueItem?.status === 'WAITING_FOR_RESULT' ? 'warning' : 'default')}>
@@ -1431,7 +1639,13 @@ function PrescriptionPage() {
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Trạng thái bệnh án">
-            <Tag color={recordLocked ? 'green' : 'blue'}>{recordStatusLabel}</Tag>
+            <Tag
+              color={recordLocked ? 'green' : (record?.status === 'SIGNED' ? 'cyan' : 'orange')}
+              icon={recordLocked ? <LockOutlined /> : (record?.status === 'SIGNED' ? <CheckCircleOutlined /> : <WarningOutlined />)}
+              style={{ fontWeight: 600 }}
+            >
+              {recordStatusLabel}
+            </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Số đơn thuốc hiện có">
             <Badge count={prescriptions.length} showZero color="#2563eb" />
@@ -1461,6 +1675,71 @@ function PrescriptionPage() {
       )}
       {!diagnoses.length && (
         <Alert type="error" showIcon message="Bệnh án chưa có chẩn đoán" style={{ marginBottom: 16 }} />
+      )}
+      {!recordLocked && !isRecordSigned && (
+        <Alert
+          type="info"
+          showIcon
+          icon={<InfoCircleOutlined />}
+          message="Bệnh án đang chờ Ký số xác nhận"
+          description={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              <span>
+                Hồ sơ bệnh án hiện tại đang ở trạng thái <strong>Bản nháp</strong>. Bác sĩ cần thực hiện <strong>Ký số bệnh án</strong> trước, sau đó mới có thể thực hiện Khóa bệnh án để hoàn tất ca khám.
+              </span>
+              <Space wrap size="small">
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => setSignModalOpen(true)}
+                  style={{ fontWeight: 600, background: '#0284c7', borderColor: '#0284c7' }}
+                >
+                  Ký số bệnh án ngay
+                </Button>
+                {targetVisitId && (
+                  <Button
+                    size="small"
+                    type="default"
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate(`/medical-records/visits/${targetVisitId}`)}
+                    style={{ fontWeight: 500 }}
+                  >
+                    Xem lại chi tiết tại màn Khám bệnh
+                  </Button>
+                )}
+              </Space>
+            </div>
+          }
+          style={{ marginBottom: 16 }}
+        />
+      )}
+      {isRecordSigned && !recordLocked && (
+        <Alert
+          type="success"
+          showIcon
+          icon={<CheckCircleOutlined style={{ color: '#16a34a' }} />}
+          message="Bệnh án đã được Ký số thành công — Sẵn sàng để Khóa hồ sơ"
+          description={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+              <span>
+                Hồ sơ đã được lưu chữ ký điện tử hợp lệ (<strong>ĐÃ KÝ SỐ</strong>). Sau khi hoàn tất kê đơn và kiểm tra thuốc, bác sĩ bấm nút <strong>"Khóa bệnh án & hoàn tất khám"</strong> để khóa hồ sơ và kết thúc ca khám.
+              </span>
+              <Button
+                type="primary"
+                danger
+                size="small"
+                icon={<LockOutlined />}
+                loading={finalizing}
+                onClick={finalizeEncounter}
+                style={{ fontWeight: 600 }}
+              >
+                Khóa bệnh án & hoàn tất khám
+              </Button>
+            </div>
+          }
+          style={{ marginBottom: 16, background: '#f0fdf4', borderColor: '#bbf7d0' }}
+        />
       )}
       {recordLocked && (
         <Alert
@@ -1541,30 +1820,51 @@ function PrescriptionPage() {
                         size="small"
                         style={{
                           marginBottom: 16,
-                          borderRadius: 10,
-                          borderWidth: 2,
-                          borderColor: isComplete ? '#BFDBFE' : '#FDE68A',
-                          backgroundColor: item.isOriginal ? '#ffffff' : '#f8fafc',
+                          borderRadius: 8,
+                          border: isComplete ? '1px solid #BFDBFE' : '1px solid #E2E8F0',
+                          borderLeft: isComplete ? '4px solid #2563EB' : '4px solid #F59E0B',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                          backgroundColor: item.isOriginal ? '#ffffff' : '#fafafa',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-                          <Space size={8} wrap>
-                            <Text strong style={{ fontSize: 15, color: '#1E40AF' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingBottom: 10,
+                            marginBottom: 14,
+                            borderBottom: '1px solid #F1F5F9',
+                            flexWrap: 'wrap',
+                            gap: 8,
+                          }}
+                        >
+                          <Space size={8} wrap align="center">
+                            <Tag
+                              color={isComplete ? 'blue' : 'gold'}
+                              style={{
+                                fontWeight: 700,
+                                fontSize: 13,
+                                padding: '2px 10px',
+                                borderRadius: 12,
+                                margin: 0,
+                              }}
+                            >
                               Thuốc #{index + 1}
-                            </Text>
+                            </Tag>
 
                             {isComplete ? (
-                              <Tag color="success" icon={<CheckCircleOutlined />}>
-                                Đủ thông tin bắt buộc
+                              <Tag color="success" icon={<CheckCircleOutlined />} style={{ borderRadius: 12, margin: 0 }}>
+                                Đầy đủ thông tin
                               </Tag>
                             ) : (
-                              <Tag color="warning" icon={<ExclamationCircleOutlined />}>
+                              <Tag color="warning" icon={<ExclamationCircleOutlined />} style={{ borderRadius: 12, margin: 0 }}>
                                 Chưa đủ trường bắt buộc
                               </Tag>
                             )}
 
                             {editingPrescription && (
-                              <Tag color={item.isOriginal ? 'default' : 'cyan'}>
+                              <Tag color={item.isOriginal ? 'default' : 'cyan'} style={{ borderRadius: 12, margin: 0 }}>
                                 {item.isOriginal ? 'Thuốc trong đơn gốc' : 'Thuốc thêm mới'}
                               </Tag>
                             )}
@@ -1573,20 +1873,20 @@ function PrescriptionPage() {
                               const avail = getAvailableStock(selectedMed)
                               if (avail <= 0) {
                                 return (
-                                  <Tag color="red" icon={<CloseCircleOutlined />}>
+                                  <Tag color="red" icon={<CloseCircleOutlined />} style={{ borderRadius: 12, margin: 0 }}>
                                     HẾT HÀNG (Tồn khả dụng: 0 {unit})
                                   </Tag>
                                 )
                               }
                               if (item.quantity > avail) {
                                 return (
-                                  <Tag color="volcano" icon={<WarningOutlined />}>
+                                  <Tag color="volcano" icon={<WarningOutlined />} style={{ borderRadius: 12, margin: 0 }}>
                                     Vượt quá tồn kho (Còn {avail} {unit})
                                   </Tag>
                                 )
                               }
                               return (
-                                <Text type="secondary" style={{ fontSize: 13 }}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
                                   (Tồn khả dụng: <strong style={{ color: '#16a34a' }}>{avail}</strong> {unit})
                                 </Text>
                               )
@@ -1596,21 +1896,31 @@ function PrescriptionPage() {
                           <Tooltip title={items.length <= 1 ? 'Đơn thuốc phải có ít nhất 1 thuốc' : 'Bỏ thuốc này khỏi đơn'}>
                             <Button
                               danger
+                              type="text"
                               size="small"
                               icon={<DeleteOutlined />}
                               disabled={!canPrescribe || items.length <= 1 || checkingInteractions || saving}
                               onClick={() => handleRemoveItem(item.clientId)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                backgroundColor: '#FEF2F2',
+                                border: '1px solid #FEE2E2',
+                                borderRadius: 6,
+                                padding: '2px 10px',
+                                fontWeight: 500,
+                              }}
                             >
                               Bỏ thuốc
                             </Button>
                           </Tooltip>
                         </div>
 
-                        {/* Hàng 1: Thuốc & Cách dùng */}
-                        <Row gutter={[12, 12]} style={{ marginBottom: 10 }}>
-                          <Col xs={24} md={15}>
+                        <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+                          <Col xs={24} md={16}>
                             <Form.Item
-                              label={<span>1. Chọn thuốc <span style={{ color: '#ef4444' }}>*</span></span>}
+                              label={<span style={{ fontWeight: 600, color: '#334155' }}>Thuốc & Hoạt chất <span style={{ color: '#ef4444' }}>*</span></span>}
                               style={{ marginBottom: 0 }}
                             >
                               <Select
@@ -1636,9 +1946,9 @@ function PrescriptionPage() {
                             </Form.Item>
                           </Col>
 
-                          <Col xs={24} md={9}>
+                          <Col xs={24} md={8}>
                             <Form.Item
-                              label={<span>2. Cách dùng <span style={{ color: '#ef4444' }}>*</span></span>}
+                              label={<span style={{ fontWeight: 600, color: '#334155' }}>Đường dùng <span style={{ color: '#ef4444' }}>*</span></span>}
                               style={{ marginBottom: 0 }}
                             >
                               <Select
@@ -1647,59 +1957,85 @@ function PrescriptionPage() {
                                 value={item.route}
                                 onChange={(value) => handleItemChange(item.clientId, 'route', value)}
                                 options={ROUTE_OPTIONS}
-                                placeholder="Chọn cách dùng (bắt buộc)"
+                                placeholder="Chọn đường dùng..."
                               />
                             </Form.Item>
                           </Col>
                         </Row>
 
-                        {/* Thông tin quy cách / hàm lượng thuốc đang chọn */}
                         {selectedMed && (
-                          <div style={{ background: '#F1F5F9', padding: '8px 12px', borderRadius: 8, marginBottom: 12, display: 'flex flexWrap', gap: 8, alignItems: 'center' }}>
-                            <Tag color="blue" style={{ margin: 0 }}>
+                          <div
+                            style={{
+                              background: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              padding: '6px 12px',
+                              borderRadius: 6,
+                              marginBottom: 12,
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: 8,
+                              alignItems: 'center',
+                              fontSize: 12,
+                            }}
+                          >
+                            <span style={{ color: '#64748B', fontWeight: 500 }}>Quy cách:</span>
+                            <Tag color="blue" style={{ margin: 0, borderRadius: 4 }}>
                               Hàm lượng: <strong>{selectedMed.strength || 'Theo quy cách'}</strong>
                             </Tag>
-                            <Tag color="cyan" style={{ margin: 0 }}>
+                            <Tag color="cyan" style={{ margin: 0, borderRadius: 4 }}>
                               Hoạt chất: <strong>{selectedMed.activeIngredient || selectedMed.medicineName}</strong>
                             </Tag>
-                            <Tag color="purple" style={{ margin: 0 }}>
-                              Đơn vị: <strong>{selectedMed.unit || 'viên'}</strong>
+                            <Tag color="purple" style={{ margin: 0, borderRadius: 4 }}>
+                              Đơn vị tính: <strong>{selectedMed.unit || 'viên'}</strong>
                             </Tag>
+                            {(() => {
+                              const avail = getAvailableStock(selectedMed)
+                              return (
+                                <Tag color={avail > 0 ? 'green' : 'red'} style={{ margin: 0, borderRadius: 4 }}>
+                                  Tồn khả dụng: <strong>{avail} {selectedMed.unit || 'viên'}</strong>
+                                </Tag>
+                              )
+                            })()}
                           </div>
                         )}
 
-                        {/* Hàng 2: Liều dùng, Tần suất, Số ngày & Tổng số lượng */}
-                        <Row gutter={[12, 12]} style={{ marginBottom: 10 }}>
+                        <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
                           <Col xs={24} sm={12} md={6}>
                             <Form.Item
-                              label={<span>3. Liều một lần <span style={{ color: '#ef4444' }}>*</span></span>}
+                              label={<span style={{ fontWeight: 600, color: '#334155' }}>Liều dùng / lần <span style={{ color: '#ef4444' }}>*</span></span>}
                               style={{ marginBottom: 0 }}
                             >
                               <Input
                                 disabled={!canPrescribe || checkingInteractions || saving}
                                 value={item.dosage}
                                 onChange={(event) => handleItemChange(item.clientId, 'dosage', event.target.value)}
-                                placeholder={`VD: 1 ${unit}/lần`}
+                                placeholder={`VD: 1 ${unit}`}
                               />
                             </Form.Item>
-                            <div style={{ marginTop: 4 }}>
-                              <Space size={4} wrap>
-                                {[`1 ${unit}`, `2 ${unit}`, `1/2 ${unit}`].map((sug) => (
-                                  <Tag
-                                    key={sug}
-                                    style={{ cursor: 'pointer', fontSize: 11, margin: 0 }}
-                                    onClick={() => handleItemChange(item.clientId, 'dosage', sug)}
-                                  >
-                                    {sug}
-                                  </Tag>
-                                ))}
-                              </Space>
+                            <div style={{ marginTop: 6, minHeight: 24, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                              {[`1 ${unit}`, `2 ${unit}`, `1/2 ${unit}`].map((sug) => (
+                                <Tag
+                                  key={sug}
+                                  style={{
+                                    cursor: 'pointer',
+                                    fontSize: 11,
+                                    margin: 0,
+                                    padding: '0 6px',
+                                    borderRadius: 4,
+                                    background: '#F8FAFC',
+                                    border: '1px solid #E2E8F0',
+                                  }}
+                                  onClick={() => handleItemChange(item.clientId, 'dosage', sug)}
+                                >
+                                  {sug}
+                                </Tag>
+                              ))}
                             </div>
                           </Col>
 
                           <Col xs={24} sm={12} md={6}>
                             <Form.Item
-                              label={<span>4. Số lần / ngày <span style={{ color: '#ef4444' }}>*</span></span>}
+                              label={<span style={{ fontWeight: 600, color: '#334155' }}>Số lần / ngày <span style={{ color: '#ef4444' }}>*</span></span>}
                               style={{ marginBottom: 0 }}
                             >
                               <InputNumber
@@ -1708,18 +2044,37 @@ function PrescriptionPage() {
                                 step={1}
                                 precision={0}
                                 style={{ width: '100%' }}
-                                placeholder="VD: 2"
+                                placeholder="2"
                                 addonAfter="lần/ngày"
                                 disabled={!canPrescribe || checkingInteractions || saving}
                                 value={item.frequency}
                                 onChange={(value) => handleItemChange(item.clientId, 'frequency', value)}
                               />
                             </Form.Item>
+                            <div style={{ marginTop: 6, minHeight: 24, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                              {[1, 2, 3].map((f) => (
+                                <Tag
+                                  key={f}
+                                  style={{
+                                    cursor: 'pointer',
+                                    fontSize: 11,
+                                    margin: 0,
+                                    padding: '0 6px',
+                                    borderRadius: 4,
+                                    background: '#F8FAFC',
+                                    border: '1px solid #E2E8F0',
+                                  }}
+                                  onClick={() => handleItemChange(item.clientId, 'frequency', f)}
+                                >
+                                  {f} lần
+                                </Tag>
+                              ))}
+                            </div>
                           </Col>
 
                           <Col xs={24} sm={12} md={6}>
                             <Form.Item
-                              label={<span>5. Số ngày dùng <span style={{ color: '#ef4444' }}>*</span></span>}
+                              label={<span style={{ fontWeight: 600, color: '#334155' }}>Số ngày dùng <span style={{ color: '#ef4444' }}>*</span></span>}
                               style={{ marginBottom: 0 }}
                             >
                               <InputNumber
@@ -1730,14 +2085,34 @@ function PrescriptionPage() {
                                 value={item.durationDays}
                                 onChange={(value) => handleItemChange(item.clientId, 'durationDays', value)}
                                 style={{ width: '100%' }}
+                                placeholder="5"
                                 addonAfter="ngày"
                               />
                             </Form.Item>
+                            <div style={{ marginTop: 6, minHeight: 24, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                              {[3, 5, 7, 10].map((d) => (
+                                <Tag
+                                  key={d}
+                                  style={{
+                                    cursor: 'pointer',
+                                    fontSize: 11,
+                                    margin: 0,
+                                    padding: '0 6px',
+                                    borderRadius: 4,
+                                    background: '#F8FAFC',
+                                    border: '1px solid #E2E8F0',
+                                  }}
+                                  onClick={() => handleItemChange(item.clientId, 'durationDays', d)}
+                                >
+                                  {d} ngày
+                                </Tag>
+                              ))}
+                            </div>
                           </Col>
 
                           <Col xs={24} sm={12} md={6}>
                             <Form.Item
-                              label={<span>6. Tổng số lượng <span style={{ color: '#ef4444' }}>*</span></span>}
+                              label={<span style={{ fontWeight: 600, color: '#334155' }}>Tổng số lượng <span style={{ color: '#ef4444' }}>*</span></span>}
                               style={{ marginBottom: 0 }}
                             >
                               <InputNumber
@@ -1747,9 +2122,32 @@ function PrescriptionPage() {
                                 value={item.quantity}
                                 onChange={(value) => handleItemChange(item.clientId, 'quantity', value)}
                                 style={{ width: '100%' }}
+                                placeholder="10"
                                 addonAfter={unit}
                               />
                             </Form.Item>
+                            <div style={{ marginTop: 6, minHeight: 24, display: 'flex', alignItems: 'center' }}>
+                              {Number(item.frequency) > 0 && Number(item.durationDays) > 0 ? (
+                                <Tag
+                                  color="blue"
+                                  style={{
+                                    cursor: 'pointer',
+                                    fontSize: 11,
+                                    margin: 0,
+                                    padding: '0 6px',
+                                    borderRadius: 4,
+                                  }}
+                                  onClick={() => {
+                                    const qty = Number(item.frequency) * Number(item.durationDays)
+                                    handleItemChange(item.clientId, 'quantity', qty)
+                                  }}
+                                >
+                                  ⚡ Tự tính: {Number(item.frequency) * Number(item.durationDays)} {unit}
+                                </Tag>
+                              ) : (
+                                <span style={{ fontSize: 11, color: '#94A3B8' }}>(= Lần × Ngày)</span>
+                              )}
+                            </div>
                             {selectedMed && (() => {
                               const avail = getAvailableStock(selectedMed)
                               if (avail > 0 && item.quantity > avail) {
@@ -1761,26 +2159,11 @@ function PrescriptionPage() {
                               }
                               return null
                             })()}
-                            {Number(item.frequency) > 0 && Number(item.durationDays) > 0 && (
-                              <div style={{ marginTop: 4 }}>
-                                <Text
-                                  type="secondary"
-                                  style={{ fontSize: 11, cursor: 'pointer', color: '#2563EB' }}
-                                  onClick={() => {
-                                    const qty = Number(item.frequency) * Number(item.durationDays)
-                                    handleItemChange(item.clientId, 'quantity', qty)
-                                  }}
-                                >
-                                  ⚡ Gợi ý: {Number(item.frequency) * Number(item.durationDays)} {unit}
-                                </Text>
-                              </div>
-                            )}
                           </Col>
                         </Row>
 
-                        {/* Hàng 3: Hướng dẫn dùng chi tiết */}
                         <Form.Item
-                          label="7. Hướng dẫn dùng & Lời dặn chi tiết"
+                          label={<span style={{ fontWeight: 600, color: '#334155' }}>Hướng dẫn sử dụng & Lời dặn của bác sĩ</span>}
                           style={{ marginBottom: 4 }}
                         >
                           <Input
@@ -1790,19 +2173,36 @@ function PrescriptionPage() {
                             placeholder="Ví dụ: Uống sau khi ăn no 30 phút, uống với nhiều nước..."
                           />
                         </Form.Item>
-                        <Space size={4} wrap style={{ marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                          <span style={{ fontSize: 11, color: '#64748B' }}>Gợi ý nhanh:</span>
                           {['Uống sau ăn no', 'Uống trước ăn 30 phút', 'Uống trước khi đi ngủ', 'Uống nhiều nước'].map((preset) => (
                             <Tag
                               key={preset}
-                              style={{ cursor: 'pointer', fontSize: 11 }}
-                              onClick={() => handleItemChange(item.clientId, 'instructions', preset)}
+                              style={{
+                                cursor: 'pointer',
+                                fontSize: 11,
+                                margin: 0,
+                                padding: '1px 8px',
+                                borderRadius: 4,
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                color: '#334155',
+                              }}
+                              onClick={() => {
+                                const current = item.instructions?.trim()
+                                const newVal = current
+                                  ? current.includes(preset)
+                                    ? current
+                                    : `${current}; ${preset}`
+                                  : preset
+                                handleItemChange(item.clientId, 'instructions', newVal)
+                              }}
                             >
                               + {preset}
                             </Tag>
                           ))}
-                        </Space>
+                        </div>
 
-                        {/* Cảnh báo tồn kho */}
                         {selectedMed && (() => {
                           const avail = getAvailableStock(selectedMed)
                           if (avail <= 0) {
@@ -1812,7 +2212,7 @@ function PrescriptionPage() {
                                 showIcon
                                 icon={<StopOutlined />}
                                 message={`Thuốc "${selectedMed.medicineName}" hiện đã HẾT HÀNG (tồn khả dụng = 0). Vui lòng đổi sang thuốc khác.`}
-                                style={{ marginTop: 10 }}
+                                style={{ marginTop: 12, borderRadius: 6 }}
                               />
                             )
                           }
@@ -1823,7 +2223,7 @@ function PrescriptionPage() {
                                 showIcon
                                 icon={<WarningOutlined />}
                                 message={`Số lượng kê (${item.quantity} ${unit}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${unit}).`}
-                                style={{ marginTop: 10 }}
+                                style={{ marginTop: 12, borderRadius: 6 }}
                               />
                             )
                           }
@@ -1851,7 +2251,16 @@ function PrescriptionPage() {
                         setConfirmedOverrides([])
                         setItems((current) => [...current, createEmptyItem(false)])
                       }}
-                      style={{ width: '100%', marginTop: 8 }}
+                      style={{
+                        width: '100%',
+                        marginTop: 4,
+                        height: 42,
+                        borderRadius: 8,
+                        borderColor: '#93C5FD',
+                        color: '#2563EB',
+                        fontWeight: 600,
+                        backgroundColor: '#F8FAFC',
+                      }}
                     >
                       + Thêm thuốc mới vào đơn
                     </Button>
@@ -2057,7 +2466,6 @@ function PrescriptionPage() {
         ]}
       />
 
-      {/* Modal thông báo Cấp mã đơn thuốc điện tử thành công */}
       <Modal
         open={issuedPrescriptionModalOpen}
         onCancel={() => setIssuedPrescriptionModalOpen(false)}
@@ -2074,7 +2482,6 @@ function PrescriptionPage() {
               width: '100%',
             }}
           >
-            {/* Nhóm trái: Badge trạng thái liên thông */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
               {justIssuedPrescription?.interconnectionStatus === 'SUCCESS' ? (
                 <span
@@ -2120,7 +2527,6 @@ function PrescriptionPage() {
               )}
             </div>
 
-            {/* Nhóm phải: 3 nút hành động */}
             <div
               style={{
                 display: 'flex',
@@ -2323,6 +2729,37 @@ function PrescriptionPage() {
         patient={encounter?.patient}
         encounter={encounter}
       />
+
+      {signModalOpen && (
+        <SignMedicalRecordModal
+          open={signModalOpen}
+          onClose={() => setSignModalOpen(false)}
+          onSuccess={handleSignSuccess}
+          recordId={medicalRecordId}
+          encounterContext={encounter}
+          medicalRecord={record}
+          patient={
+            encounter?.patient || {
+              id: record?.patientId,
+              fullName: record?.patientName,
+              patientCode: record?.patientCode,
+            }
+          }
+          formValues={signFormValues}
+          vitalSigns={record?.vitalSigns || {}}
+          bmiValue={record?.bmiValue || null}
+          primaryIcd={primaryIcd}
+          secondaryIcds={secondaryIcds}
+          selectedOrders={[]}
+          currentUser={currentUser}
+          onOpenAmend={() => {
+            setSignModalOpen(false)
+            if (targetVisitId) {
+              navigate(`/medical-records/visits/${targetVisitId}`)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

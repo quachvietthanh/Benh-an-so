@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Col,
+  Dropdown,
   Empty,
   Input,
   Popconfirm,
@@ -22,6 +23,7 @@ import {
   EditOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
+  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -33,6 +35,7 @@ import dayjs from 'dayjs'
 import medicalRecordTemplateApi from '../api/medicalRecordTemplateApi'
 import TemplateFormModal from '../components/medicalRecordTemplate/TemplateFormModal'
 import StatusToggleModal from '../components/medicalRecordTemplate/StatusToggleModal'
+import { formatTemplateName, formatSpecialtyName } from '../constants/medicalRecordTemplateConstants'
 import { useAuthContext } from '../context/AuthContext'
 
 const { Title, Text, Paragraph } = Typography
@@ -99,12 +102,16 @@ function MedicalRecordTemplateManagementPage() {
   }, [selectedSpecialty, selectedStatus])
 
   useEffect(() => {
-    fetchSpecialties()
-  }, [fetchSpecialties])
+    if (canManage) {
+      fetchSpecialties()
+    }
+  }, [canManage, fetchSpecialties])
 
   useEffect(() => {
-    fetchTemplates()
-  }, [fetchTemplates])
+    if (canManage) {
+      fetchTemplates()
+    }
+  }, [canManage, fetchTemplates])
 
   const filteredTemplates = useMemo(() => {
     let result = templates || []
@@ -143,10 +150,10 @@ function MedicalRecordTemplateManagementPage() {
     try {
       if (editingTemplate) {
         await medicalRecordTemplateApi.updateTemplate(editingTemplate.id, payload)
-        message.success(`Đã cập nhật mẫu "${payload.name}" và nâng lên phiên bản mới!`)
+        message.success(`Đã cập nhật mẫu "${formatTemplateName(payload.name)}" và nâng lên phiên bản mới!`)
       } else {
         await medicalRecordTemplateApi.createTemplate(payload)
-        message.success(`Đã tạo mẫu bệnh án "${payload.name}" thành công!`)
+        message.success(`Đã tạo mẫu bệnh án "${formatTemplateName(payload.name)}" thành công!`)
       }
       setFormModalOpen(false)
       setEditingTemplate(null)
@@ -159,7 +166,7 @@ function MedicalRecordTemplateManagementPage() {
   const handleSetDefault = async (record) => {
     try {
       await medicalRecordTemplateApi.setDefaultTemplate(record.id)
-      message.success(`Đã đặt "${record.name}" làm mẫu mặc định cho chuyên khoa ${record.specialty?.name || ''}!`)
+      message.success(`Đã đặt "${formatTemplateName(record.name)}" làm mẫu mặc định cho chuyên khoa ${record.specialty?.name || ''}!`)
       fetchTemplates()
     } catch (err) {
       const msg = err?.response?.data?.message || 'Không thể thiết lập mẫu mặc định.'
@@ -197,13 +204,27 @@ function MedicalRecordTemplateManagementPage() {
       key: 'name',
       render: (text, record) => (
         <div className="template-name-cell">
-          <div className="template-name-title">
-            <span>{text}</span>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>
+              {formatTemplateName(text)}
+            </span>
             {record.defaultTemplate && (
-              <span className="template-badge-default">
-                <StarFilled style={{ color: '#059669', marginRight: 4 }} />
+              <Tag
+                color="success"
+                icon={<StarFilled style={{ color: '#059669' }} />}
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  borderRadius: 12,
+                  padding: '1px 8px',
+                  backgroundColor: '#ecfdf5',
+                  borderColor: '#a7f3d0',
+                  color: '#059669',
+                }}
+              >
                 Mặc định
-              </span>
+              </Tag>
             )}
           </div>
           <Text type="secondary" style={{ fontSize: 11 }}>
@@ -219,7 +240,7 @@ function MedicalRecordTemplateManagementPage() {
       width: 180,
       render: (specialty) => (
         <Tag color="blue" style={{ fontWeight: 500, fontSize: 12 }}>
-          {specialty?.name || specialty?.code || '—'}
+          {formatSpecialtyName(specialty?.name || specialty?.code || '—')}
         </Tag>
       ),
     },
@@ -264,58 +285,50 @@ function MedicalRecordTemplateManagementPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 220,
-      align: 'right',
-      render: (_, record) => (
-        <Space size={6}>
-          <Tooltip title="Chỉnh sửa cấu hình trường và tạo phiên bản mới">
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              disabled={!canManage}
-              onClick={() => handleOpenEditModal(record)}
-            >
-              Sửa
-            </Button>
-          </Tooltip>
+      width: 90,
+      align: 'center',
+      render: (_, record) => {
+        const menuItems = [
+          {
+            key: 'edit',
+            icon: <EditOutlined style={{ color: '#2563eb' }} />,
+            label: 'Chỉnh sửa mẫu',
+            disabled: !canManage,
+            onClick: () => handleOpenEditModal(record),
+          },
+          !record.defaultTemplate && record.active
+            ? {
+                key: 'set-default',
+                icon: <StarOutlined style={{ color: '#d97706' }} />,
+                label: 'Đặt làm mặc định',
+                disabled: !canManage,
+                onClick: () => handleSetDefault(record),
+              }
+            : null,
+          { type: 'divider' },
+          {
+            key: 'toggle-status',
+            icon: record.active ? <CloseCircleOutlined style={{ color: '#dc2626' }} /> : <CheckCircleOutlined style={{ color: '#16a34a' }} />,
+            label: record.active ? 'Ngừng áp dụng' : 'Kích hoạt mẫu',
+            danger: record.active,
+            disabled: !canManage,
+            onClick: () => handleOpenStatusModal(record),
+          },
+        ].filter(Boolean)
 
-          {!record.defaultTemplate && record.active && (
-            <Popconfirm
-              title="Đặt làm mẫu mặc định?"
-              description={`Mẫu "${record.name}" sẽ trở thành mẫu mặc định khi bác sĩ khám chuyên khoa ${record.specialty?.name}.`}
-              onConfirm={() => handleSetDefault(record)}
-              okText="Đồng ý"
-              cancelText="Hủy"
-              disabled={!canManage}
-            >
-              <Tooltip title="Đặt làm mẫu mặc định cho chuyên khoa này">
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<StarOutlined />}
-                  disabled={!canManage}
-                  style={{ color: '#d97706' }}
-                >
-                  Mặc định
-                </Button>
-              </Tooltip>
-            </Popconfirm>
-          )}
-
-          <Tooltip title={record.active ? 'Ngừng áp dụng mẫu này' : 'Kích hoạt lại mẫu này'}>
+        return (
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
             <Button
-              type="link"
+              type="text"
               size="small"
-              danger={record.active}
-              disabled={!canManage}
-              onClick={() => handleOpenStatusModal(record)}
-            >
-              {record.active ? 'Tắt' : 'Bật'}
-            </Button>
-          </Tooltip>
-        </Space>
-      ),
+              icon={<MoreOutlined style={{ fontSize: 18, color: '#64748b' }} />}
+              aria-label="Thao tác"
+              title="Thao tác"
+              style={{ width: 32, height: 32, borderRadius: 6 }}
+            />
+          </Dropdown>
+        )
+      },
     },
   ]
 
@@ -343,30 +356,20 @@ function MedicalRecordTemplateManagementPage() {
               >
                 Làm mới
               </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                disabled={!canManage}
-                onClick={handleOpenCreateModal}
-                style={{ background: '#2563eb', borderColor: '#2563eb' }}
-              >
-                Tạo mẫu bệnh án mới
-              </Button>
+              {canManage && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleOpenCreateModal}
+                  style={{ background: '#2563eb', borderColor: '#2563eb' }}
+                >
+                  Tạo mẫu bệnh án mới
+                </Button>
+              )}
             </Space>
           </Col>
         </Row>
       </div>
-
-      {!canManage && (
-        <Alert
-          type="warning"
-          showIcon
-          icon={<ExclamationCircleOutlined />}
-          message="Chế độ chỉ xem"
-          description="Tài khoản hiện tại không có quyền MEDICAL_RECORD_TEMPLATE_MANAGE. Bạn chỉ có thể xem danh sách mẫu bệnh án mà không thể thay đổi."
-          style={{ marginBottom: 16 }}
-        />
-      )}
 
       <Card className="template-filter-card" bodyStyle={{ padding: '16px 20px' }}>
         <Row gutter={[16, 12]} align="middle">
@@ -383,7 +386,7 @@ function MedicalRecordTemplateManagementPage() {
                 { value: 'ALL', label: 'Tất cả chuyên khoa' },
                 ...specialties.map((s) => ({
                   value: s.id,
-                  label: `${s.name} (${s.code})`,
+                  label: `${formatSpecialtyName(s.name)} (${s.code})`,
                 })),
               ]}
             />

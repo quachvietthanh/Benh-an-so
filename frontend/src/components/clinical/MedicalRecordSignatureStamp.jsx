@@ -10,9 +10,6 @@ import { parseSignatureData } from '../../utils/medicalRecordSignHelpers'
 
 const { Text } = Typography
 
-/**
- * Component hiển thị Con dấu Ký số Điện tử Bệnh án (Medical Record E-Signature Stamp)
- */
 export default function MedicalRecordSignatureStamp({
   signatureData,
   signedAt,
@@ -42,7 +39,7 @@ export default function MedicalRecordSignatureStamp({
         <SafetyCertificateFilled style={{ color: '#16a34a', fontSize: 18 }} />
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#166534', lineHeight: 1.2 }}>
-            ĐÃ KÝ XÁC NHẬN: {sigInfo.doctorName}
+            {sigInfo.doctorName ? `ĐÃ KÝ XÁC NHẬN: ${sigInfo.doctorName}` : 'ĐÃ KÝ XÁC NHẬN ĐIỆN TỬ'}
           </div>
           <div style={{ fontSize: 11, color: '#15803d' }}>
             {sigInfo.signedAt || 'Đã xác thực điện tử'} {sigInfo.certHash ? `• [${sigInfo.certHash}]` : ''}
@@ -65,7 +62,6 @@ export default function MedicalRecordSignatureStamp({
         ...style,
       }}
     >
-      {/* Background Watermark */}
       <div
         style={{
           position: 'absolute',
@@ -107,7 +103,7 @@ export default function MedicalRecordSignatureStamp({
               </Tag>
             </div>
             <div style={{ fontSize: 13, color: '#334155', marginTop: 2 }}>
-              Người ký: <Text strong style={{ color: '#0f172a' }}>{sigInfo.doctorName}</Text> (Bác sĩ phụ trách)
+              Người ký: <Text strong style={{ color: '#0f172a' }}>{sigInfo.doctorName || '—'}</Text> (Bác sĩ phụ trách)
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>
               Thời gian ký: <Text strong style={{ color: '#166534' }}>{sigInfo.signedAt || '—'}</Text>
@@ -120,7 +116,6 @@ export default function MedicalRecordSignatureStamp({
           </div>
         </div>
 
-        {/* Chữ ký tay nếu có hoặc Seal Badge */}
         {sigInfo.drawing ? (
           <div style={{ textAlign: 'center', minWidth: 140 }}>
             <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Chữ ký số bác sĩ:</div>

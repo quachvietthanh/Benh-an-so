@@ -1,6 +1,3 @@
-/**
- * Resolves the primary default workspace landing route for a user based on their roles and permissions.
- */
 export const getDefaultHomePath = (roles = [], permissions = []) => {
   const normalizedRoles = (Array.isArray(roles) ? roles : [roles])
     .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))

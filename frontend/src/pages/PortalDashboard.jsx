@@ -112,7 +112,6 @@ function PortalDashboard() {
         </div>
 
         <div className="portal-dashboard-grid">
-          {/* Card 1: Đặt lịch khám trực tuyến */}
           <div className="portal-dashboard-card portal-card-booking" style={{ borderColor: '#bfdbfe' }}>
             <div className="portal-dashboard-card-top">
               <div className="portal-dashboard-card-icon blue">
@@ -135,7 +134,6 @@ function PortalDashboard() {
             </div>
           </div>
 
-          {/* Card 2: Lịch hẹn của tôi */}
           <div className="portal-dashboard-card portal-card-appointments">
             <div className="portal-dashboard-card-top">
               <div className="portal-dashboard-card-icon blue" style={{ background: '#f0fdf4', color: '#16a34a' }}>
@@ -158,7 +156,6 @@ function PortalDashboard() {
             </div>
           </div>
 
-          {/* Card 3: Tra cứu kết quả khám */}
           <div className="portal-dashboard-card portal-card-lookup">
             <div className="portal-dashboard-card-top">
               <div className="portal-dashboard-card-icon blue">
@@ -181,7 +178,6 @@ function PortalDashboard() {
             </div>
           </div>
 
-          {/* Card 4: Lịch sử khám & Đơn thuốc */}
           <div className="portal-dashboard-card portal-card-patient">
             <div className="portal-dashboard-card-top">
               <div className="portal-dashboard-card-icon green">

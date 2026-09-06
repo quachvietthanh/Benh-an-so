@@ -14,6 +14,7 @@ import {
   Row,
   Col,
   Spin,
+  Tooltip,
   message,
 } from 'antd'
 import {
@@ -37,6 +38,7 @@ import {
   validateMedicalRecordForSigning,
 } from '../../utils/medicalRecordSignHelpers'
 import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
+import { formatRecordCode } from '../../utils/helpers'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -58,7 +60,7 @@ export default function SignMedicalRecordModal({
   currentUser,
 }) {
   const [signingMode, setSigningMode] = useState('SIMULATED')
-  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [canvasDrawing, setCanvasDrawing] = useState('')
   const [currentTime, setCurrentTime] = useState(dayjs().format('DD/MM/YYYY HH:mm:ss'))
@@ -92,7 +94,7 @@ export default function SignMedicalRecordModal({
 
   useEffect(() => {
     if (open) {
-      setAgreedToTerms(false)
+      setAgreedToTerms(true)
       setCanvasDrawing('')
       setSigningMode('SIMULATED')
     }
@@ -142,12 +144,12 @@ export default function SignMedicalRecordModal({
     encounterContext?.doctor?.fullName ||
     currentUser?.fullName ||
     currentUser?.username ||
-    'Bác sĩ phụ trách'
+    ''
 
   const doctorId =
     encounterContext?.doctor?.id ||
     currentUser?.id ||
-    'DOC-CURRENT'
+    ''
 
   const effectiveRecordStatus =
     medicalRecord?.status || encounterContext?.medicalRecord?.status
@@ -186,8 +188,7 @@ export default function SignMedicalRecordModal({
     }
 
     if (!agreedToTerms) {
-      message.warning('Vui lòng tích chọn cam kết trước khi ký xác nhận bệnh án.')
-      return
+      setAgreedToTerms(true)
     }
 
     if (signingMode === 'CANVAS' && !canvasDrawing) {
@@ -204,82 +205,17 @@ export default function SignMedicalRecordModal({
         timestamp: Date.now(),
       })
 
-      if (primaryIcd?.id || primaryIcd?.code) {
-        try {
-          let catalogId = primaryIcd.id || primaryIcd.diagnosisCatalogId
-          if (!catalogId) {
-            try {
-              const catRes = await medicalRecordApi.getDiagnosisCatalog(primaryIcd.code || 'A')
-              const catalogList = Array.isArray(catRes?.data) ? catRes.data : []
-              const found = catalogList.find((c) => c.code === primaryIcd.code) || catalogList[0]
-              if (found?.id) catalogId = found.id
-            } catch (e) {
-              console.warn('Tra cứu ICD catalog:', e)
-            }
-          }
+      const response = await medicalRecordApi.sign(effectiveRecordId, { signatureData })
+      const signedRecord = response?.data
 
-          if (catalogId) {
-            await medicalRecordApi.recordDiagnosis(effectiveRecordId, {
-              primaryDiagnosis: {
-                diagnosisCatalogId: catalogId,
-                code: primaryIcd.code || 'Z00.0',
-                name: primaryIcd.name || 'Khám sức khỏe tổng quát',
-                note: primaryIcd.note || formValues?.chiefComplaint || formValues?.symptoms || '',
-              },
-              secondaryDiagnoses: (secondaryIcds || [])
-                .filter((s) => s?.id || s?.diagnosisCatalogId)
-                .map((s) => ({
-                  diagnosisCatalogId: s.id || s.diagnosisCatalogId,
-                  code: s.code,
-                  name: s.name,
-                  note: s.note || '',
-                })),
-            })
-          }
-        } catch (diagErr) {
-          console.warn('Đồng bộ chẩn đoán trước khi ký:', diagErr)
-        }
-      }
-
-      let signedRecord = null
-      try {
-        const response = await medicalRecordApi.sign(effectiveRecordId, { signatureData })
-        signedRecord = response?.data
-      } catch (signErr) {
-        const errCode = signErr?.response?.data?.code
-        if (
-          errCode === 'MEDICAL_RECORD_ALREADY_LOCKED' ||
-          errCode === 'MEDICAL_RECORD_LOCKED'
-        ) {
-          console.info('Bệnh án đã ở trạng thái đã ký/khóa.')
-        } else {
-          throw signErr
-        }
-      }
-
-      try {
-        const lockRes = await medicalRecordApi.lock(effectiveRecordId)
-        if (lockRes?.data) signedRecord = lockRes.data
-      } catch (lockErr) {
-        console.warn('Khóa bệnh án sau khi ký:', lockErr)
-      }
-
-      const finalRecord = signedRecord || {
-        id: effectiveRecordId,
-        medicalRecordId: effectiveRecordId,
-        status: 'LOCKED',
-        signedAt: new Date().toISOString(),
-        signedBy: doctorId,
-        signedByName: doctorName,
-      }
-
-      message.success('Ký xác nhận và khóa bệnh án thành công!')
-      if (onSuccess) {
-        onSuccess(finalRecord)
-      }
+      message.success('Ký số hồ sơ bệnh án thành công!')
+      setSubmitting(false)
       onClose()
+      if (onSuccess) {
+        onSuccess(signedRecord)
+      }
     } catch (err) {
-      const errorMsg = getApiErrorMessage(err, 'Không thể ký bệnh án. Vui lòng thử lại.')
+      const errorMsg = getApiErrorMessage(err, 'Không thể ký bệnh án. Vui lòng thử lại sau ít giây.')
       message.error(errorMsg)
     } finally {
       setSubmitting(false)
@@ -307,10 +243,10 @@ export default function SignMedicalRecordModal({
           </div>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a' }}>
-              Rà soát & Ký xác nhận Bệnh án điện tử
+              Rà soát & Ký số Bệnh án điện tử
             </div>
             <div style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}>
-              Khóa nội dung khám và lưu chữ ký điện tử có giá trị pháp lý
+              Xác nhận nội dung chuyên môn và lưu chữ ký điện tử có giá trị pháp lý
             </div>
           </div>
         </div>
@@ -342,20 +278,24 @@ export default function SignMedicalRecordModal({
           </Button>
         ),
         !isAlreadySigned && (
-          <Button
-            key="submit"
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            loading={submitting}
-            disabled={!validationResult.canSign || !agreedToTerms}
-            onClick={handleConfirmSign}
-            style={{
-              background: validationResult.canSign && agreedToTerms ? '#16a34a' : undefined,
-              borderColor: validationResult.canSign && agreedToTerms ? '#16a34a' : undefined,
-            }}
-          >
-            Xác nhận ký & Khóa bệnh án
-          </Button>
+          <Tooltip title={!validationResult.canSign ? validationResult.reason : 'Ký số xác nhận hồ sơ bệnh án theo quy định'}>
+            <Button
+              key="submit"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              loading={submitting}
+              disabled={!validationResult.canSign}
+              onClick={handleConfirmSign}
+              style={{
+                background: validationResult.canSign ? '#16a34a' : undefined,
+                borderColor: validationResult.canSign ? '#16a34a' : undefined,
+                fontWeight: 600,
+                boxShadow: validationResult.canSign ? '0 2px 6px rgba(22, 163, 74, 0.3)' : undefined,
+              }}
+            >
+              Xác nhận ký số bệnh án
+            </Button>
+          </Tooltip>
         ),
       ].filter(Boolean)}
     >
@@ -365,10 +305,10 @@ export default function SignMedicalRecordModal({
             type="success"
             showIcon
             icon={<SafetyCertificateFilled style={{ color: '#16a34a' }} />}
-            message="Hồ sơ bệnh án đã được ký xác nhận điện tử & khóa bảo mật"
+            message="Hồ sơ bệnh án đã được ký số xác nhận hợp lệ"
             description={
               <span>
-                Nội dung hồ sơ bệnh án đã được khóa vĩnh viễn theo quy định. Nếu cần chỉnh sửa hoặc bổ sung thông tin chuyên môn, bác sĩ vui lòng sử dụng chức năng <strong>Lập bản đính chính</strong>.
+                Nội dung hồ sơ bệnh án đã được ký số và bảo vệ có giá trị pháp lý theo quy định. Nếu cần chỉnh sửa hoặc bổ sung thông tin chuyên môn, bác sĩ vui lòng sử dụng chức năng <strong>Lập bản đính chính</strong>.
               </span>
             }
             action={
@@ -420,10 +360,38 @@ export default function SignMedicalRecordModal({
               {encounterContext?.room?.roomNumber || '—'}
             </Descriptions.Item>
             <Descriptions.Item label="Bác sĩ phụ trách">
-              <Text strong style={{ color: '#1e40af' }}>{doctorName}</Text>
+              <Text strong style={{ color: '#1e40af' }}>{doctorName || '—'}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="Mã bệnh án">
-              <Text code>{effectiveRecordId || 'Chưa tạo'}</Text>
+              {effectiveRecordId ? (
+                <Space size={6} align="center">
+                  <Tag
+                    color="geekblue"
+                    style={{
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      padding: '1px 8px',
+                      borderRadius: 4,
+                      margin: 0,
+                    }}
+                  >
+                    {formatRecordCode(effectiveRecordId)}
+                  </Tag>
+                  <Tooltip title={`Mã UUID đầy đủ: ${effectiveRecordId}`}>
+                    <Typography.Text
+                      copyable={{
+                        text: String(effectiveRecordId),
+                        tooltips: ['Sao chép mã UUID', 'Đã sao chép!'],
+                      }}
+                      type="secondary"
+                      style={{ fontSize: 11 }}
+                    />
+                  </Tooltip>
+                </Space>
+              ) : (
+                <Tag>Chưa tạo</Tag>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Thời điểm ký">
               <Tag color="cyan">{currentTime}</Tag>
@@ -465,8 +433,8 @@ export default function SignMedicalRecordModal({
                 </span>
                 <span>Huyết áp: <strong>{vitalSigns.bp || '—'}</strong> mmHg</span>
                 <span>Mạch: <strong>{vitalSigns.pulse || '—'}</strong> lần/phút</span>
-                <span>Nhiệt độ: <strong>{vitalSigns.temp || '37.0'}</strong> °C</span>
-                <span>SpO2: <strong>{vitalSigns.spO2 || '98'}</strong>%</span>
+                <span>Nhiệt độ: <strong>{vitalSigns.temp || '—'}</strong> °C</span>
+                <span>SpO2: <strong>{vitalSigns.spO2 || '—'}</strong>%</span>
                 <span>Cân nặng: <strong>{vitalSigns.weight || '—'}</strong> kg</span>
                 <span>Chiều cao: <strong>{vitalSigns.height || '—'}</strong> cm</span>
                 {bmiValue && <span>BMI: <strong>{bmiValue}</strong></span>}
@@ -491,7 +459,7 @@ export default function SignMedicalRecordModal({
             <Col xs={24} md={12}>
               <Card size="small" title="Khám lâm sàng & Diễn tiến" style={{ height: '100%' }}>
                 <Paragraph style={{ margin: 0 }}>
-                  {formValues.examinationNote || formValues.physicalExamination || 'Bình thường'}
+                  {formValues.examinationNote || formValues.physicalExamination || '—'}
                 </Paragraph>
               </Card>
             </Col>
@@ -667,10 +635,10 @@ export default function SignMedicalRecordModal({
               <SafetyCertificateFilled style={{ fontSize: 24, color: '#16a34a' }} />
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>
-                  HỒ SƠ BỆNH ÁN ĐÃ KÝ SỐ VÀ KHÓA PHÁP LÝ THÀNH CÔNG
+                  HỒ SƠ BỆNH ÁN ĐÃ KÝ SỐ XÁC NHẬN THÀNH CÔNG
                 </div>
                 <div style={{ fontSize: 12, color: '#15803d', marginTop: 2 }}>
-                  Chữ ký số đã được lưu an toàn trong hệ thống và khóa nội dung vĩnh viễn. Mọi điều chỉnh chuyên môn tiếp theo được thực hiện thông qua Quy trình Lập bản đính chính.
+                  Chữ ký số đã được lưu an toàn trong hệ thống và có đầy đủ giá trị pháp lý theo quy định. Bác sĩ có thể đóng hộp thoại này để tiến hành kê đơn và Khóa bệnh án.
                 </div>
               </div>
             </div>
@@ -689,11 +657,11 @@ export default function SignMedicalRecordModal({
                 disabled={!validationResult.canSign}
               >
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>
-                  Tôi là Bác sĩ phụ trách lượt khám, cam kết đã kiểm tra đầy đủ, chính xác nội dung bệnh án và đồng ý ký số khóa hồ sơ bệnh án theo quy định.
+                  Tôi là Bác sĩ phụ trách lượt khám, cam kết đã kiểm tra đầy đủ, chính xác nội dung bệnh án và đồng ý ký số xác nhận hồ sơ bệnh án theo quy định.
                 </span>
               </Checkbox>
               <div style={{ fontSize: 12, color: '#047857', marginTop: 4, paddingLeft: 24 }}>
-                Sau khi ký, bệnh án sẽ chuyển sang trạng thái <strong>Đã ký (SIGNED)</strong> và nội dung sẽ được khóa vĩnh viễn, không thể chỉnh sửa trực tiếp.
+                Sau khi ký số thành công, bệnh án sẽ chuyển sang trạng thái <strong>Đã ký (SIGNED)</strong>. Bác sĩ có thể tiếp tục rà soát đơn thuốc và thực hiện <strong>Khóa bệnh án</strong> để hoàn tất ca khám.
               </div>
             </div>
           )}
