@@ -9,9 +9,13 @@ import './login.css'
 function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const { login, isAuthenticated, user } = useAuthContext()
+  const { login, logout, isAuthenticated, user } = useAuthContext()
 
   if (isAuthenticated && user) {
+    const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    if (userRoles.includes('patient')) {
+      return <Navigate to="/portal/dashboard" replace />
+    }
     return <Navigate to={getDefaultHomePath(user?.roles, user?.permissions)} replace />
   }
 
@@ -20,8 +24,15 @@ function Login() {
     try {
       const result = await login(values)
       if (result.success) {
-        message.success('Đăng nhập thành công!')
         const targetUser = result.user || JSON.parse(localStorage.getItem('user') || '{}')
+        const userRoles = (targetUser?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+        if (userRoles.includes('patient')) {
+          logout()
+          message.warning('Tài khoản này là tài khoản bệnh nhân. Vui lòng đăng nhập tại Cổng bệnh nhân.')
+          navigate('/portal/login', { replace: true, state: { phone: values.username } })
+          return
+        }
+        message.success('Đăng nhập thành công!')
         const destination = getDefaultHomePath(targetUser?.roles, targetUser?.permissions)
         navigate(destination, { replace: true })
       } else {
