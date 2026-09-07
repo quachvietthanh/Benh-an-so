@@ -18,6 +18,8 @@ public enum ActionType {
 
     CHANGE_PASSWORD,
 
+    RESET_PASSWORD,
+
     LOCK,
 
     UNLOCK,

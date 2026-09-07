@@ -26,6 +26,7 @@ import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.port.dto.command.auth.PatientLoginCommand;
 import com.benhsoan.port.dto.result.PatientLoginResult;
+import com.benhsoan.port.inbound.auth.ChangePasswordUseCase;
 import com.benhsoan.port.inbound.auth.LoginUseCase;
 import com.benhsoan.port.inbound.auth.LogoutUseCase;
 import com.benhsoan.port.inbound.auth.PatientLoginUseCase;
@@ -56,6 +57,7 @@ class PatientAuthSecurityIntegrationTest {
     @MockitoBean private RefreshTokenUseCase refreshTokenUseCase;
     @MockitoBean private PatientLoginUseCase patientLoginUseCase;
     @MockitoBean private PatientPortalRegistrationUseCase patientPortalRegistrationUseCase;
+    @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;

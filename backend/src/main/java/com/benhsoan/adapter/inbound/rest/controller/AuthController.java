@@ -44,6 +44,8 @@ public class AuthController {
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final PatientLoginUseCase patientLoginUseCase;
     private final PatientPortalRegistrationUseCase patientPortalRegistrationUseCase;
+    private final com.benhsoan.port.inbound.auth.ChangePasswordUseCase changePasswordUseCase;
+    private final com.benhsoan.port.outbound.security.CurrentUserPort currentUserPort;
 
     private final AuthRestMapper authRestMapper;
 
@@ -135,5 +137,21 @@ public class AuthController {
 
         return ResponseEntity.ok(
                 authRestMapper.toResponse(result));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(
+            @jakarta.validation.Valid @RequestBody com.benhsoan.adapter.inbound.rest.request.auth.ChangePasswordRequest request
+    ) {
+
+        changePasswordUseCase.changePassword(
+                new com.benhsoan.port.dto.command.auth.ChangePasswordCommand(
+                        currentUserPort.getCurrentUserId(),
+                        request.oldPassword(),
+                        request.newPassword()
+                )
+        );
+
+        return ResponseEntity.ok().build();
     }
 }

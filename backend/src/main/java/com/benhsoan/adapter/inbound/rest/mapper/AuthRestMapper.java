@@ -41,7 +41,8 @@ public class AuthRestMapper {
                 result.accessToken(),
                 result.refreshToken(),
                 result.role(),
-                result.expiredAt()
+                result.expiredAt(),
+                result.mustChangePassword()
         );
     }
 

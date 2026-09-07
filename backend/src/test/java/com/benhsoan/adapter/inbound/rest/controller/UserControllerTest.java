@@ -76,6 +76,8 @@ class UserControllerTest {
     @org.springframework.boot.test.mock.mockito.MockBean
     private DeactivateUserUseCase deactivateUserUseCase;
     @org.springframework.boot.test.mock.mockito.MockBean
+    private com.benhsoan.port.inbound.user.ResetPasswordUseCase resetPasswordUseCase;
+    @org.springframework.boot.test.mock.mockito.MockBean
     private RoleRepository roleRepository;
     @org.springframework.boot.test.mock.mockito.MockBean
     private AuditLogRepository auditLogRepository;
@@ -135,6 +137,40 @@ class UserControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(createUserUseCase, getAllUsersUseCase, updateUserUseCase);
+    }
+
+    @Test
+    void allowsResetPasswordOnlyWithUserResetPasswordPermission() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(resetPasswordUseCase.resetPassword(any())).thenReturn(
+                new com.benhsoan.port.dto.result.ResetPasswordResult(userId, "user1", "TempPass123", java.time.Instant.now())
+        );
+
+        mvc.perform(post("/users/{id}/reset-password", userId)
+                        .with(withPermission("PERMISSION_USER_RESET_PASSWORD")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deniesResetPasswordWhenActorOnlyHasUserUpdatePermission() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mvc.perform(post("/users/{id}/reset-password", userId)
+                        .with(withPermission("PERMISSION_USER_UPDATE")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(resetPasswordUseCase);
+    }
+
+    @Test
+    void deniesResetPasswordWhenUserResetPermissionIsMissing() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mvc.perform(post("/users/{id}/reset-password", userId)
+                        .with(withPermission("PERMISSION_PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(resetPasswordUseCase);
     }
 
     private static UserResult result(UUID id) {

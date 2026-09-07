@@ -41,6 +41,7 @@ public class UserController {
     private final UpdateUserUseCase updateUserUseCase;
     private final ActivateUserUseCase activateUserUseCase;
     private final DeactivateUserUseCase deactivateUserUseCase;
+    private final com.benhsoan.port.inbound.user.ResetPasswordUseCase resetPasswordUseCase;
 
     private final UserRestMapper userRestMapper;
 
@@ -115,5 +116,20 @@ public class UserController {
 
         return userRestMapper.toResponse(
                 deactivateUserUseCase.deactivate(id));
+    }
+
+    @PostMapping("/{id}/reset-password")
+    @RequirePermission("USER_RESET_PASSWORD")
+    public com.benhsoan.adapter.inbound.rest.response.user.ResetPasswordResponse resetPassword(
+            @PathVariable UUID id,
+            @RequestBody(required = false) com.benhsoan.adapter.inbound.rest.request.user.ResetPasswordRequest request
+    ) {
+
+        String customTempPassword = request != null ? request.temporaryPassword() : null;
+        com.benhsoan.port.dto.result.ResetPasswordResult result =
+                resetPasswordUseCase.resetPassword(
+                        new com.benhsoan.port.dto.command.user.ResetPasswordCommand(id, customTempPassword));
+
+        return userRestMapper.toResponse(result);
     }
 }

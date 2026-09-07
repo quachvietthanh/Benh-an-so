@@ -22,6 +22,7 @@ public class UserPersistenceMapper {
                 entity.getPhone(),
                 entity.getRoleId(),
                 entity.isActive(),
+                entity.isMustChangePassword(),
                 entity.getLastLoginAt(),
                 entity.getCreatedAt()
         );
@@ -41,6 +42,7 @@ public class UserPersistenceMapper {
                 .phone(domain.getPhone())
                 .roleId(domain.getRoleId())
                 .active(domain.isActive())
+                .mustChangePassword(domain.isMustChangePassword())
                 .lastLoginAt(domain.getLastLoginAt())
                 .createdAt(domain.getCreatedAt())
                 .build();

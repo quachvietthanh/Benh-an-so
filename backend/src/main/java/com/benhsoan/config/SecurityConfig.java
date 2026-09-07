@@ -53,7 +53,8 @@ public class SecurityConfig {
 
                                 .authorizeHttpRequests(auth -> auth
 
-                                                // ===== PUBLIC =====
+                                                // ===== AUTHENTICATION =====
+                                                .requestMatchers("/auth/change-password").authenticated()
                                                 .requestMatchers("/auth/**").permitAll()
 
                                                 .requestMatchers(

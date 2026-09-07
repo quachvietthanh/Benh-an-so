@@ -9,8 +9,7 @@
 | `/api/v1/auth/register` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `/api/v1/auth/refresh` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/api/v1/auth/logout` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `/api/v1/auth/forgot-password` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `/api/v1/auth/reset-password` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `/api/v1/auth/change-password` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
 | | | | | | | |
 | **User Management** | | | | | | |
 | `/api/v1/users` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -19,6 +18,7 @@
 | `/api/v1/users/{id}` | PUT | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `/api/v1/users/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `/api/v1/users/{id}/roles` | PUT | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `/api/v1/users/{id}/reset-password` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
 | | | | | | | |
 | **Patient Management** | | | | | | |
 | `/api/v1/patients` | GET | ✅ | ✅ | ✅ | ✅ | ❌ |
@@ -163,7 +163,7 @@ PHARMACIST (Dược sĩ)
 
 ```java
 // User
-USER_CREATE, USER_READ, USER_UPDATE, USER_DELETE, USER_ASSIGN_ROLE
+USER_CREATE, USER_READ, USER_UPDATE, USER_DELETE, USER_ASSIGN_ROLE, USER_RESET_PASSWORD
 
 // Patient
 PATIENT_CREATE, PATIENT_READ, PATIENT_UPDATE, PATIENT_DELETE

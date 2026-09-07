@@ -78,12 +78,24 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("changePassword should update password hash")
+    @DisplayName("changePassword should update password hash and clear mustChangePassword")
     void changePassword() {
         User user = createDefaultUser();
+        user.resetPassword("tempHash123");
+        assertTrue(user.isMustChangePassword());
+
         user.changePassword("newHash456");
-        // Can't access passwordHash directly since it's private with no getter
-        // But we can verify no exception is thrown
+        assertFalse(user.isMustChangePassword());
+    }
+
+    @Test
+    @DisplayName("resetPassword should set mustChangePassword to true")
+    void resetPassword() {
+        User user = createDefaultUser();
+        assertFalse(user.isMustChangePassword());
+
+        user.resetPassword("temporaryHash789");
+        assertTrue(user.isMustChangePassword());
     }
 
     @Test
