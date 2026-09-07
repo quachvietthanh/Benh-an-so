@@ -180,7 +180,6 @@ function MedicalEncounter() {
   const loadAllBackendDiagnoses = useCallback(async () => {
     setIcdSearching(true)
     try {
-      // Single optimized initial query for common diagnoses instead of flooding the backend with 18 concurrent full-table scans
       const res = await medicalRecordApi.getDiagnosisCatalog('A')
       const rawList = Array.isArray(res?.data) ? res.data : []
       const list = rawList.map((item) => ({
@@ -221,7 +220,6 @@ function MedicalEncounter() {
 
     setTemplateError('')
 
-    // If medical record is already created and has clinical content, verify with doctor before clearing
     if (currentRecordId) {
       const formVals = form.getFieldsValue()
       const hasContent = [
@@ -282,7 +280,6 @@ function MedicalEncounter() {
         return
       }
 
-      // If no clinical content yet, apply directly to backend
       setTemplateLoading(true)
       try {
         const res = await medicalRecordApi.applyTemplate(currentRecordId, templateId)
@@ -297,7 +294,6 @@ function MedicalEncounter() {
         setTemplateLoading(false)
       }
     } else {
-      // Record not created yet, just update local state
       setSelectedTemplateId(templateId)
       setCurrentTemplate(candidate)
       message.info(`Đã chọn mẫu: ${formatTemplateName(candidate.name)}`)
@@ -409,7 +405,6 @@ function MedicalEncounter() {
         symptoms: fixMojibake(encounterData.visit?.reason || ''),
       })
 
-      // Fetch medical record for the visit
       let recordData = null
       try {
         const recordRes = await medicalRecordApi.getByVisit(visitId)
@@ -433,7 +428,6 @@ function MedicalEncounter() {
         }
       }
 
-      // Fetch template options for the visit
       try {
         const tmplOptRes = await medicalRecordApi.getTemplateOptionsByVisit(visitId)
         const tmplData = tmplOptRes.data
@@ -455,7 +449,6 @@ function MedicalEncounter() {
         console.warn('Không thể nạp template options:', tmplErr)
       }
 
-      // Load service catalog only if not yet loaded
       if (clinicalServices.length === 0) {
         try {
           const serviceResult = await clinicalServiceApi.getCatalog({ page: 0, size: 100 })
@@ -474,7 +467,6 @@ function MedicalEncounter() {
         }
       }
 
-      // Lazy load patient history if patient exists
       if (encounterData.patient?.id) {
         medicalRecordApi
           .getByPatient(encounterData.patient.id)
@@ -729,7 +721,6 @@ function MedicalEncounter() {
         }
       }
     } catch {
-      // Ignore lookup delay
     }
 
     return {
@@ -768,7 +759,6 @@ function MedicalEncounter() {
           liveQueueItem = response.data
         }
       } catch {
-        // Continue with current queue item
       }
     }
 

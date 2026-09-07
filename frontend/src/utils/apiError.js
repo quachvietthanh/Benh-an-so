@@ -1,7 +1,6 @@
 const DEFAULT_MESSAGE = 'Thao tác không thành công. Vui lòng thử lại.'
 
 export const DOMAIN_ERROR_MESSAGES = {
-  // Tài khoản & Xác thực
   ACCOUNT_DISABLED: 'Tài khoản người dùng đã bị vô hiệu hóa trong hệ thống.',
   ACCOUNT_LOCKED: 'Tài khoản đã bị tạm khóa do nhập sai mật khẩu nhiều lần.',
   INVALID_CREDENTIALS: 'Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.',
@@ -15,7 +14,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   PHONE_ALREADY_EXISTS: 'Số điện thoại này đã được sử dụng cho một tài khoản khác.',
   ROLE_NOT_FOUND: 'Không tìm thấy vai trò phân quyền người dùng trong hệ thống.',
 
-  // Lịch hẹn & Hàng đợi
   APPOINTMENT_ALREADY_CANCELLED: 'Lịch hẹn khám này đã bị hủy trước đó.',
   APPOINTMENT_ALREADY_COMPLETED: 'Lịch hẹn này đã hoàn tất quá trình khám bệnh.',
   APPOINTMENT_ALREADY_IN_PROGRESS: 'Lịch hẹn này hiện đang trong quá trình khám bệnh.',
@@ -32,7 +30,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   UNAUTHORIZED_APPOINTMENT_OPERATION: 'Bạn không có quyền thực hiện thao tác trên lịch hẹn này.',
   UNAUTHORIZED_QUEUE_OPERATION: 'Bạn không có quyền thao tác trên hàng đợi của phòng khám này.',
 
-  // Bệnh nhân & Lượt khám
   PATIENT_ALREADY_EXISTS: 'Thông tin bệnh nhân (Mã định danh/CCCD) đã tồn tại trên hệ thống.',
   PATIENT_INACTIVE: 'Hồ sơ bệnh nhân hiện đang tạm ngưng hoạt động.',
   PATIENT_NOT_FOUND: 'Không tìm thấy thông tin bệnh nhân trong hệ thống.',
@@ -44,7 +41,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   VISIT_INVALID_STATUS: 'Trạng thái lượt khám không hợp lệ để thực hiện thao tác này.',
   VISIT_NOT_FOUND: 'Không tìm thấy thông tin lượt khám trong hệ thống.',
 
-  // Bác sĩ & Phòng khám
   DOCTOR_INACTIVE: 'Bác sĩ hiện đang tạm ngưng hoạt động trong hệ thống.',
   DOCTOR_NOT_FOUND: 'Không tìm thấy thông tin bác sĩ trong hệ thống.',
   DOCTOR_ROOM_ASSIGNMENT_CONFLICT: 'Bác sĩ đã được phân công vào một phòng khám khác trong cùng ca trực.',
@@ -55,21 +51,20 @@ export const DOMAIN_ERROR_MESSAGES = {
   ROOM_NOT_FOUND: 'Không tìm thấy thông tin phòng khám trong hệ thống.',
   SPECIALTY_NOT_FOUND: 'Không tìm thấy thông tin chuyên khoa trong hệ thống.',
 
-  // Bệnh án điện tử (Medical Record)
   MEDICAL_RECORD_ALREADY_EXISTS_FOR_VISIT:
     'Lượt khám này đã có hồ sơ bệnh án được tạo trong hệ thống. Hệ thống sẽ tự động cập nhật vào hồ sơ hiện có thay vì tạo mới.',
   MEDICAL_RECORD_MISSING_DIAGNOSIS:
     'Bệnh án chưa có chẩn đoán. Vui lòng ghi nhận chẩn đoán ICD-10 trước khi ký xác nhận.',
   MEDICAL_RECORD_UNAUTHORIZED_SIGNER:
-    'Chỉ Bác sĩ phụ trách lượt khám mới có quyền ký xác nhận hồ sơ bệnh án này.',
+    'Chỉ bác sĩ phụ trách lượt khám mới có quyền ký xác nhận bệnh án này.',
   MEDICAL_RECORD_LOCKED:
-    'Hồ sơ bệnh án đã được ký số hoặc khóa bảo mật, không thể chỉnh sửa trực tiếp.',
+    'Hồ sơ bệnh án đã được ký hoặc khóa, không thể chỉnh sửa trực tiếp.',
   MEDICAL_RECORD_ALREADY_LOCKED:
-    'Hồ sơ bệnh án đã được ký số hoặc khóa bảo mật trước đó.',
+    'Hồ sơ bệnh án đã được ký hoặc khóa, không thể chỉnh sửa trực tiếp.',
   MEDICAL_RECORD_NOT_LOCKED:
     'Hồ sơ bệnh án phải ở trạng thái ĐÃ KÝ hoặc ĐÃ KHÓA mới có thể lập bản đính chính.',
   MEDICAL_RECORD_NOT_SIGNED:
-    'Bệnh án chưa được ký xác nhận. Vui lòng ký số trước khi hoàn tất hoặc khóa.',
+    'Bệnh án chưa được ký xác nhận. Vui lòng ký bệnh án trước khi hoàn tất hoặc khóa.',
   MEDICAL_RECORD_INVALID_STATUS:
     'Trạng thái hồ sơ bệnh án không hợp lệ để thực hiện thao tác này.',
   MEDICAL_RECORD_INVALID_VISIT:
@@ -87,7 +82,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   MEDICAL_RECORD_UNAUTHORIZED_RECIPIENT:
     'Người nhận không đủ điều kiện pháp lý để nhận bản sao hồ sơ bệnh án.',
 
-  // Mẫu bệnh án (Template)
   MEDICAL_RECORD_TEMPLATE_CHANGE_WITH_CONTENT:
     'Bệnh án đã có nội dung khám, không thể đổi sang mẫu khác để bảo toàn dữ liệu. Vui lòng tiếp tục với mẫu hiện tại.',
   MEDICAL_RECORD_TEMPLATE_SPECIALTY_MISMATCH:
@@ -107,7 +101,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   MEDICAL_RECORD_TEMPLATE_INVALID_REPLACEMENT:
     'Mẫu bệnh án thay thế không hợp lệ.',
 
-  // Danh mục chẩn đoán ICD-10
   DIAGNOSIS_CATALOG_CODE_ALREADY_EXISTS:
     'Mã bệnh ICD-10 đã tồn tại trong danh mục hệ thống.',
   DIAGNOSIS_CATALOG_CODE_EXISTS:
@@ -121,7 +114,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   DIAGNOSIS_CATALOG_DELETE_NOT_ALLOWED:
     'Không được phép xóa mã chẩn đoán ICD-10 chuẩn của hệ thống.',
 
-  // Dược & Đơn thuốc (Pharmacy & Prescription)
   INSUFFICIENT_STOCK:
     'Không đủ số lượng thuốc tồn kho để thực hiện xuất cấp đơn thuốc.',
   INTERACTION_CONFIRMATION_REQUIRED:
@@ -157,7 +149,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   UNAUTHORIZED_PRESCRIPTION_AMENDMENT:
     'Chỉ Bác sĩ kê đơn hoặc Bác sĩ phụ trách mới có quyền điều chỉnh đơn thuốc.',
 
-  // Chỉ định cận lâm sàng (Clinical Orders)
   CLINICAL_ORDER_ALREADY_CANCELLED:
     'Phiếu chỉ định cận lâm sàng này đã bị hủy trước đó.',
   CLINICAL_ORDER_ALREADY_COMPLETED:
@@ -185,7 +176,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   SERVICE_CATALOG_NOT_FOUND:
     'Không tìm thấy thông tin dịch vụ kỹ thuật trong danh mục.',
 
-  // Viện phí & Thanh toán (Billing & Payment)
   INVOICE_ALREADY_ISSUED:
     'Lượt khám này đã được lập hóa đơn thanh toán trước đó.',
   INVOICE_NOT_FOUND:
@@ -203,7 +193,6 @@ export const DOMAIN_ERROR_MESSAGES = {
   PAYMENT_REQUIRED_FOR_INVOICE:
     'Lượt khám có hóa đơn viện phí chưa hoàn tất thanh toán.',
 
-  // Sao lưu & Báo cáo & Chung
   BACKUP_EXECUTION_FAILED: 'Thực thi sao lưu dữ liệu hệ thống thất bại.',
   BACKUP_NOT_FOUND: 'Không tìm thấy bản sao lưu hệ thống yêu cầu.',
   INVALID_BACKUP_STATUS: 'Trạng thái bản sao lưu không hợp lệ.',
@@ -216,38 +205,58 @@ export const DOMAIN_ERROR_MESSAGES = {
   VALIDATION_FAILED: 'Dữ liệu nhập vào chưa hợp lệ hoặc thiếu thông tin bắt buộc. Vui lòng kiểm tra lại.',
 }
 
-/**
- * Dịch các thông báo lỗi kỹ thuật/tiếng Anh từ Backend sang Tiếng Việt chuẩn y tế cụ thể
- * @param {string} rawMessage
- * @returns {string}
- */
 export const translateApiErrorMessage = (rawMessage) => {
-  if (!rawMessage || typeof rawMessage !== 'string') return rawMessage || ''
+  if (!rawMessage || typeof rawMessage !== 'string') return DEFAULT_MESSAGE
   const trimmed = rawMessage.trim()
+  if (!trimmed) return DEFAULT_MESSAGE
 
-  // 1. Hồ sơ bệnh án đã tồn tại cho lượt khám (Medical record already exists for visit: <uuid>)
+  if (/timeout/i.test(trimmed) || /ECONNABORTED/i.test(trimmed)) {
+    return 'Hệ thống đang bận hoặc quá thời gian chờ phản hồi. Vui lòng thử lại sau ít giây.'
+  }
+
+  if (/Network Error/i.test(trimmed) || /Failed to fetch/i.test(trimmed)) {
+    return 'Lỗi kết nối mạng đến máy chủ. Vui lòng kiểm tra lại đường truyền internet.'
+  }
+
+  const statusMatch = trimmed.match(/status code (\d{3})/i)
+  if (statusMatch) {
+    const statusCode = statusMatch[1]
+    const statusMessages = {
+      '400': 'Dữ liệu gửi lên chưa hợp lệ hoặc thiếu thông tin bắt buộc.',
+      '401': 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.',
+      '403': 'Bạn không có quyền thực hiện thao tác này.',
+      '404': 'Không tìm thấy dữ liệu yêu cầu trên hệ thống.',
+      '409': 'Dữ liệu bị trùng lặp hoặc xung đột với trạng thái hiện tại.',
+      '500': 'Lỗi hệ thống máy chủ nội bộ. Vui lòng thử lại sau ít phút.',
+      '502': 'Cổng kết nối máy chủ tạm thời gián đoạn. Vui lòng thử lại sau.',
+      '503': 'Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau ít phút.',
+      '504': 'Máy chủ phản hồi quá hạn. Vui lòng thử lại sau ít giây.',
+    }
+    if (statusMessages[statusCode]) {
+      return statusMessages[statusCode]
+    }
+  }
+
   const recordExistsMatch = trimmed.match(/Medical record already exists for visit:\s*([a-f0-9-]+)/i)
   if (recordExistsMatch) {
-    return `Lượt khám này đã có hồ sơ bệnh án được tạo trong hệ thống. Vui lòng tiếp tục cập nhật hồ sơ hiện tại thay vì tạo mới.`
+    return 'Lượt khám này đã có hồ sơ bệnh án được tạo trong hệ thống. Vui lòng tiếp tục cập nhật hồ sơ hiện tại thay vì tạo mới.'
   }
 
-  // 2. Hóa đơn/Thanh toán đã tồn tại cho lượt khám
   const invoiceExistsMatch = trimmed.match(/An invoice already exists for visit:\s*([a-f0-9-]+)/i)
   if (invoiceExistsMatch) {
-    return `Lượt khám này đã được lập hóa đơn thanh toán trước đó.`
+    return 'Lượt khám này đã được lập hóa đơn thanh toán trước đó.'
   }
+
   const paymentExistsMatch = trimmed.match(/A payment already exists for visit:\s*([a-f0-9-]+)/i)
   if (paymentExistsMatch) {
-    return `Lượt khám này đã được ghi nhận thanh toán trước đó.`
+    return 'Lượt khám này đã được ghi nhận thanh toán trước đó.'
   }
 
-  // 3. Thiếu chẩn đoán trước khi ký (Medical record requires at least one diagnosis before signing: <uuid>)
   const missingDiagMatch = trimmed.match(/Medical record requires at least one diagnosis before signing:\s*(.*)/i)
   if (missingDiagMatch) {
-    return `Bệnh án chưa có chẩn đoán. Vui lòng ghi nhận chẩn đoán ICD-10 trước khi ký xác nhận.`
+    return 'Bệnh án chưa có chẩn đoán. Vui lòng ghi nhận chẩn đoán ICD-10 trước khi ký xác nhận.'
   }
 
-  // 4. Mẫu bệnh án thiếu mục bắt buộc (Required template section is missing: <SECTION>)
   const missingSectionMatch = trimmed.match(/Required template section is missing:\s*([A-Za-z0-9_]+)/i)
   if (missingSectionMatch) {
     const fieldCode = missingSectionMatch[1].toUpperCase()
@@ -265,18 +274,15 @@ export const translateApiErrorMessage = (rawMessage) => {
     return `Mục bắt buộc trong mẫu bệnh án chưa có nội dung: ${vietnameseName} (${fieldCode}). Vui lòng bổ sung trước khi ký.`
   }
 
-  // 5. Bác sĩ chưa được phân công phòng khám (Doctor is not assigned to room: <uuid>)
   const doctorRoomMatch = trimmed.match(/Doctor is not assigned to room:\s*(.*)/i)
   if (doctorRoomMatch) {
-    return `Bác sĩ chưa được phân công vào phòng khám này.`
+    return 'Bác sĩ chưa được phân công vào phòng khám này.'
   }
 
-  // 6. Bác sĩ không có quyền ký (User is not doctor in charge)
   if (/User is not doctor in charge/i.test(trimmed) || /Signature rejected/i.test(trimmed)) {
-    return `Chỉ Bác sĩ phụ trách lượt khám mới có quyền ký xác nhận hồ sơ bệnh án này.`
+    return 'Chỉ Bác sĩ phụ trách lượt khám mới có quyền ký xác nhận hồ sơ bệnh án này.'
   }
 
-  // 7. Từ điển thông báo lỗi cụ thể từ Backend
   const EXACT_TRANSLATIONS = {
     'Medical record must be signed before locking':
       'Hồ sơ bệnh án bắt buộc phải được ký xác nhận trước khi khóa.',
@@ -290,6 +296,20 @@ export const translateApiErrorMessage = (rawMessage) => {
       'Bệnh án chưa được ký xác nhận. Vui lòng ký số trước khi hoàn tất hoặc khóa.',
     'Cannot modify signed medical record':
       'Hồ sơ bệnh án đã ký không thể chỉnh sửa nội dung trực tiếp.',
+    'Finished visits cannot be updated.':
+      'Lượt khám đã kết thúc, không thể chỉnh sửa.',
+    'Finished visits cannot be updated':
+      'Lượt khám đã kết thúc, không thể chỉnh sửa.',
+    'Finished visits cannot be cancelled.':
+      'Lượt khám đã kết thúc, không thể hủy.',
+    'Finished visits cannot be cancelled':
+      'Lượt khám đã kết thúc, không thể hủy.',
+    'Invalid visit status transition.':
+      'Chuyển trạng thái lượt khám không hợp lệ.',
+    'Invalid visit status transition':
+      'Chuyển trạng thái lượt khám không hợp lệ.',
+    'Medical record requires an active visit':
+      'Bệnh án yêu cầu lượt khám đang hoạt động để thực hiện thao tác này.',
     'Chief complaint is required before locking medical record.':
       'Vui lòng nhập lý do khám / triệu chứng chính trước khi ký khóa bệnh án.',
     'Conclusion is required before locking medical record.':
@@ -358,7 +378,12 @@ export const translateApiErrorMessage = (rawMessage) => {
     return EXACT_TRANSLATIONS[trimmed]
   }
 
-  return rawMessage
+  const hasVietnamese = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(trimmed)
+  if (hasVietnamese) {
+    return trimmed
+  }
+
+  return 'Thao tác không thành công hoặc dữ liệu chưa hợp lệ. Vui lòng thử lại.'
 }
 
 export const normalizeApiError = (error, fallbackMessage = DEFAULT_MESSAGE) => {

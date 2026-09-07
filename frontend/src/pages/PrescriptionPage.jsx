@@ -318,7 +318,6 @@ function PrescriptionPage() {
         setRecord(recordData)
       }
 
-      // Fetch diagnoses and existing prescriptions resiliently
       const [diagnosisResult, prescriptionResult] = await Promise.allSettled([
         medicalRecordApi.getDiagnosis(medicalRecordId),
         pharmacyApi.getByMedicalRecord(medicalRecordId),
@@ -417,17 +416,17 @@ function PrescriptionPage() {
             setEncounter(routeState.encounter)
           } else {
             setEncounter({
-              visit: { id: effectiveVisitId, visitCode: recordData?.visitCode || 'VISIT-001' },
+              visit: { id: effectiveVisitId, visitCode: recordData?.visitCode || '' },
               patient: {
-                id: recordData?.patientId || 'patient-1',
-                fullName: recordData?.patientName || 'Bệnh nhân',
-                patientCode: recordData?.patientCode || 'BN-001',
+                id: recordData?.patientId || '',
+                fullName: recordData?.patientName || '',
+                patientCode: recordData?.patientCode || '',
               },
               doctor: {
-                id: recordData?.doctorId || recordData?.createdBy || currentUser?.id,
-                fullName: recordData?.doctorName || currentUser?.fullName || 'Bác sĩ phụ trách',
+                id: recordData?.doctorId || recordData?.createdBy || currentUser?.id || '',
+                fullName: recordData?.doctorName || currentUser?.fullName || '',
               },
-              queueItem: { id: recordData?.queueItemId || routeState.queueItemId || 'queue-item-1', status: 'IN_PROGRESS' },
+              queueItem: { id: recordData?.queueItemId || routeState.queueItemId || '', status: 'IN_PROGRESS' },
             })
           }
         }
@@ -473,7 +472,6 @@ function PrescriptionPage() {
       if (err?.message && err.message.includes('WAITING_FOR_RESULT')) {
         throw err
       }
-      // Khi API queue lỗi (ví dụ mã queue không đúng chuẩn UUID backend), tiếp tục với trạng thái lượt khám hiện tại
     }
 
     const blockReason = getQueueInProgressBlockReason(encounter?.queueItem, action)
@@ -1992,7 +1990,6 @@ function PrescriptionPage() {
                           </Col>
                         </Row>
 
-                        {/* Thông tin quy cách / hàm lượng thuốc đang chọn */}
                         {selectedMed && (
                           <div
                             style={{
@@ -2235,7 +2232,6 @@ function PrescriptionPage() {
                           ))}
                         </div>
 
-                        {/* Cảnh báo tồn kho */}
                         {selectedMed && (() => {
                           const avail = getAvailableStock(selectedMed)
                           if (avail <= 0) {
@@ -2499,7 +2495,6 @@ function PrescriptionPage() {
         ]}
       />
 
-      {/* Modal thông báo Cấp mã đơn thuốc điện tử thành công */}
       <Modal
         open={issuedPrescriptionModalOpen}
         onCancel={() => setIssuedPrescriptionModalOpen(false)}
@@ -2516,7 +2511,6 @@ function PrescriptionPage() {
               width: '100%',
             }}
           >
-            {/* Nhóm trái: Badge trạng thái liên thông */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
               {justIssuedPrescription?.interconnectionStatus === 'SUCCESS' ? (
                 <span
@@ -2562,7 +2556,6 @@ function PrescriptionPage() {
               )}
             </div>
 
-            {/* Nhóm phải: 3 nút hành động */}
             <div
               style={{
                 display: 'flex',

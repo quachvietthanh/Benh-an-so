@@ -951,7 +951,8 @@ function AppointmentQueue() {
     {
       title: 'Thao tác',
       key: 'action',
-      width: 150,
+      width: 90,
+      align: 'center',
       render: (_, record) => {
         const timeVal = record.appointmentAt || record.startTime || record.date
         const appTime = dayjs(timeVal)
@@ -1012,20 +1013,9 @@ function AppointmentQueue() {
         ].filter(Boolean)
 
         return (
-          <Space size="small">
-            <Button
-              size="small"
-              type="primary"
-              ghost
-              icon={<EyeOutlined />}
-              onClick={openDetail}
-            >
-              Chi tiết
-            </Button>
-            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-              <Button size="small" icon={<EllipsisOutlined />} title="Thao tác khác" />
-            </Dropdown>
-          </Space>
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+            <Button size="small" icon={<MoreOutlined style={{ fontSize: 16 }} />} title="Thao tác" />
+          </Dropdown>
         )
       },
     },
@@ -1166,9 +1156,11 @@ function AppointmentQueue() {
           },
         ].filter(Boolean)
 
+        const hasCallAction = permissions.canCallNext && record.status === 'WAITING'
+
         return (
           <Space size="small">
-            {permissions.canCallNext && record.status === 'WAITING' ? (
+            {hasCallAction && (
               <Button
                 type="primary"
                 size="small"
@@ -1177,19 +1169,9 @@ function AppointmentQueue() {
               >
                 Gọi khám
               </Button>
-            ) : (
-              <Button
-                size="small"
-                type="primary"
-                ghost
-                icon={<EyeOutlined />}
-                onClick={openDetail}
-              >
-                Chi tiết
-              </Button>
             )}
             <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-              <Button size="small" icon={<EllipsisOutlined />} title="Thao tác khác" />
+              <Button size="small" icon={<MoreOutlined style={{ fontSize: 16 }} />} title="Thao tác" />
             </Dropdown>
           </Space>
         )
@@ -1516,9 +1498,7 @@ function AppointmentQueue() {
                               ),
                               secondaryActions.length > 0 && (
                                 <Dropdown key="more" menu={{ items: secondaryActions }} trigger={['click']} placement="bottomRight">
-                                  <Button icon={<MoreOutlined />} aria-label={`Thao tác khác với bệnh nhân ${pInfo.name}`}>
-                                    Chi tiết
-                                  </Button>
+                                  <Button icon={<MoreOutlined />} aria-label={`Thao tác khác với bệnh nhân ${pInfo.name}`} />
                                 </Dropdown>
                               ),
                             ].filter(Boolean)}

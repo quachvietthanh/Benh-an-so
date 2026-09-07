@@ -73,6 +73,7 @@ function PatientList() {
   const canCreatePatient = userPermissions.includes('PATIENT_CREATE')
   const canUpdatePatient = userPermissions.includes('PATIENT_UPDATE')
   const canReadPatient = userPermissions.includes('PATIENT_READ')
+  const canBookAppointment = userPermissions.includes('APPOINTMENT_CREATE') || userPermissions.includes('APPOINTMENT_READ')
   const canManage = canCreatePatient || canUpdatePatient
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
@@ -395,12 +396,16 @@ ${rowsXml}
                       },
                     ]
                   : []),
-                {
-                  key: 'book',
-                  icon: <CalendarOutlined style={{ color: '#d97706' }} />,
-                  label: 'Đặt lịch / Tiếp nhận',
-                  onClick: () => navigate('/appointments', { state: { patientId: patient.id } }),
-                },
+                ...(canBookAppointment
+                  ? [
+                      {
+                        key: 'book',
+                        icon: <CalendarOutlined style={{ color: '#d97706' }} />,
+                        label: 'Đặt lịch / Tiếp nhận',
+                        onClick: () => navigate('/appointments', { state: { patientId: patient.id } }),
+                      },
+                    ]
+                  : []),
                 { type: 'divider' },
                 {
                   key: 'copy',

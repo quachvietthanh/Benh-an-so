@@ -144,12 +144,12 @@ export default function SignMedicalRecordModal({
     encounterContext?.doctor?.fullName ||
     currentUser?.fullName ||
     currentUser?.username ||
-    'Bác sĩ phụ trách'
+    ''
 
   const doctorId =
     encounterContext?.doctor?.id ||
     currentUser?.id ||
-    'DOC-CURRENT'
+    ''
 
   const effectiveRecordStatus =
     medicalRecord?.status || encounterContext?.medicalRecord?.status
@@ -305,7 +305,7 @@ export default function SignMedicalRecordModal({
       setSubmitting(false)
       onClose()
       if (onSuccess) {
-        onSuccess(finalRecord)
+        onSuccess(finalRecord || signedRecord)
       }
     } catch (err) {
       const errorMsg = getApiErrorMessage(err, 'Không thể ký bệnh án. Vui lòng thử lại sau ít giây.')
@@ -453,7 +453,7 @@ export default function SignMedicalRecordModal({
               {encounterContext?.room?.roomNumber || '—'}
             </Descriptions.Item>
             <Descriptions.Item label="Bác sĩ phụ trách">
-              <Text strong style={{ color: '#1e40af' }}>{doctorName}</Text>
+              <Text strong style={{ color: '#1e40af' }}>{doctorName || '—'}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="Mã bệnh án">
               {effectiveRecordId ? (
@@ -526,8 +526,8 @@ export default function SignMedicalRecordModal({
                 </span>
                 <span>Huyết áp: <strong>{vitalSigns.bp || '—'}</strong> mmHg</span>
                 <span>Mạch: <strong>{vitalSigns.pulse || '—'}</strong> lần/phút</span>
-                <span>Nhiệt độ: <strong>{vitalSigns.temp || '37.0'}</strong> °C</span>
-                <span>SpO2: <strong>{vitalSigns.spO2 || '98'}</strong>%</span>
+                <span>Nhiệt độ: <strong>{vitalSigns.temp || '—'}</strong> °C</span>
+                <span>SpO2: <strong>{vitalSigns.spO2 || '—'}</strong>%</span>
                 <span>Cân nặng: <strong>{vitalSigns.weight || '—'}</strong> kg</span>
                 <span>Chiều cao: <strong>{vitalSigns.height || '—'}</strong> cm</span>
                 {bmiValue && <span>BMI: <strong>{bmiValue}</strong></span>}
@@ -552,7 +552,7 @@ export default function SignMedicalRecordModal({
             <Col xs={24} md={12}>
               <Card size="small" title="Khám lâm sàng & Diễn tiến" style={{ height: '100%' }}>
                 <Paragraph style={{ margin: 0 }}>
-                  {formValues.examinationNote || formValues.physicalExamination || 'Bình thường'}
+                  {formValues.examinationNote || formValues.physicalExamination || '—'}
                 </Paragraph>
               </Card>
             </Col>
