@@ -25,6 +25,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_NOT_FOUND,
                     MEDICAL_RECORD_TEMPLATE_NOT_FOUND,
                     MEDICINE_NOT_FOUND,
+                    PATIENT_ALLERGY_NOT_FOUND,
                     PATIENT_NOT_FOUND,
                     PAYMENT_NOT_FOUND,
                     PORTAL_LOOKUP_NOT_FOUND,
