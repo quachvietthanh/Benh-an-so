@@ -7,7 +7,6 @@ import java.util.UUID;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.prescription.enums.WarningAction;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.domain.shared.exception.ValidationException;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;

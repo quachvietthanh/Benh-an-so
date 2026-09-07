@@ -34,6 +34,8 @@ public class User {
 
     private boolean active;
 
+    private boolean mustChangePassword;
+
     private Instant lastLoginAt;
 
     private Instant createdAt;
@@ -47,6 +49,7 @@ public class User {
             String phone,
             UUID roleId,
             boolean active,
+            boolean mustChangePassword,
             Instant lastLoginAt,
             Instant createdAt
     ) {
@@ -58,6 +61,7 @@ public class User {
         this.phone = phone;
         this.roleId = Objects.requireNonNull(roleId);
         this.active = active;
+        this.mustChangePassword = mustChangePassword;
         this.lastLoginAt = lastLoginAt;
         this.createdAt = Objects.requireNonNull(createdAt);
     }
@@ -79,6 +83,7 @@ public class User {
                 phone,
                 roleId,
                 true,
+                false,
                 null,
                 Instant.now()
         );
@@ -94,6 +99,12 @@ public class User {
 
     public void changePassword(String newPasswordHash) {
         this.passwordHash = Guard.require(newPasswordHash, "Password");
+        this.mustChangePassword = false;
+    }
+
+    public void resetPassword(String tempPasswordHash) {
+        this.passwordHash = Guard.require(tempPasswordHash, "Password");
+        this.mustChangePassword = true;
     }
 
     public void updateProfile(
@@ -112,28 +123,57 @@ public class User {
 
 
     public static User restore(
-        UUID id,
-        String username,
-        String passwordHash,
-        String fullName,
-        String email,
-        String phone,
-        UUID roleId,
-        boolean active,
-        Instant lastLoginAt,
-        Instant createdAt
-) {
-    return new User(
-            id,
-            username,
-            passwordHash,
-            fullName,
-            email,
-            phone,
-            roleId,
-            active,
-            lastLoginAt,
-            createdAt
-    );
-}
+            UUID id,
+            String username,
+            String passwordHash,
+            String fullName,
+            String email,
+            String phone,
+            UUID roleId,
+            boolean active,
+            Instant lastLoginAt,
+            Instant createdAt
+    ) {
+        return restore(
+                id,
+                username,
+                passwordHash,
+                fullName,
+                email,
+                phone,
+                roleId,
+                active,
+                false,
+                lastLoginAt,
+                createdAt
+        );
+    }
+
+    public static User restore(
+            UUID id,
+            String username,
+            String passwordHash,
+            String fullName,
+            String email,
+            String phone,
+            UUID roleId,
+            boolean active,
+            boolean mustChangePassword,
+            Instant lastLoginAt,
+            Instant createdAt
+    ) {
+        return new User(
+                id,
+                username,
+                passwordHash,
+                fullName,
+                email,
+                phone,
+                roleId,
+                active,
+                mustChangePassword,
+                lastLoginAt,
+                createdAt
+        );
+    }
 }

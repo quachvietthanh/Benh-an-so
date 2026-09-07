@@ -33,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class PatientAppointmentBookingConcurrencyIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("appointment_booking_concurrency_test")
             .withUsername("appointment_test")

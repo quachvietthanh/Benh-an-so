@@ -15,7 +15,19 @@ public record LoginResponse(
 
         String role,
 
-        Instant expiredAt
+        Instant expiredAt,
+
+        boolean mustChangePassword
 
 ) {
+    public LoginResponse(
+            UUID userId,
+            String username,
+            String accessToken,
+            String refreshToken,
+            String role,
+            Instant expiredAt
+    ) {
+        this(userId, username, accessToken, refreshToken, role, expiredAt, false);
+    }
 }

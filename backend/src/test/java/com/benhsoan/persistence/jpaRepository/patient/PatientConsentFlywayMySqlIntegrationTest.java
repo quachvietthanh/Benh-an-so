@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class PatientConsentFlywayMySqlIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("patient_consent_test")
             .withUsername("patient_consent_test")

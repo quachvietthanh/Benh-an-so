@@ -35,7 +35,6 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.domain.auth.exception.EmailAlreadyExistsException;
 import com.benhsoan.domain.auth.exception.PhoneAlreadyExistsException;
-import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.enums.Gender;

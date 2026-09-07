@@ -72,7 +72,7 @@ public class CancelAppointmentService
                 .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
         appointment.cancel(command.cancelReason());
 
-        if (lockedQueueItem != null) {
+        if (lockedQueueItem != null && lockedVisit != null) {
             var cancelledAt = clockPort.now();
             lockedQueueItem.cancel(command.cancelReason(), cancelledAt);
             lockedVisit.cancel(cancelledAt);

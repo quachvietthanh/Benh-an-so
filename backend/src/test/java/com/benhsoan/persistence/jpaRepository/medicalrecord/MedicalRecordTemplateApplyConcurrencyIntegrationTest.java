@@ -31,6 +31,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class MedicalRecordTemplateApplyConcurrencyIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("medical_record_template_concurrency_test")
             .withUsername("template_test")

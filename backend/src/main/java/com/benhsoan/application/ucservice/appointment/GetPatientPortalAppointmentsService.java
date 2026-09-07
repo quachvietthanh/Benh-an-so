@@ -1,7 +1,6 @@
 package com.benhsoan.application.ucservice.appointment;
 
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;

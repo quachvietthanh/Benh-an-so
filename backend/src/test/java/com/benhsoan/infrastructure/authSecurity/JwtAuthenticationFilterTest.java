@@ -100,6 +100,42 @@ class JwtAuthenticationFilterTest {
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
+    @Test
+    void blocksBusinessApiWhenMustChangePasswordIsTrue() throws Exception {
+        UserSession session = UserSession.restore(SESSION_ID, USER_ID, "hash", null,
+                NOW.plus(Duration.ofDays(7)), NOW, NOW, null);
+        User user = User.restore(USER_ID, "admin", "hash", "Admin", "admin@example.com", null,
+                UUID.randomUUID(), true, true, null, NOW);
+        JwtAuthenticationFilter filter = configuredFilter(session, user);
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(requestWithToken(), response, new MockFilterChain());
+
+        assertEquals(403, response.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(response.getContentAsString().contains("MUST_CHANGE_PASSWORD"));
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void allowsChangePasswordApiWhenMustChangePasswordIsTrue() throws Exception {
+        UserSession session = UserSession.restore(SESSION_ID, USER_ID, "hash", null,
+                NOW.plus(Duration.ofDays(7)), NOW, NOW, null);
+        User user = User.restore(USER_ID, "admin", "hash", "Admin", "admin@example.com", null,
+                UUID.randomUUID(), true, true, null, NOW);
+        JwtAuthenticationFilter filter = configuredFilter(session, user);
+        when(jwtTokenPort.getUsername("access-token")).thenReturn("admin");
+        when(jwtTokenPort.getRole("access-token")).thenReturn("ADMIN");
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/change-password");
+        request.addHeader("Authorization", "Bearer access-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertEquals(200, response.getStatus());
+        org.junit.jupiter.api.Assertions.assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
     private JwtAuthenticationFilter configuredFilter(UserSession session, User user) {
         when(jwtTokenPort.validate("access-token")).thenReturn(true);
         when(jwtTokenPort.getUserId("access-token")).thenReturn(USER_ID);

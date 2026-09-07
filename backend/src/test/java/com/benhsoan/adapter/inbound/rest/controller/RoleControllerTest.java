@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -47,17 +47,17 @@ import com.benhsoan.port.outbound.time.ClockPort;
         RoleControllerTest.AspectConfiguration.class})
 class RoleControllerTest {
     @Autowired MockMvc mvc;
-    @MockBean GetSystemRolesUseCase getSystemRolesUseCase;
-    @MockBean GetPermissionCatalogUseCase getPermissionCatalogUseCase;
-    @MockBean UpdateRolePermissionsUseCase updateRolePermissionsUseCase;
-    @MockBean RoleRestMapper mapper;
-    @MockBean RoleRepository roleRepository;
-    @MockBean AuditLogRepository auditLogRepository;
-    @MockBean CurrentUserPort currentUserPort;
-    @MockBean JwtTokenPort jwtTokenPort;
-    @MockBean UserSessionRepository userSessionRepository;
-    @MockBean UserRepository userRepository;
-    @MockBean ClockPort clockPort;
+    @MockitoBean GetSystemRolesUseCase getSystemRolesUseCase;
+    @MockitoBean GetPermissionCatalogUseCase getPermissionCatalogUseCase;
+    @MockitoBean UpdateRolePermissionsUseCase updateRolePermissionsUseCase;
+    @MockitoBean RoleRestMapper mapper;
+    @MockitoBean RoleRepository roleRepository;
+    @MockitoBean AuditLogRepository auditLogRepository;
+    @MockitoBean CurrentUserPort currentUserPort;
+    @MockitoBean JwtTokenPort jwtTokenPort;
+    @MockitoBean UserSessionRepository userSessionRepository;
+    @MockitoBean UserRepository userRepository;
+    @MockitoBean ClockPort clockPort;
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableAspectJAutoProxy

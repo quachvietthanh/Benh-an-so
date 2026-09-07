@@ -44,6 +44,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_ACCESS_DENIED,
                     MEDICAL_RECORD_UNAUTHORIZED_RECIPIENT,
                     MEDICAL_RECORD_UNAUTHORIZED_SIGNER,
+                    MUST_CHANGE_PASSWORD,
                     PATIENT_CONSENT_ACCESS_DENIED,
                     PATIENT_INACTIVE,
                     UNAUTHORIZED_APPOINTMENT_OPERATION,
@@ -58,14 +59,17 @@ final class DomainExceptionHttpStatusMapper {
                     DOCTOR_SCHEDULE_UNAVAILABLE,
                     INVALID_BACKUP_STATUS,
                     INVALID_DOCTOR_ROLE,
+                    INVALID_OLD_PASSWORD,
                     MEDICAL_RECORD_MISSING_AUTHORIZATION,
                     MEDICAL_RECORD_MISSING_DIAGNOSIS,
                     MEDICAL_RECORD_NOT_LOCKED,
                     MEDICAL_RECORD_NOT_SIGNED,
                     PATIENT_CONSENT_REQUIRED,
                     PAYMENT_AMOUNT_MISMATCH,
+                    SAME_PASSWORD_NOT_ALLOWED,
                     SELF_DRUG_INTERACTION,
-                    VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;
+                    VALIDATION_FAILED,
+                    WEAK_PASSWORD -> HttpStatus.BAD_REQUEST;
             case BACKUP_EXECUTION_FAILED -> HttpStatus.INTERNAL_SERVER_ERROR;
             case REPORT_DATA_EMPTY -> HttpStatus.UNPROCESSABLE_ENTITY;
             case TOO_MANY_LOGIN_ATTEMPTS -> HttpStatus.TOO_MANY_REQUESTS;

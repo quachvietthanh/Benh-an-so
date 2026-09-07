@@ -40,6 +40,7 @@ class ClinicalServiceBillingMySqlIntegrationTest {
     private static final UUID CLINICAL_SERVICE_ID = UUID.fromString("f0000000-0000-0000-0000-000000000010");
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("clinical_service_billing_test")
             .withUsername("billing_test")

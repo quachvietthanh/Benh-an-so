@@ -14,7 +14,6 @@ import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundExceptio
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateDefaultNotConfiguredException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
-import com.benhsoan.port.dto.result.MedicalRecordTemplateOptionResult;
 import com.benhsoan.port.dto.result.MedicalRecordTemplateSelectionResult;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordTemplateSelectionUseCase;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;

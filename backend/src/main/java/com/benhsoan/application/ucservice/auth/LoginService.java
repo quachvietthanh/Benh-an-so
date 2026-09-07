@@ -142,7 +142,8 @@ public class LoginService implements LoginUseCase {
                 accessToken,
                 refreshToken,
                 role.getName(),
-                expiredAt
+                expiredAt,
+                user.isMustChangePassword()
         );
     }
 }
