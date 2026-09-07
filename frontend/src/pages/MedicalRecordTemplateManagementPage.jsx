@@ -33,6 +33,7 @@ import dayjs from 'dayjs'
 import medicalRecordTemplateApi from '../api/medicalRecordTemplateApi'
 import TemplateFormModal from '../components/medicalRecordTemplate/TemplateFormModal'
 import StatusToggleModal from '../components/medicalRecordTemplate/StatusToggleModal'
+import { formatTemplateName, formatSpecialtyName } from '../constants/medicalRecordTemplateConstants'
 import { useAuthContext } from '../context/AuthContext'
 
 const { Title, Text, Paragraph } = Typography
@@ -143,10 +144,10 @@ function MedicalRecordTemplateManagementPage() {
     try {
       if (editingTemplate) {
         await medicalRecordTemplateApi.updateTemplate(editingTemplate.id, payload)
-        message.success(`Đã cập nhật mẫu "${payload.name}" và nâng lên phiên bản mới!`)
+        message.success(`Đã cập nhật mẫu "${formatTemplateName(payload.name)}" và nâng lên phiên bản mới!`)
       } else {
         await medicalRecordTemplateApi.createTemplate(payload)
-        message.success(`Đã tạo mẫu bệnh án "${payload.name}" thành công!`)
+        message.success(`Đã tạo mẫu bệnh án "${formatTemplateName(payload.name)}" thành công!`)
       }
       setFormModalOpen(false)
       setEditingTemplate(null)
@@ -159,7 +160,7 @@ function MedicalRecordTemplateManagementPage() {
   const handleSetDefault = async (record) => {
     try {
       await medicalRecordTemplateApi.setDefaultTemplate(record.id)
-      message.success(`Đã đặt "${record.name}" làm mẫu mặc định cho chuyên khoa ${record.specialty?.name || ''}!`)
+      message.success(`Đã đặt "${formatTemplateName(record.name)}" làm mẫu mặc định cho chuyên khoa ${record.specialty?.name || ''}!`)
       fetchTemplates()
     } catch (err) {
       const msg = err?.response?.data?.message || 'Không thể thiết lập mẫu mặc định.'
@@ -198,7 +199,7 @@ function MedicalRecordTemplateManagementPage() {
       render: (text, record) => (
         <div className="template-name-cell">
           <div className="template-name-title">
-            <span>{text}</span>
+            <span>{formatTemplateName(text)}</span>
             {record.defaultTemplate && (
               <span className="template-badge-default">
                 <StarFilled style={{ color: '#059669', marginRight: 4 }} />
@@ -219,7 +220,7 @@ function MedicalRecordTemplateManagementPage() {
       width: 180,
       render: (specialty) => (
         <Tag color="blue" style={{ fontWeight: 500, fontSize: 12 }}>
-          {specialty?.name || specialty?.code || '—'}
+          {formatSpecialtyName(specialty?.name || specialty?.code || '—')}
         </Tag>
       ),
     },
@@ -383,7 +384,7 @@ function MedicalRecordTemplateManagementPage() {
                 { value: 'ALL', label: 'Tất cả chuyên khoa' },
                 ...specialties.map((s) => ({
                   value: s.id,
-                  label: `${s.name} (${s.code})`,
+                  label: `${formatSpecialtyName(s.name)} (${s.code})`,
                 })),
               ]}
             />

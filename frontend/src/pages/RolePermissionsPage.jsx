@@ -20,7 +20,6 @@ import {
   getPermissionDetails,
   getRoleDisplayName,
 } from '../components/rolePermissions/rolePermissionsConstants'
-import Loading from '../components/common/Loading'
 import RoleOverviewCards from '../components/rolePermissions/RoleOverviewCards'
 import RolePermissionsFilterBar from '../components/rolePermissions/RolePermissionsFilterBar'
 import RolePermissionsMatrixTable from '../components/rolePermissions/RolePermissionsMatrixTable'
@@ -538,18 +537,7 @@ function RolePermissionsPage() {
         />
       )}
 
-      {loading && roles.length === 0 ? (
-        <Card style={{ borderRadius: 12, padding: '32px 24px', marginTop: 16 }}>
-          <Loading
-            type="table"
-            rows={8}
-            cols={6}
-            tip="Đang tải ma trận phân quyền và danh sách vai trò hệ thống..."
-          />
-        </Card>
-      ) : (
-        <>
-          <RoleOverviewCards
+      <RoleOverviewCards
             roles={roles}
             permissions={permissions}
             draftPermissionsByRole={draftPermissionsByRole}
@@ -645,8 +633,6 @@ function RolePermissionsPage() {
         onResetRole={handleResetRole}
         onSaveRole={handleRequestSaveRole}
       />
-        </>
-      )}
 
       <RolePermissionsConfirmModal
         confirmModalOpen={confirmModalOpen}

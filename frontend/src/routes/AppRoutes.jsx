@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Alert } from 'antd'
 import { useAuthContext } from '../context/AuthContext'
 import MainLayout from '../components/layout/MainLayout'
-import Loading from '../components/common/Loading'
 
 import PatientRoute from '../components/common/PatientRoute'
 
@@ -42,7 +41,7 @@ const PrescriptionInterconnectionPage = React.lazy(() => import('../pages/Prescr
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
-  <React.Suspense fallback={<Loading tip="Đang tải trang..." minHeight={320} />}>
+  <React.Suspense fallback={null}>
     {children}
   </React.Suspense>
 )
@@ -51,9 +50,8 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
   const { isAuthenticated, loading, user } = useAuthContext()
 
   if (loading) {
-    return <Loading fullPage tip="Đang kiểm tra quyền truy cập..." subtip="Đang xác thực thông tin tài khoản..." />
+    return null
   }
-
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />

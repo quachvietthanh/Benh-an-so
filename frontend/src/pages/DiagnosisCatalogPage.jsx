@@ -35,7 +35,6 @@ import {
 import diagnosisCatalogApi from '../api/diagnosisCatalogApi'
 import DiagnosisCatalogCreateModal from '../components/clinical/DiagnosisCatalogCreateModal'
 import DiagnosisCatalogEditModal from '../components/clinical/DiagnosisCatalogEditModal'
-import Loading from '../components/common/Loading'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { icd10Categories } from '../utils/icd10Data'
@@ -437,35 +436,29 @@ function DiagnosisCatalogPage() {
       </div>
 
       <Card bodyStyle={{ padding: 0 }} style={{ borderRadius: 12, overflow: 'hidden' }}>
-        {loading && data.length === 0 ? (
-          <div style={{ padding: 24 }}>
-            <Loading type="table" rows={6} cols={5} tip="Đang tải danh mục mã bệnh ICD-10..." />
-          </div>
-        ) : (
-          <Table
-            columns={columns}
-            dataSource={filteredData}
-            rowKey="id"
-            loading={loading && data.length > 0}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} mã bệnh`,
-            }}
-            locale={{
-              emptyText: (
-                <Empty
-                  description={
-                    keyword || statusFilter !== 'ALL' || groupFilter !== 'ALL'
-                      ? 'Không tìm thấy mã bệnh phù hợp với bộ lọc.'
-                      : 'Chưa có mã bệnh nào trong danh mục.'
-                  }
-                />
-              ),
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} mã bệnh`,
+          }}
+          locale={{
+            emptyText: (
+              <Empty
+                description={
+                  keyword || statusFilter !== 'ALL' || groupFilter !== 'ALL'
+                    ? 'Không tìm thấy mã bệnh phù hợp với bộ lọc.'
+                    : 'Chưa có mã bệnh nào trong danh mục.'
+                }
+              />
+            ),
+          }}
+        />
       </Card>
 
       <DiagnosisCatalogCreateModal
