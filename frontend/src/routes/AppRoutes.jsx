@@ -60,6 +60,11 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
   const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const userPerms = (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
 
+  const isPatient = userRoles.includes('patient')
+  if (isPatient) {
+    return <Navigate to="/portal/dashboard" replace />
+  }
+
   const isAdmin = userRoles.includes('admin')
 
   const hasRoleMatch = allowedRoles.length > 0 && allowedRoles.some((role) =>

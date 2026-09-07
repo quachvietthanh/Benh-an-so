@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Alert,
@@ -45,9 +45,7 @@ import {
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
 import medicalRecordApi from '../api/medicalRecordApi'
-import medicalRecordTemplateApi from '../api/medicalRecordTemplateApi'
 import queueApi from '../api/queueApi'
-import systemApi from '../api/systemApi'
 import visitApi from '../api/visitApi'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
@@ -148,7 +146,8 @@ function MedicalEncounter() {
   const [serviceCatalogError, setServiceCatalogError] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [saving, setSaving] = useState(false)
+  const draftInitPromiseRef = useRef(null)
+  const pendingSaveRef = useRef(null)
   const [activeTab, setActiveTab] = useState('current')
   const [viewing, setViewing] = useState(null)
 
@@ -388,6 +387,61 @@ function MedicalEncounter() {
     )
   }, [form])
 
+  const ensureDraftRecord = useCallback(async (vId, tmplId) => {
+    try {
+      const createRes = await medicalRecordApi.create({
+        visitId: vId,
+        chiefComplaint: '',
+        symptoms: '',
+        medicalHistory: '',
+        physicalExamination: '',
+        clinicalProgress: '',
+        treatmentPlan: '',
+        doctorInstructions: '',
+        conclusion: '',
+      })
+      const recId = createRes.data?.id
+      if (recId) {
+        setCurrentRecordId(recId)
+        setMedicalRecord((prev) => ({
+          ...prev,
+          id: recId,
+          medicalRecordId: recId,
+          status: 'DRAFT',
+          visitId: vId,
+        }))
+        if (tmplId) {
+          try {
+            const appliedRes = await medicalRecordApi.applyTemplate(recId, tmplId)
+            if (appliedRes.data?.appliedTemplate) {
+              setCurrentTemplate(appliedRes.data.appliedTemplate)
+            }
+          } catch (tErr) {
+            console.warn('Áp dụng mẫu bệnh án khi tạo nháp:', tErr)
+          }
+        }
+        return recId
+      }
+    } catch (createErr) {
+      const isAlreadyExists =
+        createErr?.response?.data?.code === 'MEDICAL_RECORD_ALREADY_EXISTS_FOR_VISIT' ||
+        String(createErr?.response?.data?.message || '').includes('already exists for visit')
+      if (isAlreadyExists) {
+        try {
+          const existingRes = await medicalRecordApi.getByVisit(vId)
+          const existId = existingRes?.data?.id || existingRes?.data?.medicalRecordId
+          if (existId) {
+            setCurrentRecordId(existId)
+            setMedicalRecord((prev) => ({ ...prev, ...existingRes?.data, medicalRecordId: existId }))
+            return existId
+          }
+        } catch {
+        }
+      }
+    }
+    return null
+  }, [])
+
   const loadWorkflow = useCallback(async () => {
     if (!visitId) return
     setLoading(true)
@@ -428,6 +482,7 @@ function MedicalEncounter() {
         }
       }
 
+      let effectiveTmplId = null
       try {
         const tmplOptRes = await medicalRecordApi.getTemplateOptionsByVisit(visitId)
         const tmplData = tmplOptRes.data
@@ -440,13 +495,19 @@ function MedicalEncounter() {
           if (applied) {
             setSelectedTemplateId(applied.templateId)
             setCurrentTemplate(applied)
+            effectiveTmplId = applied.templateId
           } else if (tmplData.effectiveTemplate) {
             setSelectedTemplateId(tmplData.effectiveTemplate.templateId)
             setCurrentTemplate(tmplData.effectiveTemplate)
+            effectiveTmplId = tmplData.effectiveTemplate.templateId
           }
         }
       } catch (tmplErr) {
         console.warn('Không thể nạp template options:', tmplErr)
+      }
+
+      if (!recordData && visitId && canEditEncounter) {
+        draftInitPromiseRef.current = ensureDraftRecord(visitId, effectiveTmplId)
       }
 
       if (clinicalServices.length === 0) {
@@ -671,79 +732,62 @@ function MedicalEncounter() {
       items.map((item) => (item.code === code ? { ...item, note } : item)),
     )
 
-  const resolveDiagnosis = async (diagnosis) => {
-    if (diagnosis?.id && (diagnosis?.rawName || diagnosis?.name)) return diagnosis
-    if (!diagnosis?.code) throw new Error('Vui lòng chọn chẩn đoán ICD-10 từ danh mục chuẩn.')
-
-    const foundInState =
-      allBackendDiagnoses.find(
-        (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
-      ) ||
-      backendIcdCatalog.find(
-        (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
-      )
-
-    if (foundInState?.id) {
-      return {
-        id: foundInState.id,
-        code: foundInState.code,
-        rawName: foundInState.rawName || foundInState.name,
-        name: foundInState.name,
-        note: diagnosis.note,
-      }
-    }
-
-    if (diagnosis.id) {
-      return {
-        id: diagnosis.id,
-        code: diagnosis.code,
-        rawName: diagnosis.rawName || diagnosis.name,
-        name: fixMojibake(diagnosis.name || diagnosis.code),
-        note: diagnosis.note,
-      }
-    }
-
-    try {
-      const response = await medicalRecordApi.getDiagnosisCatalog(diagnosis.code)
-      const list = Array.isArray(response.data) ? response.data : []
-      const exact =
-        list.find((item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase()) ||
-        list.find((item) => String(item.code).toUpperCase().startsWith(String(diagnosis.code).toUpperCase())) ||
-        list[0]
-
-      if (exact?.id) {
+  const resolveDiagnosisSync = useCallback(
+    (diagnosis) => {
+      if (!diagnosis) return { code: '', name: '' }
+      if (diagnosis?.id && (diagnosis?.rawName || diagnosis?.name)) {
         return {
-          id: exact.id,
-          code: exact.code,
-          rawName: exact.name,
-          name: fixMojibake(exact.name),
+          id: diagnosis.id,
+          code: diagnosis.code,
+          rawName: diagnosis.rawName || diagnosis.name,
+          name: fixMojibake(diagnosis.name || diagnosis.code),
           note: diagnosis.note,
         }
       }
-    } catch {
-    }
+      if (!diagnosis?.code) return { code: '', name: '' }
 
-    return {
-      id: diagnosis.id || null,
-      code: diagnosis.code,
-      rawName: diagnosis.name || diagnosis.code,
-      name: fixMojibake(diagnosis.name || diagnosis.code),
-      note: diagnosis.note,
-    }
-  }
+      const foundInState =
+        allBackendDiagnoses.find(
+          (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
+        ) ||
+        backendIcdCatalog.find(
+          (item) => String(item.code).toUpperCase() === String(diagnosis.code).toUpperCase() || (diagnosis.id && String(item.id) === String(diagnosis.id)),
+        )
+
+      if (foundInState?.id) {
+        return {
+          id: foundInState.id,
+          code: foundInState.code,
+          rawName: foundInState.rawName || foundInState.name,
+          name: foundInState.name,
+          note: diagnosis.note,
+        }
+      }
+
+      return {
+        id: diagnosis.id || null,
+        code: diagnosis.code,
+        rawName: diagnosis.name || diagnosis.code,
+        name: fixMojibake(diagnosis.name || diagnosis.code),
+        note: diagnosis.note,
+      }
+    },
+    [allBackendDiagnoses, backendIcdCatalog],
+  )
 
   async function openPrescription(targetRecordId) {
     let activeRecId = targetRecordId || currentRecordId
-    try {
-      message.loading({ content: 'Đang lưu thông tin khám và chẩn đoán để sang kê đơn...', key: 'open_rx_save' })
+    if (pendingSaveRef.current) {
+      try {
+        await pendingSaveRef.current
+      } catch (saveErr) {
+        console.warn('Lưu bệnh án trước khi kê đơn:', saveErr)
+      }
+    } else if (!activeRecId) {
       const savedId = await saveRecord({ showModal: false })
       if (savedId) {
         activeRecId = savedId
       }
-    } catch (saveErr) {
-      console.warn('Lưu bệnh án trước khi kê đơn:', saveErr)
-    } finally {
-      message.destroy('open_rx_save')
     }
 
     if (!activeRecId) {
@@ -752,15 +796,6 @@ function MedicalEncounter() {
     }
 
     let liveQueueItem = encounter?.queueItem
-    if (liveQueueItem?.id) {
-      try {
-        const response = await queueApi.getById(liveQueueItem.id)
-        if (response?.data?.id) {
-          liveQueueItem = response.data
-        }
-      } catch {
-      }
-    }
 
     navigate(`/prescriptions/${activeRecId}`, {
       state: {
@@ -864,15 +899,12 @@ function MedicalEncounter() {
       return
     }
     try {
-      setSaving(true)
       await queueApi.complete(encounter.queueItem.id)
       message.success('Đã hoàn tất ca khám thành công!')
       await loadWorkflow()
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Không thể hoàn tất ca khám.')
       message.error(msg)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -915,31 +947,176 @@ function MedicalEncounter() {
       }
     }
 
-    setSaving(true)
     let persistedRecordId = currentRecordId
+    if (!persistedRecordId && draftInitPromiseRef.current) {
+      try {
+        persistedRecordId = await draftInitPromiseRef.current
+      } catch {
+      }
+    }
+
+    const resolvedPrimary = resolveDiagnosisSync(primaryIcd)
+    const resolvedSecondary = secondaryIcds.map(resolveDiagnosisSync)
+    const diagnosisText = [
+      `[${resolvedPrimary.code}] ${resolvedPrimary.name}`,
+      ...resolvedSecondary.map((item) => `[${item.code}] ${item.name}`),
+    ].join('; ')
+
+    const recordPayload = buildMedicalRecordPayload({
+      visitId,
+      values: { ...values, conclusion: diagnosisText },
+      vitalSigns,
+    })
+
+    const updatePayload = Object.fromEntries(
+      Object.entries(recordPayload).filter(([key]) => key !== 'visitId'),
+    )
+
+    // Phản hồi ngay lập tức nếu bệnh án đã có id (khởi tạo trước khi khám)
+    if (persistedRecordId) {
+      setMedicalRecord((prev) => ({
+        ...prev,
+        ...updatePayload,
+        medicalRecordId: persistedRecordId,
+      }))
+
+      message.success('Đã lưu bệnh án thành công.')
+
+      if (selectedOrders.length === 0 && options?.showModal !== false) {
+        showSuccessModal(persistedRecordId)
+      }
+
+      const bgPromise = (async () => {
+        try {
+          await medicalRecordApi.update(persistedRecordId, updatePayload)
+          if (resolvedPrimary?.id) {
+            try {
+              await medicalRecordApi.recordDiagnosis(
+                persistedRecordId,
+                buildDiagnosisPayload({
+                  primaryDiagnosis: resolvedPrimary,
+                  secondaryDiagnoses: resolvedSecondary,
+                  note: values.examinationNote || values.symptoms,
+                }),
+              )
+            } catch (diagErr) {
+              console.warn('Lưu chẩn đoán phụ có độ trễ:', diagErr)
+            }
+          }
+
+          if (selectedOrders.length > 0) {
+            try {
+              const liveQueueResponse = await queueApi.getById(encounter.queueItem.id)
+              const queueBeforeOrder = liveQueueResponse?.data || encounter.queueItem
+              await medicalRecordApi.createClinicalOrder(
+                visitId,
+                buildClinicalOrderPayload({ clinicalReason: diagnosisText, orders: selectedOrders }),
+              )
+              const queueResponse = await queueApi.updateStatus(
+                encounter.queueItem.id,
+                'WAITING_FOR_RESULT',
+              )
+              setSelectedOrders([])
+              if (options?.showModal !== false) {
+                const continuationBlockReason = getQueueInProgressBlockReason(
+                  queueResponse?.data || queueBeforeOrder,
+                  'chuyển sang kê đơn',
+                )
+                Modal.confirm({
+                  title: 'Lượt khám đang chờ kết quả cận lâm sàng',
+                  content: continuationBlockReason,
+                  okText: 'Về hàng đợi',
+                  cancelText: 'Ở lại bệnh án',
+                  onOk: () => navigate('/appointments'),
+                })
+              }
+            } catch (orderErr) {
+              console.warn('Lưu chỉ định cận lâm sàng:', orderErr)
+            }
+          }
+        } catch (err) {
+          console.warn('Ghi nhận lưu bệnh án ngầm:', err)
+          message.error(getApiMessage(err, 'Không thể lưu bệnh án. Vui lòng thử lại.'))
+        }
+      })()
+
+      pendingSaveRef.current = bgPromise
+      return persistedRecordId
+    }
+
+    // Trường hợp chưa có mã bệnh án: Tạo nhanh rồi phản hồi ngay
     try {
-      const [resolvedPrimary, resolvedSecondary] = await Promise.all([
-        resolveDiagnosis(primaryIcd),
-        Promise.all(secondaryIcds.map(resolveDiagnosis)),
-      ])
-      const diagnosisText = [
-        `[${resolvedPrimary.code}] ${resolvedPrimary.name}`,
-        ...resolvedSecondary.map((item) => `[${item.code}] ${item.name}`),
-      ].join('; ')
+      if (selectedTemplateId) {
+        const createRes = await medicalRecordApi.create({
+          visitId,
+          chiefComplaint: '',
+          symptoms: '',
+          medicalHistory: '',
+          physicalExamination: '',
+          clinicalProgress: '',
+          treatmentPlan: '',
+          doctorInstructions: '',
+          conclusion: '',
+        })
+        persistedRecordId = createRes.data?.id
+        if (!persistedRecordId) throw new Error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
 
-      const recordPayload = buildMedicalRecordPayload({
-        visitId,
-        values: { ...values, conclusion: diagnosisText },
-        vitalSigns,
-      })
+        try {
+          const appliedRes = await medicalRecordApi.applyTemplate(persistedRecordId, selectedTemplateId)
+          if (appliedRes.data?.appliedTemplate) {
+            setCurrentTemplate(appliedRes.data.appliedTemplate)
+          }
+        } catch (templateErr) {
+          console.warn('Không thể áp template sau khi tạo:', templateErr)
+        }
+      } else {
+        const createRes = await medicalRecordApi.create({
+          visitId,
+          chiefComplaint: '',
+          symptoms: '',
+          medicalHistory: '',
+          physicalExamination: '',
+          clinicalProgress: '',
+          treatmentPlan: '',
+          doctorInstructions: '',
+          conclusion: '',
+        })
+        persistedRecordId = createRes.data?.id
+      }
+    } catch (createErr) {
+      const isAlreadyExists =
+        createErr?.response?.data?.code === 'MEDICAL_RECORD_ALREADY_EXISTS_FOR_VISIT' ||
+        String(createErr?.response?.data?.message || '').includes('already exists for visit')
 
-      const updatePayload = Object.fromEntries(
-        Object.entries(recordPayload).filter(([key]) => key !== 'visitId'),
-      )
+      if (isAlreadyExists) {
+        const existingRes = await medicalRecordApi.getByVisit(visitId)
+        persistedRecordId = existingRes?.data?.id || existingRes?.data?.medicalRecordId
+      } else {
+        message.error(getApiMessage(createErr, 'Không thể lưu bệnh án. Vui lòng thử lại.'))
+        return null
+      }
+    }
 
-      let recordResponse
-      if (persistedRecordId) {
-        recordResponse = await medicalRecordApi.update(persistedRecordId, updatePayload)
+    if (!persistedRecordId) {
+      message.error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
+      return null
+    }
+
+    setCurrentRecordId(persistedRecordId)
+    setMedicalRecord((prev) => ({
+      ...prev,
+      ...updatePayload,
+      medicalRecordId: persistedRecordId,
+    }))
+
+    message.success('Đã lưu bệnh án thành công.')
+    if (selectedOrders.length === 0 && options?.showModal !== false) {
+      showSuccessModal(persistedRecordId)
+    }
+
+    const bgPromise = (async () => {
+      try {
+        await medicalRecordApi.update(persistedRecordId, updatePayload)
         if (resolvedPrimary?.id) {
           try {
             await medicalRecordApi.recordDiagnosis(
@@ -954,154 +1131,43 @@ function MedicalEncounter() {
             console.warn('Lưu chẩn đoán phụ có độ trễ:', diagErr)
           }
         }
-      } else {
-        try {
-          if (selectedTemplateId) {
-            const createRes = await medicalRecordApi.create({
-              visitId,
-              chiefComplaint: '',
-              symptoms: '',
-              medicalHistory: '',
-              physicalExamination: '',
-              clinicalProgress: '',
-              treatmentPlan: '',
-              doctorInstructions: '',
-              conclusion: '',
-            })
-            persistedRecordId = createRes.data?.id
-            if (!persistedRecordId) throw new Error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
 
-            try {
-              const appliedRes = await medicalRecordApi.applyTemplate(persistedRecordId, selectedTemplateId)
-              if (appliedRes.data?.appliedTemplate) {
-                setCurrentTemplate(appliedRes.data.appliedTemplate)
-              }
-            } catch (templateErr) {
-              console.warn('Không thể áp template sau khi tạo:', templateErr)
-            }
-
-            recordResponse = await medicalRecordApi.update(persistedRecordId, updatePayload)
-          } else {
-            recordResponse = await medicalRecordApi.create(recordPayload)
-          }
-        } catch (createErr) {
-          const isAlreadyExists =
-            createErr?.response?.data?.code === 'MEDICAL_RECORD_ALREADY_EXISTS_FOR_VISIT' ||
-            String(createErr?.response?.data?.message || '').includes('already exists for visit')
-
-          if (isAlreadyExists) {
-            // Lượt khám đã có bệnh án trong CSDL: tự động chuyển sang cập nhật bệnh án hiện có
-            const existingRes = await medicalRecordApi.getByVisit(visitId)
-            persistedRecordId = existingRes?.data?.id || existingRes?.data?.medicalRecordId
-            if (persistedRecordId) {
-              setCurrentRecordId(persistedRecordId)
-              recordResponse = await medicalRecordApi.update(persistedRecordId, updatePayload)
-            } else {
-              throw createErr
-            }
-          } else {
-            throw createErr
-          }
-        }
-
-        persistedRecordId = recordResponse?.data?.id || persistedRecordId
-        if (persistedRecordId && resolvedPrimary?.id) {
+        if (selectedOrders.length > 0) {
           try {
-            await medicalRecordApi.recordDiagnosis(
-              persistedRecordId,
-              buildDiagnosisPayload({
-                primaryDiagnosis: resolvedPrimary,
-                secondaryDiagnoses: resolvedSecondary,
-                note: values.examinationNote || values.symptoms,
-              }),
+            await medicalRecordApi.createClinicalOrder(
+              visitId,
+              buildClinicalOrderPayload({ clinicalReason: diagnosisText, orders: selectedOrders }),
             )
-          } catch (diagErr) {
-            console.warn('Lưu chẩn đoán phụ có độ trễ:', diagErr)
+            const queueResponse = await queueApi.updateStatus(
+              encounter.queueItem.id,
+              'WAITING_FOR_RESULT',
+            )
+            setSelectedOrders([])
+            if (options?.showModal !== false) {
+              const continuationBlockReason = getQueueInProgressBlockReason(
+                queueResponse?.data || encounter.queueItem,
+                'chuyển sang kê đơn',
+              )
+              Modal.confirm({
+                title: 'Lượt khám đang chờ kết quả cận lâm sàng',
+                content: continuationBlockReason,
+                okText: 'Về hàng đợi',
+                cancelText: 'Ở lại bệnh án',
+                onOk: () => navigate('/appointments'),
+              })
+            }
+          } catch (orderErr) {
+            console.warn('Lưu chỉ định cận lâm sàng:', orderErr)
           }
         }
+      } catch (err) {
+        console.warn('Ghi nhận lưu bệnh án ngầm:', err)
+        message.error(getApiMessage(err, 'Không thể lưu bệnh án. Vui lòng thử lại.'))
       }
+    })()
 
-      persistedRecordId = recordResponse?.data?.id || persistedRecordId
-      if (!persistedRecordId) throw new Error('Hệ thống chưa tạo được mã bệnh án sau khi lưu.')
-      setCurrentRecordId(persistedRecordId)
-      setMedicalRecord((prev) => ({
-        ...prev,
-        ...recordResponse?.data,
-        ...updatePayload,
-        medicalRecordId: persistedRecordId,
-      }))
-
-      let liveQueueItem = encounter.queueItem
-      if (selectedOrders.length > 0) {
-        try {
-          const liveQueueResponse = await queueApi.getById(encounter.queueItem.id)
-          const queueBeforeOrder = liveQueueResponse?.data
-          if (
-            !queueBeforeOrder?.id ||
-            String(queueBeforeOrder.id) !== String(encounter.queueItem.id)
-          ) {
-            throw new Error('Hệ thống không tìm thấy thông tin lượt khám trước khi tạo chỉ định.')
-          }
-          const orderBlockReason = getQueueInProgressBlockReason(
-            queueBeforeOrder,
-            'tạo chỉ định cận lâm sàng mới',
-          )
-          if (orderBlockReason) throw new Error(orderBlockReason)
-
-          await medicalRecordApi.createClinicalOrder(
-            visitId,
-            buildClinicalOrderPayload({ clinicalReason: diagnosisText, orders: selectedOrders }),
-          )
-          const queueResponse = await queueApi.updateStatus(
-            encounter.queueItem.id,
-            'WAITING_FOR_RESULT',
-          )
-          liveQueueItem = queueResponse?.data || liveQueueItem
-          setSelectedOrders([])
-        } catch (orderErr) {
-          console.warn('Lưu chỉ định cận lâm sàng:', orderErr)
-        }
-      }
-
-      const continuationBlockReason = getQueueInProgressBlockReason(
-        liveQueueItem,
-        'chuyển sang kê đơn',
-      )
-
-      message.success('Đã lưu bệnh án thành công.')
-
-      if (liveQueueItem?.status === 'WAITING_FOR_RESULT') {
-        if (options?.showModal !== false) {
-          Modal.confirm({
-            title: 'Lượt khám đang chờ kết quả cận lâm sàng',
-            content: continuationBlockReason,
-            okText: 'Về hàng đợi',
-            cancelText: 'Ở lại bệnh án',
-            onOk: () => navigate('/appointments'),
-          })
-        }
-      } else if (options?.showModal !== false) {
-        showSuccessModal(persistedRecordId)
-      }
-      return persistedRecordId
-    } catch (error) {
-      console.warn('Ghi nhận lưu bệnh án:', error)
-      const isTimeout =
-        error?.code === 'ECONNABORTED' ||
-        (typeof error?.message === 'string' && error.message.toLowerCase().includes('timeout'))
-      if (isTimeout) {
-        message.success('Đã lưu bệnh án thành công.')
-        if (persistedRecordId && options?.showModal !== false) {
-          showSuccessModal(persistedRecordId)
-        }
-        return persistedRecordId
-      } else {
-        message.error(getApiMessage(error, 'Không thể lưu bệnh án. Vui lòng thử lại.'))
-        return null
-      }
-    } finally {
-      setSaving(false)
-    }
+    pendingSaveRef.current = bgPromise
+    return persistedRecordId
   }
 
   const handleOpenSignFlow = useCallback(async () => {
@@ -1308,7 +1374,6 @@ function MedicalEncounter() {
               </Button>
             )}
             <Button
-              loading={saving}
               icon={<CheckCircleOutlined />}
               onClick={() => saveRecord()}
             >
@@ -1347,7 +1412,6 @@ function MedicalEncounter() {
                     type="primary"
                     icon={<CheckCircleOutlined />}
                     onClick={handleCompleteVisit}
-                    loading={saving}
                     style={{
                       background: '#16a34a',
                       borderColor: '#16a34a',
@@ -1550,7 +1614,6 @@ function MedicalEncounter() {
                     size="small"
                     icon={<CheckCircleOutlined />}
                     onClick={handleCompleteVisit}
-                    loading={saving}
                     style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 600 }}
                   >
                     Hoàn tất ca khám

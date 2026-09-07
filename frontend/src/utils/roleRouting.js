@@ -30,5 +30,9 @@ export const getDefaultHomePath = (roles = [], permissions = []) => {
     return '/pharmacy'
   }
 
+  if (hasRole('patient')) {
+    return '/portal/dashboard'
+  }
+
   return '/login'
 }

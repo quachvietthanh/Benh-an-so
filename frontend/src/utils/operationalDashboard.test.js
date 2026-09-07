@@ -119,6 +119,7 @@ test('getDefaultHomePath directs each role to its primary allowed workspace with
   // Receptionist -> '/appointments'
   assert.equal(getDefaultHomePath(['receptionist']), '/appointments')
 
-  // Pharmacist -> '/pharmacy'
   assert.equal(getDefaultHomePath(['pharmacist']), '/pharmacy')
+  assert.equal(getDefaultHomePath(['patient']), '/portal/dashboard')
+  assert.equal(getDefaultHomePath(['ROLE_PATIENT']), '/portal/dashboard')
 })
