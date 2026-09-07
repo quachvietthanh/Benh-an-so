@@ -190,11 +190,6 @@ export function categorizePriceHistory(prices = [], refDate = null) {
   })
 }
 
-/**
- * Suggest the next valid effective date that does not conflict with existing price versions.
- * If today has no existing price version, returns today.
- * If today already exists, advances day by day until finding an unused date.
- */
 export function suggestNextEffectiveDate(priceHistory = [], refDate = null) {
   const existingDates = new Set(
     (priceHistory || [])
@@ -211,14 +206,10 @@ export function suggestNextEffectiveDate(priceHistory = [], refDate = null) {
   return candidate.format('YYYY-MM-DD')
 }
 
-/**
- * Checks if a proposed effective date conflicts with existing price records.
- */
 export function isEffectiveDateConflicted(date, priceHistory = [], newPrice = null, originalPrice = null) {
   if (!date) return { conflicted: false }
   const formattedDate = dayjs(date).isValid() ? dayjs(date).format('YYYY-MM-DD') : String(date)
 
-  // If price didn't change from originalPrice, backend allows same date
   if (
     newPrice !== null &&
     originalPrice !== null &&
@@ -236,7 +227,6 @@ export function isEffectiveDateConflicted(date, priceHistory = [], newPrice = nu
     return { conflicted: false }
   }
 
-  // If existing has the exact same price as newPrice, it won't conflict
   if (newPrice !== null && Number(existing.price) === Number(newPrice)) {
     return { conflicted: false }
   }

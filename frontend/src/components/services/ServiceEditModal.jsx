@@ -36,7 +36,6 @@ function ServiceEditModal({
 }) {
   const [priceChanged, setPriceChanged] = useState(false)
 
-  // Reset local state when modal opens
   useEffect(() => {
     if (open) {
       setPriceChanged(false)
@@ -62,7 +61,6 @@ function ServiceEditModal({
       const isDiff = origPrice !== null && currentPrice !== null && origPrice !== currentPrice
       setPriceChanged(isDiff)
 
-      // If price changed and date still matches the old effectiveFrom, auto suggest valid new date
       if (isDiff) {
         const currentDate = form.getFieldValue('effectiveFrom')
         const oldDateStr = editingService?.effectiveFrom
