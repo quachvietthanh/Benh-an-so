@@ -1,8 +1,8 @@
 package com.benhsoan.application.ucservice.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -12,8 +12,10 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -74,8 +76,8 @@ class ScanAccessLogAnomaliesServiceTest {
             views.add(view(user, now.plusSeconds(i)));
         }
         when(accessLogRepository.findViewsBetween(
-                Instant.parse("2026-08-11T10:00:00Z"),
-                Instant.parse("2026-08-11T11:00:00Z")
+                Instant.parse("2026-08-11T09:05:00Z"),
+                Instant.parse("2026-08-11T10:05:00Z")
         )).thenReturn(views);
 
         service.scan();
@@ -98,8 +100,8 @@ class ScanAccessLogAnomaliesServiceTest {
 
         MedicalRecordAccessLog offHoursView = view(user, Instant.parse("2026-08-11T15:00:00Z")); // 22:00 local
         when(accessLogRepository.findViewsBetween(
-                Instant.parse("2026-08-11T15:00:00Z"),
-                Instant.parse("2026-08-11T16:00:00Z")
+                Instant.parse("2026-08-11T14:05:00Z"),
+                Instant.parse("2026-08-11T15:05:00Z")
         )).thenReturn(List.of(offHoursView));
 
         service.scan();
@@ -130,7 +132,7 @@ class ScanAccessLogAnomaliesServiceTest {
 
         verify(securityAlertRepository, never()).save(any());
         verify(securityAlertRepository, never())
-                .existsByUserIdAndAlertTypeAndWindowStart(any(), any(), any());
+                .findByUserIdAndAlertTypeAndWindowStart(any(), any(), any());
     }
 
     @Test
@@ -144,7 +146,7 @@ class ScanAccessLogAnomaliesServiceTest {
     }
 
     @Test
-    void skipsDuplicateAlertInSameDetectionWindow() {
+    void updatesExistingAlertInSameDetectionWindow() {
         UUID user = UUID.randomUUID();
         Instant now = Instant.parse("2026-08-11T10:05:00Z");
         when(clockPort.now()).thenReturn(now);
@@ -154,14 +156,26 @@ class ScanAccessLogAnomaliesServiceTest {
             views.add(view(user, now.plusSeconds(i)));
         }
         when(accessLogRepository.findViewsBetween(any(), any())).thenReturn(views);
-        when(securityAlertRepository.existsByUserIdAndAlertTypeAndWindowStart(any(), any(), any()))
-                .thenReturn(true);
+
+        Instant windowStart = now.minus(1, ChronoUnit.HOURS);
+        SecurityAlert existing = SecurityAlert.create(
+                user,
+                AlertType.THRESHOLD_EXCEEDED,
+                AlertSeverity.HIGH,
+                "old description",
+                1,
+                windowStart,
+                now,
+                now);
+        when(securityAlertRepository.findByUserIdAndAlertTypeAndWindowStart(any(), any(), any()))
+                .thenReturn(Optional.of(existing));
 
         service.scan();
 
-        verify(securityAlertRepository, never()).save(any());
-        verify(securityAlertRepository, atLeastOnce())
-                .existsByUserIdAndAlertTypeAndWindowStart(any(), any(), any());
+        ArgumentCaptor<SecurityAlert> captor = ArgumentCaptor.forClass(SecurityAlert.class);
+        verify(securityAlertRepository, times(1)).save(captor.capture());
+        assertEquals(21, captor.getValue().getAccessCount());
+        assertTrue(captor.getValue().getDescription().contains("21"));
     }
 
     private MedicalRecordAccessLog view(UUID userId, Instant accessedAt) {

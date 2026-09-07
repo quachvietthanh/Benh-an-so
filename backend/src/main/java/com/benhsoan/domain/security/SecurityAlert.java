@@ -108,4 +108,12 @@ public class SecurityAlert {
                 createdAt
         );
     }
+
+    public void updateDetection(int accessCount, String description) {
+        if (accessCount < 0) {
+            throw new ValidationException("Access count cannot be negative.");
+        }
+        this.accessCount = accessCount;
+        this.description = Guard.require(description, "Description");
+    }
 }

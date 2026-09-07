@@ -1,9 +1,11 @@
 package com.benhsoan.persistence.adapterRepository.security;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.security.SecurityAlert;
@@ -27,21 +29,17 @@ public class SecurityAlertRepositoryAdapter implements SecurityAlertRepository {
     }
 
     @Override
-    public List<SecurityAlert> findAll() {
-        return jpaRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(mapper::toDomain)
-                .toList();
+    public Page<SecurityAlert> findAll(Pageable pageable) {
+        return jpaRepository.findAll(pageable).map(mapper::toDomain);
     }
 
     @Override
-    public boolean existsByUserIdAndAlertTypeAndWindowStart(
+    public Optional<SecurityAlert> findByUserIdAndAlertTypeAndWindowStart(
             UUID userId,
             AlertType alertType,
             Instant windowStart
     ) {
-        return jpaRepository.existsByUserIdAndAlertTypeAndWindowStart(
-                userId.toString(),
-                alertType,
-                mapper.toLocalDateTime(windowStart));
+        return jpaRepository.findByUserIdAndAlertTypeAndWindowStart(userId, alertType, windowStart)
+                .map(mapper::toDomain);
     }
 }

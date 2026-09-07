@@ -1,20 +1,19 @@
 package com.benhsoan.persistence.jpaRepository.security;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.benhsoan.domain.security.enums.AlertType;
 import com.benhsoan.persistence.entity.security.SecurityAlertEntity;
 
-public interface JpaSecurityAlertRepository extends JpaRepository<SecurityAlertEntity, String> {
+public interface JpaSecurityAlertRepository extends JpaRepository<SecurityAlertEntity, UUID> {
 
-    List<SecurityAlertEntity> findAllByOrderByCreatedAtDesc();
-
-    boolean existsByUserIdAndAlertTypeAndWindowStart(
-            String userId,
+    Optional<SecurityAlertEntity> findByUserIdAndAlertTypeAndWindowStart(
+            UUID userId,
             AlertType alertType,
-            LocalDateTime windowStart
+            Instant windowStart
     );
 }

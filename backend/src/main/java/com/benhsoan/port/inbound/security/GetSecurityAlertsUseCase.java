@@ -1,10 +1,11 @@
 package com.benhsoan.port.inbound.security;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import com.benhsoan.port.dto.result.security.SecurityAlertResult;
 
 public interface GetSecurityAlertsUseCase {
 
-    List<SecurityAlertResult> getSecurityAlerts();
+    Page<SecurityAlertResult> getSecurityAlerts(Pageable pageable);
 }

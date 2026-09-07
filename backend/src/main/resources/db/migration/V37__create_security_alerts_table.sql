@@ -4,18 +4,19 @@
 -- =====================================================
 
 CREATE TABLE security_alerts (
-    id VARCHAR(36) NOT NULL,
-    user_id VARCHAR(36) NOT NULL,
+    id BINARY(16) NOT NULL,
+    user_id BINARY(16) NOT NULL,
     alert_type VARCHAR(50) NOT NULL,
     severity VARCHAR(20) NOT NULL,
     description TEXT NOT NULL,
     access_count INT NOT NULL,
-    window_start DATETIME NOT NULL,
-    window_end DATETIME NOT NULL,
+    window_start DATETIME(6) NOT NULL,
+    window_end DATETIME(6) NOT NULL,
     status VARCHAR(20) NOT NULL,
-    created_at DATETIME NOT NULL,
+    created_at DATETIME(6) NOT NULL,
 
-    CONSTRAINT pk_security_alerts PRIMARY KEY (id)
+    CONSTRAINT pk_security_alerts PRIMARY KEY (id),
+    CONSTRAINT uq_security_alerts_user_type_window UNIQUE (user_id, alert_type, window_start)
 );
 
 CREATE INDEX idx_security_alerts_user_created

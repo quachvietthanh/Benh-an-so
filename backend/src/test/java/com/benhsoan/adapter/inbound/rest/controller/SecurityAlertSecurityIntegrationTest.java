@@ -19,6 +19,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -100,27 +103,35 @@ class SecurityAlertSecurityIntegrationTest {
     @Test
     void allowsAdminWithSecurityAlertViewPermissionAndReturnsAlerts() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(getSecurityAlertsUseCase.getSecurityAlerts()).thenReturn(List.of(
-                new SecurityAlertResult(
-                        UUID.randomUUID(),
-                        userId,
-                        AlertType.THRESHOLD_EXCEEDED,
-                        AlertSeverity.HIGH,
-                        "Threshold exceeded",
-                        25,
-                        Instant.parse("2026-08-11T10:00:00Z"),
-                        Instant.parse("2026-08-11T11:00:00Z"),
-                        AlertStatus.UNREAD,
-                        Instant.parse("2026-08-11T10:05:00Z")
-                )
+        when(getSecurityAlertsUseCase.getSecurityAlerts(any(Pageable.class))).thenReturn(new PageImpl<>(
+                List.of(
+                        new SecurityAlertResult(
+                                UUID.randomUUID(),
+                                userId,
+                                "admin",
+                                "System Administrator",
+                                AlertType.THRESHOLD_EXCEEDED,
+                                AlertSeverity.HIGH,
+                                "Threshold exceeded",
+                                25,
+                                Instant.parse("2026-08-11T10:00:00Z"),
+                                Instant.parse("2026-08-11T11:00:00Z"),
+                                AlertStatus.UNREAD,
+                                Instant.parse("2026-08-11T10:05:00Z")
+                        )
+                ),
+                PageRequest.of(0, 20),
+                1
         ));
 
         mockMvc.perform(get("/security-alerts")
                         .with(user("admin").authorities(
                                 new SimpleGrantedAuthority("PERMISSION_SECURITY_ALERT_VIEW"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].alertType").value("THRESHOLD_EXCEEDED"))
-                .andExpect(jsonPath("$[0].severity").value("HIGH"))
-                .andExpect(jsonPath("$[0].accessCount").value(25));
+                .andExpect(jsonPath("$.content[0].alertType").value("THRESHOLD_EXCEEDED"))
+                .andExpect(jsonPath("$.content[0].severity").value("HIGH"))
+                .andExpect(jsonPath("$.content[0].accessCount").value(25))
+                .andExpect(jsonPath("$.content[0].username").value("admin"))
+                .andExpect(jsonPath("$.content[0].fullName").value("System Administrator"));
     }
 }

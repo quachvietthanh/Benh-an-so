@@ -10,6 +10,8 @@ import com.benhsoan.domain.security.enums.AlertType;
 public record SecurityAlertResult(
         UUID id,
         UUID userId,
+        String username,
+        String fullName,
         AlertType alertType,
         AlertSeverity severity,
         String description,

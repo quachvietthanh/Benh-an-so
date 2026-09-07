@@ -36,8 +36,8 @@ public class ScanAccessLogAnomaliesService implements ScanAccessLogAnomaliesUseC
     @Transactional
     public void scan() {
         Instant now = clockPort.now();
-        Instant windowStart = now.truncatedTo(ChronoUnit.HOURS);
-        Instant windowEnd = windowStart.plus(1, ChronoUnit.HOURS);
+        Instant windowStart = now.minus(1, ChronoUnit.HOURS);
+        Instant windowEnd = now;
 
         List<MedicalRecordAccessLog> views = accessLogRepository.findViewsBetween(windowStart, windowEnd);
         if (views.isEmpty()) {
@@ -59,7 +59,7 @@ public class ScanAccessLogAnomaliesService implements ScanAccessLogAnomaliesUseC
         if (count <= properties.maxViewsPerHour()) {
             return;
         }
-        saveIfAbsent(SecurityAlert.create(
+        saveOrUpdate(SecurityAlert.create(
                 userId,
                 AlertType.THRESHOLD_EXCEEDED,
                 AlertSeverity.HIGH,
@@ -79,7 +79,7 @@ public class ScanAccessLogAnomaliesService implements ScanAccessLogAnomaliesUseC
         if (offHoursViews.isEmpty()) {
             return;
         }
-        saveIfAbsent(SecurityAlert.create(
+        saveOrUpdate(SecurityAlert.create(
                 userId,
                 AlertType.OFF_HOURS_ACCESS,
                 AlertSeverity.LOW,
@@ -97,11 +97,14 @@ public class ScanAccessLogAnomaliesService implements ScanAccessLogAnomaliesUseC
                 || !time.isBefore(properties.workingHoursEnd());
     }
 
-    private void saveIfAbsent(SecurityAlert candidate) {
-        if (securityAlertRepository.existsByUserIdAndAlertTypeAndWindowStart(
-                candidate.getUserId(), candidate.getAlertType(), candidate.getWindowStart())) {
-            return;
-        }
-        securityAlertRepository.save(candidate);
+    private void saveOrUpdate(SecurityAlert candidate) {
+        securityAlertRepository.findByUserIdAndAlertTypeAndWindowStart(
+                candidate.getUserId(), candidate.getAlertType(), candidate.getWindowStart())
+                .ifPresentOrElse(
+                        existing -> {
+                            existing.updateDetection(candidate.getAccessCount(), candidate.getDescription());
+                            securityAlertRepository.save(existing);
+                        },
+                        () -> securityAlertRepository.save(candidate));
     }
 }
