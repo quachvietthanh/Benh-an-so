@@ -76,7 +76,7 @@ export const DOMAIN_ERROR_MESSAGES = {
   MEDICAL_RECORD_AMENDMENT_REQUIRES_COMPLETED_VISIT:
     'Hồ sơ bệnh án chỉ có thể lập bản đính chính sau khi ca khám đã hoàn tất (COMPLETED).',
   MEDICAL_RECORD_IN_RETENTION_PERIOD:
-    'Hồ sơ đang trong thời hạn lưu trữ bắt buộc theo luật định, không thể xóa. Vui lòng dùng chức năng Lưu trữ (Archive).',
+    'Hồ sơ đang trong thời hạn lưu trữ bắt buộc, không thể xóa. Vui lòng dùng chức năng lưu trữ (Archive) nếu cần ẩn hồ sơ khỏi danh sách hoạt động.',
   MEDICAL_RECORD_MISSING_AUTHORIZATION:
     'Chưa có giấy ủy quyền hợp lệ để thực hiện sao lục hoặc trích xuất hồ sơ bệnh án.',
   MEDICAL_RECORD_UNAUTHORIZED_RECIPIENT:
@@ -383,7 +383,7 @@ export const translateApiErrorMessage = (rawMessage) => {
     return trimmed
   }
 
-  return 'Thao tác không thành công hoặc dữ liệu chưa hợp lệ. Vui lòng thử lại.'
+  return trimmed
 }
 
 export const normalizeApiError = (error, fallbackMessage = DEFAULT_MESSAGE) => {
@@ -406,7 +406,7 @@ export const normalizeApiError = (error, fallbackMessage = DEFAULT_MESSAGE) => {
   return {
     status: body?.status || response?.status || 0,
     code: body?.code || (isTimeout ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR'),
-    message: translateApiErrorMessage(rawMessage),
+    message: rawMessage,
     details,
     fields,
     firstFieldError: Object.values(fields)[0] || null,
@@ -415,10 +415,13 @@ export const normalizeApiError = (error, fallbackMessage = DEFAULT_MESSAGE) => {
 
 export const getApiErrorMessage = (error, fallbackMessage = DEFAULT_MESSAGE) => {
   const normalized = normalizeApiError(error, fallbackMessage)
+  if (normalized.firstFieldError) {
+    return normalized.firstFieldError
+  }
   if (normalized.code && DOMAIN_ERROR_MESSAGES[normalized.code]) {
     return DOMAIN_ERROR_MESSAGES[normalized.code]
   }
-  const rawMsg = normalized.firstFieldError || normalized.message || fallbackMessage
+  const rawMsg = normalized.message || fallbackMessage
   return translateApiErrorMessage(rawMsg)
 }
 
