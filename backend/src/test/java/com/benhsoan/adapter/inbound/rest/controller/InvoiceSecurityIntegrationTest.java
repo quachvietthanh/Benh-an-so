@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -117,10 +116,10 @@ class InvoiceSecurityIntegrationTest {
         ));
 
         for (String role : new String[] {"ADMIN", "RECEPTIONIST", "MANAGER"}) {
-            mockMvc.perform(get("/invoices/payable").with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
+            mockMvc.perform(get("/invoices/payable").with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
                     .andExpect(status().isOk());
 
-            mockMvc.perform(get("/invoices").with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
+            mockMvc.perform(get("/invoices").with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
                     .andExpect(status().isOk());
 
             mockMvc.perform(get("/invoices/{invoiceId}", "23100000-0000-0000-0000-000000000001")
@@ -231,7 +230,7 @@ class InvoiceSecurityIntegrationTest {
 
         for (String role : new String[] {"ADMIN", "RECEPTIONIST"}) {
             mockMvc.perform(post("/invoices/payment-quotes")
-                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE")))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_CREATE")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(quoteBody))
                     .andExpect(status().isOk());
@@ -356,7 +355,7 @@ class InvoiceSecurityIntegrationTest {
 
         for (String role : new String[] {"ADMIN", "RECEPTIONIST", "DOCTOR"}) {
             mockMvc.perform(post("/invoices/payments/{paymentId}/refund", paymentId)
-                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isForbidden());

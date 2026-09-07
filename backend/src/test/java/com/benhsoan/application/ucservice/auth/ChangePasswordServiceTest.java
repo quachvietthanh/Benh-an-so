@@ -3,7 +3,6 @@ package com.benhsoan.application.ucservice.auth;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.auditlog.AuditLog;
-import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.AccountDisabledException;
 import com.benhsoan.domain.auth.exception.InvalidOldPasswordException;

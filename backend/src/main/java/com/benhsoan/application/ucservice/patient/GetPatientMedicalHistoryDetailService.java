@@ -9,7 +9,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
 import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAuditService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;

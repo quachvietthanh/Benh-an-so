@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -88,7 +87,6 @@ class ResetPasswordSecurityIntegrationTest {
     @MockitoBean private UserSessionRepository userSessionRepository;
     @MockitoBean private ClockPort clockPort;
 
-    private final UUID adminId = UUID.randomUUID();
     private final UUID receptionistId = UUID.randomUUID();
     private final UUID targetStaffId = UUID.randomUUID();
 

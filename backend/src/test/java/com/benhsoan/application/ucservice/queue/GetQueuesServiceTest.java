@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.queue.exception.UnauthorizedQueueOperationException;
 import com.benhsoan.port.dto.command.queue.GetQueuesQuery;
-import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.outbound.repository.queue.QueueItemQueryRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 

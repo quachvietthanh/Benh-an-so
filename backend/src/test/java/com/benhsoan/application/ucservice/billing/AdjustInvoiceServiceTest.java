@@ -21,7 +21,6 @@ import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.billing.exception.InvoiceNotFoundException;
 import com.benhsoan.domain.billing.exception.InvoiceUnauthorizedAdjustmentException;
-import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.billing.AdjustInvoiceCommand;
 import com.benhsoan.port.dto.command.billing.AdjustmentInvoiceLineCommand;
 import com.benhsoan.port.dto.result.InvoiceResult;

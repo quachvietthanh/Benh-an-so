@@ -126,7 +126,6 @@ class GetMedicalRecordTemplateSelectionServiceTest {
         Visit visit = Visit.create("VS-0002", UUID.randomUUID(), actorId, null, null, emptySpecialtyId,
                 VisitType.WALK_IN, now, "Exam", null, actorId, now);
         Specialty specialty = Specialty.restore(emptySpecialtyId, "ENT", "Ear Nose Throat", true, now, now);
-        Specialty generalSpecialty = Specialty.restore(Specialty.GENERAL_ID, "GENERAL", "General", true, now, now);
 
         MedicalRecordTemplate generalDefault = MedicalRecordTemplate.create(Specialty.GENERAL_ID, "General Initial", true,
                 List.of(new SectionDefinition(MedicalRecordFieldCode.CHIEF_COMPLAINT, "Reason", true, 1)),

@@ -13,7 +13,6 @@ import com.benhsoan.adapter.inbound.rest.response.interconnection.MockInterconne
 import com.benhsoan.infrastructure.interconnection.mock.MockInterconnectionGatewayException;
 import com.benhsoan.infrastructure.interconnection.mock.MockPrescriptionInterconnectionGatewayService;
 import com.benhsoan.port.outbound.interconnection.PrescriptionInterconnectionGatewayRequest;
-import com.benhsoan.port.outbound.interconnection.PrescriptionInterconnectionGatewayResponse;
 
 import lombok.RequiredArgsConstructor;
 

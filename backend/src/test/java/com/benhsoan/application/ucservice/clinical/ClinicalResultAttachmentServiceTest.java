@@ -214,7 +214,6 @@ class ClinicalResultAttachmentServiceTest {
     private Fixture fixture() {
         UUID actorId = UUID.randomUUID();
         UUID visitId = UUID.randomUUID();
-        UUID resultId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
         Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null,

@@ -5,7 +5,6 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.domain.shared.exception.ValidationException;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;

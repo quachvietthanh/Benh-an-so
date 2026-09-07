@@ -19,7 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
-import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
 import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAuditService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;

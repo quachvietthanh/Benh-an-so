@@ -100,7 +100,6 @@ public class JwtTokenAdapter implements JwtTokenPort {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Set<String> getPermissions(String token) {
         Object value = getClaims(token).get("permissions");
         if (!(value instanceof java.util.Collection<?> values)) return Set.of();
