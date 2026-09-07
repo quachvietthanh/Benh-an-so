@@ -175,6 +175,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     void returnsNestedFieldPathForJsonTypeErrors() {
         JsonMappingException mappingException = JsonMappingException.from(
                 (com.fasterxml.jackson.core.JsonParser) null, "Invalid numeric value.");

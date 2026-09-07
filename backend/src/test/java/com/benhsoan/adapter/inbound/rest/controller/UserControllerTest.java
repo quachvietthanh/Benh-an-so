@@ -20,6 +20,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -61,35 +62,35 @@ class UserControllerTest {
     @Autowired
     private MockMvc mvc;
 
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private CreateUserUseCase createUserUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private GetAllUsersUseCase getAllUsersUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private GetDoctorsUseCase getDoctorsUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private GetUserUseCase getUserUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private UpdateUserUseCase updateUserUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private ActivateUserUseCase activateUserUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private DeactivateUserUseCase deactivateUserUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private com.benhsoan.port.inbound.user.ResetPasswordUseCase resetPasswordUseCase;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private RoleRepository roleRepository;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private AuditLogRepository auditLogRepository;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private CurrentUserPort currentUserPort;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private JwtTokenPort jwtTokenPort;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private UserRepository userRepository;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private UserSessionRepository userSessionRepository;
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @MockitoBean
     private ClockPort clockPort;
 
     @AfterEach

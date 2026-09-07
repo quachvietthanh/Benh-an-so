@@ -278,6 +278,7 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
         assertEquals("Clinical observation", result.get(1).diagnosisName());
         assertNull(result.get(1).diagnosisCode());
 
+        @SuppressWarnings("unchecked")
         ArgumentCaptor<List<MedicalRecordDiagnosis>> diagnosesCaptor = ArgumentCaptor.forClass(List.class);
         verify(medicalRecordDiagnosisRepository).replaceForMedicalRecord(org.mockito.ArgumentMatchers.eq(record.getId()), diagnosesCaptor.capture());
         MedicalRecordDiagnosis freeTextDiagnosis = diagnosesCaptor.getValue().get(1);

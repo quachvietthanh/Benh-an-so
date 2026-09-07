@@ -175,21 +175,6 @@ class ClinicalResultApplicationServiceTest {
                 new UpdateClinicalResultCommand(BigDecimal.TEN, null, null, null, "Correct input")));
     }
 
-    private Fixture arrangeEnter(ClinicalResultDataType dataType) {
-        Fixture fixture = fixture();
-        when(authorizationService.requireWriteAccess()).thenReturn(fixture.actorId());
-        when(clinicalOrderItemRepository.findById(fixture.item().getId())).thenReturn(Optional.of(fixture.item()));
-        when(clinicalResultRepository.findByClinicalOrderItemId(fixture.item().getId())).thenReturn(Optional.empty());
-        when(clinicalOrderRepository.findById(fixture.order().getId())).thenReturn(Optional.of(fixture.order()));
-        when(visitRepository.findById(fixture.visit().getId())).thenReturn(Optional.of(fixture.visit()));
-        when(medicalRecordRepository.findByVisitId(fixture.visit().getId())).thenReturn(Optional.of(fixture.record()));
-        when(clinicalServiceCatalogRepository.findById(fixture.item().getClinicalServiceId()))
-                .thenReturn(Optional.of(ClinicalServiceCatalog.restore(fixture.item().getClinicalServiceId(), UUID.randomUUID(), "LAB-GLU",
-                        "Blood glucose", ClinicalServiceType.LAB_TEST, dataType, "mmol/L", "3.9-6.4", null,
-                        true, NOW, null)));
-        return fixture;
-    }
-
     private Fixture fixture() {
         UUID actorId = UUID.randomUUID();
         UUID visitId = UUID.randomUUID();
