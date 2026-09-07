@@ -1,0 +1,63 @@
+package com.benhsoan.persistence.entity.security;
+
+import java.time.LocalDateTime;
+
+import com.benhsoan.domain.security.enums.AlertSeverity;
+import com.benhsoan.domain.security.enums.AlertStatus;
+import com.benhsoan.domain.security.enums.AlertType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "security_alerts")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class SecurityAlertEntity {
+
+    @Id
+    @Column(length = 36, nullable = false)
+    private String id;
+
+    @Column(name = "user_id", length = 36, nullable = false)
+    private String userId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "alert_type", length = 50, nullable = false)
+    private AlertType alertType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity", length = 20, nullable = false)
+    private AlertSeverity severity;
+
+    @Column(name = "description", columnDefinition = "TEXT", nullable = false)
+    private String description;
+
+    @Column(name = "access_count", nullable = false)
+    private int accessCount;
+
+    @Column(name = "window_start", nullable = false)
+    private LocalDateTime windowStart;
+
+    @Column(name = "window_end", nullable = false)
+    private LocalDateTime windowEnd;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private AlertStatus status;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+}

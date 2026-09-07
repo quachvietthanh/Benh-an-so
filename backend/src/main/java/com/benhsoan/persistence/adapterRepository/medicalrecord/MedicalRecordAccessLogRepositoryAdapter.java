@@ -1,10 +1,14 @@
 package com.benhsoan.persistence.adapterRepository.medicalrecord;
 
+import java.time.Instant;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordAccessLogEntity;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAccessLogRepository;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.MedicalRecordAccessLogSpecification;
@@ -34,5 +38,13 @@ public class MedicalRecordAccessLogRepositoryAdapter implements MedicalRecordAcc
     ) {
         return jpaRepository.findAll(MedicalRecordAccessLogSpecification.build(query), pageable)
                 .map(mapper::toDomain);
+    }
+
+    @Override
+    public List<MedicalRecordAccessLog> findViewsBetween(Instant from, Instant to) {
+        return jpaRepository.findByActionAndAccessedAtBetween(MedicalRecordAccessAction.VIEW, from, to)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 }
