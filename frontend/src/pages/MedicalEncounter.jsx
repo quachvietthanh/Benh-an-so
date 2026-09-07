@@ -61,7 +61,7 @@ import { useAuthContext } from '../context/AuthContext'
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
 import { getCategoryFromIcdCode, icd10Categories } from '../utils/icd10Data'
 import { fixMojibake } from '../utils/serviceCatalogValidation'
-import { getApiErrorMessage as getApiMessage, normalizeApiError } from '../utils/apiError'
+import { getApiErrorMessage, getApiErrorMessage as getApiMessage, normalizeApiError } from '../utils/apiError'
 import { formatRecordCode, formatRecordStatus, formatVisitCode } from '../utils/helpers'
 import { formatTemplateName } from '../constants/medicalRecordTemplateConstants'
 import {
