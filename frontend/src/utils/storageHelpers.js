@@ -752,3 +752,59 @@ export const saveNotificationLog = (notifData) => {
     return []
   }
 }
+
+/**
+ * Xóa sạch toàn bộ cache dữ liệu liên quan đến bệnh nhân khi trạng thái ẩn danh thay đổi
+ * (NCL-15-CN-003). Đảm bảo giao diện không hiển thị dữ liệu cache cũ chưa che hoặc đã che sai.
+ */
+export const invalidatePatientDataCache = (enabled) => {
+  try {
+    const targetKeys = [
+      PATIENTS_KEY,
+      QUEUES_KEY,
+      MEDICAL_RECORDS_KEY,
+      PRESCRIPTIONS_KEY,
+      INVOICES_KEY,
+      APPOINTMENTS_KEY,
+      CLINICAL_ORDERS_KEY,
+      APPOINTMENT_LOGS_KEY,
+      NOTIFICATION_LOGS_KEY,
+      'portal_booked_appointments',
+      'recent_diagnoses',
+    ]
+
+    targetKeys.forEach((key) => {
+      try {
+        localStorage.removeItem(key)
+      } catch (e) {
+        console.warn(`[storageHelpers] Lỗi xóa cache key ${key}:`, e)
+      }
+    })
+
+    // Xóa các key động liên quan đến chữ ký bệnh án hoặc dữ liệu tạm
+    try {
+      const keysToRemove = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && (key.startsWith('signed_medical_record_') || key.startsWith('app_visit_payment_methods'))) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k))
+    } catch {
+      // ignore
+    }
+
+    // Phát sự kiện toàn cục để các màn hình đang mở tự động làm mới
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('patient-data:cache-invalidated', { detail: { enabled } }))
+      window.dispatchEvent(new CustomEvent('app:anonymization-mode-changed', { detail: { enabled } }))
+    }
+
+    return true
+  } catch (err) {
+    console.error('[storageHelpers] Lỗi trong quá trình invalidatePatientDataCache:', err)
+    return false
+  }
+}
+

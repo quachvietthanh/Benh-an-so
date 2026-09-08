@@ -676,6 +676,78 @@
   }
 }
 
+/* Anonymization Mode Demo Banner (NCL-15-CN-003) */
+.anonymization-sticky-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 20px;
+  background: linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%);
+  border-bottom: 1px solid #fde68a;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.1);
+  position: sticky;
+  top: 64px;
+  z-index: 90;
+  transition: all 0.3s ease;
+}
+
+.anonymization-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.anonymization-banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.anonymization-banner-text strong {
+  color: #78350f;
+  margin-right: 4px;
+  letter-spacing: 0.3px;
+}
+
+.anonymization-banner-btn {
+  background: #ffffff;
+  border: 1px solid #f59e0b;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.anonymization-banner-btn:hover {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .anonymization-sticky-banner {
+    top: 52px;
+    padding: 6px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+
 
 
 

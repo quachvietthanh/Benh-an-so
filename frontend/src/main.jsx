@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { ClinicConfigurationProvider } from './context/ClinicConfigurationContext'
+import { AnonymizationProvider } from './context/AnonymizationContext'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import App from './App'
 import './index.css'
@@ -14,17 +15,19 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <BrowserRouter>
         <AuthProvider>
           <ClinicConfigurationProvider>
-            <App />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  background: '#363636',
-                  color: '#fff',
-                },
-              }}
-            />
+            <AnonymizationProvider>
+              <App />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 3000,
+                  style: {
+                    background: '#363636',
+                    color: '#fff',
+                  },
+                }}
+              />
+            </AnonymizationProvider>
           </ClinicConfigurationProvider>
         </AuthProvider>
       </BrowserRouter>

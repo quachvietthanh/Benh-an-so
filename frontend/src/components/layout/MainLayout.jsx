@@ -13,16 +13,19 @@ import {
   SettingOutlined,
   UserOutlined,
   KeyOutlined,
+  EyeInvisibleOutlined,
 } from '@ant-design/icons'
 import ChangePasswordModal from '../auth/ChangePasswordModal'
 import patientApi from '../../api/patientApi'
 import { useAuthContext } from '../../context/AuthContext'
+import { useAnonymization } from '../../context/AnonymizationContext'
 import { getDefaultHomePath, getNavigationItems, navigationSections, roleNames } from './navigationConfig'
 
 const { Header, Sider, Content } = Layout
 
 function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
+  const { anonymizationEnabled } = useAnonymization()
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [remotePatients, setRemotePatients] = useState([])
@@ -44,6 +47,16 @@ function MainLayout() {
   React.useEffect(() => {
     syncPatients()
   }, [syncPatients, location.pathname])
+
+  React.useEffect(() => {
+    const handleCacheInvalidated = () => {
+      syncPatients()
+    }
+    window.addEventListener('patient-data:cache-invalidated', handleCacheInvalidated)
+    return () => {
+      window.removeEventListener('patient-data:cache-invalidated', handleCacheInvalidated)
+    }
+  }, [syncPatients])
 
   const searchOptions = useMemo(() => {
     const keyword = searchValue.trim().toLowerCase()
@@ -170,6 +183,12 @@ function MainLayout() {
   const primaryRole = user?.roles?.[0] || 'doctor'
   const displayName = user?.fullName || user?.username || 'Người dùng'
 
+  const canManageConfig = useMemo(() => {
+    const roles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    const perms = (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+    return roles.includes('admin') || perms.includes('SYSTEM_CONFIG_READ')
+  }, [user])
+
   const handleLogout = () => {
     logout()
     navigate('/login')
@@ -295,6 +314,28 @@ function MainLayout() {
             </Dropdown>
           </div>
         </Header>
+
+        {anonymizationEnabled && (
+          <div className="anonymization-sticky-banner" role="alert">
+            <div className="anonymization-banner-content">
+              <span className="anonymization-banner-icon">
+                <EyeInvisibleOutlined />
+              </span>
+              <span className="anonymization-banner-text">
+                <strong>Chế độ trình diễn:</strong> Dữ liệu định danh bệnh nhân (họ tên, số điện thoại, địa chỉ) đang được ẩn danh tự động bởi hệ thống.
+              </span>
+            </div>
+            {canManageConfig && (
+              <button
+                type="button"
+                className="anonymization-banner-btn"
+                onClick={() => navigate('/system/anonymization')}
+              >
+                Cấu hình
+              </button>
+            )}
+          </div>
+        )}
 
         <Content className="clinic-content">
           <div className="page-transition">

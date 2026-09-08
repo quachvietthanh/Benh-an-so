@@ -17,7 +17,7 @@ function SystemManagementPage() {
   const isAdmin = userRoles.includes('admin')
   const isManager = userRoles.includes('manager') || userRoles.includes('clinic_manager')
 
-  const canViewConfig = (userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || isAdmin) && !isManager
+  const canViewConfig = (userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || userPermissions.includes('SYSTEM_CONFIG_READ') || isAdmin) && !isManager
   const canViewUsers = userPermissions.includes('USER_READ') || isAdmin
   const canViewRolePermissions = userPermissions.includes('ROLE_READ') || userPermissions.includes('PERMISSION_READ') || isAdmin
   const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || isAdmin
