@@ -11,6 +11,7 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.Patient;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.PatientConsentVersion;
 import com.benhsoan.domain.patient.enums.PatientChangeAction;
@@ -88,14 +89,30 @@ public class UpdatePatientService
         UUID currentUserId =
                 currentUserPort.getCurrentUserId();
 
-        if (command.fullName() != null) {
+        // NCL-15-CN-003: never persist anonymized identity values back as real
+        // patient data. If a client round-trips a masked value (only possible
+        // when anonymization mode was ON at read time), keep the existing value.
+        String fullName = command.fullName();
+        String phone = command.phone();
+        String address = command.address();
+        if (PatientAnonymizer.isMaskedFullName(fullName)) {
+            fullName = patient.getFullName();
+        }
+        if (PatientAnonymizer.isMaskedPhone(phone)) {
+            phone = patient.getPhone();
+        }
+        if (PatientAnonymizer.isMaskedAddress(address)) {
+            address = patient.getAddress();
+        }
+
+        if (fullName != null) {
             patient.updateProfile(
-                    command.fullName(),
+                    fullName,
                     command.dateOfBirth(),
                     command.gender(),
-                    command.phone(),
+                    phone,
                     command.email(),
-                    command.address(),
+                    address,
                     normalizeIdentityNumber(command.identityNumber()),
                     command.insuranceNumber(),
                     command.bloodType(),

@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.VisitRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
@@ -31,7 +32,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = VisitController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(VisitRestMapper.class)
+@Import({VisitRestMapper.class, AnonymizationModeState.class})
 class VisitControllerTest {
 
     @Autowired private MockMvc mockMvc;
