@@ -46,7 +46,7 @@
 
 ### 🔐 Authentication & Authorization
 - Đăng nhập với JWT Token
-- Phân quyền người dùng: `ADMIN`, `DOCTOR`, `NURSE`, `STAFF`
+- Phân quyền người dùng: `ADMIN`, `DOCTOR`, `RECEPTIONIST`, `PHARMACIST`, `MANAGER`
 - Bảo vệ API với Spring Security + JWT Filter
 
 ### 👤 Quản lý bệnh nhân
@@ -384,10 +384,10 @@ npm run dev
 
 | Method | Endpoint | Mô tả | Vai trò |
 |--------|----------|-------|---------|
-| `GET` | `/medical-records/visits/{visitId}` | Chi tiết hồ sơ theo lượt khám (bệnh nhân + lượt khám + chẩn đoán ICD-10) | ADMIN, DOCTOR, NURSE |
-| `GET` | `/medical-records/patient/{patientId}` | Lịch sử hồ sơ của bệnh nhân (mới nhất trước) | ADMIN, DOCTOR, NURSE |
-| `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR, NURSE |
-| `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR, NURSE |
+| `GET` | `/medical-records/visits/{visitId}` | Chi tiết hồ sơ theo lượt khám (bệnh nhân + lượt khám + chẩn đoán ICD-10) | ADMIN, DOCTOR |
+| `GET` | `/medical-records/patient/{patientId}` | Lịch sử hồ sơ của bệnh nhân (mới nhất trước) | ADMIN, DOCTOR |
+| `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR |
+| `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR |
 
 > ✅ Mọi lượt **đọc** hồ sơ đều tự động ghi **audit log** vào `medical_record_access_logs` (QTN-02). Chi tiết payload & Postman: [`docs/api/medical-record-retrieval.md`](docs/api/medical-record-retrieval.md)
 

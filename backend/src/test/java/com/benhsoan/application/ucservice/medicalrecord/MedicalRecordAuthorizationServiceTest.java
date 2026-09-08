@@ -73,8 +73,8 @@ class MedicalRecordAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("read access is denied for non-doctor roles (e.g. NURSE)")
-    void deniesNurseReadAccess() {
+    @DisplayName("read access is denied for non-doctor roles (e.g. RECEPTIONIST)")
+    void deniesNonDoctorReadAccess() {
         when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
 
@@ -172,7 +172,7 @@ class MedicalRecordAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("diagnosis write access is denied for ADMIN, NURSE, RECEPTIONIST, and PHARMACIST")
+    @DisplayName("diagnosis write access is denied for ADMIN, RECEPTIONIST, and PHARMACIST")
     void deniesNonDoctorDiagnosisWriteAccess() {
         UUID userId = UUID.randomUUID();
         UUID medicalRecordId = UUID.randomUUID();

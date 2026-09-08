@@ -48,7 +48,7 @@ test('1. Phân quyền thu phí: Chỉ Lễ tân (RECEPTIONIST) và Admin mới 
   assert.equal(checkPaymentPermission(['ROLE_ADMIN']), true)
   assert.equal(checkPaymentPermission(['doctor']), false)
   assert.equal(checkPaymentPermission(['pharmacist']), false)
-  assert.equal(checkPaymentPermission(['nurse']), false)
+  assert.equal(checkPaymentPermission(['staff']), false)
 })
 
 test('2. Tính tổng tiền cần thu từ các khoản phí Backend (không hardcode)', () => {

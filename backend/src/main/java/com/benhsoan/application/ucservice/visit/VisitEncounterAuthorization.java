@@ -16,7 +16,7 @@ class VisitEncounterAuthorization {
     private final CurrentUserPort currentUserPort;
 
     void requireReadAccess(UUID visitDoctorId) {
-        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("NURSE")) {
+        if (currentUserPort.hasRole("ADMIN")) {
             return;
         }
         if (currentUserPort.hasRole("DOCTOR") && visitDoctorId.equals(currentUserPort.getCurrentUserId())) {

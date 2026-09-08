@@ -47,8 +47,7 @@ public class ViewPatientMedicalHistoryService implements ViewPatientMedicalHisto
 
     private void validatePermission() {
         if (!currentUserPort.hasRole("ADMIN")
-                && !currentUserPort.hasRole("DOCTOR")
-                && !currentUserPort.hasRole("NURSE")) {
+                && !currentUserPort.hasRole("DOCTOR")) {
             throw new MedicalRecordAccessDeniedException();
         }
     }

@@ -90,7 +90,6 @@ export const checkQueuePermissions = (roles = [], permissions = []) => {
   const isAdmin = normalized.includes('admin')
   const isReceptionist = normalized.includes('receptionist')
   const isDoctor = normalized.includes('doctor')
-  const isNurse = normalized.includes('nurse')
 
   const canCreateApp = hasPerm('APPOINTMENT_CREATE')
   const canReadApp = hasPerm('APPOINTMENT_READ')
@@ -104,24 +103,22 @@ export const checkQueuePermissions = (roles = [], permissions = []) => {
   const canCountQueue = hasPerm('QUEUE_COUNT')
 
   return {
-    canViewBoard: canViewQueue || canReadApp || canCreateApp || isAdmin || isDoctor || isNurse || isReceptionist,
+    canViewBoard: canViewQueue || canReadApp || canCreateApp || isAdmin || isDoctor || isReceptionist,
     canViewMyQueue: (canViewQueue || isDoctor) && isDoctor,
     canCheckIn: canCreateQueue || canUpdateQueueStatus || isAdmin || isReceptionist,
     canCallNext: canCallNext || canUpdateQueueStatus || isAdmin || isReceptionist || isDoctor,
     canSkip: canUpdateQueueStatus || isAdmin || isReceptionist || isDoctor,
     canComplete: canUpdateQueueStatus || isAdmin || isDoctor,
-    canUpdateStatus: canUpdateQueueStatus || isAdmin || isDoctor || isNurse,
-    canChangeResultStatus: canUpdateQueueStatus || isAdmin || isDoctor || isNurse,
+    canUpdateStatus: canUpdateQueueStatus || isAdmin || isDoctor,
+    canChangeResultStatus: canUpdateQueueStatus || isAdmin || isDoctor,
     canManageWalkIn: canCreateQueue || canCreateApp || isAdmin || isReceptionist,
     canCreateAppointment: canCreateApp || isAdmin || isReceptionist,
     canReadAppointment: canReadApp || isAdmin || isDoctor || isReceptionist,
     canUpdateAppointment: canUpdateApp || isAdmin || isReceptionist,
     canDeleteAppointment: canDeleteApp || isAdmin || isReceptionist,
-    isNurseOnly: isNurse && !isAdmin && !isDoctor && !isReceptionist,
     isDoctorOnly: isDoctor && !isAdmin && !isReceptionist,
     isAdmin,
     isReceptionist,
     isDoctor,
-    isNurse,
   }
 }

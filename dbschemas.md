@@ -95,6 +95,39 @@ Tài liệu này mô tả schema đang thực sự tồn tại trong repo hiện
 | consent_withdrawn_reason | VARCHAR |
 | non_medical_use_restricted | BOOLEAN |
 
+### patient_allergies
+
+| Column | Type | Notes |
+|---|---|---|
+| id | BINARY(16) | PK |
+| patient_id | BINARY(16) | FK -> patients.id |
+| allergen_type | VARCHAR(50) | 'MEDICATION' |
+| allergen_name | VARCHAR(255) | Tên hoạt chất/nhóm thuốc |
+| normalized_allergen_name | VARCHAR(255) | Chuỗi chuẩn hóa lower(trim()) |
+| severity | VARCHAR(30) | MILD, MODERATE, SEVERE, ANAPHYLAXIS |
+| reaction | VARCHAR(255) | Biểu hiện lâm sàng |
+| notes | TEXT | Ghi chú |
+| active | BOOLEAN | Trạng thái hiệu lực |
+| active_normalized_name | VARCHAR(255) | Generated column hỗ trợ Unique Index uk_patient_active_allergen (patient_id, active_normalized_name) |
+| created_by | BINARY(16) | FK -> users.id |
+| created_at | TIMESTAMP | |
+| updated_by | BINARY(16) | FK -> users.id |
+| updated_at | TIMESTAMP | |
+
+### patient_allergy_change_logs
+
+| Column | Type | Notes |
+|---|---|---|
+| id | BINARY(16) | PK |
+| allergy_id | BINARY(16) | Logical FK -> patient_allergies.id (Không tạo FK vật lý để bảo toàn lịch sử snapshot độc lập khi bản ghi chính bị xóa) |
+| patient_id | BINARY(16) | FK -> patients.id |
+| action | VARCHAR(20) | CREATE, UPDATE, DELETE |
+| before_data | JSON | Snapshot trước thay đổi (TC-04) |
+| after_data | JSON | Snapshot sau thay đổi |
+| change_reason | TEXT | Lý do thay đổi |
+| changed_by | BINARY(16) | FK -> users.id |
+| changed_at | TIMESTAMP | |
+
 ### visits
 
 | Column | Type |

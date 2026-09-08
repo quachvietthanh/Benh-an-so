@@ -55,7 +55,7 @@ class RoomSecurityIntegrationTest {
     void allowsAllOperationalRolesToReadRooms() throws Exception {
         when(searchRoomsUseCase.search(any())).thenReturn(Page.empty());
 
-        for (String role : new String[] {"ADMIN", "DOCTOR", "NURSE", "RECEPTIONIST"}) {
+        for (String role : new String[] {"ADMIN", "DOCTOR", "RECEPTIONIST"}) {
             mockMvc.perform(get("/rooms").with(user("tester").roles(role)))
                     .andExpect(status().isOk());
         }
