@@ -12,7 +12,7 @@ public record CheckPatientDrugAllergyRequest(
         UUID medicalRecordId,
 
         @NotEmpty
-        List<UUID> medicineIds
+        List<@NotNull UUID> medicineIds
 
 ) {
 }

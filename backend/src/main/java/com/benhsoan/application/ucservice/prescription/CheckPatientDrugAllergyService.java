@@ -1,15 +1,16 @@
 package com.benhsoan.application.ucservice.prescription;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.patient.PatientAllergy;
 import com.benhsoan.domain.prescription.AllergyIngredientMatcher;
@@ -48,7 +49,8 @@ public class CheckPatientDrugAllergyService implements CheckPatientDrugAllergyUs
         if (patientId == null) {
             throw new ValidationException("Patient ID is required to check allergy warnings.");
         }
-        if (medicineIds == null || medicineIds.isEmpty()) {
+        List<UUID> cleanMedicineIds = distinctMedicineIds(medicineIds);
+        if (cleanMedicineIds.isEmpty()) {
             return List.of();
         }
 
@@ -57,7 +59,7 @@ public class CheckPatientDrugAllergyService implements CheckPatientDrugAllergyUs
             return List.of();
         }
 
-        List<Medicine> medicines = medicineRepository.findAllById(medicineIds);
+        List<Medicine> medicines = medicineRepository.findAllById(cleanMedicineIds);
         if (medicines.isEmpty()) {
             return List.of();
         }
@@ -75,8 +77,7 @@ public class CheckPatientDrugAllergyService implements CheckPatientDrugAllergyUs
                             activeIngredient,
                             allergy.getAllergenName(),
                             allergy.getSeverity(),
-                            allergy.getReaction()
-                    ));
+                            allergy.getReaction()));
                 }
             }
         }
@@ -84,9 +85,23 @@ public class CheckPatientDrugAllergyService implements CheckPatientDrugAllergyUs
         return List.copyOf(warnings);
     }
 
+    private List<UUID> distinctMedicineIds(List<UUID> medicineIds) {
+        if (medicineIds == null || medicineIds.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> distinctIds = new LinkedHashSet<>();
+        for (UUID id : medicineIds) {
+            if (id == null) {
+                throw new ValidationException("Medicine ID is required.");
+            }
+            distinctIds.add(id);
+        }
+        return List.copyOf(distinctIds);
+    }
+
     private UUID resolvePatientId(UUID medicalRecordId) {
         MedicalRecord medicalRecord = medicalRecordRepository.findById(medicalRecordId)
-                .orElseThrow(() -> new ValidationException("Medical record not found: " + medicalRecordId));
+                .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
 
         Visit visit = visitRepository.findById(medicalRecord.getVisitId())
                 .orElseThrow(() -> new ValidationException("Visit not found for medical record: " + medicalRecordId));

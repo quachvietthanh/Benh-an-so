@@ -530,6 +530,22 @@ class PrescriptionControllerTest {
     }
 
     @Test
+    @DisplayName("POST /prescriptions/check-allergy-warnings with null medicineId returns 400 Bad Request")
+    void checkAllergyWarningsWithNullMedicineIdReturnsBadRequest() throws Exception {
+        UUID medicalRecordId = UUID.randomUUID();
+
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId": "%s",
+                                  "medicineIds": [null]
+                                }
+                                """.formatted(medicalRecordId)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("GET /prescriptions/allergy-warning-logs returns paged logs")
     void getAllergyWarningLogsReturnsPage() throws Exception {
         UUID logId = UUID.randomUUID();

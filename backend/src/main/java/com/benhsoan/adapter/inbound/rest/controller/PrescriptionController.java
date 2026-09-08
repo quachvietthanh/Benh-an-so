@@ -54,7 +54,6 @@ import com.benhsoan.port.dto.command.prescription.SearchPrescriptionAllergyWarni
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
 
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -63,151 +62,141 @@ import lombok.RequiredArgsConstructor;
 @Validated
 public class PrescriptionController {
 
-    private final CreatePrescriptionUseCase createPrescriptionUseCase;
+        private final CreatePrescriptionUseCase createPrescriptionUseCase;
 
-    private final AmendPrescriptionUseCase amendPrescriptionUseCase;
-    private final GetPrescriptionUseCase getPrescriptionUseCase;
-    private final GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
-    private final SearchPrescriptionsUseCase searchPrescriptionsUseCase;
-    private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
-    private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
-    private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
-    private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
-    private final GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
-    private final ExportPrescriptionUseCase exportPrescriptionUseCase;
-    private final SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
-    private final RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
+        private final AmendPrescriptionUseCase amendPrescriptionUseCase;
+        private final GetPrescriptionUseCase getPrescriptionUseCase;
+        private final GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
+        private final SearchPrescriptionsUseCase searchPrescriptionsUseCase;
+        private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
+        private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
+        private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+        private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+        private final GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
+        private final ExportPrescriptionUseCase exportPrescriptionUseCase;
+        private final SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
+        private final RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
 
-    private final PrescriptionRestMapper mapper;
+        private final PrescriptionRestMapper mapper;
 
-    @GetMapping
-    @RequirePermission("PRESCRIPTION_READ")
-    public Page<PrescriptionResponse> search(
-            @RequestParam PrescriptionStatus status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        return searchPrescriptionsUseCase.search(new SearchPrescriptionsQuery(status, page, size))
-                .map(mapper::toResponse);
-    }
+        @GetMapping
+        @RequirePermission("PRESCRIPTION_READ")
+        public Page<PrescriptionResponse> search(
+                        @RequestParam PrescriptionStatus status,
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "20") int size) {
+                return searchPrescriptionsUseCase.search(new SearchPrescriptionsQuery(status, page, size))
+                                .map(mapper::toResponse);
+        }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    @RequirePermission("PRESCRIPTION_CREATE")
-    public PrescriptionResponse create(
-            @Valid @RequestBody CreatePrescriptionRequest request
-    ) {
-        PrescriptionResult result = createPrescriptionUseCase.create(
-                mapper.toCommand(request)
-        );
+        @PostMapping
+        @ResponseStatus(HttpStatus.CREATED)
+        @RequirePermission("PRESCRIPTION_CREATE")
+        public PrescriptionResponse create(
+                        @Valid @RequestBody CreatePrescriptionRequest request) {
+                PrescriptionResult result = createPrescriptionUseCase.create(
+                                mapper.toCommand(request));
 
-        return mapper.toResponse(result);
-    }
+                return mapper.toResponse(result);
+        }
 
-    @PatchMapping("/{id}")
-    @RequirePermission("PRESCRIPTION_UPDATE")
-    public PrescriptionResponse amend(
-            @PathVariable UUID id,
-            @Valid @RequestBody AmendPrescriptionRequest request
-    ) {
-        PrescriptionResult result = amendPrescriptionUseCase.amend(
-                mapper.toCommand(id, request)
-        );
+        @PatchMapping("/{id}")
+        @RequirePermission("PRESCRIPTION_UPDATE")
+        public PrescriptionResponse amend(
+                        @PathVariable UUID id,
+                        @Valid @RequestBody AmendPrescriptionRequest request) {
+                PrescriptionResult result = amendPrescriptionUseCase.amend(
+                                mapper.toCommand(id, request));
 
-        return mapper.toResponse(result);
-    }
+                return mapper.toResponse(result);
+        }
 
-    @GetMapping("/{id}")
-    @RequirePermission("PRESCRIPTION_READ")
-    public PrescriptionResponse getById(@PathVariable UUID id) {
-        return mapper.toResponse(getPrescriptionUseCase.getById(id));
-    }
+        @GetMapping("/{id}")
+        @RequirePermission("PRESCRIPTION_READ")
+        public PrescriptionResponse getById(@PathVariable UUID id) {
+                return mapper.toResponse(getPrescriptionUseCase.getById(id));
+        }
 
-    @GetMapping("/{id}/print")
-    @RequirePermission("PRESCRIPTION_PRINT")
-    public ResponseEntity<ByteArrayResource> print(@PathVariable UUID id) {
-        var printResult = exportPrescriptionUseCase.export(id);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + printResult.fileName() + "\"")
-                .contentType(MediaType.parseMediaType(printResult.contentType()))
-                .contentLength(printResult.content().length)
-                .body(new ByteArrayResource(printResult.content()));
-    }
+        @GetMapping("/{id}/print")
+        @RequirePermission("PRESCRIPTION_PRINT")
+        public ResponseEntity<ByteArrayResource> print(@PathVariable UUID id) {
+                var printResult = exportPrescriptionUseCase.export(id);
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.CONTENT_DISPOSITION,
+                                                "attachment; filename=\"" + printResult.fileName() + "\"")
+                                .contentType(MediaType.parseMediaType(printResult.contentType()))
+                                .contentLength(printResult.content().length)
+                                .body(new ByteArrayResource(printResult.content()));
+        }
 
-    @GetMapping("/medical-records/{medicalRecordId}")
-    @RequirePermission("PRESCRIPTION_READ")
-    public java.util.List<PrescriptionResponse> getByMedicalRecordId(
-            @PathVariable UUID medicalRecordId
-    ) {
-        return getPrescriptionsByMedicalRecordUseCase.getByMedicalRecordId(medicalRecordId)
-                .stream()
-                .map(mapper::toResponse)
-                .toList();
-    }
+        @GetMapping("/medical-records/{medicalRecordId}")
+        @RequirePermission("PRESCRIPTION_READ")
+        public java.util.List<PrescriptionResponse> getByMedicalRecordId(
+                        @PathVariable UUID medicalRecordId) {
+                return getPrescriptionsByMedicalRecordUseCase.getByMedicalRecordId(medicalRecordId)
+                                .stream()
+                                .map(mapper::toResponse)
+                                .toList();
+        }
 
-    @PostMapping("/{id}/dispense")
-    @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
-    public DispensePrescriptionResponse dispense(@PathVariable UUID id) {
-        return mapper.toResponse(dispensePrescriptionUseCase.dispense(id));
-    }
+        @PostMapping("/{id}/dispense")
+        @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
+        public DispensePrescriptionResponse dispense(@PathVariable UUID id) {
+                return mapper.toResponse(dispensePrescriptionUseCase.dispense(id));
+        }
 
-    @PostMapping("/{id}/cancel")
-    @RequirePermission("PRESCRIPTION_UPDATE")
-    public PrescriptionResponse cancel(@PathVariable UUID id) {
-        return mapper.toResponse(cancelPrescriptionUseCase.cancel(id));
-    }
+        @PostMapping("/{id}/cancel")
+        @RequirePermission("PRESCRIPTION_UPDATE")
+        public PrescriptionResponse cancel(@PathVariable UUID id) {
+                return mapper.toResponse(cancelPrescriptionUseCase.cancel(id));
+        }
 
-    @PostMapping("/{id}/interconnection")
-    @RequirePermission("PRESCRIPTION_INTERCONNECTION_SEND")
-    @Operation(summary = "Send a prescription to the interconnection gateway")
-    @ApiResponse(responseCode = "200", description = "Submission result")
-    @ApiResponse(responseCode = "403", description = "Requires interconnection send permission")
-    public PrescriptionInterconnectionResult sendToInterconnection(@PathVariable UUID id) {
-        return sendPrescriptionInterconnectionUseCase.send(id);
-    }
+        @PostMapping("/{id}/interconnection")
+        @RequirePermission("PRESCRIPTION_INTERCONNECTION_SEND")
+        @Operation(summary = "Send a prescription to the interconnection gateway")
+        @ApiResponse(responseCode = "200", description = "Submission result")
+        @ApiResponse(responseCode = "403", description = "Requires interconnection send permission")
+        public PrescriptionInterconnectionResult sendToInterconnection(@PathVariable UUID id) {
+                return sendPrescriptionInterconnectionUseCase.send(id);
+        }
 
-    @PostMapping("/{id}/interconnection/retry")
-    @RequirePermission("PRESCRIPTION_INTERCONNECTION_RETRY")
-    @Operation(summary = "Retry a failed prescription interconnection submission")
-    @ApiResponse(responseCode = "200", description = "Retry result")
-    @ApiResponse(responseCode = "403", description = "Requires interconnection retry permission")
-    public PrescriptionInterconnectionResult retryInterconnection(@PathVariable UUID id) {
-        return retryPrescriptionInterconnectionUseCase.retry(id);
-    }
+        @PostMapping("/{id}/interconnection/retry")
+        @RequirePermission("PRESCRIPTION_INTERCONNECTION_RETRY")
+        @Operation(summary = "Retry a failed prescription interconnection submission")
+        @ApiResponse(responseCode = "200", description = "Retry result")
+        @ApiResponse(responseCode = "403", description = "Requires interconnection retry permission")
+        public PrescriptionInterconnectionResult retryInterconnection(@PathVariable UUID id) {
+                return retryPrescriptionInterconnectionUseCase.retry(id);
+        }
 
-    @PostMapping("/check-interactions")
-    @RequirePermission("PRESCRIPTION_CREATE")
-    public List<DrugInteractionWarningResponse> checkInteractions(
-            @Valid @RequestBody CheckDrugInteractionRequest request
-    ) {
-        return mapper.toResponse(
-                checkDrugInteractionUseCase.check(mapper.toCommand(request))
-        );
-    }
+        @PostMapping("/check-interactions")
+        @RequirePermission("PRESCRIPTION_CREATE")
+        public List<DrugInteractionWarningResponse> checkInteractions(
+                        @Valid @RequestBody CheckDrugInteractionRequest request) {
+                return mapper.toResponse(
+                                checkDrugInteractionUseCase.check(mapper.toCommand(request)));
+        }
 
-    @PostMapping("/check-allergy-warnings")
-    @RequirePermission("PRESCRIPTION_CREATE")
-    public List<PatientAllergyWarningResponse> checkAllergyWarnings(
-            @Valid @RequestBody CheckPatientDrugAllergyRequest request
-    ) {
-        return mapper.toAllergyResponses(
-                checkPatientDrugAllergyUseCase.check(request.medicalRecordId(), request.medicineIds())
-        );
-    }
+        @PostMapping("/check-allergy-warnings")
+        @RequirePermission({ "PRESCRIPTION_CREATE", "PRESCRIPTION_UPDATE" })
+        public List<PatientAllergyWarningResponse> checkAllergyWarnings(
+                        @Valid @RequestBody CheckPatientDrugAllergyRequest request) {
+                return mapper.toAllergyResponses(
+                                checkPatientDrugAllergyUseCase.check(request.medicalRecordId(), request.medicineIds()));
+        }
 
-    @GetMapping("/allergy-warning-logs")
-    @RequirePermission("PRESCRIPTION_ALLERGY_WARNING_VIEW")
-    public Page<PrescriptionAllergyWarningLogResponse> searchAllergyWarningLogs(
-            @RequestParam(required = false) UUID doctorId,
-            @RequestParam(required = false) UUID patientId,
-            @RequestParam(required = false) java.time.Instant from,
-            @RequestParam(required = false) java.time.Instant to,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        return getPrescriptionAllergyWarningLogsUseCase
-                .search(new SearchPrescriptionAllergyWarningLogsQuery(doctorId, patientId, from, to, page, size))
-                .map(mapper::toAllergyLogResponse);
-    }
+        @GetMapping("/allergy-warning-logs")
+        @RequirePermission("PRESCRIPTION_ALLERGY_WARNING_VIEW")
+        public Page<PrescriptionAllergyWarningLogResponse> searchAllergyWarningLogs(
+                        @RequestParam(required = false) UUID doctorId,
+                        @RequestParam(required = false) UUID patientId,
+                        @RequestParam(required = false) java.time.Instant from,
+                        @RequestParam(required = false) java.time.Instant to,
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "20") int size) {
+                return getPrescriptionAllergyWarningLogsUseCase
+                                .search(new SearchPrescriptionAllergyWarningLogsQuery(doctorId, patientId, from, to,
+                                                page, size))
+                                .map(mapper::toAllergyLogResponse);
+        }
 }

@@ -3,12 +3,10 @@ package com.benhsoan.application.ucservice.prescription;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -39,97 +37,114 @@ import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
+import org.springframework.security.access.AccessDeniedException;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GetPrescriptionAllergyWarningLogsService Unit Tests")
 class GetPrescriptionAllergyWarningLogsServiceTest {
 
-    private static final Instant NOW = Instant.parse("2026-08-08T00:00:00Z");
+        private static final Instant NOW = Instant.parse("2026-08-08T00:00:00Z");
 
-    @Mock private PrescriptionAllergyWarningLogRepository warningLogRepository;
-    @Mock private PrescriptionRepository prescriptionRepository;
-    @Mock private PatientRepository patientRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private MedicineRepository medicineRepository;
+        @Mock
+        private PrescriptionAllergyWarningLogRepository warningLogRepository;
+        @Mock
+        private PrescriptionRepository prescriptionRepository;
+        @Mock
+        private PatientRepository patientRepository;
+        @Mock
+        private UserRepository userRepository;
+        @Mock
+        private MedicineRepository medicineRepository;
+        @Mock
+        private CurrentUserPort currentUserPort;
 
-    private GetPrescriptionAllergyWarningLogsService service;
+        private GetPrescriptionAllergyWarningLogsService service;
 
-    @BeforeEach
-    void setUp() {
-        service = new GetPrescriptionAllergyWarningLogsService(
-                warningLogRepository,
-                prescriptionRepository,
-                patientRepository,
-                userRepository,
-                medicineRepository
-        );
-    }
+        @BeforeEach
+        void setUp() {
+                service = new GetPrescriptionAllergyWarningLogsService(
+                                warningLogRepository,
+                                prescriptionRepository,
+                                patientRepository,
+                                userRepository,
+                                medicineRepository,
+                                currentUserPort);
+        }
 
-    @Test
-    void searchesLogsAndEnrichesDetails() {
-        UUID logId = UUID.randomUUID();
-        UUID prescriptionId = UUID.randomUUID();
-        UUID patientId = UUID.randomUUID();
-        UUID doctorId = UUID.randomUUID();
-        UUID medicineId = UUID.randomUUID();
+        @Test
+        void searchesLogsAndEnrichesDetails() {
+                UUID logId = UUID.randomUUID();
+                UUID prescriptionId = UUID.randomUUID();
+                UUID patientId = UUID.randomUUID();
+                UUID doctorId = UUID.randomUUID();
+                UUID medicineId = UUID.randomUUID();
 
-        UUID allergyId = UUID.randomUUID();
-        PrescriptionAllergyWarningLog log = PrescriptionAllergyWarningLog.restore(
-                logId, prescriptionId, patientId, allergyId, medicineId,
-                "Amoxicillin 500mg", "Amoxicillin", AllergySeverity.SEVERE,
-                "Anaphylaxis", "Clinically justified with monitoring", doctorId, NOW, NOW
-        );
+                when(currentUserPort.hasPermission("PRESCRIPTION_ALLERGY_WARNING_VIEW")).thenReturn(true);
 
-        when(warningLogRepository.search(any(), any()))
-                .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(0, 20), 1));
+                UUID allergyId = UUID.randomUUID();
+                PrescriptionAllergyWarningLog log = PrescriptionAllergyWarningLog.restore(
+                                logId, prescriptionId, patientId, allergyId, medicineId,
+                                "Amoxicillin 500mg", "Amoxicillin", AllergySeverity.SEVERE,
+                                "Anaphylaxis", "Clinically justified with monitoring", doctorId, NOW, NOW);
 
-        PrescriptionItem item = PrescriptionItem.create(
-                UUID.randomUUID(), prescriptionId, medicineId,
-                "Amoxicillin 500mg", "Amoxicillin", "500 mg", "capsule",
-                "1 capsule", 2, AdministrationRoute.ORAL, 5, 10, null, NOW
-        );
-        Prescription prescription = Prescription.restore(
-                prescriptionId, "RX-000001", UUID.randomUUID(), PrescriptionStatus.PENDING_DISPENSE,
-                "Note", doctorId, NOW, null, null, List.of(item)
-        );
-        when(prescriptionRepository.findById(prescriptionId)).thenReturn(Optional.of(prescription));
+                when(warningLogRepository.search(any(), any()))
+                                .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(0, 20), 1));
 
-        Patient patient = Patient.restore(
-                patientId, "PAT-001", "Nguyen Van A", java.time.LocalDate.of(1990, 1, 1),
-                Gender.MALE, "0901234567", null, null, null, null, null, null, null,
-                true, NOW, NOW, null, doctorId
-        );
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+                PrescriptionItem item = PrescriptionItem.create(
+                                UUID.randomUUID(), prescriptionId, medicineId,
+                                "Amoxicillin 500mg", "Amoxicillin", "500 mg", "capsule",
+                                "1 capsule", 2, AdministrationRoute.ORAL, 5, 10, null, NOW);
+                Prescription prescription = Prescription.restore(
+                                prescriptionId, "RX-000001", UUID.randomUUID(), PrescriptionStatus.PENDING_DISPENSE,
+                                "Note", doctorId, NOW, null, null, List.of(item));
+                when(prescriptionRepository.findAllById(any())).thenReturn(List.of(prescription));
 
-        User doctor = User.restore(
-                doctorId, "dr.nguyen", "encodedPassword", "Dr. Nguyen", "dr@test.com", "0909999999",
-                UUID.randomUUID(), true, null, NOW
-        );
-        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+                Patient patient = Patient.restore(
+                                patientId, "PAT-001", "Nguyen Van A", java.time.LocalDate.of(1990, 1, 1),
+                                Gender.MALE, "0901234567", null, null, null, null, null, null, null,
+                                true, NOW, NOW, null, doctorId);
+                when(patientRepository.findAllById(any())).thenReturn(List.of(patient));
 
-        Medicine medicine = Medicine.restore(
-                medicineId, "MED-001", "Amoxicillin 500mg", "Amoxicillin 500mg", "500 mg",
-                DosageForm.CAPSULE, "capsule", AdministrationRoute.ORAL, true, NOW, null, 0, 10
-        );
-        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine));
+                User doctor = User.restore(
+                                doctorId, "dr.nguyen", "encodedPassword", "Dr. Nguyen", "dr@test.com", "0909999999",
+                                UUID.randomUUID(), true, null, NOW);
+                when(userRepository.findAllById(any())).thenReturn(List.of(doctor));
 
-        SearchPrescriptionAllergyWarningLogsQuery query =
-                new SearchPrescriptionAllergyWarningLogsQuery(null, null, null, null, 0, 20);
+                Medicine medicine = Medicine.restore(
+                                medicineId, "MED-001", "Amoxicillin 500mg", "Amoxicillin 500mg", "500 mg",
+                                DosageForm.CAPSULE, "capsule", AdministrationRoute.ORAL, true, NOW, null, 0, 10);
+                when(medicineRepository.findAllById(any())).thenReturn(List.of(medicine));
 
-        Page<PrescriptionAllergyWarningLogResult> resultPage = service.search(query);
+                SearchPrescriptionAllergyWarningLogsQuery query = new SearchPrescriptionAllergyWarningLogsQuery(null,
+                                null, null, null, 0, 20);
 
-        assertNotNull(resultPage);
-        assertEquals(1, resultPage.getTotalElements());
-        PrescriptionAllergyWarningLogResult result = resultPage.getContent().getFirst();
+                Page<PrescriptionAllergyWarningLogResult> resultPage = service.search(query);
 
-        assertEquals(logId, result.id());
-        assertEquals("RX-000001", result.prescriptionCode());
-        assertEquals("PAT-001", result.patientCode());
-        assertEquals("Nguyen Van A", result.patientName());
-        assertEquals("Dr. Nguyen", result.doctorName());
-        assertEquals("Amoxicillin 500mg", result.medicineName());
-        assertEquals("Amoxicillin", result.allergenName());
-        assertEquals(AllergySeverity.SEVERE, result.severity());
-        assertEquals("Clinically justified with monitoring", result.overrideReason());
-    }
+                assertNotNull(resultPage);
+                assertEquals(1, resultPage.getTotalElements());
+                PrescriptionAllergyWarningLogResult result = resultPage.getContent().getFirst();
+
+                assertEquals(logId, result.id());
+                assertEquals("RX-000001", result.prescriptionCode());
+                assertEquals("PAT-001", result.patientCode());
+                assertEquals("Nguyen Van A", result.patientName());
+                assertEquals("Dr. Nguyen", result.doctorName());
+                assertEquals("Amoxicillin 500mg", result.medicineName());
+                assertEquals("Amoxicillin", result.allergenName());
+                assertEquals(AllergySeverity.SEVERE, result.severity());
+                assertEquals("Clinically justified with monitoring", result.overrideReason());
+        }
+
+        @Test
+        void throwsAccessDeniedExceptionWhenCallerLacksPermission() {
+                when(currentUserPort.hasPermission("PRESCRIPTION_ALLERGY_WARNING_VIEW")).thenReturn(false);
+                when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+
+                SearchPrescriptionAllergyWarningLogsQuery query = new SearchPrescriptionAllergyWarningLogsQuery(null,
+                                null, null, null, 0, 20);
+
+                assertThrows(AccessDeniedException.class, () -> service.search(query));
+        }
 }

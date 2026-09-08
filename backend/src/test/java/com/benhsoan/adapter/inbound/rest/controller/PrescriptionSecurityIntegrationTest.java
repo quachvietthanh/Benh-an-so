@@ -260,6 +260,12 @@ class PrescriptionSecurityIntegrationTest {
         }
 
         mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("doctor_updater").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
                         .with(user("pharmacist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
