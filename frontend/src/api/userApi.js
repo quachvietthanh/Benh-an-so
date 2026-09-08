@@ -40,6 +40,10 @@ const userApi = {
   updateStatus: (id, locked) => {
     return locked ? userApi.deactivate(id) : userApi.activate(id)
   },
+
+  resetPassword: (id, data = {}) => {
+    return axiosClient.post(`/users/${id}/reset-password`, data)
+  },
 }
 
 export default userApi

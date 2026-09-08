@@ -33,17 +33,39 @@ axiosClient.interceptors.response.use(
     if (error && typeof error === 'object') {
       error.apiError = normalizeApiError(error)
     }
-    if (error.response?.status === 401) {
+    const errorCode = error.response?.data?.code || error.apiError?.code
+    if (error.response?.status === 403 && errorCode === 'MUST_CHANGE_PASSWORD') {
+      try {
+        const storedUser = localStorage.getItem('user')
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser)
+          if (parsed && typeof parsed === 'object') {
+            parsed.mustChangePassword = true
+            localStorage.setItem('user', JSON.stringify(parsed))
+          }
+        }
+      } catch {
+        // ignore parse error
+      }
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('auth:must-change-password'))
+      }
+    } else if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       if (
-        window.location.pathname.startsWith('/portal') &&
+        typeof window !== 'undefined' &&
+        window.location?.pathname?.startsWith('/portal') &&
         window.location.pathname !== '/portal/login' &&
         window.location.pathname !== '/portal' &&
         window.location.pathname !== '/portal/register'
       ) {
         window.location.href = '/portal/login'
-      } else if (!window.location.pathname.startsWith('/portal') && window.location.pathname !== '/login') {
+      } else if (
+        typeof window !== 'undefined' &&
+        !window.location?.pathname?.startsWith('/portal') &&
+        window.location?.pathname !== '/login'
+      ) {
         window.location.href = '/login'
       }
     }

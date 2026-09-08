@@ -5,6 +5,7 @@ import { ConfigProvider, message } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
 import 'dayjs/locale/vi'
+import ForceChangePasswordModal from './components/auth/ForceChangePasswordModal'
 
 dayjs.locale('vi')
 
@@ -75,6 +76,7 @@ function App() {
           },
         }}
       >
+        <ForceChangePasswordModal />
         <AppRoutes />
       </ConfigProvider>
   )

@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }) => {
             parsed.fullName = tokenUsername || parsed.fullName || parsed.username
             parsed.roles = normalizeRoles(tokenRole)
             parsed.permissions = normalizePermissions(payload?.permissions || parsed.permissions)
+            parsed.mustChangePassword = Boolean(parsed.mustChangePassword)
             localStorage.setItem('user', JSON.stringify(parsed))
             setUser(parsed)
           } else {
@@ -112,6 +113,7 @@ export const AuthProvider = ({ children }) => {
         roles: normalizeRoles(rawRoles),
         permissions: normalizePermissions(payload?.permissions || data.permissions),
         expiredAt: data.expiredAt,
+        mustChangePassword: Boolean(data.mustChangePassword),
       }
 
       localStorage.setItem('token', data.accessToken)
@@ -229,10 +231,48 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user])
 
+  const updateMustChangePassword = (val) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const updated = { ...prev, mustChangePassword: Boolean(val) }
+      localStorage.setItem('user', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  useEffect(() => {
+    const handleMustChangePassword = () => {
+      setUser((prev) => {
+        if (!prev) return prev
+        const updated = { ...prev, mustChangePassword: true }
+        localStorage.setItem('user', JSON.stringify(updated))
+        return updated
+      })
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth:must-change-password', handleMustChangePassword)
+      return () => {
+        window.removeEventListener('auth:must-change-password', handleMustChangePassword)
+      }
+    }
+    return undefined
+  }, [])
+
   const isAuthenticated = !!user
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, patientLogin, patientRegister, logout, loading, isAuthenticated, updateCurrentUserPermissions }}>
+    <AuthContext.Provider value={{
+      user,
+      setUser,
+      login,
+      patientLogin,
+      patientRegister,
+      logout,
+      loading,
+      isAuthenticated,
+      updateCurrentUserPermissions,
+      updateMustChangePassword,
+    }}>
       {children}
     </AuthContext.Provider>
   )

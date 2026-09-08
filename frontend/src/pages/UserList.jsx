@@ -1,17 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Table, Tag, Button, Popconfirm, Space, Typography, message } from 'antd'
-import { LockOutlined, UnlockOutlined, ReloadOutlined } from '@ant-design/icons'
+import { LockOutlined, UnlockOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons'
 import userApi from '../api/userApi'
 import { formatDateTime } from '../utils/helpers'
+import { useAuthContext } from '../context/AuthContext'
+import ResetPasswordModal from '../components/users/ResetPasswordModal'
 
 const { Title } = Typography
 
 function UserList() {
+  const { user: currentUser } = useAuthContext()
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetTargetUser, setResetTargetUser] = useState(null)
+
+  const canResetPassword = useMemo(() => {
+    if (!currentUser) return false
+    const roles = (currentUser.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    const perms = (currentUser.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+    return roles.includes('admin') || perms.includes('USER_RESET_PASSWORD')
+  }, [currentUser])
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
@@ -98,36 +110,50 @@ function UserList() {
       title: 'Thao tác',
       key: 'actions',
       width: 130,
-      render: (_, record) => {
-        if (record.locked) {
-          return (
-            <Popconfirm
-              title="Mở khóa tài khoản"
-              description={`Bạn có chắc chắn muốn mở khóa tài khoản "${record.username}" không?`}
-              onConfirm={() => handleToggleLock(record, false)}
-              okText="Mở khóa"
-              cancelText="Hủy"
-              okButtonProps={{ type: 'primary' }}
-            >
-              <Button type="primary" icon={<UnlockOutlined />} size="small">
-                Mở khóa
-              </Button>
-            </Popconfirm>
-          )
-        }
+        const isSelf = String(record.id) === String(currentUser?.id) || record.username === currentUser?.username
+
         return (
-          <Popconfirm
-            title="Khóa tài khoản"
-            description={`Bạn có chắc chắn muốn khóa tài khoản "${record.username}" không?`}
-            onConfirm={() => handleToggleLock(record, true)}
-            okText="Khóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-          >
-            <Button danger icon={<LockOutlined />} size="small">
-              Khóa
-            </Button>
-          </Popconfirm>
+          <Space size={6}>
+            {canResetPassword && !isSelf && (
+              <Button
+                icon={<KeyOutlined />}
+                size="small"
+                onClick={() => {
+                  setResetTargetUser(record)
+                  setResetModalOpen(true)
+                }}
+              >
+                Đặt lại MK
+              </Button>
+            )}
+            {record.locked ? (
+              <Popconfirm
+                title="Mở khóa tài khoản"
+                description={`Bạn có chắc chắn muốn mở khóa tài khoản "${record.username}" không?`}
+                onConfirm={() => handleToggleLock(record, false)}
+                okText="Mở khóa"
+                cancelText="Hủy"
+                okButtonProps={{ type: 'primary' }}
+              >
+                <Button type="primary" icon={<UnlockOutlined />} size="small">
+                  Mở khóa
+                </Button>
+              </Popconfirm>
+            ) : (
+              <Popconfirm
+                title="Khóa tài khoản"
+                description={`Bạn có chắc chắn muốn khóa tài khoản "${record.username}" không?`}
+                onConfirm={() => handleToggleLock(record, true)}
+                okText="Khóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+              >
+                <Button danger icon={<LockOutlined />} size="small">
+                  Khóa
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
         )
       },
     },
@@ -166,6 +192,16 @@ function UserList() {
             setPageSize(newSize)
           },
         }}
+      />
+
+      <ResetPasswordModal
+        open={resetModalOpen}
+        targetUser={resetTargetUser}
+        onClose={() => {
+          setResetModalOpen(false)
+          setResetTargetUser(null)
+        }}
+        onSuccess={fetchUsers}
       />
     </div>
   )
