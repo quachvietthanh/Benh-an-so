@@ -38,6 +38,11 @@ import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
+import com.benhsoan.domain.patient.enums.AllergySeverity;
+import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
+import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
+import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
@@ -89,6 +94,12 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+
+    @MockitoBean
+    private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+
+    @MockitoBean
+    private GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
 
     @MockitoBean
     private ExportPrescriptionUseCase exportPrescriptionUseCase;
@@ -482,4 +493,79 @@ class PrescriptionControllerTest {
                 .andExpect(jsonPath("$.status").value("FAILED"))
                 .andExpect(jsonPath("$.failureReason").value("Gateway unavailable"));
     }
+
+    @Test
+    @DisplayName("POST /prescriptions/check-allergy-warnings returns allergy warnings")
+    void checkAllergyWarningsReturnsWarnings() throws Exception {
+        UUID allergyId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID medicalRecordId = UUID.randomUUID();
+        when(checkPatientDrugAllergyUseCase.check(any(), any())).thenReturn(List.of(
+                new PatientAllergyWarningResult(
+                        allergyId,
+                        patientId,
+                        medicineId,
+                        "Amoxicillin 500mg",
+                        "Amoxicillin",
+                        "Amoxicillin",
+                        AllergySeverity.SEVERE,
+                        "Anaphylactic shock"
+                )
+        ));
+
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId": "%s",
+                                  "medicineIds": ["%s"]
+                                }
+                                """.formatted(medicalRecordId, medicineId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].allergyId").value(allergyId.toString()))
+                .andExpect(jsonPath("$[0].medicineId").value(medicineId.toString()))
+                .andExpect(jsonPath("$[0].allergenName").value("Amoxicillin"))
+                .andExpect(jsonPath("$[0].severity").value("SEVERE"));
+    }
+
+    @Test
+    @DisplayName("GET /prescriptions/allergy-warning-logs returns paged logs")
+    void getAllergyWarningLogsReturnsPage() throws Exception {
+        UUID logId = UUID.randomUUID();
+        UUID prescriptionId = UUID.randomUUID();
+        when(getPrescriptionAllergyWarningLogsUseCase.search(any())).thenReturn(
+                new PageImpl<>(List.of(
+                        new PrescriptionAllergyWarningLogResult(
+                                logId,
+                                prescriptionId,
+                                "RX000001",
+                                UUID.randomUUID(),
+                                "PAT-001",
+                                "Nguyen Van A",
+                                UUID.randomUUID(),
+                                "Dr. Nguyen",
+                                UUID.randomUUID(),
+                                "Amoxicillin 500mg",
+                                "Amoxicillin",
+                                "Amoxicillin",
+                                AllergySeverity.SEVERE,
+                                "Anaphylaxis",
+                                "Critical benefit outweighs risk",
+                                NOW
+                        )
+                ), PageRequest.of(0, 20), 1)
+        );
+
+        mockMvc.perform(get("/prescriptions/allergy-warning-logs")
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(logId.toString()))
+                .andExpect(jsonPath("$.content[0].prescriptionId").value(prescriptionId.toString()))
+                .andExpect(jsonPath("$.content[0].allergenName").value("Amoxicillin"))
+                .andExpect(jsonPath("$.content[0].severity").value("SEVERE"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
 }
+

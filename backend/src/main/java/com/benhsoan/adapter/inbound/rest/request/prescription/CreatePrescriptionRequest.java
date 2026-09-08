@@ -19,7 +19,18 @@ public record CreatePrescriptionRequest(
         List<CreatePrescriptionItemRequest> items,
 
         @Valid
-        List<PrescriptionInteractionOverrideRequest> interactionOverrides
+        List<PrescriptionInteractionOverrideRequest> interactionOverrides,
+
+        @Valid
+        List<PrescriptionAllergyOverrideRequest> allergyOverrides
 
 ) {
+    public CreatePrescriptionRequest(
+            UUID medicalRecordId,
+            String note,
+            List<CreatePrescriptionItemRequest> items,
+            List<PrescriptionInteractionOverrideRequest> interactionOverrides
+    ) {
+        this(medicalRecordId, note, items, interactionOverrides, null);
+    }
 }

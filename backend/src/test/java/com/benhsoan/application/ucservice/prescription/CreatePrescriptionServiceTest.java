@@ -46,6 +46,13 @@ import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
+import com.benhsoan.domain.patient.enums.AllergySeverity;
+import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
+import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
+import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
+import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
+
 @ExtendWith(MockitoExtension.class)
 class CreatePrescriptionServiceTest {
 
@@ -54,8 +61,10 @@ class CreatePrescriptionServiceTest {
     @Mock private PrescriptionRepository prescriptionRepository;
     @Mock private MedicineRepository medicineRepository;
     @Mock private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+    @Mock private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
+    @Mock private PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
     @Mock private PrescriptionCodeGenerator prescriptionCodeGenerator;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
@@ -78,12 +87,16 @@ class CreatePrescriptionServiceTest {
                         null,
                         null
                 ));
+        lenient().when(checkPatientDrugAllergyUseCase.check(any(), any()))
+                .thenReturn(List.of());
         service = new CreatePrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
                 checkDrugInteractionUseCase,
+                checkPatientDrugAllergyUseCase,
                 medicalRecordDiagnosisRepository,
                 warningLogRepository,
+                allergyWarningLogRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
                 new PrescriptionResultMapper(displayContextResolver),
@@ -276,5 +289,74 @@ class CreatePrescriptionServiceTest {
                 "Interaction detected",
                 "Monitor patient closely"
         );
+    }
+
+    @Test
+    void rejectsWhenMedicationAllergyDetectedWithoutOverrideReason() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID allergyId = UUID.randomUUID();
+        when(checkPatientDrugAllergyUseCase.check(any(), any())).thenReturn(List.of(
+                new PatientAllergyWarningResult(
+                        allergyId,
+                        UUID.randomUUID(),
+                        medicineId,
+                        "Paracetamol",
+                        "Paracetamol",
+                        "Paracetamol",
+                        AllergySeverity.SEVERE,
+                        "Hives"
+                )
+        ));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .build();
+
+        assertThrows(
+                PrescriptionAllergyConfirmationRequiredException.class,
+                () -> service.create(command)
+        );
+        verify(prescriptionRepository, never()).save(any());
+        verify(allergyWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void allowsCreateWhenAllergyOverrideProvidedAndSavesLog() {
+        prepareValidCreate();
+        preparePersistence();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID allergyId = UUID.randomUUID();
+        when(checkPatientDrugAllergyUseCase.check(any(), any())).thenReturn(List.of(
+                new PatientAllergyWarningResult(
+                        allergyId,
+                        UUID.randomUUID(),
+                        medicineId,
+                        "Paracetamol",
+                        "Paracetamol",
+                        "Paracetamol",
+                        AllergySeverity.SEVERE,
+                        "Hives"
+                )
+        ));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .allergyOverrides(List.of(new PrescriptionAllergyOverrideCommand(
+                        allergyId,
+                        medicineId,
+                        "Clinical necessity, monitored closely"
+                )))
+                .build();
+
+        var result = service.create(command);
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
+        verify(allergyWarningLogRepository).save(any());
     }
 }

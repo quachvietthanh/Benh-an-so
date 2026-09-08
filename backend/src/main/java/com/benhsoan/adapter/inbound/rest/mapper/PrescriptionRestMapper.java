@@ -30,6 +30,13 @@ import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
 
+import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionAllergyOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.PatientAllergyWarningResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionAllergyWarningLogResponse;
+import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
+import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
+import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
+
 @Component
 public class PrescriptionRestMapper {
 
@@ -45,6 +52,14 @@ public class PrescriptionRestMapper {
                                 .map(this::toCommand)
                                 .toList();
 
+        List<PrescriptionAllergyOverrideCommand> allergyOverrides
+                = request.allergyOverrides() == null
+                        ? List.of()
+                        : request.allergyOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
         return AmendPrescriptionCommand.builder()
                 .prescriptionId(prescriptionId)
                 .note(request.note())
@@ -54,6 +69,7 @@ public class PrescriptionRestMapper {
                         .map(this::toCommand)
                         .toList())
                 .interactionOverrides(interactionOverrides)
+                .allergyOverrides(allergyOverrides)
                 .build();
     }
 
@@ -68,6 +84,14 @@ public class PrescriptionRestMapper {
                                 .map(this::toCommand)
                                 .toList();
 
+        List<PrescriptionAllergyOverrideCommand> allergyOverrides
+                = request.allergyOverrides() == null
+                        ? List.of()
+                        : request.allergyOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
         return CreatePrescriptionCommand.builder()
                 .medicalRecordId(request.medicalRecordId())
                 .note(request.note())
@@ -76,6 +100,7 @@ public class PrescriptionRestMapper {
                         .map(this::toCommand)
                         .toList())
                 .interactionOverrides(interactionOverrides)
+                .allergyOverrides(allergyOverrides)
                 .build();
     }
 
@@ -240,6 +265,72 @@ public class PrescriptionRestMapper {
                 result.expiryDate(),
                 result.dispensedQuantity(),
                 result.batchQuantityRemaining()
+        );
+    }
+
+    public PrescriptionAllergyOverrideCommand toCommand(
+            PrescriptionAllergyOverrideRequest request
+    ) {
+        if (request == null) {
+            return null;
+        }
+        return new PrescriptionAllergyOverrideCommand(
+                request.allergyId(),
+                request.medicineId(),
+                request.overrideReason()
+        );
+    }
+
+    public PatientAllergyWarningResponse toAllergyResponse(
+            PatientAllergyWarningResult result
+    ) {
+        if (result == null) {
+            return null;
+        }
+        return new PatientAllergyWarningResponse(
+                result.allergyId(),
+                result.patientId(),
+                result.medicineId(),
+                result.medicineName(),
+                result.activeIngredient(),
+                result.allergenName(),
+                result.severity(),
+                result.reaction()
+        );
+    }
+
+    public List<PatientAllergyWarningResponse> toAllergyResponses(
+            List<PatientAllergyWarningResult> results
+    ) {
+        if (results == null) {
+            return List.of();
+        }
+        return results.stream().map(this::toAllergyResponse).toList();
+    }
+
+    public PrescriptionAllergyWarningLogResponse toAllergyLogResponse(
+            PrescriptionAllergyWarningLogResult result
+    ) {
+        if (result == null) {
+            return null;
+        }
+        return new PrescriptionAllergyWarningLogResponse(
+                result.id(),
+                result.prescriptionId(),
+                result.prescriptionCode(),
+                result.patientId(),
+                result.patientCode(),
+                result.patientName(),
+                result.doctorId(),
+                result.doctorName(),
+                result.medicineId(),
+                result.medicineName(),
+                result.activeIngredient(),
+                result.allergenName(),
+                result.severity(),
+                result.reaction(),
+                result.overrideReason(),
+                result.handledAt()
         );
     }
 }

@@ -47,6 +47,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 import jakarta.validation.Valid;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CheckPatientDrugAllergyRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.PatientAllergyWarningResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionAllergyWarningLogResponse;
+import com.benhsoan.port.dto.command.prescription.SearchPrescriptionAllergyWarningLogsQuery;
+import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -64,6 +72,8 @@ public class PrescriptionController {
     private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
     private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
     private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+    private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+    private final GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
     private final ExportPrescriptionUseCase exportPrescriptionUseCase;
     private final SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
     private final RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
@@ -174,5 +184,30 @@ public class PrescriptionController {
         return mapper.toResponse(
                 checkDrugInteractionUseCase.check(mapper.toCommand(request))
         );
+    }
+
+    @PostMapping("/check-allergy-warnings")
+    @RequirePermission("PRESCRIPTION_CREATE")
+    public List<PatientAllergyWarningResponse> checkAllergyWarnings(
+            @Valid @RequestBody CheckPatientDrugAllergyRequest request
+    ) {
+        return mapper.toAllergyResponses(
+                checkPatientDrugAllergyUseCase.check(request.medicalRecordId(), request.medicineIds())
+        );
+    }
+
+    @GetMapping("/allergy-warning-logs")
+    @RequirePermission("PRESCRIPTION_ALLERGY_WARNING_VIEW")
+    public Page<PrescriptionAllergyWarningLogResponse> searchAllergyWarningLogs(
+            @RequestParam(required = false) UUID doctorId,
+            @RequestParam(required = false) UUID patientId,
+            @RequestParam(required = false) java.time.Instant from,
+            @RequestParam(required = false) java.time.Instant to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return getPrescriptionAllergyWarningLogsUseCase
+                .search(new SearchPrescriptionAllergyWarningLogsQuery(doctorId, patientId, from, to, page, size))
+                .map(mapper::toAllergyLogResponse);
     }
 }

@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.application.ucservice.prescription.snapshot.PrescriptionSnapshotMapper;
 import com.benhsoan.application.ucservice.prescription.snapshot.PrescriptionSnapshotSerializer;
+import com.benhsoan.domain.patient.enums.AllergySeverity;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicine.Medicine;
@@ -30,6 +31,7 @@ import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionAmendment;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException;
@@ -37,10 +39,14 @@ import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionAmendm
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
+import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAmendmentRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
@@ -56,7 +62,9 @@ class AmendPrescriptionServiceTest {
     @Mock private PrescriptionRepository prescriptionRepository;
     @Mock private MedicineRepository medicineRepository;
     @Mock private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+    @Mock private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
+    @Mock private PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
     @Mock private PrescriptionAmendmentRepository amendmentRepository;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private CurrentUserPort currentUserPort;
@@ -83,7 +91,9 @@ class AmendPrescriptionServiceTest {
                 prescriptionRepository,
                 medicineRepository,
                 checkDrugInteractionUseCase,
+                checkPatientDrugAllergyUseCase,
                 warningLogRepository,
+                allergyWarningLogRepository,
                 amendmentRepository,
                 auditLogRepository,
                 currentUserPort,
@@ -100,6 +110,8 @@ class AmendPrescriptionServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
         lenient().when(medicineRepository.findById(existingMedicineId))
                 .thenReturn(Optional.of(medicine(existingMedicineId, true)));
+        lenient().when(checkPatientDrugAllergyUseCase.check(any(), any()))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -235,4 +247,72 @@ class AmendPrescriptionServiceTest {
         return Medicine.restore(id, "MED-001", "Amoxicillin", "Amoxicillin", "500 mg", DosageForm.CAPSULE,
                 "capsule", AdministrationRoute.ORAL, active, CREATED_AT, null, 0, 20);
     }
+
+    @Test
+    void rejectsNewAllergyConflictWithoutOverrideBeforeSavingAmendment() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        UUID allergyId = UUID.randomUUID();
+        when(checkPatientDrugAllergyUseCase.check(any(), any())).thenReturn(List.of(
+                new PatientAllergyWarningResult(
+                        allergyId,
+                        UUID.randomUUID(),
+                        existingMedicineId,
+                        "Amoxicillin",
+                        "Amoxicillin",
+                        "Amoxicillin",
+                        AllergySeverity.SEVERE,
+                        "Anaphylaxis"
+                )
+        ));
+
+        assertThrows(PrescriptionAllergyConfirmationRequiredException.class,
+                () -> service.amend(command(List.of(item(existingMedicineId, "2 tablets")))));
+
+        verify(prescriptionRepository, never()).save(any());
+        verify(amendmentRepository, never()).save(any());
+        verify(allergyWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void allowsAmendmentWhenAllergyOverrideProvidedAndSavesLog() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        UUID allergyId = UUID.randomUUID();
+        when(checkPatientDrugAllergyUseCase.check(any(), any())).thenReturn(List.of(
+                new PatientAllergyWarningResult(
+                        allergyId,
+                        UUID.randomUUID(),
+                        existingMedicineId,
+                        "Amoxicillin",
+                        "Amoxicillin",
+                        "Amoxicillin",
+                        AllergySeverity.SEVERE,
+                        "Anaphylaxis"
+                )
+        ));
+
+        AmendPrescriptionCommand command = AmendPrescriptionCommand.builder()
+                .prescriptionId(prescriptionId)
+                .note("Take after meals")
+                .changeReason("Dose adjustment")
+                .items(List.of(item(existingMedicineId, "2 tablets")))
+                .interactionOverrides(List.of())
+                .allergyOverrides(List.of(new PrescriptionAllergyOverrideCommand(
+                        allergyId,
+                        existingMedicineId,
+                        "Benefits outweigh allergy risk, under close supervision"
+                )))
+                .build();
+
+        var result = service.amend(command);
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
+        verify(amendmentRepository).save(any());
+        verify(allergyWarningLogRepository).save(any());
+    }
 }
+

@@ -16,7 +16,9 @@ public record AmendPrescriptionCommand(
 
         List<AmendPrescriptionItemCommand> items,
 
-        List<PrescriptionInteractionOverrideCommand> interactionOverrides
+        List<PrescriptionInteractionOverrideCommand> interactionOverrides,
+
+        List<PrescriptionAllergyOverrideCommand> allergyOverrides
 
 ) {
 }

@@ -54,6 +54,8 @@
 | `/api/v1/prescriptions/{id}/interconnection` | POST | ❌ | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/prescription-interconnections` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `/api/v1/prescriptions/{id}/interconnection/retry` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `/api/v1/prescriptions/check-allergy-warnings` | POST | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/prescriptions/allergy-warning-logs` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
 | | | | | | | |
 | **Appointments** | | | | | | |
 | `/api/v1/appointments` | GET | ✅ | ✅ | ❌ | ✅ | ❌ |

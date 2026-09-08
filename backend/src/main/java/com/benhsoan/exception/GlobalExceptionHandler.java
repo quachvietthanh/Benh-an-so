@@ -105,6 +105,29 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleAllergyConfirmationRequired(
+            com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException ex,
+            HttpServletRequest request
+    ) {
+        return build(
+                DomainExceptionHttpStatusMapper.statusFor(ex.getCode()),
+                ex.getCode().name(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                Map.of("warnings", ex.getWarnings().stream().map(warning -> Map.<String, Object>of(
+                        "allergyId", warning.allergyId(),
+                        "patientId", warning.patientId(),
+                        "medicineId", warning.medicineId(),
+                        "medicineName", warning.medicineName() != null ? warning.medicineName() : "",
+                        "activeIngredient", warning.activeIngredient(),
+                        "allergenName", warning.allergenName(),
+                        "severity", warning.severity(),
+                        "reaction", warning.reaction() != null ? warning.reaction() : ""
+                )).toList())
+        );
+    }
+
     @ExceptionHandler(PrescriptionInsufficientStockException.class)
     public ResponseEntity<ApiErrorResponse> handleInsufficientStock(
             PrescriptionInsufficientStockException ex,

@@ -18,7 +18,18 @@ public record AmendPrescriptionRequest(
         List<AmendPrescriptionItemRequest> items,
 
         @Valid
-        List<PrescriptionInteractionOverrideRequest> interactionOverrides
+        List<PrescriptionInteractionOverrideRequest> interactionOverrides,
+
+        @Valid
+        List<PrescriptionAllergyOverrideRequest> allergyOverrides
 
 ) {
+    public AmendPrescriptionRequest(
+            String note,
+            String changeReason,
+            List<AmendPrescriptionItemRequest> items,
+            List<PrescriptionInteractionOverrideRequest> interactionOverrides
+    ) {
+        this(note, changeReason, items, interactionOverrides, null);
+    }
 }
