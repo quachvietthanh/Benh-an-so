@@ -37,6 +37,7 @@ import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.security.SecurityAlertResult;
 import com.benhsoan.port.inbound.security.GetSecurityAlertsUseCase;
+import com.benhsoan.port.inbound.security.UpdateSecurityAlertStatusUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -68,6 +69,9 @@ class SecurityAlertSecurityIntegrationTest {
 
     @MockitoBean
     private GetSecurityAlertsUseCase getSecurityAlertsUseCase;
+
+    @MockitoBean
+    private UpdateSecurityAlertStatusUseCase updateSecurityAlertStatusUseCase;
 
     @MockitoBean
     private JwtTokenPort jwtTokenPort;

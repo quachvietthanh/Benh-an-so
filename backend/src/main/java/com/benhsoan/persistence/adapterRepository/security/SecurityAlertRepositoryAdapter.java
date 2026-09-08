@@ -34,6 +34,11 @@ public class SecurityAlertRepositoryAdapter implements SecurityAlertRepository {
     }
 
     @Override
+    public Optional<SecurityAlert> findById(UUID id) {
+        return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<SecurityAlert> findLatestActiveAlert(
             UUID userId,
             AlertType alertType,

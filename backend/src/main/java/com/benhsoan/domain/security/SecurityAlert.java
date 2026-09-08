@@ -117,4 +117,10 @@ public class SecurityAlert {
         this.description = Guard.require(description, "Description");
         this.windowEnd = Guard.require(windowEnd, "Window end");
     }
+
+    public void updateStatus(AlertStatus newStatus, Instant updatedAt) {
+        Guard.require(newStatus, "Status");
+        Guard.require(updatedAt, "Updated at");
+        this.status = newStatus;
+    }
 }
