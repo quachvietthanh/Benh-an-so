@@ -203,9 +203,7 @@ export const ClinicalOrderTable = ({
 
         return (
           <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-            <Button size="small" icon={<MoreOutlined />} aria-label={`Thao tác với phiếu ${record.orderCode || ''}`}>
-              Chi tiết
-            </Button>
+            <Button size="small" icon={<MoreOutlined />} aria-label={`Thao tác với phiếu ${record.orderCode || ''}`} />
           </Dropdown>
         )
       },

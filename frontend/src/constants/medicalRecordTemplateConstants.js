@@ -103,3 +103,106 @@ export const FIELD_CODE_TO_FORM_NAME = {
   CONCLUSION: 'conclusion',
 }
 
+export const SECTION_LABEL_TRANSLATIONS = {
+  'Reason for visit': 'Lý do khám',
+  'Reason for follow-up': 'Lý do tái khám',
+  'Symptoms': 'Triệu chứng lâm sàng',
+  'Current symptoms': 'Triệu chứng hiện tại',
+  'Medical history': 'Tiền sử bệnh',
+  'Relevant medical history': 'Tiền sử bệnh liên quan',
+  'Physical examination': 'Khám thực thể',
+  'Clinical progress': 'Diễn tiến bệnh',
+  'Treatment plan': 'Kế hoạch điều trị',
+  'Doctor instructions': 'Dặn dò của bác sĩ',
+  'Conclusion': 'Kết luận',
+}
+
+export const TEMPLATE_NAME_TRANSLATIONS = {
+  'General outpatient initial examination': 'Khám đa khoa',
+  'General outpatient follow-up': 'Tái khám đa khoa',
+  'Internal medicine initial examination': 'Khám nội khoa',
+  'Internal medicine chronic follow-up': 'Tái khám nội khoa',
+  'Initial examination': 'Khám ban đầu',
+  'Follow-up examination': 'Tái khám',
+  'General examination': 'Khám tổng quát',
+  'Outpatient examination': 'Khám ngoại trú',
+  'Khám ban đầu ngoại trú đa khoa': 'Khám đa khoa',
+  'Tái khám ngoại trú đa khoa': 'Tái khám đa khoa',
+  'Khám ban đầu nội khoa': 'Khám nội khoa',
+  'Tái khám mạn tính nội khoa': 'Tái khám nội khoa',
+}
+
+export const formatSectionLabel = (label, fieldCode) => {
+  if (label && SECTION_LABEL_TRANSLATIONS[label]) {
+    return SECTION_LABEL_TRANSLATIONS[label]
+  }
+  if (!label && fieldCode) {
+    const meta = getFieldMeta(fieldCode)
+    return meta?.defaultLabel || fieldCode
+  }
+  if (label) {
+    const lower = String(label).trim().toLowerCase()
+    const found = Object.entries(SECTION_LABEL_TRANSLATIONS).find(
+      ([k]) => k.toLowerCase() === lower
+    )
+    if (found) return found[1]
+  }
+  return label || ''
+}
+
+export const formatTemplateName = (name) => {
+  if (!name) return ''
+  const trimmed = String(name).trim()
+  if (TEMPLATE_NAME_TRANSLATIONS[trimmed]) {
+    return TEMPLATE_NAME_TRANSLATIONS[trimmed]
+  }
+  const lower = trimmed.toLowerCase()
+  const found = Object.entries(TEMPLATE_NAME_TRANSLATIONS).find(
+    ([k]) => k.toLowerCase() === lower
+  )
+  if (found) return found[1]
+
+  // Check prefix matches e.g. "General outpatient initial examination v1" -> "Khám đa khoa v1"
+  for (const [key, val] of Object.entries(TEMPLATE_NAME_TRANSLATIONS)) {
+    if (lower.startsWith(key.toLowerCase())) {
+      const remainder = trimmed.slice(key.length).trim()
+      return remainder ? `${val} ${remainder}` : val
+    }
+  }
+
+  return trimmed
+}
+
+export const SPECIALTY_NAME_TRANSLATIONS = {
+  General: 'Đa khoa',
+  GENERAL: 'Đa khoa',
+  'Internal medicine': 'Nội khoa',
+  'INTERNAL_MEDICINE': 'Nội khoa',
+  Pediatrics: 'Nhi khoa',
+  PEDIATRICS: 'Nhi khoa',
+  Surgery: 'Ngoại khoa',
+  SURGERY: 'Ngoại khoa',
+  Obstetrics: 'Sản phụ khoa',
+  OBSTETRICS: 'Sản phụ khoa',
+  Dermatology: 'Da liễu',
+  DERMATOLOGY: 'Da liễu',
+  Ophthalmology: 'Mắt',
+  OPHTHALMOLOGY: 'Mắt',
+  Otorhinolaryngology: 'Tai Mũi Họng',
+  'Odonto-Stomatology': 'Răng Hàm Mặt',
+  'Traditional Medicine': 'Y học cổ truyền',
+}
+
+export const formatSpecialtyName = (name) => {
+  if (!name) return 'Đa khoa'
+  const trimmed = String(name).trim()
+  if (SPECIALTY_NAME_TRANSLATIONS[trimmed]) {
+    return SPECIALTY_NAME_TRANSLATIONS[trimmed]
+  }
+  const lower = trimmed.toLowerCase()
+  const found = Object.entries(SPECIALTY_NAME_TRANSLATIONS).find(
+    ([k]) => k.toLowerCase() === lower
+  )
+  if (found) return found[1]
+  return trimmed
+}

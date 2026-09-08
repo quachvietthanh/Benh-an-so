@@ -26,6 +26,7 @@ import {
   ExclamationCircleOutlined,
   ExperimentOutlined,
   FolderOpenOutlined,
+  MoreOutlined,
   PlusOutlined,
   PoweroffOutlined,
   ReloadOutlined,
@@ -35,7 +36,6 @@ import {
 import diagnosisCatalogApi from '../api/diagnosisCatalogApi'
 import DiagnosisCatalogCreateModal from '../components/clinical/DiagnosisCatalogCreateModal'
 import DiagnosisCatalogEditModal from '../components/clinical/DiagnosisCatalogEditModal'
-import Loading from '../components/common/Loading'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { icd10Categories } from '../utils/icd10Data'
@@ -271,42 +271,51 @@ function DiagnosisCatalogPage() {
       baseColumns.push({
         title: 'Thao tác',
         key: 'actions',
-        width: 130,
+        width: 80,
         align: 'center',
-        render: (_, record) => (
-          <Space size={8}>
-            <Tooltip title="Chỉnh sửa thông tin mã bệnh">
+        render: (_, record) => {
+          const menuItems = [
+            {
+              key: 'edit',
+              icon: <EditOutlined style={{ color: '#2563eb' }} />,
+              label: 'Chỉnh sửa mã bệnh',
+              onClick: () => {
+                setSelectedItem(record)
+                setEditModalOpen(true)
+              },
+            },
+            { type: 'divider' },
+            {
+              key: 'delete',
+              icon: <DeleteOutlined style={{ color: '#dc2626' }} />,
+              label: 'Xóa mã bệnh',
+              danger: true,
+              onClick: () => {
+                Modal.confirm({
+                  title: 'Xác nhận xóa mã bệnh',
+                  content: `Bạn có chắc muốn xóa mã [${record.code}] (${record.name}) khỏi danh mục?`,
+                  okText: 'Xóa',
+                  okType: 'danger',
+                  cancelText: 'Hủy',
+                  onOk: () => handleDelete(record),
+                })
+              },
+            },
+          ]
+
+          return (
+            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
               <Button
                 type="text"
                 size="small"
-                icon={<EditOutlined style={{ color: '#2563eb' }} />}
-                onClick={() => {
-                  setSelectedItem(record)
-                  setEditModalOpen(true)
-                }}
+                icon={<MoreOutlined style={{ fontSize: 18, color: '#64748b' }} />}
+                aria-label="Thao tác"
+                title="Thao tác"
+                style={{ width: 32, height: 32, borderRadius: 6 }}
               />
-            </Tooltip>
-
-            <Popconfirm
-              title="Xác nhận xóa mã bệnh"
-              description={`Bạn có chắc muốn xóa mã [${record.code}] khỏi danh mục?`}
-              onConfirm={() => handleDelete(record)}
-              okText="Xóa"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true, loading: actionLoadingId === record.id }}
-            >
-              <Tooltip title="Xóa mã bệnh">
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  loading={actionLoadingId === record.id}
-                />
-              </Tooltip>
-            </Popconfirm>
-          </Space>
-        ),
+            </Dropdown>
+          )
+        },
       })
     }
 
@@ -437,35 +446,29 @@ function DiagnosisCatalogPage() {
       </div>
 
       <Card bodyStyle={{ padding: 0 }} style={{ borderRadius: 12, overflow: 'hidden' }}>
-        {loading && data.length === 0 ? (
-          <div style={{ padding: 24 }}>
-            <Loading type="table" rows={6} cols={5} tip="Đang tải danh mục mã bệnh ICD-10..." />
-          </div>
-        ) : (
-          <Table
-            columns={columns}
-            dataSource={filteredData}
-            rowKey="id"
-            loading={loading && data.length > 0}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} mã bệnh`,
-            }}
-            locale={{
-              emptyText: (
-                <Empty
-                  description={
-                    keyword || statusFilter !== 'ALL' || groupFilter !== 'ALL'
-                      ? 'Không tìm thấy mã bệnh phù hợp với bộ lọc.'
-                      : 'Chưa có mã bệnh nào trong danh mục.'
-                  }
-                />
-              ),
-            }}
-          />
-        )}
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} mã bệnh`,
+          }}
+          locale={{
+            emptyText: (
+              <Empty
+                description={
+                  keyword || statusFilter !== 'ALL' || groupFilter !== 'ALL'
+                    ? 'Không tìm thấy mã bệnh phù hợp với bộ lọc.'
+                    : 'Chưa có mã bệnh nào trong danh mục.'
+                }
+              />
+            ),
+          }}
+        />
       </Card>
 
       <DiagnosisCatalogCreateModal

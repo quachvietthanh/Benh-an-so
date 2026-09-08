@@ -31,7 +31,6 @@ import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat.js'
 import systemApi from '../api/systemApi'
 import { useAuthContext } from '../context/AuthContext'
-import Loading from '../components/common/Loading'
 import {
   categorizePriceHistory,
   extractServiceFormErrors,
@@ -598,40 +597,29 @@ function ServicesPage() {
 
       {/* Services Table */}
       <div className="services-table-wrapper">
-        {loading && services.length === 0 ? (
-          <div style={{ padding: '36px 20px', background: '#ffffff', borderRadius: 12 }}>
-            <Loading
-              type="table"
-              rows={6}
-              cols={5}
-              tip="Đang tải danh mục dịch vụ kỹ thuật và bảng giá viện phí..."
-            />
-          </div>
-        ) : (
-          <Table
-            columns={columns}
-            dataSource={filteredServices}
-            rowKey="id"
-            loading={loading && services.length > 0}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showTotal: (total, range) =>
-                `Hiển thị ${range[0]} - ${range[1]} trên tổng số ${total} dịch vụ`,
-            }}
-            locale={{
-              emptyText: (
-                <div className="service-empty-state">
-                  <AppstoreOutlined style={{ fontSize: 36, color: '#cbd5e1' }} />
-                  <div style={{ marginTop: 8, color: '#64748b', fontWeight: 500 }}>
-                    Không tìm thấy dịch vụ kỹ thuật nào phù hợp
-                  </div>
+        <Table
+          columns={columns}
+          dataSource={filteredServices}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: (total, range) =>
+              `Hiển thị ${range[0]} - ${range[1]} trên tổng số ${total} dịch vụ`,
+          }}
+          locale={{
+            emptyText: (
+              <div className="service-empty-state">
+                <AppstoreOutlined style={{ fontSize: 36, color: '#cbd5e1' }} />
+                <div style={{ marginTop: 8, color: '#64748b', fontWeight: 500 }}>
+                  Không tìm thấy dịch vụ kỹ thuật nào phù hợp
                 </div>
-              ),
-            }}
-          />
-        )}
+              </div>
+            ),
+          }}
+        />
       </div>
 
       {/* Modal: Thêm dịch vụ mới */}
