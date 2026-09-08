@@ -7,6 +7,7 @@ import {
   DatePicker,
   Radio,
   Alert,
+  Checkbox,
   message,
 } from 'antd'
 import {
@@ -54,13 +55,15 @@ function PortalRegister() {
         gender: values.gender || 'MALE',
         identityNumber: values.identityNumber ? String(values.identityNumber).trim() : null,
         email: values.email ? String(values.email).trim() : null,
+        consentAgreed: values.consentAgreed ?? true,
+        consentVersion: 'v1.0',
       }
 
       const result = await patientRegister(payload)
 
       if (result.success) {
-        message.success('Đăng ký tài khoản thành công!')
-        navigate('/portal/dashboard', { replace: true })
+        message.success('Đăng ký tài khoản thành công! Vui lòng đăng nhập để tiếp tục.')
+        navigate('/portal/login', { replace: true, state: { phone: payload.phone } })
       } else {
         const status = result.status
         const errorData = result.data
@@ -96,30 +99,55 @@ function PortalRegister() {
             setServerError(errorMsg || 'Thông tin đăng ký bị trùng lặp trong hệ thống.')
           }
         } else if (status === 400 || status === 422) {
-          if (errorMsg.includes('Số điện thoại không hợp lệ') || errorMsg.includes('phone')) {
-            form.setFields([
-              {
-                name: 'phone',
-                errors: ['Số điện thoại không đúng định dạng di động Việt Nam.'],
-              },
-            ])
-          }
-          if (errorMsg.includes('Email không đúng định dạng') || errorMsg.includes('email')) {
-            form.setFields([
-              {
-                name: 'email',
-                errors: ['Email không đúng định dạng.'],
-              },
-            ])
-          }
-          if (errorData?.details?.fields) {
-            const fieldErrors = Object.entries(errorData.details.fields).map(([name, err]) => ({
-              name,
-              errors: [err],
-            }))
+          const detailedErrors = []
+          if (errorData?.details?.fields && typeof errorData.details.fields === 'object') {
+            const fieldLabels = {
+              phone: 'Số điện thoại',
+              password: 'Mật khẩu',
+              confirmPassword: 'Xác nhận mật khẩu',
+              fullName: 'Họ và tên',
+              dateOfBirth: 'Ngày sinh',
+              gender: 'Giới tính',
+              identityNumber: 'Số CCCD/CMND',
+              email: 'Email',
+              consentAgreed: 'Xác nhận đồng ý xử lý dữ liệu cá nhân',
+            }
+            const fieldErrors = []
+            Object.entries(errorData.details.fields).forEach(([name, err]) => {
+              let msg = String(err || '')
+              if (msg === 'Validation failed.' || msg === 'Invalid value.') {
+                msg = 'Giá trị không hợp lệ'
+              }
+              fieldErrors.push({
+                name,
+                errors: [msg],
+              })
+              const label = fieldLabels[name] || name
+              detailedErrors.push(`${label}: ${msg}`)
+            })
             form.setFields(fieldErrors)
           }
-          setServerError(errorMsg || 'Dữ liệu đăng ký không hợp lệ. Vui lòng kiểm tra lại.')
+
+          if (detailedErrors.length > 0) {
+            setServerError(
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  Thông tin đăng ký chưa hợp lệ:
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {detailedErrors.map((msg, idx) => (
+                    <li key={idx}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          } else {
+            let msg = errorMsg
+            if (!msg || msg.toLowerCase().includes('validation failed')) {
+              msg = 'Dữ liệu đăng ký không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.'
+            }
+            setServerError(msg)
+          }
         } else if (status === 500) {
           setServerError(errorMsg || 'Lỗi xử lý từ máy chủ. Vui lòng thử lại sau.')
         } else if (result.error?.response) {
@@ -185,7 +213,7 @@ function PortalRegister() {
               showIcon
               message={
                 <div>
-                  <span>{serverError}</span>
+                  {serverError}
                   {phoneConflict && (
                     <div style={{ marginTop: 6 }}>
                       <Link to="/portal/login" style={{ fontWeight: 600, color: '#176ee8' }}>
@@ -350,6 +378,35 @@ function PortalRegister() {
                 maxLength={12}
               />
             </Form.Item>
+
+            <div className="portal-register-consent-box">
+              <Form.Item
+                name="consentAgreed"
+                valuePropName="checked"
+                initialValue={true}
+                style={{ marginBottom: 0 }}
+                rules={[
+                  {
+                    validator: (_, value) =>
+                      value
+                        ? Promise.resolve()
+                        : Promise.reject(new Error('Vui lòng đồng ý với điều khoản sử dụng và xử lý dữ liệu cá nhân.')),
+                  },
+                ]}
+              >
+                <Checkbox disabled={loading}>
+                  <div className="portal-consent-content">
+                    <div className="portal-consent-title">
+                      <SafetyCertificateOutlined style={{ color: '#1677ff' }} />
+                      Cam kết & Điều khoản bảo mật y tế
+                    </div>
+                    <div className="portal-consent-desc">
+                      Tôi đồng ý với <span className="portal-consent-link">Quy định và Phiếu đồng ý xử lý dữ liệu cá nhân</span> (theo Nghị định 13/2023/NĐ-CP).
+                    </div>
+                  </div>
+                </Checkbox>
+              </Form.Item>
+            </div>
 
             <Form.Item style={{ marginBottom: 8, marginTop: 12 }}>
               <Button

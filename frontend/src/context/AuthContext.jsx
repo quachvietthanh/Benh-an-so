@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }) => {
             parsed.fullName = tokenUsername || parsed.fullName || parsed.username
             parsed.roles = normalizeRoles(tokenRole)
             parsed.permissions = normalizePermissions(payload?.permissions || parsed.permissions)
+            parsed.mustChangePassword = Boolean(parsed.mustChangePassword)
             localStorage.setItem('user', JSON.stringify(parsed))
             setUser(parsed)
           } else {
@@ -112,6 +113,7 @@ export const AuthProvider = ({ children }) => {
         roles: normalizeRoles(rawRoles),
         permissions: normalizePermissions(payload?.permissions || data.permissions),
         expiredAt: data.expiredAt,
+        mustChangePassword: Boolean(data.mustChangePassword),
       }
 
       localStorage.setItem('token', data.accessToken)
@@ -178,41 +180,20 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authApi.patientRegister(registrationData)
       const data = response.data
-
-      if (data.accessToken) {
-        const payload = getJwtPayload(data.accessToken)
-        const rawRoles = payload?.role || ['PATIENT']
-        const username = payload?.username || data.phone
-
-        const normalizedUser = {
-          id: data.userId || payload?.userId || payload?.sub,
-          patientId: data.patientId || payload?.patientId,
-          patientCode: data.patientCode || payload?.patientCode || null,
-          username: username,
-          fullName: data.fullName || username,
-          roles: normalizeRoles(rawRoles),
-          permissions: normalizePermissions(payload?.permissions || []),
-          expiredAt: payload?.exp ? new Date(payload.exp * 1000).toISOString() : null,
-          refreshToken: data.refreshToken,
-        }
-
-        localStorage.setItem('token', data.accessToken)
-        localStorage.setItem('user', JSON.stringify(normalizedUser))
-        setUser(normalizedUser)
-
-        return { success: true, data: normalizedUser }
-      }
-
       return { success: true, data }
     } catch (error) {
       const status = error.response?.status
       const errorData = error.response?.data
+      const rawMessage = errorData?.message || error.message
+      const friendlyMessage = rawMessage === 'Validation failed.'
+        ? 'Dữ liệu đăng ký chưa hợp lệ.'
+        : (rawMessage || 'Đăng ký không thành công.')
       return {
         success: false,
         status,
         data: errorData,
         error,
-        message: errorData?.message || error.message || 'Đăng ký không thành công.',
+        message: friendlyMessage,
       }
     }
   }
@@ -250,10 +231,48 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user])
 
+  const updateMustChangePassword = (val) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const updated = { ...prev, mustChangePassword: Boolean(val) }
+      localStorage.setItem('user', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  useEffect(() => {
+    const handleMustChangePassword = () => {
+      setUser((prev) => {
+        if (!prev) return prev
+        const updated = { ...prev, mustChangePassword: true }
+        localStorage.setItem('user', JSON.stringify(updated))
+        return updated
+      })
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth:must-change-password', handleMustChangePassword)
+      return () => {
+        window.removeEventListener('auth:must-change-password', handleMustChangePassword)
+      }
+    }
+    return undefined
+  }, [])
+
   const isAuthenticated = !!user
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, patientLogin, patientRegister, logout, loading, isAuthenticated, updateCurrentUserPermissions }}>
+    <AuthContext.Provider value={{
+      user,
+      setUser,
+      login,
+      patientLogin,
+      patientRegister,
+      logout,
+      loading,
+      isAuthenticated,
+      updateCurrentUserPermissions,
+      updateMustChangePassword,
+    }}>
       {children}
     </AuthContext.Provider>
   )

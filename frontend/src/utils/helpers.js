@@ -38,3 +38,25 @@ export const stringToColor = (str) => {
   const color = `hsl(${hash % 360}, 70%, 50%)`
   return color
 }
+
+export const formatRecordCode = (recordId) => {
+  if (!recordId) return 'Chưa tạo'
+  const str = String(recordId).trim()
+  if (str.startsWith('BA-') || str.startsWith('MR-')) return str
+  if (str.length > 12) {
+    return `BA-${str.slice(0, 8).toUpperCase()}`
+  }
+  return `BA-${str.toUpperCase()}`
+}
+
+export const formatVisitCode = (visitCode, visitId) => {
+  if (visitCode && !visitCode.includes('-')) return visitCode
+  const id = visitCode || visitId
+  if (!id) return '—'
+  const str = String(id).trim()
+  if (str.startsWith('LK-') || str.startsWith('VIS')) return str
+  if (str.length > 12) {
+    return `LK-${str.slice(0, 8).toUpperCase()}`
+  }
+  return `LK-${str.toUpperCase()}`
+}

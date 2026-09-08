@@ -8,6 +8,7 @@ import {
   Empty,
   Input,
   Modal,
+  Pagination,
   Row,
   Skeleton,
   Space,
@@ -54,12 +55,12 @@ function PatientMyAppointmentsPage() {
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('ALL')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [cancellingId, setCancellingId] = useState(null)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [targetAppointment, setTargetAppointment] = useState(null)
-
-  // Reschedule Modal State
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false)
   const [rescheduleTargetAppointment, setRescheduleTargetAppointment] = useState(null)
 
@@ -87,7 +88,6 @@ function PatientMyAppointmentsPage() {
       const sorted = combined.sort((a, b) => new Date(b.startTime || b.createdAt) - new Date(a.startTime || a.createdAt))
       setAppointments(sorted)
     } catch {
-      // If API returns error, fallback to local cache
       setAppointments(cachedList)
     } finally {
       setLoading(false)
@@ -112,7 +112,16 @@ function PatientMyAppointmentsPage() {
     return appointments
   }, [appointments, activeTab])
 
-  // Rule: Only SCHEDULED/CONFIRMED appointments in the FUTURE can be rescheduled or cancelled
+  const paginatedAppointments = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    return filteredAppointments.slice(startIndex, startIndex + pageSize)
+  }, [filteredAppointments, currentPage, pageSize])
+
+  const handleTabChange = (key) => {
+    setActiveTab(key)
+    setCurrentPage(1)
+  }
+
   const canModifyAppointment = (apt) => {
     if (!apt) return false
     const validStatus = apt.status === 'SCHEDULED' || apt.status === 'CONFIRMED'
@@ -120,7 +129,6 @@ function PatientMyAppointmentsPage() {
     return validStatus && isFuture
   }
 
-  // Cancel Handlers
   const handleOpenCancelModal = (apt) => {
     setTargetAppointment(apt)
     setCancelReason('')
@@ -141,7 +149,6 @@ function PatientMyAppointmentsPage() {
         cancelReason.trim() || undefined
       )
 
-      // Verification: verify old slot is released on backend
       if (oldDoctorId && oldDate) {
         try {
           const verifyRes = await patientPortalAppointmentApi.getAvailableSlots(oldDoctorId, oldDate)
@@ -152,12 +159,9 @@ function PatientMyAppointmentsPage() {
           } else {
             console.log(`[Verification] Xác nhận thành công: Khung giờ cũ ${oldTimeStr} đã được giải phóng (isAvailable=true).`)
           }
-        } catch {
-          // non-blocking
-        }
+        } catch {}
       }
 
-      // Update in localStorage
       try {
         const cached = JSON.parse(localStorage.getItem('portal_booked_appointments') || '[]')
         const updated = cached.map((item) =>
@@ -166,11 +170,8 @@ function PatientMyAppointmentsPage() {
             : item
         )
         localStorage.setItem('portal_booked_appointments', JSON.stringify(updated))
-      } catch {
-        // ignore
-      }
+      } catch {}
 
-      // Update in state
       setAppointments((prev) =>
         prev.map((item) =>
           item.id === targetAppointment.id || item.appointmentCode === targetAppointment.appointmentCode
@@ -192,7 +193,6 @@ function PatientMyAppointmentsPage() {
         setCancelModalOpen(false)
       } else if (status === 404) {
         message.warning('Lịch hẹn không tìm thấy trên hệ thống hoặc Backend chưa được khởi động lại để nhận API mới.')
-        // Cập nhật trạng thái cục bộ để không làm nghẽn người dùng
         try {
           const cached = JSON.parse(localStorage.getItem('portal_booked_appointments') || '[]')
           const updated = cached.map((item) =>
@@ -201,9 +201,7 @@ function PatientMyAppointmentsPage() {
               : item
           )
           localStorage.setItem('portal_booked_appointments', JSON.stringify(updated))
-        } catch {
-          // ignore
-        }
+        } catch {}
         setAppointments((prev) =>
           prev.map((item) =>
             item.id === targetAppointment.id || item.appointmentCode === targetAppointment.appointmentCode
@@ -222,7 +220,6 @@ function PatientMyAppointmentsPage() {
     }
   }
 
-  // Reschedule Handlers
   const handleOpenRescheduleModal = (apt) => {
     setRescheduleTargetAppointment(apt)
     setRescheduleModalOpen(true)
@@ -256,14 +253,11 @@ function PatientMyAppointmentsPage() {
           : item
       )
       localStorage.setItem('portal_booked_appointments', JSON.stringify(updated))
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   return (
     <div className="portal-my-appointments-page">
-      {/* Header */}
       <header className="portal-my-appointments-header">
         <div className="portal-my-appointments-header-inner">
           <Link className="portal-booking-brand" to="/portal/dashboard">
@@ -296,7 +290,6 @@ function PatientMyAppointmentsPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="portal-my-appointments-main">
         <div style={{ marginBottom: 16 }}>
           <Breadcrumb
@@ -334,7 +327,7 @@ function PatientMyAppointmentsPage() {
 
           <Tabs
             activeKey={activeTab}
-            onChange={setActiveTab}
+            onChange={handleTabChange}
             items={[
               { key: 'ALL', label: `Tất cả (${appointments.length})` },
               {
@@ -375,7 +368,7 @@ function PatientMyAppointmentsPage() {
             </div>
           ) : (
             <div>
-              {filteredAppointments.map((apt) => {
+              {paginatedAppointments.map((apt) => {
                 const statusInfo = statusMeta[apt.status] || {
                   label: apt.status,
                   color: 'default',
@@ -461,12 +454,28 @@ function PatientMyAppointmentsPage() {
                   </Card>
                 )
               })}
+
+              {filteredAppointments.length > 0 && (
+                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={filteredAppointments.length}
+                    showSizeChanger
+                    pageSizeOptions={['5', '10', '20', '50']}
+                    locale={{ items_per_page: '/ trang' }}
+                    onChange={(page, size) => {
+                      setCurrentPage(page)
+                      setPageSize(size)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
       </main>
 
-      {/* Cancel Modal */}
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#dc2626' }}>
@@ -502,7 +511,6 @@ function PatientMyAppointmentsPage() {
         </div>
       </Modal>
 
-      {/* Reschedule Modal */}
       <RescheduleAppointmentModal
         open={rescheduleModalOpen}
         onClose={() => {

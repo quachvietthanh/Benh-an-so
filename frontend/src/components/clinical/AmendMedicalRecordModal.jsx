@@ -23,7 +23,6 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import medicalRecordApi from '../../api/medicalRecordApi'
-import queueApi from '../../api/queueApi'
 import { getApiErrorMessage } from '../../utils/apiError'
 import { formatDateTime } from '../../utils/helpers'
 
@@ -66,136 +65,13 @@ export default function AmendMedicalRecordModal({
     encounterContext?.visit?.status === 'COMPLETED' ||
     encounterContext?.queueItem?.status === 'COMPLETED'
 
-  const patientName = patient?.fullName || encounterContext?.patient?.fullName || 'Bệnh nhân'
-  const patientCode = patient?.patientCode || encounterContext?.patient?.patientCode || '---'
-  const visitCode = encounterContext?.visit?.visitCode || encounterContext?.visit?.id || '---'
-  const doctorName = encounterContext?.doctor?.fullName || currentUser?.fullName || currentUser?.username || 'Bác sĩ phụ trách'
+  const patientName = patient?.fullName || encounterContext?.patient?.fullName || '—'
+  const patientCode = patient?.patientCode || encounterContext?.patient?.patientCode || '—'
+  const visitCode = encounterContext?.visit?.visitCode || encounterContext?.visit?.id || '—'
+  const doctorName = encounterContext?.doctor?.fullName || currentUser?.fullName || currentUser?.username || '—'
 
   const handleQuickReasonClick = (reason) => {
     form.setFieldsValue({ reason })
-  }
-
-  const ensureRecordSignedAndLocked = async () => {
-    if (!effectiveRecordId) return
-
-    try {
-      await medicalRecordApi.update(effectiveRecordId, {
-        chiefComplaint:
-          formValues?.chiefComplaint ||
-          medicalRecord?.chiefComplaint ||
-          encounterContext?.visit?.reason ||
-          'Khám và tư vấn chuyên khoa',
-        symptoms:
-          formValues?.symptoms ||
-          medicalRecord?.symptoms ||
-          formValues?.chiefComplaint ||
-          'Triệu chứng lâm sàng ghi nhận',
-        medicalHistory: formValues?.medicalHistory || medicalRecord?.medicalHistory || '',
-        physicalExamination:
-          formValues?.physicalExamination ||
-          formValues?.examinationNote ||
-          medicalRecord?.physicalExamination ||
-          '',
-        clinicalProgress: formValues?.clinicalProgress || medicalRecord?.clinicalProgress || '',
-        treatmentPlan:
-          formValues?.treatmentPlan ||
-          formValues?.doctorInstructions ||
-          medicalRecord?.treatmentPlan ||
-          '',
-        doctorInstructions:
-          formValues?.doctorInstructions ||
-          formValues?.treatmentPlan ||
-          medicalRecord?.doctorInstructions ||
-          '',
-        conclusion:
-          formValues?.conclusion ||
-          formValues?.diagnosisText ||
-          medicalRecord?.conclusion ||
-          'Chẩn đoán và kết luận khám bệnh',
-      })
-    } catch (updErr) {
-      console.warn('Lưu nội dung bệnh án trước khi ký:', updErr)
-    }
-
-    try {
-      let catalogId = primaryIcd?.id || primaryIcd?.diagnosisCatalogId
-      if (!catalogId) {
-        try {
-          const catRes = await medicalRecordApi.getDiagnosisCatalog(primaryIcd?.code || 'A')
-          const catalogList = Array.isArray(catRes?.data) ? catRes.data : []
-          const found = catalogList.find((c) => c.code === primaryIcd?.code) || catalogList[0]
-          if (found?.id) catalogId = found.id
-        } catch (catErr) {
-          console.warn('Tra cứu ICD catalog:', catErr)
-        }
-      }
-
-      if (catalogId) {
-        await medicalRecordApi.recordDiagnosis(effectiveRecordId, {
-          primaryDiagnosis: {
-            diagnosisCatalogId: catalogId,
-            code: primaryIcd?.code || 'Z00.0',
-            name: primaryIcd?.name || 'Khám sức khỏe tổng quát',
-            note: primaryIcd?.note || formValues?.chiefComplaint || '',
-          },
-          secondaryDiagnoses: (secondaryIcds || [])
-            .filter((s) => s?.id || s?.diagnosisCatalogId)
-            .map((s) => ({
-              diagnosisCatalogId: s.id || s.diagnosisCatalogId,
-              code: s.code,
-              name: s.name,
-              note: s.note || '',
-            })),
-        })
-      }
-    } catch (diagErr) {
-      console.warn('Đồng bộ chẩn đoán trước khi ký:', diagErr)
-    }
-
-    try {
-      const docId = encounterContext?.doctor?.id || currentUser?.id || 'DOC-CURRENT'
-      await medicalRecordApi.sign(effectiveRecordId, {
-        signatureData: `SIMULATED_SIGNATURE:${docId}:${Date.now()}`,
-      })
-    } catch (signErr) {
-      console.warn('Ký bệnh án trước khi đính chính:', signErr)
-    }
-
-    try {
-      await medicalRecordApi.lock(effectiveRecordId)
-    } catch (lockErr) {
-      console.warn('Khóa bệnh án trước khi đính chính:', lockErr)
-    }
-  }
-
-  const ensureVisitCompleted = async () => {
-    let queueItemId =
-      encounterContext?.queueItem?.id ||
-      encounterContext?.visit?.queueItemId ||
-      encounterContext?.queueItemId
-
-    if (!queueItemId && (encounterContext?.visit?.id || recordId)) {
-      try {
-        const myQueueRes = await queueApi.getMyQueue()
-        const items = myQueueRes?.data || []
-        const match = items.find(
-          (it) =>
-            it.visitId === encounterContext?.visit?.id ||
-            it.patientId === encounterContext?.patient?.id,
-        )
-        if (match?.id) queueItemId = match.id
-      } catch (err) {
-        console.warn('Tra cứu queueItem từ myQueue:', err)
-      }
-    }
-
-    if (queueItemId) {
-      try {
-        await queueApi.complete(queueItemId)
-      } catch (qErr) {
-        console.warn('Hoàn tất ca khám trước khi đính chính:', qErr)
-      }
-    }
   }
 
   const handleSubmit = async () => {
@@ -207,63 +83,12 @@ export default function AmendMedicalRecordModal({
       }
 
       setSubmitting(true)
-
-      let currentStatus = medicalRecord?.status || encounterContext?.medicalRecord?.status
-      try {
-        const recRes = await medicalRecordApi.getById(effectiveRecordId)
-        if (recRes?.data?.status) {
-          currentStatus = recRes.data.status
-        }
-      } catch (checkErr) {
-        console.warn('Kiểm tra trạng thái bệnh án:', checkErr)
-      }
-
-      if (currentStatus !== 'SIGNED' && currentStatus !== 'LOCKED') {
-        await ensureRecordSignedAndLocked()
-        currentStatus = 'LOCKED'
-      } else if (currentStatus === 'SIGNED') {
-        try {
-          await medicalRecordApi.lock(effectiveRecordId)
-          currentStatus = 'LOCKED'
-        } catch (lockErr) {
-          console.warn('Khóa bệnh án:', lockErr)
-        }
-      }
-
-      const isVisitDone =
-        encounterContext?.visit?.status === 'COMPLETED' ||
-        encounterContext?.queueItem?.status === 'COMPLETED'
-      if (!isVisitDone) {
-        await ensureVisitCompleted()
-      }
-
       const payload = {
         reason: values.reason.trim(),
         content: values.content.trim(),
       }
 
-      let response
-      try {
-        response = await medicalRecordApi.amend(effectiveRecordId, payload)
-      } catch (amendErr) {
-        const code = amendErr?.response?.data?.code
-        if (code === 'MEDICAL_RECORD_NOT_LOCKED' || code === 'MEDICAL_RECORD_NOT_SIGNED') {
-          await ensureRecordSignedAndLocked()
-          await ensureVisitCompleted()
-          response = await medicalRecordApi.amend(effectiveRecordId, payload)
-        } else if (
-          code === 'VISIT_NOT_COMPLETED' ||
-          code === 'MEDICAL_RECORD_AMENDMENT_REQUIRES_COMPLETED_VISIT'
-        ) {
-          try {
-            await medicalRecordApi.lock(effectiveRecordId)
-          } catch (ignore) {}
-          await ensureVisitCompleted()
-          response = await medicalRecordApi.amend(effectiveRecordId, payload)
-        } else {
-          throw amendErr
-        }
-      }
+      const response = await medicalRecordApi.amend(effectiveRecordId, payload)
 
       message.success('Đã lập bản đính chính bệnh án thành công!')
       form.resetFields()
@@ -273,7 +98,6 @@ export default function AmendMedicalRecordModal({
       onClose()
     } catch (err) {
       if (err?.errorFields) return
-      console.error('Lỗi khi lập bản đính chính bệnh án:', err)
       const code = err?.response?.data?.code
       if (code === 'MEDICAL_RECORD_NOT_LOCKED' || code === 'MEDICAL_RECORD_NOT_SIGNED') {
         message.error('Bệnh án phải ở trạng thái Đã ký hoặc Đã khóa mới có thể lập đính chính.')

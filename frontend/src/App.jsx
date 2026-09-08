@@ -5,8 +5,7 @@ import { ConfigProvider, message } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
 import 'dayjs/locale/vi'
-import { LoadingProvider } from './context/LoadingContext'
-import GlobalLoadingBar from './components/common/GlobalLoadingBar'
+import ForceChangePasswordModal from './components/auth/ForceChangePasswordModal'
 
 dayjs.locale('vi')
 
@@ -17,9 +16,7 @@ message.config({
 
 function App() {
   return (
-    <LoadingProvider>
-      <GlobalLoadingBar />
-      <ConfigProvider
+    <ConfigProvider
         locale={viVN}
         theme={{
           token: {
@@ -79,9 +76,9 @@ function App() {
           },
         }}
       >
+        <ForceChangePasswordModal />
         <AppRoutes />
       </ConfigProvider>
-    </LoadingProvider>
   )
 }
 

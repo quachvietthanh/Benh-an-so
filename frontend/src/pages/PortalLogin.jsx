@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Form, Input, Button, Alert, message } from 'antd'
 import {
   PhoneOutlined,
@@ -20,10 +20,17 @@ function PortalLogin() {
   const [lockoutSeconds, setLockoutSeconds] = useState(0)
 
   const navigate = useNavigate()
+  const location = useLocation()
   const { patientLogin, isAuthenticated, user } = useAuthContext()
 
   const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const isPatient = userRoles.includes('patient')
+
+  useEffect(() => {
+    if (location.state?.phone) {
+      form.setFieldsValue({ phone: location.state.phone })
+    }
+  }, [location.state, form])
 
   if (isAuthenticated && isPatient) {
     return <Navigate to="/portal/dashboard" replace />

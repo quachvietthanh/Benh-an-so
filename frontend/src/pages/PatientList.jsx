@@ -17,6 +17,7 @@ import {
 } from 'antd'
 import {
   CalendarOutlined,
+  CopyOutlined,
   DownloadOutlined,
   EditOutlined,
   EyeOutlined,
@@ -72,6 +73,7 @@ function PatientList() {
   const canCreatePatient = userPermissions.includes('PATIENT_CREATE')
   const canUpdatePatient = userPermissions.includes('PATIENT_UPDATE')
   const canReadPatient = userPermissions.includes('PATIENT_READ')
+  const canBookAppointment = userPermissions.includes('APPOINTMENT_CREATE') || userPermissions.includes('APPOINTMENT_READ')
   const canManage = canCreatePatient || canUpdatePatient
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
@@ -368,25 +370,60 @@ ${rowsXml}
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 114,
+      width: 76,
       fixed: 'right',
+      align: 'center',
       render: (_, patient) => (
-        <Space size={5} onClick={(event) => event.stopPropagation()}>
-          <Button className="patient-action-button" icon={<EyeOutlined />} onClick={() => navigate(`/patients/${patient.id}`, { state: { patient } })} aria-label="Xem hồ sơ" />
-          {canUpdatePatient && <Button className="patient-action-button" icon={<EditOutlined />} onClick={() => navigate(`/patients/${patient.id}`, { state: { patient } })} aria-label="Sửa hồ sơ" />}
+        <div onClick={(event) => event.stopPropagation()} style={{ display: 'inline-block' }}>
           <Dropdown
             trigger={['click']}
+            placement="bottomRight"
             menu={{
               items: [
-                { key: 'book', icon: <CalendarOutlined />, label: 'Đặt lịch / Chọn bác sĩ', onClick: () => navigate('/appointments', { state: { patientId: patient.id } }) },
-                { key: 'view', icon: <EyeOutlined />, label: 'Xem hồ sơ', onClick: () => navigate(`/patients/${patient.id}`, { state: { patient } }) },
-                { key: 'copy', label: 'Sao chép mã BN', onClick: () => copyPatientCode(patient.patientCode) },
+                {
+                  key: 'view',
+                  icon: <EyeOutlined style={{ color: '#2563eb' }} />,
+                  label: 'Xem hồ sơ chi tiết',
+                  onClick: () => navigate(`/patients/${patient.id}`, { state: { patient } }),
+                },
+                ...(canUpdatePatient
+                  ? [
+                      {
+                        key: 'edit',
+                        icon: <EditOutlined style={{ color: '#059669' }} />,
+                        label: 'Chỉnh sửa thông tin',
+                        onClick: () => navigate(`/patients/${patient.id}`, { state: { patient, edit: true } }),
+                      },
+                    ]
+                  : []),
+                ...(canBookAppointment
+                  ? [
+                      {
+                        key: 'book',
+                        icon: <CalendarOutlined style={{ color: '#d97706' }} />,
+                        label: 'Đặt lịch / Tiếp nhận',
+                        onClick: () => navigate('/appointments', { state: { patientId: patient.id } }),
+                      },
+                    ]
+                  : []),
+                { type: 'divider' },
+                {
+                  key: 'copy',
+                  icon: <CopyOutlined />,
+                  label: 'Sao chép mã bệnh nhân',
+                  onClick: () => copyPatientCode(patient.patientCode),
+                },
               ],
             }}
           >
-            <Button className="patient-action-button" icon={<MoreOutlined />} aria-label="Thêm thao tác" />
+            <Button
+              className="patient-action-button"
+              icon={<MoreOutlined style={{ fontSize: 16 }} />}
+              aria-label="Thao tác"
+              title="Thao tác"
+            />
           </Dropdown>
-        </Space>
+        </div>
       ),
     },
   ]

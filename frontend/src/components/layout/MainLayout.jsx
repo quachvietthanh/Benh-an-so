@@ -12,7 +12,9 @@ import {
   SearchOutlined,
   SettingOutlined,
   UserOutlined,
+  KeyOutlined,
 } from '@ant-design/icons'
+import ChangePasswordModal from '../auth/ChangePasswordModal'
 import patientApi from '../../api/patientApi'
 import { useAuthContext } from '../../context/AuthContext'
 import { getDefaultHomePath, getNavigationItems, navigationSections, roleNames } from './navigationConfig'
@@ -24,6 +26,7 @@ function MainLayout() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [remotePatients, setRemotePatients] = useState([])
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthContext()
@@ -191,6 +194,7 @@ function MainLayout() {
 
   const userMenuItems = [
     { key: 'profile', icon: <UserOutlined />, label: 'Thông tin cá nhân' },
+    { key: 'change-password', icon: <KeyOutlined />, label: 'Đổi mật khẩu', onClick: () => setChangePasswordOpen(true) },
     { key: 'settings', icon: <SettingOutlined />, label: 'Cài đặt tài khoản' },
     { type: 'divider' },
     { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true, onClick: handleLogout },
@@ -327,6 +331,10 @@ function MainLayout() {
           onClick={handleMenuClick}
         />
       </Drawer>
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </Layout>
   )
 }

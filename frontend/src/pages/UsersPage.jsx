@@ -25,9 +25,11 @@ import {
   SafetyCertificateOutlined,
   StopOutlined,
   UserOutlined,
+  KeyOutlined,
 } from '@ant-design/icons'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
+import ResetPasswordModal from '../components/users/ResetPasswordModal'
 
 const roleOptions = [
   { value: 'ADMIN', label: 'Quản trị viên' },
@@ -63,7 +65,21 @@ function UsersPage() {
   const [searchText, setSearchText] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetTargetUser, setResetTargetUser] = useState(null)
   const [userForm] = Form.useForm()
+
+  const canResetPassword = useMemo(() => {
+    if (!currentUser) return false
+    const roles = (currentUser.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    const perms = (currentUser.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+    return roles.includes('admin') || perms.includes('USER_RESET_PASSWORD')
+  }, [currentUser])
+
+  const openResetPasswordModal = (account) => {
+    setResetTargetUser(account)
+    setResetModalOpen(true)
+  }
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -269,47 +285,59 @@ function UsersPage() {
         const isSelf = isSelfAccount(account)
         const isActivating = account.active === false
 
+        const actionItems = [
+          {
+            key: 'edit',
+            icon: <EditOutlined />,
+            label: 'Chỉnh sửa',
+            onClick: () => openEditForm(account),
+          },
+        ]
+
+        if (canResetPassword && !isSelf) {
+          actionItems.push({
+            key: 'reset-password',
+            icon: <KeyOutlined />,
+            label: 'Đặt lại mật khẩu',
+            onClick: () => openResetPasswordModal(account),
+          })
+        }
+
+        actionItems.push(
+          isActivating
+            ? {
+                key: 'activate',
+                icon: <CheckCircleOutlined />,
+                label: 'Kích hoạt tài khoản',
+                disabled: isSelf,
+                onClick: () => {
+                  if (isSelf) {
+                    message.warning('Bạn không thể tự vô hiệu hóa hay thay đổi tài khoản của chính mình!')
+                    return
+                  }
+                  confirmToggleActive(account)
+                },
+              }
+            : {
+                key: 'deactivate',
+                danger: !isSelf,
+                icon: <StopOutlined />,
+                label: isSelf ? 'Vô hiệu hóa (Tài khoản của bạn)' : 'Vô hiệu hóa tài khoản',
+                disabled: isSelf,
+                onClick: () => {
+                  if (isSelf) {
+                    message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+                    return
+                  }
+                  confirmToggleActive(account)
+                },
+              }
+        )
+
         return (
           <Dropdown
             trigger={['click']}
-            menu={{
-              items: [
-                {
-                  key: 'edit',
-                  icon: <EditOutlined />,
-                  label: 'Chỉnh sửa',
-                  onClick: () => openEditForm(account),
-                },
-                isActivating
-                  ? {
-                      key: 'activate',
-                      icon: <CheckCircleOutlined />,
-                      label: 'Kích hoạt tài khoản',
-                      disabled: isSelf,
-                      onClick: () => {
-                        if (isSelf) {
-                          message.warning('Bạn không thể tự vô hiệu hóa hay thay đổi tài khoản của chính mình!')
-                          return
-                        }
-                        confirmToggleActive(account)
-                      },
-                    }
-                  : {
-                      key: 'deactivate',
-                      danger: !isSelf,
-                      icon: <StopOutlined />,
-                      label: isSelf ? 'Vô hiệu hóa (Tài khoản của bạn)' : 'Vô hiệu hóa tài khoản',
-                      disabled: isSelf,
-                      onClick: () => {
-                        if (isSelf) {
-                          message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
-                          return
-                        }
-                        confirmToggleActive(account)
-                      },
-                    },
-              ],
-            }}
+            menu={{ items: actionItems }}
           >
             <Button className="admin-more-button" icon={<MoreOutlined />} />
           </Dropdown>
@@ -390,6 +418,16 @@ function UsersPage() {
           </div>
         </Form>
       </Modal>
+
+      <ResetPasswordModal
+        open={resetModalOpen}
+        targetUser={resetTargetUser}
+        onClose={() => {
+          setResetModalOpen(false)
+          setResetTargetUser(null)
+        }}
+        onSuccess={loadUsers}
+      />
     </div>
   )
 }

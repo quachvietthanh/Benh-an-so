@@ -9,7 +9,6 @@ import { mergePatients, saveStoredPatient } from '../utils/storageHelpers'
 import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
 import MedicalRecordList from './MedicalRecordList'
-import Loading from '../components/common/Loading'
 import PersonalDataConsentModal from '../components/patient/PersonalDataConsentModal'
 import { getPatientConsentStatus } from '../constants/patientConsentConstants'
 
@@ -117,7 +116,7 @@ function PatientDetail() {
     }
   }
 
-  if (loading) return <Loading tip="Đang tải thông tin chi tiết bệnh nhân..." minHeight={380} />
+  if (loading) return null
   if (!patient) return <div>Không tìm thấy bệnh nhân</div>
 
 

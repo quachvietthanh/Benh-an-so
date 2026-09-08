@@ -260,7 +260,18 @@ function MedicalRecordVersionHistoryPage() {
 
   const renderClinicalSnapshot = (snapshot) => {
     if (!snapshot) return null
-    const diagnosesList = Array.isArray(snapshot.diagnoses) ? snapshot.diagnoses : []
+    const diagnosesList = Array.isArray(snapshot.diagnoses) ? snapshot.diagnoses.filter(Boolean) : []
+    const hasData = Boolean(
+      (snapshot.chiefComplaint && String(snapshot.chiefComplaint).trim()) ||
+      (snapshot.symptoms && String(snapshot.symptoms).trim()) ||
+      (snapshot.medicalHistory && String(snapshot.medicalHistory).trim()) ||
+      (snapshot.physicalExamination && String(snapshot.physicalExamination).trim()) ||
+      diagnosesList.length > 0 ||
+      (snapshot.clinicalProgress && String(snapshot.clinicalProgress).trim()) ||
+      (snapshot.treatmentPlan && String(snapshot.treatmentPlan).trim()) ||
+      (snapshot.doctorInstructions && String(snapshot.doctorInstructions).trim()) ||
+      (snapshot.conclusion && String(snapshot.conclusion).trim())
+    )
 
     return (
       <Card
@@ -277,59 +288,67 @@ function MedicalRecordVersionHistoryPage() {
           <span>Dữ liệu lâm sàng ghi nhận tại bản gốc:</span>
         </div>
 
-        <Descriptions size="small" column={{ xs: 1, sm: 2 }} bordered style={{ backgroundColor: '#ffffff' }}>
-          {snapshot.chiefComplaint && (
-            <Descriptions.Item label={<Text strong>Lý do khám</Text>} span={2}>
-              {snapshot.chiefComplaint}
-            </Descriptions.Item>
-          )}
-          {snapshot.symptoms && (
-            <Descriptions.Item label={<Text strong>Triệu chứng lâm sàng</Text>} span={2}>
-              {snapshot.symptoms}
-            </Descriptions.Item>
-          )}
-          {snapshot.medicalHistory && (
-            <Descriptions.Item label={<Text strong>Tiền sử bệnh</Text>}>
-              {snapshot.medicalHistory}
-            </Descriptions.Item>
-          )}
-          {snapshot.physicalExamination && (
-            <Descriptions.Item label={<Text strong>Khám thực thể</Text>}>
-              {snapshot.physicalExamination}
-            </Descriptions.Item>
-          )}
-          {diagnosesList.length > 0 && (
-            <Descriptions.Item label={<Text strong>Chẩn đoán ICD-10</Text>} span={2}>
-              <Space direction="vertical" size={2}>
-                {diagnosesList.map((diag, i) => (
-                  <Tag key={i} color="blue" style={{ margin: '2px 0' }}>
-                    {diag}
-                  </Tag>
-                ))}
-              </Space>
-            </Descriptions.Item>
-          )}
-          {snapshot.clinicalProgress && (
-            <Descriptions.Item label={<Text strong>Diễn biến bệnh</Text>}>
-              {snapshot.clinicalProgress}
-            </Descriptions.Item>
-          )}
-          {snapshot.treatmentPlan && (
-            <Descriptions.Item label={<Text strong>Hướng điều trị</Text>}>
-              {snapshot.treatmentPlan}
-            </Descriptions.Item>
-          )}
-          {snapshot.doctorInstructions && (
-            <Descriptions.Item label={<Text strong>Lời dặn bác sĩ</Text>} span={2}>
-              {snapshot.doctorInstructions}
-            </Descriptions.Item>
-          )}
-          {snapshot.conclusion && (
-            <Descriptions.Item label={<Text strong>Kết luận</Text>} span={2}>
-              <Text strong style={{ color: '#059669' }}>{snapshot.conclusion}</Text>
-            </Descriptions.Item>
-          )}
-        </Descriptions>
+        {!hasData ? (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="Chưa có thông tin lâm sàng chi tiết được ghi nhận tại phiên bản này."
+            style={{ margin: '12px 0' }}
+          />
+        ) : (
+          <Descriptions size="small" column={1} bordered style={{ backgroundColor: '#ffffff' }}>
+            {snapshot.chiefComplaint && String(snapshot.chiefComplaint).trim() && (
+              <Descriptions.Item label={<Text strong>Lý do khám</Text>}>
+                {snapshot.chiefComplaint}
+              </Descriptions.Item>
+            )}
+            {snapshot.symptoms && String(snapshot.symptoms).trim() && (
+              <Descriptions.Item label={<Text strong>Triệu chứng lâm sàng</Text>}>
+                {snapshot.symptoms}
+              </Descriptions.Item>
+            )}
+            {snapshot.medicalHistory && String(snapshot.medicalHistory).trim() && (
+              <Descriptions.Item label={<Text strong>Tiền sử bệnh</Text>}>
+                {snapshot.medicalHistory}
+              </Descriptions.Item>
+            )}
+            {snapshot.physicalExamination && String(snapshot.physicalExamination).trim() && (
+              <Descriptions.Item label={<Text strong>Khám thực thể</Text>}>
+                {snapshot.physicalExamination}
+              </Descriptions.Item>
+            )}
+            {diagnosesList.length > 0 && (
+              <Descriptions.Item label={<Text strong>Chẩn đoán ICD-10</Text>}>
+                <Space wrap size={4}>
+                  {diagnosesList.map((diag, i) => (
+                    <Tag key={i} color="blue" style={{ margin: '2px 0' }}>
+                      {diag}
+                    </Tag>
+                  ))}
+                </Space>
+              </Descriptions.Item>
+            )}
+            {snapshot.clinicalProgress && String(snapshot.clinicalProgress).trim() && (
+              <Descriptions.Item label={<Text strong>Diễn biến bệnh</Text>}>
+                {snapshot.clinicalProgress}
+              </Descriptions.Item>
+            )}
+            {snapshot.treatmentPlan && String(snapshot.treatmentPlan).trim() && (
+              <Descriptions.Item label={<Text strong>Hướng điều trị</Text>}>
+                {snapshot.treatmentPlan}
+              </Descriptions.Item>
+            )}
+            {snapshot.doctorInstructions && String(snapshot.doctorInstructions).trim() && (
+              <Descriptions.Item label={<Text strong>Lời dặn bác sĩ</Text>}>
+                {snapshot.doctorInstructions}
+              </Descriptions.Item>
+            )}
+            {snapshot.conclusion && String(snapshot.conclusion).trim() && (
+              <Descriptions.Item label={<Text strong>Kết luận</Text>}>
+                <Text strong style={{ color: '#059669' }}>{snapshot.conclusion}</Text>
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
       </Card>
     )
   }
@@ -570,40 +589,58 @@ function MedicalRecordVersionHistoryPage() {
 
             {selectedRecord && (
               <div>
-                <Card
-                  size="small"
-                  style={{
-                    marginBottom: 16,
-                    background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: 8,
-                  }}
-                >
-                  <Descriptions size="small" column={{ xs: 1, sm: 3 }}>
-                    <Descriptions.Item label={<Text strong>Mã bệnh án</Text>}>
-                      <Tag color="cyan" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                        {selectedRecord.recordCode || `BA-${String(selectedRecord.id || selectedRecord.medicalRecordId).substring(0, 8).toUpperCase()}`}
-                      </Tag>
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<Text strong>Bệnh nhân</Text>}>
-                      <Text strong style={{ color: '#0f172a' }}>{selectedPatient?.fullName || selectedRecord.patientName}</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<Text strong>Tổng số phiên bản</Text>}>
-                      {versionLoading ? (
-                        <Spin size="small" />
-                      ) : (
-                        <Badge
-                          count={versionHistoryData?.totalVersions || 0}
-                          showZero
-                          style={{
-                            backgroundColor: (versionHistoryData?.totalVersions || 0) > 1 ? '#7c3aed' : '#10b981',
-                            fontWeight: 700,
-                          }}
-                        />
-                      )}
-                    </Descriptions.Item>
-                  </Descriptions>
-                </Card>
+                {(() => {
+                  const rawCode = selectedRecord.visitCode || selectedRecord.recordCode || (selectedRecord.id || selectedRecord.medicalRecordId ? `BA-${String(selectedRecord.id || selectedRecord.medicalRecordId).substring(0, 8).toUpperCase()}` : '---')
+                  const displayRecordCode = String(rawCode).length > 16 ? `BA-${String(rawCode).substring(0, 8).toUpperCase()}` : rawCode
+
+                  return (
+                    <Card
+                      size="small"
+                      style={{
+                        marginBottom: 16,
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Row gutter={[16, 10]} align="middle">
+                        <Col xs={24} sm={8}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text strong style={{ color: '#475569' }}>Mã bệnh án:</Text>
+                            <Tooltip title={rawCode}>
+                              <Tag color="cyan" style={{ fontFamily: 'monospace', fontWeight: 600, margin: 0, fontSize: 12 }}>
+                                {displayRecordCode}
+                              </Tag>
+                            </Tooltip>
+                          </div>
+                        </Col>
+                        <Col xs={24} sm={10}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text strong style={{ color: '#475569' }}>Bệnh nhân:</Text>
+                            <Text strong style={{ color: '#0f172a' }}>{selectedPatient?.fullName || selectedRecord.patientName}</Text>
+                          </div>
+                        </Col>
+                        <Col xs={24} sm={6}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                            <Text strong style={{ color: '#475569' }}>Tổng số phiên bản:</Text>
+                            {versionLoading ? (
+                              <Spin size="small" />
+                            ) : (
+                              <Badge
+                                count={versionHistoryData?.totalVersions || 0}
+                                showZero
+                                style={{
+                                  backgroundColor: (versionHistoryData?.totalVersions || 0) > 1 ? '#7c3aed' : '#10b981',
+                                  fontWeight: 700,
+                                }}
+                              />
+                            )}
+                          </div>
+                        </Col>
+                      </Row>
+                    </Card>
+                  )
+                })()}
 
                 {versionLoading && (
                   <div style={{ textAlign: 'center', padding: '60px 0' }}>
