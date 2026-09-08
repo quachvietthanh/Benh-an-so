@@ -343,7 +343,6 @@ class PatientAllergySecurityIntegrationTest {
     @Test
     @DisplayName("IDOR: Xóa dị ứng thuộc bệnh nhân khác -> 404 Not Found")
     void deleteAllergy_crossPatient_shouldReturnNotFound404() throws Exception {
-        doNothing().when(deletePatientAllergyUseCase).deleteAllergy(any());
         org.mockito.Mockito.doThrow(new PatientAllergyNotFoundException(allergyId))
                 .when(deletePatientAllergyUseCase).deleteAllergy(any());
 

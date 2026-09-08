@@ -280,8 +280,9 @@ public class GlobalExceptionHandler {
             org.springframework.dao.DataIntegrityViolationException ex,
             HttpServletRequest request
     ) {
-        String msg = ex.getMessage() != null ? ex.getMessage() : "";
-        if (msg.contains("uk_patient_active_allergen") || (request.getRequestURI() != null && request.getRequestURI().contains("/allergies"))) {
+        String msg = extractIntegrityViolationMessage(ex).toLowerCase();
+        if (msg.contains("uk_patient_active_allergen")
+                || (msg.contains("duplicate entry") && msg.contains("active_normalized_name"))) {
             return build(
                     HttpStatus.CONFLICT,
                     "PATIENT_ALLERGY_ALREADY_EXISTS",
@@ -297,6 +298,18 @@ public class GlobalExceptionHandler {
                 "Dữ liệu không hợp lệ hoặc bị xung đột ràng buộc hệ thống.",
                 request.getRequestURI()
         );
+    }
+
+    private String extractIntegrityViolationMessage(Throwable throwable) {
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append(' ');
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
     }
 
     @ExceptionHandler(Exception.class)

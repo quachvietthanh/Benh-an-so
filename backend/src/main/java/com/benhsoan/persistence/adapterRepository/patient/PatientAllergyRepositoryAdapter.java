@@ -30,8 +30,29 @@ public class PatientAllergyRepositoryAdapter implements PatientAllergyRepository
             PatientAllergyEntity saved = jpaRepository.saveAndFlush(entity);
             return mapper.toDomain(saved);
         } catch (DataIntegrityViolationException e) {
-            throw new PatientAllergyAlreadyExistsException(allergy.getAllergenName());
+            if (isDuplicateAllergenConstraint(e)) {
+                throw new PatientAllergyAlreadyExistsException(allergy.getAllergenName());
+            }
+            throw e;
         }
+    }
+
+    private boolean isDuplicateAllergenConstraint(DataIntegrityViolationException ex) {
+        String message = extractMessage(ex).toLowerCase();
+        return message.contains("uk_patient_active_allergen")
+                || (message.contains("duplicate entry") && message.contains("active_normalized_name"));
+    }
+
+    private String extractMessage(Throwable throwable) {
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append(' ');
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
     }
 
     @Override
