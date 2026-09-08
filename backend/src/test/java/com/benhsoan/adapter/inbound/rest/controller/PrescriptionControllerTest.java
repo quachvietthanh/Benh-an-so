@@ -28,6 +28,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
@@ -57,7 +58,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = PrescriptionController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(PrescriptionRestMapper.class)
+@Import({PrescriptionRestMapper.class, AnonymizationModeState.class})
 @DisplayName("PrescriptionController - MockMvc Tests")
 class PrescriptionControllerTest {
 

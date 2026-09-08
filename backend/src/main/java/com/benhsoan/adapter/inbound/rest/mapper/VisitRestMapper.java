@@ -1,6 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.visit.VisitEncounterResponse;
@@ -10,11 +10,11 @@ import com.benhsoan.port.dto.result.VisitEncounterResult;
 @Component
 public class VisitRestMapper {
 
-    private final boolean anonymizationEnabled;
+    private final AnonymizationModeState anonymizationModeState;
 
     public VisitRestMapper(
-            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
-        this.anonymizationEnabled = anonymizationEnabled;
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
     }
 
     public VisitEncounterResponse toResponse(VisitEncounterResult result) {
@@ -24,9 +24,9 @@ public class VisitRestMapper {
                         result.visit().visitAt(), result.visit().startedAt(), result.visit().reason(), result.visit().note()),
                 new VisitEncounterResponse.PatientInfo(
                         result.patient().id(), result.patient().patientCode(),
-                        anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
+                        anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
                         result.patient().dateOfBirth(), result.patient().gender(),
-                        anonymizationEnabled ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone()),
+                        anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone()),
                 new VisitEncounterResponse.DoctorInfo(result.doctor().id(), result.doctor().fullName()),
                 toRoomResponse(result.room()),
                 toQueueItemResponse(result.queueItem()),

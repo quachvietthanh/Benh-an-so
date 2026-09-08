@@ -29,7 +29,7 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.clinic.ClinicConfiguration;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
@@ -100,7 +100,7 @@ class IssueMedicalRecordCopyServiceTest {
                 patientRepository, userRepository, clinicConfigurationRepository,
                 pdfRenderer, currentUserPort, clockPort, auditLogRepository,
                 new MedicalRecordCopyAuditWriter(auditLogRepository), accessAuditService,
-                new ObjectMapper(), new PatientAnonymizationService(false));
+                new ObjectMapper(), new AnonymizationModeState());
     }
 
     private IssueMedicalRecordCopyCommand command() {

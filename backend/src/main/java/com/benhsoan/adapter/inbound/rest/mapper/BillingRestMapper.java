@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
-import org.springframework.beans.factory.annotation.Value;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.billing.AdjustInvoiceRequest;
@@ -37,11 +37,11 @@ import com.benhsoan.port.dto.result.RefundPaymentResult;
 @Component
 public class BillingRestMapper {
 
-    private final boolean anonymizationEnabled;
+    private final AnonymizationModeState anonymizationModeState;
 
     public BillingRestMapper(
-            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
-        this.anonymizationEnabled = anonymizationEnabled;
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
     }
 
     public RecordPaymentCommand toCommand(RecordPaymentRequest request) {
@@ -153,7 +153,7 @@ public class BillingRestMapper {
                 result.visitCode(),
                 result.patientId(),
                 result.patientCode(),
-                anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName(),
                 result.reason(),
                 result.completedAt()
         );

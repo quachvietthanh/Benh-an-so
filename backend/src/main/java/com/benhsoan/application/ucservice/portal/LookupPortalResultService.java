@@ -44,7 +44,7 @@ import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.patient.PatientAnonymizer;
 
 import lombok.RequiredArgsConstructor;
@@ -69,7 +69,7 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
     private final PrescriptionRepository prescriptionRepository;
     private final AuditLogRepository auditLogRepository;
     private final ClockPort clockPort;
-    private final PatientAnonymizationService anonymizationService;
+    private final AnonymizationModeState anonymizationModeState;
 
     @Override
     public PortalLookupResult lookup(LookupPortalResultQuery query) {
@@ -102,7 +102,7 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
                 appointment.getAppointmentCode(),
                 appointment.getStartTime(),
                 appointment.getReason(),
-                anonymizationService.anonymizeFullName(patient.getPatientCode(), patient.getFullName()),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(patient.getPatientCode()) : patient.getFullName(),
                 patient.getDateOfBirth(),
                 patient.getGender() == null ? null : patient.getGender().name(),
                 PatientAnonymizer.maskPhonePublicPortal(patient.getPhone()),

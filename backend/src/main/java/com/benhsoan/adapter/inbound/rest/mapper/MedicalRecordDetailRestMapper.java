@@ -2,7 +2,7 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
@@ -20,19 +20,19 @@ import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 @Component
 public class MedicalRecordDetailRestMapper {
 
-    private final boolean anonymizationEnabled;
+    private final AnonymizationModeState anonymizationModeState;
 
     public MedicalRecordDetailRestMapper(
-            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
-        this.anonymizationEnabled = anonymizationEnabled;
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
     }
 
     public MedicalRecordDetailResponse toResponse(MedicalRecordDetailResult result) {
         PatientInfo patient = new PatientInfo(
                 result.patient().id(), result.patient().patientCode(),
-                anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
                 result.patient().dateOfBirth(), result.patient().gender(),
-                anonymizationEnabled ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone(),
                 result.patient().identityNumber(), result.patient().insuranceNumber());
 
         VisitInfo visit = new VisitInfo(

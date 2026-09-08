@@ -25,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.BillingRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
@@ -56,7 +57,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = InvoiceController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(BillingRestMapper.class)
+@Import({BillingRestMapper.class, AnonymizationModeState.class})
 class InvoiceControllerTest {
 
     @Autowired private MockMvc mockMvc;

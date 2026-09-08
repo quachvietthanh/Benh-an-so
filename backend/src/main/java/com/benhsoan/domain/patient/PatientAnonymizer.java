@@ -33,17 +33,19 @@ public final class PatientAnonymizer {
 
     /**
      * Masks a phone number by keeping only its first two and last two digits,
-     * e.g. {@code 0912345678} becomes {@code 09******78}.
+     * e.g. {@code 0912345678} becomes {@code 09******78}. Non-digit formatting
+     * (spaces, dashes, {@code +84} country code) is stripped first so the mask
+     * never leaks formatting artifacts.
      */
     public static String maskPhone(String phone) {
         if (phone == null || phone.isBlank()) {
             return phone;
         }
-        String trimmed = phone.trim();
-        if (trimmed.length() <= 4) {
+        String digits = phone.replaceAll("\\D", "");
+        if (digits.length() <= 4) {
             return PHONE_PLACEHOLDER;
         }
-        return trimmed.substring(0, 2) + PHONE_PLACEHOLDER + trimmed.substring(trimmed.length() - 2);
+        return digits.substring(0, 2) + PHONE_PLACEHOLDER + digits.substring(digits.length() - 2);
     }
 
     /**

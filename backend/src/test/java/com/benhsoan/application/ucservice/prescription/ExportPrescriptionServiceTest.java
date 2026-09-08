@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import com.benhsoan.domain.clinic.ClinicConfiguration;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
@@ -61,7 +61,7 @@ class ExportPrescriptionServiceTest {
                 currentUserPort,
                 auditLogRepository,
                 clockPort,
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
         Instant prescribedAt = Instant.parse("2026-08-20T03:00:00Z");
         UUID medicalRecordId = UUID.randomUUID();
@@ -164,7 +164,7 @@ class ExportPrescriptionServiceTest {
                 currentUserPort,
                 Mockito.mock(AuditLogRepository.class),
                 Mockito.mock(ClockPort.class),
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -210,7 +210,7 @@ class ExportPrescriptionServiceTest {
                 currentUserPort,
                 auditLogRepository,
                 Mockito.mock(ClockPort.class),
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -240,7 +240,7 @@ class ExportPrescriptionServiceTest {
                 Mockito.mock(CurrentUserPort.class),
                 Mockito.mock(AuditLogRepository.class),
                 Mockito.mock(ClockPort.class),
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -272,7 +272,7 @@ class ExportPrescriptionServiceTest {
                 currentUserPort,
                 Mockito.mock(AuditLogRepository.class),
                 Mockito.mock(ClockPort.class),
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -295,7 +295,7 @@ class ExportPrescriptionServiceTest {
                 Mockito.mock(PrescriptionDisplayContextResolver.class), Mockito.mock(ClinicConfigurationRepository.class),
                 new PdfBoxPrescriptionPdfRenderer(), currentUserPort,
                 Mockito.mock(AuditLogRepository.class), Mockito.mock(ClockPort.class),
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -366,7 +366,7 @@ class ExportPrescriptionServiceTest {
                 currentUserPort,
                 auditLogRepository,
                 clockPort,
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         service.export(prescriptionId);
@@ -412,7 +412,7 @@ class ExportPrescriptionServiceTest {
                 currentUserPort,
                 Mockito.mock(AuditLogRepository.class),
                 Mockito.mock(ClockPort.class),
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -431,7 +431,7 @@ class ExportPrescriptionServiceTest {
                 Mockito.mock(PrescriptionDisplayContextResolver.class), Mockito.mock(ClinicConfigurationRepository.class),
                 new PdfBoxPrescriptionPdfRenderer(), Mockito.mock(CurrentUserPort.class),
                 Mockito.mock(AuditLogRepository.class), Mockito.mock(ClockPort.class),
-                new PatientAnonymizationService(false)
+                new AnonymizationModeState()
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))

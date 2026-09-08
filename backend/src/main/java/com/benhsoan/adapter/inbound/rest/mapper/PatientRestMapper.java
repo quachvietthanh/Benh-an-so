@@ -2,7 +2,7 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Value;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
@@ -18,11 +18,11 @@ import com.benhsoan.port.dto.result.PatientResult;
 @Component
 public class PatientRestMapper {
 
-    private final boolean anonymizationEnabled;
+    private final AnonymizationModeState anonymizationModeState;
 
     public PatientRestMapper(
-            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
-        this.anonymizationEnabled = anonymizationEnabled;
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
     }
 
     public RegisterPatientCommand toCommand(RegisterPatientRequest request) {
@@ -78,9 +78,9 @@ public class PatientRestMapper {
 
     public PatientResponse toResponse(PatientResult result) {
 
-        String fullName = anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName();
-        String phone = anonymizationEnabled ? PatientAnonymizer.maskPhone(result.phone()) : result.phone();
-        String address = anonymizationEnabled ? PatientAnonymizer.maskAddress(result.address()) : result.address();
+        String fullName = anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName();
+        String phone = anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.phone()) : result.phone();
+        String address = anonymizationModeState.isEnabled() ? PatientAnonymizer.maskAddress(result.address()) : result.address();
 
         return new PatientResponse(
                 result.id(),

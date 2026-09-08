@@ -3,7 +3,7 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionItemRequest;
@@ -35,11 +35,11 @@ import com.benhsoan.port.dto.result.PrescriptionWarningResult;
 @Component
 public class PrescriptionRestMapper {
 
-    private final boolean anonymizationEnabled;
+    private final AnonymizationModeState anonymizationModeState;
 
     public PrescriptionRestMapper(
-            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
-        this.anonymizationEnabled = anonymizationEnabled;
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
     }
 
     public AmendPrescriptionCommand toCommand(
@@ -105,7 +105,7 @@ public class PrescriptionRestMapper {
                 .visitCode(result.visitCode())
                 .patientId(result.patientId())
                 .patientCode(result.patientCode())
-                .patientName(anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName())
+                .patientName(anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName())
                 .status(result.status())
                 .note(result.note())
                 .prescribedBy(result.prescribedBy())

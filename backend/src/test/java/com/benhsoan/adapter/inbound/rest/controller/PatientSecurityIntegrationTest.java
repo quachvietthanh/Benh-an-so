@@ -27,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PatientRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
@@ -47,7 +48,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = PatientController.class)
-@Import({PatientRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class,
+@Import({AnonymizationModeState.class, PatientRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class,
         RequirePermissionAspect.class, PermissionEvaluator.class, PatientSecurityIntegrationTest.AspectTestConfig.class})
 class PatientSecurityIntegrationTest {
 

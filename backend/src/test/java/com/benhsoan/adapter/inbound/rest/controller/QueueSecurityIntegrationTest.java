@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.QueueRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
@@ -42,7 +43,7 @@ import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = QueueController.class)
-@Import({QueueRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class})
+@Import({AnonymizationModeState.class, QueueRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class})
 class QueueSecurityIntegrationTest {
 
     @Autowired private MockMvc mockMvc;

@@ -22,7 +22,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import com.benhsoan.domain.appointment.Appointment;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.clinical.ClinicalOrder;
@@ -86,7 +86,7 @@ class LookupPortalResultServiceTest {
                 appointmentRepository, visitRepository, patientRepository, userRepository,
                 medicalRecordRepository, diagnosisRepository, clinicalOrderRepository,
                 clinicalOrderItemRepository, clinicalResultRepository, prescriptionRepository,
-                auditLogRepository, clockPort, new PatientAnonymizationService(false));
+                auditLogRepository, clockPort, new AnonymizationModeState());
 
         when(clockPort.now()).thenReturn(NOW);
 

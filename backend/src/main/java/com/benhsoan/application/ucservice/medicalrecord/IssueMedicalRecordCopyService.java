@@ -26,7 +26,8 @@ import com.benhsoan.domain.medicalrecord.exception.MedicalRecordUnauthorizedReci
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.medicalrecord.IssueMedicalRecordCopyCommand;
@@ -69,7 +70,7 @@ public class IssueMedicalRecordCopyService implements IssueMedicalRecordCopyUseC
     private final MedicalRecordCopyAuditWriter copyAuditWriter;
     private final MedicalRecordAccessAuditService accessAuditService;
     private final ObjectMapper objectMapper;
-    private final PatientAnonymizationService anonymizationService;
+    private final AnonymizationModeState anonymizationModeState;
 
     @Override
     public MedicalRecordCopyResult issue(IssueMedicalRecordCopyCommand command) {
@@ -190,7 +191,7 @@ public class IssueMedicalRecordCopyService implements IssueMedicalRecordCopyUseC
         return new MedicalRecordCopyDocument(
                 clinic.getClinicName(), clinic.getAddress(), clinic.getPhone(),
                 patient.getPatientCode(),
-                anonymizationService.anonymizeFullName(patient.getPatientCode(), patient.getFullName()),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(patient.getPatientCode()) : patient.getFullName(),
                 patient.getDateOfBirth() == null ? null : patient.getDateOfBirth().toString(),
                 patient.getGender() == null ? null : patient.getGender().name(),
                 visit.getVisitCode(), visit.getVisitAt(), doctor.getFullName(),

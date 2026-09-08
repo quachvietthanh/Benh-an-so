@@ -1,6 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.auth.LoginRequest;
@@ -20,11 +20,11 @@ import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
 @Component
 public class AuthRestMapper {
 
-    private final boolean anonymizationEnabled;
+    private final AnonymizationModeState anonymizationModeState;
 
     public AuthRestMapper(
-            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
-        this.anonymizationEnabled = anonymizationEnabled;
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
     }
 
     public LoginCommand toCommand(LoginRequest request) {
@@ -89,8 +89,8 @@ public class AuthRestMapper {
                 result.userId(),
                 result.patientId(),
                 result.patientCode(),
-                anonymizationEnabled ? PatientAnonymizer.maskPhone(result.phone()) : result.phone(),
-                anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.phone()) : result.phone(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName(),
                 result.accessToken(),
                 result.refreshToken(),
                 result.tokenType()
