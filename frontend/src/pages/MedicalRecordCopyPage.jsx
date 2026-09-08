@@ -68,101 +68,6 @@ const PURPOSE_OPTIONS = [
   { value: 'Khác', label: 'Mục đích khác' },
 ]
 
-const getFallbackPatientRecords = (patientId, patientCode = 'BN000001') => {
-  const isBN1 = String(patientId).includes('001') || String(patientCode).includes('001')
-
-  if (isBN1) {
-    return [
-      {
-        medicalRecordId: 'e0000000-0000-0000-0000-000000000009',
-        id: 'e0000000-0000-0000-0000-000000000009',
-        visitCode: 'VIS000009',
-        visit: {
-          id: 'd0000000-0000-0000-0000-000000000009',
-          visitCode: 'VIS000009',
-          visitType: 'WALK_IN',
-          status: 'COMPLETED',
-          visitAt: '2026-08-21T20:23:00Z',
-          doctorName: 'Dr. Nguyen Minh Anh',
-          reason: 'Đau bụng, đi ngoài',
-        },
-        visitType: 'WALK_IN',
-        doctorName: 'Dr. Nguyen Minh Anh',
-        chiefComplaint: 'Đau bụng, tiêu chảy',
-        symptoms: 'Đau bụng âm ỉ từng cơn kèm đi ngoài phân lỏng, người mệt mỏi',
-        medicalHistory: 'Tiền sử dạ dày nhẹ',
-        physicalExamination: 'Bụng mềm, ấn đau tức quanh rốn, không có phản ứng thành bụng',
-        primaryIcdCode: 'A09.0',
-        primaryIcdName: 'Nhiễm trùng đường ruột',
-        treatmentPlan: 'Bù nước điện giải Oresol, men vi sinh và kháng sinh đường ruột',
-        doctorInstructions: 'Uống nhiều nước oresol, kiêng đồ dầu mỡ, tái khám nếu sốt cao',
-        conclusion: 'Nhiễm trùng đường ruột cấp tính, điều trị ngoại trú ổn định',
-        status: 'LOCKED',
-        createdAt: '2026-08-21T20:23:00Z',
-        lockedAt: '2026-08-21T20:45:00Z',
-      },
-      {
-        medicalRecordId: 'e0000000-0000-0000-0000-000000000001',
-        id: 'e0000000-0000-0000-0000-000000000001',
-        visitCode: 'VIS000001',
-        visit: {
-          id: 'd0000000-0000-0000-0000-000000000001',
-          visitCode: 'VIS000001',
-          visitType: 'APPOINTMENT',
-          status: 'COMPLETED',
-          visitAt: '2026-08-20T09:00:00Z',
-          doctorName: 'Dr. Nguyen Minh Anh',
-          reason: 'Kham dau dau',
-        },
-        visitType: 'APPOINTMENT',
-        doctorName: 'Dr. Nguyen Minh Anh',
-        chiefComplaint: 'Đau đầu 2 ngày',
-        symptoms: 'Đau đầu nhẹ, không sốt, không nôn ói',
-        medicalHistory: 'Không có bệnh nền mạn tính đáng kể',
-        physicalExamination: 'Huyết áp 120/80 mmHg, nhịp tim đều, phổi trong',
-        primaryIcdCode: 'R51.9',
-        primaryIcdName: 'Headache',
-        treatmentPlan: 'Nghỉ ngơi, dùng thuốc giảm đau hạ sốt paracetamol khi đau nhiều',
-        doctorInstructions: 'Theo dõi tại nhà, tái khám nếu đau đầu tăng',
-        conclusion: 'Đau đầu cơ năng, đã ổn định sau xử trí ban đầu',
-        status: 'LOCKED',
-        createdAt: '2026-08-20T09:00:00Z',
-        lockedAt: '2026-08-20T09:30:00Z',
-      },
-    ]
-  }
-
-  return [
-    {
-      medicalRecordId: `e000-${String(patientId || '1').slice(-8)}`,
-      id: `e000-${String(patientId || '1').slice(-8)}`,
-      visitCode: `VIS-${String(patientId || '1').slice(-6).toUpperCase()}`,
-      visit: {
-        visitCode: `VIS-${String(patientId || '1').slice(-6).toUpperCase()}`,
-        visitType: 'APPOINTMENT',
-        status: 'COMPLETED',
-        visitAt: dayjs().subtract(2, 'day').toISOString(),
-        doctorName: 'Dr. Nguyen Minh Anh',
-        reason: 'Khám sức khỏe tổng quát định kỳ',
-      },
-      visitType: 'APPOINTMENT',
-      doctorName: 'Dr. Nguyen Minh Anh',
-      chiefComplaint: 'Khám sức khỏe định kỳ',
-      symptoms: 'Không có triệu chứng bất thường',
-      medicalHistory: 'Bình thường',
-      physicalExamination: 'Toàn trạng ổn định, mạch và huyết áp bình thường',
-      primaryIcdCode: 'Z00.0',
-      primaryIcdName: 'Khám sức khỏe tổng quát',
-      treatmentPlan: 'Duy trì chế độ ăn uống khoa học và vận động thể lực',
-      doctorInstructions: 'Tái khám định kỳ 6 tháng/lần',
-      conclusion: 'Sức khỏe tổng quát bình thường',
-      status: 'LOCKED',
-      createdAt: dayjs().subtract(2, 'day').toISOString(),
-      lockedAt: dayjs().subtract(2, 'day').add(30, 'minute').toISOString(),
-    },
-  ]
-}
-
 function MedicalRecordCopyPage() {
   const { user } = useAuthContext()
   const [form] = Form.useForm()
@@ -227,9 +132,7 @@ function MedicalRecordCopyPage() {
       const res = await (userApi.list ? userApi.list() : userApi.getAll())
       const list = Array.isArray(res.data?.content) ? res.data.content : (Array.isArray(res.data) ? res.data : [])
       setUsers(list)
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -245,61 +148,22 @@ function MedicalRecordCopyPage() {
     return map
   }, [users])
 
-  const loadPatientRecords = useCallback(async (patientId, patientCode) => {
+  const loadPatientRecords = useCallback(async (patientId) => {
     if (!patientId) return
     setRecordsLoading(true)
     setSelectedRecord(null)
 
-    const cacheKey = `synced_patient_records_${patientId}`
-
     try {
       const res = await medicalRecordApi.getByPatient(patientId)
       const list = Array.isArray(res.data) ? res.data : (res.data?.content || [])
-      
+      setRecords(list)
       if (list.length > 0) {
-        localStorage.setItem(cacheKey, JSON.stringify(list))
-        setRecords(list)
         const lockedRecord = list.find((r) => r.status === 'LOCKED')
         setSelectedRecord(lockedRecord || list[0])
-      } else {
-        const cached = localStorage.getItem(cacheKey)
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached)
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setRecords(parsed)
-              const lockedRecord = parsed.find((r) => r.status === 'LOCKED')
-              setSelectedRecord(lockedRecord || parsed[0])
-              return
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        const fallback = getFallbackPatientRecords(patientId, patientCode)
-        setRecords(fallback)
-        setSelectedRecord(fallback.find((r) => r.status === 'LOCKED') || fallback[0])
       }
     } catch {
-      const cached = localStorage.getItem(cacheKey)
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setRecords(parsed)
-            const lockedRecord = parsed.find((r) => r.status === 'LOCKED')
-            setSelectedRecord(lockedRecord || parsed[0])
-            return
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      const fallback = getFallbackPatientRecords(patientId, patientCode)
-      setRecords(fallback)
-      setSelectedRecord(fallback.find((r) => r.status === 'LOCKED') || fallback[0])
+      setRecords([])
+      setSelectedRecord(null)
     } finally {
       setRecordsLoading(false)
     }
@@ -308,33 +172,12 @@ function MedicalRecordCopyPage() {
   const loadAccessLogs = useCallback(async (patientId) => {
     if (!patientId) return
     setLogsLoading(true)
-    const logsKey = `synced_access_logs_${patientId}`
     try {
       const res = await medicalRecordApi.getAccessLogsByPatient(patientId, { size: 50 })
       const rawLogs = Array.isArray(res.data?.content) ? res.data.content : (Array.isArray(res.data) ? res.data : [])
-      const localLogs = JSON.parse(localStorage.getItem(logsKey) || '[]')
-      const combined = [...localLogs, ...rawLogs]
-      const unique = combined.filter((v, i, a) => a.findIndex((t) => (t.id && t.id === v.id) || (t.accessedAt === v.accessedAt && t.detail === v.detail)) === i)
-      setAccessLogs(unique.length > 0 ? unique : [
-        {
-          id: 'log-seed-1',
-          accessedAt: dayjs().subtract(10, 'minute').toISOString(),
-          accessedBy: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa7',
-          action: 'VIEW',
-          detail: 'Quản lý phòng khám tra cứu hồ sơ bệnh án để chuẩn bị cấp bản sao',
-        },
-      ])
+      setAccessLogs(rawLogs)
     } catch {
-      const localLogs = JSON.parse(localStorage.getItem(logsKey) || '[]')
-      setAccessLogs(localLogs.length > 0 ? localLogs : [
-        {
-          id: 'log-seed-1',
-          accessedAt: dayjs().subtract(10, 'minute').toISOString(),
-          accessedBy: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa7',
-          action: 'VIEW',
-          detail: 'Quản lý phòng khám tra cứu hồ sơ bệnh án để chuẩn bị cấp bản sao',
-        },
-      ])
+      setAccessLogs([])
     } finally {
       setLogsLoading(false)
     }
@@ -415,9 +258,7 @@ function MedicalRecordCopyPage() {
       try {
         const existing = JSON.parse(localStorage.getItem(logsKey) || '[]')
         localStorage.setItem(logsKey, JSON.stringify([newLog, ...existing]))
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
 
     message.success({
@@ -454,46 +295,64 @@ function MedicalRecordCopyPage() {
     {
       title: 'Mã đợt khám',
       key: 'visitCode',
-      width: 140,
-      render: (_, r) => (
-        <Space direction="vertical" size={1}>
-          <Text strong style={{ color: '#1e3a8a' }}>{r.visit?.visitCode || r.visitCode || 'VIS-001'}</Text>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            {r.visit?.visitType || r.visitType || 'Ngoại trú'}
-          </Text>
-        </Space>
-      ),
+      width: 150,
+      render: (_, r) => {
+        const rawType = r.visit?.visitType || r.visitType || ''
+        const typeLabel =
+          rawType === 'APPOINTMENT'
+            ? 'Hẹn trước'
+            : rawType === 'WALK_IN'
+            ? 'Vãng lai'
+            : rawType || 'Ngoại trú'
+        return (
+          <div style={{ whiteSpace: 'nowrap' }}>
+            <Text strong style={{ color: '#1e3a8a', display: 'block' }}>
+              {r.visit?.visitCode || r.visitCode || 'VIS-001'}
+            </Text>
+            <Tag color="blue" style={{ fontSize: 10, margin: '2px 0 0 0', padding: '0 6px', borderRadius: 4 }}>
+              {typeLabel}
+            </Tag>
+          </div>
+        )
+      },
     },
     {
       title: 'Thời gian khám',
       key: 'visitAt',
-      width: 160,
+      width: 140,
       render: (_, r) => {
         const time = r.visit?.visitAt || r.createdAt
         return time ? (
-          <Space direction="vertical" size={0}>
-            <span>{dayjs(time).format('DD/MM/YYYY')}</span>
-            <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(time).format('HH:mm')}</Text>
-          </Space>
-        ) : '—'
+          <div style={{ whiteSpace: 'nowrap' }}>
+            <div>{dayjs(time).format('DD/MM/YYYY')}</div>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              {dayjs(time).format('HH:mm')}
+            </Text>
+          </div>
+        ) : (
+          '—'
+        )
       },
     },
     {
       title: 'Bác sĩ phụ trách',
       key: 'doctor',
-      width: 180,
+      width: 220,
       render: (_, r) => (
-        <Space>
-          <Avatar size="small" icon={<UserOutlined />} style={{ backgroundColor: '#2563eb' }} />
-          <span>{r.visit?.doctorName || r.doctorName || 'Dr. Nguyen Minh Anh'}</span>
-        </Space>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '100%', overflow: 'hidden' }}>
+          <Avatar size="small" icon={<UserOutlined />} style={{ backgroundColor: '#2563eb', flexShrink: 0 }} />
+          <span style={{ fontWeight: 500, color: '#1e293b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            {r.visit?.doctorName || r.doctorName || 'Dr. Nguyen Minh Anh'}
+          </span>
+        </div>
       ),
     },
     {
       title: 'Lý do & Chẩn đoán',
       key: 'diagnosis',
+      width: 230,
       render: (_, r) => (
-        <div>
+        <div style={{ paddingLeft: 4 }}>
           <div style={{ fontWeight: 600, color: '#0f172a' }}>
             {r.chiefComplaint || r.visit?.reason || 'Khám bệnh'}
           </div>
@@ -521,7 +380,7 @@ function MedicalRecordCopyPage() {
             <Tag
               color={isLocked ? 'purple' : r.status === 'ARCHIVED' ? 'default' : 'orange'}
               icon={isLocked ? <LockOutlined /> : <ClockCircleOutlined />}
-              style={{ padding: '3px 8px', fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '3px 8px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
             >
               {isLocked ? 'ĐÃ KHÓA (LOCKED)' : r.status === 'ARCHIVED' ? 'LƯU TRỮ' : 'CHƯA KHÓA'}
             </Tag>
@@ -532,14 +391,15 @@ function MedicalRecordCopyPage() {
     {
       title: 'Hành động',
       key: 'action',
-      width: 190,
+      width: 180,
       align: 'center',
+      fixed: 'right',
       render: (_, r) => {
         const isSelected = (selectedRecord?.medicalRecordId || selectedRecord?.id) === (r.medicalRecordId || r.id)
         const isLocked = r.status === 'LOCKED'
 
         return (
-          <Space size="small">
+          <Space size="small" style={{ whiteSpace: 'nowrap' }}>
             <Button
               type={isSelected ? 'primary' : 'default'}
               size="small"
@@ -753,6 +613,7 @@ function MedicalRecordCopyPage() {
                         loading={recordsLoading}
                         pagination={false}
                         size="small"
+                        scroll={{ x: 1080 }}
                         locale={{
                           emptyText: (
                             <Empty
@@ -981,7 +842,7 @@ function MedicalRecordCopyPage() {
           setSelectedVersionRecord(null)
         }}
         medicalRecordId={selectedVersionRecord?.id || selectedVersionRecord?.medicalRecordId}
-        recordCode={selectedVersionRecord?.visitCode || selectedVersionRecord?.recordCode}
+        recordCode={selectedVersionRecord?.visit?.visitCode || selectedVersionRecord?.visitCode || selectedVersionRecord?.recordCode}
         patientName={selectedPatient?.fullName || selectedVersionRecord?.patientName}
         patientCode={selectedPatient?.patientCode || selectedVersionRecord?.patientCode}
       />

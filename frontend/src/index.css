@@ -383,3 +383,20 @@ textarea {
     display: none !important;
   }
 }
+
+/* ICD Diagnosis Table Selection Highlights */
+.ant-table-tbody > tr.icd-row-primary > td {
+  background-color: #f0fdf4 !important;
+}
+
+.ant-table-tbody > tr.icd-row-primary:hover > td {
+  background-color: #dcfce7 !important;
+}
+
+.ant-table-tbody > tr.icd-row-secondary > td {
+  background-color: #faf5ff !important;
+}
+
+.ant-table-tbody > tr.icd-row-secondary:hover > td {
+  background-color: #f3e8ff !important;
+}

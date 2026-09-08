@@ -14,6 +14,8 @@ import {
   Divider,
   Badge,
   Tooltip,
+  Row,
+  Col,
 } from 'antd'
 import {
   HistoryOutlined,
@@ -87,7 +89,18 @@ const MedicalRecordVersionHistoryModal = ({
   const renderClinicalSnapshot = (snapshot) => {
     if (!snapshot) return null
 
-    const diagnosesList = Array.isArray(snapshot.diagnoses) ? snapshot.diagnoses : []
+    const diagnosesList = Array.isArray(snapshot.diagnoses) ? snapshot.diagnoses.filter(Boolean) : []
+    const hasData = Boolean(
+      (snapshot.chiefComplaint && String(snapshot.chiefComplaint).trim()) ||
+      (snapshot.symptoms && String(snapshot.symptoms).trim()) ||
+      (snapshot.medicalHistory && String(snapshot.medicalHistory).trim()) ||
+      (snapshot.physicalExamination && String(snapshot.physicalExamination).trim()) ||
+      diagnosesList.length > 0 ||
+      (snapshot.clinicalProgress && String(snapshot.clinicalProgress).trim()) ||
+      (snapshot.treatmentPlan && String(snapshot.treatmentPlan).trim()) ||
+      (snapshot.doctorInstructions && String(snapshot.doctorInstructions).trim()) ||
+      (snapshot.conclusion && String(snapshot.conclusion).trim())
+    )
 
     return (
       <Card
@@ -104,12 +117,19 @@ const MedicalRecordVersionHistoryModal = ({
           <span>Thông tin khám lâm sàng (Bản gốc ban đầu):</span>
         </div>
 
-        <Descriptions size="small" column={1} bordered style={{ backgroundColor: '#ffffff' }}>
-          {snapshot.chiefComplaint && (
-            <Descriptions.Item label={<Text strong>Lý do đến khám</Text>}>
-              {snapshot.chiefComplaint}
-            </Descriptions.Item>
-          )}
+        {!hasData ? (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="Chưa có thông tin lâm sàng chi tiết được ghi nhận tại phiên bản khởi tạo."
+            style={{ margin: '8px 0' }}
+          />
+        ) : (
+          <Descriptions size="small" column={1} bordered style={{ backgroundColor: '#ffffff' }}>
+            {snapshot.chiefComplaint && String(snapshot.chiefComplaint).trim() && (
+              <Descriptions.Item label={<Text strong>Lý do đến khám</Text>}>
+                {snapshot.chiefComplaint}
+              </Descriptions.Item>
+            )}
           {snapshot.symptoms && (
             <Descriptions.Item label={<Text strong>Triệu chứng lâm sàng</Text>}>
               {snapshot.symptoms}
@@ -146,17 +166,18 @@ const MedicalRecordVersionHistoryModal = ({
               {snapshot.treatmentPlan}
             </Descriptions.Item>
           )}
-          {snapshot.doctorInstructions && (
+          {snapshot.doctorInstructions && String(snapshot.doctorInstructions).trim() && (
             <Descriptions.Item label={<Text strong>Lời dặn của bác sĩ</Text>}>
               {snapshot.doctorInstructions}
             </Descriptions.Item>
           )}
-          {snapshot.conclusion && (
+          {snapshot.conclusion && String(snapshot.conclusion).trim() && (
             <Descriptions.Item label={<Text strong>Kết luận</Text>}>
               <Text strong style={{ color: '#059669' }}>{snapshot.conclusion}</Text>
             </Descriptions.Item>
           )}
         </Descriptions>
+        )}
       </Card>
     )
   }
@@ -277,39 +298,65 @@ const MedicalRecordVersionHistoryModal = ({
       destroyOnClose
     >
       <div style={{ marginTop: 8 }}>
-        <Card
-          size="small"
-          style={{
-            marginBottom: 16,
-            background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
-            border: '1px solid #cbd5e1',
-          }}
-        >
-          <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }}>
-            <Descriptions.Item label={<Text strong>Mã bệnh án</Text>}>
-              <Tag color="cyan" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                {recordCode || (medicalRecordId ? `BA-${String(medicalRecordId).substring(0, 8).toUpperCase()}` : '---')}
-              </Tag>
-            </Descriptions.Item>
-            {patientName && (
-              <Descriptions.Item label={<Text strong>Bệnh nhân</Text>}>
-                <Text strong style={{ color: '#0f172a' }}>{patientName}</Text>
-                {patientCode && <Tag color="blue" style={{ marginLeft: 6 }}>{patientCode}</Tag>}
-              </Descriptions.Item>
-            )}
-            <Descriptions.Item label={<Text strong>Tổng số phiên bản</Text>}>
-              {loading ? (
-                <Spin size="small" />
-              ) : (
-                <Badge
-                  count={historyData?.totalVersions || 0}
-                  showZero
-                  style={{ backgroundColor: (historyData?.totalVersions || 0) > 1 ? '#7c3aed' : '#10b981' }}
-                />
-              )}
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
+        {(() => {
+          const rawCode = recordCode || (medicalRecordId ? `BA-${String(medicalRecordId).substring(0, 8).toUpperCase()}` : '---')
+          const displayRecordCode = String(rawCode).length > 16 ? `BA-${String(rawCode).substring(0, 8).toUpperCase()}` : rawCode
+
+          return (
+            <Card
+              size="small"
+              style={{
+                marginBottom: 16,
+                background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
+                border: '1px solid #cbd5e1',
+                borderRadius: 8,
+              }}
+            >
+              <Row gutter={[16, 10]} align="middle">
+                <Col xs={24} sm={8}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Text strong style={{ color: '#475569' }}>Mã bệnh án:</Text>
+                    <Tooltip title={rawCode}>
+                      <Tag color="cyan" style={{ fontFamily: 'monospace', fontWeight: 600, margin: 0, fontSize: 12 }}>
+                        {displayRecordCode}
+                      </Tag>
+                    </Tooltip>
+                  </div>
+                </Col>
+                {patientName && (
+                  <Col xs={24} sm={10}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text strong style={{ color: '#475569' }}>Bệnh nhân:</Text>
+                      <Text strong style={{ color: '#0f172a' }}>{patientName}</Text>
+                      {patientCode && (
+                        <Tag color="blue" style={{ margin: 0, fontSize: 11 }}>
+                          {patientCode}
+                        </Tag>
+                      )}
+                    </div>
+                  </Col>
+                )}
+                <Col xs={24} sm={patientName ? 6 : 16}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                    <Text strong style={{ color: '#475569' }}>Tổng số phiên bản:</Text>
+                    {loading ? (
+                      <Spin size="small" />
+                    ) : (
+                      <Badge
+                        count={historyData?.totalVersions || 0}
+                        showZero
+                        style={{
+                          backgroundColor: (historyData?.totalVersions || 0) > 1 ? '#7c3aed' : '#10b981',
+                          fontWeight: 700,
+                        }}
+                      />
+                    )}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          )
+        })()}
 
         {loading && (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>

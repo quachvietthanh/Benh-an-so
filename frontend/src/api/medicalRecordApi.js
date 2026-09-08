@@ -17,31 +17,46 @@ const medicalRecordApi = {
     return axiosClient.put(`/medical-records/${id}`, data)
   },
   recordDiagnosis: (recordId, data) => {
+    const isUuid = (val) => typeof val === 'string' && /^[0-9a-fA-F-]{36}$/.test(val)
+    const rawPrimary = data.primaryDiagnosis || data
+    const rawPrimaryCatId =
+      rawPrimary.diagnosisCatalogId ||
+      data.primaryDiagnosisCatalogId ||
+      data.diagnosisCatalogId ||
+      rawPrimary.id
+    const primaryCatalogId = isUuid(rawPrimaryCatId)
+      ? rawPrimaryCatId
+      : 'a1000000-0000-0000-0000-00000000004d'
+
     const secondarySource = data.secondaryDiagnoses || data.secondaryIcds || data.secondaryIcdCodes || []
-    const secondaryDiagnoses = Array.isArray(secondarySource)
+    const rawSecondaries = Array.isArray(secondarySource)
       ? secondarySource
       : String(secondarySource).split(',').map((code) => code.trim()).filter(Boolean)
-    const payload = data.primaryDiagnosis
-      ? data
-      : {
-        primaryDiagnosis: {
-          diagnosisCatalogId:
-            data.primaryDiagnosisCatalogId ||
-            data.diagnosisCatalogId ||
-            data.primaryIcd?.diagnosisCatalogId ||
-            data.primaryIcd?.id,
-          code: data.primaryIcdCode || data.primaryIcd?.code || 'Z00.0',
-          name: data.primaryIcdName || data.primaryIcd?.name || 'Khám sức khỏe tổng quát',
-          note: data.clinicalNotes || data.note || '',
-        },
-        secondaryDiagnoses: secondaryDiagnoses.map((sec) => ({
-          diagnosisCatalogId:
-            sec.diagnosisCatalogId || sec.id,
-          code: typeof sec === 'string' ? sec : sec.code,
-          name: typeof sec === 'string' ? sec : sec.name || sec.code,
-          note: typeof sec === 'string' ? '' : sec.note || '',
-        })),
+
+    const cleanedSecondaries = rawSecondaries.map((sec) => {
+      const rawSecCatId = typeof sec === 'object' ? (sec.diagnosisCatalogId || sec.id) : null
+      const secCatId = isUuid(rawSecCatId) ? rawSecCatId : null
+      const secName = typeof sec === 'string' ? sec : (sec.name || sec.diagnosisName || sec.code || '')
+      if (secCatId) {
+        return {
+          diagnosisCatalogId: secCatId,
+          note: (typeof sec === 'object' ? sec.note : '') || '',
+        }
       }
+      return {
+        name: secName || 'Chẩn đoán kèm theo',
+        note: (typeof sec === 'object' ? sec.note : '') || '',
+      }
+    })
+
+    const payload = {
+      primaryDiagnosis: {
+        diagnosisCatalogId: primaryCatalogId,
+        note: rawPrimary.note || data.clinicalNotes || data.note || '',
+      },
+      secondaryDiagnoses: cleanedSecondaries,
+    }
+
     return axiosClient.put(`/medical-records/${recordId}/diagnoses`, payload)
   },
   getDiagnosis: (recordId) => {
