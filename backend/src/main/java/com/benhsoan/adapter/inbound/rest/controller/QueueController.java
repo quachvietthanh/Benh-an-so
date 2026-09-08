@@ -55,7 +55,7 @@ public class QueueController {
     private final QueueRestMapper mapper;
 
     @GetMapping("/queues")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'MANAGER')")
     public List<QueueItemResponse> getQueues(@RequestParam LocalDate date, @RequestParam(required = false) UUID doctorId,
             @RequestParam(required = false) UUID roomId) {
         return getQueuesUseCase.getQueues(new GetQueuesQuery(date, doctorId, roomId)).stream().map(mapper::toResponse).toList();
@@ -88,7 +88,7 @@ public class QueueController {
     }
 
     @PatchMapping("/queue-items/{itemId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
     public QueueItemResponse updateStatus(@PathVariable UUID itemId,
             @Valid @RequestBody UpdateQueueItemStatusRequest request) {
         return mapper.toResponse(updateQueueItemStatusUseCase.updateStatus(mapper.toCommand(itemId, request)));
@@ -107,7 +107,7 @@ public class QueueController {
     }
 
     @GetMapping("/queue-items/{itemId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'MANAGER')")
     public QueueItemResponse getById(@PathVariable UUID itemId) {
         return mapper.toResponse(getQueueItemUseCase.getById(itemId));
     }

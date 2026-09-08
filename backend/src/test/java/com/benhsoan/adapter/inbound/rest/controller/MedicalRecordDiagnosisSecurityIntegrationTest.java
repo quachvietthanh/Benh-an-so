@@ -151,12 +151,12 @@ class MedicalRecordDiagnosisSecurityIntegrationTest {
     }
 
     @Test
-    void nurseReceptionistAndPharmacistAreForbiddenEvenWithMedicalRecordUpdatePermission() throws Exception {
+    void receptionistAndPharmacistAreForbiddenEvenWithMedicalRecordUpdatePermission() throws Exception {
         UUID recordId = UUID.randomUUID();
         UUID catalogId = UUID.randomUUID();
         when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
 
-        for (String role : List.of("NURSE", "RECEPTIONIST", "PHARMACIST")) {
+        for (String role : List.of("RECEPTIONIST", "PHARMACIST")) {
             when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
 
             mockMvc.perform(replaceDiagnoses(recordId, role.toLowerCase(), "ROLE_" + role, catalogId))

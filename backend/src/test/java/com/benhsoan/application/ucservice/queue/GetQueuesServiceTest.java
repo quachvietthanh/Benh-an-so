@@ -33,7 +33,6 @@ class GetQueuesServiceTest {
         when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
         when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
-        when(currentUserPort.hasRole("NURSE")).thenReturn(false);
         when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
         when(queueItemQueryRepository.findQueueBoard(query.queueDate(), query.doctorId(), query.roomId()))
                 .thenReturn(List.of());
@@ -48,7 +47,6 @@ class GetQueuesServiceTest {
         when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
         when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
-        when(currentUserPort.hasRole("NURSE")).thenReturn(false);
         when(currentUserPort.hasRole("MANAGER")).thenReturn(false);
 
         assertThrows(UnauthorizedQueueOperationException.class, () -> service.getQueues(query));

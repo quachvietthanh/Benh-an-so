@@ -273,16 +273,8 @@ class PatientAllergySecurityIntegrationTest {
     }
 
     @Test
-    @DisplayName("P1-02: Y tá có PATIENT_ALLERGY_READ gọi GET history -> 403 Forbidden")
-    void getChangeLogs_nurse_shouldReturnForbidden() throws Exception {
-        mockMvc.perform(get("/patients/{patientId}/allergies/{allergyId}/history", patientId, allergyId)
-                        .with(user("nurse").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_ALLERGY_READ"))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("P1-02: Dược sĩ có PATIENT_ALLERGY_READ gọi GET history -> 403 Forbidden")
-    void getChangeLogs_pharmacist_shouldReturnForbidden() throws Exception {
+    @DisplayName("P1-02: Người dùng chỉ có PATIENT_ALLERGY_READ gọi GET history -> 403 Forbidden")
+    void getChangeLogs_readOnlyRole_shouldReturnForbidden() throws Exception {
         mockMvc.perform(get("/patients/{patientId}/allergies/{allergyId}/history", patientId, allergyId)
                         .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_ALLERGY_READ"))))
                 .andExpect(status().isForbidden());
@@ -323,6 +315,40 @@ class PatientAllergySecurityIntegrationTest {
                         .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_ALLERGY_WRITE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PATIENT_ALLERGY_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("IDOR: Cập nhật dị ứng thuộc bệnh nhân khác -> 404 Not Found")
+    void updateAllergy_crossPatient_shouldReturnNotFound404() throws Exception {
+        when(updatePatientAllergyUseCase.updateAllergy(any()))
+                .thenThrow(new PatientAllergyNotFoundException(allergyId));
+
+        String payload = """
+                {
+                    "allergenName": "Penicillin",
+                    "severity": "MILD"
+                }
+                """;
+
+        mockMvc.perform(put("/patients/{patientId}/allergies/{allergyId}", patientId, allergyId)
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_ALLERGY_WRITE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PATIENT_ALLERGY_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("IDOR: Xóa dị ứng thuộc bệnh nhân khác -> 404 Not Found")
+    void deleteAllergy_crossPatient_shouldReturnNotFound404() throws Exception {
+        doNothing().when(deletePatientAllergyUseCase).deleteAllergy(any());
+        org.mockito.Mockito.doThrow(new PatientAllergyNotFoundException(allergyId))
+                .when(deletePatientAllergyUseCase).deleteAllergy(any());
+
+        mockMvc.perform(delete("/patients/{patientId}/allergies/{allergyId}", patientId, allergyId)
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_ALLERGY_WRITE"))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PATIENT_ALLERGY_NOT_FOUND"));
     }

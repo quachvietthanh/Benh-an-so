@@ -123,7 +123,7 @@ public class AddPatientAllergyService implements AddPatientAllergyUseCase {
         auditLogRepository.save(AuditLog.create(
                 currentUserId,
                 ActionType.CREATE,
-                ResourceType.PATIENT,
+                ResourceType.PATIENT_ALLERGY,
                 saved.getId(),
                 afterData,
                 null,

@@ -4,9 +4,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.patient.PatientAllergy;
+import com.benhsoan.domain.patient.exception.PatientAllergyAlreadyExistsException;
 import com.benhsoan.persistence.entity.patient.PatientAllergyEntity;
 import com.benhsoan.persistence.jpaRepository.patient.JpaPatientAllergyRepository;
 import com.benhsoan.persistence.mapper.patient.PatientAllergyPersistenceMapper;
@@ -23,9 +25,13 @@ public class PatientAllergyRepositoryAdapter implements PatientAllergyRepository
 
     @Override
     public PatientAllergy save(PatientAllergy allergy) {
-        PatientAllergyEntity entity = mapper.toEntity(allergy);
-        PatientAllergyEntity saved = jpaRepository.save(entity);
-        return mapper.toDomain(saved);
+        try {
+            PatientAllergyEntity entity = mapper.toEntity(allergy);
+            PatientAllergyEntity saved = jpaRepository.saveAndFlush(entity);
+            return mapper.toDomain(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new PatientAllergyAlreadyExistsException(allergy.getAllergenName());
+        }
     }
 
     @Override

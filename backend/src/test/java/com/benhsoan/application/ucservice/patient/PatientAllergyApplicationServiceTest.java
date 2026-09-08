@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +26,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientAllergy;
 import com.benhsoan.domain.patient.PatientAllergyChangeLog;
@@ -141,6 +143,9 @@ class PatientAllergyApplicationServiceTest {
         ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(auditCaptor.capture());
         assertEquals(ActionType.CREATE, auditCaptor.getValue().getActionType());
+        assertEquals(ResourceType.PATIENT_ALLERGY, auditCaptor.getValue().getResourceType());
+        assertEquals(result.id(), auditCaptor.getValue().getResourceId());
+        assertTrue(auditCaptor.getValue().getDetail().contains(patientId.toString()));
     }
 
     @Test
@@ -388,5 +393,61 @@ class PatientAllergyApplicationServiceTest {
                 .build();
 
         assertThrows(PatientAllergyAlreadyExistsException.class, () -> addService.addAllergy(command));
+    }
+
+    @Test
+    @DisplayName("TC-UC-08: Cập nhật dị ứng thuộc bệnh nhân khác -> PatientAllergyNotFoundException (IDOR)")
+    void tcUc08_updateAllergy_whenAllergyBelongsToOtherPatient_shouldThrowNotFoundAndNeverSave() {
+        UUID allergyId = UUID.randomUUID();
+        UUID otherPatientId = UUID.randomUUID();
+
+        Patient mockPatient = org.mockito.Mockito.mock(Patient.class);
+        when(mockPatient.isActive()).thenReturn(true);
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(mockPatient));
+
+        PatientAllergy allergyBelongingToOther = PatientAllergy.create(
+                otherPatientId, "MEDICATION", "Aspirin", AllergySeverity.MILD, null, null, doctorId, fixedNow
+        );
+        when(patientAllergyRepository.findById(allergyId)).thenReturn(Optional.of(allergyBelongingToOther));
+
+        UpdatePatientAllergyCommand command = UpdatePatientAllergyCommand.builder()
+                .allergyId(allergyId)
+                .patientId(patientId)
+                .allergenName("Aspirin Modified")
+                .severity(AllergySeverity.MODERATE)
+                .build();
+
+        assertThrows(PatientAllergyNotFoundException.class, () -> updateService.updateAllergy(command));
+        verify(patientAllergyRepository, never()).save(any());
+        verify(changeLogRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("TC-UC-09: Xóa dị ứng thuộc bệnh nhân khác -> PatientAllergyNotFoundException (IDOR)")
+    void tcUc09_deleteAllergy_whenAllergyBelongsToOtherPatient_shouldThrowNotFoundAndNeverSave() {
+        UUID allergyId = UUID.randomUUID();
+        UUID otherPatientId = UUID.randomUUID();
+
+        Patient mockPatient = org.mockito.Mockito.mock(Patient.class);
+        when(mockPatient.isActive()).thenReturn(true);
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(mockPatient));
+
+        PatientAllergy allergyBelongingToOther = PatientAllergy.create(
+                otherPatientId, "MEDICATION", "Paracetamol", AllergySeverity.MODERATE, null, null, doctorId, fixedNow
+        );
+        when(patientAllergyRepository.findById(allergyId)).thenReturn(Optional.of(allergyBelongingToOther));
+
+        DeletePatientAllergyCommand command = DeletePatientAllergyCommand.builder()
+                .allergyId(allergyId)
+                .patientId(patientId)
+                .reason("Xóa nhầm")
+                .build();
+
+        assertThrows(PatientAllergyNotFoundException.class, () -> deleteService.deleteAllergy(command));
+        assertTrue(allergyBelongingToOther.isActive());
+        verify(patientAllergyRepository, never()).save(any());
+        verify(changeLogRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
     }
 }

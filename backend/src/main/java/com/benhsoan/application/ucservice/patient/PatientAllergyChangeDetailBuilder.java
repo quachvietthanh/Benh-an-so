@@ -23,6 +23,7 @@ public class PatientAllergyChangeDetailBuilder {
         }
 
         Map<String, Object> map = new LinkedHashMap<>();
+        map.put("patientId", allergy.getPatientId() != null ? allergy.getPatientId().toString() : null);
         map.put("allergenType", allergy.getAllergenType());
         map.put("allergenName", allergy.getAllergenName());
         map.put("severity", allergy.getSeverity() != null ? allergy.getSeverity().name() : null);

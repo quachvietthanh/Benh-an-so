@@ -24,7 +24,6 @@ export const RECORD_STATUS_OPTIONS = [
 export const ROLE_OPTIONS = [
   { value: 'ADMIN', label: 'Quản trị viên' },
   { value: 'DOCTOR', label: 'Bác sĩ' },
-  { value: 'NURSE', label: 'Y tá' },
   { value: 'RECEPTIONIST', label: 'Lễ tân' },
   { value: 'PHARMACIST', label: 'Dược sĩ' },
   { value: 'STAFF', label: 'Nhân viên' },
@@ -33,7 +32,6 @@ export const ROLE_OPTIONS = [
 export const ROLE_COLORS = {
   ADMIN: '#f5222d',
   DOCTOR: '#1890ff',
-  NURSE: '#52c41a',
   RECEPTIONIST: '#faad14',
   PHARMACIST: '#722ed1',
   STAFF: '#8c8c8c',

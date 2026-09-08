@@ -6,7 +6,7 @@
 
 ## Mục tiêu
 
-Cung cấp API để hiển thị nội dung hồ sơ bệnh án điện tử cho Bác sĩ / Điều dưỡng khi khám bệnh:
+Cung cấp API để hiển thị nội dung hồ sơ bệnh án điện tử cho Bác sĩ khi khám bệnh:
 
 1. **Xem chi tiết hồ sơ theo lượt khám** — thông tin bệnh nhân, thông tin lượt khám, chẩn đoán ICD-10 (chính/phụ), nội dung bệnh án, trạng thái.
 2. **Xem lịch sử hồ sơ theo bệnh nhân** — tất cả hồ sơ của các lượt khám trước, mới nhất trước.
@@ -30,11 +30,11 @@ Cung cấp API để hiển thị nội dung hồ sơ bệnh án điện tử ch
 
 | Method | Endpoint | Mô tả | Vai trò |
 |--------|----------|-------|---------|
-| `GET` | `/medical-records/visits/{visitId}` | Chi tiết hồ sơ bệnh án theo lượt khám (kèm chẩn đoán ICD-10) | ADMIN, DOCTOR, NURSE |
-| `GET` | `/medical-records/patient/{patientId}` | Lịch sử hồ sơ bệnh án của bệnh nhân | ADMIN, DOCTOR, NURSE |
-| `GET` | `/medical-records/{medicalRecordId}` | Chi tiết hồ sơ (nội dung) | ADMIN, DOCTOR, NURSE |
-| `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR, NURSE |
-| `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR, NURSE |
+| `GET` | `/medical-records/visits/{visitId}` | Chi tiết hồ sơ bệnh án theo lượt khám (kèm chẩn đoán ICD-10) | ADMIN, DOCTOR |
+| `GET` | `/medical-records/patient/{patientId}` | Lịch sử hồ sơ bệnh án của bệnh nhân | ADMIN, DOCTOR |
+| `GET` | `/medical-records/{medicalRecordId}` | Chi tiết hồ sơ (nội dung) | ADMIN, DOCTOR |
+| `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR |
+| `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR |
 
 ## Ký bệnh án
 

@@ -32,7 +32,6 @@ import { useAuthContext } from '../context/AuthContext'
 const roleOptions = [
   { value: 'ADMIN', label: 'Quản trị viên' },
   { value: 'DOCTOR', label: 'Bác sĩ' },
-  { value: 'NURSE', label: 'Điều dưỡng' },
   { value: 'RECEPTIONIST', label: 'Lễ tân' },
   { value: 'PHARMACIST', label: 'Dược sĩ' },
 ]
@@ -40,7 +39,6 @@ const roleOptions = [
 const roleStyles = {
   ADMIN: 'purple',
   DOCTOR: 'blue',
-  NURSE: 'cyan',
   RECEPTIONIST: 'orange',
   PHARMACIST: 'green',
 }

@@ -1332,7 +1332,7 @@ function AppointmentQueue() {
             key: 'reception_queue',
             label: (
               <span>
-                <TeamOutlined /> Hàng Đợi Khám (Lễ Tân & Điều Dưỡng) ({filteredQueues.length})
+                <TeamOutlined /> Hàng Đợi Khám (Lễ Tân) ({filteredQueues.length})
               </span>
             ),
             children: (
@@ -1623,7 +1623,6 @@ function AppointmentQueue() {
         ].filter((item) => {
           if (permissions.isAdmin) return true
           if (permissions.isDoctor) return item.key === 'doctor_queue'
-          if (permissions.isNurse) return item.key === 'reception_queue'
           return ['appointments', 'reception_queue'].includes(item.key)
         })}
       />

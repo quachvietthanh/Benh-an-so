@@ -68,7 +68,7 @@ export function ClinicalOrdersPage() {
       .filter(Boolean)
   ), [user?.role, user?.roles])
   const canManage = normalizedRoles.some((role) => ['admin', 'doctor'].includes(role))
-  const canLoadServerOrders = normalizedRoles.some((role) => ['admin', 'doctor', 'nurse'].includes(role))
+  const canLoadServerOrders = normalizedRoles.some((role) => ['admin', 'doctor'].includes(role))
   const useDoctorQueue = normalizedRoles.includes('doctor') && !normalizedRoles.includes('admin')
   const isDemo = localStorage.getItem('token') === 'demo-token'
 

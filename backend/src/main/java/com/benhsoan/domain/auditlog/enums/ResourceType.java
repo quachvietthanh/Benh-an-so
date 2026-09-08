@@ -44,5 +44,7 @@ public enum ResourceType {
 
     PATIENT_PORTAL,
 
-    CONFIGURATION
+    CONFIGURATION,
+
+    PATIENT_ALLERGY
 }

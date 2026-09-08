@@ -73,7 +73,7 @@ export default function VisitReportView({
       workloadStatus = 'HIGH'
       workloadTitle = 'Tải khám cao'
       workloadColor = '#ea580c'
-      staffingRecommendation = 'Cần bố trí 3 bác sĩ trực và tăng cường điều dưỡng hỗ trợ phân luồng.'
+      staffingRecommendation = 'Cần bố trí 3 bác sĩ trực và tăng cường nhân sự hỗ trợ phân luồng.'
     } else if (avgPerDay < 5 && totalVisits > 0) {
       workloadStatus = 'LOW'
       workloadTitle = 'Tải khám thấp'

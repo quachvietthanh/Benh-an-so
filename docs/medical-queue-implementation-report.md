@@ -109,7 +109,7 @@ Base path: `/api/v1/queue`
 |--------|----------|-------------|-----------------------|----------|-------------|
 | **POST** | `/api/v1/queue` | ADMIN, RECEPTIONIST | `AddToQueueRequest` | `201` → `MedicalQueueResponse` | Thêm bệnh nhân vào hàng đợi, auto-số thứ tự + tự động phát hiện APPOINTMENT priority |
 | **POST** | `/api/v1/queue/call-next` | ADMIN, DOCTOR | `CallNextRequest` | `200` → `MedicalQueueResponse` | Gọi bệnh nhân kế tiếp từ WAITING/SKIPPED lên IN_PROGRESS |
-| **PUT** | `/api/v1/queue/{id}/status` | ADMIN, DOCTOR, NURSE | `UpdateQueueStatusRequest` | `200` → `MedicalQueueResponse` | Chuyển trạng thái queue (hỗ trợ SKIPPED) |
+| **PUT** | `/api/v1/queue/{id}/status` | ADMIN, DOCTOR | `UpdateQueueStatusRequest` | `200` → `MedicalQueueResponse` | Chuyển trạng thái queue (hỗ trợ SKIPPED) |
 | **GET** | `/api/v1/queue/room/{roomNumber}` | Authenticated | `?status=&page=&size=` | `200` → `PageResponse<MedicalQueueResponse>` | DS hàng đợi theo phòng (phân trang, sắp xếp priority) |
 | **GET** | `/api/v1/queue/doctor/{doctorId}` | ADMIN, DOCTOR | `?status=&page=&size=` | `200` → `PageResponse<MedicalQueueResponse>` | DS hàng đợi theo bác sĩ (phân trang, sắp xếp priority) |
 | **GET** | `/api/v1/queue/count` | Authenticated | `?roomNumber=&doctorId=&status=` | `200` → `Long` | Đếm số lượng |

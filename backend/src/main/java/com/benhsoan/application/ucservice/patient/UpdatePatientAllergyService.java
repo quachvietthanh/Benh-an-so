@@ -116,7 +116,7 @@ public class UpdatePatientAllergyService implements UpdatePatientAllergyUseCase 
         auditLogRepository.save(AuditLog.create(
                 currentUserId,
                 ActionType.UPDATE,
-                ResourceType.PATIENT,
+                ResourceType.PATIENT_ALLERGY,
                 updated.getId(),
                 afterData,
                 null,
