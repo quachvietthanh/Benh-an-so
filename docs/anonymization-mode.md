@@ -1,91 +1,116 @@
-# Anonymization Mode (NCL-15-CN-003 — CV-01 & CV-02)
+# Anonymization Mode (NCL-15-CN-003) — Architecture & Contract
 
-> Scope: this document covers **CV-01** (field identification) and **CV-02**
-> (anonymization mechanism) only. The administrator UI toggle (**CV-03**) and
-> testing (**CV-04**) are intentionally out of scope.
+This document is the specification and contract for the patient data anonymization (ẩn danh) feature. The frontend can consume these APIs without knowing any database or persistence detail.
 
 ## 1. Purpose
 
-During demonstrations, patient-identifying information must not be exposed on
-screen or in exported files. This feature masks identity **only at the
-presentation/export boundary**; the underlying patient records are never
-modified.
+When anonymization is **ON**, the backend masks patient-identifying fields in REST responses and exports so that demonstrations/training never expose real patient data. The underlying business data is never changed or persisted in masked form.
 
-## 2. Fields identified (CV-01)
+## 2. Fields masked (CV-01 scope)
 
-### Mandatory anonymization (required by the Excel spec)
+Only these three fields are masked (required by the Excel spec):
 
-| Field | Where exposed | Strategy |
-| ----- | ------------- | -------- |
-| Patient full name | `Patient`, `PatientResult`/`PatientResponse`, `VisitEncounterResult`/`VisitEncounterResponse`, `MedicalRecordDetailResult`/`MedicalRecordDetailResponse`, `PrescriptionResult`/`PrescriptionResponse`, `QueueItemResult`/`QueueItemResponse`, `PayableEncounterResult`/`PayableEncounterResponse`, `PrescriptionPrintDocument` (PDF), `MedicalRecordCopyDocument` (PDF) | `BỆNH NHÂN #<patientCode>` |
-| Patient phone | `Patient`, `PatientResult`/`PatientResponse`, `VisitEncounterResult.PatientInfo`, `MedicalRecordDetailResult.PatientInfo` | `09******78` (first 2 + last 2 digits) |
-| Patient address | `Patient`, `PatientResult`/`PatientResponse` | `[ĐỊA CHỈ ĐÃ ẨN DANH]` |
+| Field    | Masked value                                                     | Where exposed |
+|----------|------------------------------------------------------------------|---------------|
+| fullName | `BỆNH NHÂN #<patientCode>` (or `BỆNH NHÂN` when no patient code) | Patient, Visit, Medical Record, Prescription, Queue, Billing, PDF Exports |
+| phone    | `<first 2 digits>******<last 2 digits>`                          | Patient, Visit, Medical Record |
+| address  | `[ĐỊA CHỈ ĐÃ ẨN DANH]`                                          | Patient |
 
-### Candidate identifying fields (NOT anonymized — out of current scope)
+Other fields (`identityNumber`, `insuranceNumber`, `email`, `dateOfBirth`, `emergencyContact`, `emergencyPhone`) are intentionally **not** masked (candidate fields, out of current scope).
 
-| Field | Note |
-| ----- | ---- |
-| `identityNumber` | Directly identifying, but not required by the current acceptance criteria. |
-| `insuranceNumber` | Directly identifying, not required. |
-| `email` | Identifying, not required. |
-| `dateOfBirth` | Quasi-identifier; kept because it is clinically relevant and not required. |
-| `emergencyContact` / `emergencyPhone` | Third-party contact, not required. |
-| `patientCode` | Internal business reference (non-identifying); retained and reused as the stable mask key. |
+The public patient-portal phone format (`091***001`) is a separate, always-on historical contract and is unaffected by this mode.
 
 ## 3. Anonymization strategy (CV-02)
 
-Deterministic, readable masking:
-
-- **Full name** → `BỆNH NHÂN #<patientCode>` so the same patient stays
-  recognizable during a demo.
-- **Phone** → keeps only the first two and last two digits, e.g.
-  `0912345678` → `09******78`.
+Deterministic, readable masking via pure domain policy `PatientAnonymizer`:
+- **Full name** → `BỆNH NHÂN #<patientCode>` so the same patient stays recognizable during a demo.
+- **Phone** → keeps only the first two and last two digits (e.g. `0912345678` → `09******78`). Non-digit formatting is stripped first.
 - **Address** → fixed placeholder `[ĐỊA CHỈ ĐÃ ẨN DANH]`.
 
-## 4. Where the mode state lives
+## 4. API Endpoints
 
-`PatientAnonymizationService` (application layer) holds a thread-safe
-in-memory `AtomicBoolean`:
+### 1. Read current mode
 
-- `enable()`, `disable()`, `isEnabled()` — the internal contract for the future
-  administrator toggle (CV-03).
-- Default is **OFF**; optionally boot ON via `app.anonymization.enabled`
-  (env `ANONYMIZATION_ENABLED`).
-- No database schema change, no persistence.
+```http
+GET /system/anonymization
+```
 
-Masking rules themselves live in the pure domain policy
-`domain.patient.PatientAnonymizer` (framework-free, no Spring).
+Response `200 OK`:
+```json
+{
+  "enabled": false,
+  "updatedAt": "2026-09-08T14:30:00Z"
+}
+```
 
-## 5. Where masking is applied
+### 2. Turn ON / OFF
 
-### REST responses (presentation boundary)
+```http
+PATCH /system/anonymization
+```
 
-Masking is applied in the REST mappers (single shared mechanism, no controller
-logic):
+Request body:
+```json
+{
+  "enabled": true
+}
+```
 
-- `PatientRestMapper` — full name, phone, address.
-- `VisitRestMapper` — full name, phone.
-- `MedicalRecordDetailRestMapper` — full name, phone.
-- `PrescriptionRestMapper` — full name.
-- `QueueRestMapper` — full name.
-- `BillingRestMapper` — full name.
+Response `200 OK`:
+```json
+{
+  "enabled": true,
+  "updatedAt": "2026-09-08T14:30:00Z"
+}
+```
 
-### Exports (TC-02)
+## 5. Permissions (RBAC)
 
-- `ExportPrescriptionService` — masks patient name in the prescription PDF.
-- `IssueMedicalRecordCopyService` — masks patient name in the medical record
-  copy PDF.
+| Endpoint                  | Required permission      |
+|---------------------------|--------------------------|
+| `GET  /system/anonymization`  | `SYSTEM_CONFIG_READ`   |
+| `PATCH /system/anonymization` | `SYSTEM_CONFIG_UPDATE` |
 
-The operational report CSV (`ExportOperationalReportService`) does not contain
-patient identity and is therefore unchanged.
+Both permissions are granted to the `ADMIN` role only.
 
-## 6. Database safety
+## 6. HTTP status codes
 
-Original patient data remains unchanged. Masking happens only after data is
-read and before it is returned/exported; nothing is written back.
+| Code | Meaning                                                |
+|------|--------------------------------------------------------|
+| 200  | Success (GET / PATCH)                                  |
+| 400  | Missing/invalid `enabled` field                        |
+| 401  | Not authenticated                                      |
+| 403  | Authenticated but lacks the required permission        |
 
-## 7. Future toggle (CV-03)
+## 7. Presentation & Export Masking
 
-The later UI toggle must call `PatientAnonymizationService.enable()` /
-`disable()` behind an administrator permission. No mode-switch endpoint or UI
-is implemented here.
+- **REST Responses:** Masking is applied in REST mappers:
+  - `PatientRestMapper` — fullName, phone, address.
+  - `VisitRestMapper` — fullName, phone.
+  - `MedicalRecordDetailRestMapper` — fullName, phone.
+  - `PrescriptionRestMapper` — fullName.
+  - `QueueRestMapper` — fullName (`BỆNH NHÂN #<patientCode>`).
+  - `BillingRestMapper` — fullName.
+- **Exports (TC-02):**
+  - `ExportPrescriptionService` — masks patient name in prescription PDF.
+  - `IssueMedicalRecordCopyService` — masks patient name in medical record copy PDF.
+  - Operational report CSV does not contain patient identity and is unchanged.
+
+## 8. Database Safety & Update Protection
+
+Original patient data remains unchanged in the database. Masking happens only at presentation/export boundaries.
+
+If a masked value (e.g. `BỆNH NHÂN #BN001`, `09******78`, `[ĐỊA CHỈ ĐÃ ẨN DANH]`) is submitted back to a patient update endpoint, `UpdatePatientService` detects it and preserves the existing real value instead of persisting the synthetic value.
+
+## 9. Audit Logging (TC-04)
+
+Every ON/OFF change writes an audit log entry:
+- action: `UPDATE`
+- resource type: `CONFIGURATION`
+- detail: `Anonymization mode changed from <before> to <after>`
+- actor: the current user ID
+- timestamp: current instant
+
+## 10. Persistence & State Cache
+
+The mode is stored in the persistent `system_configuration` table (created via Flyway `V40__create_system_configuration_table.sql`) and survives restarts. `AnonymizationModeState` acts as an in-memory cache loaded on startup and updated synchronously after every change.

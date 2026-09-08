@@ -30,7 +30,7 @@ public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, U
 
     @Query("""
             select new com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection(
-                item.id, item.medicalQueueId, item.patientId, patient.fullName,
+                item.id, item.medicalQueueId, item.patientId, patient.patientCode, patient.fullName,
                 queue.doctorId, doctor.fullName, queue.roomId, room.code,
                 item.appointmentId, item.visitId, visit.visitCode,
                 item.sourceType, item.status, item.queueNumber, item.queueDate,
@@ -56,7 +56,7 @@ public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, U
 
     @Query("""
             select new com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection(
-                item.id, item.medicalQueueId, item.patientId, patient.fullName,
+                item.id, item.medicalQueueId, item.patientId, patient.patientCode, patient.fullName,
                 queue.doctorId, doctor.fullName, queue.roomId, room.code,
                 item.appointmentId, item.visitId, visit.visitCode,
                 item.sourceType, item.status, item.queueNumber, item.queueDate,

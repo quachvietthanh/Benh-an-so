@@ -37,6 +37,7 @@ public class QueueItemQueryRepositoryAdapter implements QueueItemQueryRepository
                 projection.id(),
                 projection.medicalQueueId(),
                 projection.patientId(),
+                projection.patientCode(),
                 projection.patientName(),
                 projection.doctorId(),
                 projection.doctorName(),

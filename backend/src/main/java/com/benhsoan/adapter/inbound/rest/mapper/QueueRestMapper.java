@@ -42,7 +42,7 @@ public class QueueRestMapper {
 
     public QueueItemResponse toResponse(QueueItemResult result) {
         return new QueueItemResponse(result.id(), result.medicalQueueId(), result.patientId(),
-                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(null) : result.patientName(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName(),
                 result.doctorId(), result.doctorName(), result.roomId(), result.roomNumber(), result.appointmentId(),
                 result.visitId(), result.visitCode(), result.sourceType(), result.status(), result.queueNumber(), result.queueDate(),
                 result.checkedInAt(), result.calledAt(), result.completedAt(), result.cancelledAt(), result.cancelReason(),
