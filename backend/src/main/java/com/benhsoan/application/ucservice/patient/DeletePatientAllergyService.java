@@ -83,7 +83,7 @@ public class DeletePatientAllergyService implements DeletePatientAllergyUseCase 
         auditLogRepository.save(AuditLog.create(
                 currentUserId,
                 ActionType.DELETE,
-                ResourceType.PATIENT,
+                ResourceType.PATIENT_ALLERGY,
                 allergy.getId(),
                 beforeData,
                 null,

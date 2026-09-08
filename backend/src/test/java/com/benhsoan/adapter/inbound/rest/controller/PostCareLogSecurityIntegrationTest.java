@@ -103,7 +103,7 @@ class PostCareLogSecurityIntegrationTest {
 
     @Test
     void forbidsUnauthorizedRoles() throws Exception {
-        for (String role : new String[]{"NURSE", "PHARMACIST", "MANAGER"}) {
+        for (String role : new String[]{"PHARMACIST", "MANAGER"}) {
             mockMvc.perform(post("/care-logs")
                             .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_CARE_LOG_READ")))
                             .contentType(MediaType.APPLICATION_JSON)

@@ -112,7 +112,7 @@ class FollowUpReminderSecurityIntegrationTest {
     }
     @Test
     void forbidsUnauthorizedRoles() throws Exception {
-        for (String role : new String[]{"DOCTOR", "NURSE", "PHARMACIST", "MANAGER"}) {
+        for (String role : new String[]{"DOCTOR", "PHARMACIST", "MANAGER"}) {
             mockMvc.perform(post("/follow-up-reminders")
                             .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_FOLLOW_UP_REMINDER_READ")))
                             .contentType(MediaType.APPLICATION_JSON)

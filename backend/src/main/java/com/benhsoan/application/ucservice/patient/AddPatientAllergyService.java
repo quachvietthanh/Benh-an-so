@@ -3,7 +3,6 @@ package com.benhsoan.application.ucservice.patient;
 import java.time.Instant;
 import java.util.UUID;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,12 +95,7 @@ public class AddPatientAllergyService implements AddPatientAllergyUseCase {
                 now
         );
 
-        PatientAllergy saved;
-        try {
-            saved = patientAllergyRepository.save(allergy);
-        } catch (DataIntegrityViolationException e) {
-            throw new PatientAllergyAlreadyExistsException(command.allergenName());
-        }
+        PatientAllergy saved = patientAllergyRepository.save(allergy);
 
         String afterData = changeDetailBuilder.buildSnapshot(saved);
         String reason = command.visitId() != null
@@ -123,7 +117,7 @@ public class AddPatientAllergyService implements AddPatientAllergyUseCase {
         auditLogRepository.save(AuditLog.create(
                 currentUserId,
                 ActionType.CREATE,
-                ResourceType.PATIENT,
+                ResourceType.PATIENT_ALLERGY,
                 saved.getId(),
                 afterData,
                 null,

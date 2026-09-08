@@ -2,111 +2,109 @@
 
 ## Ma trận quyền chi tiết
 
-| API Endpoint | Method | ADMIN | DOCTOR | NURSE | RECEPTIONIST | PHARMACIST |
-|---|---|---|---|---|---|---|
-| **Authentication** | | | | | | |
-| `/api/v1/auth/login` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `/api/v1/auth/register` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/auth/refresh` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `/api/v1/auth/logout` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `/api/v1/auth/change-password` | POST | ✅ | ✅ | ✅ | ✅ | ✅ |
-| | | | | | | |
-| **User Management** | | | | | | |
-| `/api/v1/users` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/users` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/users/{id}` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/users/{id}` | PUT | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/users/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/users/{id}/roles` | PUT | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/users/{id}/reset-password` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
-| | | | | | | |
-| **Patient Management** | | | | | | |
-| `/api/v1/patients` | GET | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `/api/v1/patients` | POST | ✅ | ✅ | ❌ | ✅ | ❌ |
-| `/api/v1/patients/{id}` | GET | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `/api/v1/patients/{id}` | PUT | ✅ | ✅ | ❌ | ✅ | ❌ |
-| `/api/v1/patients/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/patients/me` | GET | ❌ | ✅ | ✅ | ✅ | ❌ |
-| `/patients/{patientId}/allergies` | GET | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `/patients/{patientId}/allergies` | POST | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/patients/{patientId}/allergies/{allergyId}` | PUT | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/patients/{patientId}/allergies/{allergyId}` | DELETE | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/patients/{patientId}/allergies/{allergyId}/history` | GET | ✅ | ✅ | ❌ | ❌ | ❌ |
-| | | | | | | |
-| **Medical Records** | | | | | | |
-| `/api/v1/medical-records` | GET | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/medical-records` | POST | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/medical-records/{id}` | GET | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/medical-records/{id}` | PUT | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/medical-records/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/medical-records/{id}/diagnoses` | PUT | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/medical-records/{id}/diagnoses` | GET | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/medical-records/{id}/sign` | POST | ❌ | ✅ (chỉ bác sĩ phụ trách lượt khám) | ❌ | ❌ | ❌ |
-| `/api/v1/medical-records/{id}/status` | PATCH | ✅ | ✅ | ✅ | ❌ | ❌ |
-| | | | | | | |
-| **Prescriptions** | | | | | | |
-| `/api/v1/prescriptions` | GET | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `/api/v1/prescriptions` | POST | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/prescriptions/{id}` | GET | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `/api/v1/prescriptions/{id}` | PUT | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/prescriptions/{id}` | DELETE | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/prescriptions/{id}/status` | PUT | ✅ | ❌ | ❌ | ❌ | ✅ |
-| `/api/v1/prescriptions/{id}/interconnection` | POST | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/prescription-interconnections` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/prescriptions/{id}/interconnection/retry` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/prescriptions/check-allergy-warnings` | POST | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/prescriptions/allergy-warning-logs` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
-| | | | | | | |
-| **Appointments** | | | | | | |
-| `/api/v1/appointments` | GET | ✅ | ✅ | ❌ | ✅ | ❌ |
-| `/api/v1/appointments` | POST | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `/api/v1/appointments/{id}` | GET | ✅ | ✅ | ❌ | ✅ | ❌ |
-| `/api/v1/appointments/{id}` | PUT | ✅ | ✅ | ❌ | ✅ | ❌ |
-| `/api/v1/appointments/{id}` | DELETE | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `/api/v1/appointments/me` | GET | ❌ | ✅ | ✅ | ✅ | ❌ |
-| | | | | | | |
-| **Vital Signs** | | | | | | |
-| `/api/v1/vital-signs` | GET | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/vital-signs` | POST | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/vital-signs/{id}` | PUT | ✅ | ✅ | ✅ | ❌ | ❌ |
-| | | | | | | |
-| **Diagnoses** | | | | | | |
-| `/api/v1/diagnosis-catalog` | GET | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/system/diagnosis-catalog/**` | ALL | ✅ | ❌ | ❌ | ❌ | ❌ |
-| | | | | | | |
-| **Pharmacy / Inventory** | | | | | | |
-| `/api/v1/pharmacy/inventory` | GET | ✅ | ❌ | ❌ | ❌ | ✅ |
-| `/api/v1/pharmacy/inventory` | POST | ✅ | ❌ | ❌ | ❌ | ✅ |
-| `/api/v1/pharmacy/inventory/{id}` | PUT | ✅ | ❌ | ❌ | ❌ | ✅ |
-| `/api/v1/pharmacy/inventory/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ | ❌ |
-| | | | | | | |
-| **Invoices / Payments** | | | | | | |
-| `/api/v1/invoices` | GET | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `/api/v1/invoices` | POST | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `/api/v1/invoices/{id}` | GET | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `/api/v1/invoices/{id}` | PUT | ✅ | ❌ | ❌ | ✅ | ❌ |
-| | | | | | | |
-| **Audit Logs** | | | | | | |
-| `/api/v1/audit-logs` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/audit-logs/{id}` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
-| | | | | | | |
-| **Medical Queue** | | | | | | |
-| `/api/v1/queue` | POST | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `/api/v1/queue/call-next` | POST | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/queue/{id}/status` | PUT | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/queue/room/{roomNumber}` | GET | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `/api/v1/queue/doctor/{doctorId}` | GET | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/api/v1/queue/count` | GET | ✅ | ✅ | ✅ | ✅ | ✅ |
-| | | | | | | |
-| **Medical History** | | | | | | |
-| `/patients/{patientId}/medical-history` | GET | ✅ | ✅ (chỉ BN đã khám) | ❌ | ❌ | ❌ |
+| API Endpoint | Method | ADMIN | DOCTOR | RECEPTIONIST | PHARMACIST |
+| --- | --- | --- | --- | --- | --- |
+| **Authentication** |  |  |  |  |  |
+| `/api/v1/auth/login` | POST | ✅ | ✅ | ✅ | ✅ |
+| `/api/v1/auth/register` | POST | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/auth/refresh` | POST | ✅ | ✅ | ✅ | ✅ |
+| `/api/v1/auth/logout` | POST | ✅ | ✅ | ✅ | ✅ |
+| `/api/v1/auth/change-password` | POST | ✅ | ✅ | ✅ | ✅ |
+|  |  |  |  |  |  |
+| **User Management** |  |  |  |  |  |
+| `/api/v1/users` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/users` | POST | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/users/{id}` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/users/{id}` | PUT | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/users/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/users/{id}/roles` | PUT | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/users/{id}/reset-password` | POST | ✅ | ❌ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Patient Management** |  |  |  |  |  |
+| `/api/v1/patients` | GET | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/patients` | POST | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/patients/{id}` | GET | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/patients/{id}` | PUT | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/patients/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/patients/me` | GET | ❌ | ✅ | ✅ | ❌ |
+| `/patients/{patientId}/allergies` | GET | ✅ | ✅ | ❌ | ✅ |
+| `/patients/{patientId}/allergies` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/patients/{patientId}/allergies/{allergyId}` | PUT | ✅ | ✅ | ❌ | ❌ |
+| `/patients/{patientId}/allergies/{allergyId}` | DELETE | ✅ | ✅ | ❌ | ❌ |
+| `/patients/{patientId}/allergies/{allergyId}/history` | GET | ✅ | ✅ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Medical Records** |  |  |  |  |  |
+| `/api/v1/medical-records` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/medical-records` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}` | PUT | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}/diagnoses` | PUT | ❌ | ✅ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}/diagnoses` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/medical-records/{id}/sign` | POST | ❌ | ✅ (chỉ bác sĩ phụ trách lượt khám) | ❌ | ❌ |
+| `/api/v1/medical-records/{id}/status` | PATCH | ✅ | ✅ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Prescriptions** |  |  |  |  |  |
+| `/api/v1/prescriptions` | GET | ✅ | ✅ | ❌ | ✅ |
+| `/api/v1/prescriptions` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/prescriptions/{id}` | GET | ✅ | ✅ | ❌ | ✅ |
+| `/api/v1/prescriptions/{id}` | PUT | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/prescriptions/{id}` | DELETE | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/prescriptions/{id}/status` | PUT | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/prescriptions/{id}/interconnection` | POST | ❌ | ✅ | ❌ | ❌ |
+| `/api/v1/prescription-interconnections` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/prescriptions/{id}/interconnection/retry` | POST | ✅ | ❌ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Appointments** |  |  |  |  |  |
+| `/api/v1/appointments` | GET | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/appointments` | POST | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/appointments/{id}` | GET | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/appointments/{id}` | PUT | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/appointments/{id}` | DELETE | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/appointments/me` | GET | ❌ | ✅ | ✅ | ❌ |
+|  |  |  |  |  |  |
+| **Vital Signs** |  |  |  |  |  |
+| `/api/v1/vital-signs` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/vital-signs` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/vital-signs/{id}` | PUT | ✅ | ✅ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Diagnoses** |  |  |  |  |  |
+| `/api/v1/diagnosis-catalog` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/system/diagnosis-catalog/**` | ALL | ✅ | ❌ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Pharmacy / Inventory** |  |  |  |  |  |
+| `/api/v1/pharmacy/inventory` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/pharmacy/inventory` | POST | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/pharmacy/inventory/{id}` | PUT | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/pharmacy/inventory/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Invoices / Payments** |  |  |  |  |  |
+| `/api/v1/invoices` | GET | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/invoices` | POST | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/invoices/{id}` | GET | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/invoices/{id}` | PUT | ✅ | ❌ | ✅ | ❌ |
+|  |  |  |  |  |  |
+| **Audit Logs** |  |  |  |  |  |
+| `/api/v1/audit-logs` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/audit-logs/{id}` | GET | ✅ | ❌ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Medical Queue** |  |  |  |  |  |
+| `/api/v1/queue` | POST | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/queue/call-next` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/queue/{id}/status` | PUT | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/queue/room/{roomNumber}` | GET | ✅ | ✅ | ✅ | ✅ |
+| `/api/v1/queue/doctor/{doctorId}` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/queue/count` | GET | ✅ | ✅ | ✅ | ✅ |
+|  |  |  |  |  |  |
+| **Medical History** |  |  |  |  |  |
+| `/patients/{patientId}/medical-history` | GET | ✅ | ✅ (chỉ BN đã khám) | ❌ | ❌ |
 
-| | | | | | | |
-| **Admin / System** | | | | | | |
-| `/api/v1/admin/**` | ALL | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/roles` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/roles` | POST | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/api/v1/permissions` | GET | ✅ | ❌ | ❌ | ❌ | ❌ |
+|  |  |  |  |  |  |
+| **Admin / System** |  |  |  |  |  |
+| `/api/v1/admin/**` | ALL | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/roles` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/roles` | POST | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/permissions` | GET | ✅ | ❌ | ❌ | ❌ |
 
 ## Role Hierarchy (Phân cấp vai trò)
 
@@ -126,13 +124,6 @@ DOCTOR (Bác sĩ)
   ├── Appointments management
   ├── Medical Queue (call next, update status, view)
   └── Medical History view
-
-NURSE (Y tá)
-  ├── Patient read
-  ├── Medical Records read
-  ├── Vital Signs CRUD
-  ├── Appointments read
-  └── Medical Queue update status + view
 
 RECEPTIONIST (Lễ tân)
   ├── Patient CRUD (read/write)

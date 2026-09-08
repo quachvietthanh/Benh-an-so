@@ -26,8 +26,9 @@
    - Nếu bệnh nhân đã có một mục dị ứng active với hoạt chất này, hệ thống từ chối lưu và trả về mã lỗi HTTP `409 Conflict` (`PATIENT_ALLERGY_ALREADY_EXISTS`).
 3. **Từ chối và lưu vết truy cập trái quyền (TC-03)**:
    - Nếu người dùng có vai trò không được phép (ví dụ Lễ tân `RECEPTIONIST`) cố gắng thực hiện các thao tác ghi nhận dị ứng, hệ thống chặn lại với HTTP `403 Forbidden` (`FORBIDDEN`) và tự động ghi nhật ký vi phạm (`ActionType.ACCESS_DENIED`, `ResourceType.PERMISSION`) vào `audit_logs`.
-4. **Lưu lịch sử thay đổi dị ứng (TC-04)**:
+4. **Lưu lịch sử thay đổi dị ứng (TC-04 & QTN-02)**:
    - Khi Bác sĩ cập nhật hoặc xóa một mục dị ứng, hệ thống tự động ghi lại snapshot trạng thái trước khi thay đổi (`before_data`) và sau khi thay đổi (`after_data`), định danh người thực hiện (`changedBy`), và thời điểm vào bảng `patient_allergy_change_logs`.
+   - Đồng thời, hệ thống ghi nhật ký kiểm toán vào `audit_logs` với `resourceType = ResourceType.PATIENT_ALLERGY`, `resourceId = allergyId`, và snapshot chi tiết chứa `patientId`.
 
 ---
 
@@ -81,7 +82,7 @@
 ### 2.2. Lấy danh sách dị ứng của bệnh nhân
 - **Method:** `GET`
 - **Path:** `/patients/{patientId}/allergies`
-- **Permission:** `PATIENT_ALLERGY_READ` (Bác sĩ, Dược sĩ, Y tá, Quản lý, Admin)
+- **Permission:** `PATIENT_ALLERGY_READ` (Bác sĩ, Dược sĩ, Quản lý, Admin)
 
 #### Response (200 OK)
 ```json

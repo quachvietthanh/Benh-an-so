@@ -298,12 +298,48 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found.", request.getRequestURI());
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException ex,
+            HttpServletRequest request
+    ) {
+        String msg = extractIntegrityViolationMessage(ex).toLowerCase();
+        if (msg.contains("uk_patient_active_allergen")
+                || (msg.contains("duplicate entry") && msg.contains("active_normalized_name"))) {
+            return build(
+                    HttpStatus.CONFLICT,
+                    "PATIENT_ALLERGY_ALREADY_EXISTS",
+                    "Hoạt chất hoặc dị nguyên này đã tồn tại trong danh sách dị ứng của bệnh nhân.",
+                    request.getRequestURI()
+            );
+        }
+
+        log.error("Data integrity violation for {}", request.getRequestURI(), ex);
+        return build(
+                HttpStatus.CONFLICT,
+                "DATA_INTEGRITY_VIOLATION",
+                "Dữ liệu không hợp lệ hoặc bị xung đột ràng buộc hệ thống.",
+                request.getRequestURI()
+        );
+    }
+
+    private String extractIntegrityViolationMessage(Throwable throwable) {
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append(' ');
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnknown(
             Exception ex,
             HttpServletRequest request
     ) {
-
         log.error("Unhandled request failure for {}", request.getRequestURI(), ex);
 
         return build(

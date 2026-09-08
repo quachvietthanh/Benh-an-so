@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 export const canViewMedicalRecord = (roles = []) => {
-  const allowedRoles = ['admin', 'doctor', 'nurse', 'role_admin', 'role_doctor', 'role_nurse']
+  const allowedRoles = ['admin', 'doctor', 'role_admin', 'role_doctor']
   return roles.some((role) => allowedRoles.includes(String(role).toLowerCase()))
 }
 
@@ -36,7 +36,6 @@ export const validateMedicalRecordDetail = (record) => {
 test('1. KIỂM THỬ QUYỀN XEM BỆNH ÁN (Role-Based Authorization Test)', () => {
   assert.equal(canViewMedicalRecord(['doctor']), true)
   assert.equal(canViewMedicalRecord(['ADMIN']), true)
-  assert.equal(canViewMedicalRecord(['Nurse']), true)
   assert.equal(canViewMedicalRecord(['ROLE_DOCTOR']), true)
 
   assert.equal(canViewMedicalRecord(['pharmacist']), false)

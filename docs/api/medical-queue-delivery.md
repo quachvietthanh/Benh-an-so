@@ -181,7 +181,7 @@ Legacy: N/A
 
 **Error `400 Bad Request`:** If the transition is invalid (e.g., COMPLETED → WAITING).
 
-**Security:** `hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')`
+**Security:** `hasAnyRole('ADMIN', 'DOCTOR')`
 
 ---
 

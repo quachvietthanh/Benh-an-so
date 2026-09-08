@@ -24,7 +24,7 @@ class QueueOperationAuthorization {
     }
 
     void requireClinicalUpdatePermission(MedicalQueue queue) {
-        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("NURSE")) {
+        if (currentUserPort.hasRole("ADMIN")) {
             return;
         }
         requireOwningDoctor(queue);
@@ -49,8 +49,7 @@ class QueueOperationAuthorization {
     }
 
     void requireReadPermission(UUID doctorId) {
-        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("NURSE")
-                || currentUserPort.hasRole("RECEPTIONIST")) {
+        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST")) {
             return;
         }
         if (!currentUserPort.hasRole("DOCTOR") || !doctorId.equals(currentUserPort.getCurrentUserId())) {
