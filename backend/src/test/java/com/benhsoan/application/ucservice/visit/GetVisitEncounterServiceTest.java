@@ -54,13 +54,13 @@ class GetVisitEncounterServiceTest {
     }
 
     @Test
-    void allowsAdminAndNurseToViewEncounter() {
+    void allowsAdminToViewEncounter() {
         UUID visitId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
         VisitEncounterQueryRepository repository = mock(VisitEncounterQueryRepository.class);
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
         when(repository.findByVisitId(visitId)).thenReturn(Optional.of(encounter(visitId, doctorId)));
-        when(currentUserPort.hasRole("NURSE")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
 
         assertEquals(visitId, service(repository, currentUserPort).getEncounter(visitId).visit().id());
     }

@@ -178,8 +178,8 @@ test('15. Role khác không thao tác được', () => {
   const doctorAccess = validateBackupCreationAccess(['DOCTOR'])
   assert.strictEqual(doctorAccess.allowed, false)
 
-  const nurseEligibility = validateBackupRestoreEligibility({ id: 'uuid-1', status: 'SUCCESS' }, ['NURSE'])
-  assert.strictEqual(nurseEligibility.eligible, false)
+  const pharmacistEligibility = validateBackupRestoreEligibility({ id: 'uuid-1', status: 'SUCCESS' }, ['PHARMACIST'])
+  assert.strictEqual(pharmacistEligibility.eligible, false)
 
   const receptionistEligibility = validateBackupRestoreEligibility({ id: 'uuid-1', status: 'SUCCESS' }, ['RECEPTIONIST'])
   assert.strictEqual(receptionistEligibility.eligible, false)

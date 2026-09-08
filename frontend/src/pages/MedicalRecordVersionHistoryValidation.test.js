@@ -16,7 +16,7 @@ test('1. KIỂM THỬ PHÂN QUYỀN TRUY CẬP LỊCH SỬ PHIÊN BẢN (RBAC & 
   assert.equal(canViewMedicalRecordVersionHistory(['doctor']), false, 'Bác sĩ không có quyền mặc định xem toàn bộ lịch sử quản lý nếu không cấp permission')
   assert.equal(canViewMedicalRecordVersionHistory(['receptionist']), false, 'Lễ tân không có quyền')
   assert.equal(canViewMedicalRecordVersionHistory(['pharmacist']), false, 'Dược sĩ không có quyền')
-  assert.equal(canViewMedicalRecordVersionHistory(['nurse']), false, 'Điều dưỡng không có quyền')
+  assert.equal(canViewMedicalRecordVersionHistory(['staff']), false, 'Nhân viên không có quyền')
   assert.equal(canViewMedicalRecordVersionHistory([]), false, 'Không có vai trò phải bị từ chối')
 
   assert.equal(

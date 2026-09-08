@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
@@ -41,7 +42,8 @@ class SearchPrescriptionInterconnectionsServiceTest {
         when(resolver.resolve(any(), any())).thenReturn(
                 new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
                         UUID.randomUUID(), "VISIT-001", UUID.randomUUID(), "PAT-001", "Nguyen Van A", "Dr. B"));
-        var service = new SearchPrescriptionInterconnectionsService(repository, resolver, currentUser);
+        var service = new SearchPrescriptionInterconnectionsService(repository, resolver, currentUser,
+                new AnonymizationModeState());
 
         var page = service.search(new SearchPrescriptionInterconnectionsQuery(
                 InterconnectionStatus.FAILED, NOW.minusSeconds(3600), NOW, 0, 20));
@@ -62,7 +64,8 @@ class SearchPrescriptionInterconnectionsServiceTest {
     void nonAdminCannotSearch() {
         CurrentUserPort currentUser = mock(CurrentUserPort.class);
         var service = new SearchPrescriptionInterconnectionsService(
-                mock(PrescriptionRepository.class), mock(PrescriptionDisplayContextResolver.class), currentUser);
+                mock(PrescriptionRepository.class), mock(PrescriptionDisplayContextResolver.class), currentUser,
+                new AnonymizationModeState());
 
         assertThrows(AccessDeniedException.class, () -> service.search(
                 new SearchPrescriptionInterconnectionsQuery(InterconnectionStatus.NOT_SENT, null, null, 0, 20)));

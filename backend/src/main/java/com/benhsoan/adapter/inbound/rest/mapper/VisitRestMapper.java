@@ -1,12 +1,21 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.visit.VisitEncounterResponse;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.result.VisitEncounterResult;
 
 @Component
 public class VisitRestMapper {
+
+    private final AnonymizationModeState anonymizationModeState;
+
+    public VisitRestMapper(
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
+    }
 
     public VisitEncounterResponse toResponse(VisitEncounterResult result) {
         return new VisitEncounterResponse(
@@ -14,8 +23,10 @@ public class VisitRestMapper {
                         result.visit().id(), result.visit().visitCode(), result.visit().type(), result.visit().status(),
                         result.visit().visitAt(), result.visit().startedAt(), result.visit().reason(), result.visit().note()),
                 new VisitEncounterResponse.PatientInfo(
-                        result.patient().id(), result.patient().patientCode(), result.patient().fullName(),
-                        result.patient().dateOfBirth(), result.patient().gender(), result.patient().phone()),
+                        result.patient().id(), result.patient().patientCode(),
+                        anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
+                        result.patient().dateOfBirth(), result.patient().gender(),
+                        anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone()),
                 new VisitEncounterResponse.DoctorInfo(result.doctor().id(), result.doctor().fullName()),
                 toRoomResponse(result.room()),
                 toQueueItemResponse(result.queueItem()),

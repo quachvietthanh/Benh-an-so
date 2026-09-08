@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.prescription.SearchPrescriptionInterconnectionsQuery;
 import com.benhsoan.port.dto.result.PrescriptionInterconnectionListItemResult;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionInterconnectionsUseCase;
@@ -24,6 +26,7 @@ public class SearchPrescriptionInterconnectionsService implements SearchPrescrip
     private final PrescriptionRepository prescriptionRepository;
     private final PrescriptionDisplayContextResolver displayContextResolver;
     private final CurrentUserPort currentUserPort;
+    private final AnonymizationModeState anonymizationModeState;
 
     @Override
     public Page<PrescriptionInterconnectionListItemResult> search(
@@ -42,7 +45,8 @@ public class SearchPrescriptionInterconnectionsService implements SearchPrescrip
                             prescription.getMedicalRecordId(), prescription.getPrescribedBy());
                     return new PrescriptionInterconnectionListItemResult(
                             prescription.getId(), prescription.getPrescriptionCode(),
-                            context.patientId(), context.patientCode(), context.patientName(),
+                            context.patientId(), context.patientCode(),
+                            anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(context.patientCode()) : context.patientName(),
                             prescription.getPrescribedBy(), context.doctorName(), prescription.getStatus(),
                             prescription.getInterconnectionStatus(), prescription.getLastInterconnectionAt(),
                             prescription.getLastInterconnectionError(), prescription.getInterconnectionReceiptCode()

@@ -17,8 +17,7 @@ public class ClinicalOrderAuthorizationService {
 
     public UUID requireReadAccess() {
         if (!currentUserPort.hasRole("ADMIN")
-                && !currentUserPort.hasRole("DOCTOR")
-                && !currentUserPort.hasRole("NURSE")) {
+                && !currentUserPort.hasRole("DOCTOR")) {
             throw new MedicalRecordAccessDeniedException();
         }
         return currentUserPort.getCurrentUserId();

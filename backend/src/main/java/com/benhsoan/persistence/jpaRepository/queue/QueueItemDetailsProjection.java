@@ -11,6 +11,7 @@ public record QueueItemDetailsProjection(
         UUID id,
         UUID medicalQueueId,
         UUID patientId,
+        String patientCode,
         String patientName,
         UUID doctorId,
         String doctorName,

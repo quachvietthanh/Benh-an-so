@@ -47,7 +47,7 @@ public class RoomController {
     private final RoomRestMapper mapper;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
     public Page<RoomResponse> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "true") Boolean active,
@@ -58,7 +58,7 @@ public class RoomController {
     }
 
     @GetMapping("/{roomId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
     public RoomResponse getById(@PathVariable UUID roomId) {
         return mapper.toResponse(getRoomUseCase.getById(roomId));
     }

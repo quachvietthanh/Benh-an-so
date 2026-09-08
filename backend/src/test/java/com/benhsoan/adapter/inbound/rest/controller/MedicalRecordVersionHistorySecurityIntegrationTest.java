@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.config.SecurityConfig;
@@ -53,7 +54,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = MedicalRecordController.class)
-@Import({
+@Import({AnonymizationModeState.class, 
         AopAutoConfiguration.class,
         MedicalRecordVersionHistorySecurityIntegrationTest.AspectTestConfig.class,
         MedicalRecordRestMapper.class,

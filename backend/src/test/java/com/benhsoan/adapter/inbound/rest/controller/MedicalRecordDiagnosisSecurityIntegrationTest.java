@@ -27,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDetailRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper;
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAuditService;
@@ -69,7 +70,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = MedicalRecordController.class)
-@Import({
+@Import({AnonymizationModeState.class, 
         AopAutoConfiguration.class,
         MedicalRecordDiagnosisSecurityIntegrationTest.AspectTestConfig.class,
         MedicalRecordRestMapper.class,
@@ -151,12 +152,12 @@ class MedicalRecordDiagnosisSecurityIntegrationTest {
     }
 
     @Test
-    void nurseReceptionistAndPharmacistAreForbiddenEvenWithMedicalRecordUpdatePermission() throws Exception {
+    void receptionistAndPharmacistAreForbiddenEvenWithMedicalRecordUpdatePermission() throws Exception {
         UUID recordId = UUID.randomUUID();
         UUID catalogId = UUID.randomUUID();
         when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
 
-        for (String role : List.of("NURSE", "RECEPTIONIST", "PHARMACIST")) {
+        for (String role : List.of("RECEPTIONIST", "PHARMACIST")) {
             when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
 
             mockMvc.perform(replaceDiagnoses(recordId, role.toLowerCase(), "ROLE_" + role, catalogId))

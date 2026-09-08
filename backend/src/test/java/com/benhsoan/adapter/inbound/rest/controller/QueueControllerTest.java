@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.QueueRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
@@ -47,7 +48,7 @@ import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 
 @WebMvcTest(controllers = QueueController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({QueueRestMapper.class, GlobalExceptionHandler.class})
+@Import({AnonymizationModeState.class, QueueRestMapper.class, GlobalExceptionHandler.class})
 class QueueControllerTest {
 
     @Autowired private MockMvc mockMvc;

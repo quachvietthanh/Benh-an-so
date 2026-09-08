@@ -154,7 +154,8 @@ class ScanAccessLogAnomaliesServiceTest {
 
         when(clockPort.now()).thenReturn(t1, t2);
         when(accessLogRepository.findViewsBetween(any(), any()))
-                .thenReturn(views(user, 21, t1), views(user, 21, t2));
+                .thenReturn(views(user, 21, t1))
+                .thenReturn(views(user, 21, t2));
 
         AtomicReference<SecurityAlert> persisted = new AtomicReference<>();
         when(securityAlertRepository.save(any(SecurityAlert.class)))

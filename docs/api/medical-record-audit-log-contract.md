@@ -70,7 +70,7 @@ Tra cứu nhật ký truy cập bệnh án theo nhiều tiêu chí lọc.
 
 - `ADMIN`
 
-> Phase 1 chốt endpoint này là API giám sát dành cho quản trị viên. Các role `DOCTOR` và `NURSE` không thuộc phạm vi truy cập endpoint này.
+> Phase 1 chốt endpoint này là API giám sát dành cho quản trị viên. Role `DOCTOR` không thuộc phạm vi truy cập endpoint này.
 
 #### Query Parameters
 
