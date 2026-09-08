@@ -5,7 +5,6 @@ import {
   Form,
   Input,
   Row,
-  Skeleton,
   Space,
   Tag,
 } from 'antd'
@@ -26,15 +25,7 @@ function DynamicMedicalRecordSections({
   sections = [],
   template = null,
   disabled = false,
-  loading = false,
 }) {
-  if (loading) {
-    return (
-      <Card bordered style={{ marginBottom: 16 }}>
-        <Skeleton active paragraph={{ rows: 6 }} />
-      </Card>
-    )
-  }
 
   const effectiveSections = sections && sections.length > 0 ? sections : DEFAULT_TEMPLATE_SECTIONS
   const sortedSections = [...effectiveSections].sort((a, b) => a.displayOrder - b.displayOrder)

@@ -354,9 +354,8 @@ function MedicalEncounterForm({
                     style={{ flex: 1 }}
                     value={selectedTemplateId || currentTemplate?.templateId || currentTemplate?.id || undefined}
                     onChange={onTemplateChange}
-                    disabled={!isDoctor || isSigned || templateLoading}
-                    loading={templateLoading}
-                    placeholder={templateLoading ? 'Đang nạp mẫu...' : 'Chọn mẫu áp dụng...'}
+                    disabled={!isDoctor || isSigned}
+                    placeholder="Chọn mẫu áp dụng..."
                     options={availableTemplates.map((t) => ({
                       value: t.templateId || t.id,
                       label: `${formatTemplateName(t.name)} (v${t.versionNo || t.currentVersionNo || 1})${t.defaultTemplate ? ' [Mặc định]' : ''}`,
@@ -386,7 +385,6 @@ function MedicalEncounterForm({
             sections={currentTemplate?.sections}
             template={currentTemplate}
             disabled={!isDoctor || isSigned}
-            loading={templateLoading}
           />
 
           <Card
@@ -445,7 +443,6 @@ function MedicalEncounterForm({
                     allowClear
                     placeholder="🔍 Tra cứu mã bệnh theo mã ICD (J00, I10...) hoặc tên bệnh (cảm cúm, đau đầu...)"
                     value={null}
-                    loading={diagnosisSearching}
                     style={{ width: '100%' }}
                     filterOption={(input, option) => {
                       const q = (input || '').toLowerCase().trim()
@@ -532,7 +529,6 @@ function MedicalEncounterForm({
                   placeholder={primaryIcd ? '🔍 Tìm mã hoặc tên bệnh kèm theo...' : 'Vui lòng chọn chẩn đoán chính trước'}
                   value={null}
                   disabled={!primaryIcd}
-                  loading={diagnosisSearching}
                   style={{ width: '100%' }}
                   filterOption={(input, option) => {
                     const q = (input || '').toLowerCase().trim()
