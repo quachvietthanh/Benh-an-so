@@ -41,7 +41,6 @@ import securityAlertApi from '../../api/securityAlertApi'
 
 const { Title, Text, Paragraph } = Typography
 
-// Cấu hình loại cảnh báo theo chuẩn nghiệp vụ Backend
 const ALERT_TYPE_CONFIG = {
   THRESHOLD_EXCEEDED: {
     label: 'Vượt ngưỡng truy cập',
@@ -64,12 +63,10 @@ function SecurityAlertsTab() {
   const [errorMessage, setErrorMessage] = useState('')
   const [selectedAlert, setSelectedAlert] = useState(null)
 
-  // Phân trang
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [totalElements, setTotalElements] = useState(0)
 
-  // Bộ lọc
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [severityFilter, setSeverityFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -117,7 +114,6 @@ function SecurityAlertsTab() {
     fetchAlerts(page, pageSize)
   }, [fetchAlerts, page, pageSize])
 
-  // Cập nhật trạng thái
   const handleUpdateStatus = async (alertId, newStatus) => {
     setUpdatingId(alertId)
     try {
@@ -145,7 +141,6 @@ function SecurityAlertsTab() {
     }
   }
 
-  // Danh sách lọc client
   const filteredAlerts = useMemo(() => {
     return alerts.filter((item) => {
       if (typeFilter !== 'ALL' && item.alertType !== typeFilter) return false
@@ -155,7 +150,6 @@ function SecurityAlertsTab() {
     })
   }, [alerts, typeFilter, severityFilter, statusFilter])
 
-  // Thống kê nhanh
   const stats = useMemo(() => {
     const total = alerts.length
     const unread = alerts.filter((a) => a.status === 'UNREAD').length
@@ -164,14 +158,12 @@ function SecurityAlertsTab() {
     return { total, unread, high, offHours }
   }, [alerts])
 
-  // Định dạng mã cảnh báo chuẩn hệ thống (CB-XXXXXXXX)
   const formatAlertCode = (id) => {
     if (!id) return 'CB-00000000'
     const cleanId = String(id).replace(/-/g, '')
     return `CB-${cleanId.slice(0, 8).toUpperCase()}`
   }
 
-  // Chuyển đổi mô tả nguyên nhân sang tiếng Việt chuẩn nghiệp vụ y tế
   const formatDescriptionVietnamese = (item) => {
     if (!item) return ''
     if (typeof item === 'string') {
@@ -472,7 +464,6 @@ function SecurityAlertsTab() {
 
   return (
     <div className="security-alerts-tab" style={{ padding: '2px 0' }}>
-      {/* Tiêu đề & Giới thiệu tinh gọn */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <WarningOutlined style={{ fontSize: 18, color: '#ef4444' }} />
@@ -485,7 +476,6 @@ function SecurityAlertsTab() {
         </Paragraph>
       </div>
 
-      {/* Thông báo lỗi nếu có */}
       {errorMessage && (
         <Alert
           type="error"
@@ -501,7 +491,6 @@ function SecurityAlertsTab() {
         />
       )}
 
-      {/* Thống kê nhanh: Card phẳng, viền nhẹ, hiện đại */}
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col xs={12} sm={6}>
           <div
@@ -655,7 +644,6 @@ function SecurityAlertsTab() {
         </Col>
       </Row>
 
-      {/* Thanh công cụ lọc & thao tác gọn gàng */}
       <div
         style={{
           marginBottom: 12,
@@ -721,7 +709,6 @@ function SecurityAlertsTab() {
         </Tooltip>
       </div>
 
-      {/* Bảng dữ liệu: Đã tối ưu chiều rộng, KHÔNG bị cuộn ngang */}
       <Card
         size="small"
         bodyStyle={{ padding: 0 }}
@@ -767,7 +754,6 @@ function SecurityAlertsTab() {
         />
       </Card>
 
-      {/* Drawer xem chi tiết cảnh báo */}
       <Drawer
         title={
           <Space align="center" size={10}>

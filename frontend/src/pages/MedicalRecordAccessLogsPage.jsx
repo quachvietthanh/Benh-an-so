@@ -163,7 +163,6 @@ function MedicalRecordAccessLogsPage() {
         setUsers(userList)
       }
     } catch {
-      // Ignored: silent fallback
     } finally {
       setPatientLoading(false)
     }
