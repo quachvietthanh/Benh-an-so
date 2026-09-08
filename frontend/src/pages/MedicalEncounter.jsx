@@ -1335,7 +1335,7 @@ function MedicalEncounter() {
           </Text>
         </div>
         {canEditEncounter && (
-          <Space wrap size="middle">
+          <Space wrap size="middle" className="encounter-header-actions">
             {selectedOrders.length > 0 && (
               <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
                 In phiếu chỉ định

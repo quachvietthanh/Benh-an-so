@@ -792,7 +792,7 @@
 }
 
 .ops-card-actions .anticon {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .ops-dashboard-footnote {
@@ -802,7 +802,7 @@
   justify-content: flex-end;
   gap: 6px;
   color: #8a97a8;
-  font-size: 10.5px;
+  font-size: 12px;
   text-align: right;
 }
 

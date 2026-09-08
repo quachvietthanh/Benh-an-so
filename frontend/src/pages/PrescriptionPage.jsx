@@ -1585,7 +1585,7 @@ function PrescriptionPage() {
               : 'Hồ sơ gắn liền với bệnh án hiện tại, đảm bảo an toàn thông tin điều trị.'}
           </Text>
         </div>
-        <Space wrap size="middle">
+        <Space wrap size="middle" className="prescription-header-actions">
           {editingPrescription && (
             <Button icon={<RollbackOutlined />} onClick={cancelEditMode}>
               Hủy điều chỉnh
@@ -2856,7 +2856,6 @@ function PrescriptionPage() {
               <Tooltip title="Sao chép mã đơn">
                 <Button
                   icon={<CopyOutlined />}
-                  size="large"
                   onClick={() => {
                     if (justIssuedPrescription?.prescriptionCode) {
                       navigator.clipboard.writeText(justIssuedPrescription.prescriptionCode)

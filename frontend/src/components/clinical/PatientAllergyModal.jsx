@@ -506,14 +506,17 @@ export default function PatientAllergyModal({
                     {COMMON_MEDICATION_ALLERGENS.map((common) => (
                       <Tag
                         key={common}
+                        className="allergen-chip"
                         style={{
                           cursor: 'pointer',
-                          padding: '3px 10px',
-                          borderRadius: 12,
+                          padding: '4px 12px',
+                          borderRadius: 16,
                           background: '#f1f5f9',
                           borderColor: '#cbd5e1',
                           color: '#334155',
-                          fontSize: 12,
+                          fontSize: 12.5,
+                          display: 'inline-flex',
+                          alignItems: 'center',
                         }}
                         onClick={() => addForm.setFieldsValue({ allergenName: common })}
                       >
@@ -528,8 +531,8 @@ export default function PatientAllergyModal({
                     onFinish={handleAddAllergy}
                     initialValues={{ severity: 'MODERATE' }}
                   >
-                    <Row gutter={16}>
-                      <Col span={14}>
+                    <Row gutter={[16, 8]}>
+                      <Col xs={24} md={14}>
                         <Form.Item
                           name="allergenName"
                           label="Tên hoạt chất hoặc nhóm thuốc gây dị ứng"
@@ -540,17 +543,16 @@ export default function PatientAllergyModal({
                         >
                           <Input
                             placeholder="Ví dụ: Amoxicillin, Aspirin, Ibuprofen, Paracetamol..."
-                            size="large"
                           />
                         </Form.Item>
                       </Col>
-                      <Col span={10}>
+                      <Col xs={24} md={10}>
                         <Form.Item
                           name="severity"
                           label="Mức độ nghiêm trọng của phản ứng"
                           rules={[{ required: true, message: 'Vui lòng chọn mức độ phản ứng' }]}
                         >
-                          <Select size="large" options={ALLERGY_SEVERITY_OPTIONS} />
+                          <Select options={ALLERGY_SEVERITY_OPTIONS} />
                         </Form.Item>
                       </Col>
                     </Row>
@@ -573,7 +575,7 @@ export default function PatientAllergyModal({
                       />
                     </Form.Item>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
                       <Button onClick={() => setActiveTab('list')}>Hủy</Button>
                       <Button
                         type="primary"

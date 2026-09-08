@@ -152,7 +152,7 @@ export default function PatientAllergyBanner({
                 type="link"
                 icon={<PlusOutlined />}
                 onClick={() => setModalOpen(true)}
-                style={{ fontSize: 11, padding: 0 }}
+                style={{ fontSize: 12, padding: 0 }}
               >
                 Ghi nhận
               </Button>
@@ -224,7 +224,7 @@ export default function PatientAllergyBanner({
                   {activeAllergies.length} hoạt chất / nhóm thuốc
                 </Tag>
               </Space>
-              <Space size={6}>
+              <Space size={6} wrap>
                 {canWrite && (
                   <Button
                     size="small"
