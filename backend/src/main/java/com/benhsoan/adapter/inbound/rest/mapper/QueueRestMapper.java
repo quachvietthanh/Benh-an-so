@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 
 import java.util.UUID;
 
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.queue.CheckInWalkInRequest;
@@ -9,6 +10,7 @@ import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueItemResponse;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.queue.CheckInWalkInCommand;
 import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
 import com.benhsoan.port.dto.command.queue.UpdateQueueItemStatusCommand;
@@ -17,6 +19,13 @@ import com.benhsoan.port.dto.result.QueueItemResult;
 
 @Component
 public class QueueRestMapper {
+
+    private final AnonymizationModeState anonymizationModeState;
+
+    public QueueRestMapper(
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
+    }
 
     public CheckInWalkInCommand toCommand(CheckInWalkInRequest request) {
         return new CheckInWalkInCommand(request.patientId(), request.doctorId(), request.reason(), request.note(),
@@ -32,7 +41,8 @@ public class QueueRestMapper {
     }
 
     public QueueItemResponse toResponse(QueueItemResult result) {
-        return new QueueItemResponse(result.id(), result.medicalQueueId(), result.patientId(), result.patientName(),
+        return new QueueItemResponse(result.id(), result.medicalQueueId(), result.patientId(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName(),
                 result.doctorId(), result.doctorName(), result.roomId(), result.roomNumber(), result.appointmentId(),
                 result.visitId(), result.visitCode(), result.sourceType(), result.status(), result.queueNumber(), result.queueDate(),
                 result.checkedInAt(), result.calledAt(), result.completedAt(), result.cancelledAt(), result.cancelReason(),

@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.auth.LoginRequest;
@@ -8,6 +9,7 @@ import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientLoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientRegistrationResponse;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
@@ -17,6 +19,13 @@ import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
 
 @Component
 public class AuthRestMapper {
+
+    private final AnonymizationModeState anonymizationModeState;
+
+    public AuthRestMapper(
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
+    }
 
     public LoginCommand toCommand(LoginRequest request) {
 
@@ -80,8 +89,8 @@ public class AuthRestMapper {
                 result.userId(),
                 result.patientId(),
                 result.patientCode(),
-                result.phone(),
-                result.fullName(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.phone()) : result.phone(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName(),
                 result.accessToken(),
                 result.refreshToken(),
                 result.tokenType()

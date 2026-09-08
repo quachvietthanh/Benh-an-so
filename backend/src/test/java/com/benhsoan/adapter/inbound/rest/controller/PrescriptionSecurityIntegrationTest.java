@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.exception.GlobalExceptionHandler;
@@ -48,7 +49,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = {PrescriptionController.class, PrescriptionInterconnectionController.class})
-@Import({PrescriptionRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
+@Import({AnonymizationModeState.class, PrescriptionRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
         RequirePermissionAspect.class, PermissionEvaluator.class, PrescriptionSecurityIntegrationTest.AspectTestConfig.class})
 class PrescriptionSecurityIntegrationTest {
 

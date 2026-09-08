@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.billing.AdjustInvoiceRequest;
@@ -19,6 +20,7 @@ import com.benhsoan.adapter.inbound.rest.response.billing.PaymentResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentQuoteResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentServiceFeeQuoteResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.RefundPaymentResponse;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.billing.AdjustInvoiceCommand;
 import com.benhsoan.port.dto.command.billing.AdjustmentInvoiceLineCommand;
 import com.benhsoan.port.dto.command.billing.CreateInvoiceCommand;
@@ -34,6 +36,13 @@ import com.benhsoan.port.dto.result.RefundPaymentResult;
 
 @Component
 public class BillingRestMapper {
+
+    private final AnonymizationModeState anonymizationModeState;
+
+    public BillingRestMapper(
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
+    }
 
     public RecordPaymentCommand toCommand(RecordPaymentRequest request) {
         return RecordPaymentCommand.builder()
@@ -144,7 +153,7 @@ public class BillingRestMapper {
                 result.visitCode(),
                 result.patientId(),
                 result.patientCode(),
-                result.patientName(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName(),
                 result.reason(),
                 result.completedAt()
         );

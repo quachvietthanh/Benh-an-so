@@ -15,6 +15,8 @@ import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotPrintableException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.infrastructure.pdf.PdfRenderingException;
 import com.benhsoan.port.dto.result.PrescriptionPrintResult;
 import com.benhsoan.port.dto.result.PrescriptionPrintDocument;
@@ -44,6 +46,7 @@ public class ExportPrescriptionService implements ExportPrescriptionUseCase {
     private final CurrentUserPort currentUserPort;
     private final AuditLogRepository auditLogRepository;
     private final ClockPort clockPort;
+    private final AnonymizationModeState anonymizationModeState;
 
     @Override
     public PrescriptionPrintResult export(UUID prescriptionId) {
@@ -123,7 +126,8 @@ public class ExportPrescriptionService implements ExportPrescriptionUseCase {
         return new PrescriptionPrintDocument(
                 clinic.getClinicName(), clinic.getAddress(), clinic.getPhone(),
                 prescription.getPrescriptionCode(), context.patientId(), context.patientCode(),
-                context.patientName(), prescription.getPrescribedBy(), context.doctorName(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(context.patientCode()) : context.patientName(),
+                prescription.getPrescribedBy(), context.doctorName(),
                 prescription.getPrescribedAt(), prescription.getItems().stream()
                         .map(item -> new PrescriptionPrintDocument.Item(
                                 item.getMedicineName(), item.getStrength(), item.getUnit(),

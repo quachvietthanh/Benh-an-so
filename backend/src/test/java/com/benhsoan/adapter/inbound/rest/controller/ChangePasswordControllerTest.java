@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.AuthRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.auth.exception.InvalidOldPasswordException;
 import com.benhsoan.domain.auth.exception.WeakPasswordException;
 import com.benhsoan.exception.GlobalExceptionHandler;
@@ -40,7 +41,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({
+@Import({AnonymizationModeState.class, 
         AuthRestMapper.class,
         GlobalExceptionHandler.class
 })

@@ -26,6 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PatientRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException;
@@ -51,7 +52,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = PatientController.class)
-@Import({
+@Import({AnonymizationModeState.class, 
         PatientRestMapper.class,
         GlobalExceptionHandler.class,
         SecurityConfig.class,

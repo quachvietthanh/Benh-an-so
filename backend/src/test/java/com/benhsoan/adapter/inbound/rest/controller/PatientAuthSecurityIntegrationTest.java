@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.AuthRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
 import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
@@ -41,7 +42,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = AuthController.class)
-@Import({
+@Import({AnonymizationModeState.class, 
         AuthRestMapper.class,
         GlobalExceptionHandler.class,
         SecurityConfig.class,
