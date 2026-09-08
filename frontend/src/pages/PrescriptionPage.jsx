@@ -53,6 +53,7 @@ import {
   SwapOutlined,
   SyncOutlined,
   WarningOutlined,
+  FireOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
@@ -60,15 +61,18 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import pharmacyApi from '../api/pharmacyApi'
 import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
+import patientAllergyApi from '../api/patientAllergyApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
+import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import { useAuthContext } from '../context/AuthContext'
 
 import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
 import { fixMojibake, getQueueInProgressBlockReason, unwrapCollection } from '../utils/workflowContract'
 import { formatRecordCode, formatVisitCode } from '../utils/helpers'
+import { checkPrescriptionAllergyConflict } from '../utils/allergyConstants'
 import {
   canSubmitPrescription,
   areAllInteractionsHandled,
@@ -162,6 +166,7 @@ function PrescriptionPage() {
   const [finalizing, setFinalizing] = useState(false)
   const [loadError, setLoadError] = useState(null)
   const [activeTab, setActiveTab] = useState('prescribe')
+  const [patientAllergies, setPatientAllergies] = useState([])
 
   const [detectedInteractions, setDetectedInteractions] = useState([])
   const [checkingInteractions, setCheckingInteractions] = useState(false)
@@ -249,6 +254,19 @@ function PrescriptionPage() {
     [canPrescribe, saving, checkingInteractions, interactionApiError, detectedInteractions, confirmedOverrides, stockValidationStatus],
   )
   const canSubmit = submitStatus.allowed
+
+  const detectedAllergyConflicts = useMemo(() => {
+    if (!patientAllergies || !patientAllergies.length || !items || !items.length) return []
+    return items
+      .map((it, idx) => {
+        if (!it.medicineId) return null
+        const med = medicines.find((m) => String(m.id) === String(it.medicineId))
+        if (!med) return null
+        const check = checkPrescriptionAllergyConflict(med, patientAllergies)
+        return check.hasConflict ? { ...check, itemIndex: idx, medicine: med } : null
+      })
+      .filter(Boolean)
+  }, [items, medicines, patientAllergies])
 
   const diagnosisSummary = useMemo(() => {
     const primary = diagnoses.find((diagnosis) => diagnosis.diagnosisType === 'PRIMARY') || diagnoses[0]
@@ -431,12 +449,14 @@ function PrescriptionPage() {
       })
       setMedicines(normalizedMeds)
 
+      let loadedEncounterPatientId = null
       const effectiveVisitId = recordData?.visitId || routeState.visitId || routeState.encounter?.visit?.id
       if (effectiveVisitId) {
         try {
           const encounterResponse = await visitApi.getEncounter(effectiveVisitId)
           if (encounterResponse?.data) {
             setEncounter(encounterResponse.data)
+            loadedEncounterPatientId = encounterResponse.data.patient?.id
           }
         } catch {
           if (routeState.encounter) {
@@ -459,6 +479,20 @@ function PrescriptionPage() {
         }
       } else if (routeState.encounter) {
         setEncounter(routeState.encounter)
+      }
+
+      const effectivePatientId =
+        loadedEncounterPatientId ||
+        recordData?.patientId ||
+        routeState.patient?.id ||
+        routeState.encounter?.patient?.id
+      if (effectivePatientId) {
+        try {
+          const allergyRes = await patientAllergyApi.getAllergies(effectivePatientId)
+          setPatientAllergies(unwrapCollection(allergyRes.data))
+        } catch (allErr) {
+          console.warn('Lỗi nạp tiền sử dị ứng bệnh nhân:', allErr)
+        }
       }
     } catch (error) {
       const apiError = error.apiError || normalizeApiError(error, 'Không thể tải ngữ cảnh kê đơn.')
@@ -865,6 +899,41 @@ function PrescriptionPage() {
 
       if (!checkStatus.allowed) {
         message.error(checkStatus.reason)
+        return
+      }
+
+      if (detectedAllergyConflicts.length > 0) {
+        Modal.confirm({
+          title: 'CẢNH BÁO NGUY CƠ DỊ ỨNG THUỐC / SỐC PHẢN VỆ',
+          icon: <FireOutlined style={{ color: '#ef4444', fontSize: 22 }} />,
+          width: 580,
+          content: (
+            <div style={{ marginTop: 8 }}>
+              <Paragraph type="danger" strong style={{ fontSize: 14 }}>
+                Phát hiện {detectedAllergyConflicts.length} loại thuốc trong đơn trùng với tiền sử dị ứng đã ghi nhận của bệnh nhân:
+              </Paragraph>
+              <ul style={{ paddingLeft: 20, marginBottom: 12 }}>
+                {detectedAllergyConflicts.map((c, i) => (
+                  <li key={i} style={{ marginBottom: 6 }}>
+                    <Text strong>{c.medicine?.medicineName || c.medicine?.name}:</Text> Dị ứng với{' '}
+                    <Tag color={c.severityMeta?.color}>{c.matchedAllergy?.allergenName}</Tag> - Mức độ:{' '}
+                    <Text type="danger" strong>{c.severityMeta?.label}</Text>
+                    {c.matchedAllergy?.reaction ? ` (${c.matchedAllergy.reaction})` : ''}
+                  </li>
+                ))}
+              </ul>
+              <Paragraph style={{ color: '#475569', fontSize: 13 }}>
+                Kê thuốc bệnh nhân đã có tiền sử dị ứng có thể dẫn đến phản vệ nguy hiểm tính mạng. Bác sĩ có chắc chắn đã kiểm tra kỹ và muốn tiếp tục lưu đơn thuốc này?
+              </Paragraph>
+            </div>
+          ),
+          okText: 'Xác nhận tiếp tục kê',
+          okType: 'danger',
+          cancelText: 'Hủy để đổi thuốc khác',
+          onOk: async () => {
+            await executeSavePrescription(confirmedOverrides)
+          },
+        })
         return
       }
 
@@ -1705,6 +1774,17 @@ function PrescriptionPage() {
         </Descriptions>
       </Card>
 
+      {/* Banner tiền sử dị ứng thuốc - Hiển thị nổi bật ở đầu bệnh án của mọi lượt khám */}
+      <PatientAllergyBanner
+        patientId={encounter?.patient?.id || record?.patientId || routeState.patient?.id || routeState.encounter?.patient?.id}
+        patientName={encounter?.patient?.fullName || record?.patientName || routeState.patient?.fullName || routeState.encounter?.patient?.fullName}
+        visitId={targetVisitId}
+        allergies={patientAllergies}
+        onAllergiesChange={setPatientAllergies}
+        currentUser={currentUser}
+        compact={false}
+      />
+
       {prescriptionBlockReason && (
         <Alert
           type={encounter?.queueItem?.status === 'WAITING_FOR_RESULT' ? 'warning' : 'error'}
@@ -1851,6 +1931,35 @@ function PrescriptionPage() {
                     </div>
                   }
                 >
+                  {detectedAllergyConflicts.length > 0 && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      icon={<FireOutlined style={{ fontSize: 20, color: '#dc2626' }} />}
+                      message={
+                        <Text strong style={{ fontSize: 15, color: '#991b1b' }}>
+                          CẢNH BÁO NGUY CƠ PHẢN VỆ: PHÁT HIỆN {detectedAllergyConflicts.length} THUỐC TRÙNG TIỀN SỬ DỊ ỨNG!
+                        </Text>
+                      }
+                      description={
+                        <div style={{ marginTop: 6 }}>
+                          <div>Đơn thuốc đang kê có chứa hoạt chất/nhóm thuốc mà bệnh nhân có tiền sử dị ứng đã ghi nhận trong hồ sơ:</div>
+                          <ul style={{ margin: '8px 0 0 18px', padding: 0 }}>
+                            {detectedAllergyConflicts.map((c, idx) => (
+                              <li key={idx} style={{ marginBottom: 4 }}>
+                                <Text strong>{c.medicine?.medicineName || c.medicine?.name}:</Text> Dị ứng với <Tag color={c.severityMeta?.color}>{c.matchedAllergy?.allergenName}</Tag> - Mức độ: <Text type="danger" strong>{c.severityMeta?.label}</Text> {c.matchedAllergy?.reaction ? `(${c.matchedAllergy.reaction})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                          <div style={{ marginTop: 6, fontWeight: 600, color: '#b91c1c' }}>
+                            Khuyến cáo: Thay thế bằng nhóm thuốc an toàn khác để ngăn ngừa sốc phản vệ đe dọa tính mạng người bệnh.
+                          </div>
+                        </div>
+                      }
+                      style={{ marginBottom: 16, border: '2px solid #ef4444', backgroundColor: '#fef2f2', borderRadius: 8 }}
+                    />
+                  )}
+
                   {items.map((item, index) => {
                     const selectedMed = selectedMedicineMap.get(String(item.medicineId))
                     const unit = selectedMed?.unit || 'viên'
@@ -1922,6 +2031,28 @@ function PrescriptionPage() {
                               </Tag>
                             )}
 
+                            {(() => {
+                              const itemAllergyConflict = detectedAllergyConflicts.find((c) => c.itemIndex === index)
+                              if (!itemAllergyConflict) return null
+                              return (
+                                <Tag
+                                  color={itemAllergyConflict.isLifeThreatening ? '#b91c1c' : 'red'}
+                                  icon={<FireOutlined />}
+                                  style={{
+                                    fontWeight: 700,
+                                    fontSize: 12,
+                                    padding: '2px 8px',
+                                    borderRadius: 12,
+                                    margin: 0,
+                                    backgroundColor: itemAllergyConflict.isLifeThreatening ? '#fef2f2' : undefined,
+                                    borderColor: itemAllergyConflict.isLifeThreatening ? '#ef4444' : undefined,
+                                  }}
+                                >
+                                  {itemAllergyConflict.isLifeThreatening ? '🚨 NGUY CƠ SỐC PHẢN VỆ' : 'CẢNH BÁO DỊ ỨNG'}: {itemAllergyConflict.matchedAllergy?.allergenName} ({itemAllergyConflict.severityMeta?.label})
+                                </Tag>
+                              )
+                            })()}
+
                             {selectedMed && (() => {
                               const avail = getAvailableStock(selectedMed)
                               if (avail <= 0) {
@@ -1987,12 +2118,16 @@ function PrescriptionPage() {
                                 options={sortedMedicines.map((medicine) => {
                                   const availStock = getAvailableStock(medicine)
                                   const isOut = availStock <= 0
+                                  const medConflict = checkPrescriptionAllergyConflict(medicine, patientAllergies)
+                                  const allergyPrefix = medConflict.hasConflict
+                                    ? `[⚠️ DỊ ỨNG${medConflict.isLifeThreatening ? ' - SỐC PHẢN VỆ' : ''}] `
+                                    : ''
                                   return {
                                     value: medicine.id,
                                     disabled: isOut,
                                     label: isOut
-                                      ? `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Hết hàng`
-                                      : `${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
+                                      ? `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Hết hàng`
+                                      : `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
                                   }
                                 })}
                                 placeholder="Tìm kiếm thuốc theo tên hoặc hoạt chất..."
@@ -2052,6 +2187,39 @@ function PrescriptionPage() {
                             })()}
                           </div>
                         )}
+
+                        {(() => {
+                          const itemAllergyConflict = detectedAllergyConflicts.find((c) => c.itemIndex === index)
+                          if (!itemAllergyConflict) return null
+                          return (
+                            <Alert
+                              type="error"
+                              showIcon
+                              icon={<FireOutlined style={{ fontSize: 18, color: '#dc2626' }} />}
+                              message={
+                                <Text strong style={{ color: itemAllergyConflict.isLifeThreatening ? '#7f1d1d' : '#991b1b', fontSize: 13 }}>
+                                  {itemAllergyConflict.isLifeThreatening ? '🚨 CẢNH BÁO SỐC PHẢN VỆ / ĐE DỌA TÍNH MẠNG' : 'CẢNH BÁO DỊ ỨNG THUỐC ĐÃ BIẾT'}
+                                </Text>
+                              }
+                              description={
+                                <div style={{ fontSize: 12 }}>
+                                  <div>{itemAllergyConflict.warningMessage}</div>
+                                  {itemAllergyConflict.matchedAllergy?.notes && (
+                                    <div style={{ marginTop: 2, color: '#4b5563' }}>
+                                      <strong>Ghi chú tiền sử:</strong> {itemAllergyConflict.matchedAllergy.notes}
+                                    </div>
+                                  )}
+                                </div>
+                              }
+                              style={{
+                                marginBottom: 12,
+                                borderRadius: 6,
+                                border: '1.5px solid #ef4444',
+                                backgroundColor: '#fef2f2',
+                              }}
+                            />
+                          )
+                        })()}
 
                         {/* Hàng 2: Liều dùng, Tần suất, Số ngày & Tổng số lượng (cân đối 4 cột) */}
                         <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
