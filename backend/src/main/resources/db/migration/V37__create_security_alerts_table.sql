@@ -16,7 +16,10 @@ CREATE TABLE security_alerts (
     created_at DATETIME(6) NOT NULL,
 
     CONSTRAINT pk_security_alerts PRIMARY KEY (id),
-    CONSTRAINT uq_security_alerts_user_type_window UNIQUE (user_id, alert_type, window_start)
+    CONSTRAINT uq_security_alerts_user_type_window UNIQUE (user_id, alert_type, window_start),
+    CONSTRAINT fk_security_alerts_user
+        FOREIGN KEY (user_id)
+        REFERENCES users (id)
 );
 
 CREATE INDEX idx_security_alerts_user_created

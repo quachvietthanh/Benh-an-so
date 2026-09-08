@@ -109,11 +109,12 @@ public class SecurityAlert {
         );
     }
 
-    public void updateDetection(int accessCount, String description) {
+    public void updateDetection(int accessCount, String description, Instant windowEnd) {
         if (accessCount < 0) {
             throw new ValidationException("Access count cannot be negative.");
         }
         this.accessCount = accessCount;
         this.description = Guard.require(description, "Description");
+        this.windowEnd = Guard.require(windowEnd, "Window end");
     }
 }

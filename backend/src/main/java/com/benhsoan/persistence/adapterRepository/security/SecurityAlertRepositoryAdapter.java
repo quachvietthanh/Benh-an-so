@@ -34,12 +34,13 @@ public class SecurityAlertRepositoryAdapter implements SecurityAlertRepository {
     }
 
     @Override
-    public Optional<SecurityAlert> findByUserIdAndAlertTypeAndWindowStart(
+    public Optional<SecurityAlert> findLatestActiveAlert(
             UUID userId,
             AlertType alertType,
-            Instant windowStart
+            Instant createdAfter
     ) {
-        return jpaRepository.findByUserIdAndAlertTypeAndWindowStart(userId, alertType, windowStart)
+        return jpaRepository.findTopByUserIdAndAlertTypeAndCreatedAtAfterOrderByCreatedAtDesc(
+                        userId, alertType, createdAfter)
                 .map(mapper::toDomain);
     }
 }

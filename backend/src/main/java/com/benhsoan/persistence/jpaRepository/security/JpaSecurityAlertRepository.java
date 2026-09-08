@@ -11,9 +11,9 @@ import com.benhsoan.persistence.entity.security.SecurityAlertEntity;
 
 public interface JpaSecurityAlertRepository extends JpaRepository<SecurityAlertEntity, UUID> {
 
-    Optional<SecurityAlertEntity> findByUserIdAndAlertTypeAndWindowStart(
+    Optional<SecurityAlertEntity> findTopByUserIdAndAlertTypeAndCreatedAtAfterOrderByCreatedAtDesc(
             UUID userId,
             AlertType alertType,
-            Instant windowStart
+            Instant createdAfter
     );
 }

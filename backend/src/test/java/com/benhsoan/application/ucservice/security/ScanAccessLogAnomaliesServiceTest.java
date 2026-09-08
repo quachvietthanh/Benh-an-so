@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -132,7 +133,7 @@ class ScanAccessLogAnomaliesServiceTest {
 
         verify(securityAlertRepository, never()).save(any());
         verify(securityAlertRepository, never())
-                .findByUserIdAndAlertTypeAndWindowStart(any(), any(), any());
+                .findLatestActiveAlert(any(), any(), any());
     }
 
     @Test
@@ -146,36 +147,48 @@ class ScanAccessLogAnomaliesServiceTest {
     }
 
     @Test
-    void updatesExistingAlertInSameDetectionWindow() {
+    void secondScanUpdatesExistingAlertInsteadOfCreatingDuplicate() {
         UUID user = UUID.randomUUID();
-        Instant now = Instant.parse("2026-08-11T10:05:00Z");
-        when(clockPort.now()).thenReturn(now);
+        Instant t1 = Instant.parse("2026-08-11T10:05:00Z"); // 17:05 local, within working hours
+        Instant t2 = t1.plus(5, ChronoUnit.MINUTES);
 
-        List<MedicalRecordAccessLog> views = new ArrayList<>();
-        for (int i = 0; i < 21; i++) {
-            views.add(view(user, now.plusSeconds(i)));
-        }
-        when(accessLogRepository.findViewsBetween(any(), any())).thenReturn(views);
+        when(clockPort.now()).thenReturn(t1, t2);
+        when(accessLogRepository.findViewsBetween(any(), any()))
+                .thenReturn(views(user, 21, t1), views(user, 21, t2));
 
-        Instant windowStart = now.minus(1, ChronoUnit.HOURS);
-        SecurityAlert existing = SecurityAlert.create(
-                user,
-                AlertType.THRESHOLD_EXCEEDED,
-                AlertSeverity.HIGH,
-                "old description",
-                1,
-                windowStart,
-                now,
-                now);
-        when(securityAlertRepository.findByUserIdAndAlertTypeAndWindowStart(any(), any(), any()))
-                .thenReturn(Optional.of(existing));
+        AtomicReference<SecurityAlert> persisted = new AtomicReference<>();
+        when(securityAlertRepository.save(any(SecurityAlert.class)))
+                .thenAnswer(invocation -> {
+                    SecurityAlert alert = invocation.getArgument(0);
+                    persisted.set(alert);
+                    return alert;
+                });
+        when(securityAlertRepository.findLatestActiveAlert(any(), any(), any()))
+                .thenAnswer(invocation -> Optional.ofNullable(persisted.get()));
 
+        // First cycle: no recent alert of the same type -> insert a new alert.
+        service.scan();
+        SecurityAlert first = persisted.get();
+        assertEquals(AlertSeverity.HIGH, first.getSeverity());
+        assertEquals(21, first.getAccessCount());
+
+        // Second cycle (t2 = t1 + 5 min): cooldown query returns the existing alert -> update it.
         service.scan();
 
-        ArgumentCaptor<SecurityAlert> captor = ArgumentCaptor.forClass(SecurityAlert.class);
-        verify(securityAlertRepository, times(1)).save(captor.capture());
-        assertEquals(21, captor.getValue().getAccessCount());
-        assertTrue(captor.getValue().getDescription().contains("21"));
+        verify(securityAlertRepository, times(2)).save(any(SecurityAlert.class));
+        SecurityAlert updated = persisted.get();
+        assertEquals(first.getId(), updated.getId());
+        assertEquals(t2, updated.getWindowEnd());
+        assertEquals(21, updated.getAccessCount());
+        assertTrue(updated.getDescription().contains("21"));
+    }
+
+    private List<MedicalRecordAccessLog> views(UUID userId, int count, Instant around) {
+        List<MedicalRecordAccessLog> result = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            result.add(view(userId, around.minusSeconds(i)));
+        }
+        return result;
     }
 
     private MedicalRecordAccessLog view(UUID userId, Instant accessedAt) {

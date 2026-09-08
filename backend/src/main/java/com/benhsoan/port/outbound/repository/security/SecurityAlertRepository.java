@@ -16,9 +16,9 @@ public interface SecurityAlertRepository {
 
     Page<SecurityAlert> findAll(Pageable pageable);
 
-    Optional<SecurityAlert> findByUserIdAndAlertTypeAndWindowStart(
+    Optional<SecurityAlert> findLatestActiveAlert(
             UUID userId,
             AlertType alertType,
-            Instant windowStart
+            Instant createdAfter
     );
 }

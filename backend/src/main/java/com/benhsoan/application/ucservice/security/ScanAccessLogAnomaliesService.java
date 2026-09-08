@@ -59,7 +59,7 @@ public class ScanAccessLogAnomaliesService implements ScanAccessLogAnomaliesUseC
         if (count <= properties.maxViewsPerHour()) {
             return;
         }
-        saveOrUpdate(SecurityAlert.create(
+        processAlert(SecurityAlert.create(
                 userId,
                 AlertType.THRESHOLD_EXCEEDED,
                 AlertSeverity.HIGH,
@@ -79,7 +79,7 @@ public class ScanAccessLogAnomaliesService implements ScanAccessLogAnomaliesUseC
         if (offHoursViews.isEmpty()) {
             return;
         }
-        saveOrUpdate(SecurityAlert.create(
+        processAlert(SecurityAlert.create(
                 userId,
                 AlertType.OFF_HOURS_ACCESS,
                 AlertSeverity.LOW,
@@ -97,12 +97,16 @@ public class ScanAccessLogAnomaliesService implements ScanAccessLogAnomaliesUseC
                 || !time.isBefore(properties.workingHoursEnd());
     }
 
-    private void saveOrUpdate(SecurityAlert candidate) {
-        securityAlertRepository.findByUserIdAndAlertTypeAndWindowStart(
-                candidate.getUserId(), candidate.getAlertType(), candidate.getWindowStart())
+    private void processAlert(SecurityAlert candidate) {
+        Instant createdAfter = candidate.getCreatedAt().minus(1, ChronoUnit.HOURS);
+        securityAlertRepository.findLatestActiveAlert(
+                candidate.getUserId(), candidate.getAlertType(), createdAfter)
                 .ifPresentOrElse(
                         existing -> {
-                            existing.updateDetection(candidate.getAccessCount(), candidate.getDescription());
+                            existing.updateDetection(
+                                    candidate.getAccessCount(),
+                                    candidate.getDescription(),
+                                    candidate.getWindowEnd());
                             securityAlertRepository.save(existing);
                         },
                         () -> securityAlertRepository.save(candidate));
