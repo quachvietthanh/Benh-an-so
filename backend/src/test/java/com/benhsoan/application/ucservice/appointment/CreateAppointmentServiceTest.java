@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.appointment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,11 +12,13 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.exception.AppointmentTimeConflictException;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.port.dto.command.appointment.CreateAppointmentCommand;
@@ -32,6 +35,37 @@ class CreateAppointmentServiceTest {
     private static final Instant APPOINTMENT_START = Instant.parse("2099-08-10T09:00:00Z");
     private static final Instant APPOINTMENT_END = Instant.parse("2099-08-10T09:30:00Z");
 
+    private PatientRepository patientRepository;
+    private UserRepository userRepository;
+    private AppointmentRepository appointmentRepository;
+    private AppointmentCodeGenerator appointmentCodeGenerator;
+    private CurrentUserPort currentUserPort;
+    private AuditLogRepository auditLogRepository;
+    private DoctorScheduleResolutionService doctorScheduleResolutionService;
+    private CreateAppointmentService service;
+
+    @BeforeEach
+    void setUp() {
+        patientRepository = mock(PatientRepository.class);
+        userRepository = mock(UserRepository.class);
+        appointmentRepository = mock(AppointmentRepository.class);
+        appointmentCodeGenerator = mock(AppointmentCodeGenerator.class);
+        currentUserPort = mock(CurrentUserPort.class);
+        auditLogRepository = mock(AuditLogRepository.class);
+        doctorScheduleResolutionService = mock(DoctorScheduleResolutionService.class);
+
+        service = new CreateAppointmentService(
+                appointmentRepository,
+                patientRepository,
+                userRepository,
+                appointmentCodeGenerator,
+                currentUserPort,
+                new AppointmentResultMapper(),
+                auditLogRepository,
+                doctorScheduleResolutionService
+        );
+    }
+
     @Test
     void createsAppointmentAndWritesAuditLog() {
         UUID patientId = UUID.randomUUID();
@@ -39,21 +73,6 @@ class CreateAppointmentServiceTest {
         UUID actorId = UUID.randomUUID();
         Instant startTime = APPOINTMENT_START;
         Instant endTime = APPOINTMENT_END;
-        PatientRepository patientRepository = mock(PatientRepository.class);
-        UserRepository userRepository = mock(UserRepository.class);
-        AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
-        AppointmentCodeGenerator appointmentCodeGenerator = mock(AppointmentCodeGenerator.class);
-        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
-        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
-        CreateAppointmentService service = new CreateAppointmentService(
-                appointmentRepository,
-                patientRepository,
-                userRepository,
-                appointmentCodeGenerator,
-                currentUserPort,
-                new AppointmentResultMapper(),
-                auditLogRepository
-        );
 
         Patient patient = mock(Patient.class);
         User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com", "0900000001",
@@ -75,6 +94,7 @@ class CreateAppointmentServiceTest {
         assertEquals(patientId, result.patientId());
         assertEquals(doctorId, result.doctorId());
         assertEquals("Tai kham tong quat", result.reason());
+        verify(doctorScheduleResolutionService).validateDoctorWorkingAndAvailable(doctorId, startTime, endTime);
         verify(appointmentRepository).save(any(Appointment.class));
         verify(auditLogRepository).save(any());
     }
@@ -85,21 +105,6 @@ class CreateAppointmentServiceTest {
         UUID doctorId = UUID.randomUUID();
         Instant startTime = APPOINTMENT_START;
         Instant endTime = APPOINTMENT_END;
-        PatientRepository patientRepository = mock(PatientRepository.class);
-        UserRepository userRepository = mock(UserRepository.class);
-        AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
-        AppointmentCodeGenerator appointmentCodeGenerator = mock(AppointmentCodeGenerator.class);
-        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
-        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
-        CreateAppointmentService service = new CreateAppointmentService(
-                appointmentRepository,
-                patientRepository,
-                userRepository,
-                appointmentCodeGenerator,
-                currentUserPort,
-                new AppointmentResultMapper(),
-                auditLogRepository
-        );
 
         Patient patient = mock(Patient.class);
         User inactiveDoctor = User.restore(doctorId, "doctor2", "hash", "Doctor Two", "doctor2@example.com",
@@ -118,21 +123,6 @@ class CreateAppointmentServiceTest {
         UUID doctorId = UUID.randomUUID();
         Instant startTime = APPOINTMENT_START;
         Instant endTime = APPOINTMENT_END;
-        PatientRepository patientRepository = mock(PatientRepository.class);
-        UserRepository userRepository = mock(UserRepository.class);
-        AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
-        AppointmentCodeGenerator appointmentCodeGenerator = mock(AppointmentCodeGenerator.class);
-        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
-        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
-        CreateAppointmentService service = new CreateAppointmentService(
-                appointmentRepository,
-                patientRepository,
-                userRepository,
-                appointmentCodeGenerator,
-                currentUserPort,
-                new AppointmentResultMapper(),
-                auditLogRepository
-        );
 
         Patient patient = mock(Patient.class);
         User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com", "0900000001",
@@ -145,5 +135,28 @@ class CreateAppointmentServiceTest {
         assertThrows(AppointmentTimeConflictException.class, () -> service.create(new CreateAppointmentCommand(
                 patientId, doctorId, startTime, endTime, "Tai kham tong quat"
         )));
+    }
+
+    @Test
+    void rejectsWhenDoctorNotWorkingOrOnTimeOff() {
+        // NCL-03-CN-006 TC-02: receptionist booking during doctor time off / outside working hours
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        Instant startTime = APPOINTMENT_START;
+        Instant endTime = APPOINTMENT_END;
+
+        Patient patient = mock(Patient.class);
+        User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com", "0900000001",
+                UUID.randomUUID(), true, null, Instant.parse("2026-08-01T00:00:00Z"));
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+
+        doThrow(new DoctorNotWorkingException("Bác sĩ không làm việc trong khung giờ này."))
+                .when(doctorScheduleResolutionService).validateDoctorWorkingAndAvailable(doctorId, startTime, endTime);
+
+        DoctorNotWorkingException ex = assertThrows(DoctorNotWorkingException.class,
+                () -> service.create(new CreateAppointmentCommand(patientId, doctorId, startTime, endTime, "Dat lich")));
+        assertEquals("Bác sĩ không làm việc trong khung giờ này.", ex.getMessage());
     }
 }

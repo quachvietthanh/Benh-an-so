@@ -15,15 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
 import com.benhsoan.domain.appointment.Appointment;
-import com.benhsoan.domain.appointment.DoctorSchedule;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.appointment.exception.AppointmentInvalidStatusException;
 import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
 import com.benhsoan.domain.appointment.exception.AppointmentPastCutoffException;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
 import com.benhsoan.domain.appointment.exception.DoctorNotFoundException;
-import com.benhsoan.domain.appointment.exception.DoctorScheduleNotFoundException;
-import com.benhsoan.domain.appointment.exception.DoctorUnavailableException;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
 import com.benhsoan.domain.appointment.exception.SlotAlreadyBookedException;
 import com.benhsoan.domain.auditlog.AuditLog;
@@ -35,7 +33,6 @@ import com.benhsoan.port.dto.command.appointment.PatientRescheduleAppointmentCom
 import com.benhsoan.port.dto.result.appointment.PatientAppointmentResult;
 import com.benhsoan.port.inbound.appointment.PatientRescheduleAppointmentUseCase;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.appointment.DoctorScheduleRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -66,7 +63,7 @@ public class PatientRescheduleAppointmentService implements PatientRescheduleApp
 
     private final AppointmentRepository appointmentRepository;
 
-    private final DoctorScheduleRepository doctorScheduleRepository;
+    private final DoctorScheduleResolutionService doctorScheduleResolutionService;
 
     private final UserRepository userRepository;
 
@@ -134,18 +131,11 @@ public class PatientRescheduleAppointmentService implements PatientRescheduleApp
             throw new DoctorInactiveException(doctor.getId());
         }
 
-        DoctorSchedule schedule = doctorScheduleRepository
-                .findByDoctorIdAndScheduleDateForUpdate(doctorId, command.newAppointmentDate())
-                .orElseThrow(() -> new DoctorScheduleNotFoundException(doctorId, command.newAppointmentDate()));
-        if (!schedule.isActive()) {
-            throw new DoctorUnavailableException(doctorId, command.newAppointmentDate());
-        }
-
-        LocalTime slotEndTime = command.newStartTime().plus(SLOT_DURATION);
-        if (command.newStartTime().isBefore(schedule.getStartTime())
-                || slotEndTime.isAfter(schedule.getEndTime())) {
-            throw new InvalidAppointmentTimeException("Khung giờ đặt lịch nằm ngoài giờ làm việc của bác sĩ.");
-        }
+        doctorScheduleResolutionService.validateDoctorWorkingAndAvailable(
+                doctorId,
+                newStartTime,
+                newEndTime
+        );
 
         boolean conflict = appointmentRepository.findActiveAppointmentsForDoctorBetween(
                         doctorId,

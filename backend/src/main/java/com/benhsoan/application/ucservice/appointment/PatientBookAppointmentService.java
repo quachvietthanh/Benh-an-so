@@ -15,11 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.appointment.Appointment;
-import com.benhsoan.domain.appointment.DoctorSchedule;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
 import com.benhsoan.domain.appointment.exception.DoctorNotFoundException;
-import com.benhsoan.domain.appointment.exception.DoctorScheduleNotFoundException;
-import com.benhsoan.domain.appointment.exception.DoctorUnavailableException;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
 import com.benhsoan.domain.appointment.exception.InvalidDoctorRoleException;
 import com.benhsoan.domain.appointment.exception.SlotAlreadyBookedException;
@@ -35,7 +33,6 @@ import com.benhsoan.port.dto.result.appointment.PatientAppointmentResult;
 import com.benhsoan.port.inbound.appointment.PatientBookAppointmentUseCase;
 import com.benhsoan.port.outbound.generator.AppointmentCodeGenerator;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.appointment.DoctorScheduleRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -69,7 +66,7 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
 
     private final AppointmentCodeGenerator appointmentCodeGenerator;
 
-    private final DoctorScheduleRepository doctorScheduleRepository;
+    private final DoctorScheduleResolutionService doctorScheduleResolutionService;
 
     private final PatientRepository patientRepository;
 
@@ -120,18 +117,11 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
         }
         requireDoctorRole(doctor);
 
-        DoctorSchedule schedule = doctorScheduleRepository
-                .findByDoctorIdAndScheduleDateForUpdate(command.doctorId(), command.appointmentDate())
-                .orElseThrow(() -> new DoctorScheduleNotFoundException(command.doctorId(), command.appointmentDate()));
-        if (!schedule.isActive()) {
-            throw new DoctorUnavailableException(command.doctorId(), command.appointmentDate());
-        }
-
-        LocalTime slotEndTime = command.startTime().plus(SLOT_DURATION);
-        if (command.startTime().isBefore(schedule.getStartTime())
-                || slotEndTime.isAfter(schedule.getEndTime())) {
-            throw new InvalidAppointmentTimeException("Khung giờ đặt lịch nằm ngoài giờ làm việc của bác sĩ.");
-        }
+        doctorScheduleResolutionService.validateDoctorWorkingAndAvailable(
+                command.doctorId(),
+                startTime,
+                endTime
+        );
 
         if (!appointmentRepository.findActiveAppointmentsForDoctorBetween(
                         command.doctorId(),

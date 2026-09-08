@@ -63,6 +63,14 @@
 | `/api/v1/appointments/{id}` | DELETE | ✅ | ❌ | ✅ | ❌ |
 | `/api/v1/appointments/me` | GET | ❌ | ✅ | ✅ | ❌ |
 |  |  |  |  |  |  |
+| **Doctor Schedule & Time-Off** |  |  |  |  |  |
+| `/api/v1/doctor-schedules/weekly` | PUT | ✅ (MANAGER ✅) | ❌ | ❌ | ❌ |
+| `/api/v1/doctor-schedules/weekly` | GET | ✅ (MANAGER ✅) | ✅ | ✅ | ❌ |
+| `/api/v1/doctor-time-offs` | POST | ✅ (MANAGER ✅) | ❌ | ❌ | ❌ |
+| `/api/v1/doctor-time-offs` | GET | ✅ (MANAGER ✅) | ✅ | ✅ | ❌ |
+| `/api/v1/doctor-time-offs/{id}` | DELETE | ✅ (MANAGER ✅) | ❌ | ❌ | ❌ |
+| `/api/v1/doctor-time-offs/{id}/affected-appointments` | GET | ✅ (MANAGER ✅) | ✅ | ✅ | ❌ |
+|  |  |  |  |  |  |
 | **Vital Signs** |  |  |  |  |  |
 | `/api/v1/vital-signs` | GET | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/vital-signs` | POST | ✅ | ✅ | ❌ | ❌ |
@@ -148,6 +156,8 @@ PHARMACIST (Dược sĩ)
 | Medical Record | `RECORD_` | Quản lý hồ sơ bệnh án |
 | Prescription | `PRESCRIPTION_` | Quản lý đơn thuốc |
 | Appointment | `APPOINTMENT_` | Quản lý lịch hẹn |
+| Doctor Schedule | `DOCTOR_SCHEDULE_` | Quản lý lịch làm việc định kỳ của bác sĩ |
+| Doctor Time-Off | `DOCTOR_TIME_OFF_` | Quản lý thời gian nghỉ / phép của bác sĩ |
 | Vital Signs | `VITAL_SIGN_` | Quản lý dấu hiệu sinh tồn |
 | Diagnosis | `DIAGNOSIS_` | Quản lý chẩn đoán |
 | Pharmacy | `PHARMACY_` | Quản lý nhà thuốc |
@@ -175,6 +185,10 @@ PRESCRIPTION_INTERCONNECTION_SEND, PRESCRIPTION_INTERCONNECTION_READ, PRESCRIPTI
 
 // Appointment
 APPOINTMENT_CREATE, APPOINTMENT_READ, APPOINTMENT_UPDATE, APPOINTMENT_DELETE
+
+// Doctor Schedule & Time-Off
+DOCTOR_SCHEDULE_UPDATE, DOCTOR_SCHEDULE_READ,
+DOCTOR_TIME_OFF_CREATE, DOCTOR_TIME_OFF_READ, DOCTOR_TIME_OFF_DELETE
 
 // Vital Sign
 VITAL_SIGN_CREATE, VITAL_SIGN_READ, VITAL_SIGN_UPDATE

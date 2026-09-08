@@ -46,5 +46,9 @@ public enum ResourceType {
 
     CONFIGURATION,
 
-    PATIENT_ALLERGY
+    PATIENT_ALLERGY,
+
+    DOCTOR_SCHEDULE,
+
+    DOCTOR_TIME_OFF
 }

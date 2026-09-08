@@ -49,6 +49,8 @@ public class CreateAppointmentService
 
     private final AuditLogRepository auditLogRepository;
 
+    private final DoctorScheduleResolutionService doctorScheduleResolutionService;
+
     @Override
     public AppointmentResult create(
             CreateAppointmentCommand command
@@ -133,8 +135,14 @@ public class CreateAppointmentService
         }
 
         if (command.startTime().isBefore(Instant.now())) {
-            throw new ValidationException("Appointment end time must be after start time.");
+            throw new ValidationException("Appointment start time cannot be in the past.");
         }
+
+        doctorScheduleResolutionService.validateDoctorWorkingAndAvailable(
+                command.doctorId(),
+                command.startTime(),
+                command.endTime()
+        );
 
         if (appointmentRepository.existsActiveAppointmentConflict(
             command.doctorId(),

@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.appointment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,9 +26,9 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
 import com.benhsoan.domain.appointment.Appointment;
-import com.benhsoan.domain.appointment.DoctorSchedule;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.appointment.exception.AppointmentPastCutoffException;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
 import com.benhsoan.domain.appointment.exception.SlotAlreadyBookedException;
 import com.benhsoan.domain.auditlog.AuditLog;
@@ -37,7 +38,6 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.port.dto.command.appointment.PatientRescheduleAppointmentCommand;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.appointment.DoctorScheduleRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -57,7 +57,7 @@ class PatientRescheduleAppointmentServiceTest {
     private static final Instant NEW_END = NEW_START.plusSeconds(1800);
 
     @Mock private AppointmentRepository appointmentRepository;
-    @Mock private DoctorScheduleRepository doctorScheduleRepository;
+    @Mock private DoctorScheduleResolutionService doctorScheduleResolutionService;
     @Mock private UserRepository userRepository;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private PatientAccessGuard patientAccessGuard;
@@ -70,7 +70,7 @@ class PatientRescheduleAppointmentServiceTest {
     void setUp() {
         service = new PatientRescheduleAppointmentService(
                 appointmentRepository,
-                doctorScheduleRepository,
+                doctorScheduleResolutionService,
                 userRepository,
                 currentUserPort,
                 patientAccessGuard,
@@ -95,14 +95,11 @@ class PatientRescheduleAppointmentServiceTest {
 
         User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com",
                 "0900000001", roleId, true, null, Instant.parse("2026-08-01T00:00:00Z"));
-        DoctorSchedule schedule = DoctorSchedule.create(doctorId, NEW_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
         when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
-        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, NEW_DATE))
-                .thenReturn(Optional.of(schedule));
         when(appointmentRepository.findActiveAppointmentsForDoctorBetween(doctorId, NEW_START, NEW_END))
                 .thenReturn(List.of());
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
@@ -120,6 +117,36 @@ class PatientRescheduleAppointmentServiceTest {
         assertEquals(ActionType.UPDATE, audit.getActionType());
         assertEquals(ResourceType.APPOINTMENT, audit.getResourceType());
         assertEquals(appointmentId, audit.getResourceId());
+    }
+
+    @Test
+    void reschedulesAppointmentWithWeeklyScheduleOnly() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        Appointment appointment = Appointment.restore(appointmentId, "AP000400", patientId, doctorId,
+                OLD_START, OLD_END, AppointmentStatus.SCHEDULED, "Khám tổng quát",
+                null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
+
+        User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com",
+                "0900000001", roleId, true, null, Instant.parse("2026-08-01T00:00:00Z"));
+
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
+        when(clockPort.now()).thenReturn(NOW);
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
+        when(appointmentRepository.findActiveAppointmentsForDoctorBetween(doctorId, NEW_START, NEW_END))
+                .thenReturn(List.of());
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(appointmentRepository.save(appointment)).thenReturn(appointment);
+
+        service.reschedule(appointmentId, new PatientRescheduleAppointmentCommand(NEW_DATE, NEW_TIME, "Đổi sang ca thứ ba"));
+
+        verify(doctorScheduleResolutionService).validateDoctorWorkingAndAvailable(doctorId, NEW_START, NEW_END);
+        assertEquals(NEW_START, appointment.getStartTime());
     }
 
     @Test
@@ -200,19 +227,45 @@ class PatientRescheduleAppointmentServiceTest {
 
         User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com",
                 "0900000001", roleId, true, null, Instant.parse("2026-08-01T00:00:00Z"));
-        DoctorSchedule schedule = DoctorSchedule.create(doctorId, NEW_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
         when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
         when(clockPort.now()).thenReturn(NOW);
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
-        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, NEW_DATE))
-                .thenReturn(Optional.of(schedule));
         when(appointmentRepository.findActiveAppointmentsForDoctorBetween(doctorId, NEW_START, NEW_END))
                 .thenReturn(List.of(other));
 
         assertThrows(SlotAlreadyBookedException.class,
                 () -> service.reschedule(appointmentId,
                         new PatientRescheduleAppointmentCommand(NEW_DATE, NEW_TIME, "Đổi lịch")));
+    }
+
+    @Test
+    void rejectsWhenDoctorHasTimeOff() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+
+        Appointment appointment = Appointment.restore(appointmentId, "AP000404", patientId, doctorId,
+                OLD_START, OLD_END, AppointmentStatus.SCHEDULED, "Khám tổng quát",
+                null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
+
+        User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com",
+                "0900000001", roleId, true, null, Instant.parse("2026-08-01T00:00:00Z"));
+
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
+        when(clockPort.now()).thenReturn(NOW);
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
+
+        doThrow(new DoctorNotWorkingException()).when(doctorScheduleResolutionService)
+                .validateDoctorWorkingAndAvailable(doctorId, NEW_START, NEW_END);
+
+        DoctorNotWorkingException ex = assertThrows(DoctorNotWorkingException.class,
+                () -> service.reschedule(appointmentId,
+                        new PatientRescheduleAppointmentCommand(NEW_DATE, NEW_TIME, "Đổi lịch")));
+        assertEquals("Bác sĩ không làm việc trong khung giờ này.", ex.getMessage());
     }
 }

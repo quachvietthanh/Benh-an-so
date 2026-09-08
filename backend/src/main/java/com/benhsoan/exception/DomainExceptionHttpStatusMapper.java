@@ -19,6 +19,7 @@ final class DomainExceptionHttpStatusMapper {
                     CLINICAL_RESULT_NOT_FOUND,
                     DIAGNOSIS_CATALOG_NOT_FOUND,
                     DOCTOR_NOT_FOUND,
+                    DOCTOR_TIME_OFF_NOT_FOUND,
                     DRUG_INTERACTION_NOT_FOUND,
                     FOLLOW_UP_REMINDER_NOT_FOUND,
                     INVOICE_NOT_FOUND,
@@ -58,6 +59,7 @@ final class DomainExceptionHttpStatusMapper {
                     TOKEN_INVALID -> HttpStatus.UNAUTHORIZED;
             case APPOINTMENT_PAST_CUTOFF,
                     APPOINTMENT_TIME_IN_PAST,
+                    DOCTOR_NOT_WORKING,
                     DOCTOR_SCHEDULE_UNAVAILABLE,
                     INVALID_BACKUP_STATUS,
                     INVALID_DOCTOR_ROLE,

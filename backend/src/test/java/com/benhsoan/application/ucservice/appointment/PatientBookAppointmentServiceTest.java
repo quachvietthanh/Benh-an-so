@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,10 +26,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.appointment.Appointment;
-import com.benhsoan.domain.appointment.DoctorSchedule;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
-import com.benhsoan.domain.appointment.exception.DoctorScheduleNotFoundException;
-import com.benhsoan.domain.appointment.exception.DoctorUnavailableException;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
 import com.benhsoan.domain.appointment.exception.InvalidDoctorRoleException;
 import com.benhsoan.domain.appointment.exception.SlotAlreadyBookedException;
@@ -42,7 +41,6 @@ import com.benhsoan.port.dto.command.appointment.PatientBookAppointmentCommand;
 import com.benhsoan.port.dto.result.appointment.PatientAppointmentResult;
 import com.benhsoan.port.outbound.generator.AppointmentCodeGenerator;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
-import com.benhsoan.port.outbound.repository.appointment.DoctorScheduleRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -62,7 +60,7 @@ class PatientBookAppointmentServiceTest {
 
     @Mock private AppointmentRepository appointmentRepository;
     @Mock private AppointmentCodeGenerator appointmentCodeGenerator;
-    @Mock private DoctorScheduleRepository doctorScheduleRepository;
+    @Mock private DoctorScheduleResolutionService doctorScheduleResolutionService;
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
     @Mock private RoleRepository roleRepository;
@@ -79,7 +77,7 @@ class PatientBookAppointmentServiceTest {
         service = new PatientBookAppointmentService(
                 appointmentRepository,
                 appointmentCodeGenerator,
-                doctorScheduleRepository,
+                doctorScheduleResolutionService,
                 patientRepository,
                 userRepository,
                 roleRepository,
@@ -97,10 +95,6 @@ class PatientBookAppointmentServiceTest {
 
     private Role doctorRole(UUID roleId) {
         return Role.restore(roleId, "DOCTOR", null, true, NOW, NOW, Set.of());
-    }
-
-    private DoctorSchedule schedule(UUID doctorId, LocalDate date, LocalTime start, LocalTime end, boolean active) {
-        return DoctorSchedule.restore(UUID.randomUUID(), doctorId, date, start, end, active, NOW, null);
     }
 
     private void stubPatientAndDoctor(UUID userId, UUID patientId, UUID doctorId, UUID roleId) {
@@ -121,8 +115,6 @@ class PatientBookAppointmentServiceTest {
 
         when(clockPort.now()).thenReturn(NOW);
         stubPatientAndDoctor(userId, patientId, doctorId, roleId);
-        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
-                .thenReturn(Optional.of(schedule(doctorId, FUTURE_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0), true)));
         when(appointmentRepository.findActiveAppointmentsForDoctorBetween(
                 eq(doctorId), any(Instant.class), any(Instant.class))).thenReturn(List.of());
         when(appointmentCodeGenerator.generate()).thenReturn("APT000100");
@@ -150,6 +142,29 @@ class PatientBookAppointmentServiceTest {
     }
 
     @Test
+    void booksAppointmentWithWeeklyScheduleOnly() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        stubPatientAndDoctor(userId, patientId, doctorId, roleId);
+        when(appointmentRepository.findActiveAppointmentsForDoctorBetween(
+                eq(doctorId), any(Instant.class), any(Instant.class))).thenReturn(List.of());
+        when(appointmentCodeGenerator.generate()).thenReturn("APT000101");
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PatientAppointmentResult result = service.book(
+                new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, "Khám định kỳ"));
+
+        assertEquals("APT000101", result.appointmentCode());
+        assertEquals(patientId, result.patientId());
+        verify(doctorScheduleResolutionService).validateDoctorWorkingAndAvailable(
+                eq(doctorId), any(Instant.class), any(Instant.class));
+    }
+
+    @Test
     void rejectsSlotCollisionWithConflict() {
         UUID patientId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
@@ -158,8 +173,6 @@ class PatientBookAppointmentServiceTest {
 
         when(clockPort.now()).thenReturn(NOW);
         stubPatientAndDoctor(userId, patientId, doctorId, roleId);
-        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
-                .thenReturn(Optional.of(schedule(doctorId, FUTURE_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0), true)));
 
         Appointment existing = mock(Appointment.class);
         when(appointmentRepository.findActiveAppointmentsForDoctorBetween(
@@ -181,7 +194,7 @@ class PatientBookAppointmentServiceTest {
     }
 
     @Test
-    void rejectsMissingDoctorSchedule() {
+    void rejectsWhenDoctorNotWorkingAccordingToResolutionService() {
         UUID patientId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -189,27 +202,12 @@ class PatientBookAppointmentServiceTest {
 
         when(clockPort.now()).thenReturn(NOW);
         stubPatientAndDoctor(userId, patientId, doctorId, roleId);
-        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
-                .thenReturn(Optional.empty());
+        doThrow(new DoctorNotWorkingException()).when(doctorScheduleResolutionService)
+                .validateDoctorWorkingAndAvailable(eq(doctorId), any(Instant.class), any(Instant.class));
 
-        assertThrows(DoctorScheduleNotFoundException.class,
+        DoctorNotWorkingException ex = assertThrows(DoctorNotWorkingException.class,
                 () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, null)));
-    }
-
-    @Test
-    void rejectsInactiveDoctorSchedule() {
-        UUID patientId = UUID.randomUUID();
-        UUID doctorId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        UUID roleId = UUID.randomUUID();
-
-        when(clockPort.now()).thenReturn(NOW);
-        stubPatientAndDoctor(userId, patientId, doctorId, roleId);
-        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
-                .thenReturn(Optional.of(schedule(doctorId, FUTURE_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0), false)));
-
-        assertThrows(DoctorUnavailableException.class,
-                () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, null)));
+        assertEquals("Bác sĩ không làm việc trong khung giờ này.", ex.getMessage());
     }
 
     @Test
@@ -217,22 +215,6 @@ class PatientBookAppointmentServiceTest {
         assertThrows(InvalidAppointmentTimeException.class,
                 () -> service.book(new PatientBookAppointmentCommand(
                         UUID.randomUUID(), FUTURE_DATE, LocalTime.of(9, 17), null)));
-    }
-
-    @Test
-    void rejectsSlotOutsideWorkingHours() {
-        UUID patientId = UUID.randomUUID();
-        UUID doctorId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        UUID roleId = UUID.randomUUID();
-
-        when(clockPort.now()).thenReturn(NOW);
-        stubPatientAndDoctor(userId, patientId, doctorId, roleId);
-        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
-                .thenReturn(Optional.of(schedule(doctorId, FUTURE_DATE, LocalTime.of(8, 0), LocalTime.of(10, 0), true)));
-
-        assertThrows(InvalidAppointmentTimeException.class,
-                () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, LocalTime.of(10, 0), null)));
     }
 
     @Test
@@ -253,5 +235,22 @@ class PatientBookAppointmentServiceTest {
 
         assertThrows(InvalidDoctorRoleException.class,
                 () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, null)));
+    }
+
+    @Test
+    void rejectsWhenDoctorHasTimeOff() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        stubPatientAndDoctor(userId, patientId, doctorId, roleId);
+        doThrow(new DoctorNotWorkingException()).when(doctorScheduleResolutionService)
+                .validateDoctorWorkingAndAvailable(eq(doctorId), any(Instant.class), any(Instant.class));
+
+        DoctorNotWorkingException ex = assertThrows(DoctorNotWorkingException.class,
+                () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, null)));
+        assertEquals("Bác sĩ không làm việc trong khung giờ này.", ex.getMessage());
     }
 }
