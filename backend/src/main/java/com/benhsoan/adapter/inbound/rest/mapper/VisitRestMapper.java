@@ -1,18 +1,21 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.visit.VisitEncounterResponse;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.result.VisitEncounterResult;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class VisitRestMapper {
 
-    private final PatientAnonymizationService anonymizationService;
+    private final boolean anonymizationEnabled;
+
+    public VisitRestMapper(
+            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
+        this.anonymizationEnabled = anonymizationEnabled;
+    }
 
     public VisitEncounterResponse toResponse(VisitEncounterResult result) {
         return new VisitEncounterResponse(
@@ -21,9 +24,9 @@ public class VisitRestMapper {
                         result.visit().visitAt(), result.visit().startedAt(), result.visit().reason(), result.visit().note()),
                 new VisitEncounterResponse.PatientInfo(
                         result.patient().id(), result.patient().patientCode(),
-                        anonymizationService.anonymizeFullName(result.patient().patientCode(), result.patient().fullName()),
+                        anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
                         result.patient().dateOfBirth(), result.patient().gender(),
-                        anonymizationService.anonymizePhone(result.patient().phone())),
+                        anonymizationEnabled ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone()),
                 new VisitEncounterResponse.DoctorInfo(result.doctor().id(), result.doctor().fullName()),
                 toRoomResponse(result.room()),
                 toQueueItemResponse(result.queueItem()),

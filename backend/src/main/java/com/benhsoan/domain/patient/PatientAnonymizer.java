@@ -55,4 +55,50 @@ public final class PatientAnonymizer {
         }
         return MASKED_ADDRESS;
     }
+
+    /**
+     * Always-on masking used by the public (unauthenticated) patient portal
+     * lookup. This keeps a distinct, historically stable contract
+     * (first 3 + "***" + last 3 digits) and must not be gated by the
+     * demonstration anonymization mode, since the portal is public.
+     */
+    public static String maskPhonePublicPortal(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+        String digits = phone.replaceAll("\\D", "");
+        if (digits.length() < 7) {
+            return "***";
+        }
+        return digits.substring(0, 3) + "***" + digits.substring(digits.length() - 3);
+    }
+
+    /**
+     * True when the value is one of the synthetic masked-name forms produced by
+     * {@link #maskFullName(String)}. Used to prevent masked values from being
+     * persisted back as real patient data.
+     */
+    public static boolean isMaskedFullName(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return trimmed.equals(GENERIC_MASKED_NAME) || trimmed.startsWith(MASKED_NAME_PREFIX);
+    }
+
+    /**
+     * True when the value contains the phone mask placeholder produced by
+     * {@link #maskPhone(String)}.
+     */
+    public static boolean isMaskedPhone(String value) {
+        return value != null && value.contains(PHONE_PLACEHOLDER);
+    }
+
+    /**
+     * True when the value equals the fixed masked-address placeholder produced
+     * by {@link #maskAddress(String)}.
+     */
+    public static boolean isMaskedAddress(String value) {
+        return value != null && value.equals(MASKED_ADDRESS);
+    }
 }

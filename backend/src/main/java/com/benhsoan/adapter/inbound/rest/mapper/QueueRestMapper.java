@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.queue.CheckInWalkInRequest;
@@ -9,20 +10,22 @@ import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueItemResponse;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.queue.CheckInWalkInCommand;
 import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
 import com.benhsoan.port.dto.command.queue.UpdateQueueItemStatusCommand;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.dto.result.QueueItemResult;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class QueueRestMapper {
 
-    private final PatientAnonymizationService anonymizationService;
+    private final boolean anonymizationEnabled;
+
+    public QueueRestMapper(
+            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
+        this.anonymizationEnabled = anonymizationEnabled;
+    }
 
     public CheckInWalkInCommand toCommand(CheckInWalkInRequest request) {
         return new CheckInWalkInCommand(request.patientId(), request.doctorId(), request.reason(), request.note(),
@@ -39,7 +42,7 @@ public class QueueRestMapper {
 
     public QueueItemResponse toResponse(QueueItemResult result) {
         return new QueueItemResponse(result.id(), result.medicalQueueId(), result.patientId(),
-                anonymizationService.anonymizeFullName(null, result.patientName()),
+                anonymizationEnabled ? PatientAnonymizer.maskFullName(null) : result.patientName(),
                 result.doctorId(), result.doctorName(), result.roomId(), result.roomNumber(), result.appointmentId(),
                 result.visitId(), result.visitCode(), result.sourceType(), result.status(), result.queueNumber(), result.queueDate(),
                 result.checkedInAt(), result.calledAt(), result.completedAt(), result.cancelledAt(), result.cancelReason(),

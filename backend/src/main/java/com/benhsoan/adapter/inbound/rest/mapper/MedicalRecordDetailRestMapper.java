@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
@@ -11,25 +12,27 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDia
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.AppliedMedicalRecordTemplateResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordTemplateSectionResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.SpecialtyResponse;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.result.AppliedMedicalRecordTemplateResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class MedicalRecordDetailRestMapper {
 
-    private final PatientAnonymizationService anonymizationService;
+    private final boolean anonymizationEnabled;
+
+    public MedicalRecordDetailRestMapper(
+            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
+        this.anonymizationEnabled = anonymizationEnabled;
+    }
 
     public MedicalRecordDetailResponse toResponse(MedicalRecordDetailResult result) {
         PatientInfo patient = new PatientInfo(
                 result.patient().id(), result.patient().patientCode(),
-                anonymizationService.anonymizeFullName(result.patient().patientCode(), result.patient().fullName()),
+                anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
                 result.patient().dateOfBirth(), result.patient().gender(),
-                anonymizationService.anonymizePhone(result.patient().phone()),
+                anonymizationEnabled ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone(),
                 result.patient().identityNumber(), result.patient().insuranceNumber());
 
         VisitInfo visit = new VisitInfo(

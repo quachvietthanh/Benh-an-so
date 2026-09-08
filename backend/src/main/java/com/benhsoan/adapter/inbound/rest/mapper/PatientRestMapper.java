@@ -2,25 +2,28 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.patient.RegisterPatientCommand;
 import com.benhsoan.port.dto.command.patient.SearchPatientCommand;
 import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class PatientRestMapper {
 
-    private final PatientAnonymizationService anonymizationService;
+    private final boolean anonymizationEnabled;
+
+    public PatientRestMapper(
+            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
+        this.anonymizationEnabled = anonymizationEnabled;
+    }
 
     public RegisterPatientCommand toCommand(RegisterPatientRequest request) {
 
@@ -75,9 +78,9 @@ public class PatientRestMapper {
 
     public PatientResponse toResponse(PatientResult result) {
 
-        String fullName = anonymizationService.anonymizeFullName(result.patientCode(), result.fullName());
-        String phone = anonymizationService.anonymizePhone(result.phone());
-        String address = anonymizationService.anonymizeAddress(result.address());
+        String fullName = anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName();
+        String phone = anonymizationEnabled ? PatientAnonymizer.maskPhone(result.phone()) : result.phone();
+        String address = anonymizationEnabled ? PatientAnonymizer.maskAddress(result.address()) : result.address();
 
         return new PatientResponse(
                 result.id(),

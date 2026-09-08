@@ -105,7 +105,7 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
                 anonymizationService.anonymizeFullName(patient.getPatientCode(), patient.getFullName()),
                 patient.getDateOfBirth(),
                 patient.getGender() == null ? null : patient.getGender().name(),
-                PatientAnonymizer.maskPhone(patient.getPhone()),
+                PatientAnonymizer.maskPhonePublicPortal(patient.getPhone()),
                 visit.getVisitCode(),
                 visit.getVisitAt(),
                 doctor == null ? null : doctor.getFullName(),

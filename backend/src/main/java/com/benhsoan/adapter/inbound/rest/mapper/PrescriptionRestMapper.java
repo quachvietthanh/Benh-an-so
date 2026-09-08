@@ -3,6 +3,7 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionItemRequest;
@@ -17,7 +18,7 @@ import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescript
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionWarningResponse;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
@@ -31,13 +32,15 @@ import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class PrescriptionRestMapper {
 
-    private final PatientAnonymizationService anonymizationService;
+    private final boolean anonymizationEnabled;
+
+    public PrescriptionRestMapper(
+            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
+        this.anonymizationEnabled = anonymizationEnabled;
+    }
 
     public AmendPrescriptionCommand toCommand(
             UUID prescriptionId,
@@ -102,7 +105,7 @@ public class PrescriptionRestMapper {
                 .visitCode(result.visitCode())
                 .patientId(result.patientId())
                 .patientCode(result.patientCode())
-                .patientName(anonymizationService.anonymizeFullName(result.patientCode(), result.patientName()))
+                .patientName(anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName())
                 .status(result.status())
                 .note(result.note())
                 .prescribedBy(result.prescribedBy())

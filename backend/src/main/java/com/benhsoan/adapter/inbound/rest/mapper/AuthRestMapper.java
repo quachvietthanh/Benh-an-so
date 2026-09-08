@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.auth.LoginRequest;
@@ -8,7 +9,7 @@ import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientLoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientRegistrationResponse;
-import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
@@ -16,13 +17,15 @@ import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.dto.result.PatientLoginResult;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class AuthRestMapper {
 
-    private final PatientAnonymizationService anonymizationService;
+    private final boolean anonymizationEnabled;
+
+    public AuthRestMapper(
+            @Value("${app.anonymization.enabled:false}") boolean anonymizationEnabled) {
+        this.anonymizationEnabled = anonymizationEnabled;
+    }
 
     public LoginCommand toCommand(LoginRequest request) {
 
@@ -86,8 +89,8 @@ public class AuthRestMapper {
                 result.userId(),
                 result.patientId(),
                 result.patientCode(),
-                anonymizationService.anonymizePhone(result.phone()),
-                anonymizationService.anonymizeFullName(result.patientCode(), result.fullName()),
+                anonymizationEnabled ? PatientAnonymizer.maskPhone(result.phone()) : result.phone(),
+                anonymizationEnabled ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName(),
                 result.accessToken(),
                 result.refreshToken(),
                 result.tokenType()
