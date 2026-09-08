@@ -49,8 +49,19 @@ public class GlobalExceptionHandler {
             DomainException ex,
             HttpServletRequest request
     ) {
-
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(com.benhsoan.domain.auth.exception.WeakPasswordException.class)
+    public ResponseEntity<ApiErrorResponse> handleWeakPassword(
+            com.benhsoan.domain.auth.exception.WeakPasswordException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = DomainExceptionHttpStatusMapper.statusFor(ex.getCode());
+        Map<String, Object> details = new HashMap<>();
+        details.put("violations", ex.getViolations());
+        details.put("fields", Map.of("newPassword", String.join("; ", ex.getViolations())));
+        return build(status, ex.getCode().name(), ex.getMessage(), request.getRequestURI(), details);
     }
 
     @ExceptionHandler(TooManyLoginAttemptsException.class)

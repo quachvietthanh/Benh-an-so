@@ -69,7 +69,7 @@ class MedicineSecurityIntegrationTest {
         for (String role : new String[] {"ADMIN", "DOCTOR", "PHARMACIST"}) {
             mockMvc.perform(get("/medicines")
                             .param("active", "true")
-                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
                     .andExpect(status().isOk());
         }
     }

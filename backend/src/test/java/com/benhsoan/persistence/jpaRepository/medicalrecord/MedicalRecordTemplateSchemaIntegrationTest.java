@@ -33,6 +33,7 @@ class MedicalRecordTemplateSchemaIntegrationTest {
     private static final String GENERAL_SPECIALTY_ID = "f0000000-0000-0000-0000-000000000001";
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("medical_record_template_test")
             .withUsername("template_test")

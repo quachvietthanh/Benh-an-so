@@ -53,14 +53,17 @@ public class MedicalAttachment {
     }
 
     private void validateOwner() {
-        if ((medicalRecordId == null) == (clinicalResultId == null)) {
+        if (medicalRecordId == null && clinicalResultId == null) {
             throw new ValidationException("Attachment must have exactly one owner.");
-        
-        }if (attachmentType == MedicalAttachmentType.MEDICAL_RECORD && medicalRecordId == null) 
+        }
+        if (medicalRecordId != null && clinicalResultId != null) {
+            throw new ValidationException("Attachment must have exactly one owner.");
+        }
+        if (attachmentType == MedicalAttachmentType.MEDICAL_RECORD && medicalRecordId == null) {
             throw new ValidationException("Medical record attachment requires medical record.");
-        
+        }
         if ((attachmentType == MedicalAttachmentType.LAB_RESULT || attachmentType == MedicalAttachmentType.IMAGING_RESULT) && clinicalResultId == null) {
             throw new ValidationException("Result attachment requires clinical result.");
-    
-        }}
+        }
+    }
 }

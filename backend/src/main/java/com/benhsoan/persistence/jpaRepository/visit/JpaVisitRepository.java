@@ -14,13 +14,6 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 import com.benhsoan.persistence.entity.visit.VisitEntity;
-import com.benhsoan.persistence.entity.appointment.AppointmentEntity;
-import com.benhsoan.persistence.entity.auth.UserEntity;
-import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
-import com.benhsoan.persistence.entity.patient.PatientEntity;
-import com.benhsoan.persistence.entity.queue.MedicalQueueEntity;
-import com.benhsoan.persistence.entity.queue.QueueItemEntity;
-import com.benhsoan.persistence.entity.queue.RoomEntity;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 
 public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {

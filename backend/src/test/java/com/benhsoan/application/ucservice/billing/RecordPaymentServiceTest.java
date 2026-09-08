@@ -102,6 +102,7 @@ class RecordPaymentServiceTest {
         assertEquals(new BigDecimal("345000"), result.totalAmount());
         assertEquals(actorId, result.collectedBy());
         verify(paymentRepository).save(any(Payment.class));
+        @SuppressWarnings("unchecked")
         ArgumentCaptor<List<com.benhsoan.domain.billing.PaymentServiceFee>> snapshotCaptor =
                 ArgumentCaptor.forClass(List.class);
         verify(paymentServiceFeeRepository).saveAll(snapshotCaptor.capture());

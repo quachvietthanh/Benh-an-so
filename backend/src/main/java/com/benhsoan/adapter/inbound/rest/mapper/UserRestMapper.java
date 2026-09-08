@@ -54,4 +54,18 @@ public class UserRestMapper {
                 .map(this::toResponse)
                 .toList();
     }
+
+    public com.benhsoan.adapter.inbound.rest.response.user.ResetPasswordResponse toResponse(
+            com.benhsoan.port.dto.result.ResetPasswordResult result
+    ) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.user.ResetPasswordResponse(
+                result.userId(),
+                result.username(),
+                result.temporaryPassword(),
+                result.resetAt()
+        );
+    }
 }

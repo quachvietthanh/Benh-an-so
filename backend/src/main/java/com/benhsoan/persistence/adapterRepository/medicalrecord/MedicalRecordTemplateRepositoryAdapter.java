@@ -9,9 +9,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordTemplate;
-import com.benhsoan.domain.medicalrecord.MedicalRecordTemplateSection;
 import com.benhsoan.domain.medicalrecord.MedicalRecordTemplateVersion;
-import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateDefaultReplacementRequiredException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateInvalidReplacementException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateNotFoundException;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordTemplateEntity;

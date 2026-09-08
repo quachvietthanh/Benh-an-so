@@ -17,7 +17,6 @@ import com.benhsoan.port.outbound.storage.ClinicalAttachmentUpload;
 import com.benhsoan.port.outbound.storage.SignedClinicalAttachmentUrl;
 import com.benhsoan.port.outbound.storage.StoredClinicalAttachment;
 import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
 
 @Component
 @ConditionalOnProperty(prefix = "clinical-attachments.cloudinary", name = "enabled", havingValue = "true")
@@ -39,7 +38,7 @@ public class CloudinaryClinicalAttachmentStorageAdapter implements ClinicalAttac
         ClinicalAttachmentResourceType resourceType = resourceTypeFor(upload.contentType());
         String publicId = createPublicId(upload.clinicalResultId());
         try {
-            Map<?, ?> response = cloudinary.uploader().upload(upload.content(), ObjectUtils.asMap(
+            Map<?, ?> response = cloudinary.uploader().upload(upload.content(), Map.of(
                     "public_id", publicId,
                     "resource_type", toCloudinaryResourceType(resourceType),
                     "type", AUTHENTICATED_DELIVERY_TYPE,
@@ -63,7 +62,7 @@ public class CloudinaryClinicalAttachmentStorageAdapter implements ClinicalAttac
     @Override
     public void delete(String publicId, ClinicalAttachmentResourceType resourceType) {
         try {
-            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap(
+            cloudinary.uploader().destroy(publicId, Map.of(
                     "resource_type", toCloudinaryResourceType(resourceType),
                     "type", AUTHENTICATED_DELIVERY_TYPE,
                     "invalidate", true
@@ -80,7 +79,7 @@ public class CloudinaryClinicalAttachmentStorageAdapter implements ClinicalAttac
             ClinicalAttachmentResourceType resourceType) {
         Instant expiresAt = Instant.now().plus(properties.signedUrlTtl());
         try {
-            String url = cloudinary.privateDownload(publicId, null, ObjectUtils.asMap(
+            String url = cloudinary.privateDownload(publicId, null, Map.of(
                     "resource_type", toCloudinaryResourceType(resourceType),
                     "type", AUTHENTICATED_DELIVERY_TYPE,
                     "expires_at", expiresAt.getEpochSecond()

@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 class JsonDatabaseBackupStorageAdapterIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("backup_test")
             .withUsername("backup_test")

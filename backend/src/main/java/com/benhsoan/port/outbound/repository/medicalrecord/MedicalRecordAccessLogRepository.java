@@ -1,8 +1,5 @@
 package com.benhsoan.port.outbound.repository.medicalrecord;
 
-import java.time.Instant;
-import java.util.UUID;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

@@ -35,6 +35,7 @@ import com.benhsoan.port.outbound.repository.prescription.PrescriptionCodeSequen
 class PrescriptionCodeSequenceRepositoryAdapterMySqlIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("prescription_code_sequence_test")
             .withUsername("prescription_test")

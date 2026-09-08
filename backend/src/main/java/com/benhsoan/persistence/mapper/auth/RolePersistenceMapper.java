@@ -1,7 +1,5 @@
 package com.benhsoan.persistence.mapper.auth;
 
-import java.util.HashSet;
-
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.auth.Role;

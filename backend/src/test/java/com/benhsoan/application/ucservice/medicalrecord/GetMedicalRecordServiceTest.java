@@ -25,7 +25,6 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
 import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
-import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.patient.Patient;

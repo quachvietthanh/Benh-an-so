@@ -3,7 +3,6 @@ package com.benhsoan.infrastructure.pdf;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 import org.apache.pdfbox.Loader;

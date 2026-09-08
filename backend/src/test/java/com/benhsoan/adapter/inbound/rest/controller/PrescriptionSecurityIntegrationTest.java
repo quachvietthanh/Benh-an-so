@@ -84,7 +84,7 @@ class PrescriptionSecurityIntegrationTest {
         for (String role : new String[] {"ADMIN", "PHARMACIST"}) {
             mockMvc.perform(get("/prescriptions")
                             .param("status", "PENDING_DISPENSE")
-                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
                     .andExpect(status().isOk());
         }
 
@@ -109,7 +109,7 @@ class PrescriptionSecurityIntegrationTest {
 
         for (String role : new String[] {"ADMIN", "DOCTOR"}) {
             mockMvc.perform(post("/prescriptions/check-interactions")
-                            .with(user("tester").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk());

@@ -48,6 +48,7 @@ import static org.mockito.Mockito.when;
 class BackupRecordLifecycleTransactionIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("backup_lifecycle_test")
             .withUsername("backup_test")

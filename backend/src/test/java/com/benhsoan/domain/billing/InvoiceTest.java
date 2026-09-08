@@ -18,7 +18,6 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException;
 import com.benhsoan.domain.billing.exception.InvoiceUnauthorizedAdjustmentException;
 import com.benhsoan.domain.billing.exception.PaymentRequiredForInvoiceException;
-import com.benhsoan.domain.shared.exception.ValidationException;
 
 @DisplayName("Invoice Domain Tests")
 class InvoiceTest {

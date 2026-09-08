@@ -28,6 +28,8 @@ import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordDiagnosisRestMapper
 import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordTemplateChangeWithContentException;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
@@ -331,5 +333,35 @@ class MedicalRecordControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(applyMedicalRecordTemplateUseCase);
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/template - returns 409 when clinical content already exists")
+    void applyTemplateReturns409WhenRecordHasContent() throws Exception {
+        UUID templateId = UUID.randomUUID();
+        when(applyMedicalRecordTemplateUseCase.apply(org.mockito.ArgumentMatchers.eq(recordId),
+                org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new MedicalRecordTemplateChangeWithContentException());
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/template", recordId)
+                        .contentType("application/json")
+                        .content("{\"templateId\":\"" + templateId + "\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_TEMPLATE_CHANGE_WITH_CONTENT"));
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/template - returns 403 when doctor is unauthorized")
+    void applyTemplateReturns403WhenUnauthorizedDoctor() throws Exception {
+        UUID templateId = UUID.randomUUID();
+        when(applyMedicalRecordTemplateUseCase.apply(org.mockito.ArgumentMatchers.eq(recordId),
+                org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new MedicalRecordAccessDeniedException());
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/template", recordId)
+                        .contentType("application/json")
+                        .content("{\"templateId\":\"" + templateId + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_ACCESS_DENIED"));
     }
 }
