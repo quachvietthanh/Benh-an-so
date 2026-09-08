@@ -10,6 +10,9 @@ const authApi = {
   patientRegister: (data) => {
     return axiosClient.post('/auth/patient/register', data)
   },
+  changePassword: (data) => {
+    return axiosClient.post('/auth/change-password', data)
+  },
 }
 
 export default authApi

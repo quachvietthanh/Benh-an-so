@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/vi'
 import { LoadingProvider } from './context/LoadingContext'
 import GlobalLoadingBar from './components/common/GlobalLoadingBar'
+import ForceChangePasswordModal from './components/auth/ForceChangePasswordModal'
 
 dayjs.locale('vi')
 
@@ -79,6 +80,7 @@ function App() {
           },
         }}
       >
+        <ForceChangePasswordModal />
         <AppRoutes />
       </ConfigProvider>
     </LoadingProvider>
