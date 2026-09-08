@@ -71,6 +71,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `PUT /doctors/{doctorId}/room-assignment`; `DELETE /doctors/{doctorId}/room-assignment` | `NEW: ROOM_ASSIGNMENT_UPDATE` | Phòng/bác sĩ hợp lệ; không đổi khi queue open | New catalog + service context |
 | `GET /system/clinic`; `PUT /system/clinic` | `NEW: CLINIC_CONFIGURATION_READ` / `NEW: CLINIC_CONFIGURATION_UPDATE` | Cấu hình hợp lệ, audit actor | New catalog |
 | `POST /backups`; `GET /backups`, `/{id}`, `/{id}/download`; `POST /backups/{id}/restore` | `NEW: BACKUP_CREATE` / `NEW: BACKUP_READ` / `NEW: BACKUP_RESTORE` | Giữ backup integrity/restore lock và audit; `BackupAuthorizer` phải thay role policy riêng | New catalog + service context |
+| `GET /security-alerts` → `SecurityAlertController.getSecurityAlerts` | `SECURITY_ALERT_VIEW` | ADMIN-only (seeded); paginated response enriched with username/fullName | Implemented — NCL-15 / QTN-25 (V37) |
 
 ## Quy tắc thực hiện Giai đoạn C
 
