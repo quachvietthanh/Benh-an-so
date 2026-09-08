@@ -35,6 +35,7 @@ import dayjs from 'dayjs'
 
 import patientPortalMedicalHistoryApi from '../api/patientPortalMedicalHistoryApi'
 import MedicalHistoryDetailModal from '../components/portal/MedicalHistoryDetailModal'
+import { getApiErrorMessage } from '../utils/apiError'
 import './patientMedicalHistory.css'
 
 const { Title, Text } = Typography
@@ -45,7 +46,6 @@ function PatientMedicalHistoryPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [searchKeyword, setSearchKeyword] = useState('')
 
-  // Detail Modal State
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedVisitId, setSelectedVisitId] = useState(null)
   const [selectedSummary, setSelectedSummary] = useState(null)
@@ -59,7 +59,7 @@ function PatientMedicalHistoryPage() {
       const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : []
       setHistoryList(list)
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Không thể tải lịch sử khám bệnh. Vui lòng thử lại sau.'
+      const msg = getApiErrorMessage(err, 'Không thể tải lịch sử khám bệnh. Vui lòng thử lại sau.')
       setErrorMessage(msg)
       setHistoryList([])
     } finally {
@@ -90,7 +90,6 @@ function PatientMedicalHistoryPage() {
 
   return (
     <div className="portal-medical-history-page">
-      {/* Header */}
       <header className="portal-medical-history-header">
         <div className="portal-medical-history-header-inner">
           <Link className="portal-booking-brand" to="/portal/dashboard">
@@ -123,7 +122,6 @@ function PatientMedicalHistoryPage() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="portal-medical-history-main">
         <div style={{ marginBottom: 16 }}>
           <Breadcrumb
@@ -242,7 +240,6 @@ function PatientMedicalHistoryPage() {
                   >
                     <Row gutter={[16, 12]} align="middle">
                       <Col xs={24} md={16}>
-                        {/* Header of Item */}
                         <div
                           style={{
                             display: 'flex',
@@ -281,7 +278,6 @@ function PatientMedicalHistoryPage() {
                           </Tag>
                         </div>
 
-                        {/* Doctor & Diagnosis Info */}
                         <div
                           style={{
                             display: 'flex',
@@ -296,7 +292,7 @@ function PatientMedicalHistoryPage() {
                             <span>
                               Bác sĩ phụ trách:{' '}
                               <strong style={{ color: '#1e293b' }}>
-                                BS. {item.doctorName || 'Bác sĩ phụ trách'}
+                                {item.doctorName ? `BS. ${item.doctorName}` : '—'}
                               </strong>
                             </span>
                           </div>
@@ -342,7 +338,6 @@ function PatientMedicalHistoryPage() {
         </div>
       </main>
 
-      {/* Detail Modal */}
       <MedicalHistoryDetailModal
         open={detailModalOpen}
         onClose={() => {

@@ -85,30 +85,57 @@
   color: #64748b;
 }
 
-.portal-register-header-links {
+.portal-register-header-links,
+.portal-login-header-links {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
-.portal-register-login-link {
-  font-size: 13px;
-  font-weight: 600;
-  color: #176ee8;
-  text-decoration: none;
+.portal-header-link {
+  height: 34px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: 6px;
-  background: #e6f7ff;
-  border: 1px solid #bae0ff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  text-decoration: none;
+  border-radius: 8px;
   transition: all 0.2s ease;
+  line-height: 1;
 }
 
-.portal-register-login-link:hover {
+.portal-header-link:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  text-decoration: none;
+}
+
+.portal-header-btn-register {
+  height: 34px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0958d9;
+  background: #e6f4ff;
+  border: 1px solid #bae0ff;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.portal-header-btn-register:hover {
   background: #bae0ff;
-  color: #0050b3;
+  color: #003eb3;
+  border-color: #91caff;
+  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.15);
+  text-decoration: none;
 }
 
 .portal-register-main {
@@ -216,6 +243,57 @@
   gap: 14px;
 }
 
+.portal-register-consent-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.portal-register-consent-box:hover {
+  border-color: #93c5fd;
+  background: #f0f7ff;
+}
+
+.portal-register-consent-box .ant-checkbox-wrapper {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.portal-register-consent-box .ant-checkbox {
+  margin-top: 3px;
+}
+
+.portal-consent-content {
+  margin-left: 8px;
+  line-height: 1.4;
+}
+
+.portal-consent-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.portal-consent-desc {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.portal-consent-link {
+  color: #1677ff;
+  font-weight: 500;
+}
+
 .portal-register-btn {
   height: 42px !important;
   font-size: 15px !important;
@@ -262,9 +340,13 @@
     gap: 10px;
   }
 
-  .portal-register-header-links {
+  .portal-register-header-links,
+  .portal-login-header-links {
     width: 100%;
-    justify-content: space-between;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
   }
 
   .portal-register-card {

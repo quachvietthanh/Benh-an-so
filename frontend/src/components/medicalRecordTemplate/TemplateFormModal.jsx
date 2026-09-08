@@ -18,7 +18,12 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons'
 import SectionConfigEditor from './SectionConfigEditor'
-import { DEFAULT_TEMPLATE_SECTIONS } from '../../constants/medicalRecordTemplateConstants'
+import {
+  DEFAULT_TEMPLATE_SECTIONS,
+  formatSectionLabel,
+  formatTemplateName,
+  formatSpecialtyName,
+} from '../../constants/medicalRecordTemplateConstants'
 
 function TemplateFormModal({
   open,
@@ -40,14 +45,17 @@ function TemplateFormModal({
       if (initialData) {
         form.setFieldsValue({
           specialtyId: initialData.specialty?.id || initialData.specialtyId,
-          name: initialData.name || '',
+          name: formatTemplateName(initialData.name || ''),
           changeNote: '',
           makeDefault: Boolean(initialData.defaultTemplate || initialData.isDefault),
         })
         if (initialData.sections && initialData.sections.length > 0) {
-          const sorted = [...initialData.sections].sort(
-            (a, b) => a.displayOrder - b.displayOrder
-          )
+          const sorted = [...initialData.sections]
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+            .map((s) => ({
+              ...s,
+              label: formatSectionLabel(s.label, s.fieldCode),
+            }))
           setSections(sorted)
         } else {
           setSections(DEFAULT_TEMPLATE_SECTIONS)
@@ -185,7 +193,7 @@ function TemplateFormModal({
                 disabled={isEdit}
                 options={specialties.map((s) => ({
                   value: s.id,
-                  label: `${s.name} (${s.code})`,
+                  label: `${formatSpecialtyName(s.name)} (${s.code})`,
                 }))}
               />
             </Form.Item>

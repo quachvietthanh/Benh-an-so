@@ -5,7 +5,6 @@ import {
   Form,
   Input,
   Row,
-  Skeleton,
   Space,
   Tag,
 } from 'antd'
@@ -15,6 +14,8 @@ import {
 import {
   DEFAULT_TEMPLATE_SECTIONS,
   FIELD_CODE_TO_FORM_NAME,
+  formatSectionLabel,
+  formatTemplateName,
   getFieldMeta,
 } from '../../constants/medicalRecordTemplateConstants'
 
@@ -24,15 +25,7 @@ function DynamicMedicalRecordSections({
   sections = [],
   template = null,
   disabled = false,
-  loading = false,
 }) {
-  if (loading) {
-    return (
-      <Card bordered style={{ marginBottom: 16 }}>
-        <Skeleton active paragraph={{ rows: 6 }} />
-      </Card>
-    )
-  }
 
   const effectiveSections = sections && sections.length > 0 ? sections : DEFAULT_TEMPLATE_SECTIONS
   const sortedSections = [...effectiveSections].sort((a, b) => a.displayOrder - b.displayOrder)
@@ -48,7 +41,7 @@ function DynamicMedicalRecordSections({
           {template && (
             <Space size={6} wrap>
               <Tag color="blue" style={{ fontWeight: 600 }}>
-                Mẫu: {template.name}
+                Mẫu: {formatTemplateName(template.name)}
               </Tag>
               <Tag color="purple">
                 v{template.versionNo || template.currentVersionNo || 1}
@@ -67,27 +60,24 @@ function DynamicMedicalRecordSections({
           const formFieldName = FIELD_CODE_TO_FORM_NAME[section.fieldCode] || section.fieldCode
           const meta = getFieldMeta(section.fieldCode)
           const isRequired = Boolean(section.required)
+          const sectionLabel = formatSectionLabel(section.label, section.fieldCode)
           const rows = section.fieldCode === 'PHYSICAL_EXAMINATION' || section.fieldCode === 'MEDICAL_HISTORY' ? 3 : 2
 
           return (
             <Col xs={24} key={section.fieldCode || idx}>
               <Form.Item
                 name={formFieldName}
+                required={false}
                 label={
                   <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                    {idx + 1}. {section.label || meta.defaultLabel}
-                    {isRequired && <span style={{ color: '#ef4444', marginLeft: 4 }}>*</span>}
+                    {idx + 1}. {sectionLabel}
                   </span>
                 }
                 rules={[
                   {
-                    required: isRequired,
-                    message: `Vui lòng nhập ${section.label || meta.defaultLabel}`,
-                  },
-                  {
                     validator: (_, val) => {
-                      if (isRequired && (!val || !val.trim())) {
-                        return Promise.reject(new Error(`Vui lòng không để trống trường ${section.label || meta.defaultLabel}`))
+                      if (section.fieldCode === 'CHIEF_COMPLAINT' && isRequired && (!val || !val.trim())) {
+                        return Promise.reject(new Error(`Vui lòng không để trống trường ${sectionLabel}`))
                       }
                       return Promise.resolve()
                     },

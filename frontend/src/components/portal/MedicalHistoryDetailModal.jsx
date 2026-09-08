@@ -32,6 +32,7 @@ import {
 import dayjs from 'dayjs'
 
 import patientPortalMedicalHistoryApi from '../../api/patientPortalMedicalHistoryApi'
+import { getApiErrorMessage } from '../../utils/apiError'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -63,7 +64,7 @@ function MedicalHistoryDetailModal({
         if (status === 403 || status === 404) {
           message.error('Không tìm thấy hồ sơ khám bệnh này.')
         } else {
-          message.error(err?.response?.data?.message || 'Không thể tải chi tiết hồ sơ khám bệnh.')
+          message.error(getApiErrorMessage(err, 'Không thể tải chi tiết hồ sơ khám bệnh.'))
         }
         if (isMounted) {
           onClose()
@@ -85,8 +86,8 @@ function MedicalHistoryDetailModal({
   const visitDate = detail?.visitAt || initialSummary?.visitAt
   const formattedDate = visitDate ? dayjs(visitDate).format('DD/MM/YYYY') : '---'
   const formattedTime = visitDate ? dayjs(visitDate).format('HH:mm') : '---'
-  const doctorName = detail?.doctorName || initialSummary?.doctorName || 'Bác sĩ phụ trách'
-  const specialtyName = detail?.specialtyName || initialSummary?.specialtyName || 'Đa khoa'
+  const doctorName = detail?.doctorName || initialSummary?.doctorName || '—'
+  const specialtyName = detail?.specialtyName || initialSummary?.specialtyName || '—'
 
   const handlePrint = () => {
     window.print()
@@ -119,7 +120,6 @@ function MedicalHistoryDetailModal({
         </div>
       ) : detail ? (
         <div className="medical-history-modal-content" style={{ maxHeight: '72vh', overflowY: 'auto', paddingRight: 4 }}>
-          {/* Header Summary Box */}
           <div
             style={{
               background: '#f8fafc',
@@ -162,7 +162,6 @@ function MedicalHistoryDetailModal({
             </Row>
           </div>
 
-          {/* Section 1: Diagnoses */}
           <div style={{ marginBottom: 22 }}>
             <div
               style={{
@@ -217,7 +216,6 @@ function MedicalHistoryDetailModal({
             )}
           </div>
 
-          {/* Section 2: Prescription */}
           <div style={{ marginBottom: 22 }}>
             <div
               style={{
@@ -307,7 +305,6 @@ function MedicalHistoryDetailModal({
             )}
           </div>
 
-          {/* Section 3: Doctor Advice */}
           <div>
             <div
               style={{
