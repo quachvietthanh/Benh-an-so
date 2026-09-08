@@ -11,17 +11,25 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDia
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.AppliedMedicalRecordTemplateResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordTemplateSectionResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.SpecialtyResponse;
+import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
 import com.benhsoan.port.dto.result.AppliedMedicalRecordTemplateResult;
 import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
 import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class MedicalRecordDetailRestMapper {
+
+    private final PatientAnonymizationService anonymizationService;
 
     public MedicalRecordDetailResponse toResponse(MedicalRecordDetailResult result) {
         PatientInfo patient = new PatientInfo(
-                result.patient().id(), result.patient().patientCode(), result.patient().fullName(),
-                result.patient().dateOfBirth(), result.patient().gender(), result.patient().phone(),
+                result.patient().id(), result.patient().patientCode(),
+                anonymizationService.anonymizeFullName(result.patient().patientCode(), result.patient().fullName()),
+                result.patient().dateOfBirth(), result.patient().gender(),
+                anonymizationService.anonymizePhone(result.patient().phone()),
                 result.patient().identityNumber(), result.patient().insuranceNumber());
 
         VisitInfo visit = new VisitInfo(

@@ -8,6 +8,7 @@ import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientLoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientRegistrationResponse;
+import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
@@ -15,8 +16,13 @@ import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.dto.result.PatientLoginResult;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class AuthRestMapper {
+
+    private final PatientAnonymizationService anonymizationService;
 
     public LoginCommand toCommand(LoginRequest request) {
 
@@ -80,8 +86,8 @@ public class AuthRestMapper {
                 result.userId(),
                 result.patientId(),
                 result.patientCode(),
-                result.phone(),
-                result.fullName(),
+                anonymizationService.anonymizePhone(result.phone()),
+                anonymizationService.anonymizeFullName(result.patientCode(), result.fullName()),
                 result.accessToken(),
                 result.refreshToken(),
                 result.tokenType()

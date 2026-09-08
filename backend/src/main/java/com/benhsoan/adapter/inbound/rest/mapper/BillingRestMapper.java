@@ -19,6 +19,7 @@ import com.benhsoan.adapter.inbound.rest.response.billing.PaymentResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentQuoteResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentServiceFeeQuoteResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.RefundPaymentResponse;
+import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
 import com.benhsoan.port.dto.command.billing.AdjustInvoiceCommand;
 import com.benhsoan.port.dto.command.billing.AdjustmentInvoiceLineCommand;
 import com.benhsoan.port.dto.command.billing.CreateInvoiceCommand;
@@ -32,8 +33,13 @@ import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.dto.result.PaymentQuoteResult;
 import com.benhsoan.port.dto.result.RefundPaymentResult;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class BillingRestMapper {
+
+    private final PatientAnonymizationService anonymizationService;
 
     public RecordPaymentCommand toCommand(RecordPaymentRequest request) {
         return RecordPaymentCommand.builder()
@@ -144,7 +150,7 @@ public class BillingRestMapper {
                 result.visitCode(),
                 result.patientId(),
                 result.patientCode(),
-                result.patientName(),
+                anonymizationService.anonymizeFullName(result.patientCode(), result.patientName()),
                 result.reason(),
                 result.completedAt()
         );

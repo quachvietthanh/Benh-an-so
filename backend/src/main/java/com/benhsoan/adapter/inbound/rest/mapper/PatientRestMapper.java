@@ -8,13 +8,19 @@ import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
+import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
 import com.benhsoan.port.dto.command.patient.RegisterPatientCommand;
 import com.benhsoan.port.dto.command.patient.SearchPatientCommand;
 import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class PatientRestMapper {
+
+    private final PatientAnonymizationService anonymizationService;
 
     public RegisterPatientCommand toCommand(RegisterPatientRequest request) {
 
@@ -69,15 +75,19 @@ public class PatientRestMapper {
 
     public PatientResponse toResponse(PatientResult result) {
 
+        String fullName = anonymizationService.anonymizeFullName(result.patientCode(), result.fullName());
+        String phone = anonymizationService.anonymizePhone(result.phone());
+        String address = anonymizationService.anonymizeAddress(result.address());
+
         return new PatientResponse(
                 result.id(),
                 result.patientCode(),
-                result.fullName(),
+                fullName,
                 result.dateOfBirth(),
                 result.gender(),
-                result.phone(),
+                phone,
                 result.email(),
-                result.address(),
+                address,
                 result.identityNumber(),
                 result.insuranceNumber(),
                 result.bloodType(),

@@ -3,10 +3,16 @@ package com.benhsoan.adapter.inbound.rest.mapper;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.response.visit.VisitEncounterResponse;
+import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
 import com.benhsoan.port.dto.result.VisitEncounterResult;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class VisitRestMapper {
+
+    private final PatientAnonymizationService anonymizationService;
 
     public VisitEncounterResponse toResponse(VisitEncounterResult result) {
         return new VisitEncounterResponse(
@@ -14,8 +20,10 @@ public class VisitRestMapper {
                         result.visit().id(), result.visit().visitCode(), result.visit().type(), result.visit().status(),
                         result.visit().visitAt(), result.visit().startedAt(), result.visit().reason(), result.visit().note()),
                 new VisitEncounterResponse.PatientInfo(
-                        result.patient().id(), result.patient().patientCode(), result.patient().fullName(),
-                        result.patient().dateOfBirth(), result.patient().gender(), result.patient().phone()),
+                        result.patient().id(), result.patient().patientCode(),
+                        anonymizationService.anonymizeFullName(result.patient().patientCode(), result.patient().fullName()),
+                        result.patient().dateOfBirth(), result.patient().gender(),
+                        anonymizationService.anonymizePhone(result.patient().phone())),
                 new VisitEncounterResponse.DoctorInfo(result.doctor().id(), result.doctor().fullName()),
                 toRoomResponse(result.room()),
                 toQueueItemResponse(result.queueItem()),

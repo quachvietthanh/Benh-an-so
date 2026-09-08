@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import com.benhsoan.domain.clinic.ClinicConfiguration;
+import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
@@ -59,7 +60,8 @@ class ExportPrescriptionServiceTest {
                 pdfRenderer,
                 currentUserPort,
                 auditLogRepository,
-                clockPort
+                clockPort,
+                new PatientAnonymizationService(false)
         );
         Instant prescribedAt = Instant.parse("2026-08-20T03:00:00Z");
         UUID medicalRecordId = UUID.randomUUID();
@@ -161,7 +163,8 @@ class ExportPrescriptionServiceTest {
                 new PdfBoxPrescriptionPdfRenderer(),
                 currentUserPort,
                 Mockito.mock(AuditLogRepository.class),
-                Mockito.mock(ClockPort.class)
+                Mockito.mock(ClockPort.class),
+                new PatientAnonymizationService(false)
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -206,7 +209,8 @@ class ExportPrescriptionServiceTest {
                 renderer,
                 currentUserPort,
                 auditLogRepository,
-                Mockito.mock(ClockPort.class)
+                Mockito.mock(ClockPort.class),
+                new PatientAnonymizationService(false)
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -235,7 +239,8 @@ class ExportPrescriptionServiceTest {
                 new PdfBoxPrescriptionPdfRenderer(),
                 Mockito.mock(CurrentUserPort.class),
                 Mockito.mock(AuditLogRepository.class),
-                Mockito.mock(ClockPort.class)
+                Mockito.mock(ClockPort.class),
+                new PatientAnonymizationService(false)
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -266,7 +271,8 @@ class ExportPrescriptionServiceTest {
                 new PdfBoxPrescriptionPdfRenderer(),
                 currentUserPort,
                 Mockito.mock(AuditLogRepository.class),
-                Mockito.mock(ClockPort.class)
+                Mockito.mock(ClockPort.class),
+                new PatientAnonymizationService(false)
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -288,7 +294,8 @@ class ExportPrescriptionServiceTest {
                 prescriptionRepository, Mockito.mock(PrescriptionReadAccessValidator.class),
                 Mockito.mock(PrescriptionDisplayContextResolver.class), Mockito.mock(ClinicConfigurationRepository.class),
                 new PdfBoxPrescriptionPdfRenderer(), currentUserPort,
-                Mockito.mock(AuditLogRepository.class), Mockito.mock(ClockPort.class)
+                Mockito.mock(AuditLogRepository.class), Mockito.mock(ClockPort.class),
+                new PatientAnonymizationService(false)
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -358,7 +365,8 @@ class ExportPrescriptionServiceTest {
                 renderer,
                 currentUserPort,
                 auditLogRepository,
-                clockPort
+                clockPort,
+                new PatientAnonymizationService(false)
         );
 
         service.export(prescriptionId);
@@ -403,7 +411,8 @@ class ExportPrescriptionServiceTest {
                 renderer,
                 currentUserPort,
                 Mockito.mock(AuditLogRepository.class),
-                Mockito.mock(ClockPort.class)
+                Mockito.mock(ClockPort.class),
+                new PatientAnonymizationService(false)
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))
@@ -421,7 +430,8 @@ class ExportPrescriptionServiceTest {
                 prescriptionRepository, Mockito.mock(PrescriptionReadAccessValidator.class),
                 Mockito.mock(PrescriptionDisplayContextResolver.class), Mockito.mock(ClinicConfigurationRepository.class),
                 new PdfBoxPrescriptionPdfRenderer(), Mockito.mock(CurrentUserPort.class),
-                Mockito.mock(AuditLogRepository.class), Mockito.mock(ClockPort.class)
+                Mockito.mock(AuditLogRepository.class), Mockito.mock(ClockPort.class),
+                new PatientAnonymizationService(false)
         );
 
         assertThatThrownBy(() -> service.export(prescriptionId))

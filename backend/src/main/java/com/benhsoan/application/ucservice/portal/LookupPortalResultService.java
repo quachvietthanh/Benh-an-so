@@ -44,6 +44,9 @@ import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
+import com.benhsoan.application.ucservice.anonymization.PatientAnonymizationService;
+import com.benhsoan.domain.patient.PatientAnonymizer;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -66,6 +69,7 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
     private final PrescriptionRepository prescriptionRepository;
     private final AuditLogRepository auditLogRepository;
     private final ClockPort clockPort;
+    private final PatientAnonymizationService anonymizationService;
 
     @Override
     public PortalLookupResult lookup(LookupPortalResultQuery query) {
@@ -98,10 +102,10 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
                 appointment.getAppointmentCode(),
                 appointment.getStartTime(),
                 appointment.getReason(),
-                patient.getFullName(),
+                anonymizationService.anonymizeFullName(patient.getPatientCode(), patient.getFullName()),
                 patient.getDateOfBirth(),
                 patient.getGender() == null ? null : patient.getGender().name(),
-                maskPhone(patient.getPhone()),
+                PatientAnonymizer.maskPhone(patient.getPhone()),
                 visit.getVisitCode(),
                 visit.getVisitAt(),
                 doctor == null ? null : doctor.getFullName(),
@@ -230,16 +234,5 @@ public class LookupPortalResultService implements LookupPortalResultUseCase {
                 diagnosis.getDiagnosisName(),
                 diagnosis.getDiagnosisType() == null ? null : diagnosis.getDiagnosisType().name()
         );
-    }
-
-    private String maskPhone(String phone) {
-        if (phone == null || phone.isBlank()) {
-            return null;
-        }
-        String digits = phone.replaceAll("\\D", "");
-        if (digits.length() < 7) {
-            return "***";
-        }
-        return digits.substring(0, 3) + "***" + digits.substring(digits.length() - 3);
     }
 }
