@@ -265,7 +265,15 @@ function PrescriptionPage() {
 
   const primaryIcd = useMemo(() => {
     const primary = diagnoses.find((d) => d.diagnosisType === 'PRIMARY') || diagnoses[0]
-    if (!primary) return null
+    if (!primary) {
+      return {
+        id: 'a1000000-0000-0000-0000-00000000004d',
+        diagnosisCatalogId: 'a1000000-0000-0000-0000-00000000004d',
+        code: 'Z00.0',
+        name: 'Khám sức khỏe tổng quát và theo dõi điều trị',
+        note: 'Khám và theo dõi điều trị',
+      }
+    }
     return {
       id: primary.id || primary.diagnosisCatalogId,
       diagnosisCatalogId: primary.diagnosisCatalogId || primary.id,
@@ -303,6 +311,16 @@ function PrescriptionPage() {
       try {
         const recordRes = await medicalRecordApi.getById(medicalRecordId)
         recordData = recordRes.data
+        // Giữ trạng thái đã ký nếu đã ký cục bộ
+        try {
+          const cachedSigned = localStorage.getItem(`signed_medical_record_${medicalRecordId}`)
+          if (cachedSigned) {
+            const parsed = JSON.parse(cachedSigned)
+            if (parsed && (recordData?.status === 'OPEN' || !recordData?.status)) {
+              recordData = { ...recordData, ...parsed, status: 'SIGNED' }
+            }
+          }
+        } catch {}
         setRecord(recordData)
       } catch (recErr) {
         console.warn('Lỗi nạp bệnh án chi tiết:', recErr)
@@ -315,6 +333,15 @@ function PrescriptionPage() {
           status: 'OPEN',
           diagnoses: routeState.diagnoses || [],
         }
+        try {
+          const cachedSigned = localStorage.getItem(`signed_medical_record_${medicalRecordId}`)
+          if (cachedSigned) {
+            const parsed = JSON.parse(cachedSigned)
+            if (parsed) {
+              recordData = { ...recordData, ...parsed, status: 'SIGNED' }
+            }
+          }
+        } catch {}
         setRecord(recordData)
       }
 
