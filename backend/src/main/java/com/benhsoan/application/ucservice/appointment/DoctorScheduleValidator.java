@@ -66,8 +66,13 @@ public class DoctorScheduleValidator {
         ZonedDateTime endZoned = endTime.atZone(CLINIC_ZONE);
 
         LocalDate startDate = startZoned.toLocalDate();
+        LocalDate endDate = endZoned.toLocalDate();
         LocalTime slotStartTime = startZoned.toLocalTime();
         LocalTime slotEndTime = endZoned.toLocalTime();
+
+        if (!startDate.equals(endDate)) {
+            throw new DoctorNotWorkingException("Khung giờ đặt lịch nằm ngoài giờ làm việc của bác sĩ.");
+        }
 
         Optional<EffectiveWorkingHours> workingHoursOpt = resolveWorkingHours(doctorId, startDate);
         if (workingHoursOpt.isEmpty()) {

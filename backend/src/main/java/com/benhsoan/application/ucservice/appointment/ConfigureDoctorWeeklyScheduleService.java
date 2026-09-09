@@ -61,7 +61,8 @@ public class ConfigureDoctorWeeklyScheduleService implements ConfigureDoctorWeek
         Guard.require(command.doctorId(), "Doctor id");
         Guard.require(command.schedules(), "Schedules list");
 
-        User doctor = userRepository.findById(command.doctorId())
+        // Pessimistic lock on doctor user row to serialize with concurrent appointment booking and time-off
+        User doctor = userRepository.findByIdForUpdate(command.doctorId())
                 .orElseThrow(() -> new DoctorNotFoundException(command.doctorId()));
         if (!doctor.isActive()) {
             throw new DoctorInactiveException(doctor.getId());

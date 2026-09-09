@@ -102,7 +102,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
     @Test
     void configuresWeeklyScheduleSuccessfullyAndAudits() {
         // TC-01: Cấu hình lịch làm việc định kỳ theo tuần
-        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
         when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(createDoctorRole()));
         when(clinicConfigurationRepository.find()).thenReturn(Optional.of(createClinicConfig()));
         when(weeklyScheduleRepository.findByDoctorId(DOCTOR_ID)).thenReturn(List.of());
@@ -135,7 +135,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
 
     @Test
     void rejectsWhenWorkingHoursFallOutsideClinicHours() {
-        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
         when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(createDoctorRole()));
         when(clinicConfigurationRepository.find()).thenReturn(Optional.of(createClinicConfig())); // 07:30 - 17:30
 
@@ -152,7 +152,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
 
     @Test
     void rejectsDuplicateDayOfWeekInRequest() {
-        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
         when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(createDoctorRole()));
 
         ConfigureDoctorWeeklyScheduleCommand command = new ConfigureDoctorWeeklyScheduleCommand(
@@ -170,7 +170,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
 
     @Test
     void rejectsDoctorNotFound() {
-        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.empty());
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.empty());
 
         ConfigureDoctorWeeklyScheduleCommand command = new ConfigureDoctorWeeklyScheduleCommand(
                 DOCTOR_ID,
@@ -182,7 +182,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
 
     @Test
     void rejectsInactiveDoctor() {
-        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(false, DOCTOR_ROLE_ID)));
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(false, DOCTOR_ROLE_ID)));
 
         ConfigureDoctorWeeklyScheduleCommand command = new ConfigureDoctorWeeklyScheduleCommand(
                 DOCTOR_ID,
@@ -195,7 +195,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
     @Test
     void rejectsNonDoctorUser() {
         UUID otherRoleId = UUID.randomUUID();
-        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, otherRoleId)));
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, otherRoleId)));
         when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(createDoctorRole()));
 
         ConfigureDoctorWeeklyScheduleCommand command = new ConfigureDoctorWeeklyScheduleCommand(
@@ -210,7 +210,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
     void deactivatesOmittedDaysWhenConfiguringWeeklySchedule() {
         // Finding [P2-2]: Semantics của PUT /weekly: các ngày có trong DB nhưng không có trong payload
         // phải tự động được cập nhật active = false (Collection Replacement)
-        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
         when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(createDoctorRole()));
         when(clinicConfigurationRepository.find()).thenReturn(Optional.of(createClinicConfig()));
         when(clockPort.now()).thenReturn(NOW);
