@@ -39,6 +39,7 @@ const MedicalRecordCopyPage = React.lazy(() => import('../pages/MedicalRecordCop
 const MedicalRecordVersionHistoryPage = React.lazy(() => import('../pages/MedicalRecordVersionHistoryPage'))
 const PrescriptionInterconnectionPage = React.lazy(() => import('../pages/PrescriptionInterconnectionPage'))
 const DoctorScheduleManagementPage = React.lazy(() => import('../pages/DoctorScheduleManagementPage'))
+const AnonymizationPage = React.lazy(() => import('../pages/AnonymizationPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -141,7 +142,7 @@ function AppRoutes() {
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedPermissions={['REPORT_VIEW', 'REPORT_EXPORT']} allowedRoles={['admin', 'manager']}><LazyPage><ReportsPage /></LazyPage></PrivateRoute>} />
-        <Route path="system-management" element={<PrivateRoute allowedPermissions={['ROLE_READ', 'ROLE_UPDATE', 'CLINIC_CONFIGURATION_READ', 'USER_READ', 'BACKUP_READ']} allowedRoles={['admin']}><LazyPage><SystemManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="system-management" element={<PrivateRoute allowedPermissions={['ROLE_READ', 'ROLE_UPDATE', 'CLINIC_CONFIGURATION_READ', 'SYSTEM_CONFIG_READ', 'USER_READ', 'BACKUP_READ']} allowedRoles={['admin']}><LazyPage><SystemManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="backup-restore" element={<PrivateRoute allowedPermissions={['BACKUP_READ', 'BACKUP_CREATE', 'BACKUP_RESTORE']} allowedRoles={['admin']}><LazyPage><BackupRestorePage /></LazyPage></PrivateRoute>} />
         <Route path="audit-logs" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
@@ -152,6 +153,9 @@ function AppRoutes() {
         <Route path="system/medical-record-templates" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_TEMPLATE_MANAGE']} allowedRoles={['admin']}><LazyPage><MedicalRecordTemplateManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="medical-record-templates" element={<Navigate to="/system/medical-record-templates" replace />} />
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
+        <Route path="system/anonymization" element={<PrivateRoute allowedPermissions={['SYSTEM_CONFIG_READ']} allowedRoles={['admin']}><LazyPage><AnonymizationPage /></LazyPage></PrivateRoute>} />
+        <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
+
 
       </Route>
 

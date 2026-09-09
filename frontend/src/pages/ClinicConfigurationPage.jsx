@@ -58,10 +58,15 @@ function ClinicConfigurationPage() {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
 
-  const canReadConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ')
-  const canUpdateConfig = userPermissions.includes('CLINIC_CONFIGURATION_UPDATE')
-  const canCreateRoom = userPermissions.includes('ROOM_CREATE')
-  const canUpdateRoom = userPermissions.includes('ROOM_UPDATE')
+  const userRoles = useMemo(() => {
+    return (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user])
+
+  const isAdmin = userRoles.includes('admin')
+  const canReadConfig = userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || isAdmin
+  const canUpdateConfig = userPermissions.includes('CLINIC_CONFIGURATION_UPDATE') || isAdmin
+  const canCreateRoom = userPermissions.includes('ROOM_CREATE') || isAdmin
+  const canUpdateRoom = userPermissions.includes('ROOM_UPDATE') || isAdmin
 
   const fetchConfig = useCallback(async () => {
     setLoadingConfig(true)

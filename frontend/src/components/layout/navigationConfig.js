@@ -15,6 +15,7 @@ import {
   ShopOutlined,
   SolutionOutlined,
   UserOutlined,
+  EyeInvisibleOutlined,
 } from '@ant-design/icons'
 
 export const roleNames = {
@@ -33,7 +34,7 @@ export const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/prescription-interconnections'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/prescription-interconnections', '/system/anonymization'] },
 ]
 
 export const getNavigationItems = (roles = [], permissions = []) => {
@@ -71,8 +72,9 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || isAdmin || isManager },
     { key: '/system/diagnosis-catalog', label: 'Danh mục mã bệnh (ICD-10)', icon: ExperimentOutlined, check: () => hasPerm('DIAGNOSIS_CATALOG_MANAGE') || isAdmin },
     { key: '/system/medical-record-templates', label: 'Mẫu bệnh án chuyên khoa', icon: FileTextOutlined, check: () => hasPerm('MEDICAL_RECORD_TEMPLATE_MANAGE') || isAdmin },
-    { key: '/prescription-interconnections', label: 'Liên thông đơn thuốc', icon: CloudServerOutlined, check: () => hasPerm('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => isAdmin || (!isManager && (hasPerm('ROLE_READ') || hasPerm('CLINIC_CONFIGURATION_READ') || hasPerm('USER_READ') || hasPerm('BACKUP_READ'))) },
+    { key: '/prescription-interconnections', label: 'Liên thông đơn thuốc', icon: CloudServerOutlined, check: () => hasPerm('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin },
+    { key: '/system/anonymization', label: 'Chế độ ẩn danh dữ liệu', icon: EyeInvisibleOutlined, check: () => hasPerm('SYSTEM_CONFIG_READ') || isAdmin },
   ]
 
   return items.filter((item) => item.check())
