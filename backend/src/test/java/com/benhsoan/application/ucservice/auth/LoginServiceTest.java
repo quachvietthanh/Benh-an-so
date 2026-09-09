@@ -26,6 +26,7 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
 import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
+import com.benhsoan.port.dto.result.LoginAttemptResult;
 import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
@@ -97,13 +98,9 @@ class LoginServiceTest {
                 when(user.isActive()).thenReturn(true);
                 when(user.getPasswordHash()).thenReturn("hashed_secret");
 
-                when(loginAttemptPort.isBlocked(USERNAME))
-                                .thenReturn(false) // ban đầu chưa bị khóa
-                                .thenReturn(true); // sau khi loginFailed(username) lần thứ 5 thì bị khóa
-
-                when(loginAttemptPort.getRetryAfterSeconds(USERNAME)).thenReturn(900L);
-                when(loginAttemptPort.getBlockedUntil(USERNAME)).thenReturn(NOW.plusSeconds(900));
-                when(loginAttemptPort.getAttemptCount(USERNAME)).thenReturn(5);
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(5, true, true, NOW.plusSeconds(900), 900L));
 
                 when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
                 when(passwordEncoderPort.matches(WRONG_PASSWORD, "hashed_secret")).thenReturn(false);
@@ -115,7 +112,7 @@ class LoginServiceTest {
                 assertEquals(900L, exception.getRetryAfterSeconds());
                 assertEquals(NOW.plusSeconds(900), exception.getBlockedUntil());
 
-                verify(loginAttemptPort).loginFailed(USERNAME);
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
 
                 // Xác nhận gọi LoginLockoutAuditWriter để ghi nhận Audit Log LOCK an toàn trong
                 // REQUIRES_NEW transaction
@@ -125,6 +122,29 @@ class LoginServiceTest {
                                 5,
                                 NOW.plusSeconds(900),
                                 null);
+        }
+
+        @Test
+        @DisplayName("Concurrent failed login: request thứ 6 chạm block nhưng không phải newlyBlocked -> không ghi duplicate Audit Log")
+        void concurrentFailedLogin_alreadyBlockedDoesNotDuplicateAuditLog() {
+                User user = mock(User.class);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(6, true, false, NOW.plusSeconds(900), 900L));
+
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(WRONG_PASSWORD, "hashed_secret")).thenReturn(false);
+
+                TooManyLoginAttemptsException exception = assertThrows(
+                                TooManyLoginAttemptsException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, WRONG_PASSWORD)));
+
+                assertEquals(900L, exception.getRetryAfterSeconds());
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
+                verify(loginLockoutAuditWriter, never()).writeUsernameLockout(any(), any(), any(int.class), any(), any());
         }
 
         @Test
@@ -190,6 +210,8 @@ class LoginServiceTest {
                 when(user.getPasswordHash()).thenReturn("hashed_secret");
 
                 when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(1, false, false, null, 0L));
                 when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
                 when(passwordEncoderPort.matches(WRONG_PASSWORD, "hashed_secret")).thenReturn(false);
 
@@ -197,19 +219,16 @@ class LoginServiceTest {
                                 InvalidCredentialsException.class,
                                 () -> loginService.login(new LoginCommand(USERNAME, WRONG_PASSWORD)));
 
-                verify(loginAttemptPort).loginFailed(USERNAME);
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
                 verify(auditLogRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("Username không tồn tại sai lần thứ 5 -> Khóa tạm nhưng không ghi AuditLog với userId null")
         void nonExistentUserFifthFailedAttempt_blocksWithoutAuditLogException() {
-                when(loginAttemptPort.isBlocked(USERNAME))
-                                .thenReturn(false)
-                                .thenReturn(true);
-
-                when(loginAttemptPort.getRetryAfterSeconds(USERNAME)).thenReturn(900L);
-                when(loginAttemptPort.getBlockedUntil(USERNAME)).thenReturn(NOW.plusSeconds(900));
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(5, true, true, NOW.plusSeconds(900), 900L));
 
                 when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
 
@@ -218,7 +237,7 @@ class LoginServiceTest {
                                 () -> loginService.login(new LoginCommand(USERNAME, WRONG_PASSWORD)));
 
                 assertEquals(900L, exception.getRetryAfterSeconds());
-                verify(loginAttemptPort).loginFailed(USERNAME);
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
                 verify(auditLogRepository, never()).save(any());
         }
 }

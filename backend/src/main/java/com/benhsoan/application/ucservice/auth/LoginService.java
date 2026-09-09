@@ -126,11 +126,11 @@ public class LoginService implements LoginUseCase {
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> {
-                    loginAttemptPort.loginFailed(username);
-                    if (loginAttemptPort.isBlocked(username)) {
+                    var attemptResult = loginAttemptPort.recordLoginFailed(username);
+                    if (attemptResult.blocked()) {
                         throw new TooManyLoginAttemptsException(
-                                loginAttemptPort.getRetryAfterSeconds(username),
-                                loginAttemptPort.getBlockedUntil(username));
+                                attemptResult.retryAfterSeconds(),
+                                attemptResult.blockedUntil());
                     }
                     return new InvalidCredentialsException();
                 });
@@ -143,18 +143,20 @@ public class LoginService implements LoginUseCase {
                 command.password(),
                 user.getPasswordHash()
         )) {
-            loginAttemptPort.loginFailed(username);
-            if (loginAttemptPort.isBlocked(username)) {
-                loginLockoutAuditWriter.writeUsernameLockout(
-                        user.getId(),
-                        user.getUsername(),
-                        loginAttemptPort.getAttemptCount(username),
-                        loginAttemptPort.getBlockedUntil(username),
-                        null
-                );
+            var attemptResult = loginAttemptPort.recordLoginFailed(username);
+            if (attemptResult.blocked()) {
+                if (attemptResult.newlyBlocked()) {
+                    loginLockoutAuditWriter.writeUsernameLockout(
+                            user.getId(),
+                            user.getUsername(),
+                            attemptResult.attemptCount(),
+                            attemptResult.blockedUntil(),
+                            null
+                    );
+                }
                 throw new TooManyLoginAttemptsException(
-                        loginAttemptPort.getRetryAfterSeconds(username),
-                        loginAttemptPort.getBlockedUntil(username));
+                        attemptResult.retryAfterSeconds(),
+                        attemptResult.blockedUntil());
             }
             throw new InvalidCredentialsException();
         }

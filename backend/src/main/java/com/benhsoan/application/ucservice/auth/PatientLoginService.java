@@ -139,11 +139,11 @@ public class PatientLoginService implements PatientLoginUseCase {
 
         User user = userRepository.findByPhone(phone)
                 .orElseThrow(() -> {
-                    loginAttemptPort.loginFailed(phone);
-                    if (loginAttemptPort.isBlocked(phone)) {
+                    var attemptResult = loginAttemptPort.recordLoginFailed(phone);
+                    if (attemptResult.blocked()) {
                         throw new TooManyLoginAttemptsException(
-                                loginAttemptPort.getRetryAfterSeconds(phone),
-                                loginAttemptPort.getBlockedUntil(phone));
+                                attemptResult.retryAfterSeconds(),
+                                attemptResult.blockedUntil());
                     }
                     return new InvalidCredentialsException();
                 });
@@ -153,18 +153,20 @@ public class PatientLoginService implements PatientLoginUseCase {
         }
 
         if (!passwordEncoderPort.matches(command.password(), user.getPasswordHash())) {
-            loginAttemptPort.loginFailed(phone);
-            if (loginAttemptPort.isBlocked(phone)) {
-                loginLockoutAuditWriter.writePhoneLockout(
-                        user.getId(),
-                        phone,
-                        loginAttemptPort.getAttemptCount(phone),
-                        loginAttemptPort.getBlockedUntil(phone),
-                        command.ipAddress()
-                );
+            var attemptResult = loginAttemptPort.recordLoginFailed(phone);
+            if (attemptResult.blocked()) {
+                if (attemptResult.newlyBlocked()) {
+                    loginLockoutAuditWriter.writePhoneLockout(
+                            user.getId(),
+                            phone,
+                            attemptResult.attemptCount(),
+                            attemptResult.blockedUntil(),
+                            command.ipAddress()
+                    );
+                }
                 throw new TooManyLoginAttemptsException(
-                        loginAttemptPort.getRetryAfterSeconds(phone),
-                        loginAttemptPort.getBlockedUntil(phone));
+                        attemptResult.retryAfterSeconds(),
+                        attemptResult.blockedUntil());
             }
             throw new InvalidCredentialsException();
         }
