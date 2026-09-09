@@ -30,6 +30,7 @@ import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
 import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.port.dto.command.auth.PatientLoginCommand;
+import com.benhsoan.port.dto.result.LoginAttemptResult;
 import com.benhsoan.port.dto.result.PatientLoginResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
@@ -62,6 +63,7 @@ class PatientLoginServiceTest {
     @Mock private RefreshTokenGeneratorPort refreshTokenGeneratorPort;
     @Mock private LoginAttemptPort loginAttemptPort;
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private LoginLockoutAuditWriter loginLockoutAuditWriter;
     @Mock private ClockPort clockPort;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -73,7 +75,7 @@ class PatientLoginServiceTest {
         service = new PatientLoginService(
                 userRepository, roleRepository, userSessionRepository, patientRepository,
                 passwordEncoderPort, jwtTokenPort, tokenHashPort, refreshTokenGeneratorPort,
-                loginAttemptPort, auditLogRepository, clockPort, objectMapper);
+                loginAttemptPort, auditLogRepository, loginLockoutAuditWriter, clockPort, objectMapper);
     }
 
     @Test
@@ -139,12 +141,63 @@ class PatientLoginServiceTest {
 
         when(userRepository.findByPhone(PHONE)).thenReturn(Optional.of(user));
         when(passwordEncoderPort.matches("wrong", "hash")).thenReturn(false);
+        when(loginAttemptPort.isBlocked(PHONE)).thenReturn(false);
+        when(loginAttemptPort.recordLoginFailed(PHONE)).thenReturn(new LoginAttemptResult(1, false, false, null, 0L));
 
         assertThrows(InvalidCredentialsException.class,
                 () -> service.login(new PatientLoginCommand(PHONE, "wrong", null, null)));
 
-        verify(loginAttemptPort).loginFailed(PHONE);
+        verify(loginAttemptPort).recordLoginFailed(PHONE);
         verify(loginAttemptPort, never()).loginSucceeded(PHONE);
+    }
+
+    @Test
+    void wrongPassword5thTimeImmediatelyBlocksAndRecordsAuditLog() {
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(userId);
+        when(user.isActive()).thenReturn(true);
+        when(user.getPasswordHash()).thenReturn("hash");
+
+        when(userRepository.findByPhone(PHONE)).thenReturn(Optional.of(user));
+        when(passwordEncoderPort.matches("wrong", "hash")).thenReturn(false);
+        when(loginAttemptPort.isBlocked(PHONE)).thenReturn(false);
+        when(loginAttemptPort.recordLoginFailed(PHONE)).thenReturn(new LoginAttemptResult(5, true, true, NOW.plusSeconds(900), 900L));
+
+        TooManyLoginAttemptsException ex = assertThrows(
+                TooManyLoginAttemptsException.class,
+                () -> service.login(new PatientLoginCommand(PHONE, "wrong", null, null)));
+
+        assertEquals(900L, ex.getRetryAfterSeconds());
+        verify(loginAttemptPort).recordLoginFailed(PHONE);
+
+        verify(loginLockoutAuditWriter).writePhoneLockout(
+                userId,
+                PHONE,
+                5,
+                NOW.plusSeconds(900),
+                null
+        );
+    }
+
+    @Test
+    void concurrentFailedLogin_alreadyBlockedDoesNotDuplicatePhoneLockAuditLog() {
+        User user = mock(User.class);
+        when(user.isActive()).thenReturn(true);
+        when(user.getPasswordHash()).thenReturn("hash");
+
+        when(userRepository.findByPhone(PHONE)).thenReturn(Optional.of(user));
+        when(passwordEncoderPort.matches("wrong", "hash")).thenReturn(false);
+        when(loginAttemptPort.isBlocked(PHONE)).thenReturn(false);
+        when(loginAttemptPort.recordLoginFailed(PHONE)).thenReturn(new LoginAttemptResult(6, true, false, NOW.plusSeconds(900), 900L));
+
+        TooManyLoginAttemptsException ex = assertThrows(
+                TooManyLoginAttemptsException.class,
+                () -> service.login(new PatientLoginCommand(PHONE, "wrong", null, null)));
+
+        assertEquals(900L, ex.getRetryAfterSeconds());
+        verify(loginAttemptPort).recordLoginFailed(PHONE);
+        verify(loginLockoutAuditWriter, never()).writePhoneLockout(any(), any(), any(int.class), any(), any());
     }
 
     @Test
