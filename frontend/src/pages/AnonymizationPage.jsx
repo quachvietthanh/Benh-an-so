@@ -186,12 +186,23 @@ function AnonymizationPage() {
               onConfirm={() => toggleAnonymization(!anonymizationEnabled)}
               okText="Xác nhận"
               cancelText="Hủy"
+              okButtonProps={{
+                type: 'primary',
+                danger: anonymizationEnabled,
+                size: 'large',
+              }}
+              cancelButtonProps={{
+                size: 'large',
+              }}
               disabled={!canUpdate || loading || saving}
+              overlayClassName="anon-confirm-popconfirm"
+              overlayStyle={{ maxWidth: 410 }}
+              placement="bottomRight"
             >
               <Button
                 type={anonymizationEnabled ? 'default' : 'primary'}
                 danger={anonymizationEnabled}
-                size="middle"
+                size="large"
                 icon={anonymizationEnabled ? <EyeOutlined /> : <EyeInvisibleOutlined />}
                 loading={saving}
                 disabled={!canUpdate || loading}

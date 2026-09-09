@@ -155,18 +155,22 @@
   border-color: #ef4444 !important;
   color: #dc2626 !important;
   font-weight: 600 !important;
-  border-radius: 6px !important;
-  font-size: 13px !important;
-  height: 32px !important;
-  padding: 0 14px !important;
-  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.06) !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  height: 40px !important;
+  padding: 0 18px !important;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.1) !important;
   transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 .anon-action-btn-danger:hover {
   background: #fef2f2 !important;
   border-color: #dc2626 !important;
   color: #b91c1c !important;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.16) !important;
 }
 
 .anon-action-btn-primary {
@@ -174,17 +178,123 @@
   border-color: #2563eb !important;
   color: #ffffff !important;
   font-weight: 600 !important;
-  border-radius: 6px !important;
-  font-size: 13px !important;
-  height: 32px !important;
-  padding: 0 14px !important;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  height: 40px !important;
+  padding: 0 18px !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25) !important;
   transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 .anon-action-btn-primary:hover {
   background: #1d4ed8 !important;
   border-color: #1d4ed8 !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35) !important;
+}
+
+/* Popconfirm Hộp thoại Xác nhận Ẩn danh Gọn gàng & Button To Rõ Cân Đối Khung Hình */
+.anon-confirm-popconfirm {
+  max-width: 410px !important;
+}
+
+.anon-confirm-popconfirm .ant-popover-inner {
+  padding: 18px 20px !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.16), 0 4px 12px -2px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-message {
+  align-items: flex-start !important;
+  gap: 12px !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-message-icon,
+.anon-confirm-popconfirm .ant-popover-message > .anticon {
+  font-size: 20px !important;
+  margin-top: 1px !important;
+  flex-shrink: 0 !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-title,
+.anon-confirm-popconfirm .ant-popover-message-title {
+  font-size: 15.5px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  line-height: 1.4 !important;
+  margin-bottom: 8px !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-description {
+  font-size: 13.5px !important;
+  color: #475569 !important;
+  line-height: 1.55 !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons {
+  display: flex !important;
+  width: 100% !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-top: 18px !important;
+  padding-top: 14px !important;
+  border-top: 1px solid #f1f5f9 !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons .ant-btn {
+  flex: 1 1 0% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 16px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  margin: 0 !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons .ant-btn-default {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons .ant-btn-default:hover {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons .ant-btn-primary:not(.ant-btn-dangerous) {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25) !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons .ant-btn-primary:not(.ant-btn-dangerous):hover {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35) !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons .ant-btn-dangerous {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25) !important;
+}
+
+.anon-confirm-popconfirm .ant-popconfirm-buttons .ant-btn-dangerous:hover {
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.35) !important;
 }
 
 /* Comparison Demo Card */
