@@ -100,14 +100,28 @@ export default function SignMedicalRecordModal({
     }
   }, [open])
 
+  const getCanvasCoordinates = (e) => {
+    const canvas = canvasRef.current
+    if (!canvas) return { x: 0, y: 0 }
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    }
+  }
+
   const startDrawing = (e) => {
     const canvas = canvasRef.current
     if (!canvas) return
     isDrawingRef.current = true
     const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
+    const pos = getCanvasCoordinates(e)
     ctx.beginPath()
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top)
+    ctx.moveTo(pos.x, pos.y)
   }
 
   const draw = (e) => {
@@ -115,11 +129,11 @@ export default function SignMedicalRecordModal({
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
+    const pos = getCanvasCoordinates(e)
     ctx.lineWidth = 2.5
     ctx.lineCap = 'round'
     ctx.strokeStyle = '#1e3a8a'
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top)
+    ctx.lineTo(pos.x, pos.y)
     ctx.stroke()
   }
 
@@ -704,6 +718,8 @@ export default function SignMedicalRecordModal({
                     borderRadius: 8,
                     background: '#fff',
                     position: 'relative',
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
                   }}
                 >
                   <canvas
@@ -714,7 +730,25 @@ export default function SignMedicalRecordModal({
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
                     onMouseLeave={stopDrawing}
-                    style={{ cursor: 'crosshair', display: 'block' }}
+                    onTouchStart={(e) => {
+                      e.preventDefault()
+                      startDrawing(e)
+                    }}
+                    onTouchMove={(e) => {
+                      e.preventDefault()
+                      draw(e)
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault()
+                      stopDrawing()
+                    }}
+                    style={{
+                      cursor: 'crosshair',
+                      display: 'block',
+                      maxWidth: '100%',
+                      height: 'auto',
+                      touchAction: 'none',
+                    }}
                   />
                   <Button
                     size="small"

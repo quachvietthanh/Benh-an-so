@@ -573,7 +573,7 @@
 .appointment-modal-title p {
   margin: 3px 0 0;
   color: #79879a;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .appointment-form-modal .ant-modal-body {
@@ -725,7 +725,7 @@
   overflow: hidden;
   margin-top: 3px;
   color: #78879a;
-  font-size: 9px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -751,13 +751,13 @@
 .appointment-no-show-warning strong {
   display: block;
   color: #7c460d;
-  font-size: 10px;
+  font-size: 12.5px;
 }
 
 .appointment-no-show-warning p {
   margin: 4px 0 0;
   color: #805d2e;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -783,7 +783,7 @@
 .appointment-detail-patient p {
   margin: 4px 0 0;
   color: #77869a;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .appointment-detail-grid {
@@ -801,7 +801,8 @@
 .appointment-detail-grid dt {
   margin-bottom: 4px;
   color: #8491a3;
-  font-size: 8px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .appointment-detail-grid dd {

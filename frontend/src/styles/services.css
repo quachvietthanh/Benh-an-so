@@ -370,7 +370,7 @@
   align-items: flex-start;
   gap: 8px;
   color: #526a86;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.55;
   background: #f3f8ff;
   border: 1px solid #dae9fb;
@@ -404,7 +404,7 @@
   display: block;
   margin-bottom: 4px;
   color: #176ee8;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -865,7 +865,7 @@
   padding: 0 5px;
   place-items: center;
   color: #176ee8;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 18px;
   background: #e8f2ff;

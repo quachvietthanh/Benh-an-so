@@ -38,6 +38,7 @@ import {
   EllipsisOutlined,
   ExclamationCircleOutlined,
   EyeOutlined,
+  FileTextOutlined,
   FilterOutlined,
   HistoryOutlined,
   MedicineBoxOutlined,
@@ -58,6 +59,7 @@ import appointmentApi from '../api/appointmentApi'
 import patientApi from '../api/patientApi'
 import PersonalDataConsentField from '../components/patient/PersonalDataConsentField'
 import queueApi from '../api/queueApi'
+import PatientMedicalHistoryModal from '../components/clinical/PatientMedicalHistoryModal'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
 import {
@@ -186,6 +188,18 @@ function AppointmentQueue() {
   const [quickPatientModalOpen, setQuickPatientModalOpen] = useState(false)
   const [quickPatientSaving, setQuickPatientSaving] = useState(false)
   const [logsDrawerOpen, setLogsDrawerOpen] = useState(false)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [historyPatientTarget, setHistoryPatientTarget] = useState(null)
+  const [completedSearchKeyword, setCompletedSearchKeyword] = useState('')
+
+  const openPatientHistory = useCallback((patientId, patientName, patientCode) => {
+    if (!patientId) {
+      message.warning('Không tìm thấy mã bệnh nhân để tra cứu lịch sử.')
+      return
+    }
+    setHistoryPatientTarget({ patientId, patientName, patientCode })
+    setHistoryModalOpen(true)
+  }, [])
 
   const [bookForm] = Form.useForm()
   const [walkInForm] = Form.useForm()
@@ -426,6 +440,12 @@ function AppointmentQueue() {
       inProgress: sortByNumber(items.filter((q) => q.status === 'IN_PROGRESS')),
       waiting: sortByNumber(items.filter((q) => q.status === 'WAITING')),
       waitingForResult: sortByNumber(items.filter((q) => q.status === 'WAITING_FOR_RESULT')),
+      completed: [...items.filter((q) => q.status === 'COMPLETED')].sort((a, b) => {
+        if (a.completedAt && b.completedAt) {
+          return new Date(b.completedAt) - new Date(a.completedAt)
+        }
+        return Number(b.queueNumber || 0) - Number(a.queueNumber || 0)
+      }),
       finished: sortByNumber(items.filter((q) => ['COMPLETED', 'SKIPPED', 'CANCELLED'].includes(q.status))),
     }
   }, [permissions.isDoctorOnly, myQueueData, queues, user?.id, queueDoctorFilter])
@@ -1449,6 +1469,12 @@ function AppointmentQueue() {
                       renderItem={(item) => {
                         const pInfo = getPatientInfo(item.patientId, item.patientName)
                         const secondaryActions = [
+                          {
+                            key: 'history',
+                            label: 'Lịch sử khám của bệnh nhân',
+                            icon: <HistoryOutlined style={{ color: '#2563eb' }} />,
+                            onClick: () => openPatientHistory(item.patientId, pInfo.name, pInfo.code),
+                          },
                           ...(permissions.canUpdateStatus
                             ? [{
                               key: 'wait-result',
@@ -1496,6 +1522,13 @@ function AppointmentQueue() {
                                   Ghi bệnh án / Khám
                                 </Button>
                               ),
+                              <Button
+                                key="history"
+                                icon={<HistoryOutlined />}
+                                onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
+                              >
+                                Lịch sử khám
+                              </Button>,
                               secondaryActions.length > 0 && (
                                 <Dropdown key="more" menu={{ items: secondaryActions }} trigger={['click']} placement="bottomRight">
                                   <Button icon={<MoreOutlined />} aria-label={`Thao tác khác với bệnh nhân ${pInfo.name}`} />
@@ -1619,6 +1652,13 @@ function AppointmentQueue() {
                                 Gọi vào khám
                               </Button>
                             ),
+                            <Button
+                              key="history"
+                              icon={<HistoryOutlined />}
+                              onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
+                            >
+                              Lịch sử
+                            </Button>,
                           ].filter(Boolean)}
                         >
                           <List.Item.Meta
@@ -1732,6 +1772,13 @@ function AppointmentQueue() {
                             <Button key="view-record" onClick={() => openEncounter(item)}>
                               Xem bệnh án
                             </Button>,
+                            <Button
+                              key="history"
+                              icon={<HistoryOutlined />}
+                              onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
+                            >
+                              Lịch sử
+                            </Button>,
                           ].filter(Boolean)}
                         >
                           <List.Item.Meta
@@ -1808,12 +1855,290 @@ function AppointmentQueue() {
                     }}
                   />
                 </Card>
+
+                {/* Khối 4: Bệnh nhân đã khám xong trong ngày */}
+                <Card
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                      <Text strong style={{ color: '#16a34a' }}>
+                        🟢 BỆNH NHÂN ĐÃ KHÁM XONG TRONG NGÀY ({doctorQueueGroups.completed.length})
+                      </Text>
+                      <Tag color="success" style={{ margin: 0, fontWeight: 600 }}>
+                        Ngày {selectedDate.format('DD/MM/YYYY')}
+                      </Tag>
+                    </div>
+                  }
+                  style={{ borderRadius: 12, borderColor: '#bbf7d0', backgroundColor: '#fafffa' }}
+                >
+                  {doctorQueueGroups.completed.length === 0 ? (
+                    <div style={{ padding: '24px 0', textAlign: 'center' }}>
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description={
+                          <span style={{ color: '#64748b' }}>
+                            Chưa có bệnh nhân nào hoàn tất khám trong ngày {selectedDate.format('DD/MM/YYYY')}.
+                          </span>
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <List
+                      dataSource={doctorQueueGroups.completed}
+                      pagination={{ pageSize: 5 }}
+                      renderItem={(item) => {
+                        const pInfo = getPatientInfo(item.patientId, item.patientName)
+                        return (
+                          <List.Item
+                            actions={[
+                              <Button
+                                key="view-record"
+                                icon={<FileTextOutlined />}
+                                onClick={() => openEncounter(item)}
+                              >
+                                Xem lại bệnh án
+                              </Button>,
+                              <Button
+                                key="view-history"
+                                type="primary"
+                                ghost
+                                icon={<HistoryOutlined />}
+                                onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
+                              >
+                                Lịch sử khám
+                              </Button>,
+                            ]}
+                          >
+                            <List.Item.Meta
+                              avatar={
+                                <Avatar
+                                  size={44}
+                                  style={{
+                                    backgroundColor: '#16a34a',
+                                    fontWeight: 700,
+                                    fontSize: 15,
+                                    boxShadow: '0 2px 5px rgba(22, 163, 74, 0.2)',
+                                  }}
+                                >
+                                  {getInitials(pInfo.name)}
+                                </Avatar>
+                              }
+                              title={
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                  <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
+                                    {pInfo.name}
+                                  </Text>
+                                  {item.queueNumber && (
+                                    <Tag
+                                      color="green"
+                                      style={{
+                                        fontWeight: 700,
+                                        fontSize: 12,
+                                        padding: '1px 8px',
+                                        borderRadius: 4,
+                                        margin: 0,
+                                      }}
+                                    >
+                                      STT #{String(item.queueNumber).padStart(2, '0')}
+                                    </Tag>
+                                  )}
+                                  <Tag color="success" style={{ margin: 0, fontSize: 11, borderRadius: 4, fontWeight: 600 }}>
+                                    <CheckCircleOutlined style={{ marginRight: 4 }} />Đã hoàn thành
+                                  </Tag>
+                                </div>
+                              }
+                              description={
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap', fontSize: 12 }}>
+                                  <span style={{ color: '#64748b' }}>
+                                    Mã lượt:{' '}
+                                    <Tag
+                                      style={{
+                                        fontFamily: 'monospace',
+                                        fontWeight: 600,
+                                        fontSize: 11.5,
+                                        color: '#1d4ed8',
+                                        backgroundColor: '#eff6ff',
+                                        borderColor: '#bfdbfe',
+                                        borderRadius: 4,
+                                        margin: 0,
+                                        padding: '0 6px',
+                                      }}
+                                    >
+                                      {formatVisitCode(item.visitCode, item.visitId)}
+                                    </Tag>
+                                  </span>
+                                  {pInfo.code && pInfo.code !== '—' && (
+                                    <span style={{ color: '#64748b' }}>
+                                      Mã BN: <Text strong style={{ color: '#334155' }}>{pInfo.code}</Text>
+                                    </span>
+                                  )}
+                                  {pInfo.phone && (
+                                    <span style={{ color: '#64748b' }}>
+                                      SĐT: <Text style={{ color: '#334155' }}>{pInfo.phone}</Text>
+                                    </span>
+                                  )}
+                                  {item.completedAt && (
+                                    <span style={{ color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                                      <CheckCircleOutlined style={{ fontSize: 12, color: '#16a34a' }} />
+                                      <span>Hoàn tất lúc: {dayjs(item.completedAt).format('HH:mm')}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              }
+                            />
+                          </List.Item>
+                        )
+                      }}
+                    />
+                  )}
+                </Card>
               </div>
+            ),
+          },
+          {
+            key: 'completed_history',
+            label: (
+              <span>
+                <HistoryOutlined /> Lịch Sử Bệnh Nhân Đã Khám ({doctorQueueGroups.completed.length})
+              </span>
+            ),
+            children: (
+              <Card style={{ borderRadius: 12 }}>
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }} align="middle" justify="space-between">
+                  <Col xs={24} sm={12} md={8}>
+                    <Input
+                      placeholder="Tìm theo tên bệnh nhân, mã BN, mã lượt, SĐT..."
+                      prefix={<SearchOutlined />}
+                      value={completedSearchKeyword}
+                      onChange={(e) => setCompletedSearchKeyword(e.target.value)}
+                      allowClear
+                    />
+                  </Col>
+                  <Col xs={24} sm={12} md={12} style={{ textAlign: 'right' }}>
+                    <Text type="secondary" style={{ fontSize: 13 }}>
+                      Danh sách các ca khám hoàn thành ngày <strong>{selectedDate.format('DD/MM/YYYY')}</strong>
+                    </Text>
+                  </Col>
+                </Row>
+
+                <Table
+                  dataSource={doctorQueueGroups.completed.filter((item) => {
+                    if (!completedSearchKeyword.trim()) return true
+                    const kw = completedSearchKeyword.trim().toLowerCase()
+                    const pInfo = getPatientInfo(item.patientId, item.patientName)
+                    return (
+                      pInfo.name.toLowerCase().includes(kw) ||
+                      (pInfo.code && pInfo.code.toLowerCase().includes(kw)) ||
+                      (item.visitCode && item.visitCode.toLowerCase().includes(kw)) ||
+                      (pInfo.phone && pInfo.phone.includes(kw))
+                    )
+                  })}
+                  columns={[
+                    {
+                      title: 'STT',
+                      dataIndex: 'queueNumber',
+                      key: 'queueNumber',
+                      width: 80,
+                      align: 'center',
+                      render: (val) => (
+                        <Tag color="green" style={{ fontWeight: 700 }}>
+                          #{String(val || 1).padStart(2, '0')}
+                        </Tag>
+                      ),
+                    },
+                    {
+                      title: 'Bệnh nhân',
+                      key: 'patient',
+                      render: (_, record) => {
+                        const pInfo = getPatientInfo(record.patientId, record.patientName)
+                        return (
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{pInfo.name}</div>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>
+                              Mã BN: <strong style={{ color: '#334155' }}>{pInfo.code || '—'}</strong>
+                              {pInfo.phone && ` • SĐT: ${pInfo.phone}`}
+                            </div>
+                          </div>
+                        )
+                      },
+                    },
+                    {
+                      title: 'Mã lượt khám',
+                      dataIndex: 'visitCode',
+                      key: 'visitCode',
+                      width: 140,
+                      render: (val, record) => (
+                        <Tag style={{ fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8', backgroundColor: '#eff6ff' }}>
+                          {formatVisitCode(val, record.visitId)}
+                        </Tag>
+                      ),
+                    },
+                    {
+                      title: 'Giờ tiếp nhận',
+                      dataIndex: 'checkedInAt',
+                      key: 'checkedInAt',
+                      width: 130,
+                      render: (val) => val ? dayjs(val).format('HH:mm') : '—',
+                    },
+                    {
+                      title: 'Giờ hoàn tất',
+                      dataIndex: 'completedAt',
+                      key: 'completedAt',
+                      width: 130,
+                      render: (val) => val ? (
+                        <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                          {dayjs(val).format('HH:mm')}
+                        </span>
+                      ) : '—',
+                    },
+                    {
+                      title: 'Trạng thái',
+                      key: 'status',
+                      width: 150,
+                      render: () => (
+                        <Tag color="success" style={{ fontWeight: 600 }}>
+                          <CheckCircleOutlined style={{ marginRight: 4 }} />Đã hoàn thành
+                        </Tag>
+                      ),
+                    },
+                    {
+                      title: 'Thao tác',
+                      key: 'action',
+                      width: 220,
+                      align: 'center',
+                      render: (_, record) => {
+                        const pInfo = getPatientInfo(record.patientId, record.patientName)
+                        return (
+                          <Space size={6}>
+                            <Button
+                              size="small"
+                              icon={<FileTextOutlined />}
+                              onClick={() => openEncounter(record)}
+                            >
+                              Bệnh án
+                            </Button>
+                            <Button
+                              size="small"
+                              type="primary"
+                              ghost
+                              icon={<HistoryOutlined />}
+                              onClick={() => openPatientHistory(record.patientId, pInfo.name, pInfo.code)}
+                            >
+                              Lịch sử khám
+                            </Button>
+                          </Space>
+                        )
+                      },
+                    },
+                  ]}
+                  rowKey="id"
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                />
+              </Card>
             ),
           },
         ].filter((item) => {
           if (permissions.isAdmin) return true
-          if (permissions.isDoctor) return item.key === 'doctor_queue'
+          if (permissions.isDoctor) return ['doctor_queue', 'completed_history'].includes(item.key)
           return ['appointments', 'reception_queue'].includes(item.key)
         })}
       />
@@ -2214,6 +2539,18 @@ function AppointmentQueue() {
           </div>
         )}
       </Modal>
+
+      <PatientMedicalHistoryModal
+        open={historyModalOpen}
+        onClose={() => {
+          setHistoryModalOpen(false)
+          setHistoryPatientTarget(null)
+        }}
+        patientId={historyPatientTarget?.patientId}
+        patientName={historyPatientTarget?.patientName}
+        patientCode={historyPatientTarget?.patientCode}
+        onOpenEncounter={openEncounter}
+      />
     </div>
   )
 }
