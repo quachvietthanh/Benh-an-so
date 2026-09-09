@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.appointment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +29,7 @@ import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.DoctorSchedule;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.appointment.exception.AppointmentPastCutoffException;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
 import com.benhsoan.domain.appointment.exception.SlotAlreadyBookedException;
 import com.benhsoan.domain.auditlog.AuditLog;
@@ -58,6 +60,8 @@ class PatientRescheduleAppointmentServiceTest {
 
     @Mock private AppointmentRepository appointmentRepository;
     @Mock private DoctorScheduleRepository doctorScheduleRepository;
+    @Mock private com.benhsoan.port.outbound.repository.appointment.DoctorWeeklyScheduleRepository doctorWeeklyScheduleRepository;
+    @Mock private com.benhsoan.port.outbound.repository.appointment.DoctorTimeOffRepository doctorTimeOffRepository;
     @Mock private UserRepository userRepository;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private PatientAccessGuard patientAccessGuard;
@@ -71,6 +75,8 @@ class PatientRescheduleAppointmentServiceTest {
         service = new PatientRescheduleAppointmentService(
                 appointmentRepository,
                 doctorScheduleRepository,
+                doctorWeeklyScheduleRepository,
+                doctorTimeOffRepository,
                 userRepository,
                 currentUserPort,
                 patientAccessGuard,
@@ -214,5 +220,37 @@ class PatientRescheduleAppointmentServiceTest {
         assertThrows(SlotAlreadyBookedException.class,
                 () -> service.reschedule(appointmentId,
                         new PatientRescheduleAppointmentCommand(NEW_DATE, NEW_TIME, "Đổi lịch")));
+    }
+
+    @Test
+    void rejectsRescheduleWhenDoctorInTimeOff() {
+        // TC-02 / QTN-30: Bác sĩ không làm việc trong khung giờ này khi dời lịch vào khoảng nghỉ
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        Appointment appointment = Appointment.restore(appointmentId, "AP000400", patientId, doctorId,
+                OLD_START, OLD_END, AppointmentStatus.SCHEDULED, "Khám tổng quát",
+                null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
+
+        User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com",
+                "0900000001", roleId, true, null, Instant.parse("2026-08-01T00:00:00Z"));
+        DoctorSchedule schedule = DoctorSchedule.create(doctorId, NEW_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0));
+
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
+        when(clockPort.now()).thenReturn(NOW);
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
+        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, NEW_DATE))
+                .thenReturn(Optional.of(schedule));
+        when(doctorTimeOffRepository.existsActiveOverlapping(eq(doctorId), eq(NEW_START), eq(NEW_END)))
+                .thenReturn(true);
+
+        DoctorNotWorkingException ex = assertThrows(DoctorNotWorkingException.class,
+                () -> service.reschedule(appointmentId,
+                        new PatientRescheduleAppointmentCommand(NEW_DATE, NEW_TIME, "Đổi lịch")));
+        assertEquals("Bác sĩ không làm việc trong khung giờ này.", ex.getMessage());
     }
 }

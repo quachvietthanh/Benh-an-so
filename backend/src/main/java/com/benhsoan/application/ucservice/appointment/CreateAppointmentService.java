@@ -26,6 +26,7 @@ import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -48,6 +49,10 @@ public class CreateAppointmentService
     private final AppointmentResultMapper appointmentResultMapper;
 
     private final AuditLogRepository auditLogRepository;
+
+    private final DoctorScheduleValidator doctorScheduleValidator;
+
+    private final ClockPort clockPort;
 
     @Override
     public AppointmentResult create(
@@ -132,9 +137,16 @@ public class CreateAppointmentService
             throw new ValidationException("Appointment end time must be after start time.");
         }
 
-        if (command.startTime().isBefore(Instant.now())) {
-            throw new ValidationException("Appointment end time must be after start time.");
+        if (command.startTime().isBefore(clockPort.now())) {
+            throw new ValidationException("Thời gian đặt lịch không được ở trong quá khứ.");
         }
+
+        // QTN-30 / TC-02: Check doctor schedule and active time-off
+        doctorScheduleValidator.validateDoctorWorkingAndAvailable(
+                command.doctorId(),
+                command.startTime(),
+                command.endTime()
+        );
 
         if (appointmentRepository.existsActiveAppointmentConflict(
             command.doctorId(),
