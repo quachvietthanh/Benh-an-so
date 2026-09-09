@@ -82,4 +82,11 @@ class LoginAttemptAdapterTest {
         adapter.loginSucceeded("phone");
         verify(repository).deleteById("phone");
     }
+
+    @Test
+    void unlockDeletesRecord() {
+        LoginAttemptAdapter adapter = new LoginAttemptAdapter(5, 900_000, repository, clockPort);
+        adapter.unlock("admin_user");
+        verify(repository).deleteById("admin_user");
+    }
 }

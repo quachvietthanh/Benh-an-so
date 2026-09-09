@@ -1,7 +1,7 @@
 package com.benhsoan.application.ucservice.auth;
 
-import java.time.Instant;
 import java.time.Duration;
+import java.time.Instant;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +29,9 @@ import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class LoginService implements LoginUseCase {
 
@@ -56,7 +55,63 @@ public class LoginService implements LoginUseCase {
 
     private final AuditLogRepository auditLogRepository;
 
+    private final LoginLockoutAuditWriter loginLockoutAuditWriter;
+
     private final ClockPort clockPort;
+
+    @Autowired
+    public LoginService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            UserSessionRepository userSessionRepository,
+            PasswordEncoderPort passwordEncoderPort,
+            JwtTokenPort jwtTokenPort,
+            TokenHashPort tokenHashPort,
+            RefreshTokenGeneratorPort refreshTokenGeneratorPort,
+            LoginAttemptPort loginAttemptPort,
+            AuditLogRepository auditLogRepository,
+            LoginLockoutAuditWriter loginLockoutAuditWriter,
+            ClockPort clockPort
+    ) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.userSessionRepository = userSessionRepository;
+        this.passwordEncoderPort = passwordEncoderPort;
+        this.jwtTokenPort = jwtTokenPort;
+        this.tokenHashPort = tokenHashPort;
+        this.refreshTokenGeneratorPort = refreshTokenGeneratorPort;
+        this.loginAttemptPort = loginAttemptPort;
+        this.auditLogRepository = auditLogRepository;
+        this.loginLockoutAuditWriter = loginLockoutAuditWriter;
+        this.clockPort = clockPort;
+    }
+
+    public LoginService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            UserSessionRepository userSessionRepository,
+            PasswordEncoderPort passwordEncoderPort,
+            JwtTokenPort jwtTokenPort,
+            TokenHashPort tokenHashPort,
+            RefreshTokenGeneratorPort refreshTokenGeneratorPort,
+            LoginAttemptPort loginAttemptPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort
+    ) {
+        this(
+                userRepository,
+                roleRepository,
+                userSessionRepository,
+                passwordEncoderPort,
+                jwtTokenPort,
+                tokenHashPort,
+                refreshTokenGeneratorPort,
+                loginAttemptPort,
+                auditLogRepository,
+                new LoginLockoutAuditWriter(auditLogRepository),
+                clockPort
+        );
+    }
 
     @Override
     public LoginResult login(LoginCommand command) {
@@ -71,9 +126,12 @@ public class LoginService implements LoginUseCase {
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> {
-
                     loginAttemptPort.loginFailed(username);
-
+                    if (loginAttemptPort.isBlocked(username)) {
+                        throw new TooManyLoginAttemptsException(
+                                loginAttemptPort.getRetryAfterSeconds(username),
+                                loginAttemptPort.getBlockedUntil(username));
+                    }
                     return new InvalidCredentialsException();
                 });
 
@@ -85,9 +143,19 @@ public class LoginService implements LoginUseCase {
                 command.password(),
                 user.getPasswordHash()
         )) {
-
             loginAttemptPort.loginFailed(username);
-
+            if (loginAttemptPort.isBlocked(username)) {
+                loginLockoutAuditWriter.writeUsernameLockout(
+                        user.getId(),
+                        user.getUsername(),
+                        loginAttemptPort.getAttemptCount(username),
+                        loginAttemptPort.getBlockedUntil(username),
+                        null
+                );
+                throw new TooManyLoginAttemptsException(
+                        loginAttemptPort.getRetryAfterSeconds(username),
+                        loginAttemptPort.getBlockedUntil(username));
+            }
             throw new InvalidCredentialsException();
         }
 
@@ -134,7 +202,6 @@ public class LoginService implements LoginUseCase {
                         null
                 )
         );
-
 
         return new LoginResult(
                 user.getId(),

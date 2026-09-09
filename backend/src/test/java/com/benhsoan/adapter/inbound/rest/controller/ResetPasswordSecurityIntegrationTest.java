@@ -79,6 +79,8 @@ class ResetPasswordSecurityIntegrationTest {
     @MockitoBean private ActivateUserUseCase activateUserUseCase;
     @MockitoBean private DeactivateUserUseCase deactivateUserUseCase;
     @MockitoBean private ResetPasswordUseCase resetPasswordUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.user.UnlockUserUseCase unlockUserUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.user.GetLoginAuditLogsUseCase getLoginAuditLogsUseCase;
     @MockitoBean private RoleRepository roleRepository;
     @MockitoBean private AuditLogRepository auditLogRepository;
     @MockitoBean private CurrentUserPort currentUserPort;

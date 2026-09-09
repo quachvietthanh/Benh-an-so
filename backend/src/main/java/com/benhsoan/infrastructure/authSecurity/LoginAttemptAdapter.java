@@ -49,6 +49,12 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void unlock(String identifier) {
+        repository.deleteById(identifier);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void loginFailed(String identifier) {
         Instant now = clockPort.now();
         LoginAttemptEntity entity = repository.findById(identifier).orElse(null);
@@ -69,11 +75,30 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
         if (attempts >= maxAttempts) {
             entity.setBlockedUntil(now.plusMillis(blockDurationMs));
         }
-        repository.save(entity);
+        try {
+            repository.save(entity);
+            repository.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            LoginAttemptEntity existing = repository.findById(identifier).orElse(null);
+            if (existing != null) {
+                if (isExpired(existing, now)) {
+                    existing.setAttempts(0);
+                    existing.setBlockedUntil(null);
+                }
+                int retriedAttempts = existing.getAttempts() + 1;
+                existing.setAttempts(retriedAttempts);
+                existing.setUpdatedAt(now);
+                if (retriedAttempts >= maxAttempts) {
+                    existing.setBlockedUntil(now.plusMillis(blockDurationMs));
+                }
+                repository.save(existing);
+                repository.flush();
+            }
+        }
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public boolean isBlocked(String identifier) {
         LoginAttemptEntity entity = repository.findById(identifier).orElse(null);
         if (entity == null || entity.getBlockedUntil() == null) {
@@ -83,7 +108,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public long getRetryAfterSeconds(String identifier) {
         LoginAttemptEntity entity = repository.findById(identifier).orElse(null);
         if (entity == null || entity.getBlockedUntil() == null) {
@@ -97,7 +122,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Instant getBlockedUntil(String identifier) {
         LoginAttemptEntity entity = repository.findById(identifier).orElse(null);
         if (entity == null) {
@@ -111,7 +136,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public int getAttemptCount(String identifier) {
         LoginAttemptEntity entity = repository.findById(identifier).orElse(null);
         return entity == null ? 0 : entity.getAttempts();

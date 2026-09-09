@@ -2,8 +2,6 @@ package com.benhsoan.persistence.adapterRepository.appointment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,7 +12,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
@@ -32,8 +29,10 @@ class AppointmentRepositoryAdapterTest {
     private static final Instant FROM = Instant.parse("2026-09-14T08:00:00Z");
     private static final Instant TO = Instant.parse("2026-09-14T09:00:00Z");
 
-    @Mock private JpaAppointmentRepository jpaRepository;
-    @Mock private AppointmentPersistenceMapper mapper;
+    @Mock
+    private JpaAppointmentRepository jpaRepository;
+    @Mock
+    private AppointmentPersistenceMapper mapper;
 
     private AppointmentRepositoryAdapter adapter;
 
@@ -61,11 +60,12 @@ class AppointmentRepositoryAdapterTest {
 
     @Test
     void existsActiveAppointmentConflictQueriesWithActiveSpecification() {
-        when(jpaRepository.exists(any(Specification.class))).thenReturn(true);
+        when(jpaRepository.exists(org.mockito.ArgumentMatchers.<Specification<AppointmentEntity>>any()))
+                .thenReturn(true);
 
         boolean exists = adapter.existsActiveAppointmentConflict(DOCTOR_ID, FROM, TO);
 
         assertTrue(exists);
-        verify(jpaRepository).exists(any(Specification.class));
+        verify(jpaRepository).exists(org.mockito.ArgumentMatchers.<Specification<AppointmentEntity>>any());
     }
 }

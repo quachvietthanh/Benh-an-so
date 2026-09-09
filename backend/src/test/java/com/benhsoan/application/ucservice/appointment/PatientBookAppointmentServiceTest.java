@@ -305,7 +305,7 @@ class PatientBookAppointmentServiceTest {
                 .thenReturn(Optional.empty());
 
         DoctorWeeklySchedule weeklySchedule = DoctorWeeklySchedule.create(
-                doctorId, FUTURE_DATE.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(12, 0));
+                doctorId, FUTURE_DATE.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(12, 0), NOW);
         when(doctorWeeklyScheduleRepository.findByDoctorIdAndDayOfWeek(doctorId, FUTURE_DATE.getDayOfWeek()))
                 .thenReturn(Optional.of(weeklySchedule));
         when(doctorTimeOffRepository.existsActiveOverlapping(eq(doctorId), any(Instant.class), any(Instant.class)))

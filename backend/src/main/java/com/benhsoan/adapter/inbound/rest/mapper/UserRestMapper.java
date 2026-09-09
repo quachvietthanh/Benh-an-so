@@ -68,4 +68,22 @@ public class UserRestMapper {
                 result.resetAt()
         );
     }
+
+    public com.benhsoan.adapter.inbound.rest.response.user.LoginAuditLogResponse toResponse(
+            com.benhsoan.port.dto.result.LoginAuditLogResult result
+    ) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.user.LoginAuditLogResponse(
+                result.id(),
+                result.userId(),
+                result.actionType(),
+                result.resourceType(),
+                result.resourceId(),
+                result.detail(),
+                result.ipAddress(),
+                result.createdAt()
+        );
+    }
 }

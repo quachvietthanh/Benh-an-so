@@ -8,6 +8,8 @@ public interface LoginAttemptPort {
 
     void loginFailed(String identifier);
 
+    void unlock(String identifier);
+
     boolean isBlocked(String identifier);
 
     long getRetryAfterSeconds(String identifier);

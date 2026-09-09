@@ -36,7 +36,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Patient portal authentication (NCL-14-CN-002). Authenticates by phone number + password,
@@ -44,7 +44,6 @@ import lombok.RequiredArgsConstructor;
  * the linked patientId (CV-02), and records a login audit with IP/User-Agent (TC-04).
  */
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class PatientLoginService implements PatientLoginUseCase {
 
@@ -61,8 +60,71 @@ public class PatientLoginService implements PatientLoginUseCase {
     private final RefreshTokenGeneratorPort refreshTokenGeneratorPort;
     private final LoginAttemptPort loginAttemptPort;
     private final AuditLogRepository auditLogRepository;
+    private final LoginLockoutAuditWriter loginLockoutAuditWriter;
     private final ClockPort clockPort;
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    public PatientLoginService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            UserSessionRepository userSessionRepository,
+            PatientRepository patientRepository,
+            PasswordEncoderPort passwordEncoderPort,
+            JwtTokenPort jwtTokenPort,
+            TokenHashPort tokenHashPort,
+            RefreshTokenGeneratorPort refreshTokenGeneratorPort,
+            LoginAttemptPort loginAttemptPort,
+            AuditLogRepository auditLogRepository,
+            LoginLockoutAuditWriter loginLockoutAuditWriter,
+            ClockPort clockPort,
+            ObjectMapper objectMapper
+    ) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.userSessionRepository = userSessionRepository;
+        this.patientRepository = patientRepository;
+        this.passwordEncoderPort = passwordEncoderPort;
+        this.jwtTokenPort = jwtTokenPort;
+        this.tokenHashPort = tokenHashPort;
+        this.refreshTokenGeneratorPort = refreshTokenGeneratorPort;
+        this.loginAttemptPort = loginAttemptPort;
+        this.auditLogRepository = auditLogRepository;
+        this.loginLockoutAuditWriter = loginLockoutAuditWriter;
+        this.clockPort = clockPort;
+        this.objectMapper = objectMapper;
+    }
+
+    public PatientLoginService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            UserSessionRepository userSessionRepository,
+            PatientRepository patientRepository,
+            PasswordEncoderPort passwordEncoderPort,
+            JwtTokenPort jwtTokenPort,
+            TokenHashPort tokenHashPort,
+            RefreshTokenGeneratorPort refreshTokenGeneratorPort,
+            LoginAttemptPort loginAttemptPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            ObjectMapper objectMapper
+    ) {
+        this(
+                userRepository,
+                roleRepository,
+                userSessionRepository,
+                patientRepository,
+                passwordEncoderPort,
+                jwtTokenPort,
+                tokenHashPort,
+                refreshTokenGeneratorPort,
+                loginAttemptPort,
+                auditLogRepository,
+                new LoginLockoutAuditWriter(auditLogRepository),
+                clockPort,
+                objectMapper
+        );
+    }
 
     @Override
     public PatientLoginResult login(PatientLoginCommand command) {
@@ -78,6 +140,11 @@ public class PatientLoginService implements PatientLoginUseCase {
         User user = userRepository.findByPhone(phone)
                 .orElseThrow(() -> {
                     loginAttemptPort.loginFailed(phone);
+                    if (loginAttemptPort.isBlocked(phone)) {
+                        throw new TooManyLoginAttemptsException(
+                                loginAttemptPort.getRetryAfterSeconds(phone),
+                                loginAttemptPort.getBlockedUntil(phone));
+                    }
                     return new InvalidCredentialsException();
                 });
 
@@ -87,6 +154,18 @@ public class PatientLoginService implements PatientLoginUseCase {
 
         if (!passwordEncoderPort.matches(command.password(), user.getPasswordHash())) {
             loginAttemptPort.loginFailed(phone);
+            if (loginAttemptPort.isBlocked(phone)) {
+                loginLockoutAuditWriter.writePhoneLockout(
+                        user.getId(),
+                        phone,
+                        loginAttemptPort.getAttemptCount(phone),
+                        loginAttemptPort.getBlockedUntil(phone),
+                        command.ipAddress()
+                );
+                throw new TooManyLoginAttemptsException(
+                        loginAttemptPort.getRetryAfterSeconds(phone),
+                        loginAttemptPort.getBlockedUntil(phone));
+            }
             throw new InvalidCredentialsException();
         }
 

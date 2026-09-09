@@ -3,6 +3,8 @@ package com.benhsoan.persistence.adapterRepository.auditlog;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.auditlog.AuditLog;
@@ -26,14 +28,20 @@ public class AuditLogRepositoryAdapter
 
         AuditLogEntity entity = mapper.toEntity(auditLog);
         return mapper.toDomain(
-                jpaRepository.save(entity)
-        );
+                jpaRepository.save(entity));
     }
 
     @Override
     public Optional<AuditLog> findById(UUID id) {
-        if(id == null) return null;
+        if (id == null)
+            return Optional.empty();
         return jpaRepository.findById(id)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Page<AuditLog> findLoginAuditLogs(UUID userId, Pageable pageable) {
+        return jpaRepository.findLoginAuditLogs(userId, pageable)
                 .map(mapper::toDomain);
     }
 

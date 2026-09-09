@@ -13,10 +13,11 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.RoleNotFoundException;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
 import com.benhsoan.port.dto.result.UserResult;
-import com.benhsoan.port.inbound.user.ActivateUserUseCase;
+import com.benhsoan.port.inbound.user.UnlockUserUseCase;
+import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class ActivateUserService implements ActivateUserUseCase {
+public class UnlockUserService implements UnlockUserUseCase {
 
     private final UserRepository userRepository;
 
@@ -32,54 +33,44 @@ public class ActivateUserService implements ActivateUserUseCase {
 
     private final UserResultMapper userResultMapper;
 
+    private final LoginAttemptPort loginAttemptPort;
+
     private final AuditLogRepository auditLogRepository;
 
     private final CurrentUserPort currentUserPort;
 
-    private final com.benhsoan.port.outbound.authSecurity.LoginAttemptPort loginAttemptPort;
-
     @Override
-    public UserResult activate(UUID id) {
+    public UserResult unlockUser(UUID id) {
 
         User user = userRepository.findById(id)
                 .orElseThrow(UserNotFoundException::new);
 
-        user.activate();
-
         loginAttemptPort.unlock(user.getUsername());
+
         if (user.getPhone() != null && !user.getPhone().isBlank()) {
             loginAttemptPort.unlock(user.getPhone());
         }
 
-        User saved = userRepository.save(user);
-        
-
-        Role role = roleRepository.findById(saved.getRoleId())
-                .orElseThrow(RoleNotFoundException::new);
+        UUID adminUserId = currentUserPort.getCurrentUserId();
 
         auditLogRepository.save(
                 AuditLog.create(
-                        currentUserPort.getCurrentUserId(),
-                        ActionType.ACTIVATE,
+                        adminUserId,
+                        ActionType.UNLOCK,
                         ResourceType.USER,
-                        saved.getId(),
+                        user.getId(),
                         """
                         {
-                        "action":"ACTIVATE",
-                        "username":"%s",
-                        "fullName":"%s",
-                        "email":"%s",
-                        "role":"%s"
+                        "unlockedUsername":"%s"
                         }
-                        """.formatted(
-                                saved.getUsername(),
-                                saved.getFullName(),
-                                saved.getEmail(),
-                                role.getName()),
+                        """.formatted(user.getUsername()),
                         null
                 )
         );
 
-        return userResultMapper.toResult(saved, role);
+        Role role = roleRepository.findById(user.getRoleId())
+                .orElseThrow(RoleNotFoundException::new);
+
+        return userResultMapper.toResult(user, role);
     }
 }
