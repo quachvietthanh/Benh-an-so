@@ -48,6 +48,7 @@ import medicalRecordApi from '../api/medicalRecordApi'
 import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import MedicalEncounterForm from '../components/clinical/MedicalEncounterForm'
+import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
 import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordModal'
 import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
@@ -1334,7 +1335,7 @@ function MedicalEncounter() {
           </Text>
         </div>
         {canEditEncounter && (
-          <Space wrap size="middle">
+          <Space wrap size="middle" className="encounter-header-actions">
             {selectedOrders.length > 0 && (
               <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
                 In phiếu chỉ định
@@ -1652,6 +1653,7 @@ function MedicalEncounter() {
                 form={form}
                 isDoctor={canEditEncounter}
                 isSigned={isRecordSigned}
+                currentUser={user}
                 medicalRecord={medicalRecord || encounter?.medicalRecord}
                 onOpenSignModal={handleOpenSignFlow}
                 encounterContext={encounter}
@@ -1943,6 +1945,14 @@ function MedicalEncounter() {
       >
         {viewing && (
           <>
+            {viewing.patientId && (
+              <PatientAllergyBanner
+                patientId={viewing.patientId}
+                patientName={viewing.patientName}
+                currentUser={user}
+                compact
+              />
+            )}
             {isMedicalRecordSigned(viewing.status) && (
               <div style={{ marginBottom: 16 }}>
                 <MedicalRecordSignatureStamp

@@ -39,6 +39,7 @@ import { fixMojibake } from '../../utils/serviceCatalogValidation'
 import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
 import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
 import DynamicMedicalRecordSections from './DynamicMedicalRecordSections'
+import PatientAllergyBanner from './PatientAllergyBanner'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
 
@@ -101,6 +102,7 @@ function MedicalEncounterForm({
   templateLoading = false,
   templateError = '',
   onClearTemplateError = () => {},
+  currentUser = null,
 }) {
   const [icdTableSearch, setIcdTableSearch] = useState('')
   const [icdTableCategory, setIcdTableCategory] = useState('ALL')
@@ -136,6 +138,15 @@ function MedicalEncounterForm({
             status={medicalRecord?.status || 'SIGNED'}
           />
         </div>
+      )}
+      {selectedPatientObj?.id && (
+        <PatientAllergyBanner
+          patientId={selectedPatientObj?.id}
+          patientName={selectedPatientObj?.fullName}
+          visitId={encounterContext?.visit?.id}
+          currentUser={currentUser}
+          canWrite={isDoctor}
+        />
       )}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
@@ -244,7 +255,16 @@ function MedicalEncounterForm({
                   <div><b>Ngày sinh:</b> {selectedPatientObj.dateOfBirth}</div>
                   <div><b>Thẻ BHYT:</b> {selectedPatientObj.healthInsuranceCode || 'Không có'}</div>
                   <div><b>Tiền sử bệnh:</b> <Text type="danger">{selectedPatientObj.medicalHistory || 'Chưa ghi nhận'}</Text></div>
-                  <div><b>Dị ứng thuốc:</b> <Text type="warning">{selectedPatientObj.allergies || 'Không dị ứng'}</Text></div>
+                  <div style={{ marginTop: 6 }}>
+                    <PatientAllergyBanner
+                      patientId={selectedPatientObj?.id}
+                      patientName={selectedPatientObj?.fullName}
+                      visitId={encounterContext?.visit?.id}
+                      currentUser={currentUser}
+                      canWrite={isDoctor}
+                      compact
+                    />
+                  </div>
                 </div>
               </div>
             )}

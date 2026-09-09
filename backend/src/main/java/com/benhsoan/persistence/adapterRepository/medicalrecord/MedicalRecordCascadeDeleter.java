@@ -14,6 +14,7 @@ import com.benhsoan.persistence.jpaRepository.clinical.JpaMedicalAttachmentRepos
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAccessLogRepository;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAmendmentRepository;
 import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordDiagnosisRepository;
+import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionAllergyWarningLogRepository;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionAmendmentRepository;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionDispenseItemRepository;
 import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionItemRepository;
@@ -42,6 +43,7 @@ public class MedicalRecordCascadeDeleter {
     private final JpaPrescriptionItemRepository prescriptionItemRepository;
     private final JpaPrescriptionAmendmentRepository prescriptionAmendmentRepository;
     private final JpaPrescriptionWarningLogRepository prescriptionWarningLogRepository;
+    private final JpaPrescriptionAllergyWarningLogRepository prescriptionAllergyWarningLogRepository;
     private final JpaPrescriptionDispenseItemRepository prescriptionDispenseItemRepository;
 
     @Transactional
@@ -71,6 +73,7 @@ public class MedicalRecordCascadeDeleter {
             prescriptionDispenseItemRepository.deleteByPrescriptionIdIn(prescriptionIds);
             prescriptionAmendmentRepository.deleteByPrescriptionIdIn(prescriptionIds);
             prescriptionWarningLogRepository.deleteByPrescriptionIdIn(prescriptionIds);
+            prescriptionAllergyWarningLogRepository.deleteByPrescriptionIdIn(prescriptionIds);
             prescriptionItemRepository.deleteAllByPrescriptionIdIn(prescriptionIds);
         }
         prescriptionRepository.deleteByMedicalRecordId(medicalRecordId);

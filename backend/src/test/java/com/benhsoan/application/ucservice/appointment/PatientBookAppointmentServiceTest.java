@@ -26,7 +26,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.DoctorSchedule;
+import com.benhsoan.domain.appointment.DoctorWeeklySchedule;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.appointment.exception.DoctorScheduleNotFoundException;
 import com.benhsoan.domain.appointment.exception.DoctorUnavailableException;
 import com.benhsoan.domain.appointment.exception.InvalidAppointmentTimeException;
@@ -63,6 +65,8 @@ class PatientBookAppointmentServiceTest {
     @Mock private AppointmentRepository appointmentRepository;
     @Mock private AppointmentCodeGenerator appointmentCodeGenerator;
     @Mock private DoctorScheduleRepository doctorScheduleRepository;
+    @Mock private com.benhsoan.port.outbound.repository.appointment.DoctorWeeklyScheduleRepository doctorWeeklyScheduleRepository;
+    @Mock private com.benhsoan.port.outbound.repository.appointment.DoctorTimeOffRepository doctorTimeOffRepository;
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
     @Mock private RoleRepository roleRepository;
@@ -80,6 +84,8 @@ class PatientBookAppointmentServiceTest {
                 appointmentRepository,
                 appointmentCodeGenerator,
                 doctorScheduleRepository,
+                doctorWeeklyScheduleRepository,
+                doctorTimeOffRepository,
                 patientRepository,
                 userRepository,
                 roleRepository,
@@ -253,5 +259,66 @@ class PatientBookAppointmentServiceTest {
 
         assertThrows(InvalidDoctorRoleException.class,
                 () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, null)));
+    }
+
+    @Test
+    void rejectsBookingWhenDoctorInTimeOff() {
+        // TC-02 / QTN-30: Bác sĩ không làm việc trong khung giờ này
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID doctorRoleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        Patient patient = mock(Patient.class);
+        when(patient.getId()).thenReturn(patientId);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
+        when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(doctorRole(doctorRoleId)));
+        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
+                .thenReturn(Optional.of(schedule(doctorId, FUTURE_DATE, LocalTime.of(8, 0), LocalTime.of(12, 0), true)));
+        when(doctorTimeOffRepository.existsActiveOverlapping(eq(doctorId), any(Instant.class), any(Instant.class)))
+                .thenReturn(true);
+
+        DoctorNotWorkingException ex = assertThrows(DoctorNotWorkingException.class,
+                () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, null)));
+        assertEquals("Bác sĩ không làm việc trong khung giờ này.", ex.getMessage());
+    }
+
+    @Test
+    void booksSuccessfullyUsingWeeklyScheduleFallback() {
+        // TC-01: Đặt lịch dựa trên lịch tuần định kỳ khi không có lịch ngày cụ thể
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID doctorRoleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        Patient patient = mock(Patient.class);
+        when(patient.getId()).thenReturn(patientId);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
+        when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(doctorRole(doctorRoleId)));
+        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
+                .thenReturn(Optional.empty());
+
+        DoctorWeeklySchedule weeklySchedule = DoctorWeeklySchedule.create(
+                doctorId, FUTURE_DATE.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(12, 0));
+        when(doctorWeeklyScheduleRepository.findByDoctorIdAndDayOfWeek(doctorId, FUTURE_DATE.getDayOfWeek()))
+                .thenReturn(Optional.of(weeklySchedule));
+        when(doctorTimeOffRepository.existsActiveOverlapping(eq(doctorId), any(Instant.class), any(Instant.class)))
+                .thenReturn(false);
+        when(appointmentRepository.findActiveAppointmentsForDoctorBetween(eq(doctorId), any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of());
+        when(appointmentCodeGenerator.generate()).thenReturn("AP-12345");
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PatientAppointmentResult result = service.book(
+                new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, "Khám bệnh"));
+
+        assertEquals("AP-12345", result.appointmentCode());
+        verify(appointmentRepository).save(any(Appointment.class));
     }
 }

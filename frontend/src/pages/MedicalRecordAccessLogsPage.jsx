@@ -15,6 +15,7 @@ import {
   Space,
   Statistic,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -35,11 +36,14 @@ import {
   SafetyCertificateOutlined,
   SearchOutlined,
   UserOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import medicalRecordApi from '../api/medicalRecordApi'
 import patientApi from '../api/patientApi'
 import userApi from '../api/userApi'
+import { useAuthContext } from '../context/AuthContext'
+import SecurityAlertsTab from '../components/security/SecurityAlertsTab'
 
 const { Title, Text, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -93,6 +97,24 @@ const getErrorMessage = (error, fallback) =>
   error?.response?.data?.message || error?.message || fallback
 
 function MedicalRecordAccessLogsPage() {
+  const { user } = useAuthContext()
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user?.permissions])
+  const userRoles = useMemo(() => {
+    return (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user?.roles])
+  const isAdmin = userRoles.includes('admin') || userRoles.includes('role_admin')
+
+  const canViewAuditLogs = userPermissions.includes('AUDIT_READ') || isAdmin
+  const canViewSecurityAlerts = userPermissions.includes('SECURITY_ALERT_VIEW') || isAdmin
+
+  const [activeMainTab, setActiveMainTab] = useState(() => {
+    if (canViewAuditLogs) return 'audit-logs'
+    if (canViewSecurityAlerts) return 'security-alerts'
+    return 'audit-logs'
+  })
+
   const [patients, setPatients] = useState([])
   const [users, setUsers] = useState([])
   const [selectedPatientId, setSelectedPatientId] = useState(null)
@@ -140,16 +162,17 @@ function MedicalRecordAccessLogsPage() {
           : []
         setUsers(userList)
       }
-    } catch (err) {
-      console.error('Lỗi tải danh mục người dùng/bệnh nhân:', err)
+    } catch {
     } finally {
       setPatientLoading(false)
     }
   }, [selectedPatientId])
 
   useEffect(() => {
-    loadInitialData()
-  }, [loadInitialData])
+    if (canViewAuditLogs) {
+      loadInitialData()
+    }
+  }, [loadInitialData, canViewAuditLogs])
 
   const userMap = useMemo(() => {
     const map = new Map()
@@ -212,8 +235,10 @@ function MedicalRecordAccessLogsPage() {
   }, [selectedPatientId, page, pageSize, dateRange])
 
   useEffect(() => {
-    loadAccessLogs()
-  }, [loadAccessLogs])
+    if (canViewAuditLogs) {
+      loadAccessLogs()
+    }
+  }, [loadAccessLogs, canViewAuditLogs])
 
   const filteredLogs = useMemo(() => {
     let list = accessLogs
@@ -378,8 +403,8 @@ function MedicalRecordAccessLogsPage() {
     },
   ]
 
-  return (
-    <div style={{ paddingBottom: 32 }}>
+  const renderAuditLogsContent = () => (
+    <>
       <div
         style={{
           display: 'flex',
@@ -391,11 +416,11 @@ function MedicalRecordAccessLogsPage() {
         }}
       >
         <div>
-          <Title level={3} style={{ margin: 0 }}>
+          <Title level={4} style={{ margin: 0 }}>
             <SafetyCertificateOutlined style={{ marginRight: 8, color: '#1677ff' }} />
             Nhật ký truy cập bệnh án & Dữ liệu y tế (Audit Logs)
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0, fontSize: 13 }}>
             Giám sát minh bạch mọi lần xem, sửa, tạo, khóa hoặc bổ sung thông tin bệnh án theo người dùng và mốc thời gian.
           </Paragraph>
         </div>
@@ -582,6 +607,61 @@ function MedicalRecordAccessLogsPage() {
           }}
         />
       </Card>
+    </>
+  )
+
+  if (!canViewAuditLogs && !canViewSecurityAlerts) {
+    return (
+      <div style={{ padding: 24, textAlign: 'center' }}>
+        <Card style={{ borderRadius: 12 }}>
+          <Empty description="Tài khoản của bạn không có quyền truy cập vào Nhật ký kiểm toán hoặc Cảnh báo bảo mật." />
+        </Card>
+      </div>
+    )
+  }
+
+  if (canViewAuditLogs && canViewSecurityAlerts) {
+    return (
+      <div style={{ paddingBottom: 32 }}>
+        <Tabs
+          activeKey={activeMainTab}
+          onChange={setActiveMainTab}
+          items={[
+            {
+              key: 'audit-logs',
+              label: (
+                <span>
+                  <SafetyCertificateOutlined /> Nhật ký truy cập bệnh án
+                </span>
+              ),
+              children: renderAuditLogsContent(),
+            },
+            {
+              key: 'security-alerts',
+              label: (
+                <span>
+                  <WarningOutlined style={{ color: '#ff4d4f' }} /> Cảnh báo truy cập bất thường
+                </span>
+              ),
+              children: <SecurityAlertsTab />,
+            },
+          ]}
+        />
+      </div>
+    )
+  }
+
+  if (canViewSecurityAlerts) {
+    return (
+      <div style={{ paddingBottom: 32 }}>
+        <SecurityAlertsTab />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ paddingBottom: 32 }}>
+      {renderAuditLogsContent()}
     </div>
   )
 }

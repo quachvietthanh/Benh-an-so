@@ -54,6 +54,10 @@
 | `/api/v1/prescriptions/{id}/interconnection` | POST | ❌ | ✅ | ❌ | ❌ |
 | `/api/v1/prescription-interconnections` | GET | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/prescriptions/{id}/interconnection/retry` | POST | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/prescriptions/check-interactions` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/prescriptions/check-allergy-warnings` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/prescriptions/allergy-warning-logs` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/prescriptions/{id}/print` | GET | ❌ | ✅ | ❌ | ✅ |
 |  |  |  |  |  |  |
 | **Appointments** |  |  |  |  |  |
 | `/api/v1/appointments` | GET | ✅ | ✅ | ✅ | ❌ |
@@ -88,6 +92,10 @@
 | `/api/v1/audit-logs` | GET | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/audit-logs/{id}` | GET | ✅ | ❌ | ❌ | ❌ |
 |  |  |  |  |  |  |
+| **Security Alerts** |  |  |  |  |  |
+| `/api/v1/security-alerts` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/security-alerts/{id}/status` | PATCH | ✅ | ❌ | ❌ | ❌ |
+|  |  |  |  |  |  |
 | **Medical Queue** |  |  |  |  |  |
 | `/api/v1/queue` | POST | ✅ | ❌ | ✅ | ❌ |
 | `/api/v1/queue/call-next` | POST | ✅ | ✅ | ❌ | ❌ |
@@ -114,12 +122,14 @@ ADMIN (Quản trị viên)
   ├── User management
   ├── Role & Permission management
   ├── Audit log access
+  ├── Prescription allergy warning logs access
+  ├── Security alerts management
   └── Medical Queue full access
 
 DOCTOR (Bác sĩ)
   ├── Patient CRUD
   ├── Medical Records CRUD
-  ├── Prescriptions (create/read/update)
+  ├── Prescriptions (create/read/update/cancel, check interactions, check allergy warnings & override)
   ├── Diagnoses management
   ├── Appointments management
   ├── Medical Queue (call next, update status, view)
@@ -134,7 +144,8 @@ RECEPTIONIST (Lễ tân)
 
 PHARMACIST (Dược sĩ)
   ├── Prescriptions read
-  ├── Prescription status update
+  ├── Prescription status update (dispense)
+  ├── Prescription export/print
   ├── Pharmacy inventory CRUD
   └── No patient/medical record access
 ```
@@ -146,13 +157,14 @@ PHARMACIST (Dược sĩ)
 | User Management | `USER_` | Quản lý người dùng |
 | Patient Management | `PATIENT_` | Quản lý bệnh nhân |
 | Medical Record | `RECORD_` | Quản lý hồ sơ bệnh án |
-| Prescription | `PRESCRIPTION_` | Quản lý đơn thuốc |
+| Prescription | `PRESCRIPTION_` | Quản lý đơn thuốc & cảnh báo dị ứng |
 | Appointment | `APPOINTMENT_` | Quản lý lịch hẹn |
 | Vital Signs | `VITAL_SIGN_` | Quản lý dấu hiệu sinh tồn |
 | Diagnosis | `DIAGNOSIS_` | Quản lý chẩn đoán |
 | Pharmacy | `PHARMACY_` | Quản lý nhà thuốc |
 | Invoice | `INVOICE_` | Quản lý hóa đơn |
 | Audit Log | `AUDIT_` | Quản lý nhật ký |
+| Security Alert | `SECURITY_ALERT_` | Quản lý cảnh báo bảo mật |
 | Role | `ROLE_` | Quản lý vai trò |
 | Permission | `PERMISSION_` | Quản lý quyền |
 | Medical Queue | `QUEUE_` | Quản lý hàng đợi khám |
@@ -170,8 +182,9 @@ PATIENT_CREATE, PATIENT_READ, PATIENT_UPDATE, PATIENT_DELETE, PATIENT_CONSENT_UP
 RECORD_CREATE, RECORD_READ, RECORD_UPDATE, RECORD_DELETE, RECORD_UPDATE_STATUS
 
 // Prescription
-PRESCRIPTION_CREATE, PRESCRIPTION_READ, PRESCRIPTION_UPDATE, PRESCRIPTION_DELETE, PRESCRIPTION_UPDATE_STATUS,
-PRESCRIPTION_INTERCONNECTION_SEND, PRESCRIPTION_INTERCONNECTION_READ, PRESCRIPTION_INTERCONNECTION_RETRY
+PRESCRIPTION_CREATE, PRESCRIPTION_READ, PRESCRIPTION_UPDATE, PRESCRIPTION_DELETE, PRESCRIPTION_UPDATE_STATUS, PRESCRIPTION_PRINT,
+PRESCRIPTION_INTERCONNECTION_SEND, PRESCRIPTION_INTERCONNECTION_READ, PRESCRIPTION_INTERCONNECTION_RETRY,
+PRESCRIPTION_ALLERGY_WARNING_VIEW
 
 // Appointment
 APPOINTMENT_CREATE, APPOINTMENT_READ, APPOINTMENT_UPDATE, APPOINTMENT_DELETE
@@ -190,6 +203,9 @@ INVOICE_CREATE, INVOICE_READ, INVOICE_UPDATE, INVOICE_DELETE
 
 // Audit
 AUDIT_READ
+
+// Security Alert
+SECURITY_ALERT_VIEW
 
 // Role & Permission
 ROLE_READ, ROLE_CREATE, ROLE_UPDATE, ROLE_DELETE

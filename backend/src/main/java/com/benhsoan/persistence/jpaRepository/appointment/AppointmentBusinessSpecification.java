@@ -43,11 +43,7 @@ public final class AppointmentBusinessSpecification {
 
     public static Specification<AppointmentEntity> active() {
         return (root, query, cb)
-                -> root.get("status").in(
-                        AppointmentStatus.SCHEDULED,
-                        AppointmentStatus.CHECKED_IN,
-                        AppointmentStatus.IN_PROGRESS
-                );
+                -> root.get("status").in(AppointmentStatus.ACTIVE_STATUSES);
     }
 
     public static Specification<AppointmentEntity> overlap(

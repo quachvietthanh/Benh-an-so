@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.patient;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import com.benhsoan.port.dto.command.patient.SearchPatientCommand;
 public interface PatientRepository {
 
     Optional<Patient> findById(UUID id);
+
+    List<Patient> findAllById(Collection<UUID> ids);
 
     Patient save(Patient patient);
 

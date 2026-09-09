@@ -10,6 +10,7 @@ import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
 import MedicalRecordList from './MedicalRecordList'
 import PersonalDataConsentModal from '../components/patient/PersonalDataConsentModal'
+import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import { getPatientConsentStatus } from '../constants/patientConsentConstants'
 
 
@@ -179,6 +180,15 @@ function PatientDetail() {
           <Descriptions.Item label="SĐT khẩn cấp">{patient.emergencyPhone || '---'}</Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {patient && (
+        <PatientAllergyBanner
+          patientId={patient.id}
+          patientName={patient.fullName}
+          currentUser={user}
+          compact={false}
+        />
+      )}
 
       <PersonalDataConsentModal
         open={consentModalOpen}

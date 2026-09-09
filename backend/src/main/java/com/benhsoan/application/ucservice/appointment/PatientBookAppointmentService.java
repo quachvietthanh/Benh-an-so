@@ -42,6 +42,10 @@ import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
+import com.benhsoan.domain.appointment.DoctorWeeklySchedule;
+import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
+import com.benhsoan.port.outbound.repository.appointment.DoctorTimeOffRepository;
+import com.benhsoan.port.outbound.repository.appointment.DoctorWeeklyScheduleRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -70,6 +74,10 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
     private final AppointmentCodeGenerator appointmentCodeGenerator;
 
     private final DoctorScheduleRepository doctorScheduleRepository;
+
+    private final DoctorWeeklyScheduleRepository doctorWeeklyScheduleRepository;
+
+    private final DoctorTimeOffRepository doctorTimeOffRepository;
 
     private final PatientRepository patientRepository;
 
@@ -120,17 +128,37 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
         }
         requireDoctorRole(doctor);
 
-        DoctorSchedule schedule = doctorScheduleRepository
-                .findByDoctorIdAndScheduleDateForUpdate(command.doctorId(), command.appointmentDate())
-                .orElseThrow(() -> new DoctorScheduleNotFoundException(command.doctorId(), command.appointmentDate()));
-        if (!schedule.isActive()) {
-            throw new DoctorUnavailableException(command.doctorId(), command.appointmentDate());
+        LocalTime scheduleStartTime;
+        LocalTime scheduleEndTime;
+
+        java.util.Optional<DoctorSchedule> dateScheduleOpt = doctorScheduleRepository
+                .findByDoctorIdAndScheduleDateForUpdate(command.doctorId(), command.appointmentDate());
+        if (dateScheduleOpt.isPresent()) {
+            DoctorSchedule schedule = dateScheduleOpt.get();
+            if (!schedule.isActive()) {
+                throw new DoctorUnavailableException(command.doctorId(), command.appointmentDate());
+            }
+            scheduleStartTime = schedule.getStartTime();
+            scheduleEndTime = schedule.getEndTime();
+        } else {
+            java.util.Optional<DoctorWeeklySchedule> weeklyOpt = doctorWeeklyScheduleRepository
+                    .findByDoctorIdAndDayOfWeek(command.doctorId(), command.appointmentDate().getDayOfWeek());
+            if (weeklyOpt.isEmpty() || !weeklyOpt.get().isActive()) {
+                throw new DoctorScheduleNotFoundException(command.doctorId(), command.appointmentDate());
+            }
+            scheduleStartTime = weeklyOpt.get().getStartTime();
+            scheduleEndTime = weeklyOpt.get().getEndTime();
         }
 
         LocalTime slotEndTime = command.startTime().plus(SLOT_DURATION);
-        if (command.startTime().isBefore(schedule.getStartTime())
-                || slotEndTime.isAfter(schedule.getEndTime())) {
+        if (command.startTime().isBefore(scheduleStartTime)
+                || slotEndTime.isAfter(scheduleEndTime)) {
             throw new InvalidAppointmentTimeException("Khung giờ đặt lịch nằm ngoài giờ làm việc của bác sĩ.");
+        }
+
+        // QTN-30: Check doctor time-off
+        if (doctorTimeOffRepository.existsActiveOverlapping(command.doctorId(), startTime, endTime)) {
+            throw new DoctorNotWorkingException("Bác sĩ không làm việc trong khung giờ này.");
         }
 
         if (!appointmentRepository.findActiveAppointmentsForDoctorBetween(

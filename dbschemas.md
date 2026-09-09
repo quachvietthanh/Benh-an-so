@@ -128,6 +128,24 @@ Tài liệu này mô tả schema đang thực sự tồn tại trong repo hiện
 | changed_by | BINARY(16) | FK -> users.id |
 | changed_at | TIMESTAMP | |
 
+### prescription_allergy_warning_logs
+
+| Column | Type | Notes |
+|---|---|---|
+| id | BINARY(16) | PK |
+| prescription_id | BINARY(16) | FK -> prescriptions.id (CASCADE) |
+| patient_id | BINARY(16) | FK -> patients.id (CASCADE) |
+| allergy_id | BINARY(16) | FK -> patient_allergies.id |
+| medicine_id | BINARY(16) | FK -> medicines.id |
+| active_ingredient | VARCHAR(255) | Hoạt chất thuốc |
+| allergen_name | VARCHAR(255) | Tên dị ứng bệnh nhân |
+| severity | VARCHAR(30) | MILD, MODERATE, SEVERE, ANAPHYLAXIS |
+| reaction | VARCHAR(255) | Biểu hiện lâm sàng |
+| override_reason | TEXT | Lý do bác sĩ bỏ qua cảnh báo dị ứng (TC-02) |
+| handled_by | BINARY(16) | FK -> users.id (Bác sĩ thực hiện override) |
+| handled_at | TIMESTAMP | Thời điểm override |
+| created_at | TIMESTAMP | Thời điểm tạo bản ghi |
+
 ### visits
 
 | Column | Type |

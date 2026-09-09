@@ -151,8 +151,8 @@ textarea {
 }
 
 .ant-popconfirm .ant-popconfirm-buttons .ant-btn {
-  height: 28px !important;
-  padding: 0 10px !important;
+  height: 30px !important;
+  padding: 0 12px !important;
   font-size: 12px !important;
   border-radius: 6px !important;
   min-width: unset !important;
@@ -177,6 +177,55 @@ textarea {
   justify-content: center !important;
   padding: 0 12px !important;
   margin: 0 !important;
+}
+
+/* Icon-only button standardization */
+.ant-btn.ant-btn-icon-only {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+}
+
+.ant-btn.ant-btn-icon-only.ant-btn-sm {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  border-radius: 6px !important;
+}
+
+.ant-btn.ant-btn-icon-only.ant-btn-lg {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 10px !important;
+}
+
+/* Responsive Action Container for Page Headers & Toolbars */
+.page-header-actions,
+.prescription-header-actions,
+.encounter-header-actions,
+.mobile-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Touch-friendly chips & tags */
+.suggestion-chip,
+.allergen-chip,
+.dose-suggestion-tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 28px !important;
+  padding: 3px 10px !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease-in-out;
 }
 
 .page-header {
@@ -210,32 +259,89 @@ textarea {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .page-header-actions,
+  .prescription-header-actions,
+  .encounter-header-actions,
+  .mobile-action-bar {
+    width: 100% !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+  }
+
+  .page-header-actions > .ant-btn,
+  .prescription-header-actions > .ant-btn,
+  .encounter-header-actions > .ant-btn {
+    flex: 1 1 calc(50% - 4px) !important;
+    min-width: calc(50% - 4px) !important;
+    height: 38px !important;
+  }
+
+  .page-header-actions > .ant-btn:only-child,
+  .prescription-header-actions > .ant-btn:only-child,
+  .encounter-header-actions > .ant-btn:only-child {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
   }
 
   .ant-card-body {
-    padding: 14px !important;
+    padding: 12px !important;
+  }
+
+  .ant-card-head {
+    min-height: 42px !important;
+    padding: 0 12px !important;
+  }
+
+  .ant-card-head-title {
+    font-size: 14px !important;
+    padding: 10px 0 !important;
   }
 
   .ant-descriptions {
-    font-size: 13px;
+    font-size: 12.5px;
   }
 
   .ant-descriptions-item-label,
   .ant-descriptions-item-content {
-    padding: 8px 10px !important;
+    padding: 6px 8px !important;
   }
 
+  /* Modal on Tablet & Mobile */
   .ant-modal {
-    max-width: 95vw !important;
-    margin: 10px auto !important;
+    max-width: calc(100vw - 16px) !important;
+    margin: 8px auto !important;
+    top: 8px !important;
+    padding-bottom: 8px !important;
   }
 
-  .ant-modal-body {
-    padding: 12px !important;
+  .ant-modal .ant-modal-content {
+    border-radius: 12px !important;
+    padding: 14px !important;
+  }
+
+  .ant-modal .ant-modal-header {
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .ant-modal .ant-modal-title {
+    font-size: 15px !important;
+    line-height: 1.4 !important;
+  }
+
+  .ant-modal .ant-modal-body {
+    max-height: calc(85vh - 120px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 0 !important;
   }
 
   .ant-table {
-    font-size: 13px;
+    font-size: 12.5px;
   }
 
   .ant-tabs-nav-list {
@@ -254,6 +360,14 @@ textarea {
     padding: 0 10px !important;
     font-size: 12px !important;
     border-radius: 6px !important;
+  }
+
+  .suggestion-chip,
+  .allergen-chip,
+  .dose-suggestion-tag {
+    min-height: 32px !important;
+    padding: 4px 12px !important;
+    font-size: 12.5px !important;
   }
 
   .ant-list-item {
@@ -302,16 +416,16 @@ textarea {
 
   .ant-modal-footer {
     display: flex !important;
-    flex-direction: row !important;
-    justify-content: stretch !important;
+    flex-wrap: wrap !important;
     gap: 8px !important;
-    padding: 12px 14px !important;
-    margin-top: 14px !important;
+    padding: 10px 0 0 !important;
+    margin-top: 12px !important;
+    border-top: 1px solid #f1f5f9 !important;
   }
 
   .ant-modal-footer .ant-btn {
-    flex: 1 1 0% !important;
-    min-width: 0 !important;
+    flex: 1 1 calc(50% - 4px) !important;
+    min-width: calc(50% - 4px) !important;
     height: 38px !important;
     padding: 0 12px !important;
     font-size: 13px !important;
@@ -323,18 +437,57 @@ textarea {
     justify-content: center !important;
   }
 
+  .ant-modal-footer .ant-btn:only-child {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+
   .admin-more-button.ant-btn,
   .patient-action-button.ant-btn,
   .btn-table-action.ant-btn,
   .appointment-action-button.ant-btn {
-    height: 32px !important;
-    width: 32px !important;
-    min-width: 32px !important;
+    height: 34px !important;
+    width: 34px !important;
+    min-width: 34px !important;
     padding: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     border-radius: 6px !important;
+}
+
+@media (max-width: 576px) {
+  .ant-btn-sm {
+    height: 32px !important;
+    padding-inline: 8px !important;
+  }
+
+  .suggestion-chip,
+  .allergen-chip,
+  .dose-suggestion-tag {
+    min-height: 32px !important;
+    padding: 4px 10px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header-actions > .ant-btn,
+  .prescription-header-actions > .ant-btn,
+  .encounter-header-actions > .ant-btn {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+    height: 40px !important;
+  }
+
+  .ant-modal-footer {
+    flex-direction: column-reverse !important;
+  }
+
+  .ant-modal-footer .ant-btn {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 40px !important;
   }
 }
 

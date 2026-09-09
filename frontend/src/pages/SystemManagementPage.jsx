@@ -20,7 +20,7 @@ function SystemManagementPage() {
   const canViewConfig = (userPermissions.includes('CLINIC_CONFIGURATION_READ') || userPermissions.includes('ROOM_READ') || userPermissions.includes('SYSTEM_CONFIG_READ') || isAdmin) && !isManager
   const canViewUsers = userPermissions.includes('USER_READ') || isAdmin
   const canViewRolePermissions = userPermissions.includes('ROLE_READ') || userPermissions.includes('PERMISSION_READ') || isAdmin
-  const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || isAdmin
+  const canViewAccessLogs = userPermissions.includes('AUDIT_READ') || userPermissions.includes('SECURITY_ALERT_VIEW') || isAdmin
   const canViewBackup = userPermissions.includes('BACKUP_READ') || isAdmin
 
   const tabItems = [
@@ -41,7 +41,7 @@ function SystemManagementPage() {
     },
     canViewAccessLogs && {
       key: 'access-logs',
-      label: <span><SafetyCertificateOutlined /> Nhật ký truy cập bệnh án</span>,
+      label: <span><SafetyCertificateOutlined /> Nhật ký & Cảnh báo truy cập</span>,
       children: <MedicalRecordAccessLogsPage />,
     },
     canViewBackup && {

@@ -170,11 +170,7 @@ public class AppointmentRepositoryAdapter
                         doctorId,
                         from,
                         to,
-                        List.of(
-                                AppointmentStatus.SCHEDULED,
-                                AppointmentStatus.CONFIRMED,
-                                AppointmentStatus.IN_PROGRESS
-                        )
+                        AppointmentStatus.ACTIVE_STATUSES
                 ).stream()
                 .map(mapper::toDomain)
                 .toList();
