@@ -289,5 +289,29 @@ class PrescriptionSecurityIntegrationTest {
                         .with(user("pharmacist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("FINDING-01: Chặn IDOR - Doctor kiểm tra hồ sơ bệnh án không thuộc phụ trách bị 403 Forbidden")
+    void rejectsCheckAllergyWarnings_WhenDoctorDoesNotOwnMedicalRecord_Returns403() throws Exception {
+        when(checkPatientDrugAllergyUseCase.check(any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException(
+                        "Only the doctor responsible for the visit can change prescriptions."));
+
+        String body = """
+                {
+                  "medicalRecordId": "16000000-0000-0000-0000-000000000001",
+                  "medicineIds": [
+                    "16000000-0000-0000-0000-000000000002"
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("doctor_other").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
 }
 

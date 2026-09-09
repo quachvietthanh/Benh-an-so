@@ -301,19 +301,32 @@ public class AmendPrescriptionService
     private Map<UUID, Medicine> loadActiveMedicines(
             List<AmendPrescriptionItemCommand> itemCommands
     ) {
-        Map<UUID, Medicine> medicines = new LinkedHashMap<>();
+        Map<UUID, Medicine> foundById = medicineRepository
+                .findAllById(itemCommands.stream()
+                        .map(AmendPrescriptionItemCommand::medicineId)
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(
+                        Medicine::getId,
+                        medicine -> medicine
+                ));
 
+        Map<UUID, Medicine> medicines = new LinkedHashMap<>();
         for (AmendPrescriptionItemCommand item : itemCommands) {
-            Medicine medicine = medicineRepository.findById(item.medicineId())
-                    .orElseThrow(() -> new ValidationException(
-                            "Medicine not found: " + item.medicineId()
-                    ));
+            Medicine medicine = foundById.get(item.medicineId());
+            if (medicine == null) {
+                throw new ValidationException(
+                        "Medicine not found: " + item.medicineId()
+                );
+            }
+
             if (!medicine.isActive()) {
                 throw new ValidationException(
                         "Inactive medicine cannot remain in an amended prescription: "
                                 + medicine.getId()
                 );
             }
+
             medicines.put(medicine.getId(), medicine);
         }
 

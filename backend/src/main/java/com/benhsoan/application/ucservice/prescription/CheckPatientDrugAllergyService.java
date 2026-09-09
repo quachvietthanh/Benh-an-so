@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
-import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.patient.PatientAllergy;
 import com.benhsoan.domain.prescription.AllergyIngredientMatcher;
@@ -18,10 +17,10 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
-import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientAllergyRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,16 +31,23 @@ public class CheckPatientDrugAllergyService implements CheckPatientDrugAllergyUs
 
     private final PatientAllergyRepository patientAllergyRepository;
     private final MedicineRepository medicineRepository;
-    private final MedicalRecordRepository medicalRecordRepository;
     private final VisitRepository visitRepository;
+    private final PrescriptionClinicalContextValidator clinicalContextValidator;
+    private final CurrentUserPort currentUserPort;
 
     @Override
     public List<PatientAllergyWarningResult> check(UUID medicalRecordId, List<UUID> medicineIds) {
         if (medicalRecordId == null) {
             throw new ValidationException("Medical record ID is required to check allergy warnings.");
         }
-        UUID patientId = resolvePatientId(medicalRecordId);
-        return checkByPatientId(patientId, medicineIds);
+        UUID currentUserId = currentUserPort.getCurrentUserId();
+        MedicalRecord medicalRecord = clinicalContextValidator.requireEditableRecordForDoctor(
+                medicalRecordId,
+                currentUserId
+        );
+        Visit visit = visitRepository.findById(medicalRecord.getVisitId())
+                .orElseThrow(() -> new ValidationException("Visit not found for medical record: " + medicalRecordId));
+        return checkByPatientId(visit.getPatientId(), medicineIds);
     }
 
     @Override
@@ -97,15 +103,5 @@ public class CheckPatientDrugAllergyService implements CheckPatientDrugAllergyUs
             distinctIds.add(id);
         }
         return List.copyOf(distinctIds);
-    }
-
-    private UUID resolvePatientId(UUID medicalRecordId) {
-        MedicalRecord medicalRecord = medicalRecordRepository.findById(medicalRecordId)
-                .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
-
-        Visit visit = visitRepository.findById(medicalRecord.getVisitId())
-                .orElseThrow(() -> new ValidationException("Visit not found for medical record: " + medicalRecordId));
-
-        return visit.getPatientId();
     }
 }

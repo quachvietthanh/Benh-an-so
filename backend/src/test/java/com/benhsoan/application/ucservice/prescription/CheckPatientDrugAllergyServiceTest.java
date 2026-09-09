@@ -18,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
-import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
@@ -29,10 +28,13 @@ import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
-import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientAllergyRepository;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
+import com.benhsoan.domain.prescription.exception.PrescriptionClinicalContextConflictException;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CheckPatientDrugAllergyService Unit Tests")
@@ -45,9 +47,11 @@ class CheckPatientDrugAllergyServiceTest {
     @Mock
     private MedicineRepository medicineRepository;
     @Mock
-    private MedicalRecordRepository medicalRecordRepository;
-    @Mock
     private VisitRepository visitRepository;
+    @Mock
+    private PrescriptionClinicalContextValidator clinicalContextValidator;
+    @Mock
+    private CurrentUserPort currentUserPort;
 
     private CheckPatientDrugAllergyService service;
 
@@ -62,8 +66,9 @@ class CheckPatientDrugAllergyServiceTest {
         service = new CheckPatientDrugAllergyService(
                 patientAllergyRepository,
                 medicineRepository,
-                medicalRecordRepository,
-                visitRepository);
+                visitRepository,
+                clinicalContextValidator,
+                currentUserPort);
         medicalRecordId = UUID.randomUUID();
         visitId = UUID.randomUUID();
         patientId = UUID.randomUUID();
@@ -77,9 +82,44 @@ class CheckPatientDrugAllergyServiceTest {
     }
 
     @Test
+    @DisplayName("FINDING-01: Chặn IDOR khi Doctor A gọi pre-check trên hồ sơ của Doctor B")
+    void rejectsWhenDoctorDoesNotOwnVisit_IDOR() {
+        when(currentUserPort.getCurrentUserId()).thenReturn(doctorId);
+        when(clinicalContextValidator.requireEditableRecordForDoctor(medicalRecordId, doctorId))
+                .thenThrow(new AccessDeniedException("Only the doctor responsible for the visit can change prescriptions."));
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                () -> service.check(medicalRecordId, List.of(medicineId)));
+        assertEquals("Only the doctor responsible for the visit can change prescriptions.", ex.getMessage());
+    }
+
+    @Test
+    void rejectsWhenVisitIsCompleted() {
+        when(currentUserPort.getCurrentUserId()).thenReturn(doctorId);
+        when(clinicalContextValidator.requireEditableRecordForDoctor(medicalRecordId, doctorId))
+                .thenThrow(new PrescriptionClinicalContextConflictException("Prescriptions can only be changed during an active visit."));
+
+        assertThrows(PrescriptionClinicalContextConflictException.class,
+                () -> service.check(medicalRecordId, List.of(medicineId)));
+    }
+
+    @Test
+    void rejectsWhenMedicalRecordIsLocked() {
+        when(currentUserPort.getCurrentUserId()).thenReturn(doctorId);
+        when(clinicalContextValidator.requireEditableRecordForDoctor(medicalRecordId, doctorId))
+                .thenThrow(new MedicalRecordAlreadyLockedException());
+
+        assertThrows(MedicalRecordAlreadyLockedException.class,
+                () -> service.check(medicalRecordId, List.of(medicineId)));
+    }
+
+    @Test
     void rejectsWhenMedicalRecordNotFound() {
-        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.empty());
-        assertThrows(MedicalRecordNotFoundException.class, () -> service.check(medicalRecordId, List.of(medicineId)));
+        when(currentUserPort.getCurrentUserId()).thenReturn(doctorId);
+        when(clinicalContextValidator.requireEditableRecordForDoctor(medicalRecordId, doctorId))
+                .thenThrow(new ValidationException("Medical record not found: " + medicalRecordId));
+
+        assertThrows(ValidationException.class, () -> service.check(medicalRecordId, List.of(medicineId)));
     }
 
     @Test
@@ -98,7 +138,8 @@ class CheckPatientDrugAllergyServiceTest {
     void rejectsWhenVisitNotFound() {
         MedicalRecord mr = MedicalRecord.create(visitId, "Cough", "Fever", null, null, null, null, null, null, doctorId,
                 NOW);
-        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.of(mr));
+        when(currentUserPort.getCurrentUserId()).thenReturn(doctorId);
+        when(clinicalContextValidator.requireEditableRecordForDoctor(medicalRecordId, doctorId)).thenReturn(mr);
         when(visitRepository.findById(visitId)).thenReturn(Optional.empty());
 
         assertThrows(ValidationException.class, () -> service.check(medicalRecordId, List.of(medicineId)));
@@ -177,7 +218,8 @@ class CheckPatientDrugAllergyServiceTest {
     private void prepareContext() {
         MedicalRecord mr = MedicalRecord.create(visitId, "Cough", "Fever", null, null, null, null, null, null, doctorId,
                 NOW);
-        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.of(mr));
+        when(currentUserPort.getCurrentUserId()).thenReturn(doctorId);
+        when(clinicalContextValidator.requireEditableRecordForDoctor(medicalRecordId, doctorId)).thenReturn(mr);
         Visit visit = Visit.restore(visitId, "VIS-001", patientId, doctorId, null, null, VisitType.APPOINTMENT,
                 VisitStatus.IN_PROGRESS, NOW, NOW, null, "Checkup", null, doctorId, NOW, NOW);
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));

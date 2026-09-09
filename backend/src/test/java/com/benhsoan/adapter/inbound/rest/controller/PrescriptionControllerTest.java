@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
 import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
@@ -71,6 +72,9 @@ class PrescriptionControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private AnonymizationModeState anonymizationModeState;
 
     @MockitoBean
     private CreatePrescriptionUseCase createPrescriptionUseCase;
@@ -583,6 +587,135 @@ class PrescriptionControllerTest {
                 .andExpect(jsonPath("$.content[0].allergenName").value("Amoxicillin"))
                 .andExpect(jsonPath("$.content[0].severity").value("SEVERE"))
                 .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions - 409 Conflict when allergy confirmation required")
+    void createPrescriptionThrowsAllergyConfirmationRequiredReturns409() throws Exception {
+        UUID medicalRecordId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        UUID allergyId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        when(createPrescriptionUseCase.create(any()))
+                .thenThrow(new PrescriptionAllergyConfirmationRequiredException(List.of(
+                        new PrescriptionAllergyConfirmationRequiredException.AllergyWarning(
+                                allergyId,
+                                patientId,
+                                medicineId,
+                                "Amoxicillin 500mg",
+                                "Amoxicillin",
+                                "Amoxicillin",
+                                AllergySeverity.SEVERE,
+                                "Anaphylaxis"
+                        )
+                )));
+
+        mockMvc.perform(post("/prescriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "medicalRecordId": "%s",
+                                  "items": [{
+                                    "medicineId": "%s",
+                                    "dosage": "1 tablet",
+                                    "frequency": 2,
+                                    "route": "ORAL",
+                                    "durationDays": 5,
+                                    "quantity": 10
+                                  }]
+                                }
+                                """.formatted(medicalRecordId, medicineId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ALLERGY_CONFIRMATION_REQUIRED"))
+                .andExpect(jsonPath("$.details.warnings[0].allergyId").value(allergyId.toString()))
+                .andExpect(jsonPath("$.details.warnings[0].allergenName").value("Amoxicillin"))
+                .andExpect(jsonPath("$.details.warnings[0].severity").value("SEVERE"));
+    }
+
+    @Test
+    @DisplayName("PATCH /prescriptions/{id} - 409 Conflict when allergy confirmation required")
+    void amendPrescriptionThrowsAllergyConfirmationRequiredReturns409() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        UUID allergyId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        when(amendPrescriptionUseCase.amend(any()))
+                .thenThrow(new PrescriptionAllergyConfirmationRequiredException(List.of(
+                        new PrescriptionAllergyConfirmationRequiredException.AllergyWarning(
+                                allergyId,
+                                patientId,
+                                medicineId,
+                                "Amoxicillin 500mg",
+                                "Amoxicillin",
+                                "Amoxicillin",
+                                AllergySeverity.SEVERE,
+                                "Anaphylaxis"
+                        )
+                )));
+
+        mockMvc.perform(patch("/prescriptions/{id}", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "changeReason": "Dose adjustment",
+                                  "items": [{
+                                    "medicineId": "%s",
+                                    "dosage": "2 tablets",
+                                    "frequency": 2,
+                                    "route": "ORAL",
+                                    "durationDays": 5,
+                                    "quantity": 10
+                                  }]
+                                }
+                                """.formatted(medicineId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ALLERGY_CONFIRMATION_REQUIRED"))
+                .andExpect(jsonPath("$.details.warnings[0].allergyId").value(allergyId.toString()))
+                .andExpect(jsonPath("$.details.warnings[0].allergenName").value("Amoxicillin"))
+                .andExpect(jsonPath("$.details.warnings[0].severity").value("SEVERE"));
+    }
+
+    @Test
+    @DisplayName("FINDING-02: GET /prescriptions/allergy-warning-logs masks patient name when anonymization is enabled")
+    void getAllergyWarningLogsWhenAnonymizationEnabledReturnsMaskedPatientName() throws Exception {
+        anonymizationModeState.setEnabled(true);
+        try {
+            UUID logId = UUID.randomUUID();
+            UUID prescriptionId = UUID.randomUUID();
+            when(getPrescriptionAllergyWarningLogsUseCase.search(any())).thenReturn(
+                    new PageImpl<>(List.of(
+                            new PrescriptionAllergyWarningLogResult(
+                                    logId,
+                                    prescriptionId,
+                                    "RX000001",
+                                    UUID.randomUUID(),
+                                    "PAT-001",
+                                    "Nguyen Van A",
+                                    UUID.randomUUID(),
+                                    "Dr. Nguyen",
+                                    UUID.randomUUID(),
+                                    "Amoxicillin 500mg",
+                                    "Amoxicillin",
+                                    "Amoxicillin",
+                                    AllergySeverity.SEVERE,
+                                    "Anaphylaxis",
+                                    "Critical benefit outweighs risk",
+                                    NOW
+                            )
+                    ), PageRequest.of(0, 20), 1)
+            );
+
+            mockMvc.perform(get("/prescriptions/allergy-warning-logs")
+                            .param("page", "0")
+                            .param("size", "20"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].patientName").value("BỆNH NHÂN #PAT-001"))
+                    .andExpect(jsonPath("$.content[0].patientCode").value("PAT-001"));
+        } finally {
+            anonymizationModeState.setEnabled(false);
+        }
     }
 }
 

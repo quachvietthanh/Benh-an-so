@@ -1,5 +1,5 @@
 -- =====================================================
--- V40__create_prescription_allergy_warning_logs_table.sql
+-- V41__create_prescription_allergy_warning_logs_table.sql
 -- NCL-05-CN-004: Cảnh báo dị ứng thuốc khi kê đơn
 -- Business Rules: QTN-26, QTN-05, QTN-02, QTN-11
 -- Acceptance Criteria: TC-01, TC-02, TC-03, TC-04, TC-05

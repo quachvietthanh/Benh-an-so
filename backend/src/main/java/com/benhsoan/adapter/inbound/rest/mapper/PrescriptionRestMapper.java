@@ -323,13 +323,16 @@ public class PrescriptionRestMapper {
         if (result == null) {
             return null;
         }
+        String patientName = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskFullName(result.patientCode())
+                : result.patientName();
         return new PrescriptionAllergyWarningLogResponse(
                 result.id(),
                 result.prescriptionId(),
                 result.prescriptionCode(),
                 result.patientId(),
                 result.patientCode(),
-                result.patientName(),
+                patientName,
                 result.doctorId(),
                 result.doctorName(),
                 result.medicineId(),
