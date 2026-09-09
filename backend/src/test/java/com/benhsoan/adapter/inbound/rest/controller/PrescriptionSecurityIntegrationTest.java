@@ -240,7 +240,7 @@ class PrescriptionSecurityIntegrationTest {
     }
 
     @Test
-    void allowsAdminsAndDoctorsToCheckAllergyWarnings() throws Exception {
+    void allowsDoctorsWithPrescriptionPermissionToCheckAllergyWarnings() throws Exception {
         when(checkPatientDrugAllergyUseCase.check(any(), any())).thenReturn(java.util.List.of());
 
         String body = """
@@ -252,13 +252,11 @@ class PrescriptionSecurityIntegrationTest {
                 }
                 """;
 
-        for (String role : new String[] {"ADMIN", "DOCTOR"}) {
-            mockMvc.perform(post("/prescriptions/check-allergy-warnings")
-                            .with(user(role.toLowerCase()).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(body))
-                    .andExpect(status().isOk());
-        }
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
 
         mockMvc.perform(post("/prescriptions/check-allergy-warnings")
                         .with(user("doctor_updater").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE")))
@@ -270,7 +268,7 @@ class PrescriptionSecurityIntegrationTest {
                         .with(user("pharmacist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                    .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -291,8 +289,8 @@ class PrescriptionSecurityIntegrationTest {
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("FINDING-01: Chặn IDOR - Doctor kiểm tra hồ sơ bệnh án không thuộc phụ trách bị 403 Forbidden")
-    void rejectsCheckAllergyWarnings_WhenDoctorDoesNotOwnMedicalRecord_Returns403() throws Exception {
+    @org.junit.jupiter.api.DisplayName("FINDING-01: Chặn IDOR - Bác sĩ khác hoặc Admin không phụ trách ca khám bị 403 Forbidden")
+    void rejectsCheckAllergyWarnings_WhenCallerDoesNotOwnMedicalRecord_Returns403() throws Exception {
         when(checkPatientDrugAllergyUseCase.check(any(), any()))
                 .thenThrow(new org.springframework.security.access.AccessDeniedException(
                         "Only the doctor responsible for the visit can change prescriptions."));
@@ -306,8 +304,17 @@ class PrescriptionSecurityIntegrationTest {
                 }
                 """;
 
+        // Bác sĩ khác không phụ trách ca khám
         mockMvc.perform(post("/prescriptions/check-allergy-warnings")
                         .with(user("doctor_other").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        // Admin không phụ trách ca khám cũng bị chặn ở domain layer
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("admin").authorities(
                                 new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))

@@ -33,6 +33,7 @@
 - **Method:** `POST`
 - **Path:** `/prescriptions/check-allergy-warnings`
 - **Permission:** `PRESCRIPTION_CREATE` (hoặc `PRESCRIPTION_UPDATE`)
+- **Clinical Scope & Ownership:** Người gọi bắt buộc phải là Bác sĩ đang phụ trách lượt khám (`visit.doctorId == currentUserId`), lượt khám đang diễn ra (`IN_PROGRESS`) và hồ sơ bệnh án chưa bị khóa. Quản trị viên (`ADMIN`) hoặc bác sĩ không phụ trách sẽ bị từ chối với `403 Forbidden`.
 
 #### Request Body
 ```json
@@ -163,3 +164,24 @@
   }
 }
 ```
+
+---
+
+## 3. Kiến Trúc Bảo Mật & Phân Tích Tương Tranh (TOCTOU Traceability)
+
+### 3.1. Phạm vi phân quyền Pre-check (Clinical Scope & Ownership)
+- Endpoint `POST /prescriptions/check-allergy-warnings` áp dụng cơ chế xác thực hai lớp:
+  1. **Tầng API Gateway / Filter**: Yêu cầu người dùng đăng nhập có quyền `PRESCRIPTION_CREATE` hoặc `PRESCRIPTION_UPDATE`.
+  2. **Tầng Domain / Application Service**: Yêu cầu người gọi bắt buộc phải là **Bác sĩ đang phụ trách lượt khám** (`visit.doctorId == currentUserId`), lượt khám đang diễn ra (`IN_PROGRESS`), và hồ sơ bệnh án chưa bị khóa (`ensureEditable()`).
+- Theo quy định phân quyền hệ thống (VT-05 Quản trị viên: *"Không tham gia nghiệp vụ khám bệnh và không kê đơn thuốc"*), tài khoản Quản trị viên (`ADMIN`) hoặc bác sĩ không phụ trách ca khám nếu gọi endpoint này sẽ nhận mã lỗi **HTTP 403 Forbidden** (`AccessDeniedException`).
+
+### 3.2. Phân tích rủi ro TOCTOU (Time-of-Check to Time-of-Use)
+- **Bản chất của Pre-check**: Endpoint `check-allergy-warnings` được thiết kế như một công cụ tư vấn giao diện người dùng thời gian thực (real-time UI advisory assistant). Endpoint này không khóa bản ghi trong cơ sở dữ liệu để đảm bảo hiệu năng và tránh tranh chấp khóa không cần thiết khi bác sĩ đang thao tác trên màn hình.
+- **Rủi ro tương tranh tiềm ẩn**: Tồn tại một khoảng thời gian trễ giữa lúc bác sĩ gọi pre-check và thời điểm bác sĩ gửi lệnh lưu đơn thuốc (`POST /prescriptions` hoặc `PATCH /prescriptions/{id}`). Trong khoảng thời gian này, có thể có dị ứng mới của bệnh nhân được ghi nhận thêm bởi nhân viên y tế khác.
+- **Cơ chế bảo vệ toàn vẹn dữ liệu (Authoritative Enforcement)**:
+  - Hệ thống không tin cậy hoàn toàn vào kết quả pre-check ở client.
+  - Khi bác sĩ thực hiện lưu đơn (`CreatePrescriptionService` hoặc `AmendPrescriptionService`), nghiệp vụ luôn được bao bọc trong một Transaction với khóa bi quan (`PESSIMISTIC_WRITE` qua `findByIdForUpdate`).
+  - Tại đây, hệ thống **tái kiểm tra toàn bộ hoạt chất đối chiếu với danh sách dị ứng đang active của bệnh nhân**.
+  - Nếu phát hiện bất kỳ dị ứng nào chưa được cung cấp lý do bỏ qua (`allergyOverrides`), hệ thống lập tức rollback giao dịch và trả về mã lỗi **HTTP 409 Conflict** (`ALLERGY_CONFIRMATION_REQUIRED`) kèm danh sách dị ứng mới phát sinh.
+  - Vì vậy, tính toàn vẹn dữ liệu và an toàn lâm sàng cho người bệnh luôn được đảm bảo tuyệt đối.
+
