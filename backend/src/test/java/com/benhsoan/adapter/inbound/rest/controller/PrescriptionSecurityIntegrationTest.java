@@ -28,11 +28,13 @@ import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
+import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
 import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
 import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
@@ -66,6 +68,8 @@ class PrescriptionSecurityIntegrationTest {
     @MockitoBean private DispensePrescriptionUseCase dispensePrescriptionUseCase;
     @MockitoBean private CancelPrescriptionUseCase cancelPrescriptionUseCase;
     @MockitoBean private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
+    @MockitoBean private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+    @MockitoBean private GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
     @MockitoBean private ExportPrescriptionUseCase exportPrescriptionUseCase;
     @MockitoBean private SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
     @MockitoBean private RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
@@ -234,4 +238,87 @@ class PrescriptionSecurityIntegrationTest {
                                 "PERMISSION_PRESCRIPTION_INTERCONNECTION_SEND"))))
                 .andExpect(status().isConflict());
     }
+
+    @Test
+    void allowsDoctorsWithPrescriptionPermissionToCheckAllergyWarnings() throws Exception {
+        when(checkPatientDrugAllergyUseCase.check(any(), any())).thenReturn(java.util.List.of());
+
+        String body = """
+                {
+                  "medicalRecordId": "16000000-0000-0000-0000-000000000001",
+                  "medicineIds": [
+                    "16000000-0000-0000-0000-000000000002"
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("doctor_updater").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("pharmacist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void onlyAllowsUsersWithAllergyWarningViewPermissionToAccessLogs() throws Exception {
+        when(getPrescriptionAllergyWarningLogsUseCase.search(any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/prescriptions/allergy-warning-logs")
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_ALLERGY_WARNING_VIEW"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/prescriptions/allergy-warning-logs")
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/prescriptions/allergy-warning-logs")
+                        .with(user("pharmacist").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("FINDING-01: Chặn IDOR - Bác sĩ khác hoặc Admin không phụ trách ca khám bị 403 Forbidden")
+    void rejectsCheckAllergyWarnings_WhenCallerDoesNotOwnMedicalRecord_Returns403() throws Exception {
+        when(checkPatientDrugAllergyUseCase.check(any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException(
+                        "Only the doctor responsible for the visit can change prescriptions."));
+
+        String body = """
+                {
+                  "medicalRecordId": "16000000-0000-0000-0000-000000000001",
+                  "medicineIds": [
+                    "16000000-0000-0000-0000-000000000002"
+                  ]
+                }
+                """;
+
+        // Bác sĩ khác không phụ trách ca khám
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("doctor_other").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        // Admin không phụ trách ca khám cũng bị chặn ở domain layer
+        mockMvc.perform(post("/prescriptions/check-allergy-warnings")
+                        .with(user("admin").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
 }
+

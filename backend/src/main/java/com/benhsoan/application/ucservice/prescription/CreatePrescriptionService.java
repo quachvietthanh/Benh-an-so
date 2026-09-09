@@ -22,19 +22,25 @@ import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
 import com.benhsoan.domain.prescription.enums.WarningAction;
+import com.benhsoan.domain.prescription.PrescriptionAllergyWarningLog;
+import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
+import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.outbound.generator.PrescriptionCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
@@ -56,9 +62,13 @@ public class CreatePrescriptionService
 
     private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
 
+    private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+
     private final MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
 
     private final PrescriptionWarningLogRepository warningLogRepository;
+
+    private final PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
 
     private final PrescriptionCodeGenerator prescriptionCodeGenerator;
 
@@ -107,6 +117,14 @@ public class CreatePrescriptionService
                 command.interactionOverrides()
         );
 
+        // Detect patient medication allergies (QTN-26, NCL-05-CN-004)
+        List<PatientAllergyWarningResult> allergyWarnings = checkPatientDrugAllergyUseCase
+                .check(command.medicalRecordId(), List.copyOf(medicines.keySet()));
+        Map<AllergyKey, String> allergyOverrideReasons = validateAllergyOverrides(
+                allergyWarnings,
+                command.allergyOverrides()
+        );
+
         Prescription prescription = Prescription.create(
                 prescriptionId,
                 prescriptionCodeGenerator.generate(),
@@ -125,8 +143,15 @@ public class CreatePrescriptionService
                 currentUserId,
                 now
         );
+        List<PrescriptionAllergyWarningLog> allergyLogs = saveAllergyWarningLogs(
+                saved.getId(),
+                allergyWarnings,
+                allergyOverrideReasons,
+                currentUserId,
+                now
+        );
 
-        saveAuditLog(saved, warningLogs.size(), currentUserId, now);
+        saveAuditLog(saved, warningLogs.size() + allergyLogs.size(), currentUserId, now);
 
         return resultMapper.toResult(saved, warningLogs);
     }
@@ -373,6 +398,107 @@ public class CreatePrescriptionService
                         issuedAt
                 )
         );
+    }
+
+    private Map<AllergyKey, String> validateAllergyOverrides(
+            List<PatientAllergyWarningResult> allergyWarnings,
+            List<PrescriptionAllergyOverrideCommand> overrideCommands
+    ) {
+        List<PrescriptionAllergyOverrideCommand> safeOverrideCommands
+                = overrideCommands == null ? List.of() : overrideCommands;
+        Map<AllergyKey, String> reasonsByKey = new HashMap<>();
+
+        for (PrescriptionAllergyOverrideCommand override : safeOverrideCommands) {
+            if (override == null || override.allergyId() == null || override.medicineId() == null) {
+                throw new ValidationException(
+                        "Allergy ID and medicine ID are required for an allergy override."
+                );
+            }
+            if (override.overrideReason() == null || override.overrideReason().isBlank()) {
+                throw new ValidationException(
+                        "Override reason is required for medication allergy: " + override.allergyId()
+                );
+            }
+            AllergyKey key = new AllergyKey(override.allergyId(), override.medicineId());
+            if (reasonsByKey.put(key, override.overrideReason().trim()) != null) {
+                throw new ValidationException(
+                        "Duplicate override for medication allergy: " + override.allergyId()
+                );
+            }
+        }
+
+        Set<AllergyKey> detectedKeys = allergyWarnings.stream()
+                .map(w -> new AllergyKey(w.allergyId(), w.medicineId()))
+                .collect(Collectors.toSet());
+
+        for (AllergyKey suppliedKey : reasonsByKey.keySet()) {
+            if (!detectedKeys.contains(suppliedKey)) {
+                throw new ValidationException(
+                        "Override does not belong to a detected medication allergy: "
+                                + suppliedKey.allergyId()
+                );
+            }
+        }
+
+        List<PatientAllergyWarningResult> unconfirmed = allergyWarnings.stream()
+                .filter(warning -> !reasonsByKey.containsKey(new AllergyKey(warning.allergyId(), warning.medicineId())))
+                .toList();
+
+        if (!unconfirmed.isEmpty()) {
+            throw new PrescriptionAllergyConfirmationRequiredException(
+                    unconfirmed.stream()
+                            .map(this::toAllergyWarning)
+                            .toList()
+            );
+        }
+
+        return Map.copyOf(reasonsByKey);
+    }
+
+    private PrescriptionAllergyConfirmationRequiredException.AllergyWarning toAllergyWarning(
+            PatientAllergyWarningResult warning
+    ) {
+        return new PrescriptionAllergyConfirmationRequiredException.AllergyWarning(
+                warning.allergyId(),
+                warning.patientId(),
+                warning.medicineId(),
+                warning.medicineName(),
+                warning.activeIngredient(),
+                warning.allergenName(),
+                warning.severity(),
+                warning.reaction()
+        );
+    }
+
+    private List<PrescriptionAllergyWarningLog> saveAllergyWarningLogs(
+            UUID prescriptionId,
+            List<PatientAllergyWarningResult> allergyWarnings,
+            Map<AllergyKey, String> overrideReasons,
+            UUID handledBy,
+            Instant handledAt
+    ) {
+        return allergyWarnings.stream()
+                .map(warning -> allergyWarningLogRepository.save(
+                        PrescriptionAllergyWarningLog.create(
+                                UUID.randomUUID(),
+                                prescriptionId,
+                                warning.patientId(),
+                                warning.allergyId(),
+                                warning.medicineId(),
+                                warning.activeIngredient(),
+                                warning.allergenName(),
+                                warning.severity(),
+                                warning.reaction(),
+                                overrideReasons.get(new AllergyKey(warning.allergyId(), warning.medicineId())),
+                                handledBy,
+                                handledAt,
+                                handledAt
+                        )
+                ))
+                .toList();
+    }
+
+    private record AllergyKey(UUID allergyId, UUID medicineId) {
     }
 
     private void requireCommand(CreatePrescriptionCommand command) {

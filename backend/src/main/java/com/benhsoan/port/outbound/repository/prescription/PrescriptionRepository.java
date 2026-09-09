@@ -19,6 +19,8 @@ public interface PrescriptionRepository {
 
     Optional<Prescription> findById(UUID id);
 
+    List<Prescription> findAllById(Collection<UUID> ids);
+
     Optional<Prescription> findByPrescriptionCode(String prescriptionCode);
 
     boolean existsByPrescriptionCode(String prescriptionCode);

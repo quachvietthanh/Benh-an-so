@@ -75,6 +75,17 @@ public class PrescriptionRepositoryAdapter
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Prescription> findAllById(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findAllById(ids).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public boolean existsByPrescriptionCode(String prescriptionCode) {
         return jpaRepository.existsByPrescriptionCode(prescriptionCode);
     }
