@@ -14,6 +14,7 @@ import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordAcce
 import com.benhsoan.persistence.jpaRepository.medicalrecord.MedicalRecordAccessLogSpecification;
 import com.benhsoan.persistence.mapper.medicalrecord.MedicalRecordAccessLogPersistenceMapper;
 import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
+import com.benhsoan.port.dto.result.AccessLogAccountCountResult;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordAccessLogRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,14 @@ public class MedicalRecordAccessLogRepositoryAdapter implements MedicalRecordAcc
         return jpaRepository.findByActionAndAccessedAtBetween(MedicalRecordAccessAction.VIEW, from, to)
                 .stream()
                 .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<AccessLogAccountCountResult> countAccessByAccountBetween(Instant from, Instant to) {
+        return jpaRepository.countAccessByAccount(MedicalRecordAccessAction.ACCESS_ACTIONS, from, to)
+                .stream()
+                .map(p -> new AccessLogAccountCountResult(p.getAccessedBy(), p.getAccessCount()))
                 .toList();
     }
 }

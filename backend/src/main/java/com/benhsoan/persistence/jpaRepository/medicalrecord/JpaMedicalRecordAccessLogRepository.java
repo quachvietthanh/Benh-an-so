@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.jpaRepository.medicalrecord;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,5 +26,18 @@ public interface JpaMedicalRecordAccessLogRepository
             MedicalRecordAccessAction action,
             Instant from,
             Instant to
+    );
+
+    @Query("select log.accessedBy as accessedBy, count(log) as accessCount "
+            + "from MedicalRecordAccessLogEntity log "
+            + "where log.action in :actions "
+            + "and log.accessedAt >= :from "
+            + "and log.accessedAt < :to "
+            + "group by log.accessedBy "
+            + "order by count(log) desc, log.accessedBy asc")
+    List<AccessLogAccountCountProjection> countAccessByAccount(
+            @Param("actions") Collection<MedicalRecordAccessAction> actions,
+            @Param("from") Instant from,
+            @Param("to") Instant to
     );
 }
