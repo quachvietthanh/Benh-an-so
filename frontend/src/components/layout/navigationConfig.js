@@ -83,5 +83,3 @@ export const getNavigationItems = (roles = [], permissions = []) => {
 }
 
 export { getDefaultHomePath } from '../../utils/roleRouting.js'
-
-
