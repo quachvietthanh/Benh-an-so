@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
-import authApi from '../api/authApi'
+import authApi, { parseRetryAfterSeconds, isLockoutError } from '../api/authApi'
 
 const AuthContext = createContext(null)
 
@@ -122,12 +122,29 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, user: normalizedUser }
     } catch (error) {
-      const message =
-        error.response?.data?.message ||
-        (error.response?.status === 500
-          ? 'Máy chủ Backend đang bị lỗi hoặc chưa sẵn sàng kết nối (Lỗi 500)'
-          : error.message || 'Tên đăng nhập hoặc mật khẩu không đúng')
-      return { success: false, message }
+      const status = error.response?.status
+      const isLockout = isLockoutError(error)
+      const retryAfterSeconds = parseRetryAfterSeconds(error)
+      const errorData = error.response?.data
+      const message = isLockout
+        ? (retryAfterSeconds > 0
+            ? `Tài khoản tạm khóa. Vui lòng thử lại sau ${retryAfterSeconds} giây.`
+            : 'Tài khoản tạm khóa. Vui lòng thử lại sau.')
+        : (status === 403
+            ? 'Tài khoản đã bị vô hiệu hóa / khóa. Vui lòng liên hệ quản trị viên.'
+            : (errorData?.message ||
+              (status === 500
+                ? 'Máy chủ Backend đang bị lỗi hoặc chưa sẵn sàng kết nối (Lỗi 500)'
+                : (status === 401 ? 'Tên đăng nhập hoặc mật khẩu không chính xác.' : error.message || 'Tên đăng nhập hoặc mật khẩu không đúng'))))
+      return {
+        success: false,
+        status,
+        isLockout,
+        retryAfterSeconds,
+        data: errorData,
+        error,
+        message,
+      }
     }
   }
 
@@ -160,13 +177,20 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       const status = error.response?.status
       const errorData = error.response?.data
+      const isLockout = isLockoutError(error)
+      const retryAfterSeconds = parseRetryAfterSeconds(error) || (status === 429 ? 60 : 0)
       return {
         success: false,
         status,
+        isLockout,
+        retryAfterSeconds,
         data: errorData,
+        error,
         message:
-          status === 429
-            ? 'Tài khoản tạm thời bị khóa do nhập sai mật khẩu nhiều lần.'
+          isLockout
+            ? (retryAfterSeconds > 0
+                ? `Tài khoản tạm khóa. Vui lòng thử lại sau ${retryAfterSeconds} giây.`
+                : 'Tài khoản tạm khóa. Vui lòng thử lại sau.')
             : status === 403
               ? 'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ phòng khám để được hỗ trợ.'
               : status === 401 || status === 400

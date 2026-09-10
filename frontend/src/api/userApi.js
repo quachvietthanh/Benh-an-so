@@ -29,6 +29,14 @@ const userApi = {
     return axiosClient.patch(`/users/${id}/deactivate`)
   },
 
+  activateUser: (id) => {
+    return axiosClient.patch(`/users/${id}/activate`)
+  },
+
+  deactivateUser: (id) => {
+    return axiosClient.patch(`/users/${id}/deactivate`)
+  },
+
   getAll: (params) => {
     return axiosClient.get('/users', { params })
   },

@@ -16,6 +16,7 @@ import {
   SolutionOutlined,
   UserOutlined,
   EyeInvisibleOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 
 export const roleNames = {
@@ -34,7 +35,7 @@ export const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/prescription-interconnections', '/system/anonymization'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/prescription-interconnections', '/system/anonymization'] },
 ]
 
 export const getNavigationItems = (roles = [], permissions = []) => {
@@ -69,6 +70,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('PHARMACY_CREATE') || isPharmacist) },
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, check: () => !isAdmin && !isDoctor && (hasPerm('INVOICE_READ') || hasPerm('INVOICE_CREATE') || isManager || isReceptionist) },
     { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, check: () => hasPerm('REPORT_VIEW') || isAdmin || isManager },
+    { key: '/users', label: 'Quản trị tài khoản', icon: TeamOutlined, check: () => isAdmin || hasPerm('USER_READ') },
     { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || isAdmin || isManager },
     { key: '/system/diagnosis-catalog', label: 'Danh mục mã bệnh (ICD-10)', icon: ExperimentOutlined, check: () => hasPerm('DIAGNOSIS_CATALOG_MANAGE') || isAdmin },
     { key: '/system/medical-record-templates', label: 'Mẫu bệnh án chuyên khoa', icon: FileTextOutlined, check: () => hasPerm('MEDICAL_RECORD_TEMPLATE_MANAGE') || isAdmin },
@@ -81,5 +83,3 @@ export const getNavigationItems = (roles = [], permissions = []) => {
 }
 
 export { getDefaultHomePath } from '../../utils/roleRouting.js'
-
-
