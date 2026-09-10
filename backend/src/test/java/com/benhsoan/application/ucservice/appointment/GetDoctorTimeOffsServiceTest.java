@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -43,9 +42,12 @@ class GetDoctorTimeOffsServiceTest {
     private static final Instant END_TIME = Instant.parse("2026-09-15T12:00:00Z");
     private static final Instant CREATED_AT = Instant.parse("2026-09-10T02:00:00Z");
 
-    @Mock private DoctorTimeOffRepository doctorTimeOffRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private AppointmentRepository appointmentRepository;
+    @Mock
+    private DoctorTimeOffRepository doctorTimeOffRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private AppointmentRepository appointmentRepository;
 
     private GetDoctorTimeOffsService service;
 
@@ -54,8 +56,7 @@ class GetDoctorTimeOffsServiceTest {
         service = new GetDoctorTimeOffsService(
                 doctorTimeOffRepository,
                 userRepository,
-                appointmentRepository
-        );
+                appointmentRepository);
     }
 
     private User createDoctorUser() {
@@ -77,8 +78,7 @@ class GetDoctorTimeOffsServiceTest {
 
         DoctorTimeOff activeTimeOff = DoctorTimeOff.restore(
                 TIME_OFF_ID, DOCTOR_ID, START_TIME, END_TIME, "Nghi phep",
-                TimeOffStatus.ACTIVE, CREATED_BY, CREATED_AT, null
-        );
+                TimeOffStatus.ACTIVE, CREATED_BY, CREATED_AT, null);
         when(doctorTimeOffRepository.findByDoctorId(DOCTOR_ID)).thenReturn(List.of(activeTimeOff));
 
         Appointment appt = mock(Appointment.class);
@@ -113,8 +113,7 @@ class GetDoctorTimeOffsServiceTest {
 
         DoctorTimeOff activeTimeOff = DoctorTimeOff.restore(
                 TIME_OFF_ID, DOCTOR_ID, START_TIME, END_TIME, "Nghi phep",
-                TimeOffStatus.ACTIVE, CREATED_BY, CREATED_AT, null
-        );
+                TimeOffStatus.ACTIVE, CREATED_BY, CREATED_AT, null);
         when(doctorTimeOffRepository.findByDoctorId(DOCTOR_ID)).thenReturn(List.of(activeTimeOff));
         when(appointmentRepository.findActiveAppointmentsForDoctorBetween(DOCTOR_ID, START_TIME, END_TIME))
                 .thenReturn(List.of());
@@ -131,8 +130,7 @@ class GetDoctorTimeOffsServiceTest {
 
         DoctorTimeOff cancelledTimeOff = DoctorTimeOff.restore(
                 TIME_OFF_ID, DOCTOR_ID, START_TIME, END_TIME, "Nghi phep",
-                TimeOffStatus.CANCELLED, CREATED_BY, CREATED_AT, CREATED_AT
-        );
+                TimeOffStatus.CANCELLED, CREATED_BY, CREATED_AT, CREATED_AT);
         when(doctorTimeOffRepository.findByDoctorId(DOCTOR_ID)).thenReturn(List.of(cancelledTimeOff));
 
         List<DoctorTimeOffResult> results = service.getTimeOffs(DOCTOR_ID);
