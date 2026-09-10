@@ -271,11 +271,38 @@ public class GlobalExceptionHandler {
             AccessDeniedException ex,
             HttpServletRequest request
     ) {
-
+        String message = resolveAccessDeniedMessage(ex);
         return build(
                 HttpStatus.FORBIDDEN,
                 "ACCESS_DENIED",
-                "Access denied.",
+                message,
+                request.getRequestURI()
+        );
+    }
+
+    private String resolveAccessDeniedMessage(AccessDeniedException ex) {
+        if (ex.getMessage() == null || ex.getMessage().isBlank()) {
+            return "Access denied.";
+        }
+        String trimmed = ex.getMessage().trim();
+        if ("Denied".equalsIgnoreCase(trimmed)
+                || "Access is denied".equalsIgnoreCase(trimmed)
+                || "Access denied".equalsIgnoreCase(trimmed)
+                || "Access denied.".equalsIgnoreCase(trimmed)) {
+            return "Access denied.";
+        }
+        return trimmed;
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
+            IllegalArgumentException ex,
+            HttpServletRequest request
+    ) {
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_ARGUMENT",
+                ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Invalid argument provided.",
                 request.getRequestURI()
         );
     }

@@ -257,6 +257,38 @@ class GlobalExceptionHandlerTest {
         assertEquals(30L, ((Number) response.getBody().details().get("retryAfterSeconds")).longValue());
     }
 
+    @Test
+    void returnsStructuredBadRequestForIllegalArgumentException() {
+        var response = handler.handleIllegalArgument(
+                new IllegalArgumentException("Queue number must be positive."), request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("INVALID_ARGUMENT", response.getBody().code());
+        assertEquals("Queue number must be positive.", response.getBody().message());
+    }
+
+    @Test
+    void preservesCustomMessageWhenProvidedInAccessDeniedException() {
+        var response = handler.handleAccessDenied(
+                new org.springframework.security.access.AccessDeniedException("Only the prescribing doctor can cancel a prescription."), request
+        );
+
+        assertEquals(403, response.getStatusCode().value());
+        assertEquals("ACCESS_DENIED", response.getBody().code());
+        assertEquals("Only the prescribing doctor can cancel a prescription.", response.getBody().message());
+    }
+
+    @Test
+    void mapsPrescriptionNoChangesToBadRequest() {
+        var response = handler.handleDomainException(
+                new com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException(), request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("PRESCRIPTION_NO_CHANGES", response.getBody().code());
+    }
+
     private ApiErrorResponse assertContract(
             ResponseEntity<ApiErrorResponse> response,
             int expectedStatus,
