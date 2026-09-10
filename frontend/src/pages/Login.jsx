@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { Form, Input, Button, message } from 'antd'
+import { Form, Input, Button, Alert, message } from 'antd'
 import { UserOutlined, LockOutlined, SearchOutlined } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
 import { getDefaultHomePath } from '../components/layout/navigationConfig'
@@ -8,8 +8,25 @@ import './login.css'
 
 function Login() {
   const [loading, setLoading] = useState(false)
+  const [lockoutSeconds, setLockoutSeconds] = useState(0)
+  const [errorMessage, setErrorMessage] = useState('')
   const navigate = useNavigate()
   const { login, logout, isAuthenticated, user } = useAuthContext()
+
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return undefined
+    const timer = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          setErrorMessage('')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [lockoutSeconds])
 
   if (isAuthenticated && user) {
     const userRoles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
@@ -20,10 +37,16 @@ function Login() {
   }
 
   const handleSubmit = async (values) => {
+    if (lockoutSeconds > 0) {
+      return
+    }
     setLoading(true)
+    setErrorMessage('')
     try {
       const result = await login(values)
       if (result.success) {
+        setLockoutSeconds(0)
+        setErrorMessage('')
         const targetUser = result.user || JSON.parse(localStorage.getItem('user') || '{}')
         const userRoles = (targetUser?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
         if (userRoles.includes('patient')) {
@@ -36,10 +59,20 @@ function Login() {
         const destination = getDefaultHomePath(targetUser?.roles, targetUser?.permissions)
         navigate(destination, { replace: true })
       } else {
-        message.error(result.message || 'Đăng nhập thất bại')
+        if (result.isLockout || result.status === 429) {
+          const seconds = result.retryAfterSeconds || 60
+          setLockoutSeconds(seconds)
+          setErrorMessage(`Tài khoản tạm khóa. Vui lòng thử lại sau ${seconds} giây.`)
+        } else {
+          const msg = result.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.'
+          setErrorMessage(msg)
+          message.error(msg)
+        }
       }
     } catch (error) {
-      message.error('Đã xảy ra lỗi hệ thống')
+      const msg = 'Đã xảy ra lỗi hệ thống. Vui lòng thử lại.'
+      setErrorMessage(msg)
+      message.error(msg)
     } finally {
       setLoading(false)
     }
@@ -63,6 +96,20 @@ function Login() {
         <div className="bsa2-title">Bệnh Án Số</div>
         <p className="bsa2-sub">Đăng nhập hệ thống khám chữa bệnh</p>
 
+        {errorMessage && (
+          <Alert
+            className="bsa2-login-alert"
+            type={lockoutSeconds > 0 ? 'warning' : 'error'}
+            showIcon
+            message={
+              lockoutSeconds > 0
+                ? `Tài khoản tạm khóa. Vui lòng thử lại sau ${lockoutSeconds} giây.`
+                : errorMessage
+            }
+            style={{ marginBottom: 16, textAlign: 'left' }}
+          />
+        )}
+
         <Form
           className="bsa2-form"
           name="login"
@@ -78,6 +125,7 @@ function Login() {
               prefix={<UserOutlined />}
               placeholder="Tên đăng nhập"
               bordered={false}
+              disabled={loading || lockoutSeconds > 0}
             />
           </Form.Item>
 
@@ -89,6 +137,7 @@ function Login() {
               prefix={<LockOutlined />}
               placeholder="Mật khẩu"
               bordered={false}
+              disabled={loading || lockoutSeconds > 0}
             /> 
           </Form.Item>
 
@@ -97,10 +146,11 @@ function Login() {
               type="primary"
               htmlType="submit"
               loading={loading}
+              disabled={lockoutSeconds > 0}
               block
               style={{ height: 44, fontSize: 16 }}
             >
-              Đăng nhập
+              {lockoutSeconds > 0 ? `Vui lòng thử lại sau (${lockoutSeconds}s)` : 'Đăng nhập'}
             </Button>
           </Form.Item>
         </Form>

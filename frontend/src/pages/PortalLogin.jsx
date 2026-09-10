@@ -69,11 +69,11 @@ function PortalLogin() {
         message.success('Đăng nhập cổng bệnh nhân thành công!')
         navigate('/portal/dashboard', { replace: true })
       } else {
-        if (result.status === 429) {
-          const retryAfter = result.data?.retryAfterSeconds || 60
+        if (result.status === 429 || result.isLockout) {
+          const retryAfter = result.retryAfterSeconds || result.data?.details?.retryAfterSeconds || result.data?.retryAfterSeconds || 60
           setLockoutSeconds(retryAfter)
           setErrorType('warning')
-          setErrorMessage(`Tài khoản tạm thời bị khóa do đăng nhập sai nhiều lần. Vui lòng thử lại sau ${retryAfter} giây.`)
+          setErrorMessage(`Tài khoản tạm khóa. Vui lòng thử lại sau ${retryAfter} giây.`)
         } else if (result.status === 403) {
           setErrorType('error')
           setErrorMessage('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ phòng khám để được hỗ trợ.')
@@ -188,7 +188,7 @@ function PortalLogin() {
                 disabled={lockoutSeconds > 0}
                 block
               >
-                {lockoutSeconds > 0 ? `Vui lòng chờ (${lockoutSeconds}s)` : 'Đăng nhập Cổng bệnh nhân'}
+                {lockoutSeconds > 0 ? `Vui lòng thử lại sau (${lockoutSeconds}s)` : 'Đăng nhập Cổng bệnh nhân'}
               </Button>
             </Form.Item>
           </Form>

@@ -8,6 +8,7 @@ import {
   Input,
   message,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
@@ -26,6 +27,8 @@ import {
   StopOutlined,
   UserOutlined,
   KeyOutlined,
+  LockOutlined,
+  UnlockOutlined,
 } from '@ant-design/icons'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
@@ -86,12 +89,29 @@ function UsersPage() {
     try {
       const response = await userApi.list()
       const rawData = Array.isArray(response.data) ? response.data : response.data?.content || []
+      const storedOverrides = (() => {
+        try {
+          return JSON.parse(localStorage.getItem('admin_user_status_overrides') || '{}')
+        } catch {
+          return {}
+        }
+      })()
       setUsers((prev) => {
         const prevMap = new Map(prev.map((u) => [u.id, u.active]))
-        return rawData.map((item) => ({
-          ...item,
-          active: item.active !== undefined ? item.active : (prevMap.has(item.id) ? prevMap.get(item.id) : true),
-        }))
+        return rawData.map((item) => {
+          let activeState = true
+          if (item.active !== undefined) {
+            activeState = item.active
+          } else if (storedOverrides[item.id] !== undefined) {
+            activeState = storedOverrides[item.id]
+          } else if (prevMap.has(item.id)) {
+            activeState = prevMap.get(item.id)
+          }
+          return {
+            ...item,
+            active: activeState,
+          }
+        })
       })
     } catch {
       setUsers([])
@@ -185,49 +205,41 @@ function UsersPage() {
     return Boolean(matchUsername || matchId)
   }
 
-  const handleToggleActive = async (account) => {
+  const handleToggleActive = async (account, willLock) => {
     if (isSelfAccount(account)) {
-      message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
+      message.warning('Bạn không thể tự khóa tài khoản của chính mình!')
       return
     }
 
-    const isActivating = account.active === false
-    const newActiveState = isActivating
-    const actionText = isActivating ? 'kích hoạt' : 'vô hiệu hóa'
-
-    setUsers((prev) =>
-      prev.map((u) => (u.id === account.id ? { ...u, active: newActiveState } : u))
-    )
+    const targetActive = !willLock
+    const actionText = willLock ? 'khóa' : 'mở khóa'
 
     try {
-      if (isActivating) {
-        await userApi.activate(account.id)
+      if (willLock) {
+        await userApi.deactivateUser(account.id)
       } else {
-        await userApi.deactivate(account.id)
+        await userApi.activateUser(account.id)
       }
-      message.success(`Đã ${actionText} tài khoản ${account.username}`)
-    } catch {
-      message.success(`Đã ${actionText} tài khoản ${account.username}`)
-    }
-  }
 
-  const confirmToggleActive = (account) => {
-    if (isSelfAccount(account)) {
-      message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
-      return
+      try {
+        const stored = JSON.parse(localStorage.getItem('admin_user_status_overrides') || '{}')
+        stored[account.id] = targetActive
+        localStorage.setItem('admin_user_status_overrides', JSON.stringify(stored))
+      } catch {
+        // ignore localStorage error
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === account.id ? { ...u, active: targetActive } : u))
+      )
+      message.success(`Đã ${actionText} tài khoản "${account.username}" thành công`)
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.message ||
+        error.apiError?.message ||
+        `Không thể ${actionText} tài khoản. Vui lòng thử lại.`
+      message.error(errorMsg)
     }
-    const isActivating = account.active === false
-    Modal.confirm({
-      title: isActivating ? 'Kích hoạt tài khoản?' : 'Vô hiệu hóa tài khoản?',
-      content: isActivating
-        ? `Tài khoản ${account.username} sẽ được kích hoạt và cho phép truy cập lại hệ thống.`
-        : `Tài khoản ${account.username} sẽ bị vô hiệu hóa và tạm ngưng truy cập hệ thống.`,
-      okText: isActivating ? 'Kích hoạt' : 'Vô hiệu hóa',
-      cancelText: 'Hủy',
-      okButtonProps: isActivating ? { type: 'primary' } : { danger: true },
-      centered: true,
-      onOk: () => handleToggleActive(account),
-    })
   }
 
   const columns = [
@@ -270,22 +282,22 @@ function UsersPage() {
       width: 140,
       render: (_, account) => (
         account.active === false ? (
-          <Tag color="error" icon={<StopOutlined />}>Vô hiệu hóa</Tag>
+          <Tag color="error" icon={<StopOutlined />}>Đã khóa</Tag>
         ) : (
-          <Tag color="success" icon={<CheckCircleOutlined />}>Hoạt động</Tag>
+          <Tag color="success" icon={<CheckCircleOutlined />}>Đang hoạt động</Tag>
         )
       ),
     },
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 90,
+      width: 150,
       align: 'right',
       render: (_, account) => {
         const isSelf = isSelfAccount(account)
-        const isActivating = account.active === false
+        const isCurrentlyActive = account.active !== false
 
-        const actionItems = [
+        const actionMenuItems = [
           {
             key: 'edit',
             icon: <EditOutlined />,
@@ -295,7 +307,7 @@ function UsersPage() {
         ]
 
         if (canResetPassword && !isSelf) {
-          actionItems.push({
+          actionMenuItems.push({
             key: 'reset-password',
             icon: <KeyOutlined />,
             label: 'Đặt lại mật khẩu',
@@ -303,43 +315,62 @@ function UsersPage() {
           })
         }
 
-        actionItems.push(
-          isActivating
-            ? {
-                key: 'activate',
-                icon: <CheckCircleOutlined />,
-                label: 'Kích hoạt tài khoản',
-                disabled: isSelf,
-                onClick: () => {
-                  if (isSelf) {
-                    message.warning('Bạn không thể tự vô hiệu hóa hay thay đổi tài khoản của chính mình!')
-                    return
-                  }
-                  confirmToggleActive(account)
-                },
-              }
-            : {
-                key: 'deactivate',
-                danger: !isSelf,
-                icon: <StopOutlined />,
-                label: isSelf ? 'Vô hiệu hóa (Tài khoản của bạn)' : 'Vô hiệu hóa tài khoản',
-                disabled: isSelf,
-                onClick: () => {
-                  if (isSelf) {
-                    message.warning('Bạn không thể tự vô hiệu hóa tài khoản của chính mình!')
-                    return
-                  }
-                  confirmToggleActive(account)
-                },
-              }
-        )
+        actionMenuItems.push({
+          type: 'divider',
+        })
+
+        actionMenuItems.push({
+          key: 'toggle-active',
+          danger: isCurrentlyActive,
+          icon: isCurrentlyActive ? <LockOutlined /> : <UnlockOutlined />,
+          disabled: isSelf,
+          onClick: () => {
+            if (isSelf) return
+            Modal.confirm({
+              title: isCurrentlyActive ? 'Khóa tài khoản' : 'Mở khóa tài khoản',
+              content: `Bạn có chắc chắn muốn ${isCurrentlyActive ? 'khóa' : 'mở khóa'} tài khoản "${account.username}" không?`,
+              okText: isCurrentlyActive ? 'Khóa' : 'Mở khóa',
+              okType: isCurrentlyActive ? 'danger' : 'primary',
+              cancelText: 'Hủy',
+              onOk: () => handleToggleActive(account, isCurrentlyActive),
+            })
+          },
+          label: (
+            <Popconfirm
+              title={isCurrentlyActive ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+              description={`Bạn có chắc chắn muốn ${isCurrentlyActive ? 'khóa' : 'mở khóa'} tài khoản "${account.username}" không?`}
+              onConfirm={(e) => {
+                e?.stopPropagation?.()
+                handleToggleActive(account, isCurrentlyActive)
+              }}
+              okText={isCurrentlyActive ? 'Khóa' : 'Mở khóa'}
+              cancelText="Hủy"
+              okButtonProps={{ danger: isCurrentlyActive, type: isCurrentlyActive ? undefined : 'primary' }}
+              disabled={isSelf}
+            >
+              <span
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: 'inline-block', width: '100%' }}
+                title={isSelf ? 'Không thể tự khóa tài khoản của chính mình' : undefined}
+              >
+                {isCurrentlyActive ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+              </span>
+            </Popconfirm>
+          ),
+        })
 
         return (
           <Dropdown
             trigger={['click']}
-            menu={{ items: actionItems }}
+            menu={{ items: actionMenuItems }}
+            placement="bottomRight"
           >
-            <Button className="admin-more-button" icon={<MoreOutlined />} />
+            <Button
+              className="admin-more-button"
+              icon={<MoreOutlined />}
+              size="small"
+              title="Thao tác"
+            />
           </Dropdown>
         )
       },
