@@ -1,18 +1,14 @@
 package com.benhsoan.infrastructure.authSecurity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -86,9 +82,8 @@ class LoginAttemptConcurrencyIntegrationTest {
         loginAttemptPort.unlock(CONCURRENT_USER);
         loginAttemptPort.unlock(CONCURRENT_E2E_USER);
 
-        Role doctorRole = roleRepository.findByName("DOCTOR").orElseGet(() ->
-                roleRepository.save(Role.create("DOCTOR", "Doctor role", true, Set.of()))
-        );
+        Role doctorRole = roleRepository.findByName("DOCTOR")
+                .orElseGet(() -> roleRepository.save(Role.create("DOCTOR", "Doctor role", true, Set.of())));
 
         e2eUser = userRepository.findByUsername(CONCURRENT_E2E_USER).orElseGet(() -> {
             User user = User.create(
@@ -97,8 +92,7 @@ class LoginAttemptConcurrencyIntegrationTest {
                     "Concurrent Test User",
                     "concurrent@hospital.vn",
                     "0908888777",
-                    doctorRole.getId()
-            );
+                    doctorRole.getId());
             return userRepository.save(user);
         });
     }
@@ -146,7 +140,8 @@ class LoginAttemptConcurrencyIntegrationTest {
         assertTrue(loginAttemptPort.isBlocked(CONCURRENT_USER), "Account must be blocked");
         assertNotNull(loginAttemptPort.getBlockedUntil(CONCURRENT_USER), "Blocked until must be set");
 
-        // 2. Chỉ duy nhất 1 luồng nhận newlyBlocked = true (chính là luồng chạm đúng mốc maxAttempts = 5)
+        // 2. Chỉ duy nhất 1 luồng nhận newlyBlocked = true (chính là luồng chạm đúng
+        // mốc maxAttempts = 5)
         long newlyBlockedCount = results.stream().filter(LoginAttemptResult::newlyBlocked).count();
         assertEquals(1, newlyBlockedCount, "Exactly ONE thread must get newlyBlocked=true");
 
@@ -202,11 +197,14 @@ class LoginAttemptConcurrencyIntegrationTest {
         executor.shutdown();
 
         // Cả 8 request đều phải bị từ chối
-        assertEquals(4, invalidCredentialsCount, "4 requests under threshold must fail with InvalidCredentialsException");
-        assertEquals(4, tooManyAttemptsCount, "4 requests at or above threshold must fail with TooManyLoginAttemptsException");
+        assertEquals(4, invalidCredentialsCount,
+                "4 requests under threshold must fail with InvalidCredentialsException");
+        assertEquals(4, tooManyAttemptsCount,
+                "4 requests at or above threshold must fail with TooManyLoginAttemptsException");
 
         // Kiểm tra số lượng Audit Log LOCK trong database: CHÍNH XÁC LÀ 1!
-        Page<LoginAuditLogResult> auditLogs = getLoginAuditLogsUseCase.getLoginAuditLogs(e2eUser.getId(), PageRequest.of(0, 20));
+        Page<LoginAuditLogResult> auditLogs = getLoginAuditLogsUseCase.getLoginAuditLogs(e2eUser.getId(),
+                PageRequest.of(0, 20));
         long lockLogCount = auditLogs.getContent().stream()
                 .filter(log -> log.actionType() == ActionType.LOCK)
                 .count();
