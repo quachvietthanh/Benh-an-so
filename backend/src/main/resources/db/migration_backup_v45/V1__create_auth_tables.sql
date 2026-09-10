@@ -1,13 +1,12 @@
--- =====================================================
+﻿-- =====================================================
 -- V1__create_auth_tables.sql
--- Authentication & Authorization Schema (Consolidated)
--- Includes: roles, permissions, role_permissions, users,
---           user_sessions, audit_logs, login_attempts
+-- Authentication & Authorization Schema
 -- =====================================================
 
 -- ===========================
 -- Roles
 -- ===========================
+
 CREATE TABLE roles (
     id BINARY(16) NOT NULL,
     name VARCHAR(50) NOT NULL,
@@ -15,6 +14,7 @@ CREATE TABLE roles (
     is_system BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
+
     CONSTRAINT pk_roles PRIMARY KEY (id),
     CONSTRAINT uk_roles_name UNIQUE (name)
 );
@@ -22,6 +22,7 @@ CREATE TABLE roles (
 -- ===========================
 -- Permissions
 -- ===========================
+
 CREATE TABLE permissions (
     id BINARY(16) NOT NULL,
     code VARCHAR(100) NOT NULL,
@@ -31,6 +32,7 @@ CREATE TABLE permissions (
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
+
     CONSTRAINT pk_permissions PRIMARY KEY (id),
     CONSTRAINT uk_permissions_code UNIQUE (code)
 );
@@ -38,17 +40,29 @@ CREATE TABLE permissions (
 -- ===========================
 -- Role Permissions
 -- ===========================
+
 CREATE TABLE role_permissions (
     role_id BINARY(16) NOT NULL,
     permission_id BINARY(16) NOT NULL,
-    CONSTRAINT pk_role_permissions PRIMARY KEY (role_id, permission_id),
-    CONSTRAINT fk_role_permissions_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
-    CONSTRAINT fk_role_permissions_permission FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+
+    CONSTRAINT pk_role_permissions
+        PRIMARY KEY (role_id, permission_id),
+
+    CONSTRAINT fk_role_permissions_role
+        FOREIGN KEY (role_id)
+        REFERENCES roles(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_role_permissions_permission
+        FOREIGN KEY (permission_id)
+        REFERENCES permissions(id)
+        ON DELETE CASCADE
 );
 
 -- ===========================
 -- Users
 -- ===========================
+
 CREATE TABLE users (
     id BINARY(16) NOT NULL,
     username VARCHAR(50) NOT NULL,
@@ -58,23 +72,23 @@ CREATE TABLE users (
     phone VARCHAR(20),
     role_id BINARY(16) NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
-    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     last_login_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
     CONSTRAINT pk_users PRIMARY KEY (id),
+
     CONSTRAINT uk_users_username UNIQUE (username),
     CONSTRAINT uk_users_email UNIQUE (email),
-    CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id)
-);
 
-CREATE UNIQUE INDEX uk_users_phone ON users(phone);
-CREATE INDEX idx_users_role ON users(role_id);
-CREATE INDEX idx_role_permissions_permission ON role_permissions(permission_id);
+    CONSTRAINT fk_users_role
+        FOREIGN KEY (role_id)
+        REFERENCES roles(id)
+);
 
 -- ===========================
 -- User Sessions
 -- ===========================
+
 CREATE TABLE user_sessions (
     id BINARY(16) NOT NULL,
     user_id BINARY(16) NOT NULL,
@@ -84,42 +98,71 @@ CREATE TABLE user_sessions (
     created_at TIMESTAMP NOT NULL,
     last_used_at TIMESTAMP NULL,
     revoked_at TIMESTAMP NULL,
+
     CONSTRAINT pk_user_sessions PRIMARY KEY (id),
-    CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
 
-CREATE UNIQUE INDEX uk_user_sessions_refresh_token_hash ON user_sessions(refresh_token_hash);
-CREATE INDEX idx_user_sessions_user ON user_sessions(user_id);
-
--- ===========================
--- Login Attempts (Lockout & Brute-force Tracking)
--- ===========================
-CREATE TABLE login_attempts (
-    identifier VARCHAR(100) NOT NULL,
-    attempts INT NOT NULL DEFAULT 0,
-    blocked_until TIMESTAMP NULL,
-    updated_at TIMESTAMP NOT NULL,
-
-    CONSTRAINT pk_login_attempts PRIMARY KEY (identifier)
+    CONSTRAINT fk_user_sessions_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
 );
 
 -- ===========================
 -- Audit Logs
 -- ===========================
+
 CREATE TABLE audit_logs (
     id BINARY(16) NOT NULL,
+
     user_id BINARY(16) NOT NULL,
+
     action_type VARCHAR(30) NOT NULL,
+
     resource_type VARCHAR(30) NOT NULL,
+
     resource_id BINARY(16),
+
     detail JSON,
+
     ip_address VARCHAR(45),
+
     created_at TIMESTAMP NOT NULL,
-    CONSTRAINT pk_audit_logs PRIMARY KEY (id),
-    CONSTRAINT fk_audit_logs_user FOREIGN KEY (user_id) REFERENCES users(id)
+
+    CONSTRAINT pk_audit_logs
+        PRIMARY KEY (id),
+
+    CONSTRAINT fk_audit_logs_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
 );
 
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
-CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
-CREATE INDEX idx_audit_logs_action_created ON audit_logs(action_type, created_at);
+-- =====================================================
+-- Indexes
+-- =====================================================
+
+CREATE INDEX idx_users_role
+    ON users(role_id);
+
+CREATE INDEX idx_role_permissions_permission
+    ON role_permissions(permission_id);
+
+CREATE UNIQUE INDEX uk_user_sessions_refresh_token_hash
+    ON user_sessions(refresh_token_hash);
+
+CREATE INDEX idx_user_sessions_user_expires
+    ON user_sessions(user_id, refresh_expires_at);
+
+CREATE INDEX idx_user_sessions_previous_refresh_token_hash
+    ON user_sessions(previous_refresh_token_hash);
+
+CREATE INDEX idx_audit_logs_created_at
+    ON audit_logs(created_at);
+
+CREATE INDEX idx_audit_logs_resource
+    ON audit_logs(resource_type, resource_id);
+
+CREATE INDEX idx_audit_logs_action
+    ON audit_logs(action_type);
+
+CREATE INDEX idx_audit_logs_user_created
+    ON audit_logs(user_id, created_at);

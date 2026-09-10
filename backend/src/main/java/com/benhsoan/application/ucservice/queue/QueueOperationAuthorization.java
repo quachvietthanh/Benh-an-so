@@ -49,7 +49,7 @@ class QueueOperationAuthorization {
     }
 
     void requireReadPermission(UUID doctorId) {
-        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST")) {
+        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST") || currentUserPort.hasRole("MANAGER")) {
             return;
         }
         if (!currentUserPort.hasRole("DOCTOR") || !doctorId.equals(currentUserPort.getCurrentUserId())) {

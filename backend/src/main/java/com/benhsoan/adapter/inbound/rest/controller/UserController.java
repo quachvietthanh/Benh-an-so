@@ -77,7 +77,7 @@ public class UserController {
     }
 
     @GetMapping("/doctors")
-    @RequirePermission("USER_READ")
+    @RequirePermission(value = {"USER_READ", "DOCTOR_SCHEDULE_READ"}, operator = RequirePermission.Operator.ANY)
     public List<UserResponse> getDoctors() {
 
         return userRestMapper.toResponse(

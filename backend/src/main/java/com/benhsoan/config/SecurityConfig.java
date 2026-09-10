@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -70,7 +69,8 @@ public class SecurityConfig {
                                                                 "/actuator/info")
                                                 .permitAll()
 
-                                                // Patient portal result lookup (public, strictly scoped by appointment code — QTN-15)
+                                                // Patient portal result lookup (public, strictly scoped by appointment
+                                                // code — QTN-15)
                                                 .requestMatchers("/portal/**").permitAll()
                                                 .requestMatchers("/mock-interconnection/**").permitAll()
 
@@ -201,7 +201,8 @@ public class SecurityConfig {
                 return (request, response, authException) -> {
 
                         writeError(response, HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED",
-                                        "Bạn cần đăng nhập để truy cập tài nguyên này", request.getRequestURI(), objectMapper);
+                                        "Bạn cần đăng nhập để truy cập tài nguyên này", request.getRequestURI(),
+                                        objectMapper);
                 };
         }
 
@@ -210,7 +211,8 @@ public class SecurityConfig {
 
                 return (request, response, accessDeniedException) -> {
 
-                        writeError(response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Bạn không có quyền truy cập tài nguyên này",
+                        writeError(response, HttpStatus.FORBIDDEN, "ACCESS_DENIED",
+                                        "Bạn không có quyền truy cập tài nguyên này",
                                         request.getRequestURI(), objectMapper);
                 };
         }

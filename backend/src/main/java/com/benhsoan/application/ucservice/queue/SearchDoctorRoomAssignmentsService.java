@@ -14,7 +14,7 @@ public class SearchDoctorRoomAssignmentsService implements SearchDoctorRoomAssig
     private final RoomAuthorizationService authorizationService;
     private final DoctorRoomAssignmentResultMapper mapper;
     public List<DoctorRoomAssignmentResult> search(UUID doctorId, UUID roomId) {
-        authorizationService.requireManageAccess();
+        authorizationService.requireReadAccess();
         if (doctorId != null) return repository.findByDoctorId(doctorId).stream().map(mapper::toResult).toList();
         if (roomId != null) return repository.findByRoomId(roomId).stream().map(mapper::toResult).toList();
         throw new com.benhsoan.domain.shared.exception.ValidationException("doctorId or roomId is required.");

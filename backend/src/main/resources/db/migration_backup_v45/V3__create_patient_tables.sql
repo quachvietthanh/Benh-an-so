@@ -1,10 +1,4 @@
--- =====================================================
--- V3__create_patient_tables.sql
--- Patient Management Schema (Consolidated)
--- Includes: patients, patient_change_logs, consent fields, phone index
--- =====================================================
-
-CREATE TABLE patients (
+﻿CREATE TABLE patients (
     id BINARY(16) NOT NULL,
     patient_code VARCHAR(30) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
@@ -22,17 +16,7 @@ CREATE TABLE patients (
     user_id BINARY(16) NULL,
     created_by BINARY(16) NOT NULL,
     created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    -- Consent & Personal Data Protection Fields (Consolidated from V34)
-    consent_agreed BOOLEAN NOT NULL DEFAULT FALSE,
-    consent_agreed_at TIMESTAMP NULL,
-    consent_version VARCHAR(30) NULL,
-    consent_withdrawn BOOLEAN NOT NULL DEFAULT FALSE,
-    consent_withdrawn_at TIMESTAMP NULL,
-    consent_withdrawn_reason VARCHAR(500) NULL,
-    non_medical_use_restricted BOOLEAN NOT NULL DEFAULT FALSE,
-
+    updated_at TIMESTAMP NOT NULL,
     CONSTRAINT pk_patients PRIMARY KEY (id),
     CONSTRAINT uk_patients_code UNIQUE (patient_code),
     CONSTRAINT uk_patients_identity UNIQUE (identity_number),
@@ -56,6 +40,5 @@ CREATE TABLE patient_change_logs (
 CREATE INDEX idx_patients_created_by ON patients(created_by);
 CREATE INDEX idx_patients_full_name ON patients(full_name);
 CREATE INDEX idx_patients_active ON patients(active);
-CREATE INDEX idx_patients_phone ON patients(phone);
 CREATE INDEX idx_patient_change_logs_patient ON patient_change_logs(patient_id);
 CREATE INDEX idx_patient_change_logs_created_at ON patient_change_logs(created_at);

@@ -102,18 +102,15 @@ INSERT INTO drug_interaction_rules (
 -- ===========================
 
 INSERT INTO prescriptions (
-    id, prescription_code, medical_record_id, status, note, cancel_reason,
-    interconnection_status, last_interconnection_at, last_interconnection_error, interconnection_receipt_code,
+    id, prescription_code, medical_record_id, status, note,
     prescribed_by, prescribed_at, updated_by, updated_at
 ) VALUES
--- RX000001: Demo US-57, US-58 (Interconnected successfully to National Prescription System)
-(UUID_TO_BIN('16200000-0000-0000-0000-000000000001'), 'RX000001', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'DISPENSED', 'Dieu tri dau dau trieu chung.', NULL, 'SUCCESS', CURRENT_TIMESTAMP, NULL, 'DTQG-2026-000001', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:30:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6'), '2026-08-20 02:35:00'),
-(UUID_TO_BIN('16200000-0000-0000-0000-000000000002'), 'RX000002', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'DISPENSED', 'Don dieu tri viem duong ho hap cap.', NULL, 'NOT_SENT', NULL, NULL, NULL, UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:35:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6'), '2026-08-20 02:40:00'),
-(UUID_TO_BIN('16200000-0000-0000-0000-000000000003'), 'RX000003', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'PENDING_DISPENSE', 'Don mau cho cap phat va dieu chinh.', NULL, 'NOT_SENT', NULL, NULL, NULL, UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:40:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:45:00'),
--- RX000004: Demo US-76 (Cancelled prescription with reason)
-(UUID_TO_BIN('16200000-0000-0000-0000-000000000004'), 'RX000004', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'CANCELLED', 'Don huy do thay doi phuong an dieu tri.', 'Bệnh nhân có tiền sử dị ứng với Amoxicillin chưa khai báo ban đầu.', 'NOT_SENT', NULL, NULL, NULL, UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:42:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:46:00'),
-(UUID_TO_BIN('16200000-0000-0000-0000-000000000005'), 'RX000005', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'PENDING_DISPENSE', 'Don mau co canh bao tuong tac da duoc xac nhan.', NULL, 'NOT_SENT', NULL, NULL, NULL, UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:47:00', NULL, NULL),
-(UUID_TO_BIN('16200000-0000-0000-0000-000000000006'), 'RX000006', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'PENDING_DISPENSE', 'Don theo doi benh man tinh.', NULL, 'NOT_SENT', NULL, NULL, NULL, UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:50:00', NULL, NULL);
+(UUID_TO_BIN('16200000-0000-0000-0000-000000000001'), 'RX000001', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'DISPENSED', 'Dieu tri dau dau trieu chung.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:30:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6'), '2026-08-20 02:35:00'),
+(UUID_TO_BIN('16200000-0000-0000-0000-000000000002'), 'RX000002', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'DISPENSED', 'Don dieu tri viem duong ho hap cap.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:35:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6'), '2026-08-20 02:40:00'),
+(UUID_TO_BIN('16200000-0000-0000-0000-000000000003'), 'RX000003', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'PENDING_DISPENSE', 'Don mau cho cap phat va dieu chinh.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:40:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:45:00'),
+(UUID_TO_BIN('16200000-0000-0000-0000-000000000004'), 'RX000004', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'CANCELLED', 'Don huy do thay doi phuong an dieu tri.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:42:00', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:46:00'),
+(UUID_TO_BIN('16200000-0000-0000-0000-000000000005'), 'RX000005', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'PENDING_DISPENSE', 'Don mau co canh bao tuong tac da duoc xac nhan.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:47:00', NULL, NULL),
+(UUID_TO_BIN('16200000-0000-0000-0000-000000000006'), 'RX000006', UUID_TO_BIN('e0000000-0000-0000-0000-000000000001'), 'PENDING_DISPENSE', 'Don theo doi benh man tinh.', UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), '2026-08-20 02:50:00', NULL, NULL);
 
 -- ===========================
 -- Prescription items
@@ -166,13 +163,3 @@ INSERT INTO prescription_amendments (
 -- The next automatically generated code is RX000007.
 INSERT INTO prescription_code_sequences (code_prefix, `last_value`)
 VALUES ('RX', 6);
-
-
--- Seed prescription_interconnection_logs (Demo US-58: Tra cứu trạng thái liên thông đơn thuốc)
-INSERT INTO prescription_interconnection_logs (
-    id, prescription_id, attempt_number, attempt_type, outcome, request_payload, response_payload, receipt_code, failure_reason, attempted_by, started_at, completed_at
-) VALUES
-(UUID_TO_BIN('16600000-0000-0000-0000-000000000001'), UUID_TO_BIN('16200000-0000-0000-0000-000000000001'), 1, 'SEND', 'SUCCESS',
- '{"prescriptionCode": "RX000001", "patientCode": "BN000001", "doctorLicense": "CCHN-001234", "diagnosis": "K29.0", "itemsCount": 2}',
- '{"status": 200, "nationalCode": "DTQG-2026-000001", "message": "Liên thông đơn thuốc quốc gia thành công", "timestamp": "2026-09-10T10:00:00Z"}',
- 'DTQG-2026-000001', NULL, UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2'), DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 DAY), DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 DAY));
