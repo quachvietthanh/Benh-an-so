@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Alert,
@@ -1300,6 +1300,8 @@ function PrescriptionPage() {
     })
   }
 
+  const lastSignModalTimeRef = useRef(0)
+
   const handleSignSuccess = async (signedData) => {
     const nextStatus = signedData?.status || 'SIGNED'
     setRecord((current) => ({
@@ -1307,6 +1309,12 @@ function PrescriptionPage() {
       ...signedData,
       status: nextStatus,
     }))
+
+    const now = Date.now()
+    if (now - lastSignModalTimeRef.current < 3000) {
+      return
+    }
+    lastSignModalTimeRef.current = now
 
     Modal.success({
       title: 'Ký số bệnh án thành công!',

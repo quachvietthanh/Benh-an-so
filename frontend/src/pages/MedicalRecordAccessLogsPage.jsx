@@ -26,6 +26,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CopyOutlined,
+  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   FileDoneOutlined,
@@ -44,6 +45,7 @@ import patientApi from '../api/patientApi'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
 import SecurityAlertsTab from '../components/security/SecurityAlertsTab'
+import ExportAccessLogReportModal from '../components/reporting/ExportAccessLogReportModal'
 
 const { Title, Text, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -108,6 +110,7 @@ function MedicalRecordAccessLogsPage() {
 
   const canViewAuditLogs = userPermissions.includes('AUDIT_READ') || isAdmin
   const canViewSecurityAlerts = userPermissions.includes('SECURITY_ALERT_VIEW') || isAdmin
+  const canExportReport = isAdmin || userPermissions.includes('ACCESS_LOG_REPORT_EXPORT') || userPermissions.includes('REPORT_EXPORT')
 
   const [activeMainTab, setActiveMainTab] = useState(() => {
     if (canViewAuditLogs) return 'audit-logs'
@@ -122,6 +125,7 @@ function MedicalRecordAccessLogsPage() {
   const [loading, setLoading] = useState(false)
   const [patientLoading, setPatientLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
@@ -425,6 +429,16 @@ function MedicalRecordAccessLogsPage() {
           </Paragraph>
         </div>
         <Space wrap>
+          {canExportReport && (
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={() => setExportModalOpen(true)}
+              style={{ backgroundColor: '#1d4ed8' }}
+            >
+              Xuất báo cáo giám sát theo kỳ
+            </Button>
+          )}
           <Button icon={<ReloadOutlined />} loading={loading} onClick={loadAccessLogs}>
             Làm mới
           </Button>
@@ -647,6 +661,11 @@ function MedicalRecordAccessLogsPage() {
             },
           ]}
         />
+        <ExportAccessLogReportModal
+          open={exportModalOpen}
+          onClose={() => setExportModalOpen(false)}
+          onSuccess={loadAccessLogs}
+        />
       </div>
     )
   }
@@ -662,6 +681,11 @@ function MedicalRecordAccessLogsPage() {
   return (
     <div style={{ paddingBottom: 32 }}>
       {renderAuditLogsContent()}
+      <ExportAccessLogReportModal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        onSuccess={loadAccessLogs}
+      />
     </div>
   )
 }
