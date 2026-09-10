@@ -56,6 +56,24 @@ class DomainExceptionRegistryContractTest {
         }
     }
 
+    @Test
+    void mapsEveryDomainErrorCodeToAValidHttpStatus() {
+        for (DomainErrorCode code : DomainErrorCode.values()) {
+            HttpStatus status = DomainExceptionHttpStatusMapper.statusFor(code);
+            org.junit.jupiter.api.Assertions.assertNotNull(status, () -> code + " must have a non-null HTTP status");
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    Set.of(HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN,
+                            HttpStatus.NOT_FOUND, HttpStatus.CONFLICT, HttpStatus.UNPROCESSABLE_ENTITY,
+                            HttpStatus.TOO_MANY_REQUESTS, HttpStatus.INTERNAL_SERVER_ERROR).contains(status),
+                    () -> code + " mapped to unexpected status: " + status
+            );
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, DomainExceptionHttpStatusMapper.statusFor(DomainErrorCode.PRESCRIPTION_NO_CHANGES));
+        assertEquals(HttpStatus.FORBIDDEN, DomainExceptionHttpStatusMapper.statusFor(DomainErrorCode.DOCTOR_INACTIVE));
+        assertEquals(HttpStatus.CONFLICT, DomainExceptionHttpStatusMapper.statusFor(DomainErrorCode.LAST_ADMINISTRATOR_PERMISSION));
+        assertEquals(HttpStatus.BAD_REQUEST, DomainExceptionHttpStatusMapper.statusFor(DomainErrorCode.APPOINTMENT_NOT_OVERDUE));
+    }
+
     private Set<Class<? extends DomainException>> concreteDomainExceptionTypes() throws IOException {
         try (Stream<Path> files = Files.walk(DOMAIN_SOURCE_ROOT)) {
             Set<Class<? extends DomainException>> types = new LinkedHashSet<>();

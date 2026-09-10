@@ -121,29 +121,12 @@ public class SecurityConfig {
                                                 .requestMatchers("/invoices/**").authenticated()
 
                                                 // ===== MEDICAL QUEUE =====
-                                                .requestMatchers(HttpMethod.GET, "/queues/me")
-                                                .hasRole("DOCTOR")
-                                                .requestMatchers(HttpMethod.GET, "/queues")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST", "MANAGER")
-                                                .requestMatchers(HttpMethod.POST, "/queues/*/call-next")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.POST, "/queue-items/walk-in")
-                                                .hasAnyRole("ADMIN", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.POST, "/queue-items/*/complete")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
-                                                .requestMatchers(HttpMethod.POST, "/queue-items/*/skip")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers(HttpMethod.PATCH, "/queue-items/*/status")
-                                                .hasAnyRole("ADMIN", "DOCTOR")
-                                                .requestMatchers(HttpMethod.GET, "/queue-items/*")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST", "MANAGER")
+                                                .requestMatchers("/queues/**", "/queue-items/**").authenticated()
 
                                                 // ===== ROOMS =====
-                                                .requestMatchers(HttpMethod.GET, "/rooms", "/rooms/**")
-                                                .hasAnyRole("ADMIN", "DOCTOR", "RECEPTIONIST")
-                                                .requestMatchers("/rooms", "/rooms/**").hasRole("ADMIN")
-                                                .requestMatchers("/doctor-room-assignments/**").hasRole("ADMIN")
-                                                .requestMatchers("/doctors/*/room-assignment").hasRole("ADMIN")
+                                                .requestMatchers("/rooms/**").authenticated()
+                                                .requestMatchers("/doctor-room-assignments/**").authenticated()
+                                                .requestMatchers("/doctors/*/room-assignment").authenticated()
 
                                                 // ===== OTHERS =====
                                                 .anyRequest().authenticated())

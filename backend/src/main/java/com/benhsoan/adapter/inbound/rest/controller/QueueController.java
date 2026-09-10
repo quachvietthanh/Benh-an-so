@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +20,7 @@ import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueItemResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.queue.CallNextQueueItemCommand;
 import com.benhsoan.port.dto.command.queue.CheckInAppointmentCommand;
 import com.benhsoan.port.dto.command.queue.CompleteQueueItemCommand;
@@ -55,59 +55,59 @@ public class QueueController {
     private final QueueRestMapper mapper;
 
     @GetMapping("/queues")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'MANAGER')")
+    @RequirePermission("QUEUE_VIEW")
     public List<QueueItemResponse> getQueues(@RequestParam LocalDate date, @RequestParam(required = false) UUID doctorId,
             @RequestParam(required = false) UUID roomId) {
         return getQueuesUseCase.getQueues(new GetQueuesQuery(date, doctorId, roomId)).stream().map(mapper::toResponse).toList();
     }
 
     @GetMapping("/queues/me")
-    @PreAuthorize("hasRole('DOCTOR')")
+    @RequirePermission("QUEUE_VIEW")
     public List<QueueItemResponse> getMyQueue(@RequestParam LocalDate date) {
         return getMyQueueUseCase.getMyQueue(new GetMyQueueQuery(date)).stream().map(mapper::toResponse).toList();
     }
 
     @PostMapping("/appointments/{appointmentId}/check-in")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("QUEUE_CREATE")
     public QueueCheckInResponse checkInAppointment(@PathVariable UUID appointmentId) {
         return mapper.toResponse(checkInAppointmentUseCase.checkIn(new CheckInAppointmentCommand(appointmentId)));
     }
 
     @PostMapping("/queue-items/walk-in")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @RequirePermission("QUEUE_CREATE")
     public QueueCheckInResponse checkInWalkIn(@Valid @RequestBody CheckInWalkInRequest request) {
         return mapper.toResponse(checkInWalkInUseCase.checkIn(mapper.toCommand(request)));
     }
 
     @PostMapping("/queues/{queueId}/call-next")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("QUEUE_CALL_NEXT")
     public QueueItemResponse callNext(@PathVariable UUID queueId) {
         return mapper.toResponse(callNextQueueItemUseCase.callNext(new CallNextQueueItemCommand(queueId)));
     }
 
     @PatchMapping("/queue-items/{itemId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
     public QueueItemResponse updateStatus(@PathVariable UUID itemId,
             @Valid @RequestBody UpdateQueueItemStatusRequest request) {
         return mapper.toResponse(updateQueueItemStatusUseCase.updateStatus(mapper.toCommand(itemId, request)));
     }
 
     @PostMapping("/queue-items/{itemId}/complete")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
     public QueueItemResponse complete(@PathVariable UUID itemId) {
         return mapper.toResponse(completeQueueItemUseCase.complete(new CompleteQueueItemCommand(itemId)));
     }
 
     @PostMapping("/queue-items/{itemId}/skip")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
     public QueueItemResponse skip(@PathVariable UUID itemId, @Valid @RequestBody SkipQueueItemRequest request) {
         return mapper.toResponse(skipQueueItemUseCase.skip(mapper.toCommand(itemId, request)));
     }
 
     @GetMapping("/queue-items/{itemId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'MANAGER')")
+    @RequirePermission("QUEUE_VIEW")
     public QueueItemResponse getById(@PathVariable UUID itemId) {
         return mapper.toResponse(getQueueItemUseCase.getById(itemId));
     }
