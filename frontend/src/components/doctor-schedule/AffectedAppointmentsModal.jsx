@@ -98,12 +98,20 @@ function AffectedAppointmentsModal({ open, onClose, appointments = [], doctorNam
     },
   ]
 
+  const isWeeklySchedule =
+    timeOffRange === 'Cấu hình lịch làm việc tuần mới' ||
+    (typeof timeOffRange === 'string' && timeOffRange.toLowerCase().includes('lịch làm việc'))
+
   return (
     <Modal
       title={(
         <Space align="center" style={{ color: '#d97706' }}>
           <ExclamationCircleOutlined style={{ fontSize: 20 }} />
-          <span>Danh sách Lịch hẹn bị ảnh hưởng do Bác sĩ nghỉ đột xuất</span>
+          <span>
+            {isWeeklySchedule
+              ? 'Danh sách Lịch hẹn bị ảnh hưởng do Thay đổi Lịch làm việc tuần'
+              : 'Danh sách Lịch hẹn bị ảnh hưởng do Bác sĩ nghỉ đột xuất'}
+          </span>
         </Space>
       )}
       open={open}
@@ -127,15 +135,26 @@ function AffectedAppointmentsModal({ open, onClose, appointments = [], doctorNam
         style={{ marginBottom: 16 }}
         message={
           <strong>
-            Phát hiện {appointments.length} lịch hẹn trùng với khoảng nghỉ của bác sĩ {doctorName ? `“${doctorName}”` : ''}!
+            {isWeeklySchedule
+              ? `Phát hiện ${appointments.length} lịch hẹn xung đột với lịch làm việc mới của bác sĩ ${doctorName ? `“${doctorName}”` : ''}!`
+              : `Phát hiện ${appointments.length} lịch hẹn trùng với khoảng nghỉ của bác sĩ ${doctorName ? `“${doctorName}”` : ''}!`}
           </strong>
         }
         description={
           <div>
-            {timeOffRange && <div style={{ marginBottom: 4 }}>Khoảng nghỉ: <strong>{timeOffRange}</strong></div>}
-            <div>
-              Các khung giờ này đã bị khóa trên hệ thống. Nhân viên lễ tân cần chủ động liên hệ bệnh nhân theo danh sách dưới đây để thông báo dời ngày hoặc hủy lịch hẹn.
-            </div>
+            {isWeeklySchedule ? (
+              <div>
+                Thay đổi cấu hình lịch tuần khiến một số lịch hẹn đã đặt trước đó rơi vào ngày nghỉ hoặc ngoài giờ làm việc mới.
+                Nhân viên tiếp nhận cần chủ động liên hệ bệnh nhân theo danh sách dưới đây để thông báo dời ngày hoặc sắp xếp lại lịch hẹn.
+              </div>
+            ) : (
+              <>
+                {timeOffRange && <div style={{ marginBottom: 4 }}>Khoảng nghỉ: <strong>{timeOffRange}</strong></div>}
+                <div>
+                  Các khung giờ này đã bị khóa trên hệ thống. Nhân viên lễ tân cần chủ động liên hệ bệnh nhân theo danh sách dưới đây để thông báo dời ngày hoặc hủy lịch hẹn.
+                </div>
+              </>
+            )}
           </div>
         }
       />

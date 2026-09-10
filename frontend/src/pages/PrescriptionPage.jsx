@@ -63,6 +63,8 @@ import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import patientAllergyApi from '../api/patientAllergyApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
+import PrescriptionAllergyWarningModal from '../components/pharmacy/PrescriptionAllergyWarningModal.jsx'
+import PrescriptionAllergyWarningLogsModal from '../components/pharmacy/PrescriptionAllergyWarningLogsModal.jsx'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
@@ -78,7 +80,13 @@ import {
   areAllInteractionsHandled,
   getUnhandledInteractions,
 } from '../utils/drugInteractionValidation'
-import { mergeMedicines, saveStoredPrescription } from '../utils/storageHelpers'
+import {
+  areAllAllergiesHandled,
+  canSubmitPrescriptionWithAllergies,
+  getUnhandledAllergies,
+  isAllergyHandled,
+} from '../utils/prescriptionAllergyValidation.js'
+import { mergeMedicines, saveStoredPrescription, saveStoredAllergyWarningLogs } from '../utils/storageHelpers'
 import {
   getAvailableStock,
   sortMedicinesByStockAvailability,
@@ -174,6 +182,13 @@ function PrescriptionPage() {
   const [confirmedOverrides, setConfirmedOverrides] = useState([])
   const [interactionApiError, setInteractionApiError] = useState(null)
 
+  const [detectedAllergyWarnings, setDetectedAllergyWarnings] = useState([])
+  const [checkingAllergies, setCheckingAllergies] = useState(false)
+  const [allergyModalOpen, setAllergyModalOpen] = useState(false)
+  const [allergyLogsModalOpen, setAllergyLogsModalOpen] = useState(false)
+  const [confirmedAllergyOverrides, setConfirmedAllergyOverrides] = useState([])
+  const [allergyApiError, setAllergyApiError] = useState(null)
+
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
   const [printModalOpen, setPrintModalOpen] = useState(false)
@@ -227,10 +242,61 @@ function PrescriptionPage() {
     [medicines],
   )
 
+  const selectedMedicineMap = useMemo(
+    () => new Map(medicines.map((m) => [String(m.id), m])),
+    [medicines],
+  )
+
   const stockValidationStatus = useMemo(
     () => validatePrescriptionStock(items, medicines),
     [items, medicines],
   )
+
+  const detectedAllergyConflicts = useMemo(() => {
+    if (!patientAllergies || !patientAllergies.length || !items || !items.length) return []
+    return items
+      .map((it, idx) => {
+        if (!it.medicineId) return null
+        const med = medicines.find((m) => String(m.id) === String(it.medicineId))
+        if (!med) return null
+        const check = checkPrescriptionAllergyConflict(med, patientAllergies)
+        return check.hasConflict ? { ...check, itemIndex: idx, medicine: med } : null
+      })
+      .filter(Boolean)
+  }, [items, medicines, patientAllergies])
+
+  const activeAllergyWarnings = useMemo(() => {
+    const map = new Map()
+
+    // 1. Authoritative matches detected by server
+    detectedAllergyWarnings.forEach((bw) => {
+      const key = `${bw.allergyId}_${bw.medicineId}`
+      map.set(key, bw)
+    })
+
+    // 2. Client-detected matches from patient's allergy profile (if not already covered by server)
+    detectedAllergyConflicts.forEach((c) => {
+      const medicineId = c.medicine?.id
+      const alreadyCovered = Array.from(map.values()).some((w) => String(w.medicineId) === String(medicineId))
+      if (!alreadyCovered) {
+        const allergyId = c.matchedAllergy?.id || `client-allergy-${c.matchedAllergy?.allergenName}`
+        const key = `${allergyId}_${medicineId}`
+        map.set(key, {
+          allergyId,
+          patientId: c.matchedAllergy?.patientId,
+          medicineId,
+          medicineName: c.medicine?.medicineName || c.medicine?.name || 'Thuốc',
+          activeIngredient: c.medicine?.activeIngredient,
+          allergenName: c.matchedAllergy?.allergenName,
+          severity: c.matchedAllergy?.severity || c.severity,
+          reaction: c.matchedAllergy?.reaction,
+          itemIndex: c.itemIndex,
+        })
+      }
+    })
+
+    return Array.from(map.values())
+  }, [detectedAllergyConflicts, detectedAllergyWarnings])
 
   const submitStatus = useMemo(
     () => {
@@ -249,24 +315,33 @@ function PrescriptionPage() {
           reason: stockValidationStatus.errors[0] || 'Vui lòng kiểm tra lại tồn kho thuốc trong đơn.',
         }
       }
+      const allergyStatus = canSubmitPrescriptionWithAllergies({
+        canPrescribe,
+        saving,
+        checkingAllergies,
+        allergyApiError,
+        detectedAllergies: activeAllergyWarnings,
+        confirmedAllergyOverrides,
+      })
+      if (!allergyStatus.allowed) return allergyStatus
+
       return { allowed: true, reason: '' }
     },
-    [canPrescribe, saving, checkingInteractions, interactionApiError, detectedInteractions, confirmedOverrides, stockValidationStatus],
+    [
+      canPrescribe,
+      saving,
+      checkingInteractions,
+      interactionApiError,
+      detectedInteractions,
+      confirmedOverrides,
+      stockValidationStatus,
+      checkingAllergies,
+      allergyApiError,
+      activeAllergyWarnings,
+      confirmedAllergyOverrides,
+    ],
   )
   const canSubmit = submitStatus.allowed
-
-  const detectedAllergyConflicts = useMemo(() => {
-    if (!patientAllergies || !patientAllergies.length || !items || !items.length) return []
-    return items
-      .map((it, idx) => {
-        if (!it.medicineId) return null
-        const med = medicines.find((m) => String(m.id) === String(it.medicineId))
-        if (!med) return null
-        const check = checkPrescriptionAllergyConflict(med, patientAllergies)
-        return check.hasConflict ? { ...check, itemIndex: idx, medicine: med } : null
-      })
-      .filter(Boolean)
-  }, [items, medicines, patientAllergies])
 
   const diagnosisSummary = useMemo(() => {
     const primary = diagnoses.find((diagnosis) => diagnosis.diagnosisType === 'PRIMARY') || diagnoses[0]
@@ -594,6 +669,33 @@ function PrescriptionPage() {
     }
   }, [medicines])
 
+  const performAllergyCheck = useCallback(async (currentItems) => {
+    const validItems = (currentItems || []).filter((item) => Boolean(item.medicineId))
+    const medicineIds = [...new Set(validItems.map((item) => item.medicineId))]
+
+    if (!medicalRecordId || medicineIds.length === 0) {
+      setDetectedAllergyWarnings([])
+      setAllergyApiError(null)
+      return []
+    }
+
+    setCheckingAllergies(true)
+    setAllergyApiError(null)
+    try {
+      const response = await pharmacyApi.checkAllergyWarnings(medicalRecordId, medicineIds)
+      const warnings = response?.data || []
+      setDetectedAllergyWarnings(warnings)
+      setAllergyApiError(null)
+      return warnings
+    } catch (error) {
+      console.warn('Lỗi kiểm tra dị ứng thuốc từ máy chủ:', error)
+      setAllergyApiError('Không thể kiểm tra dị ứng thuốc từ máy chủ. Vui lòng thử lại.')
+      return []
+    } finally {
+      setCheckingAllergies(false)
+    }
+  }, [medicalRecordId])
+
   const handleItemChange = (clientId, field, value) => {
     const nextItems = items.map((item) => {
       if (item.clientId !== clientId) return item
@@ -622,7 +724,9 @@ function PrescriptionPage() {
     setItems(nextItems)
     if (field === 'medicineId') {
       setConfirmedOverrides([])
+      setConfirmedAllergyOverrides([])
       performInteractionCheck(nextItems).catch(() => {})
+      performAllergyCheck(nextItems).catch(() => {})
     }
   }
 
@@ -634,7 +738,9 @@ function PrescriptionPage() {
     const nextItems = items.filter((entry) => entry.clientId !== clientId)
     setItems(nextItems)
     setConfirmedOverrides([])
+    setConfirmedAllergyOverrides([])
     performInteractionCheck(nextItems).catch(() => {})
+    performAllergyCheck(nextItems).catch(() => {})
   }
 
   const validateForm = () => {
@@ -720,7 +826,7 @@ function PrescriptionPage() {
       instructions: (item.instructions || '').trim(),
     }))
 
-  const executeSavePrescription = async (overrides = []) => {
+  const executeSavePrescription = async (overrides = [], allergyOverrides = confirmedAllergyOverrides) => {
     setSaving(true)
     try {
       const activeQueueItem = await requireLiveInProgressQueue(
@@ -789,6 +895,23 @@ function PrescriptionPage() {
         return
       }
 
+      // Chuẩn bị danh sách overrides dị ứng thuốc hợp lệ để gửi backend
+      const validAllergyOverrides = (allergyOverrides || [])
+        .filter(
+          (o) =>
+            o &&
+            o.allergyId &&
+            !String(o.allergyId).startsWith('client-allergy-') &&
+            o.medicineId &&
+            typeof o.overrideReason === 'string' &&
+            o.overrideReason.trim().length > 0,
+        )
+        .map((o) => ({
+          allergyId: o.allergyId,
+          medicineId: o.medicineId,
+          overrideReason: o.overrideReason.trim(),
+        }))
+
       const payload = {
         note: note.trim(),
         items: formatItems(),
@@ -798,6 +921,11 @@ function PrescriptionPage() {
                 ruleId: override.ruleId,
                 overrideReason: override.overrideReason,
               })),
+            }
+          : {}),
+        ...(validAllergyOverrides.length > 0
+          ? {
+              allergyOverrides: validAllergyOverrides,
             }
           : {}),
       }
@@ -843,6 +971,30 @@ function PrescriptionPage() {
       }
       saveStoredPrescription(savedObj)
 
+      if (allergyOverrides && allergyOverrides.length > 0) {
+        const localLogsToSave = allergyOverrides.map((o) => {
+          const med = medicines.find((m) => String(m.id) === String(o.medicineId))
+          const allergy = patientAllergies.find((a) => String(a.id) === String(o.allergyId))
+          return {
+            id: `log-allergy-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+            prescriptionId: pData?.id || savedObj?.id,
+            prescriptionCode: prescriptionCode || savedObj?.prescriptionCode,
+            doctorId: currentUser?.id,
+            doctorName: currentUser?.fullName || encounter?.doctor?.fullName || 'Bác sĩ',
+            patientId: encounter?.patient?.id || record?.patientId || routeState.patient?.id,
+            patientName: encounter?.patient?.fullName || record?.patientName || routeState.patient?.fullName || 'Bệnh nhân',
+            medicineId: o.medicineId,
+            medicineName: med?.name || med?.medicineName || 'Thuốc kê trong đơn',
+            activeIngredient: med?.activeIngredient || '',
+            allergenName: allergy?.allergenName || 'Dị nguyên',
+            severity: allergy?.severity || 'MODERATE',
+            overrideReason: o.overrideReason,
+            handledAt: new Date().toISOString(),
+          }
+        })
+        saveStoredAllergyWarningLogs(localLogsToSave)
+      }
+
       message.success(
         editingPrescription
           ? `Đã cập nhật và lưu vết điều chỉnh đơn thuốc ${prescriptionCode} thành công (Mã đơn cố định).`
@@ -865,9 +1017,23 @@ function PrescriptionPage() {
       setChangeReason('')
       setDetectedInteractions([])
       setConfirmedOverrides([])
+      setDetectedAllergyWarnings([])
+      setConfirmedAllergyOverrides([])
       await loadData()
       setActiveTab('history')
     } catch (error) {
+      const responseData = error?.response?.data
+      if (responseData?.code === 'ALLERGY_CONFIRMATION_REQUIRED') {
+        const rawWarnings = responseData?.details?.warnings || []
+        if (rawWarnings.length > 0) {
+          setDetectedAllergyWarnings(rawWarnings)
+        }
+        setAllergyModalOpen(true)
+        message.error(
+          'Phát hiện thuốc trùng tiền sử dị ứng của bệnh nhân. Vui lòng kiểm tra và nhập lý do lâm sàng để tiếp tục.',
+        )
+        return
+      }
       message.error(getApiMessage(error, 'Không thể lưu đơn thuốc.'))
     } finally {
       setSaving(false)
@@ -882,9 +1048,22 @@ function PrescriptionPage() {
     }
 
     try {
+      // 1. Kiểm tra tương tác thuốc
       const warnings = await performInteractionCheck(items)
       if (warnings.length > 0 && !areAllInteractionsHandled(warnings, confirmedOverrides)) {
         setInteractionModalOpen(true)
+        return
+      }
+
+      // 2. Kiểm tra dị ứng thuốc từ máy chủ
+      const serverAllergies = await performAllergyCheck(items)
+      const effectiveAllergies = serverAllergies.length > 0 ? serverAllergies : activeAllergyWarnings
+
+      if (
+        effectiveAllergies.length > 0 &&
+        !areAllAllergiesHandled(effectiveAllergies, confirmedAllergyOverrides)
+      ) {
+        setAllergyModalOpen(true)
         return
       }
 
@@ -902,42 +1081,21 @@ function PrescriptionPage() {
         return
       }
 
-      if (detectedAllergyConflicts.length > 0) {
-        Modal.confirm({
-          title: 'CẢNH BÁO NGUY CƠ DỊ ỨNG THUỐC / SỐC PHẢN VỆ',
-          icon: <FireOutlined style={{ color: '#ef4444', fontSize: 22 }} />,
-          width: 580,
-          content: (
-            <div style={{ marginTop: 8 }}>
-              <Paragraph type="danger" strong style={{ fontSize: 14 }}>
-                Phát hiện {detectedAllergyConflicts.length} loại thuốc trong đơn trùng với tiền sử dị ứng đã ghi nhận của bệnh nhân:
-              </Paragraph>
-              <ul style={{ paddingLeft: 20, marginBottom: 12 }}>
-                {detectedAllergyConflicts.map((c, i) => (
-                  <li key={i} style={{ marginBottom: 6 }}>
-                    <Text strong>{c.medicine?.medicineName || c.medicine?.name}:</Text> Dị ứng với{' '}
-                    <Tag color={c.severityMeta?.color}>{c.matchedAllergy?.allergenName}</Tag> - Mức độ:{' '}
-                    <Text type="danger" strong>{c.severityMeta?.label}</Text>
-                    {c.matchedAllergy?.reaction ? ` (${c.matchedAllergy.reaction})` : ''}
-                  </li>
-                ))}
-              </ul>
-              <Paragraph style={{ color: '#475569', fontSize: 13 }}>
-                Kê thuốc bệnh nhân đã có tiền sử dị ứng có thể dẫn đến phản vệ nguy hiểm tính mạng. Bác sĩ có chắc chắn đã kiểm tra kỹ và muốn tiếp tục lưu đơn thuốc này?
-              </Paragraph>
-            </div>
-          ),
-          okText: 'Xác nhận tiếp tục kê',
-          okType: 'danger',
-          cancelText: 'Hủy để đổi thuốc khác',
-          onOk: async () => {
-            await executeSavePrescription(confirmedOverrides)
-          },
-        })
+      const allergyStatus = canSubmitPrescriptionWithAllergies({
+        canPrescribe,
+        saving,
+        checkingAllergies,
+        allergyApiError,
+        detectedAllergies: effectiveAllergies,
+        confirmedAllergyOverrides,
+      })
+
+      if (!allergyStatus.allowed) {
+        message.error(allergyStatus.reason)
         return
       }
 
-      await executeSavePrescription(confirmedOverrides)
+      await executeSavePrescription(confirmedOverrides, confirmedAllergyOverrides)
     } catch (error) {
       message.error(getApiMessage(error, 'Không thể tạo đơn thuốc.'))
     }
@@ -946,7 +1104,20 @@ function PrescriptionPage() {
   const handleConfirmInteractionOverrides = async (overrides) => {
     setConfirmedOverrides(overrides)
     setInteractionModalOpen(false)
-    await executeSavePrescription(overrides)
+    if (
+      activeAllergyWarnings.length > 0 &&
+      !areAllAllergiesHandled(activeAllergyWarnings, confirmedAllergyOverrides)
+    ) {
+      setAllergyModalOpen(true)
+      return
+    }
+    await executeSavePrescription(overrides, confirmedAllergyOverrides)
+  }
+
+  const handleConfirmAllergyOverrides = async (allergyOverrides) => {
+    setConfirmedAllergyOverrides(allergyOverrides)
+    setAllergyModalOpen(false)
+    await executeSavePrescription(confirmedOverrides, allergyOverrides)
   }
 
   const startEditPrescription = (prescription) => {
@@ -970,19 +1141,22 @@ function PrescriptionPage() {
     setEditingPrescription(prescription)
     setNote(prescription.note || '')
     setChangeReason('')
-    setItems(
-      (prescription.items || []).map((item) => ({
-        clientId: `prescription-item-${++localItemSequence}`,
-        medicineId: item.medicineId,
-        quantity: Number(item.quantity),
-        dosage: item.dosage || '',
-        frequency: item.frequency != null ? Number(item.frequency) : 2,
-        route: item.route || 'ORAL',
-        durationDays: Number(item.durationDays) || 5,
-        instructions: item.instructions || '',
-        isOriginal: true,
-      })),
-    )
+    const nextItems = (prescription.items || []).map((item) => ({
+      clientId: `prescription-item-${++localItemSequence}`,
+      medicineId: item.medicineId,
+      quantity: Number(item.quantity),
+      dosage: item.dosage || '',
+      frequency: item.frequency != null ? Number(item.frequency) : 2,
+      route: item.route || 'ORAL',
+      durationDays: Number(item.durationDays) || 5,
+      instructions: item.instructions || '',
+      isOriginal: true,
+    }))
+    setItems(nextItems.length > 0 ? nextItems : [createEmptyItem()])
+    setConfirmedOverrides([])
+    setConfirmedAllergyOverrides([])
+    performInteractionCheck(nextItems).catch(() => {})
+    performAllergyCheck(nextItems).catch(() => {})
     setActiveTab('prescribe')
     message.info(`Đang mở chế độ điều chỉnh đơn thuốc ${prescription.prescriptionCode}.`)
   }
@@ -994,6 +1168,8 @@ function PrescriptionPage() {
     setNote('')
     setDetectedInteractions([])
     setConfirmedOverrides([])
+    setDetectedAllergyWarnings([])
+    setConfirmedAllergyOverrides([])
   }
 
   const handleCancelPrescription = (prescription) => {
@@ -1481,8 +1657,6 @@ function PrescriptionPage() {
     )
   }
 
-  const selectedMedicineMap = new Map(medicines.map((m) => [String(m.id), m]))
-
   const queueStatusLabel = {
     WAITING: 'Chờ khám',
     IN_PROGRESS: 'Đang khám',
@@ -1579,11 +1753,6 @@ function PrescriptionPage() {
               'Kê đơn thuốc theo bệnh án'
             )}
           </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            {editingPrescription
-              ? 'Sửa đổi liều dùng, số lượng hoặc thêm/bớt thuốc khi đơn đang ở trạng thái chờ cấp phát.'
-              : 'Hồ sơ gắn liền với bệnh án hiện tại, đảm bảo an toàn thông tin điều trị.'}
-          </Text>
         </div>
         <Space wrap size="middle" className="prescription-header-actions">
           {editingPrescription && (
@@ -1595,7 +1764,7 @@ function PrescriptionPage() {
             <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
               <Button
                 type="primary"
-                loading={saving || checkingInteractions}
+                loading={saving || checkingInteractions || checkingAllergies}
                 disabled={!canSubmit}
                 icon={<CheckCircleOutlined />}
                 onClick={handleSaveClick}
@@ -1729,6 +1898,28 @@ function PrescriptionPage() {
           <Descriptions.Item label="Chẩn đoán chính" span={2}>
             <Text strong style={{ color: '#1e40af' }}>{diagnosisSummary}</Text>
           </Descriptions.Item>
+          <Descriptions.Item label="Tiền sử dị ứng" span={2}>
+            {patientAllergies.filter((a) => a.active !== false).length > 0 ? (
+              <Space size={6} wrap>
+                {patientAllergies
+                  .filter((a) => a.active !== false)
+                  .map((a) => (
+                    <Tag
+                      key={a.id || a.allergenName}
+                      color={a.severity === 'ANAPHYLAXIS' ? '#b91c1c' : 'red'}
+                      style={{ fontWeight: 700, fontSize: 13, padding: '2px 8px' }}
+                    >
+                      <FireOutlined style={{ marginRight: 4 }} />
+                      {a.allergenName}
+                    </Tag>
+                  ))}
+              </Space>
+            ) : (
+              <Tag color="success" style={{ fontWeight: 600, fontSize: 12 }}>
+                <CheckCircleOutlined /> Chưa ghi nhận
+              </Tag>
+            )}
+          </Descriptions.Item>
           <Descriptions.Item label="Hàng đợi / STT">
             {encounter?.queueItem ? (
               <Space size={4} align="center">
@@ -1782,6 +1973,7 @@ function PrescriptionPage() {
         allergies={patientAllergies}
         onAllergiesChange={setPatientAllergies}
         currentUser={currentUser}
+        onOpenLogs={() => setAllergyLogsModalOpen(true)}
         compact={false}
       />
 
@@ -1931,28 +2123,45 @@ function PrescriptionPage() {
                     </div>
                   }
                 >
-                  {detectedAllergyConflicts.length > 0 && (
+                  {activeAllergyWarnings.length > 0 && (
                     <Alert
                       type="error"
                       showIcon
                       icon={<FireOutlined style={{ fontSize: 20, color: '#dc2626' }} />}
                       message={
-                        <Text strong style={{ fontSize: 15, color: '#991b1b' }}>
-                          CẢNH BÁO NGUY CƠ PHẢN VỆ: PHÁT HIỆN {detectedAllergyConflicts.length} THUỐC TRÙNG TIỀN SỬ DỊ ỨNG!
-                        </Text>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <Text strong style={{ fontSize: 15, color: '#991b1b' }}>
+                            CẢNH BÁO NGUY CƠ DỊ ỨNG THUỐC / SỐC PHẢN VỆ: PHÁT HIỆN {activeAllergyWarnings.length} THUỐC TRÙNG TIỀN SỬ DỊ ỨNG!
+                          </Text>
+                          {areAllAllergiesHandled(activeAllergyWarnings, confirmedAllergyOverrides) ? (
+                            <Tag color="green" icon={<CheckCircleOutlined />}>
+                              Đã nhập lý do lâm sàng bỏ qua
+                            </Tag>
+                          ) : (
+                            <Button
+                              danger
+                              type="primary"
+                              size="small"
+                              onClick={() => setAllergyModalOpen(true)}
+                            >
+                              Xem cảnh báo & Nhập lý do bỏ qua
+                            </Button>
+                          )}
+                        </div>
                       }
                       description={
                         <div style={{ marginTop: 6 }}>
                           <div>Đơn thuốc đang kê có chứa hoạt chất/nhóm thuốc mà bệnh nhân có tiền sử dị ứng đã ghi nhận trong hồ sơ:</div>
                           <ul style={{ margin: '8px 0 0 18px', padding: 0 }}>
-                            {detectedAllergyConflicts.map((c, idx) => (
+                            {activeAllergyWarnings.map((c, idx) => (
                               <li key={idx} style={{ marginBottom: 4 }}>
-                                <Text strong>{c.medicine?.medicineName || c.medicine?.name}:</Text> Dị ứng với <Tag color={c.severityMeta?.color}>{c.matchedAllergy?.allergenName}</Tag> - Mức độ: <Text type="danger" strong>{c.severityMeta?.label}</Text> {c.matchedAllergy?.reaction ? `(${c.matchedAllergy.reaction})` : ''}
+                                <Text strong>{c.medicineName || 'Thuốc'}:</Text> Dị ứng với <Tag color="red">{c.allergenName}</Tag> - Mức độ:{' '}
+                                <Text type="danger" strong>{c.severity || 'Cảnh báo'}</Text> {c.reaction ? `(${c.reaction})` : ''}
                               </li>
                             ))}
                           </ul>
                           <div style={{ marginTop: 6, fontWeight: 600, color: '#b91c1c' }}>
-                            Khuyến cáo: Thay thế bằng nhóm thuốc an toàn khác để ngăn ngừa sốc phản vệ đe dọa tính mạng người bệnh.
+                            Khuyến cáo: Bác sĩ nên thay thế bằng nhóm thuốc an toàn khác để ngăn ngừa phản vệ đe dọa tính mạng người bệnh.
                           </div>
                         </div>
                       }
@@ -2032,23 +2241,56 @@ function PrescriptionPage() {
                             )}
 
                             {(() => {
-                              const itemAllergyConflict = detectedAllergyConflicts.find((c) => c.itemIndex === index)
-                              if (!itemAllergyConflict) return null
+                              const itemWarning = activeAllergyWarnings.find(
+                                (w) => String(w.medicineId) === String(item.medicineId),
+                              )
+                              if (!itemWarning) return null
+                              const isHandled = isAllergyHandled(itemWarning, confirmedAllergyOverrides)
+                              const isLifeThreatening =
+                                String(itemWarning.severity).toUpperCase() === 'ANAPHYLAXIS' ||
+                                String(itemWarning.severity).toUpperCase() === 'SEVERE'
                               return (
                                 <Tag
-                                  color={itemAllergyConflict.isLifeThreatening ? '#b91c1c' : 'red'}
-                                  icon={<FireOutlined />}
+                                  icon={
+                                    <FireOutlined
+                                      style={{
+                                        color: isHandled ? '#15803d' : '#ffffff',
+                                        fontSize: 13,
+                                        marginRight: 4,
+                                      }}
+                                    />
+                                  }
                                   style={{
                                     fontWeight: 700,
-                                    fontSize: 12,
-                                    padding: '2px 8px',
-                                    borderRadius: 12,
+                                    fontSize: 13,
+                                    padding: '4px 12px',
+                                    borderRadius: 14,
                                     margin: 0,
-                                    backgroundColor: itemAllergyConflict.isLifeThreatening ? '#fef2f2' : undefined,
-                                    borderColor: itemAllergyConflict.isLifeThreatening ? '#ef4444' : undefined,
+                                    cursor: 'pointer',
+                                    backgroundColor: isHandled
+                                      ? '#f0fdf4'
+                                      : isLifeThreatening
+                                      ? '#dc2626'
+                                      : '#ea580c',
+                                    borderColor: isHandled
+                                      ? '#86efac'
+                                      : isLifeThreatening
+                                      ? '#991b1b'
+                                      : '#c2410c',
+                                    borderWidth: '1.5px',
+                                    borderStyle: 'solid',
+                                    color: isHandled ? '#15803d' : '#ffffff',
+                                    boxShadow: isLifeThreatening && !isHandled ? '0 2px 6px rgba(220, 38, 38, 0.35)' : undefined,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
                                   }}
+                                  onClick={() => setAllergyModalOpen(true)}
+                                  title="Bấm để mở hộp thoại xem hoặc nhập lý do bỏ qua cảnh báo dị ứng"
                                 >
-                                  {itemAllergyConflict.isLifeThreatening ? '🚨 NGUY CƠ SỐC PHẢN VỆ' : 'CẢNH BÁO DỊ ỨNG'}: {itemAllergyConflict.matchedAllergy?.allergenName} ({itemAllergyConflict.severityMeta?.label})
+                                  <span style={{ color: isHandled ? '#15803d' : '#ffffff', fontWeight: 700 }}>
+                                    {isLifeThreatening ? '🚨 NGUY CƠ SỐC PHẢN VỆ' : '⚠️ CẢNH BÁO DỊ ỨNG'}: {itemWarning.allergenName} ({itemWarning.severity || 'Dị ứng'})
+                                    {isHandled ? ' [Đã nhập lý do]' : ' [Cần nhập lý do]'}
+                                  </span>
                                 </Tag>
                               )
                             })()}
@@ -2632,15 +2874,111 @@ function PrescriptionPage() {
                     </div>
                   )}
 
+                  {checkingAllergies && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        type="info"
+                        showIcon
+                        icon={<Spin size="small" />}
+                        message="Đang đối chiếu hoạt chất thuốc với tiền sử dị ứng của bệnh nhân..."
+                      />
+                    </div>
+                  )}
+
+                  {!checkingAllergies && allergyApiError && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        type="error"
+                        showIcon
+                        icon={<WarningOutlined />}
+                        message="Lỗi kiểm tra dị ứng thuốc"
+                        description={
+                          <div>
+                            <Paragraph style={{ marginBottom: 8, color: '#991b1b' }}>
+                              {allergyApiError}
+                            </Paragraph>
+                            <Button
+                              size="small"
+                              type="primary"
+                              danger
+                              onClick={() => performAllergyCheck(items).catch(() => {})}
+                            >
+                              Thử lại kiểm tra dị ứng
+                            </Button>
+                          </div>
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {!checkingAllergies && !allergyApiError && activeAllergyWarnings.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      {areAllAllergiesHandled(activeAllergyWarnings, confirmedAllergyOverrides) ? (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                          message={`Đã ghi nhận lý do lâm sàng bỏ qua cho toàn bộ ${activeAllergyWarnings.length} cảnh báo dị ứng thuốc`}
+                          description={
+                            <div>
+                              <ul style={{ margin: '4px 0 8px 0', paddingLeft: 20 }}>
+                                {activeAllergyWarnings.map((w, idx) => {
+                                  const ov = confirmedAllergyOverrides.find(
+                                    (o) =>
+                                      String(o.allergyId) === String(w.allergyId) &&
+                                      String(o.medicineId) === String(w.medicineId),
+                                  )
+                                  return (
+                                    <li key={idx}>
+                                      <strong>{w.medicineName}</strong> (Dị ứng: {w.allergenName} - {w.severity || 'Cảnh báo'}):{' '}
+                                      <Text type="secondary">Lý do lâm sàng: "{ov?.overrideReason}"</Text>
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                              <Button size="small" onClick={() => setAllergyModalOpen(true)}>
+                                Xem / Thay đổi lý do bỏ qua dị ứng
+                              </Button>
+                            </div>
+                          }
+                        />
+                      ) : (
+                        <Alert
+                          type="error"
+                          showIcon
+                          icon={<FireOutlined style={{ color: '#dc2626' }} />}
+                          message={`CẢNH BÁO DỊ ỨNG THUỐC: Phát hiện ${activeAllergyWarnings.length} thuốc trùng tiền sử dị ứng (${getUnhandledAllergies(activeAllergyWarnings, confirmedAllergyOverrides).length} chưa xử lý)`}
+                          description={
+                            <div>
+                              <Paragraph style={{ marginBottom: 8, color: '#991b1b' }}>
+                                Nút "{editingPrescription ? 'Lưu điều chỉnh đơn thuốc' : 'Tạo đơn thuốc'}" bị khóa. Bác sĩ phải điều chỉnh bỏ/đổi thuốc an toàn hoặc bấm "Xem cảnh báo & Nhập lý do bỏ qua" để tiếp tục kê đơn.
+                              </Paragraph>
+                              <ul style={{ margin: '4px 0 8px 0', paddingLeft: 20 }}>
+                                {activeAllergyWarnings.map((w, idx) => (
+                                  <li key={idx}>
+                                    <strong>{w.medicineName}</strong>: Hoạt chất/nhóm thuốc trùng tiền sử dị ứng <strong>{w.allergenName}</strong> ({w.severity || 'Cảnh báo'}){w.reaction ? ` — Phản ứng: ${w.reaction}` : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                              <Button size="small" type="primary" danger onClick={() => setAllergyModalOpen(true)}>
+                                Xem cảnh báo & Nhập lý do bỏ qua
+                              </Button>
+                            </div>
+                          }
+                        />
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     {editingPrescription && (
-                      <Button disabled={checkingInteractions || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
+                      <Button disabled={checkingInteractions || checkingAllergies || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                     )}
                     {canPrescribe && (
                       <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
                         <Button
                           type="primary"
-                          loading={saving || checkingInteractions}
+                          loading={saving || checkingInteractions || checkingAllergies}
                           disabled={!canSubmit}
                           icon={<CheckCircleOutlined />}
                           onClick={handleSaveClick}
@@ -2924,6 +3262,22 @@ function PrescriptionPage() {
           />
         </React.Suspense>
       )}
+
+      <PrescriptionAllergyWarningModal
+        open={allergyModalOpen}
+        warnings={activeAllergyWarnings}
+        patientName={encounter?.patient?.fullName || record?.patientName || ''}
+        onCancel={() => setAllergyModalOpen(false)}
+        onConfirmOverride={handleConfirmAllergyOverrides}
+      />
+
+      <PrescriptionAllergyWarningLogsModal
+        open={allergyLogsModalOpen}
+        onClose={() => setAllergyLogsModalOpen(false)}
+        patientId={encounter?.patient?.id || record?.patientId || routeState.patient?.id}
+        defaultPatientId={encounter?.patient?.id || record?.patientId || routeState.patient?.id}
+        patientName={encounter?.patient?.fullName || record?.patientName || routeState.patient?.fullName}
+      />
 
       <PrescriptionDetailModal
         open={detailModalOpen}

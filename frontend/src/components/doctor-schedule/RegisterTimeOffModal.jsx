@@ -3,7 +3,8 @@ import { Button, DatePicker, Form, Input, Modal, Space, Typography, message } fr
 import { ClockCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import doctorScheduleApi from '../../api/doctorScheduleApi.js'
-import { formatDuration } from '../../utils/doctorScheduleHelpers.js'
+import { cleanDoctorScheduleErrorMessage, formatDuration } from '../../utils/doctorScheduleHelpers.js'
+import { getApiErrorMessage } from '../../utils/apiError.js'
 
 const { TextArea } = Input
 const { RangePicker } = DatePicker
@@ -87,10 +88,12 @@ function RegisterTimeOffModal({ open, onClose, doctor, onSuccess }) {
     } catch (err) {
       if (err.errorFields) return
       if (err.response?.status === 403 || err.response?.data?.code === 'ACCESS_DENIED') {
-        message.error('Bạn không có quyền đăng ký thời gian nghỉ cho bác sĩ (403 Forbidden).')
+        message.error('Bạn không có quyền đăng ký thời gian nghỉ cho bác sĩ.')
         return
       }
-      const apiMsg = err.response?.data?.message || err.apiError?.message || 'Không thể đăng ký khoảng nghỉ. Vui lòng thử lại.'
+      const apiMsg = cleanDoctorScheduleErrorMessage(
+        getApiErrorMessage(err, 'Không thể đăng ký khoảng nghỉ. Vui lòng thử lại.')
+      )
       message.error(apiMsg)
     } finally {
       setSubmitting(false)

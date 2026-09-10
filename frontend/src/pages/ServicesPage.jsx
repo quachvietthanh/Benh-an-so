@@ -67,7 +67,9 @@ function ServicesPage() {
   const [editingService, setEditingService] = useState(null)
   const [savingService, setSavingService] = useState(false)
   const [createFormError, setCreateFormError] = useState(null)
+  const [createFormErrorDescription, setCreateFormErrorDescription] = useState(null)
   const [editFormError, setEditFormError] = useState(null)
+  const [editFormErrorDescription, setEditFormErrorDescription] = useState(null)
   const [editPriceHistory, setEditPriceHistory] = useState([])
 
   // Price History Drawer States
@@ -95,10 +97,10 @@ function ServicesPage() {
     )
   }, [user])
 
-  const canReadService = userPermissions.includes('SERVICE_CATALOG_READ') || userRoles.includes('admin') || userRoles.includes('manager')
-  const canCreateService = userPermissions.includes('SERVICE_CATALOG_CREATE') || userRoles.includes('admin') || userRoles.includes('manager')
-  const canUpdateService = userPermissions.includes('SERVICE_CATALOG_UPDATE') || userRoles.includes('admin') || userRoles.includes('manager')
-  const canManagePrice = userPermissions.includes('SERVICE_PRICE_MANAGE') || userRoles.includes('admin') || userRoles.includes('manager')
+  const canReadService = userPermissions.includes('SERVICE_CATALOG_READ') || userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('clinic_manager')
+  const canCreateService = userPermissions.includes('SERVICE_CATALOG_CREATE') || userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('clinic_manager')
+  const canUpdateService = userPermissions.includes('SERVICE_CATALOG_UPDATE') || userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('clinic_manager')
+  const canManagePrice = userPermissions.includes('SERVICE_PRICE_MANAGE') || userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('clinic_manager')
   const canManage = canCreateService || canUpdateService || canManagePrice
 
   // Fetch Services from backend
@@ -180,6 +182,7 @@ function ServicesPage() {
   // Handle open create modal
   const handleOpenCreateModal = () => {
     setCreateFormError(null)
+    setCreateFormErrorDescription(null)
     createForm.resetFields()
     createForm.setFieldsValue({
       effectiveFrom: dayjs(),
@@ -191,20 +194,26 @@ function ServicesPage() {
   const handleCreateService = async (values) => {
     setSavingService(true)
     setCreateFormError(null)
+    setCreateFormErrorDescription(null)
     try {
       const payload = prepareCreateServicePayload(values)
       await systemApi.createService(payload)
       message.success(`Đã thêm mới dịch vụ "${values.name}" thành công!`)
       setCreateModalOpen(false)
       setCreateFormError(null)
+      setCreateFormErrorDescription(null)
       createForm.resetFields()
       loadServices()
     } catch (err) {
       console.error('[ServicesPage] Lỗi tạo dịch vụ:', err)
-      const { errorMessage, fieldErrors } = extractServiceFormErrors(err)
+      const { errorMessage, description, fieldErrors } = extractServiceFormErrors(err)
       setCreateFormError(errorMessage)
+      setCreateFormErrorDescription(description)
       if (fieldErrors && fieldErrors.length > 0) {
         createForm.setFields(fieldErrors)
+        if (createForm.scrollToField && fieldErrors[0]?.name) {
+          createForm.scrollToField(fieldErrors[0].name)
+        }
       }
       message.error(errorMessage)
     } finally {
@@ -215,6 +224,7 @@ function ServicesPage() {
   // Handle open edit modal
   const handleOpenEditModal = (service) => {
     setEditFormError(null)
+    setEditFormErrorDescription(null)
     setEditingService(service)
     setEditPriceHistory([])
     editForm.resetFields()
@@ -227,9 +237,10 @@ function ServicesPage() {
     })
     setEditModalOpen(true)
 
-    if (service?.id) {
+    const serviceId = service?.id || service?.serviceCatalogId
+    if (serviceId) {
       systemApi
-        .getServicePriceHistory(service.id)
+        .getServicePriceHistory(serviceId)
         .then((res) => {
           setEditPriceHistory(res?.data || [])
         })
@@ -241,9 +252,19 @@ function ServicesPage() {
 
   // Handle submit update service
   const handleUpdateService = async (values) => {
-    if (!editingService?.id) return
+    const serviceId = editingService?.id || editingService?.serviceCatalogId
+    if (!serviceId) {
+      const notFoundMsg = 'Không tìm thấy thông tin dịch vụ trong hệ thống.'
+      const notFoundDesc = 'Mã định danh dịch vụ bị thiếu hoặc không tồn tại (Lỗi 404). Vui lòng đóng cửa sổ và tải lại trang.'
+      setEditFormError(notFoundMsg)
+      setEditFormErrorDescription(notFoundDesc)
+      message.error(notFoundMsg)
+      return
+    }
+
     setSavingService(true)
     setEditFormError(null)
+    setEditFormErrorDescription(null)
 
     const conflict = isEffectiveDateConflicted(
       values.effectiveFrom,
@@ -253,31 +274,40 @@ function ServicesPage() {
     )
     if (conflict.conflicted) {
       setEditFormError(conflict.message)
+      setEditFormErrorDescription('Vui lòng chọn ngày bắt đầu áp dụng khác hoặc nhấn nút Áp dụng ngày gợi ý bên dưới.')
       editForm.setFields([
         {
           name: 'effectiveFrom',
           errors: [conflict.message],
         },
       ])
+      if (editForm.scrollToField) {
+        editForm.scrollToField('effectiveFrom')
+      }
       setSavingService(false)
       return
     }
 
     try {
       const payload = prepareUpdateServicePayload(values, editingService)
-      await systemApi.updateService(editingService.id, payload)
+      await systemApi.updateService(serviceId, payload)
       message.success(`Đã cập nhật dịch vụ "${values.name}" thành công!`)
       setEditModalOpen(false)
       setEditFormError(null)
+      setEditFormErrorDescription(null)
       setEditingService(null)
       setEditPriceHistory([])
       loadServices()
     } catch (err) {
       console.error('[ServicesPage] Lỗi cập nhật dịch vụ:', err)
-      const { errorMessage, fieldErrors } = extractServiceFormErrors(err)
+      const { errorMessage, description, fieldErrors } = extractServiceFormErrors(err)
       setEditFormError(errorMessage)
+      setEditFormErrorDescription(description)
       if (fieldErrors && fieldErrors.length > 0) {
         editForm.setFields(fieldErrors)
+        if (editForm.scrollToField && fieldErrors[0]?.name) {
+          editForm.scrollToField(fieldErrors[0].name)
+        }
       }
       message.error(errorMessage)
     } finally {
@@ -287,20 +317,27 @@ function ServicesPage() {
 
   // Handle toggle service active status
   const handleToggleStatus = async (service, checked) => {
-    setTogglingId(service.id)
+    const serviceId = service?.id || service?.serviceCatalogId
+    if (!serviceId) return
+    setTogglingId(serviceId)
     try {
-      const payload = {
-        name: service.name,
-        price: service.price,
-        effectiveFrom: service.effectiveFrom
-          ? dayjs(service.effectiveFrom).format('YYYY-MM-DD')
-          : dayjs().format('YYYY-MM-DD'),
-        active: checked,
+      try {
+        await systemApi.updateServiceStatus(serviceId, checked)
+      } catch (patchErr) {
+        // Fallback to updateService if PATCH status is not supported
+        const payload = {
+          name: service.name,
+          price: service.price,
+          effectiveFrom: service.effectiveFrom
+            ? dayjs(service.effectiveFrom).format('YYYY-MM-DD')
+            : dayjs().format('YYYY-MM-DD'),
+          active: checked,
+        }
+        await systemApi.updateService(serviceId, payload)
       }
-      await systemApi.updateService(service.id, payload)
       message.success(`Đã ${checked ? 'kích hoạt' : 'tạm dừng'} dịch vụ "${service.name}".`)
       setServices((prev) =>
-        prev.map((s) => (s.id === service.id ? { ...s, active: checked } : s)),
+        prev.map((s) => (s.id === serviceId ? { ...s, active: checked } : s)),
       )
     } catch (err) {
       console.error('[ServicesPage] Lỗi đổi trạng thái dịch vụ:', err)
@@ -628,12 +665,18 @@ function ServicesPage() {
         onCancel={() => {
           setCreateModalOpen(false)
           setCreateFormError(null)
+          setCreateFormErrorDescription(null)
         }}
         onFinish={handleCreateService}
         form={createForm}
         loading={savingService}
         formError={createFormError}
-        onClearError={() => setCreateFormError(null)}
+        formErrorDescription={createFormErrorDescription}
+        onClearError={() => {
+          setCreateFormError(null)
+          setCreateFormErrorDescription(null)
+        }}
+        canSubmit={canCreateService}
       />
 
       {/* Modal: Sửa thông tin & Điều chỉnh bảng giá */}
@@ -642,6 +685,7 @@ function ServicesPage() {
         onCancel={() => {
           setEditModalOpen(false)
           setEditFormError(null)
+          setEditFormErrorDescription(null)
           setEditingService(null)
           setEditPriceHistory([])
         }}
@@ -649,9 +693,14 @@ function ServicesPage() {
         form={editForm}
         loading={savingService}
         formError={editFormError}
-        onClearError={() => setEditFormError(null)}
+        formErrorDescription={editFormErrorDescription}
+        onClearError={() => {
+          setEditFormError(null)
+          setEditFormErrorDescription(null)
+        }}
         editingService={editingService}
         priceHistory={editPriceHistory}
+        canSubmit={canUpdateService}
       />
 
       {/* Drawer: Lịch sử giá dịch vụ */}

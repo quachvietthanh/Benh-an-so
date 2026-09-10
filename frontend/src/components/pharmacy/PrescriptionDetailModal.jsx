@@ -38,6 +38,7 @@ import {
   SyncOutlined,
   UserOutlined,
   WarningOutlined,
+  FireOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import pharmacyApi from '../../api/pharmacyApi'
@@ -81,6 +82,7 @@ function PrescriptionDetailModal({
   const [sendingInterconnection, setSendingInterconnection] = useState(false)
   const [interconnectionState, setInterconnectionState] = useState(null)
   const [printing, setPrinting] = useState(false)
+  const [allergyLogs, setAllergyLogs] = useState([])
 
   useEffect(() => {
     if (prescription) {
@@ -90,6 +92,17 @@ function PrescriptionDetailModal({
         failureReason: prescription.lastInterconnectionError || prescription.failureReason || '',
         completedAt: prescription.lastInterconnectionAt || prescription.completedAt || '',
       })
+
+      if (prescription.id) {
+        pharmacyApi
+          .getAllergyWarningLogs({ prescriptionId: prescription.id })
+          .then((res) => {
+            const data = res?.data || {}
+            const items = data.content || (Array.isArray(data) ? data : [])
+            setAllergyLogs(items)
+          })
+          .catch(() => setAllergyLogs([]))
+      }
     }
   }, [prescription])
 
@@ -585,6 +598,34 @@ function PrescriptionDetailModal({
                           ))}
                         </ul>
                       }
+                    />
+                  </div>
+                )}
+
+                {allergyLogs && allergyLogs.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <Alert
+                      type="error"
+                      showIcon
+                      icon={<FireOutlined style={{ color: '#dc2626' }} />}
+                      message={<Text strong style={{ color: '#991b1b' }}>Lưu vết vượt qua cảnh báo dị ứng thuốc ({allergyLogs.length})</Text>}
+                      description={
+                        <ul style={{ paddingLeft: 20, margin: '6px 0 0 0' }}>
+                          {allergyLogs.map((log, idx) => (
+                            <li key={idx} style={{ marginBottom: 6 }}>
+                              <Text strong style={{ color: '#b91c1c' }}>[{log.severity || 'DỊ ỨNG'}]</Text>{' '}
+                              Thuốc: <strong>{log.medicineName}</strong> (Hoạt chất: {log.activeIngredient}) trùng dị ứng với <strong>{log.allergenName}</strong>
+                              {log.reaction ? ` — Phản ứng: ${log.reaction}` : ''}
+                              {log.overrideReason && (
+                                <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>
+                                  Lý do bác sĩ ghi nhận: <em>"{log.overrideReason}"</em> {log.doctorName ? `(Bác sĩ: ${log.doctorName})` : ''}
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      }
+                      style={{ backgroundColor: '#fef2f2', borderColor: '#fca5a5' }}
                     />
                   </div>
                 )}

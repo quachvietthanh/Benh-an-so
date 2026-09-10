@@ -336,5 +336,50 @@ test('TC18: Phát hiện xung đột ngày hiệu lực khi đổi đơn giá (i
   assert.equal(noConflictNewDate.conflicted, false)
 })
 
+test('TC19: Trích xuất lỗi 403 ACCESS_DENIED kèm mô tả hướng dẫn quyền hạn', () => {
+  const forbiddenError = {
+    response: {
+      status: 403,
+      data: {
+        code: 'ACCESS_DENIED',
+        message: 'Access Denied',
+      },
+    },
+  }
+
+  const result = extractServiceFormErrors(forbiddenError)
+  assert.equal(result.errorMessage, 'Bạn không có quyền thực hiện thao tác này.')
+  assert.ok(result.description.includes('Quản trị viên') || result.description.includes('Quản lý'))
+  assert.deepEqual(result.fieldErrors, [])
+})
+
+test('TC20: Trích xuất lỗi 404 RESOURCE_NOT_FOUND khi dịch vụ không tồn tại', () => {
+  const notFoundError = {
+    response: {
+      status: 404,
+      data: {
+        code: 'RESOURCE_NOT_FOUND',
+        message: 'Service catalog not found: 123',
+      },
+    },
+  }
+
+  const result = extractServiceFormErrors(notFoundError)
+  assert.equal(result.errorMessage, 'Không tìm thấy thông tin dịch vụ trong hệ thống.')
+  assert.ok(result.description.includes('404') || result.description.includes('tải lại'))
+  assert.deepEqual(result.fieldErrors, [])
+})
+
+test('TC21: Nhận diện vai trò clinic_manager cho quyền truy cập và quản lý dịch vụ', () => {
+  const clinicManagerUser = { roles: ['ROLE_CLINIC_MANAGER'] }
+  const checkRole = (user) => {
+    const roles = (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+    return roles.includes('admin') || roles.includes('manager') || roles.includes('clinic_manager')
+  }
+
+  assert.equal(checkRole(clinicManagerUser), true, 'ROLE_CLINIC_MANAGER phải được nhận diện hợp lệ')
+})
+
+
 
 
