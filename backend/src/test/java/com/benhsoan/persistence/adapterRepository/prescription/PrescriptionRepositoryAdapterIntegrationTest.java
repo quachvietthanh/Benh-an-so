@@ -238,6 +238,35 @@ class PrescriptionRepositoryAdapterIntegrationTest {
         );
     }
 
+    @Test
+    void savesAndLoadsCancelledPrescriptionWithCancelReason() {
+        UUID prescriptionId = UUID.randomUUID();
+        Prescription prescription = prescription(prescriptionId, "RX-CANCEL-01", PrescriptionStatus.PENDING_DISPENSE, CREATED_AT, null);
+        prescription.cancel("Bệnh nhân hủy lượt khám", UUID.randomUUID(), AMENDED_AT);
+
+        prescriptionRepository.save(prescription);
+
+        Prescription loaded = prescriptionRepository.findById(prescriptionId).orElseThrow();
+        assertEquals(PrescriptionStatus.CANCELLED, loaded.getStatus());
+        assertEquals("Bệnh nhân hủy lượt khám", loaded.getCancelReason());
+        assertEquals(AMENDED_AT, loaded.getUpdatedAt());
+    }
+
+    @Test
+    void handlesCancelReasonWithExact500Characters() {
+        UUID prescriptionId = UUID.randomUUID();
+        String longReason = "A".repeat(500);
+        Prescription prescription = prescription(prescriptionId, "RX-CANCEL-LONG", PrescriptionStatus.PENDING_DISPENSE, CREATED_AT, null);
+        prescription.cancel(longReason, UUID.randomUUID(), AMENDED_AT);
+
+        prescriptionRepository.save(prescription);
+
+        Prescription loaded = prescriptionRepository.findById(prescriptionId).orElseThrow();
+        assertEquals(PrescriptionStatus.CANCELLED, loaded.getStatus());
+        assertEquals(500, loaded.getCancelReason().length());
+        assertEquals(longReason, loaded.getCancelReason());
+    }
+
     private Prescription prescription(
             UUID id,
             String code,

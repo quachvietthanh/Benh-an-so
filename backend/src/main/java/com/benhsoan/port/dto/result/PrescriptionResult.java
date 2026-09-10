@@ -28,6 +28,8 @@ public record PrescriptionResult(
 
         String note,
 
+        String cancelReason,
+
         UUID prescribedBy,
 
         String doctorName,
@@ -43,4 +45,27 @@ public record PrescriptionResult(
         List<PrescriptionWarningResult> warnings
 
 ) {
+
+    public PrescriptionResult(
+            UUID id,
+            String prescriptionCode,
+            UUID medicalRecordId,
+            UUID visitId,
+            String visitCode,
+            UUID patientId,
+            String patientCode,
+            String patientName,
+            PrescriptionStatus status,
+            String note,
+            UUID prescribedBy,
+            String doctorName,
+            Instant prescribedAt,
+            UUID updatedBy,
+            Instant updatedAt,
+            List<PrescriptionItemResult> items,
+            List<PrescriptionWarningResult> warnings
+    ) {
+        this(id, prescriptionCode, medicalRecordId, visitId, visitCode, patientId, patientCode, patientName,
+                status, note, null, prescribedBy, doctorName, prescribedAt, updatedBy, updatedAt, items, warnings);
+    }
 }

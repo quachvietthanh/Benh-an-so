@@ -36,6 +36,8 @@ public class Prescription {
 
     private String note;
 
+    private String cancelReason;
+
     private UUID prescribedBy;
 
     private Instant prescribedAt;
@@ -60,6 +62,7 @@ public class Prescription {
             UUID medicalRecordId,
             PrescriptionStatus status,
             String note,
+            String cancelReason,
             UUID prescribedBy,
             Instant prescribedAt,
             UUID updatedBy,
@@ -75,6 +78,7 @@ public class Prescription {
         this.medicalRecordId = requireNonNull(medicalRecordId, "Medical record id is required.");
         this.status = requireNonNull(status, "Prescription status is required.");
         this.note = normalizeOptionalText(note);
+        this.cancelReason = normalizeOptionalText(cancelReason);
         this.prescribedBy = requireNonNull(prescribedBy, "Prescribing doctor id is required.");
         this.prescribedAt = requireNonNull(prescribedAt, "Prescription time is required.");
         this.updatedBy = updatedBy;
@@ -102,6 +106,7 @@ public class Prescription {
                 medicalRecordId,
                 PrescriptionStatus.PENDING_DISPENSE,
                 note,
+                null,
                 prescribedBy,
                 prescribedAt,
                 null,
@@ -127,7 +132,7 @@ public class Prescription {
             List<PrescriptionItem> items
     ) {
         return restore(
-                id, prescriptionCode, medicalRecordId, status, note, prescribedBy, prescribedAt,
+                id, prescriptionCode, medicalRecordId, status, note, null, prescribedBy, prescribedAt,
                 updatedBy, updatedAt, InterconnectionStatus.NOT_SENT, null, null, null, items
         );
     }
@@ -148,12 +153,37 @@ public class Prescription {
             String interconnectionReceiptCode,
             List<PrescriptionItem> items
     ) {
+        return restore(
+                id, prescriptionCode, medicalRecordId, status, note, null, prescribedBy, prescribedAt,
+                updatedBy, updatedAt, interconnectionStatus, lastInterconnectionAt, lastInterconnectionError,
+                interconnectionReceiptCode, items
+        );
+    }
+
+    public static Prescription restore(
+            UUID id,
+            String prescriptionCode,
+            UUID medicalRecordId,
+            PrescriptionStatus status,
+            String note,
+            String cancelReason,
+            UUID prescribedBy,
+            Instant prescribedAt,
+            UUID updatedBy,
+            Instant updatedAt,
+            InterconnectionStatus interconnectionStatus,
+            Instant lastInterconnectionAt,
+            String lastInterconnectionError,
+            String interconnectionReceiptCode,
+            List<PrescriptionItem> items
+    ) {
         return new Prescription(
                 id,
                 prescriptionCode,
                 medicalRecordId,
                 status,
                 note,
+                cancelReason,
                 prescribedBy,
                 prescribedAt,
                 updatedBy,
@@ -215,7 +245,7 @@ public class Prescription {
         this.updatedAt = validatedDispensedAt;
     }
 
-    public void cancel(UUID cancelledBy, Instant cancelledAt) {
+    public void cancel(String cancelReason, UUID cancelledBy, Instant cancelledAt) {
         if (status == PrescriptionStatus.CANCELLED) {
             throw new PrescriptionAlreadyCancelledException();
         }
@@ -223,6 +253,11 @@ public class Prescription {
             throw new PrescriptionAlreadyDispensedException();
         }
 
+        String validatedReason = requireText(cancelReason, "Cancellation reason is required.");
+        if (validatedReason.length() > 500) {
+            throw new ValidationException("Cancellation reason must not exceed 500 characters.");
+        }
+        this.cancelReason = validatedReason;
         UUID validatedCancelledBy = requireNonNull(cancelledBy, "Cancelling user id is required.");
         Instant validatedCancelledAt = requireNonNull(cancelledAt, "Cancellation time is required.");
         this.status = PrescriptionStatus.CANCELLED;

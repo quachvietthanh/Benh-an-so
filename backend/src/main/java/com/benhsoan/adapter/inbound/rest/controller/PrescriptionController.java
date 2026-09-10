@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
@@ -147,8 +148,16 @@ public class PrescriptionController {
 
         @PostMapping("/{id}/cancel")
         @RequirePermission("PRESCRIPTION_UPDATE")
-        public PrescriptionResponse cancel(@PathVariable UUID id) {
-                return mapper.toResponse(cancelPrescriptionUseCase.cancel(id));
+        @Operation(summary = "Hủy đơn thuốc chưa cấp phát kèm lý do")
+        @ApiResponse(responseCode = "200", description = "Đơn thuốc đã được hủy thành công")
+        @ApiResponse(responseCode = "400", description = "Thiếu lý do hủy hoặc dữ liệu không hợp lệ")
+        @ApiResponse(responseCode = "403", description = "Không có quyền hủy đơn thuốc hoặc không phải bác sĩ kê đơn")
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy đơn thuốc")
+        @ApiResponse(responseCode = "409", description = "Đơn thuốc đã cấp phát hoặc đã hủy")
+        public PrescriptionResponse cancel(
+                        @PathVariable UUID id,
+                        @Valid @RequestBody CancelPrescriptionRequest request) {
+                return mapper.toResponse(cancelPrescriptionUseCase.cancel(mapper.toCommand(id, request)));
         }
 
         @PostMapping("/{id}/interconnection")

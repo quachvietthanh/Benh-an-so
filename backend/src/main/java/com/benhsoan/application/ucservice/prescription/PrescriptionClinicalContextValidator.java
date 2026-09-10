@@ -54,4 +54,30 @@ public class PrescriptionClinicalContextValidator {
 
         return medicalRecord;
     }
+
+    public MedicalRecord requireDoctorPermissionForPrescriptionCancellation(
+            UUID medicalRecordId,
+            UUID doctorId
+    ) {
+        if (medicalRecordId == null) {
+            throw new ValidationException("Medical record id is required.");
+        }
+
+        MedicalRecord medicalRecord = medicalRecordRepository.findById(medicalRecordId)
+                .orElseThrow(() -> new ValidationException(
+                        "Medical record not found: " + medicalRecordId
+                ));
+
+        Visit visit = visitRepository.findById(medicalRecord.getVisitId())
+                .orElseThrow(() -> new ValidationException(
+                        "Visit not found for medical record: " + medicalRecordId
+                ));
+        if (!Objects.equals(visit.getDoctorId(), doctorId)) {
+            throw new AccessDeniedException(
+                    "Only the doctor responsible for the visit can cancel prescriptions."
+            );
+        }
+
+        return medicalRecord;
+    }
 }

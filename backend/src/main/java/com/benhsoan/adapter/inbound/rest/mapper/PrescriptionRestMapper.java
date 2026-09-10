@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
@@ -21,6 +22,7 @@ import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionWarni
 import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
+import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
@@ -113,6 +115,16 @@ public class PrescriptionRestMapper {
                 .build();
     }
 
+    public CancelPrescriptionCommand toCommand(
+            UUID prescriptionId,
+            CancelPrescriptionRequest request
+    ) {
+        return new CancelPrescriptionCommand(
+                prescriptionId,
+                request != null ? request.cancelReason() : null
+        );
+    }
+
     public CheckDrugInteractionCommand toCommand(
             CheckDrugInteractionRequest request
     ) {
@@ -133,6 +145,7 @@ public class PrescriptionRestMapper {
                 .patientName(anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName())
                 .status(result.status())
                 .note(result.note())
+                .cancelReason(result.cancelReason())
                 .prescribedBy(result.prescribedBy())
                 .doctorName(result.doctorName())
                 .prescribedAt(result.prescribedAt())

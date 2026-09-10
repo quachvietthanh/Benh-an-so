@@ -39,6 +39,7 @@ public class PrescriptionPersistenceMapper {
                 entity.getMedicalRecordId(),
                 entity.getStatus(),
                 entity.getNote(),
+                entity.getCancelReason(),
                 entity.getPrescribedBy(),
                 entity.getPrescribedAt(),
                 entity.getUpdatedBy(),
@@ -62,6 +63,7 @@ public class PrescriptionPersistenceMapper {
                 .medicalRecordId(domain.getMedicalRecordId())
                 .status(domain.getStatus())
                 .note(domain.getNote())
+                .cancelReason(domain.getCancelReason())
                 .prescribedBy(domain.getPrescribedBy())
                 .prescribedAt(domain.getPrescribedAt())
                 .updatedBy(domain.getUpdatedBy())

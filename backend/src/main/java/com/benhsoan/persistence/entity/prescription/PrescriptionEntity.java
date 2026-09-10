@@ -44,6 +44,9 @@ public class PrescriptionEntity {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
+
     @Column(name = "prescribed_by", nullable = false, columnDefinition = "BINARY(16)")
     private UUID prescribedBy;
 

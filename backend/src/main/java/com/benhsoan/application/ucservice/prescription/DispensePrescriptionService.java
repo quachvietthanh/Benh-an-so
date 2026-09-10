@@ -75,6 +75,12 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
         var prescription = prescriptionRepository.findByIdForUpdate(prescriptionId)
                 .orElseThrow(() -> new PrescriptionNotFoundException(prescriptionId));
+        if (prescription.getStatus() == com.benhsoan.domain.prescription.enums.PrescriptionStatus.CANCELLED) {
+            throw new com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException("Cancelled prescriptions cannot be dispensed.");
+        }
+        if (prescription.getStatus() == com.benhsoan.domain.prescription.enums.PrescriptionStatus.DISPENSED) {
+            throw new com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException();
+        }
         List<PrescriptionItem> prescriptionItems = prescriptionItemRepository.findByPrescriptionId(prescriptionId);
         List<UUID> medicineIds = prescriptionItems.stream()
                 .map(PrescriptionItem::getMedicineId)

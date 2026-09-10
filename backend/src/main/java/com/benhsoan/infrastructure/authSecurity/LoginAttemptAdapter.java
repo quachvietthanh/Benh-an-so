@@ -21,8 +21,10 @@ import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 /**
- * Persistent login-attempt tracking with atomic {@code blocked_until} expiry (NCL-14-CN-002 TC-02).
- * Writes run in a REQUIRES_NEW transaction so failed-attempt increments survive the rollback of the
+ * Persistent login-attempt tracking with atomic {@code blocked_until} expiry
+ * (NCL-14-CN-002 TC-02).
+ * Writes run in a REQUIRES_NEW transaction so failed-attempt increments survive
+ * the rollback of the
  * login use-case when credentials are rejected.
  */
 @Component
@@ -44,8 +46,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
             @Value("${app.security.login.block-duration-ms:900000}") long blockDurationMs,
             JpaLoginAttemptRepository repository,
             ClockPort clockPort,
-            @Autowired(required = false) PlatformTransactionManager transactionManager
-    ) {
+            @Autowired(required = false) PlatformTransactionManager transactionManager) {
         this.maxAttempts = maxAttempts;
         this.blockDurationMs = blockDurationMs;
         this.repository = repository;
@@ -63,8 +64,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
             int maxAttempts,
             long blockDurationMs,
             JpaLoginAttemptRepository repository,
-            ClockPort clockPort
-    ) {
+            ClockPort clockPort) {
         this(maxAttempts, blockDurationMs, repository, clockPort, null);
     }
 
@@ -101,8 +101,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
                             blocked,
                             newlyBlocked,
                             blocked ? entity.getBlockedUntil() : null,
-                            retryAfter
-                    );
+                            retryAfter);
                 } else {
                     LoginAttemptEntity newEntity = new LoginAttemptEntity();
                     newEntity.setIdentifier(identifier);
@@ -115,7 +114,8 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
                     }
                     try {
                         repository.saveAndFlush(newEntity);
-                        boolean blocked = newEntity.getBlockedUntil() != null && now.isBefore(newEntity.getBlockedUntil());
+                        boolean blocked = newEntity.getBlockedUntil() != null
+                                && now.isBefore(newEntity.getBlockedUntil());
                         boolean newlyBlocked = blocked && (newEntity.getAttempts() == maxAttempts);
                         long retryAfter = calculateRetryAfterSeconds(newEntity.getBlockedUntil(), now);
                         return new LoginAttemptResult(
@@ -123,8 +123,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
                                 blocked,
                                 newlyBlocked,
                                 blocked ? newEntity.getBlockedUntil() : null,
-                                retryAfter
-                        );
+                                retryAfter);
                     } catch (org.springframework.dao.DataIntegrityViolationException ex) {
                         status.setRollbackOnly();
                         return null;
@@ -194,10 +193,6 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
     public int getAttemptCount(String identifier) {
         LoginAttemptEntity entity = repository.findById(identifier).orElse(null);
         return entity == null ? 0 : entity.getAttempts();
-    }
-
-    private boolean isExpired(LoginAttemptEntity entity, Instant now) {
-        return entity.getBlockedUntil() != null && !now.isBefore(entity.getBlockedUntil());
     }
 
     private long calculateRetryAfterSeconds(Instant blockedUntil, Instant now) {

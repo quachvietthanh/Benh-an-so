@@ -43,6 +43,9 @@ import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
 import com.benhsoan.domain.patient.enums.AllergySeverity;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
+import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
+import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
+import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
@@ -716,6 +719,113 @@ class PrescriptionControllerTest {
         } finally {
             anonymizationModeState.setEnabled(false);
         }
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/cancel - 200 cancels prescription with valid reason (TC-01, QTN-27)")
+    void cancel_returns200WithCancelledPrescription() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        PrescriptionResult cancelledResult = new PrescriptionResult(
+                prescriptionId, "RX000001", UUID.randomUUID(), UUID.randomUUID(), "VISIT-001",
+                UUID.randomUUID(), "PAT-001", "Nguyen Van A", PrescriptionStatus.CANCELLED,
+                "Clinical note", "Bệnh nhân đổi phác đồ điều trị", UUID.randomUUID(), "Dr. B",
+                NOW, UUID.randomUUID(), NOW.plusSeconds(300), List.of(), List.of()
+        );
+
+        when(cancelPrescriptionUseCase.cancel(any(CancelPrescriptionCommand.class))).thenReturn(cancelledResult);
+
+        String requestBody = """
+                {
+                  "cancelReason": "Bệnh nhân đổi phác đồ điều trị"
+                }
+                """;
+
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(prescriptionId.toString()))
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.cancelReason").value("Bệnh nhân đổi phác đồ điều trị"))
+                .andExpect(jsonPath("$.note").value("Clinical note"));
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/cancel - 400 when cancel reason is missing or blank (TC-02, QTN-27)")
+    void cancel_returns400WhenMissingReason() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+
+        // Empty json
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        // Blank cancelReason
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cancelReason\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(cancelPrescriptionUseCase, never()).cancel(any(CancelPrescriptionCommand.class));
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/cancel - 409 when prescription already dispensed (TC-03, QTN-27)")
+    void cancel_returns409WhenAlreadyDispensed() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(cancelPrescriptionUseCase.cancel(any(CancelPrescriptionCommand.class)))
+                .thenThrow(new PrescriptionAlreadyDispensedException());
+
+        String requestBody = """
+                {
+                  "cancelReason": "Bệnh nhân muốn đổi thuốc"
+                }
+                """;
+
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/cancel - 404 when prescription not found")
+    void cancel_returns404WhenNotFound() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(cancelPrescriptionUseCase.cancel(any(CancelPrescriptionCommand.class)))
+                .thenThrow(new PrescriptionNotFoundException(prescriptionId));
+
+        String requestBody = """
+                {
+                  "cancelReason": "Lý do hủy"
+                }
+                """;
+
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/cancel - 403 when unauthorized doctor attempts cancellation (P3-02, TC-04)")
+    void cancel_returns403WhenUnauthorizedDoctor() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(cancelPrescriptionUseCase.cancel(any(CancelPrescriptionCommand.class)))
+                .thenThrow(new com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionCancellationException());
+
+        String requestBody = """
+                {
+                  "cancelReason": "Lý do hủy"
+                }
+                """;
+
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED_PRESCRIPTION_CANCELLATION"));
     }
 }
 

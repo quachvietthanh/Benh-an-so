@@ -42,6 +42,7 @@ public class PrescriptionResultMapper {
                 displayContext.patientName(),
                 prescription.getStatus(),
                 prescription.getNote(),
+                prescription.getCancelReason(),
                 prescription.getPrescribedBy(),
                 displayContext.doctorName(),
                 prescription.getPrescribedAt(),
