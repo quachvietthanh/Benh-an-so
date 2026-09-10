@@ -111,8 +111,26 @@ public class ExportAccessLogReportService implements ExportAccessLogReportUseCas
         if (value == null) {
             return "";
         }
-        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
+        String neutralized = neutralizeFormulaInjection(value);
+        if (neutralized.contains(",") || neutralized.contains("\"") || neutralized.contains("\n")) {
+            return "\"" + neutralized.replace("\"", "\"\"") + "\"";
+        }
+        return neutralized;
+    }
+
+    /**
+     * Neutralize spreadsheet formula injection (CSV injection, OWASP) for
+     * account-controlled text before it is written into a CSV cell.
+     * Leading {@code '} prevents spreadsheet applications from evaluating
+     * the value as a formula/command.
+     */
+    private String neutralizeFormulaInjection(String value) {
+        if (value.isEmpty()) {
+            return value;
+        }
+        char first = value.charAt(0);
+        if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t') {
+            return "'" + value;
         }
         return value;
     }

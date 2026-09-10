@@ -150,6 +150,63 @@ class ExportAccessLogReportServiceTest {
         assertEquals(expectedTo, toCaptor.getValue());
     }
 
+    @Test
+    void neutralizesEqualsPrefixInUsername() {
+        String csv = exportCsvFor("=cmd()", "Dr. A");
+        assertTrue(csv.contains("'=cmd(),Dr. A,1"),
+                "username starting with '=' must be neutralized with a leading apostrophe");
+    }
+
+    @Test
+    void neutralizesPlusPrefixInUsername() {
+        String csv = exportCsvFor("+cmd", "Dr. A");
+        assertTrue(csv.contains("'+cmd,Dr. A,1"),
+                "username starting with '+' must be neutralized with a leading apostrophe");
+    }
+
+    @Test
+    void neutralizesMinusPrefixInFullName() {
+        String csv = exportCsvFor("user1", "-cmd");
+        assertTrue(csv.contains("user1,'-cmd,1"),
+                "fullName starting with '-' must be neutralized with a leading apostrophe");
+    }
+
+    @Test
+    void neutralizesAtPrefixInFullName() {
+        String csv = exportCsvFor("user1", "@cmd");
+        assertTrue(csv.contains("user1,'@cmd,1"),
+                "fullName starting with '@' must be neutralized with a leading apostrophe");
+    }
+
+    @Test
+    void neutralizesTabPrefix() {
+        String csv = exportCsvFor("\t=cmd()", "Dr. A");
+        assertTrue(csv.contains("'\t=cmd(),Dr. A,1"),
+                "value starting with tab must be neutralized with a leading apostrophe");
+    }
+
+    @Test
+    void preservesCsvEscapingForCommaAndQuote() {
+        String commaCsv = exportCsvFor("a,b", "X");
+        assertTrue(commaCsv.contains("\"a,b\""), "comma must be quoted");
+
+        String quoteCsv = exportCsvFor("a\"b", "X");
+        assertTrue(quoteCsv.contains("\"a\"\"b\""), "quote must be quoted and doubled");
+    }
+
+    private String exportCsvFor(String username, String fullName) {
+        when(accessLogRepository.countAccessByAccountBetween(any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of(new AccessLogAccountCountResult(ACTOR_A, 1L)));
+        when(userRepository.findAllById(anyList()))
+                .thenReturn(List.of(user(ACTOR_A, username, fullName)));
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(ADMIN_ID);
+
+        AccessLogReportExportResult result = service.export(
+                LocalDate.parse("2026-09-01"), LocalDate.parse("2026-09-30"));
+        return new String(result.content(), StandardCharsets.UTF_8);
+    }
+
     private User user(UUID id, String username, String fullName) {
         return User.restore(id, username, "$2a$10$hash", fullName, username + "@benhsoan.com", null,
                 UUID.randomUUID(), true, null, Instant.parse("2026-01-01T00:00:00Z"));

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
@@ -24,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import com.benhsoan.config.SecurityConfig;
+import com.benhsoan.domain.reporting.exception.AccessLogReportDataEmptyException;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
@@ -113,5 +115,88 @@ class AccessLogReportSecurityIntegrationTest {
                 .andExpect(header().string("Content-Disposition",
                         "attachment; filename=\"access-log-report-2026-09-01-to-2026-09-30.csv\""))
                 .andExpect(MockMvcResultMatchers.content().bytes(csv));
+    }
+
+    @Test
+    void returnsUnprocessableEntityWhenNoAccessLogsInPeriod() throws Exception {
+        when(exportAccessLogReportUseCase.export(any(LocalDate.class), any(LocalDate.class)))
+                .thenThrow(new AccessLogReportDataEmptyException());
+
+        mockMvc.perform(get("/reports/access-log/export")
+                        .param("from", "2026-09-01")
+                        .param("to", "2026-09-30")
+                        .with(admin()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("REPORT_DATA_EMPTY"))
+                .andExpect(jsonPath("$.message")
+                        .value("No medical record access logs available for the selected period."))
+                .andExpect(header().doesNotExist("Content-Disposition"));
+    }
+
+    @Test
+    void rejectsInvalidDateRangeBeforeCallingUseCase() throws Exception {
+        mockMvc.perform(get("/reports/access-log/export")
+                        .param("from", "2026-09-30")
+                        .param("to", "2026-09-01")
+                        .with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+
+        verifyNoInteractions(exportAccessLogReportUseCase);
+    }
+
+    @Test
+    void rejectsMissingFromParameter() throws Exception {
+        mockMvc.perform(get("/reports/access-log/export")
+                        .param("to", "2026-09-30")
+                        .with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MISSING_PARAMETER"))
+                .andExpect(jsonPath("$.message").value("from is required."));
+    }
+
+    @Test
+    void rejectsMissingToParameter() throws Exception {
+        mockMvc.perform(get("/reports/access-log/export")
+                        .param("from", "2026-09-01")
+                        .with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MISSING_PARAMETER"))
+                .andExpect(jsonPath("$.message").value("to is required."));
+    }
+
+    @Test
+    void rejectsInvalidDateFormat() throws Exception {
+        mockMvc.perform(get("/reports/access-log/export")
+                        .param("from", "2026/09/01")
+                        .param("to", "2026-09-30")
+                        .with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be in yyyy-MM-dd format."));
+    }
+
+    @Test
+    void rejectsRangeExceeding366Days() throws Exception {
+        mockMvc.perform(get("/reports/access-log/export")
+                        .param("from", "2025-01-01")
+                        .param("to", "2026-01-02")
+                        .with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
+    }
+
+    @Test
+    void rejectsUnauthenticatedRequest() throws Exception {
+        mockMvc.perform(get("/reports/access-log/export")
+                        .param("from", "2026-09-01")
+                        .param("to", "2026-09-30"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(exportAccessLogReportUseCase);
+    }
+
+    private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.UserRequestPostProcessor admin() {
+        return user("admin").authorities(
+                new SimpleGrantedAuthority("PERMISSION_ACCESS_LOG_REPORT_EXPORT"));
     }
 }
