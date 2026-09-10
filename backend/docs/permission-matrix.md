@@ -72,6 +72,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `GET /system/clinic`; `PUT /system/clinic` | `NEW: CLINIC_CONFIGURATION_READ` / `NEW: CLINIC_CONFIGURATION_UPDATE` | Cấu hình hợp lệ, audit actor | New catalog |
 | `POST /backups`; `GET /backups`, `/{id}`, `/{id}/download`; `POST /backups/{id}/restore` | `NEW: BACKUP_CREATE` / `NEW: BACKUP_READ` / `NEW: BACKUP_RESTORE` | Giữ backup integrity/restore lock và audit; `BackupAuthorizer` phải thay role policy riêng | New catalog + service context |
 | `GET /security-alerts` → `SecurityAlertController.getSecurityAlerts` | `SECURITY_ALERT_VIEW` | ADMIN-only (seeded); paginated response enriched with username/fullName | Implemented — NCL-15 / QTN-25 (V37) |
+| `GET /reports/access-log/export` → `AccessLogReportController.export` | `ACCESS_LOG_REPORT_EXPORT` | ADMIN-only (seeded); khoảng ngày hợp lệ, tối đa 366 ngày; tổng hợp lượt truy cập bệnh án theo tài khoản | Implemented — NCL-15-CN-004 (V43) |
 
 ## Quy tắc thực hiện Giai đoạn C
 

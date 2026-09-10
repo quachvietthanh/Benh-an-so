@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Table, Tag, Button, Popconfirm, Space, Typography, message } from 'antd'
-import { LockOutlined, UnlockOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons'
+import { Table, Tag, Button, Popconfirm, Space, Typography, message, Dropdown, Modal } from 'antd'
+import { LockOutlined, UnlockOutlined, ReloadOutlined, KeyOutlined, MoreOutlined } from '@ant-design/icons'
 import userApi from '../api/userApi'
 import { formatDateTime } from '../utils/helpers'
 import { useAuthContext } from '../context/AuthContext'
@@ -32,7 +32,25 @@ function UserList() {
         page,
         size: pageSize,
       })
-      setUsers(response.data.content)
+      const content = response.data.content || []
+      const storedOverrides = (() => {
+        try {
+          return JSON.parse(localStorage.getItem('admin_user_status_overrides') || '{}')
+        } catch {
+          return {}
+        }
+      })()
+      const mapped = content.map((u) => {
+        const isActive = u.active !== undefined
+          ? u.active
+          : (storedOverrides[u.id] !== undefined ? storedOverrides[u.id] : true)
+        return {
+          ...u,
+          active: isActive,
+          locked: !isActive,
+        }
+      })
+      setUsers(mapped)
       setTotal(response.data.totalElements)
     } catch (error) {
       console.error('Failed to fetch users:', error)
@@ -49,13 +67,26 @@ function UserList() {
   const handleToggleLock = async (user, locked) => {
     try {
       const action = locked ? 'khóa' : 'mở khóa'
-      await userApi.updateStatus(user.id, locked)
+      if (locked) {
+        await userApi.deactivateUser(user.id)
+      } else {
+        await userApi.activateUser(user.id)
+      }
+      try {
+        const stored = JSON.parse(localStorage.getItem('admin_user_status_overrides') || '{}')
+        stored[user.id] = !locked
+        localStorage.setItem('admin_user_status_overrides', JSON.stringify(stored))
+      } catch {
+        // ignore localStorage error
+      }
       message.success(`Đã ${action} tài khoản "${user.username}" thành công`)
-      fetchUsers()
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, active: !locked, locked } : u))
+      )
     } catch (error) {
       console.error('Failed to update user status:', error)
       const errMsg =
-        error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại'
+        error.response?.data?.message || error.apiError?.message || 'Có lỗi xảy ra, vui lòng thử lại'
       message.error(errMsg)
     }
   }
@@ -90,13 +121,10 @@ function UserList() {
       key: 'status',
       width: 130,
       render: (_, record) => {
-        if (record.locked) {
-          return <Tag color="red">Bị khóa</Tag>
+        if (record.locked || record.active === false) {
+          return <Tag color="red">Đã khóa</Tag>
         }
-        if (record.active) {
-          return <Tag color="green">Hoạt động</Tag>
-        }
-        return <Tag color="orange">Vô hiệu hóa</Tag>
+        return <Tag color="green">Đang hoạt động</Tag>
       },
     },
     {
@@ -110,50 +138,79 @@ function UserList() {
       title: 'Thao tác',
       key: 'actions',
       width: 130,
+      render: (_, record) => {
         const isSelf = String(record.id) === String(currentUser?.id) || record.username === currentUser?.username
+        const isLocked = Boolean(record.locked || record.active === false)
+
+        const actionMenuItems = []
+
+        if (canResetPassword && !isSelf) {
+          actionMenuItems.push({
+            key: 'reset-password',
+            icon: <KeyOutlined />,
+            label: 'Đặt lại mật khẩu',
+            onClick: () => {
+              setResetTargetUser(record)
+              setResetModalOpen(true)
+            },
+          })
+          actionMenuItems.push({
+            type: 'divider',
+          })
+        }
+
+        actionMenuItems.push({
+          key: 'toggle-lock',
+          danger: !isLocked,
+          icon: isLocked ? <UnlockOutlined /> : <LockOutlined />,
+          disabled: isSelf,
+          onClick: () => {
+            if (isSelf) return
+            Modal.confirm({
+              title: isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản',
+              content: `Bạn có chắc chắn muốn ${isLocked ? 'mở khóa' : 'khóa'} tài khoản "${record.username}" không?`,
+              okText: isLocked ? 'Mở khóa' : 'Khóa',
+              okType: isLocked ? 'primary' : 'danger',
+              cancelText: 'Hủy',
+              onOk: () => handleToggleLock(record, !isLocked),
+            })
+          },
+          label: (
+            <Popconfirm
+              title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+              description={`Bạn có chắc chắn muốn ${isLocked ? 'mở khóa' : 'khóa'} tài khoản "${record.username}" không?`}
+              onConfirm={(e) => {
+                e?.stopPropagation?.()
+                handleToggleLock(record, !isLocked)
+              }}
+              okText={isLocked ? 'Mở khóa' : 'Khóa'}
+              cancelText="Hủy"
+              okButtonProps={{ type: isLocked ? 'primary' : undefined, danger: !isLocked }}
+              disabled={isSelf}
+            >
+              <span
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: 'inline-block', width: '100%' }}
+                title={isSelf ? 'Không thể tự khóa tài khoản của chính mình' : undefined}
+              >
+                {isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+              </span>
+            </Popconfirm>
+          ),
+        })
 
         return (
-          <Space size={6}>
-            {canResetPassword && !isSelf && (
-              <Button
-                icon={<KeyOutlined />}
-                size="small"
-                onClick={() => {
-                  setResetTargetUser(record)
-                  setResetModalOpen(true)
-                }}
-              >
-                Đặt lại MK
-              </Button>
-            )}
-            {record.locked ? (
-              <Popconfirm
-                title="Mở khóa tài khoản"
-                description={`Bạn có chắc chắn muốn mở khóa tài khoản "${record.username}" không?`}
-                onConfirm={() => handleToggleLock(record, false)}
-                okText="Mở khóa"
-                cancelText="Hủy"
-                okButtonProps={{ type: 'primary' }}
-              >
-                <Button type="primary" icon={<UnlockOutlined />} size="small">
-                  Mở khóa
-                </Button>
-              </Popconfirm>
-            ) : (
-              <Popconfirm
-                title="Khóa tài khoản"
-                description={`Bạn có chắc chắn muốn khóa tài khoản "${record.username}" không?`}
-                onConfirm={() => handleToggleLock(record, true)}
-                okText="Khóa"
-                cancelText="Hủy"
-                okButtonProps={{ danger: true }}
-              >
-                <Button danger icon={<LockOutlined />} size="small">
-                  Khóa
-                </Button>
-              </Popconfirm>
-            )}
-          </Space>
+          <Dropdown
+            trigger={['click']}
+            menu={{ items: actionMenuItems }}
+            placement="bottomRight"
+          >
+            <Button
+              icon={<MoreOutlined />}
+              size="small"
+              title="Thao tác"
+            />
+          </Dropdown>
         )
       },
     },

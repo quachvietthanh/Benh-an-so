@@ -232,6 +232,17 @@
   transform: translateY(-1px);
 }
 
+.portal-login-btn:disabled,
+.portal-login-btn[disabled] {
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
 .portal-login-footer {
   margin-top: 24px;
   padding-top: 18px;
