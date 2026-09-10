@@ -1,10 +1,9 @@
 package com.benhsoan.port.inbound.prescription;
 
-import java.util.UUID;
-
+import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 
 public interface CancelPrescriptionUseCase {
 
-    PrescriptionResult cancel(UUID prescriptionId);
+    PrescriptionResult cancel(CancelPrescriptionCommand command);
 }

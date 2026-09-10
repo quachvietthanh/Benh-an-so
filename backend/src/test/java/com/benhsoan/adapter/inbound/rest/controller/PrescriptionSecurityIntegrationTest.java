@@ -7,6 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -39,6 +43,9 @@ import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
 import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
 import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
 import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
+import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
+import com.benhsoan.port.dto.result.PrescriptionResult;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -316,6 +323,41 @@ class PrescriptionSecurityIntegrationTest {
         mockMvc.perform(post("/prescriptions/check-allergy-warnings")
                         .with(user("admin").authorities(
                                 new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/cancel requires PRESCRIPTION_UPDATE permission (QTN-27, TC-04)")
+    void cancelPrescriptionRequiresPrescriptionUpdatePermission() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(cancelPrescriptionUseCase.cancel(any(CancelPrescriptionCommand.class)))
+                .thenReturn(new PrescriptionResult(
+                        prescriptionId, "RX000001", UUID.randomUUID(), UUID.randomUUID(), "VISIT-001",
+                        UUID.randomUUID(), "PAT-001", "Nguyen Van A", PrescriptionStatus.CANCELLED,
+                        "Note", "Patient cancelled", UUID.randomUUID(), "Dr. A", Instant.now(), null, null,
+                        List.of(), List.of()
+                ));
+
+        String body = """
+                {
+                  "cancelReason": "Bệnh nhân đổi phương án điều trị"
+                }
+                """;
+
+        // User having PRESCRIPTION_UPDATE is allowed
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .with(user("doctor").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        // Pharmacist/User having only PRESCRIPTION_READ is rejected with 403 Forbidden (TC-04)
+        mockMvc.perform(post("/prescriptions/{id}/cancel", prescriptionId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isForbidden());

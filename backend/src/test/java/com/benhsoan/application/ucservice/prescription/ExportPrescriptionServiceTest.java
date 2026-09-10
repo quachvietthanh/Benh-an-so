@@ -151,7 +151,7 @@ class ExportPrescriptionServiceTest {
                         "500 mg", "tablet", "1 tablet", 1, AdministrationRoute.ORAL, 1, 1, null, Instant.now()
                 ))
         );
-        prescription.cancel(UUID.randomUUID(), Instant.now());
+        prescription.cancel("Đã hủy đơn thuốc", UUID.randomUUID(), Instant.now());
         when(prescriptionRepository.findById(prescriptionId)).thenReturn(java.util.Optional.of(prescription));
         CurrentUserPort currentUserPort = Mockito.mock(CurrentUserPort.class);
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);

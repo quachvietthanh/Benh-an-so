@@ -52,6 +52,7 @@ final class DomainExceptionHttpStatusMapper {
                     PATIENT_INACTIVE,
                     UNAUTHORIZED_APPOINTMENT_OPERATION,
                     UNAUTHORIZED_PRESCRIPTION_AMENDMENT,
+                    UNAUTHORIZED_PRESCRIPTION_CANCELLATION,
                     UNAUTHORIZED_QUEUE_OPERATION,
                     VISIT_ENCOUNTER_ACCESS_DENIED -> HttpStatus.FORBIDDEN;
             case INVALID_CREDENTIALS,

@@ -31,6 +31,8 @@ public record PrescriptionResponse(
 
         String note,
 
+        String cancelReason,
+
         UUID prescribedBy,
 
         String doctorName,
