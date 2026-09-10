@@ -6,10 +6,83 @@ const MEDICINES_KEY = 'app_medicines'
 const BATCHES_KEY = 'app_batches'
 const INVOICES_KEY = 'app_invoices'
 const AUDIT_LOGS_KEY = 'app_audit_logs'
+const ALLERGY_WARNING_LOGS_KEY = 'app_allergy_warning_logs'
 
 export const demoBatches = []
 export const demoInvoices = []
 export const demoAuditLogs = []
+
+export const DEFAULT_ALLERGY_WARNING_LOGS = [
+  {
+    id: 'demo-allergy-log-1',
+    prescriptionId: 'presc-demo-1',
+    prescriptionCode: 'DT-20260909-001',
+    doctorId: '11000000-0000-0000-0000-000000000002',
+    doctorName: 'BS. Lê Văn Bác Sĩ (doctor1)',
+    patientId: '10000000-0000-0000-0000-000000000011',
+    patientName: 'pham van hoang',
+    medicineId: '16000000-0000-0000-0000-000000000003',
+    medicineName: 'Amoxicillin 500 mg',
+    activeIngredient: 'Amoxicillin',
+    allergenName: 'Penicillin / Amoxicillin',
+    severity: 'SEVERE',
+    overrideReason: 'Đã hội chẩn chuyên khoa dị ứng, sử dụng phác đồ giải mẫn cảm dưới sự giám sát chặt chẽ tại buồng cấp cứu.',
+    handledAt: '2026-09-09T08:30:00.000Z',
+  },
+  {
+    id: 'demo-allergy-log-2',
+    prescriptionId: 'presc-demo-2',
+    prescriptionCode: 'DT-20260908-005',
+    doctorId: '11000000-0000-0000-0000-000000000002',
+    doctorName: 'BS. Lê Văn Bác Sĩ (doctor1)',
+    patientId: '10000000-0000-0000-0000-000000000002',
+    patientName: 'Trần Thị Mai',
+    medicineId: '16000000-0000-0000-0000-000000000002',
+    medicineName: 'Ibuprofen 400 mg',
+    activeIngredient: 'Ibuprofen',
+    allergenName: 'Aspirin / NSAID',
+    severity: 'MODERATE',
+    overrideReason: 'Bệnh nhân có tiền sử mày đay nhẹ với Aspirin cách đây 5 năm; thử test dung nạp tốt, theo dõi sát tại chỗ.',
+    handledAt: '2026-09-08T14:15:00.000Z',
+  },
+]
+
+export const getStoredAllergyWarningLogs = () => {
+  try {
+    const raw = localStorage.getItem(ALLERGY_WARNING_LOGS_KEY)
+    if (!raw) {
+      localStorage.setItem(ALLERGY_WARNING_LOGS_KEY, JSON.stringify(DEFAULT_ALLERGY_WARNING_LOGS))
+      return DEFAULT_ALLERGY_WARNING_LOGS
+    }
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_ALLERGY_WARNING_LOGS
+  } catch {
+    return DEFAULT_ALLERGY_WARNING_LOGS
+  }
+}
+
+export const saveStoredAllergyWarningLogs = (newLogs = []) => {
+  try {
+    const current = getStoredAllergyWarningLogs()
+    const incoming = Array.isArray(newLogs) ? newLogs : [newLogs]
+    const map = new Map()
+    incoming.forEach((log) => {
+      const key = log.id || `${log.prescriptionId}_${log.medicineId}_${log.allergenName || log.allergyId}`
+      map.set(key, log)
+    })
+    current.forEach((log) => {
+      const key = log.id || `${log.prescriptionId}_${log.medicineId}_${log.allergenName || log.allergyId}`
+      if (!map.has(key)) {
+        map.set(key, log)
+      }
+    })
+    const updated = Array.from(map.values())
+    localStorage.setItem(ALLERGY_WARNING_LOGS_KEY, JSON.stringify(updated))
+    return updated
+  } catch {
+    return []
+  }
+}
 
 export const QUEUES_KEY = 'app_queues'
 

@@ -253,4 +253,35 @@ class PatientRescheduleAppointmentServiceTest {
                         new PatientRescheduleAppointmentCommand(NEW_DATE, NEW_TIME, "Đổi lịch")));
         assertEquals("Bác sĩ không làm việc trong khung giờ này.", ex.getMessage());
     }
+
+    @Test
+    void rejectsRescheduleWhenDayIsDeactivatedInWeeklySchedule() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        Appointment appointment = Appointment.restore(appointmentId, "AP000400", patientId, doctorId,
+                OLD_START, OLD_END, AppointmentStatus.SCHEDULED, "Khám tổng quát",
+                null, null, null, actorId, Instant.parse("2026-08-01T00:00:00Z"));
+
+        User doctor = User.restore(doctorId, "doctor1", "hash", "Doctor One", "doctor1@example.com",
+                "0900000001", roleId, true, null, Instant.parse("2026-08-01T00:00:00Z"));
+
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
+        when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId)).thenReturn(mock(Patient.class));
+        when(clockPort.now()).thenReturn(NOW);
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
+
+        com.benhsoan.domain.appointment.DoctorWeeklySchedule weeklyDisabled = com.benhsoan.domain.appointment.DoctorWeeklySchedule.create(
+                doctorId, NEW_DATE.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(17, 0), NOW);
+        weeklyDisabled.update(LocalTime.of(8, 0), LocalTime.of(17, 0), false, NOW);
+        when(doctorWeeklyScheduleRepository.findByDoctorIdAndDayOfWeek(doctorId, NEW_DATE.getDayOfWeek()))
+                .thenReturn(Optional.of(weeklyDisabled));
+
+        assertThrows(com.benhsoan.domain.appointment.exception.DoctorUnavailableException.class,
+                () -> service.reschedule(appointmentId,
+                        new PatientRescheduleAppointmentCommand(NEW_DATE, NEW_TIME, "Đổi lịch")));
+    }
 }

@@ -141,23 +141,38 @@ public class PatientRescheduleAppointmentService implements PatientRescheduleApp
         LocalTime scheduleStartTime;
         LocalTime scheduleEndTime;
 
-        java.util.Optional<DoctorSchedule> dateScheduleOpt = doctorScheduleRepository
-                .findByDoctorIdAndScheduleDateForUpdate(doctorId, command.newAppointmentDate());
-        if (dateScheduleOpt.isPresent()) {
+        java.util.Optional<com.benhsoan.domain.appointment.DoctorWeeklySchedule> weeklyOpt = doctorWeeklyScheduleRepository
+                .findByDoctorIdAndDayOfWeek(doctorId, command.newAppointmentDate().getDayOfWeek());
+        if (weeklyOpt.isPresent()) {
+            com.benhsoan.domain.appointment.DoctorWeeklySchedule weekly = weeklyOpt.get();
+            if (!weekly.isActive()) {
+                throw new DoctorUnavailableException(doctorId, command.newAppointmentDate());
+            }
+            java.util.Optional<DoctorSchedule> dateScheduleOpt = doctorScheduleRepository
+                    .findByDoctorIdAndScheduleDateForUpdate(doctorId, command.newAppointmentDate());
+            if (dateScheduleOpt.isPresent()) {
+                DoctorSchedule schedule = dateScheduleOpt.get();
+                if (!schedule.isActive()) {
+                    throw new DoctorUnavailableException(doctorId, command.newAppointmentDate());
+                }
+                scheduleStartTime = schedule.getStartTime();
+                scheduleEndTime = schedule.getEndTime();
+            } else {
+                scheduleStartTime = weekly.getStartTime();
+                scheduleEndTime = weekly.getEndTime();
+            }
+        } else {
+            java.util.Optional<DoctorSchedule> dateScheduleOpt = doctorScheduleRepository
+                    .findByDoctorIdAndScheduleDateForUpdate(doctorId, command.newAppointmentDate());
+            if (dateScheduleOpt.isEmpty()) {
+                throw new DoctorScheduleNotFoundException(doctorId, command.newAppointmentDate());
+            }
             DoctorSchedule schedule = dateScheduleOpt.get();
             if (!schedule.isActive()) {
                 throw new DoctorUnavailableException(doctorId, command.newAppointmentDate());
             }
             scheduleStartTime = schedule.getStartTime();
             scheduleEndTime = schedule.getEndTime();
-        } else {
-            java.util.Optional<com.benhsoan.domain.appointment.DoctorWeeklySchedule> weeklyOpt = doctorWeeklyScheduleRepository
-                    .findByDoctorIdAndDayOfWeek(doctorId, command.newAppointmentDate().getDayOfWeek());
-            if (weeklyOpt.isEmpty() || !weeklyOpt.get().isActive()) {
-                throw new DoctorScheduleNotFoundException(doctorId, command.newAppointmentDate());
-            }
-            scheduleStartTime = weeklyOpt.get().getStartTime();
-            scheduleEndTime = weeklyOpt.get().getEndTime();
         }
 
         LocalTime slotEndTime = command.newStartTime().plus(SLOT_DURATION);

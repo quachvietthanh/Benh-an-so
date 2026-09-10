@@ -26,7 +26,9 @@ function ServiceCreateModal({
   form,
   loading,
   formError,
+  formErrorDescription,
   onClearError,
+  canSubmit = true,
 }) {
   const handleValuesChange = (changedValues) => {
     if (onClearError) onClearError()
@@ -35,6 +37,14 @@ function ServiceCreateModal({
       form.setFields([{ name: changedField, errors: [] }])
     }
   }
+
+  const computedDescription =
+    formErrorDescription ||
+    (formError?.includes('không có quyền')
+      ? 'Chỉ tài khoản Quản trị viên (Admin) hoặc Quản lý phòng khám (Manager) mới có quyền tạo dịch vụ mới.'
+      : formError?.includes('Không tìm thấy')
+        ? 'Đường dẫn dịch vụ không tồn tại (Lỗi 404). Vui lòng kiểm tra lại cấu hình hệ thống.'
+        : undefined)
 
   return (
     <Modal
@@ -68,12 +78,23 @@ function ServiceCreateModal({
         onFinish={onFinish}
         onValuesChange={handleValuesChange}
       >
+        {!canSubmit && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Chế độ chỉ xem"
+            description="Tài khoản hiện tại chỉ có quyền xem danh mục. Thao tác tạo dịch vụ bị khóa do thiếu quyền SERVICE_CATALOG_CREATE."
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         {formError && (
           <Alert
             className="service-modal-alert"
             type="error"
             showIcon
-            message={formError}
+            message={<span style={{ fontWeight: 600 }}>{formError}</span>}
+            description={computedDescription}
             closable
             onClose={onClearError}
             style={{ marginBottom: 16 }}
@@ -183,6 +204,7 @@ function ServiceCreateModal({
             type="primary"
             htmlType="submit"
             loading={loading}
+            disabled={loading || !canSubmit}
             style={{ background: '#2563eb' }}
           >
             Lưu dịch vụ

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +43,7 @@ import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.clinic.ClinicConfigurationRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -57,6 +59,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private RoleRepository roleRepository;
     @Mock private ClinicConfigurationRepository clinicConfigurationRepository;
+    @Mock private AppointmentRepository appointmentRepository;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private ClockPort clockPort;
@@ -71,6 +74,7 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
                 userRepository,
                 roleRepository,
                 clinicConfigurationRepository,
+                appointmentRepository,
                 currentUserPort,
                 auditLogRepository,
                 clockPort,
@@ -248,5 +252,54 @@ class ConfigureDoctorWeeklyScheduleServiceTest {
                 .filter(r -> r.dayOfWeek() == DayOfWeek.SUNDAY)
                 .findFirst().orElseThrow();
         assertEquals(false, sundayResult.active());
+    }
+
+    @Test
+    void detectsAffectedAppointmentsWhenDisablingDayOrRestrictingHoursAndAudits() throws Exception {
+        when(userRepository.findByIdForUpdate(DOCTOR_ID)).thenReturn(Optional.of(createDoctorUser(true, DOCTOR_ROLE_ID)));
+        when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(createDoctorRole()));
+        when(clinicConfigurationRepository.find()).thenReturn(Optional.of(createClinicConfig()));
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
+        when(weeklyScheduleRepository.findByDoctorId(DOCTOR_ID)).thenReturn(List.of());
+        when(weeklyScheduleRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Cuộc hẹn 1: Rơi vào Thứ 7 (bác sĩ không làm việc vào Thứ 7 trong cấu hình mới)
+        Instant saturdayStart = Instant.parse("2026-08-29T02:00:00Z"); // Saturday 09:00 UTC+7
+        Instant saturdayEnd = Instant.parse("2026-08-29T02:30:00Z");
+        com.benhsoan.domain.appointment.Appointment apptSaturday = com.benhsoan.domain.appointment.Appointment.restore(
+                UUID.randomUUID(), "APT-SAT", UUID.randomUUID(), DOCTOR_ID,
+                saturdayStart, saturdayEnd, com.benhsoan.domain.appointment.enums.AppointmentStatus.SCHEDULED,
+                "Khám T7", null, null, null, ACTOR_ID, NOW
+        );
+
+        // Cuộc hẹn 2: Rơi vào Thứ 2 nhưng 14:00 - 14:30 (ngoài giờ sáng 08:00 - 12:00)
+        Instant mondayAfternoonStart = Instant.parse("2026-08-31T07:00:00Z"); // Monday 14:00 UTC+7
+        Instant mondayAfternoonEnd = Instant.parse("2026-08-31T07:30:00Z");
+        com.benhsoan.domain.appointment.Appointment apptMondayAfternoon = com.benhsoan.domain.appointment.Appointment.restore(
+                UUID.randomUUID(), "APT-MON-PM", UUID.randomUUID(), DOCTOR_ID,
+                mondayAfternoonStart, mondayAfternoonEnd, com.benhsoan.domain.appointment.enums.AppointmentStatus.SCHEDULED,
+                "Khám T2 chiều", null, null, null, ACTOR_ID, NOW
+        );
+
+        when(appointmentRepository.findActiveAppointmentsForDoctorBetween(eq(DOCTOR_ID), any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of(apptSaturday, apptMondayAfternoon));
+
+        ConfigureDoctorWeeklyScheduleCommand command = new ConfigureDoctorWeeklyScheduleCommand(
+                DOCTOR_ID,
+                List.of(
+                        new WeeklyScheduleItem(DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(12, 0), true)
+                )
+        );
+
+        service.configureWeeklySchedule(command);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(audit.getDetail());
+
+        assertEquals(2, node.get("affectedAppointmentsCount").asInt());
+        assertEquals(2, node.get("affectedAppointments").size());
     }
 }

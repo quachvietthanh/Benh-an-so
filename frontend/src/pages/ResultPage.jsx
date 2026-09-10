@@ -8,7 +8,6 @@ import {
   Button,
   Typography,
   Space,
-  message,
 } from 'antd'
 import {
   FileDoneOutlined,
@@ -284,7 +283,6 @@ export function ResultPage() {
     } catch (err) {
       console.error('Error loading clinical results from API:', err)
       setOrders([])
-      message.error(`Không thể tải kết quả cận lâm sàng: ${apiErrorMessage(err)}`)
     } finally {
       setLoading(false)
     }

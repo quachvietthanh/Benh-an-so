@@ -42,8 +42,11 @@ import dayjs from 'dayjs'
 import doctorScheduleApi from '../api/doctorScheduleApi.js'
 import userApi from '../api/userApi.js'
 import systemApi from '../api/systemApi.js'
+import appointmentApi from '../api/appointmentApi.js'
 import {
   DAYS_OF_WEEK,
+  cleanDoctorScheduleErrorMessage,
+  detectAffectedAppointments,
   formatDuration,
   formatTimeOffStatus,
   getDayLabel,
@@ -52,6 +55,7 @@ import {
   normalizeTimeDisplay,
   toBackendTime,
 } from '../utils/doctorScheduleHelpers.js'
+import { getApiErrorMessage } from '../utils/apiError.js'
 import { useAuthContext } from '../context/AuthContext.jsx'
 import AffectedAppointmentsModal from '../components/doctor-schedule/AffectedAppointmentsModal.jsx'
 import RegisterTimeOffModal from '../components/doctor-schedule/RegisterTimeOffModal.jsx'
@@ -207,7 +211,7 @@ function DoctorScheduleManagementPage() {
       setWeeklySchedules(fullWeek)
     } catch (err) {
       if (err.response?.status === 403) {
-        message.error('Bạn không có quyền xem hoặc tải lịch làm việc của bác sĩ này (403 Forbidden).')
+        message.error('Bạn không có quyền xem hoặc tải lịch làm việc của bác sĩ này.')
       }
       setHasExistingSchedule(false)
       setWeeklySchedules(DAYS_OF_WEEK.map((d) => ({
@@ -233,7 +237,7 @@ function DoctorScheduleManagementPage() {
       setTimeOffs(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
       if (err.response?.status === 403) {
-        message.error('Bạn không có quyền xem danh sách khoảng nghỉ của bác sĩ này (403 Forbidden).')
+        message.error('Bạn không có quyền xem danh sách khoảng nghỉ của bác sĩ này.')
       }
       setTimeOffs([])
     } finally {
@@ -337,7 +341,7 @@ function DoctorScheduleManagementPage() {
   const handleSaveWeeklySchedule = async () => {
     if (!selectedDoctorId) return
     if (!canUpdateWeeklySchedule) {
-      message.error('Bạn không có quyền cấu hình lịch làm việc (403 Forbidden).')
+      message.error('Bạn không có quyền cấu hình lịch làm việc.')
       return
     }
 
@@ -367,19 +371,41 @@ function DoctorScheduleManagementPage() {
       }
 
       await doctorScheduleApi.configureWeeklySchedule(selectedDoctorId, payload)
-      message.success('Cập nhật lịch làm việc định kỳ thành công!')
       setIsDirty(false)
       setHasExistingSchedule(true)
       fetchWeeklySchedule(selectedDoctorId)
+
+      // Kiểm tra các lịch hẹn tương lai bị ảnh hưởng bởi lịch làm việc mới (đồng bộ với backend QTN-31)
+      try {
+        const aptRes = await appointmentApi.getAll({
+          doctorId: selectedDoctorId,
+          startDate: dayjs().toISOString(),
+          endDate: dayjs().add(180, 'day').toISOString(),
+          size: 100,
+        })
+        const list = Array.isArray(aptRes?.data?.content)
+          ? aptRes.data.content
+          : (Array.isArray(aptRes?.data) ? aptRes.data : [])
+        const affected = detectAffectedAppointments(list, weeklySchedules)
+        if (affected.length > 0) {
+          setActiveAffectedTimeOffRange('Cấu hình lịch làm việc tuần mới')
+          setActiveAffectedAppointments(affected)
+          setAffectedModalOpen(true)
+          message.warning(`Đã lưu lịch làm việc tuần. Phát hiện ${affected.length} lịch hẹn bị ảnh hưởng cần điều phối lại.`)
+        } else {
+          message.success('Cập nhật lịch làm việc định kỳ thành công!')
+        }
+      } catch {
+        message.success('Cập nhật lịch làm việc định kỳ thành công!')
+      }
     } catch (err) {
       if (err.response?.status === 403) {
-        message.error('Bạn không có quyền cấu hình lịch làm việc cho bác sĩ này (403 Forbidden).')
+        message.error('Bạn không có quyền cấu hình lịch làm việc cho bác sĩ này.')
         return
       }
-      const apiMsg =
-        err.response?.data?.message ||
-        err.apiError?.message ||
-        'Không thể lưu lịch làm việc. Vui lòng kiểm tra lại ràng buộc giờ phòng khám.'
+      const apiMsg = cleanDoctorScheduleErrorMessage(
+        getApiErrorMessage(err, 'Không thể lưu lịch làm việc. Vui lòng kiểm tra lại ràng buộc giờ phòng khám.')
+      )
       message.error(apiMsg)
     } finally {
       setSavingWeekly(false)
@@ -390,7 +416,7 @@ function DoctorScheduleManagementPage() {
   const handleCancelTimeOff = async (timeOffId) => {
     if (!selectedDoctorId || !timeOffId) return
     if (!canCancelTimeOff) {
-      message.error('Bạn không có quyền hủy khoảng nghỉ này (403 Forbidden).')
+      message.error('Bạn không có quyền hủy khoảng nghỉ này.')
       return
     }
     setCancellingId(timeOffId)
@@ -400,10 +426,12 @@ function DoctorScheduleManagementPage() {
       fetchTimeOffs(selectedDoctorId)
     } catch (err) {
       if (err.response?.status === 403) {
-        message.error('Bạn không có quyền hủy khoảng nghỉ của bác sĩ này (403 Forbidden).')
+        message.error('Bạn không có quyền hủy khoảng nghỉ của bác sĩ này.')
         return
       }
-      const apiMsg = err.response?.data?.message || err.apiError?.message || 'Không thể hủy khoảng nghỉ.'
+      const apiMsg = cleanDoctorScheduleErrorMessage(
+        getApiErrorMessage(err, 'Không thể hủy khoảng nghỉ.')
+      )
       message.error(apiMsg)
     } finally {
       setCancellingId(null)

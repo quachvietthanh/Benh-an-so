@@ -135,3 +135,61 @@ export const formatTimeOffStatus = (status) => {
       return { label: status || 'Chưa xác định', color: 'default' }
   }
 }
+
+/**
+ * Removes technical error codes, HTTP status prefixes, and parenthesized error tags
+ * (e.g. "409 - ", "(403 Forbidden)", "[403]", "(400)") so doctor schedule notifications
+ * display clean, user-friendly Vietnamese text without technical codes.
+ */
+export const cleanDoctorScheduleErrorMessage = (msg) => {
+  if (!msg || typeof msg !== 'string') return ''
+  return msg
+    .replace(/\s*\(\d{3}(?:\s+[A-Za-z]+)?\)/gi, '') // removes '(403 Forbidden)', '(403)'
+    .replace(/^\[?\d{3}\]?\s*[-:]\s*/, '') // removes '409 - ', '[403]: ', '400 - '
+    .replace(/\s*\(?(?:ERR_[A-Z_]+|[A-Z_]{3,}_[A-Z_]+)\)?/g, '') // removes raw error enums
+    .trim()
+}
+
+/**
+ * Detects which upcoming appointments are affected by a doctor's weekly schedule configuration.
+ * An appointment is affected if:
+ * 1. It is active (SCHEDULED or CONFIRMED)
+ * 2. It falls on a day of week where doctor is NOT active, OR
+ * 3. Its appointment time range falls outside the doctor's working hours on that day.
+ */
+export const detectAffectedAppointments = (appointments = [], weeklySchedules = []) => {
+  if (!Array.isArray(appointments) || !Array.isArray(weeklySchedules)) return []
+
+  const activeDaysMap = new Map()
+  weeklySchedules.forEach((s) => {
+    if (s.active) {
+      activeDaysMap.set(s.dayOfWeek, {
+        start: toBackendTime(s.startTime),
+        end: toBackendTime(s.endTime),
+      })
+    }
+  })
+
+  const daysEnum = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
+
+  return appointments.filter((apt) => {
+    if (!['SCHEDULED', 'CONFIRMED'].includes(apt.status)) return false
+
+    const startDayjs = dayjs(apt.startTime)
+    if (!startDayjs.isValid()) return false
+
+    const dayKey = daysEnum[startDayjs.day()]
+    const schedule = activeDaysMap.get(dayKey)
+
+    // Doctor is not working on this day of week in the new weekly schedule
+    if (!schedule) return true
+
+    const apptStart = startDayjs.format('HH:mm:ss')
+    const apptEnd = dayjs(apt.endTime).format('HH:mm:ss')
+
+    // Appointment starts before working hours or ends after working hours
+    return apptStart < schedule.start || apptEnd > schedule.end
+  })
+}
+
+

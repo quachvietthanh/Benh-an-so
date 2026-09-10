@@ -30,9 +30,11 @@ function ServiceEditModal({
   form,
   loading,
   formError,
+  formErrorDescription,
   onClearError,
   editingService,
   priceHistory = [],
+  canSubmit = true,
 }) {
   const [priceChanged, setPriceChanged] = useState(false)
 
@@ -89,6 +91,14 @@ function ServiceEditModal({
 
   const suggestedDateStr = suggestNextEffectiveDate(priceHistory)
 
+  const computedDescription =
+    formErrorDescription ||
+    (formError?.includes('không có quyền')
+      ? 'Chỉ tài khoản Quản trị viên (Admin) hoặc Quản lý phòng khám (Manager) mới có quyền cập nhật thông tin và điều chỉnh giá dịch vụ.'
+      : formError?.includes('Không tìm thấy')
+        ? 'Dịch vụ không tồn tại trên hệ thống hoặc đã bị xóa (Lỗi 404). Vui lòng đóng modal và tải lại danh sách dịch vụ.'
+        : undefined)
+
   return (
     <Modal
       className="service-form-modal"
@@ -121,6 +131,16 @@ function ServiceEditModal({
         onFinish={onFinish}
         onValuesChange={handleValuesChange}
       >
+        {!canSubmit && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Chế độ chỉ xem"
+            description="Tài khoản hiện tại chỉ có quyền xem thông tin. Thao tác lưu thay đổi bị khóa do thiếu quyền SERVICE_CATALOG_UPDATE."
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         {formError && (
           <Alert
             className="service-modal-alert"
@@ -128,7 +148,7 @@ function ServiceEditModal({
             showIcon
             message={
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div>{formError}</div>
+                <div style={{ fontWeight: 600 }}>{formError}</div>
                 {(formError.includes('ngày hiệu lực') || formError.includes('mức giá')) && (
                   <div>
                     <Button
@@ -143,6 +163,7 @@ function ServiceEditModal({
                 )}
               </div>
             }
+            description={computedDescription}
             closable
             onClose={onClearError}
             style={{ marginBottom: 16 }}
@@ -277,6 +298,7 @@ function ServiceEditModal({
             type="primary"
             htmlType="submit"
             loading={loading}
+            disabled={loading || !canSubmit}
             style={{ background: '#2563eb' }}
           >
             Lưu thay đổi

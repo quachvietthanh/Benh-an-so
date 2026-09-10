@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const pharmacyApi = {
   medicines: (params) => axiosClient.get('/medicines', { params: { size: 200, ...params } }),
@@ -6,6 +6,9 @@ const pharmacyApi = {
   getByMedicalRecord: (medicalRecordId) => axiosClient.get(`/prescriptions/medical-records/${medicalRecordId}`),
   getById: (id) => axiosClient.get(`/prescriptions/${id}`),
   checkInteractions: (drugIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds }),
+  checkAllergyWarnings: (medicalRecordId, medicineIds) =>
+    axiosClient.post('/prescriptions/check-allergy-warnings', { medicalRecordId, medicineIds }),
+  getAllergyWarningLogs: (params) => axiosClient.get('/prescriptions/allergy-warning-logs', { params }),
   createPrescription: (data) => axiosClient.post('/prescriptions', data),
   updatePrescription: (id, data) => axiosClient.patch(`/prescriptions/${id}`, data),
   cancelPrescription: (id) => axiosClient.post(`/prescriptions/${id}/cancel`),

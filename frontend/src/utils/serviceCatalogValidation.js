@@ -369,11 +369,13 @@ export function extractServiceFormErrors(error) {
 
   const apiError = normalizeApiError(error)
   let generalMessage = ''
+  let generalDescription = ''
   const fieldErrorsMap = {}
 
   if (apiError.code === 'ACCESS_DENIED' || apiError.status === 403) {
     return {
       errorMessage: 'Bạn không có quyền thực hiện thao tác này.',
+      description: 'Thao tác tạo hoặc chỉnh sửa danh mục dịch vụ kỹ thuật yêu cầu tài khoản Quản trị viên (Admin) hoặc Quản lý phòng khám (Manager).',
       fieldErrors: [],
     }
   }
@@ -381,6 +383,7 @@ export function extractServiceFormErrors(error) {
   if (apiError.code === 'AUTHENTICATION_FAILED' || apiError.status === 401) {
     return {
       errorMessage: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      description: 'Vui lòng đăng nhập lại để làm mới phiên làm việc và tiếp tục thao tác.',
       fieldErrors: [],
     }
   }
@@ -388,6 +391,7 @@ export function extractServiceFormErrors(error) {
   if (apiError.code === 'RESOURCE_NOT_FOUND' || apiError.status === 404) {
     return {
       errorMessage: 'Không tìm thấy thông tin dịch vụ trong hệ thống.',
+      description: 'Dịch vụ không tồn tại trên hệ thống hoặc đã bị xóa (Lỗi 404). Vui lòng tải lại danh sách dịch vụ.',
       fieldErrors: [],
     }
   }
@@ -416,12 +420,15 @@ export function extractServiceFormErrors(error) {
   if (rootMsg && !isGenericValidation) {
     if ((rootMsg.includes('Mã dịch vụ') || rootMsg.toLowerCase().includes('service code')) && !fieldErrorsMap.serviceCode) {
       fieldErrorsMap.serviceCode = rootMsg
+      generalDescription = 'Vui lòng kiểm tra lại mã dịch vụ hoặc đặt một mã khác để phân biệt.'
     }
     if ((rootMsg.includes('Tên dịch vụ') || rootMsg.toLowerCase().includes('service name')) && !fieldErrorsMap.name) {
       fieldErrorsMap.name = rootMsg
+      generalDescription = 'Vui lòng đặt tên phân biệt với các dịch vụ kỹ thuật hiện có.'
     }
     if ((rootMsg.includes('mức giá') || rootMsg.includes('ngày hiệu lực') || rootMsg.toLowerCase().includes('effective date')) && !fieldErrorsMap.effectiveFrom) {
       fieldErrorsMap.effectiveFrom = rootMsg
+      generalDescription = 'Vui lòng chọn ngày hiệu lực khác hoặc nhấn nút Gợi ý ngày áp dụng.'
     }
     if ((rootMsg.includes('Đơn giá') || rootMsg.toLowerCase().includes('service price')) && !rootMsg.includes('ngày hiệu lực') && !fieldErrorsMap.price) {
       fieldErrorsMap.price = rootMsg
@@ -441,6 +448,7 @@ export function extractServiceFormErrors(error) {
 
   return {
     errorMessage: generalMessage,
+    description: generalDescription,
     fieldErrors,
   }
 }

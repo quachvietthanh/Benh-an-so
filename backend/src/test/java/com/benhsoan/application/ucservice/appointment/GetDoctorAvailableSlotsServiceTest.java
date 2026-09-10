@@ -174,4 +174,20 @@ class GetDoctorAvailableSlotsServiceTest {
                 // 09:30 - 10:00: available
                 assertTrue(slots.get(3).isAvailable());
         }
+
+        @Test
+        void returnsEmptyWhenDayIsDeactivatedInWeeklySchedule() {
+                Instant now = Instant.parse("2026-08-26T02:00:00Z");
+                DoctorWeeklySchedule weeklyDisabled = DoctorWeeklySchedule.create(
+                                DOCTOR_ID, DATE.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(12, 0), now);
+                weeklyDisabled.update(LocalTime.of(8, 0), LocalTime.of(12, 0), false, now);
+
+                when(weeklyScheduleRepository.findByDoctorIdAndDayOfWeek(DOCTOR_ID, DATE.getDayOfWeek()))
+                                .thenReturn(Optional.of(weeklyDisabled));
+
+                List<DoctorAvailableSlotResult> slots = service.getAvailableSlots(
+                                new GetDoctorAvailableSlotsQuery(DOCTOR_ID, DATE));
+
+                assertTrue(slots.isEmpty());
+        }
 }

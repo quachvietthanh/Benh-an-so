@@ -1,8 +1,13 @@
 package com.benhsoan.application.ucservice.appointment;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +18,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.DoctorWeeklySchedule;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
 import com.benhsoan.domain.appointment.exception.DoctorNotFoundException;
@@ -29,6 +35,7 @@ import com.benhsoan.port.dto.command.appointment.ConfigureDoctorWeeklyScheduleCo
 import com.benhsoan.port.dto.command.appointment.WeeklyScheduleItem;
 import com.benhsoan.port.dto.result.appointment.DoctorWeeklyScheduleResult;
 import com.benhsoan.port.inbound.appointment.ConfigureDoctorWeeklyScheduleUseCase;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.repository.appointment.DoctorWeeklyScheduleRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
@@ -40,16 +47,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class ConfigureDoctorWeeklyScheduleService implements ConfigureDoctorWeeklyScheduleUseCase {
 
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final DoctorWeeklyScheduleRepository weeklyScheduleRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final ClinicConfigurationRepository clinicConfigurationRepository;
+    private final AppointmentRepository appointmentRepository;
     private final CurrentUserPort currentUserPort;
     private final AuditLogRepository auditLogRepository;
     private final ClockPort clockPort;
@@ -136,6 +148,53 @@ public class ConfigureDoctorWeeklyScheduleService implements ConfigureDoctorWeek
 
         List<DoctorWeeklySchedule> saved = weeklyScheduleRepository.saveAll(toSave);
 
+        // Scan future active appointments affected by schedule changes
+        Instant horizon = now.plus(Duration.ofDays(180));
+        List<Appointment> futureAppointments = appointmentRepository.findActiveAppointmentsForDoctorBetween(
+                command.doctorId(), now, horizon);
+
+        Map<DayOfWeek, DoctorWeeklySchedule> activeMap = new HashMap<>();
+        for (DoctorWeeklySchedule s : saved) {
+            if (s.isActive()) {
+                activeMap.put(s.getDayOfWeek(), s);
+            }
+        }
+
+        List<Map<String, Object>> affectedList = new ArrayList<>();
+        for (Appointment appt : futureAppointments) {
+            ZonedDateTime startZoned = appt.getStartTime().atZone(CLINIC_ZONE);
+            ZonedDateTime endZoned = appt.getEndTime().atZone(CLINIC_ZONE);
+            DayOfWeek day = startZoned.getDayOfWeek();
+            DoctorWeeklySchedule schedule = activeMap.get(day);
+
+            boolean isAffected = false;
+            if (schedule == null) {
+                // Doctor no longer works on this day
+                isAffected = true;
+            } else {
+                LocalTime apptStart = startZoned.toLocalTime();
+                LocalTime apptEnd = endZoned.toLocalTime();
+                if (apptStart.isBefore(schedule.getStartTime()) || apptEnd.isAfter(schedule.getEndTime())) {
+                    isAffected = true;
+                }
+            }
+
+            if (isAffected) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("appointmentId", appt.getId().toString());
+                item.put("appointmentCode", appt.getAppointmentCode());
+                item.put("patientId", appt.getPatientId().toString());
+                item.put("startTime", appt.getStartTime().toString());
+                item.put("endTime", appt.getEndTime().toString());
+                affectedList.add(item);
+            }
+        }
+
+        if (!affectedList.isEmpty()) {
+            log.warn("Cấu hình lịch tuần của bác sĩ {} làm ảnh hưởng {} cuộc hẹn tương lai.",
+                    command.doctorId(), affectedList.size());
+        }
+
         // Audit log (QTN-31)
         UUID currentUserId = currentUserPort.getCurrentUserId();
         auditLogRepository.save(AuditLog.create(
@@ -143,7 +202,7 @@ public class ConfigureDoctorWeeklyScheduleService implements ConfigureDoctorWeek
                 ActionType.UPDATE,
                 ResourceType.DOCTOR_SCHEDULE,
                 command.doctorId(),
-                buildAuditDetail(command.doctorId(), saved, now),
+                buildAuditDetail(command.doctorId(), saved, affectedList, now),
                 null,
                 now
         ));
@@ -161,11 +220,20 @@ public class ConfigureDoctorWeeklyScheduleService implements ConfigureDoctorWeek
         }
     }
 
-    private String buildAuditDetail(UUID doctorId, List<DoctorWeeklySchedule> schedules, Instant now) {
+    private String buildAuditDetail(
+            UUID doctorId,
+            List<DoctorWeeklySchedule> schedules,
+            List<Map<String, Object>> affectedAppointments,
+            Instant now
+    ) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("doctorId", doctorId.toString());
         detail.put("updatedAt", now.toString());
         detail.put("scheduleCount", schedules.size());
+        detail.put("affectedAppointmentsCount", affectedAppointments.size());
+        if (!affectedAppointments.isEmpty()) {
+            detail.put("affectedAppointments", affectedAppointments);
+        }
         try {
             return objectMapper.writeValueAsString(detail);
         } catch (JsonProcessingException e) {

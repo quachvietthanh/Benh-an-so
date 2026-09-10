@@ -321,4 +321,29 @@ class PatientBookAppointmentServiceTest {
         assertEquals("AP-12345", result.appointmentCode());
         verify(appointmentRepository).save(any(Appointment.class));
     }
+
+    @Test
+    void rejectsBookingWhenDayIsDeactivatedInWeeklySchedule() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID doctorRoleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        Patient patient = mock(Patient.class);
+        when(patient.getId()).thenReturn(patientId);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
+        when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(doctorRole(doctorRoleId)));
+
+        DoctorWeeklySchedule weeklySchedule = DoctorWeeklySchedule.create(
+                doctorId, FUTURE_DATE.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(12, 0), NOW);
+        weeklySchedule.update(LocalTime.of(8, 0), LocalTime.of(12, 0), false, NOW);
+        when(doctorWeeklyScheduleRepository.findByDoctorIdAndDayOfWeek(doctorId, FUTURE_DATE.getDayOfWeek()))
+                .thenReturn(Optional.of(weeklySchedule));
+
+        assertThrows(DoctorUnavailableException.class,
+                () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, "Khám bệnh")));
+    }
 }
