@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -21,6 +20,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.RoomRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.queue.CreateRoomRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateRoomRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.RoomResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.queue.SearchRoomsQuery;
 import com.benhsoan.port.inbound.queue.ActivateRoomUseCase;
 import com.benhsoan.port.inbound.queue.CreateRoomUseCase;
@@ -47,7 +47,7 @@ public class RoomController {
     private final RoomRestMapper mapper;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("ROOM_READ")
     public Page<RoomResponse> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "true") Boolean active,
@@ -58,32 +58,32 @@ public class RoomController {
     }
 
     @GetMapping("/{roomId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST')")
+    @RequirePermission("ROOM_READ")
     public RoomResponse getById(@PathVariable UUID roomId) {
         return mapper.toResponse(getRoomUseCase.getById(roomId));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("ROOM_CREATE")
     public RoomResponse create(@Valid @RequestBody CreateRoomRequest request) {
         return mapper.toResponse(createRoomUseCase.create(mapper.toCommand(request)));
     }
 
     @PutMapping("/{roomId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("ROOM_UPDATE")
     public RoomResponse update(@PathVariable UUID roomId, @Valid @RequestBody UpdateRoomRequest request) {
         return mapper.toResponse(updateRoomUseCase.update(mapper.toCommand(roomId, request)));
     }
 
     @PatchMapping("/{roomId}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("ROOM_UPDATE")
     public RoomResponse activate(@PathVariable UUID roomId) {
         return mapper.toResponse(activateRoomUseCase.activate(roomId));
     }
 
     @PatchMapping("/{roomId}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequirePermission("ROOM_UPDATE")
     public RoomResponse deactivate(@PathVariable UUID roomId) {
         return mapper.toResponse(deactivateRoomUseCase.deactivate(roomId));
     }
