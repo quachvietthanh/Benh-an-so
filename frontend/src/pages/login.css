@@ -93,9 +93,18 @@
   font-weight: 600;
 }
 
-.bsa2-form .ant-btn-primary:hover {
+.bsa2-form .ant-btn-primary:hover:not(:disabled) {
   background: #0f3138 !important;
   border-color: #0f3138 !important;
+}
+
+.bsa2-form .ant-btn-primary:disabled,
+.bsa2-form .ant-btn-primary[disabled] {
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
 }
 
 .bsa2-patient-divider {
