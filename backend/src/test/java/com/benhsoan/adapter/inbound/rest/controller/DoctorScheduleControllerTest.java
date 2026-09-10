@@ -41,6 +41,8 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.port.dto.result.appointment.AffectedAppointmentResult;
 import com.benhsoan.port.dto.result.appointment.DoctorTimeOffResult;
 import com.benhsoan.port.dto.result.appointment.DoctorWeeklyScheduleResult;
 import com.benhsoan.port.inbound.appointment.CancelDoctorTimeOffUseCase;
@@ -173,10 +175,16 @@ class DoctorScheduleControllerTest {
 
     @Test
     void getsTimeOffsWithPermission() throws Exception {
+        UUID apptId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
         when(getDoctorTimeOffsUseCase.getTimeOffs(DOCTOR_ID)).thenReturn(List.of(
                 new DoctorTimeOffResult(
                         TIME_OFF_ID, DOCTOR_ID, START_TIME, END_TIME, "Nghi phep",
-                        TimeOffStatus.ACTIVE, UUID.randomUUID(), Instant.now(), List.of()
+                        TimeOffStatus.ACTIVE, UUID.randomUUID(), Instant.now(),
+                        List.of(new AffectedAppointmentResult(
+                                apptId, "APT000001", patientId, START_TIME, START_TIME.plusSeconds(1800),
+                                AppointmentStatus.SCHEDULED, "Tai kham"
+                        ))
                 )
         ));
 
@@ -184,7 +192,9 @@ class DoctorScheduleControllerTest {
                         .with(withPermissions("DOCTOR_TIMEOFF_READ")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(TIME_OFF_ID.toString()))
-                .andExpect(jsonPath("$[0].status").value("ACTIVE"));
+                .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$[0].affectedAppointments[0].id").value(apptId.toString()))
+                .andExpect(jsonPath("$[0].affectedAppointments[0].appointmentCode").value("APT000001"));
     }
 
     @Test

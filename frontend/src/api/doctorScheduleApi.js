@@ -51,7 +51,10 @@ const doctorScheduleApi = {
       const res = await axiosClient.get(`/system/doctors/${doctorId}/schedules/weekly`)
       return res
     } catch (err) {
-      if (err.response?.status === 404 || err.response?.status === 403 || !err.response) {
+      if (err.response?.status === 403) {
+        throw err
+      }
+      if (err.response?.status === 404 || !err.response) {
         const local = getLocalWeekly(doctorId)
         return { data: local || [], isFallback: true, errorStatus: err.response?.status }
       }
@@ -69,7 +72,10 @@ const doctorScheduleApi = {
       saveLocalWeekly(doctorId, data.schedules)
       return res
     } catch (err) {
-      if (err.response?.status === 404 || err.response?.status === 403 || !err.response) {
+      if (err.response?.status === 403) {
+        throw err
+      }
+      if (err.response?.status === 404 || !err.response) {
         saveLocalWeekly(doctorId, data.schedules)
         return { data: data.schedules, isFallback: true, errorStatus: err.response?.status }
       }
@@ -86,7 +92,10 @@ const doctorScheduleApi = {
       const res = await axiosClient.get(`/system/doctors/${doctorId}/time-offs`)
       return res
     } catch (err) {
-      if (err.response?.status === 404 || err.response?.status === 403 || !err.response) {
+      if (err.response?.status === 403) {
+        throw err
+      }
+      if (err.response?.status === 404 || !err.response) {
         const local = getLocalTimeOffs(doctorId)
         return { data: local || [], isFallback: true, errorStatus: err.response?.status }
       }
@@ -103,7 +112,10 @@ const doctorScheduleApi = {
       const res = await axiosClient.post(`/system/doctors/${doctorId}/time-offs`, data)
       return res
     } catch (err) {
-      if (err.response?.status === 404 || err.response?.status === 403 || !err.response) {
+      if (err.response?.status === 403) {
+        throw err
+      }
+      if (err.response?.status === 404 || !err.response) {
         const currentList = getLocalTimeOffs(doctorId)
         const newTimeOff = {
           id: 'to-' + Date.now(),
@@ -113,17 +125,7 @@ const doctorScheduleApi = {
           reason: data.reason,
           status: 'ACTIVE',
           createdAt: new Date().toISOString(),
-          affectedAppointments: [
-            {
-              id: 'apt-sim-' + Date.now(),
-              appointmentCode: 'APT-' + Math.floor(100000 + Math.random() * 900000),
-              patientId: 'd0000000-0000-0000-0000-000000000001',
-              startTime: data.startTime,
-              endTime: data.endTime,
-              status: 'CONFIRMED',
-              reason: 'Khám chuyên khoa định kỳ',
-            },
-          ],
+          affectedAppointments: [],
         }
         const updated = [newTimeOff, ...currentList]
         saveLocalTimeOffs(doctorId, updated)
@@ -142,7 +144,10 @@ const doctorScheduleApi = {
       const res = await axiosClient.patch(`/system/doctors/${doctorId}/time-offs/${timeOffId}/cancel`)
       return res
     } catch (err) {
-      if (err.response?.status === 404 || err.response?.status === 403 || !err.response) {
+      if (err.response?.status === 403) {
+        throw err
+      }
+      if (err.response?.status === 404 || !err.response) {
         const currentList = getLocalTimeOffs(doctorId)
         const updated = currentList.map((t) =>
           t.id === timeOffId ? { ...t, status: 'CANCELLED' } : t

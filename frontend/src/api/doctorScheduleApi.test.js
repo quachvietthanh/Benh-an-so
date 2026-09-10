@@ -160,3 +160,57 @@ test('doctorScheduleApi calls PATCH /system/doctors/{doctorId}/time-offs/{timeOf
     axiosClient.patch = originalPatch
   }
 })
+
+test('doctorScheduleApi rethrows 403 Forbidden and does NOT swallow it into fallback (Blocker 1)', async () => {
+  const doctorId = '11111111-1111-1111-1111-111111111111'
+  const timeOffId = 'to-99'
+  const forbiddenError = new Error('Request failed with status code 403')
+  forbiddenError.response = { status: 403, data: { message: 'Forbidden: Access Denied' } }
+
+  const originalGet = axiosClient.get
+  const originalPut = axiosClient.put
+  const originalPost = axiosClient.post
+  const originalPatch = axiosClient.patch
+
+  axiosClient.get = async () => { throw forbiddenError }
+  axiosClient.put = async () => { throw forbiddenError }
+  axiosClient.post = async () => { throw forbiddenError }
+  axiosClient.patch = async () => { throw forbiddenError }
+
+  try {
+    // 1. getWeeklySchedule
+    await assert.rejects(
+      async () => await doctorScheduleApi.getWeeklySchedule(doctorId),
+      (err) => err.response?.status === 403
+    )
+
+    // 2. configureWeeklySchedule
+    await assert.rejects(
+      async () => await doctorScheduleApi.configureWeeklySchedule(doctorId, { schedules: [] }),
+      (err) => err.response?.status === 403
+    )
+
+    // 3. getTimeOffs
+    await assert.rejects(
+      async () => await doctorScheduleApi.getTimeOffs(doctorId),
+      (err) => err.response?.status === 403
+    )
+
+    // 4. registerTimeOff
+    await assert.rejects(
+      async () => await doctorScheduleApi.registerTimeOff(doctorId, { startTime: '2026-09-10T08:00:00Z', endTime: '2026-09-10T12:00:00Z' }),
+      (err) => err.response?.status === 403
+    )
+
+    // 5. cancelTimeOff
+    await assert.rejects(
+      async () => await doctorScheduleApi.cancelTimeOff(doctorId, timeOffId),
+      (err) => err.response?.status === 403
+    )
+  } finally {
+    axiosClient.get = originalGet
+    axiosClient.put = originalPut
+    axiosClient.post = originalPost
+    axiosClient.patch = originalPatch
+  }
+})

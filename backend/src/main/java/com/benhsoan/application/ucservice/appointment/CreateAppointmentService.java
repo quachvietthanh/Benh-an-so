@@ -1,6 +1,5 @@
 package com.benhsoan.application.ucservice.appointment;
 
-import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -34,127 +33,112 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class CreateAppointmentService
-        implements CreateAppointmentUseCase {
+                implements CreateAppointmentUseCase {
 
-    private final AppointmentRepository appointmentRepository;
+        private final AppointmentRepository appointmentRepository;
 
-    private final PatientRepository patientRepository;
+        private final PatientRepository patientRepository;
 
-    private final UserRepository userRepository;
+        private final UserRepository userRepository;
 
-    private final AppointmentCodeGenerator appointmentCodeGenerator;
+        private final AppointmentCodeGenerator appointmentCodeGenerator;
 
-    private final CurrentUserPort currentUserPort;
+        private final CurrentUserPort currentUserPort;
 
-    private final AppointmentResultMapper appointmentResultMapper;
+        private final AppointmentResultMapper appointmentResultMapper;
 
-    private final AuditLogRepository auditLogRepository;
+        private final AuditLogRepository auditLogRepository;
 
-    private final DoctorScheduleValidator doctorScheduleValidator;
+        private final DoctorScheduleValidator doctorScheduleValidator;
 
-    private final ClockPort clockPort;
+        private final ClockPort clockPort;
 
-    @Override
-    public AppointmentResult create(
-            CreateAppointmentCommand command
-    ) {
+        @Override
+        public AppointmentResult create(
+                        CreateAppointmentCommand command) {
 
-        validate(command);
+                validate(command);
 
-        UUID currentUserId =
-                currentUserPort.getCurrentUserId();
+                UUID currentUserId = currentUserPort.getCurrentUserId();
 
-        String appointmentCode =
-                appointmentCodeGenerator.generate();
+                String appointmentCode = appointmentCodeGenerator.generate();
 
-        Appointment appointment =
-                Appointment.create(
-                        appointmentCode,
-                        command.patientId(),
-                        command.doctorId(),
-                        command.startTime(),
-                        command.endTime(),
-                        command.reason(),
-                        currentUserId
-                );
+                Appointment appointment = Appointment.create(
+                                appointmentCode,
+                                command.patientId(),
+                                command.doctorId(),
+                                command.startTime(),
+                                command.endTime(),
+                                command.reason(),
+                                currentUserId);
 
-        Appointment saved = appointmentRepository.save(appointment);
+                Appointment saved = appointmentRepository.save(appointment);
 
-        auditLogRepository.save(
-                AuditLog.create(
-                        currentUserId,
-                        ActionType.CREATE,
-                        ResourceType.APPOINTMENT,
-                        saved.getId(),
-                        """
-                        {
-                        "appointmentCode":"%s",
-                        "patientId":"%s",
-                        "doctorId":"%s",
-                        "startTime":"%s",
-                        "endTime":"%s"
-                        }
-                        """.formatted(
-                                saved.getAppointmentCode(),
-                                saved.getPatientId(),
-                                saved.getDoctorId(),
-                                saved.getStartTime(),
-                                saved.getEndTime()
-                        ),
-                        null
-                )
-        );
+                auditLogRepository.save(
+                                AuditLog.create(
+                                                currentUserId,
+                                                ActionType.CREATE,
+                                                ResourceType.APPOINTMENT,
+                                                saved.getId(),
+                                                """
+                                                                {
+                                                                "appointmentCode":"%s",
+                                                                "patientId":"%s",
+                                                                "doctorId":"%s",
+                                                                "startTime":"%s",
+                                                                "endTime":"%s"
+                                                                }
+                                                                """.formatted(
+                                                                saved.getAppointmentCode(),
+                                                                saved.getPatientId(),
+                                                                saved.getDoctorId(),
+                                                                saved.getStartTime(),
+                                                                saved.getEndTime()),
+                                                null));
 
-        return appointmentResultMapper.toResult(saved);
-    }
-
-    private void validate(
-            CreateAppointmentCommand command
-    ) {
-
-        patientRepository.findById(command.patientId())
-                .orElseThrow(() ->
-                        new PatientNotFoundException(command.patientId()));
-
-        User doctor =
-                userRepository.findByIdForUpdate(command.doctorId())
-                        .orElseThrow(() ->
-                                new DoctorNotFoundException(
-                                        command.doctorId()));
-
-        if (!doctor.isActive()) {
-            throw new DoctorInactiveException(
-                    doctor.getId()
-            );
+                return appointmentResultMapper.toResult(saved);
         }
 
-        if (!currentUserPort.hasRole("ADMIN")
-                && !currentUserPort.hasRole("RECEPTIONIST")) {
-            throw new UnauthorizedAppointmentOperationException();
-        }
+        private void validate(
+                        CreateAppointmentCommand command) {
 
-        if (!command.endTime().isAfter(command.startTime())) {
-            throw new ValidationException("Appointment end time must be after start time.");
-        }
+                patientRepository.findById(command.patientId())
+                                .orElseThrow(() -> new PatientNotFoundException(command.patientId()));
 
-        if (command.startTime().isBefore(clockPort.now())) {
-            throw new ValidationException("Thời gian đặt lịch không được ở trong quá khứ.");
-        }
+                User doctor = userRepository.findByIdForUpdate(command.doctorId())
+                                .orElseThrow(() -> new DoctorNotFoundException(
+                                                command.doctorId()));
 
-        // QTN-30 / TC-02: Check doctor schedule and active time-off
-        doctorScheduleValidator.validateDoctorWorkingAndAvailable(
-                command.doctorId(),
-                command.startTime(),
-                command.endTime()
-        );
+                if (!doctor.isActive()) {
+                        throw new DoctorInactiveException(
+                                        doctor.getId());
+                }
 
-        if (appointmentRepository.existsActiveAppointmentConflict(
-            command.doctorId(),
-            command.startTime(),
-            command.endTime()
-        )) {
-            throw new AppointmentTimeConflictException();
+                if (!currentUserPort.hasRole("ADMIN")
+                                && !currentUserPort.hasRole("RECEPTIONIST")) {
+                        throw new UnauthorizedAppointmentOperationException();
+                }
+
+                if (!command.endTime().isAfter(command.startTime())) {
+                        throw new ValidationException("Appointment end time must be after start time.");
+                }
+
+                if (command.startTime().isBefore(clockPort.now())) {
+                        throw new ValidationException("Thời gian đặt lịch không được ở trong quá khứ.");
+                }
+
+                // QTN-30 / TC-02: Check doctor schedule and active time-off
+                doctorScheduleValidator.validateDoctorWorkingAndAvailable(
+                                command.doctorId(),
+                                command.startTime(),
+                                command.endTime());
+
+                if (appointmentRepository.existsActiveAppointmentConflict(
+                                command.doctorId(),
+                                command.startTime(),
+                                command.endTime())) {
+                        throw new AppointmentTimeConflictException();
+                }
         }
-    }
 
 }

@@ -12,9 +12,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.bind.annotation.RequestParam;
+
 import com.benhsoan.adapter.inbound.rest.mapper.UserRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.user.CreateUserRequest;
 import com.benhsoan.adapter.inbound.rest.request.user.UpdateUserRequest;
+import com.benhsoan.adapter.inbound.rest.response.user.LoginAuditLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.user.UserResponse;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.UserResult;
@@ -23,7 +29,9 @@ import com.benhsoan.port.inbound.user.CreateUserUseCase;
 import com.benhsoan.port.inbound.user.DeactivateUserUseCase;
 import com.benhsoan.port.inbound.user.GetAllUsersUseCase;
 import com.benhsoan.port.inbound.user.GetDoctorsUseCase;
+import com.benhsoan.port.inbound.user.GetLoginAuditLogsUseCase;
 import com.benhsoan.port.inbound.user.GetUserUseCase;
+import com.benhsoan.port.inbound.user.UnlockUserUseCase;
 import com.benhsoan.port.inbound.user.UpdateUserUseCase;
 
 import jakarta.validation.Valid;
@@ -42,6 +50,8 @@ public class UserController {
     private final ActivateUserUseCase activateUserUseCase;
     private final DeactivateUserUseCase deactivateUserUseCase;
     private final com.benhsoan.port.inbound.user.ResetPasswordUseCase resetPasswordUseCase;
+    private final UnlockUserUseCase unlockUserUseCase;
+    private final GetLoginAuditLogsUseCase getLoginAuditLogsUseCase;
 
     private final UserRestMapper userRestMapper;
 
@@ -131,5 +141,26 @@ public class UserController {
                         new com.benhsoan.port.dto.command.user.ResetPasswordCommand(id, customTempPassword));
 
         return userRestMapper.toResponse(result);
+    }
+
+    @PostMapping("/{id}/unlock")
+    @RequirePermission("USER_UPDATE")
+    public UserResponse unlock(
+            @PathVariable UUID id
+    ) {
+        return userRestMapper.toResponse(
+                unlockUserUseCase.unlockUser(id));
+    }
+
+    @GetMapping("/{id}/login-logs")
+    @RequirePermission("USER_READ")
+    public Page<LoginAuditLogResponse> getLoginAuditLogs(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+        return getLoginAuditLogsUseCase.getLoginAuditLogs(id, pageable)
+                .map(userRestMapper::toResponse);
     }
 }

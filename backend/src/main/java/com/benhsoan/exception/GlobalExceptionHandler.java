@@ -73,6 +73,12 @@ public class GlobalExceptionHandler {
         HttpStatus status = DomainExceptionHttpStatusMapper.statusFor(ex.getCode());
         long retryAfterSeconds = Math.max(0, ex.getRetryAfterSeconds());
 
+        Map<String, Object> details = new HashMap<>();
+        details.put("retryAfterSeconds", retryAfterSeconds);
+        if (ex.getBlockedUntil() != null) {
+            details.put("blockedUntil", ex.getBlockedUntil().toString());
+        }
+
         return ResponseEntity
                 .status(status)
                 .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
@@ -81,7 +87,7 @@ public class GlobalExceptionHandler {
                         ex.getCode().name(),
                         ex.getMessage(),
                         request.getRequestURI(),
-                        Map.of("retryAfterSeconds", retryAfterSeconds)));
+                        details));
     }
 
     @ExceptionHandler(PrescriptionInteractionConfirmationRequiredException.class)

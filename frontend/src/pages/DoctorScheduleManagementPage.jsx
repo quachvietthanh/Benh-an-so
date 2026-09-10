@@ -52,6 +52,7 @@ import {
   normalizeTimeDisplay,
   toBackendTime,
 } from '../utils/doctorScheduleHelpers.js'
+import { useAuthContext } from '../context/AuthContext.jsx'
 import AffectedAppointmentsModal from '../components/doctor-schedule/AffectedAppointmentsModal.jsx'
 import RegisterTimeOffModal from '../components/doctor-schedule/RegisterTimeOffModal.jsx'
 import './doctorScheduleManagement.css'
@@ -59,6 +60,8 @@ import './doctorScheduleManagement.css'
 const { Title, Text } = Typography
 
 function DoctorScheduleManagementPage() {
+  const { user } = useAuthContext()
+
   const [doctors, setDoctors] = useState([])
   const [selectedDoctorId, setSelectedDoctorId] = useState(null)
   const [doctorsLoading, setDoctorsLoading] = useState(false)
@@ -71,6 +74,7 @@ function DoctorScheduleManagementPage() {
   const [loadingWeekly, setLoadingWeekly] = useState(false)
   const [savingWeekly, setSavingWeekly] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
+  const [hasExistingSchedule, setHasExistingSchedule] = useState(true)
 
   // Tab 2: Time Offs
   const [timeOffs, setTimeOffs] = useState([])
@@ -124,6 +128,49 @@ function DoctorScheduleManagementPage() {
     return doctors.find((d) => String(d.id) === String(selectedDoctorId)) || null
   }, [doctors, selectedDoctorId])
 
+  // RBAC permissions based on logged-in user and selected doctor
+  const userRoles = useMemo(() => {
+    const raw = Array.isArray(user?.roles)
+      ? user.roles
+      : user?.role
+      ? [user.role]
+      : []
+    return raw.map((r) => String(r || '').toUpperCase().replace(/^ROLE_/, ''))
+  }, [user])
+
+  const userPermissions = useMemo(() => {
+    const raw = Array.isArray(user?.permissions) ? user.permissions : []
+    return raw.map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
+
+  const isAdminOrManager = useMemo(() => {
+    return (
+      userRoles.includes('ADMIN') ||
+      userRoles.includes('CLINIC_MANAGER') ||
+      userRoles.includes('MANAGER')
+    )
+  }, [userRoles])
+
+  const isSelfDoctor = useMemo(() => {
+    if (!user || !selectedDoctorId) return false
+    const matchId = user.id && String(user.id) === String(selectedDoctorId)
+    const matchDoctorId = user.doctorId && String(user.doctorId) === String(selectedDoctorId)
+    const matchUsername = user.username && currentDoctor?.username && user.username === currentDoctor.username
+    return Boolean(matchId || matchDoctorId || matchUsername)
+  }, [user, selectedDoctorId, currentDoctor])
+
+  const canUpdateWeeklySchedule = useMemo(() => {
+    return isAdminOrManager || isSelfDoctor || userPermissions.includes('DOCTOR_SCHEDULE_UPDATE')
+  }, [isAdminOrManager, isSelfDoctor, userPermissions])
+
+  const canCreateTimeOff = useMemo(() => {
+    return isAdminOrManager || isSelfDoctor || userPermissions.includes('DOCTOR_TIMEOFF_CREATE')
+  }, [isAdminOrManager, isSelfDoctor, userPermissions])
+
+  const canCancelTimeOff = useMemo(() => {
+    return isAdminOrManager || isSelfDoctor || userPermissions.includes('DOCTOR_TIMEOFF_CANCEL')
+  }, [isAdminOrManager, isSelfDoctor, userPermissions])
+
   // 2. Fetch Weekly Schedule when doctor changes
   const fetchWeeklySchedule = useCallback(async (doctorId) => {
     if (!doctorId) return
@@ -137,6 +184,7 @@ function DoctorScheduleManagementPage() {
         setIsFallbackActive(false)
       }
       const data = Array.isArray(res.data) ? res.data : []
+      setHasExistingSchedule(data.length > 0)
 
       // Build complete 7-day list
       const fullWeek = DAYS_OF_WEEK.map((d) => {
@@ -157,7 +205,11 @@ function DoctorScheduleManagementPage() {
         }
       })
       setWeeklySchedules(fullWeek)
-    } catch {
+    } catch (err) {
+      if (err.response?.status === 403) {
+        message.error('Bạn không có quyền xem hoặc tải lịch làm việc của bác sĩ này (403 Forbidden).')
+      }
+      setHasExistingSchedule(false)
       setWeeklySchedules(DAYS_OF_WEEK.map((d) => ({
         dayOfWeek: d.key,
         startTime: '08:00',
@@ -179,7 +231,10 @@ function DoctorScheduleManagementPage() {
         setIsFallbackActive(true)
       }
       setTimeOffs(Array.isArray(res.data) ? res.data : [])
-    } catch {
+    } catch (err) {
+      if (err.response?.status === 403) {
+        message.error('Bạn không có quyền xem danh sách khoảng nghỉ của bác sĩ này (403 Forbidden).')
+      }
       setTimeOffs([])
     } finally {
       setLoadingTimeOffs(false)
@@ -193,8 +248,30 @@ function DoctorScheduleManagementPage() {
     }
   }, [selectedDoctorId, fetchWeeklySchedule, fetchTimeOffs])
 
+  // Switch doctor with unsaved changes guard (Review Note 2)
+  const handleSelectDoctor = (newDoctorId) => {
+    if (newDoctorId === selectedDoctorId) return
+    if (isDirty) {
+      Modal.confirm({
+        title: 'Chưa lưu thay đổi lịch làm việc',
+        icon: <ExclamationCircleOutlined />,
+        content: 'Bạn có các thay đổi chưa lưu trên lịch làm việc của bác sĩ hiện tại. Nếu chuyển bác sĩ khác, các thay đổi chưa lưu sẽ bị mất. Bạn có chắc chắn muốn chuyển không?',
+        okText: 'Rời đi (Không lưu)',
+        cancelText: 'Ở lại tiếp tục sửa',
+        okButtonProps: { danger: true },
+        onOk: () => {
+          setIsDirty(false)
+          setSelectedDoctorId(newDoctorId)
+        },
+      })
+      return
+    }
+    setSelectedDoctorId(newDoctorId)
+  }
+
   // --- Handlers for Tab 1: Weekly Schedule ---
   const handleDayToggle = (dayOfWeek, active) => {
+    if (!canUpdateWeeklySchedule) return
     setWeeklySchedules((prev) =>
       prev.map((item) => (item.dayOfWeek === dayOfWeek ? { ...item, active } : item))
     )
@@ -202,6 +279,7 @@ function DoctorScheduleManagementPage() {
   }
 
   const handleTimeChange = (dayOfWeek, timeStrings) => {
+    if (!canUpdateWeeklySchedule) return
     if (!timeStrings || timeStrings.length < 2) return
     const [start, end] = timeStrings
     setWeeklySchedules((prev) =>
@@ -213,6 +291,7 @@ function DoctorScheduleManagementPage() {
   }
 
   const handleApplyPreset = (dayOfWeek, preset) => {
+    if (!canUpdateWeeklySchedule) return
     let start = '08:00'
     let end = '17:00'
     if (preset === 'morning') {
@@ -234,6 +313,7 @@ function DoctorScheduleManagementPage() {
   }
 
   const handleCopyMondayToWeekdays = () => {
+    if (!canUpdateWeeklySchedule) return
     const monday = weeklySchedules.find((d) => d.dayOfWeek === 'MONDAY')
     if (!monday) return
 
@@ -256,6 +336,10 @@ function DoctorScheduleManagementPage() {
 
   const handleSaveWeeklySchedule = async () => {
     if (!selectedDoctorId) return
+    if (!canUpdateWeeklySchedule) {
+      message.error('Bạn không có quyền cấu hình lịch làm việc (403 Forbidden).')
+      return
+    }
 
     // Validation
     const clinicOpen = clinicConfig?.openingTime || '07:30:00'
@@ -285,8 +369,13 @@ function DoctorScheduleManagementPage() {
       await doctorScheduleApi.configureWeeklySchedule(selectedDoctorId, payload)
       message.success('Cập nhật lịch làm việc định kỳ thành công!')
       setIsDirty(false)
+      setHasExistingSchedule(true)
       fetchWeeklySchedule(selectedDoctorId)
     } catch (err) {
+      if (err.response?.status === 403) {
+        message.error('Bạn không có quyền cấu hình lịch làm việc cho bác sĩ này (403 Forbidden).')
+        return
+      }
       const apiMsg =
         err.response?.data?.message ||
         err.apiError?.message ||
@@ -300,12 +389,20 @@ function DoctorScheduleManagementPage() {
   // --- Handlers for Tab 2: Time-Offs ---
   const handleCancelTimeOff = async (timeOffId) => {
     if (!selectedDoctorId || !timeOffId) return
+    if (!canCancelTimeOff) {
+      message.error('Bạn không có quyền hủy khoảng nghỉ này (403 Forbidden).')
+      return
+    }
     setCancellingId(timeOffId)
     try {
       await doctorScheduleApi.cancelTimeOff(selectedDoctorId, timeOffId)
       message.success('Hủy khoảng nghỉ thành công! Bác sĩ đã có thể nhận lịch trong khung giờ này.')
       fetchTimeOffs(selectedDoctorId)
     } catch (err) {
+      if (err.response?.status === 403) {
+        message.error('Bạn không có quyền hủy khoảng nghỉ của bác sĩ này (403 Forbidden).')
+        return
+      }
       const apiMsg = err.response?.data?.message || err.apiError?.message || 'Không thể hủy khoảng nghỉ.'
       message.error(apiMsg)
     } finally {
@@ -467,6 +564,17 @@ function DoctorScheduleManagementPage() {
         if (record.status === 'CANCELLED') {
           return <Text type="secondary">Đã hủy</Text>
         }
+        if (!canCancelTimeOff) {
+          return (
+            <Tooltip title="Bạn không có quyền hủy khoảng nghỉ này">
+              <span>
+                <Button danger size="small" icon={<DeleteOutlined />} disabled>
+                  Hủy nghỉ
+                </Button>
+              </span>
+            </Tooltip>
+          )
+        }
         return (
           <Popconfirm
             title="Hủy khoảng nghỉ này?"
@@ -501,19 +609,52 @@ function DoctorScheduleManagementPage() {
               <Title level={5} style={{ margin: 0 }}>Cấu hình các ngày làm việc trong tuần</Title>
             </div>
             <Space>
-              <Button icon={<CopyOutlined />} onClick={handleCopyMondayToWeekdays}>
-                Sao chép Thứ 2 cho T3 - T6
-              </Button>
-              <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                loading={savingWeekly}
-                onClick={handleSaveWeeklySchedule}
-              >
-                Lưu lịch làm việc tuần
-              </Button>
+              <Tooltip title={!canUpdateWeeklySchedule ? 'Bạn không có quyền cấu hình lịch làm việc' : ''}>
+                <span>
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={handleCopyMondayToWeekdays}
+                    disabled={!canUpdateWeeklySchedule}
+                  >
+                    Sao chép Thứ 2 cho T3 - T6
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title={!canUpdateWeeklySchedule ? 'Bạn không có quyền cấu hình lịch làm việc' : ''}>
+                <span>
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    loading={savingWeekly}
+                    disabled={!canUpdateWeeklySchedule}
+                    onClick={handleSaveWeeklySchedule}
+                  >
+                    Lưu lịch làm việc tuần
+                  </Button>
+                </span>
+              </Tooltip>
             </Space>
           </div>
+
+          {!hasExistingSchedule && !loadingWeekly && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Bác sĩ này chưa có lịch làm việc định kỳ trong hệ thống"
+              description="Hệ thống đang hiển thị khung giờ làm việc mẫu (Thứ 2 đến Thứ 7 từ 08:00 đến 17:00, Chủ Nhật nghỉ). Vui lòng điều chỉnh và bấm 'Lưu lịch làm việc tuần' để chính thức kích hoạt lịch cho bác sĩ."
+            />
+          )}
+
+          {!canUpdateWeeklySchedule && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Chế độ chỉ xem lịch làm việc"
+              description="Tài khoản của bạn không có quyền thay đổi hoặc lưu cấu hình lịch làm việc cho bác sĩ này. Các trường chỉnh sửa đã bị khóa."
+            />
+          )}
 
           <Spin spinning={loadingWeekly}>
             <div className="day-schedule-list">
@@ -557,6 +698,7 @@ function DoctorScheduleManagementPage() {
                             format="HH:mm"
                             minuteStep={15}
                             allowClear={false}
+                            disabled={!canUpdateWeeklySchedule}
                             placeholder={['Giờ bắt đầu', 'Giờ kết thúc']}
                             onChange={(_, timeStrings) => handleTimeChange(item.dayOfWeek, timeStrings)}
                             status={!validation.valid ? 'error' : ''}
@@ -574,6 +716,7 @@ function DoctorScheduleManagementPage() {
                           <Button
                             size="small"
                             type="text"
+                            disabled={!canUpdateWeeklySchedule}
                             onClick={() => handleApplyPreset(item.dayOfWeek, 'full')}
                           >
                             Cả ngày
@@ -581,6 +724,7 @@ function DoctorScheduleManagementPage() {
                           <Button
                             size="small"
                             type="text"
+                            disabled={!canUpdateWeeklySchedule}
                             onClick={() => handleApplyPreset(item.dayOfWeek, 'morning')}
                           >
                             Ca sáng
@@ -588,6 +732,7 @@ function DoctorScheduleManagementPage() {
                           <Button
                             size="small"
                             type="text"
+                            disabled={!canUpdateWeeklySchedule}
                             onClick={() => handleApplyPreset(item.dayOfWeek, 'afternoon')}
                           >
                             Ca chiều
@@ -597,6 +742,7 @@ function DoctorScheduleManagementPage() {
 
                       <Switch
                         checked={isWorking}
+                        disabled={!canUpdateWeeklySchedule}
                         onChange={(checked) => handleDayToggle(item.dayOfWeek, checked)}
                         checkedChildren="Làm"
                         unCheckedChildren="Nghỉ"
@@ -609,14 +755,19 @@ function DoctorScheduleManagementPage() {
           </Spin>
 
           <div className="schedule-actions-bar" style={{ justifyContent: 'flex-end' }}>
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              loading={savingWeekly}
-              onClick={handleSaveWeeklySchedule}
-            >
-              Lưu lịch làm việc tuần
-            </Button>
+            <Tooltip title={!canUpdateWeeklySchedule ? 'Bạn không có quyền cấu hình lịch làm việc' : ''}>
+              <span>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  loading={savingWeekly}
+                  disabled={!canUpdateWeeklySchedule}
+                  onClick={handleSaveWeeklySchedule}
+                >
+                  Lưu lịch làm việc tuần
+                </Button>
+              </span>
+            </Tooltip>
           </div>
         </div>
       ),
@@ -643,13 +794,18 @@ function DoctorScheduleManagementPage() {
                 <Radio.Button value="ACTIVE">Đang hiệu lực</Radio.Button>
                 <Radio.Button value="CANCELLED">Đã hủy</Radio.Button>
               </Radio.Group>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setRegisterModalOpen(true)}
-              >
-                Đăng ký khoảng nghỉ đột xuất
-              </Button>
+              <Tooltip title={!canCreateTimeOff ? 'Bạn không có quyền đăng ký khoảng nghỉ cho bác sĩ này' : ''}>
+                <span>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    disabled={!canCreateTimeOff}
+                    onClick={() => setRegisterModalOpen(true)}
+                  >
+                    Đăng ký khoảng nghỉ đột xuất
+                  </Button>
+                </span>
+              </Tooltip>
             </Space>
           </div>
 
@@ -823,7 +979,7 @@ function DoctorScheduleManagementPage() {
           <Select
             className="doctor-select-field"
             value={selectedDoctorId}
-            onChange={setSelectedDoctorId}
+            onChange={handleSelectDoctor}
             loading={doctorsLoading}
             showSearch
             placeholder="Tìm kiếm và chọn bác sĩ..."

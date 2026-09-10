@@ -1,14 +1,17 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,7 +23,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.port.dto.result.LoginAuditLogResult;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -78,6 +88,10 @@ class UserControllerTest {
     private DeactivateUserUseCase deactivateUserUseCase;
     @MockitoBean
     private com.benhsoan.port.inbound.user.ResetPasswordUseCase resetPasswordUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.user.UnlockUserUseCase unlockUserUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.user.GetLoginAuditLogsUseCase getLoginAuditLogsUseCase;
     @MockitoBean
     private RoleRepository roleRepository;
     @MockitoBean
@@ -172,6 +186,57 @@ class UserControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(resetPasswordUseCase);
+    }
+
+    @Test
+    void allowsUnlockWhenUserHasUpdatePermission() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(unlockUserUseCase.unlockUser(userId)).thenReturn(result(userId));
+
+        mvc.perform(post("/users/{id}/unlock", userId)
+                        .with(withPermission("PERMISSION_USER_UPDATE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.username").value("user"));
+    }
+
+    @Test
+    void deniesUnlockWhenPermissionIsMissing() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mvc.perform(post("/users/{id}/unlock", userId)
+                        .with(withPermission("PERMISSION_PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(unlockUserUseCase);
+    }
+
+    @Test
+    void allowsGetLoginLogsWhenUserHasReadPermission() throws Exception {
+        UUID userId = UUID.randomUUID();
+        LoginAuditLogResult log = new LoginAuditLogResult(
+                UUID.randomUUID(), userId, ActionType.LOCK, ResourceType.USER, userId,
+                "{\"failedAttempts\":5}", null, Instant.now()
+        );
+        when(getLoginAuditLogsUseCase.getLoginAuditLogs(eq(userId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(0, 20), 1));
+
+        mvc.perform(get("/users/{id}/login-logs", userId)
+                        .with(withPermission("PERMISSION_USER_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].actionType").value("LOCK"))
+                .andExpect(jsonPath("$.content[0].resourceType").value("USER"));
+    }
+
+    @Test
+    void deniesGetLoginLogsWhenPermissionIsMissing() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mvc.perform(get("/users/{id}/login-logs", userId)
+                        .with(withPermission("PERMISSION_ROLE_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getLoginAuditLogsUseCase);
     }
 
     private static UserResult result(UUID id) {

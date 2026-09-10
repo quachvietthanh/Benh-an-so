@@ -25,10 +25,17 @@ function RegisterTimeOffModal({ open, onClose, doctor, onSuccess }) {
     let start, end
 
     if (presetType === 'today_pm') {
-      start = now.hour(13).minute(0).second(0)
-      end = now.hour(17).minute(30).second(0)
-      if (start.isBefore(now)) {
-        start = now.add(10, 'minute')
+      const pmEnd = now.hour(17).minute(30).second(0)
+      const earliestStart = now.hour(13).minute(0).second(0)
+      const candidateStart = now.isAfter(earliestStart) ? now.add(10, 'minute').second(0) : earliestStart
+
+      if (now.isAfter(now.hour(17).minute(15)) || !pmEnd.isAfter(candidateStart)) {
+        start = now.add(1, 'day').hour(13).minute(0).second(0)
+        end = now.add(1, 'day').hour(17).minute(30).second(0)
+        message.info('Ca chiều hôm nay đã qua thời hạn đăng ký, hệ thống tự động chọn ca chiều ngày mai.')
+      } else {
+        start = candidateStart
+        end = pmEnd
       }
     } else if (presetType === 'tomorrow_full') {
       start = now.add(1, 'day').hour(8).minute(0).second(0)
@@ -79,6 +86,10 @@ function RegisterTimeOffModal({ open, onClose, doctor, onSuccess }) {
       }
     } catch (err) {
       if (err.errorFields) return
+      if (err.response?.status === 403 || err.response?.data?.code === 'ACCESS_DENIED') {
+        message.error('Bạn không có quyền đăng ký thời gian nghỉ cho bác sĩ (403 Forbidden).')
+        return
+      }
       const apiMsg = err.response?.data?.message || err.apiError?.message || 'Không thể đăng ký khoảng nghỉ. Vui lòng thử lại.'
       message.error(apiMsg)
     } finally {
