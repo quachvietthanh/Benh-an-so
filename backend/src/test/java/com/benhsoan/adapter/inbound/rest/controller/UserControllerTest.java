@@ -130,12 +130,18 @@ class UserControllerTest {
     }
 
     @Test
-    void allowsPatientToRetrieveActiveDoctorsWithoutUserReadPermission() throws Exception {
+    void allowsActorWithUserReadPermissionToRetrieveActiveDoctors() throws Exception {
         UUID doctorId = UUID.randomUUID();
         when(getDoctorsUseCase.getAllActiveDoctors()).thenReturn(List.of(result(doctorId)));
 
-        mvc.perform(get("/users/doctors").with(user("patient").roles("PATIENT")))
+        mvc.perform(get("/users/doctors").with(withPermission("PERMISSION_USER_READ")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void deniesRetrieveActiveDoctorsWhenUserReadPermissionIsMissing() throws Exception {
+        mvc.perform(get("/users/doctors").with(user("patient").roles("PATIENT")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
