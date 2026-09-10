@@ -131,23 +131,38 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
         LocalTime scheduleStartTime;
         LocalTime scheduleEndTime;
 
-        java.util.Optional<DoctorSchedule> dateScheduleOpt = doctorScheduleRepository
-                .findByDoctorIdAndScheduleDateForUpdate(command.doctorId(), command.appointmentDate());
-        if (dateScheduleOpt.isPresent()) {
+        java.util.Optional<DoctorWeeklySchedule> weeklyOpt = doctorWeeklyScheduleRepository
+                .findByDoctorIdAndDayOfWeek(command.doctorId(), command.appointmentDate().getDayOfWeek());
+        if (weeklyOpt.isPresent()) {
+            DoctorWeeklySchedule weekly = weeklyOpt.get();
+            if (!weekly.isActive()) {
+                throw new DoctorUnavailableException(command.doctorId(), command.appointmentDate());
+            }
+            java.util.Optional<DoctorSchedule> dateScheduleOpt = doctorScheduleRepository
+                    .findByDoctorIdAndScheduleDateForUpdate(command.doctorId(), command.appointmentDate());
+            if (dateScheduleOpt.isPresent()) {
+                DoctorSchedule schedule = dateScheduleOpt.get();
+                if (!schedule.isActive()) {
+                    throw new DoctorUnavailableException(command.doctorId(), command.appointmentDate());
+                }
+                scheduleStartTime = schedule.getStartTime();
+                scheduleEndTime = schedule.getEndTime();
+            } else {
+                scheduleStartTime = weekly.getStartTime();
+                scheduleEndTime = weekly.getEndTime();
+            }
+        } else {
+            java.util.Optional<DoctorSchedule> dateScheduleOpt = doctorScheduleRepository
+                    .findByDoctorIdAndScheduleDateForUpdate(command.doctorId(), command.appointmentDate());
+            if (dateScheduleOpt.isEmpty()) {
+                throw new DoctorScheduleNotFoundException(command.doctorId(), command.appointmentDate());
+            }
             DoctorSchedule schedule = dateScheduleOpt.get();
             if (!schedule.isActive()) {
                 throw new DoctorUnavailableException(command.doctorId(), command.appointmentDate());
             }
             scheduleStartTime = schedule.getStartTime();
             scheduleEndTime = schedule.getEndTime();
-        } else {
-            java.util.Optional<DoctorWeeklySchedule> weeklyOpt = doctorWeeklyScheduleRepository
-                    .findByDoctorIdAndDayOfWeek(command.doctorId(), command.appointmentDate().getDayOfWeek());
-            if (weeklyOpt.isEmpty() || !weeklyOpt.get().isActive()) {
-                throw new DoctorScheduleNotFoundException(command.doctorId(), command.appointmentDate());
-            }
-            scheduleStartTime = weeklyOpt.get().getStartTime();
-            scheduleEndTime = weeklyOpt.get().getEndTime();
         }
 
         LocalTime slotEndTime = command.startTime().plus(SLOT_DURATION);

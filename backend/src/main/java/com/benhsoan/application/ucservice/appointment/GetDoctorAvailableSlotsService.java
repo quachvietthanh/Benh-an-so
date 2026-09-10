@@ -52,6 +52,27 @@ public class GetDoctorAvailableSlotsService implements GetDoctorAvailableSlotsUs
 
     @Override
     public List<DoctorAvailableSlotResult> getAvailableSlots(GetDoctorAvailableSlotsQuery query) {
+        // 1. Recurring weekly schedule takes precedence as the base schedule
+        Optional<DoctorWeeklySchedule> weeklySchedule = weeklyScheduleRepository
+                .findByDoctorIdAndDayOfWeek(query.doctorId(), query.date().getDayOfWeek());
+        if (weeklySchedule.isPresent()) {
+            DoctorWeeklySchedule ws = weeklySchedule.get();
+            if (!ws.isActive()) {
+                return List.of();
+            }
+            Optional<DoctorSchedule> dateSchedule = doctorScheduleRepository
+                    .findByDoctorIdAndScheduleDate(query.doctorId(), query.date());
+            if (dateSchedule.isPresent()) {
+                DoctorSchedule ds = dateSchedule.get();
+                if (!ds.isActive()) {
+                    return List.of();
+                }
+                return computeSlots(query.doctorId(), query.date(), ds.getStartTime(), ds.getEndTime(), clockPort.now());
+            }
+            return computeSlots(query.doctorId(), query.date(), ws.getStartTime(), ws.getEndTime(), clockPort.now());
+        }
+
+        // 2. Fallback to dateSchedule for doctors without weekly schedule configured
         Optional<DoctorSchedule> dateSchedule = doctorScheduleRepository
                 .findByDoctorIdAndScheduleDate(query.doctorId(), query.date());
 
@@ -61,17 +82,6 @@ public class GetDoctorAvailableSlotsService implements GetDoctorAvailableSlotsUs
                 return List.of();
             }
             return computeSlots(query.doctorId(), query.date(), schedule.getStartTime(), schedule.getEndTime(), clockPort.now());
-        }
-
-        // Fallback to weekly schedule
-        Optional<DoctorWeeklySchedule> weeklySchedule = weeklyScheduleRepository
-                .findByDoctorIdAndDayOfWeek(query.doctorId(), query.date().getDayOfWeek());
-        if (weeklySchedule.isPresent()) {
-            DoctorWeeklySchedule ws = weeklySchedule.get();
-            if (!ws.isActive()) {
-                return List.of();
-            }
-            return computeSlots(query.doctorId(), query.date(), ws.getStartTime(), ws.getEndTime(), clockPort.now());
         }
 
         return List.of();

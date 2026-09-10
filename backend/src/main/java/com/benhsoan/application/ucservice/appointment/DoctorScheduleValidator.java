@@ -37,17 +37,7 @@ public class DoctorScheduleValidator {
     public record EffectiveWorkingHours(LocalTime startTime, LocalTime endTime) {}
 
     public Optional<EffectiveWorkingHours> resolveWorkingHours(UUID doctorId, LocalDate date) {
-        // 1. Specific date override in doctor_schedules takes precedence
-        Optional<DoctorSchedule> dateSchedule = doctorScheduleRepository.findByDoctorIdAndScheduleDate(doctorId, date);
-        if (dateSchedule.isPresent()) {
-            DoctorSchedule ds = dateSchedule.get();
-            if (!ds.isActive()) {
-                return Optional.empty();
-            }
-            return Optional.of(new EffectiveWorkingHours(ds.getStartTime(), ds.getEndTime()));
-        }
-
-        // 2. Fallback to recurring weekly schedule
+        // 1. Recurring weekly schedule takes precedence as the base schedule
         DayOfWeek dayOfWeek = date.getDayOfWeek();
         Optional<DoctorWeeklySchedule> weeklySchedule = weeklyScheduleRepository.findByDoctorIdAndDayOfWeek(doctorId, dayOfWeek);
         if (weeklySchedule.isPresent()) {
@@ -55,7 +45,26 @@ public class DoctorScheduleValidator {
             if (!ws.isActive()) {
                 return Optional.empty();
             }
+            // If active in weekly schedule, check for specific date override in doctor_schedules
+            Optional<DoctorSchedule> dateSchedule = doctorScheduleRepository.findByDoctorIdAndScheduleDate(doctorId, date);
+            if (dateSchedule.isPresent()) {
+                DoctorSchedule ds = dateSchedule.get();
+                if (!ds.isActive()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new EffectiveWorkingHours(ds.getStartTime(), ds.getEndTime()));
+            }
             return Optional.of(new EffectiveWorkingHours(ws.getStartTime(), ws.getEndTime()));
+        }
+
+        // 2. Fallback to specific date schedule for doctors without weekly schedule configured
+        Optional<DoctorSchedule> dateSchedule = doctorScheduleRepository.findByDoctorIdAndScheduleDate(doctorId, date);
+        if (dateSchedule.isPresent()) {
+            DoctorSchedule ds = dateSchedule.get();
+            if (!ds.isActive()) {
+                return Optional.empty();
+            }
+            return Optional.of(new EffectiveWorkingHours(ds.getStartTime(), ds.getEndTime()));
         }
 
         return Optional.empty();
