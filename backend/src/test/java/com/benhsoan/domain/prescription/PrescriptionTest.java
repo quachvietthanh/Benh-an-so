@@ -58,6 +58,22 @@ class PrescriptionTest {
     }
 
     @Test
+    @DisplayName("Rejects cancellation when reason exceeds 500 characters (QTN-27)")
+    void cancel_rejectsReasonExceeding500Characters() {
+        Prescription prescription = createPendingPrescription();
+        UUID cancelledBy = UUID.randomUUID();
+        Instant cancelledAt = NOW.plusSeconds(300);
+        String tooLongReason = "A".repeat(501);
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> prescription.cancel(tooLongReason, cancelledBy, cancelledAt)
+        );
+        assertEquals("Cancellation reason must not exceed 500 characters.", ex.getMessage());
+        assertEquals(PrescriptionStatus.PENDING_DISPENSE, prescription.getStatus());
+    }
+
+    @Test
     @DisplayName("Rejects cancellation when prescription is already dispensed (QTN-27, TC-03)")
     void cancel_alreadyDispensed() {
         Prescription prescription = createPendingPrescription();

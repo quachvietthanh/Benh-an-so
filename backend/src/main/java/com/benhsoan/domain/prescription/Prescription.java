@@ -253,7 +253,11 @@ public class Prescription {
             throw new PrescriptionAlreadyDispensedException();
         }
 
-        this.cancelReason = requireText(cancelReason, "Cancellation reason is required.");
+        String validatedReason = requireText(cancelReason, "Cancellation reason is required.");
+        if (validatedReason.length() > 500) {
+            throw new ValidationException("Cancellation reason must not exceed 500 characters.");
+        }
+        this.cancelReason = validatedReason;
         UUID validatedCancelledBy = requireNonNull(cancelledBy, "Cancelling user id is required.");
         Instant validatedCancelledAt = requireNonNull(cancelledAt, "Cancellation time is required.");
         this.status = PrescriptionStatus.CANCELLED;
