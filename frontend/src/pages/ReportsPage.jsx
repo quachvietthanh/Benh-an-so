@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Alert,
@@ -77,6 +77,7 @@ function ReportsPage() {
 
   const canViewReports = userPermissions.includes('REPORT_VIEW') || isAdmin || isManager
   const canExportReports = userPermissions.includes('REPORT_EXPORT') || isAdmin || isManager
+  const canExportAccessLog = isAdmin || userPermissions.includes('ACCESS_LOG_REPORT_EXPORT')
 
   // URL parameters parsing
   const urlTab = searchParams.get('tab')
@@ -95,6 +96,7 @@ function ReportsPage() {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const isExportingRef = useRef(false)
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [loadError, setLoadError] = useState('')
 
@@ -324,6 +326,8 @@ function ReportsPage() {
   }
 
   const handleExport = async () => {
+    if (isExportingRef.current || exporting) return
+
     const params = getParams()
     const validation = validateExportParams(params)
     if (!validation.isValid) {
@@ -331,6 +335,12 @@ function ReportsPage() {
       return
     }
 
+    if (selectedReportType === 'ACCESS_LOG_REPORT' && !canExportAccessLog) {
+      message.error('Bạn không có quyền xuất báo cáo (Yêu cầu quyền ACCESS_LOG_REPORT_EXPORT của Quản trị viên).')
+      return
+    }
+
+    isExportingRef.current = true
     setExporting(true)
     try {
       let response
@@ -340,17 +350,22 @@ function ReportsPage() {
         response = await reportApi.exportVisits(params)
       } else if (selectedReportType === 'REVENUE_REPORT') {
         response = await reportApi.exportRevenue(params)
+      } else if (selectedReportType === 'ACCESS_LOG_REPORT') {
+        response = await reportApi.exportAccessLog(params)
       } else {
         response = await reportApi.exportVisits(params)
       }
 
-      const filename = getExportFilename(selectedReportType, params)
+      const disposition = response.headers?.['content-disposition']
+      const filename = getExportFilename(disposition, selectedReportType, params.from, params.to)
       downloadCsvBlob(response.data, filename)
       message.success(`Đã xuất báo cáo ${filename} thành công!`)
     } catch (err) {
       console.error('Lỗi xuất báo cáo CSV:', err)
-      message.error(getExportErrorMessage(err))
+      const errorMsg = await getExportErrorMessage(err)
+      message.error(errorMsg)
     } finally {
+      isExportingRef.current = false
       setExporting(false)
     }
   }
@@ -431,14 +446,23 @@ function ReportsPage() {
           </Button>
 
           {canExportReports && (
-            <Button
-              type="primary"
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              onClick={handleExport}
+            <Tooltip
+              title={
+                selectedReportType === 'ACCESS_LOG_REPORT' && !canExportAccessLog
+                  ? 'Yêu cầu quyền Quản trị viên (ACCESS_LOG_REPORT_EXPORT) để xuất báo cáo này'
+                  : ''
+              }
             >
-              Xuất CSV
-            </Button>
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                loading={exporting}
+                disabled={selectedReportType === 'ACCESS_LOG_REPORT' && !canExportAccessLog}
+                onClick={handleExport}
+              >
+                Xuất CSV
+              </Button>
+            </Tooltip>
           )}
         </Space>
       </div>
