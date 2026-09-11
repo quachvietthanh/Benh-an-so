@@ -34,7 +34,7 @@ WHERE p.code IN (
     'ROOM_READ',
     'ROOM_ASSIGNMENT_READ',
     'QUEUE_UPDATE_STATUS',
-    'USER_READ'
+    'USER_READ', 'QUEUE_CALL_NEXT'
 )
 AND NOT EXISTS (
     SELECT 1 FROM role_permissions rp
