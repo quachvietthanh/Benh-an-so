@@ -16,7 +16,8 @@ class RoomAuthorizationService {
     void requireReadAccess() {
         if (!currentUserPort.hasRole("ADMIN")
                 && !currentUserPort.hasRole("DOCTOR")
-                && !currentUserPort.hasRole("RECEPTIONIST")) {
+                && !currentUserPort.hasRole("RECEPTIONIST")
+                && !currentUserPort.hasRole("MANAGER")) {
             throw new UnauthorizedQueueOperationException();
         }
     }

@@ -43,6 +43,8 @@ import com.benhsoan.persistence.jpaRepository.queue.JpaRoomRepository;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityManager;
 
+import org.springframework.test.context.ContextConfiguration;
+
 @DataJpaTest(properties = {
         "spring.flyway.enabled=false",
         "spring.sql.init.mode=never",
@@ -51,6 +53,7 @@ import jakarta.persistence.EntityManager;
         "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
+@ContextConfiguration(classes = com.benhsoan.BenhSoAnApplication.class)
 class VisitEncounterQueryJpaIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-08-03T02:00:00Z");

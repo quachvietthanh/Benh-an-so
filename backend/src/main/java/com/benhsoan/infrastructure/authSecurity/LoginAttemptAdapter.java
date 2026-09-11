@@ -85,7 +85,10 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
         Instant now = clockPort.now();
         Instant newBlockedUntil = now.plusMillis(blockDurationMs);
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 20; i++) {
+            if (i > 0) {
+                Thread.yield();
+            }
             LoginAttemptResult result = executeInTransaction(status -> {
                 int updatedRows = repository.atomicIncrement(identifier, now, maxAttempts, newBlockedUntil);
                 if (updatedRows > 0) {

@@ -1,4 +1,4 @@
-CREATE TABLE appointments (
+﻿CREATE TABLE appointments (
     id BINARY(16) NOT NULL,
     appointment_code VARCHAR(30) NOT NULL,
     patient_id BINARY(16) NOT NULL,
@@ -11,7 +11,6 @@ CREATE TABLE appointments (
     checked_in_at TIMESTAMP NULL,
     completed_at TIMESTAMP NULL,
     created_by BINARY(16) NOT NULL,
-    booking_channel VARCHAR(30) NULL,
     created_at TIMESTAMP NOT NULL,
     CONSTRAINT pk_appointments PRIMARY KEY (id),
     CONSTRAINT uk_appointments_code UNIQUE (appointment_code),
@@ -54,24 +53,6 @@ CREATE TABLE doctor_room_assignments (
     CONSTRAINT fk_doctor_room_assignments_room FOREIGN KEY (room_id) REFERENCES rooms(id),
     CONSTRAINT fk_doctor_room_assignments_assigned_by FOREIGN KEY (assigned_by) REFERENCES users(id)
 );
-
-CREATE TABLE doctor_schedules (
-    id BINARY(16) NOT NULL,
-    doctor_id BINARY(16) NOT NULL,
-    schedule_date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NULL,
-
-    CONSTRAINT pk_doctor_schedules PRIMARY KEY (id),
-    CONSTRAINT uk_doctor_schedules_doctor_date UNIQUE (doctor_id, schedule_date),
-    CONSTRAINT fk_doctor_schedules_doctor FOREIGN KEY (doctor_id) REFERENCES users(id),
-    CONSTRAINT ck_doctor_schedules_time_range CHECK (end_time > start_time)
-);
-
-CREATE INDEX idx_doctor_schedules_date ON doctor_schedules(schedule_date);
 
 CREATE TABLE medical_queues (
     id BINARY(16) NOT NULL,
@@ -260,10 +241,6 @@ CREATE TABLE medical_records (
     locked_at TIMESTAMP NULL,
     locked_by BINARY(16) NULL,
 
-    signature_data LONGTEXT NULL,
-    signed_at TIMESTAMP NULL,
-    signed_by BINARY(16) NULL,
-
     created_by BINARY(16) NOT NULL,
     created_at TIMESTAMP NOT NULL,
 
@@ -282,10 +259,6 @@ CREATE TABLE medical_records (
 
     CONSTRAINT fk_medical_records_locked_by
         FOREIGN KEY (locked_by)
-        REFERENCES users(id),
-
-    CONSTRAINT fk_medical_records_signed_by
-        FOREIGN KEY (signed_by)
         REFERENCES users(id),
 
     CONSTRAINT fk_medical_records_created_by

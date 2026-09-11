@@ -1,4 +1,4 @@
--- =====================================================
+﻿-- =====================================================
 -- V22 - Seed inventory, queue and dispense history data
 -- Completes missing runtime data so Postman/manual API
 -- testing can exercise successful and failing flows.
@@ -910,29 +910,3 @@ INSERT INTO stock_movements (
     'Dispensed for prescription item 16300000-0000-0000-0000-000000000004',
     '2026-08-20 02:40:00'
 );
-
-
--- =====================================================
--- Additional Inventory Seeds (Demo US-26, US-28, US-77)
--- =====================================================
-
--- Lô thuốc cận hạn dùng (< 30 ngày) và lô quá hạn (Demo US-28)
-INSERT INTO medicine_batches (
-    id, medicine_id, batch_number, expiry_date, quantity, status, created_at, updated_at
-) VALUES
--- Lô cận hạn (hết hạn sau 15 ngày)
-(UUID_TO_BIN('15000000-0000-0000-0000-000000000091'), UUID_TO_BIN('16000000-0000-0000-0000-000000000001'), 'LOT-NEAR-EXPIRY-01', DATE_ADD(CURDATE(), INTERVAL 15 DAY), 15, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
--- Lô đã hết hạn (quá hạn 5 ngày)
-(UUID_TO_BIN('15000000-0000-0000-0000-000000000092'), UUID_TO_BIN('16000000-0000-0000-0000-000000000002'), 'LOT-EXPIRED-01', DATE_SUB(CURDATE(), INTERVAL 5 DAY), 10, 'EXPIRED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
--- Cảnh báo tồn kho thấp (Demo US-26)
-INSERT INTO inventory_alert_logs (
-    id, medicine_id, alert_type, threshold_value, observed_quantity, created_at, resolved_at
-) VALUES
-(UUID_TO_BIN('15500000-0000-0000-0000-000000000001'), UUID_TO_BIN('16000000-0000-0000-0000-000000000001'), 'LOW_STOCK', 120, 25, CURRENT_TIMESTAMP, NULL);
-
--- Cấp phát một phần khi kho không đủ số lượng kê (Demo US-77)
-INSERT INTO prescription_dispense_items (
-    id, prescription_id, prescription_item_id, medicine_id, medicine_batch_id, dispensed_quantity, dispensed_by, dispensed_at, created_at
-) VALUES
-(UUID_TO_BIN('18300000-0000-0000-0000-000000000007'), UUID_TO_BIN('16200000-0000-0000-0000-000000000001'), UUID_TO_BIN('16300000-0000-0000-0000-000000000001'), UUID_TO_BIN('16000000-0000-0000-0000-000000000001'), UUID_TO_BIN('15000000-0000-0000-0000-000000000091'), 5, UUID_TO_BIN('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6'), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
