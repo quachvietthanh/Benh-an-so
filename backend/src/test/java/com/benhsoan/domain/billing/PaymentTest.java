@@ -64,10 +64,29 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("record should reject payment amount different from amount due")
-    void recordShouldRejectDifferentPaymentAmount() {
+    @DisplayName("record should reject payment amount exceeding amount due")
+    void recordShouldRejectPaymentAmountExceedingAmountDue() {
         assertThrows(
                 PaymentAmountMismatchException.class,
+                () -> Payment.record(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        new BigDecimal("100000"),
+                        new BigDecimal("150000"),
+                        new BigDecimal("300000"),
+                        PaymentMethod.CASH,
+                        UUID.randomUUID(),
+                        Instant.parse("2026-08-11T03:00:00Z"),
+                        VisitStatus.WAITING,
+                        true
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("record should accept partial payment amount less than or equal to amount due")
+    void recordShouldAcceptPartialPaymentAmount() {
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(
                 () -> Payment.record(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
@@ -77,7 +96,7 @@ class PaymentTest {
                         PaymentMethod.CASH,
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T03:00:00Z"),
-                        VisitStatus.WAITING,
+                        VisitStatus.COMPLETED,
                         true
                 )
         );

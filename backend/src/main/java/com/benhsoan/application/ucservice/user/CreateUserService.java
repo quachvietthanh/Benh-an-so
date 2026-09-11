@@ -56,9 +56,11 @@ public class CreateUserService implements CreateUserUseCase {
             throw new EmailAlreadyExistsException();
         }
 
-        if (command.phone() != null
-                && !command.phone().isBlank()
-                && userRepository.existsByPhone(command.phone())) {
+        String normalizedPhone = (command.phone() == null || command.phone().isBlank())
+                ? null
+                : command.phone().trim();
+
+        if (normalizedPhone != null && userRepository.existsByPhone(normalizedPhone)) {
             throw new PhoneAlreadyExistsException();
         }
 
@@ -73,7 +75,7 @@ public class CreateUserService implements CreateUserUseCase {
                 passwordHash,
                 command.fullName(),
                 command.email(),
-                command.phone(),
+                normalizedPhone,
                 role.getId()
         );
         

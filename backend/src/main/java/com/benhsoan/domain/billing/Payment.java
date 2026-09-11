@@ -365,7 +365,7 @@ public class Payment {
             BigDecimal totalAmount
     ) {
         BigDecimal validatedAmountPaid = validateNonNegative(amountPaid, "Amount paid is required.");
-        if (validatedAmountPaid.compareTo(totalAmount) != 0) {
+        if (validatedAmountPaid.compareTo(totalAmount) > 0) {
             throw new PaymentAmountMismatchException(totalAmount, validatedAmountPaid);
         }
         return validatedAmountPaid;

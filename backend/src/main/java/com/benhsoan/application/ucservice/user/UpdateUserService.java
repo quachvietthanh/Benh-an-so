@@ -53,10 +53,13 @@ public class UpdateUserService implements UpdateUserUseCase {
             throw new EmailAlreadyExistsException();
         }
 
-        if (command.phone() != null
-                && !command.phone().isBlank()
-                && !command.phone().equals(user.getPhone())
-                && userRepository.existsByPhone(command.phone())) {
+        String normalizedPhone = (command.phone() == null || command.phone().isBlank())
+                ? null
+                : command.phone().trim();
+
+        if (normalizedPhone != null
+                && !normalizedPhone.equals(user.getPhone())
+                && userRepository.existsByPhone(normalizedPhone)) {
             throw new PhoneAlreadyExistsException();
         }
 
@@ -66,7 +69,7 @@ public class UpdateUserService implements UpdateUserUseCase {
         user.updateProfile(
                 command.fullName(),
                 command.email(),
-                command.phone()
+                normalizedPhone
         );
 
         user = User.restore(

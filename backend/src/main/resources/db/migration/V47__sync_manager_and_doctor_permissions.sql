@@ -38,3 +38,15 @@ WHERE p.code IN (
       WHERE rp.role_id = UUID_TO_BIN('66666666-6666-6666-6666-666666666666')
         AND rp.permission_id = p.id
   );
+
+-- 3. Grant QUEUE_CALL_NEXT to RECEPTIONIST (44444444-4444-4444-4444-444444444444)
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT UUID_TO_BIN('44444444-4444-4444-4444-444444444444'), p.id
+FROM permissions p
+WHERE p.code = 'QUEUE_CALL_NEXT'
+  AND NOT EXISTS (
+      SELECT 1 FROM role_permissions rp
+      WHERE rp.role_id = UUID_TO_BIN('44444444-4444-4444-4444-444444444444')
+        AND rp.permission_id = p.id
+  );
+

@@ -313,7 +313,7 @@ class RecordPaymentServiceTest {
 
         assertThrows(
                 PaymentAmountMismatchException.class,
-                () -> service.record(command(visitId, "100000", "150000", "200000"))
+                () -> service.record(command(visitId, "100000", "150000", "300000"))
         );
     }
 

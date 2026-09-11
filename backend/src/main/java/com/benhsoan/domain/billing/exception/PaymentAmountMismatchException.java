@@ -9,7 +9,7 @@ public class PaymentAmountMismatchException extends BillingException {
 
     public PaymentAmountMismatchException(BigDecimal expectedAmount, BigDecimal actualAmount) {
         super(DomainErrorCode.PAYMENT_AMOUNT_MISMATCH,
-                "Payment amount must equal the amount due. Expected: "
+                "Payment amount cannot exceed the amount due. Maximum allowed: "
                         + expectedAmount
                         + ", actual: "
                         + actualAmount
