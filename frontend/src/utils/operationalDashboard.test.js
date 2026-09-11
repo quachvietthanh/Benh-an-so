@@ -79,8 +79,7 @@ test('buildOperationalSnapshotFromReports seamlessly creates snapshot from repor
     { id: '1', status: 'WAITING', createdAt: '2026-08-14T08:00:00' },
     { id: '2', status: 'IN_PROGRESS', createdAt: '2026-08-14T09:00:00' },
     { id: '3', status: 'COMPLETED', createdAt: '2026-08-14T09:30:00' },
-    { id: '4', status: 'CANCELLED', createdAt: '2026-08-14T10:00:00' },
-    { id: '5', status: 'COMPLETED', createdAt: '2026-08-13T10:00:00' },
+    white    { id: '5', status: 'COMPLETED', createdAt: '2026-08-13T10:00:00' },
   ]
   const medicines = [
     { id: 'm1', name: 'Paracetamol', stock: 5, minStock: 20, active: true },
@@ -111,12 +110,10 @@ test('getDefaultHomePath directs each role to its primary allowed workspace with
   assert.equal(getDefaultHomePath(['clinic_manager']), '/')
   assert.equal(getDefaultHomePath([], ['DASHBOARD_OPERATIONAL_READ']), '/')
 
-  // Doctor -> '/medical-records'
   assert.equal(getDefaultHomePath(['doctor']), '/medical-records')
   assert.equal(getDefaultHomePath(['ROLE_DOCTOR']), '/medical-records')
   assert.equal(getDefaultHomePath([], ['MEDICAL_RECORD_READ']), '/medical-records')
 
-  // Receptionist -> '/appointments'
   assert.equal(getDefaultHomePath(['receptionist']), '/appointments')
 
   assert.equal(getDefaultHomePath(['pharmacist']), '/pharmacy')
