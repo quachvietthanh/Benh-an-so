@@ -1267,8 +1267,13 @@ function MedicalEncounter() {
           type="warning"
           showIcon
           message="Chưa chọn lượt khám"
-          description="Màn khám bệnh phải được mở từ một lượt khám trong hàng đợi. Không thể chọn bệnh nhân tự do tại đây."
-          action={<Button onClick={() => navigate('/appointments')}>Mở danh sách lượt khám</Button>}
+          description={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Màn khám bệnh phải được mở từ một lượt khám trong hàng đợi.</span>
+              <span>Không thể chọn bệnh nhân tự do tại đây.</span>
+            </div>
+          }
+          action={<Button type="primary" onClick={() => navigate('/appointments')}>Mở danh sách lượt khám</Button>}
         />
       </Card>
     )
@@ -1286,7 +1291,7 @@ function MedicalEncounter() {
         showIcon
         message="Không thể mở lượt khám"
         description={loadError}
-        action={<Button onClick={loadWorkflow}>Thử lại</Button>}
+        action={<Button type="primary" onClick={loadWorkflow}>Thử lại</Button>}
       />
     )
   }

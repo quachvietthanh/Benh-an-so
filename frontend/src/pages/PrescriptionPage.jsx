@@ -1658,8 +1658,13 @@ function PrescriptionPage() {
           type="warning"
           showIcon
           message="Chưa có bệnh án để kê đơn"
-          description="Màn kê đơn chỉ mở từ một lượt khám đã lưu và phải có mã bệnh án trên đường dẫn."
-          action={<Button onClick={() => navigate('/appointments')}>Về danh sách lượt khám</Button>}
+          description={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Màn kê đơn chỉ mở từ một lượt khám đã lưu.</span>
+              <span>Phải có mã bệnh án trên đường dẫn để tiếp tục.</span>
+            </div>
+          }
+          action={<Button type="primary" onClick={() => navigate('/appointments')}>Về danh sách lượt khám</Button>}
         />
       </Card>
     )
