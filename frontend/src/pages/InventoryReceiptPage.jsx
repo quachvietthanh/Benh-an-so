@@ -689,51 +689,54 @@ function InventoryReceiptPage() {
         />
       )}
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 8 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+        <Col xs={12} sm={12} md={6}>
+          <Card size="small" style={{ borderRadius: 8, height: '100%' }} styles={{ body: { padding: '12px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } }}>
             <Statistic
-              title="Tổng số lô trong kho"
+              title={<div style={{ minHeight: 38, display: 'flex', alignItems: 'center', fontSize: 13, lineHeight: '18px', color: '#64748b' }}>Tổng số lô trong kho</div>}
               value={stats.totalBatches}
+              valueStyle={{ fontWeight: 700 }}
               prefix={<InboxOutlined style={{ color: '#1677ff' }} />}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 8 }}>
+        <Col xs={12} sm={12} md={6}>
+          <Card size="small" style={{ borderRadius: 8, height: '100%' }} styles={{ body: { padding: '12px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } }}>
             <Statistic
-              title="Lô đủ điều kiện cấp phát (FEFO)"
+              title={<div style={{ minHeight: 38, display: 'flex', alignItems: 'center', fontSize: 13, lineHeight: '18px', color: '#64748b' }}>Lô đủ điều kiện cấp phát (FEFO)</div>}
               value={stats.eligibleBatches}
               valueStyle={{ color: '#52c41a', fontWeight: 700 }}
               prefix={<CheckCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card
             size="small"
             style={{
               borderRadius: 8,
               borderLeft: stats.nearExpiryBatches > 0 ? '4px solid #faad14' : undefined,
               cursor: 'pointer',
+              height: '100%',
             }}
+            styles={{ body: { padding: '12px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } }}
             onClick={() => setActiveTab('alerts')}
           >
             <Statistic
-              title="Lô sắp hết hạn (≤ 90 ngày)"
+              title={<div style={{ minHeight: 38, display: 'flex', alignItems: 'center', fontSize: 13, lineHeight: '18px', color: '#64748b' }}>Lô sắp hết hạn (≤ 90 ngày)</div>}
               value={stats.nearExpiryBatches}
-              valueStyle={stats.nearExpiryBatches > 0 ? { color: '#faad14', fontWeight: 700 } : undefined}
+              valueStyle={stats.nearExpiryBatches > 0 ? { color: '#faad14', fontWeight: 700 } : { fontWeight: 700 }}
               prefix={<FieldTimeOutlined />}
-              suffix={<Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>Xem →</Text>}
+              suffix={<Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>Xem →</Text>}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 8 }}>
+        <Col xs={12} sm={12} md={6}>
+          <Card size="small" style={{ borderRadius: 8, height: '100%' }} styles={{ body: { padding: '12px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } }}>
             <Statistic
-              title="Lô hết hạn / Hết tồn"
+              title={<div style={{ minHeight: 38, display: 'flex', alignItems: 'center', fontSize: 13, lineHeight: '18px', color: '#64748b' }}>Lô hết hạn / Hết tồn</div>}
               value={stats.expiredOrDepleted}
-              valueStyle={stats.expiredOrDepleted > 0 ? { color: '#ff4d4f' } : undefined}
+              valueStyle={stats.expiredOrDepleted > 0 ? { color: '#ff4d4f', fontWeight: 700 } : { fontWeight: 700 }}
               prefix={<WarningOutlined />}
             />
           </Card>
@@ -768,12 +771,12 @@ function InventoryReceiptPage() {
                     }}
                     onFinish={handleSubmit}
                   >
-                    <Row gutter={16}>
-                      <Col xs={24} md={16}>
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} md={15} lg={16}>
                         <Form.Item
                           name="note"
                           label="Ghi chú phiếu nhập kho"
-                          extra="Nhập thông tin nguồn cung cấp, hóa đơn chứng từ hoặc biên bản kiểm nhận..."
+                          style={{ marginBottom: 4 }}
                         >
                           <Input.TextArea
                             rows={2}
@@ -782,23 +785,37 @@ function InventoryReceiptPage() {
                             placeholder="Ví dụ: Nhập theo hợp đồng dược phẩm quý III từ Công ty Dược TW"
                           />
                         </Form.Item>
+                        <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+                          Nhập thông tin nguồn cung cấp, hóa đơn chứng từ hoặc biên bản kiểm nhận...
+                        </div>
                       </Col>
-                      <Col xs={24} md={8}>
+                      <Col xs={24} md={9} lg={8}>
                         <Card
                           size="small"
                           style={{
                             background: '#f8fafc',
                             borderColor: '#e2e8f0',
-                            textAlign: 'right',
+                            borderRadius: 8,
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
                           }}
+                          styles={{ body: { padding: '12px 16px' } }}
                         >
-                          <Text type="secondary">Tổng giá trị phiếu nhập:</Text>
-                          <div style={{ fontSize: 22, fontWeight: 700, color: '#1677ff', marginTop: 4 }}>
-                            {totalReceiptAmount.toLocaleString('vi-VN')} ₫
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                            <div>
+                              <Text type="secondary" style={{ fontSize: 13, fontWeight: 600 }}>Tổng giá trị phiếu nhập:</Text>
+                              <div>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {formItems.length} dòng thuốc
+                                </Text>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 21, fontWeight: 700, color: '#1677ff' }}>
+                              {totalReceiptAmount.toLocaleString('vi-VN')} ₫
+                            </div>
                           </div>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {formItems.length} dòng thuốc
-                          </Text>
                         </Card>
                       </Col>
                     </Row>
@@ -1105,6 +1122,7 @@ function InventoryReceiptPage() {
                     dataSource={recentReceipts}
                     pagination={{ pageSize: 5 }}
                     bordered
+                    scroll={{ x: 750 }}
                     locale={{ emptyText: <Empty description="Chưa có phiếu nhập nào trong phiên làm việc hiện tại" /> }}
                   />
                 </div>

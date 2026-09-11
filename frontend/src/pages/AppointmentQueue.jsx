@@ -908,7 +908,12 @@ function AppointmentQueue() {
       title: 'Mã lịch hẹn',
       dataIndex: 'appointmentCode',
       key: 'appointmentCode',
-      render: (code) => <Text strong style={{ color: '#2563eb' }}>{code || 'Chưa có'}</Text>,
+      width: 140,
+      render: (code) => (
+        <Text strong style={{ color: '#2563eb', whiteSpace: 'nowrap', display: 'inline-block' }}>
+          {code || 'Chưa có'}
+        </Text>
+      ),
     },
     {
       title: 'Bệnh nhân',
@@ -921,8 +926,8 @@ function AppointmentQueue() {
           <Space align="center" size="small">
             <Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 150 }}>
-              <Text strong style={{ fontSize: 14, color: '#0f172a', lineHeight: '1.4' }}>{pInfo.name}</Text>
-              <Text type="secondary" style={{ fontSize: 12, lineHeight: '1.2' }}>Mã: {pInfo.code}</Text>
+              <Text strong style={{ fontSize: 14, color: '#0f172a', lineHeight: '1.4', whiteSpace: 'nowrap' }}>{pInfo.name}</Text>
+              <Text type="secondary" style={{ fontSize: 12, lineHeight: '1.2', whiteSpace: 'nowrap' }}>Mã: {pInfo.code}</Text>
             </div>
           </Space>
         )
@@ -932,12 +937,13 @@ function AppointmentQueue() {
       title: 'Bác sĩ & Chuyên khoa',
       dataIndex: 'doctorName',
       key: 'doctorName',
+      width: 200,
       render: (_, record) => {
         const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
         return (
           <div>
-            <Text strong style={{ color: '#0f172a', display: 'block' }}>{dInfo.name}</Text>
-            <Tag color="cyan">{dInfo.department}</Tag>
+            <Text strong style={{ color: '#0f172a', display: 'block', whiteSpace: 'nowrap' }}>{dInfo.name}</Text>
+            <Tag color="cyan" style={{ whiteSpace: 'nowrap', marginTop: 2 }}>{dInfo.department}</Tag>
           </div>
         )
       },
@@ -946,6 +952,7 @@ function AppointmentQueue() {
       title: 'Khung giờ hẹn',
       dataIndex: 'appointmentAt',
       key: 'appointmentAt',
+      width: 180,
       render: (at, record) => {
         const timeVal = at || record.startTime || record.date
         const appTime = dayjs(timeVal)
@@ -953,8 +960,8 @@ function AppointmentQueue() {
         const isOverdue15Min = timeVal && dayjs().isAfter(appTime.add(15, 'minute')) && record.status === 'SCHEDULED'
         return (
           <Space direction="vertical" size={2}>
-            <Text>{timeStr}</Text>
-            {isOverdue15Min && <Tag color="error">Quá 15p giờ hẹn</Tag>}
+            <Text style={{ whiteSpace: 'nowrap' }}>{timeStr}</Text>
+            {isOverdue15Min && <Tag color="error" style={{ whiteSpace: 'nowrap' }}>Quá 15p giờ hẹn</Tag>}
           </Space>
         )
       },
@@ -963,15 +970,16 @@ function AppointmentQueue() {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
+      width: 140,
       render: (st) => {
         const meta = APPOINTMENT_STATUS_META[st] || { label: 'Không xác định', tone: 'gray' }
-        return <Tag color={meta.tone}>{meta.label}</Tag>
+        return <Tag color={meta.tone} style={{ whiteSpace: 'nowrap' }}>{meta.label}</Tag>
       },
     },
     {
       title: 'Thao tác',
       key: 'action',
-      width: 90,
+      width: 110,
       align: 'center',
       render: (_, record) => {
         const timeVal = record.appointmentAt || record.startTime || record.date
@@ -1071,7 +1079,7 @@ function AppointmentQueue() {
       title: 'Mã lượt khám',
       dataIndex: 'visitCode',
       key: 'visitCode',
-      width: 140,
+      width: 150,
       render: (val, record) => {
         const rawCode = val || record.visitId || record.id || 'Chưa có'
         let displayCode = rawCode
@@ -1085,41 +1093,46 @@ function AppointmentQueue() {
       title: 'Nguồn',
       dataIndex: 'sourceType',
       key: 'sourceType',
+      width: 150,
       render: (src) => (
         src === 'WALK_IN'
-          ? <Tag color="orange">Bệnh nhân tự đến</Tag>
-          : <Tag color="blue">Hẹn trước</Tag>
+          ? <Tag color="orange" style={{ whiteSpace: 'nowrap' }}>Bệnh nhân tự đến</Tag>
+          : <Tag color="blue" style={{ whiteSpace: 'nowrap' }}>Hẹn trước</Tag>
       ),
     },
     {
       title: 'Bác sĩ',
       dataIndex: 'doctorName',
       key: 'doctorName',
+      width: 180,
       render: (_, record) => {
         const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
-        return dInfo.name
+        return <span style={{ whiteSpace: 'nowrap' }}>{dInfo.name}</span>
       },
     },
     {
       title: 'Phòng',
       dataIndex: 'roomName',
       key: 'roomName',
-      render: (room, record) => room || record.roomNumber || record.roomCode || 'Chưa phân phòng',
+      width: 140,
+      render: (room, record) => <span style={{ whiteSpace: 'nowrap' }}>{room || record.roomNumber || record.roomCode || 'Chưa phân phòng'}</span>,
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
+      width: 150,
       render: (st) => {
         const meta = QUEUE_STATUS_META[st] || { label: 'Không xác định', tone: 'gray' }
-        return <Tag color={meta.tone}>{meta.label}</Tag>
+        return <Tag color={meta.tone} style={{ whiteSpace: 'nowrap' }}>{meta.label}</Tag>
       },
     },
     {
       title: 'Thời gian đến',
       dataIndex: 'checkedInAt',
       key: 'checkedInAt',
-      render: (time) => (time ? dayjs(time).format('HH:mm DD/MM/YYYY') : '—'),
+      width: 160,
+      render: (time) => <span style={{ whiteSpace: 'nowrap' }}>{time ? dayjs(time).format('HH:mm DD/MM/YYYY') : '—'}</span>,
     },
     {
       title: 'Thao tác',
@@ -1316,6 +1329,7 @@ function AppointmentQueue() {
                   rowKey="id"
                   loading={loading}
                   pagination={{ pageSize: 10, showSizeChanger: true }}
+                  scroll={{ x: 960 }}
                 />
               </Card>
             ),
@@ -1422,6 +1436,7 @@ function AppointmentQueue() {
                     rowKey="id"
                     loading={loading}
                     pagination={{ pageSize: 10, showSizeChanger: true }}
+                    scroll={{ x: 1080 }}
                   />
                 )}
               </Card>
@@ -2132,6 +2147,7 @@ function AppointmentQueue() {
                   ]}
                   rowKey="id"
                   pagination={{ pageSize: 10, showSizeChanger: true }}
+                  scroll={{ x: 960 }}
                 />
               </Card>
             ),
