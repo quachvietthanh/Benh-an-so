@@ -170,6 +170,7 @@ function MedicalEncounter() {
   const [primaryIcd, setPrimaryIcd] = useState(null)
   const [secondaryIcds, setSecondaryIcds] = useState([])
   const [diagnosisModalOpen, setDiagnosisModalOpen] = useState(false)
+  const lastSignModalTimeRef = useRef(0)
   const [icdSearchQuery, setIcdSearchQuery] = useState('')
   const [icdCategory, setIcdCategory] = useState('ALL')
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
@@ -1993,6 +1994,9 @@ function MedicalEncounter() {
           onSuccess={(signedData) => {
             setMedicalRecord((prev) => ({ ...prev, ...signedData, status: 'LOCKED' }))
             loadWorkflow().catch((err) => console.warn('Lỗi làm mới sau khi ký:', err))
+            const now = Date.now()
+            if (now - lastSignModalTimeRef.current < 3000) return
+            lastSignModalTimeRef.current = now
             Modal.confirm({
               title: 'Bệnh án đã được ký số & hoàn tất thành công',
               icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
