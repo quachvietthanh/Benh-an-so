@@ -41,11 +41,11 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `POST /appointments` → `AppointmentController.create` | `APPOINTMENT_CREATE` | Bác sĩ tồn tại/active, không trùng lịch; ADMIN/RECEPTIONIST business authorization | Permission + service context |
 | `GET /appointments`, `/{id}`, `/overdue` → read methods | `APPOINTMENT_READ` | Phạm vi lịch hẹn/bác sĩ nếu use case áp dụng | Chuyển từ role |
 | `POST /appointments/{id}/reminder`; `PATCH /appointments/{id}/cancel`, `/{id}/no-show` | `APPOINTMENT_UPDATE` | Chỉ transition trạng thái hợp lệ; ADMIN/RECEPTIONIST business authorization | Permission + service context |
-| `GET /queues` → `QueueController.getQueues`; `GET /queue-items/{itemId}` → `getById` | `QUEUE_VIEW` | Phạm vi ngày/bác sĩ/queue | Chuyển từ role |
+| `GET /queues` → `QueueController.getQueues`; `GET /queue-items/{itemId}` → `getById`; `GET /queue-items/{itemId}/history` → `getHistory` | `QUEUE_VIEW` | Phạm vi ngày/bác sĩ/queue; lịch sử hàng đợi | Chuyển từ role |
 | `GET /queues/me` → `getMyQueue` | `QUEUE_VIEW` | Bắt buộc DOCTOR; query doctorId = current user | Permission + service context |
 | `POST /appointments/{appointmentId}/check-in`; `POST /queue-items/walk-in` | `QUEUE_CREATE` | Hẹn/queue ở trạng thái có thể check-in; ADMIN/RECEPTIONIST business authorization | Permission + service context |
 | `POST /queues/{queueId}/call-next` → `callNext` | `QUEUE_CALL_NEXT` | Queue mở, bác sĩ/room/queue item phù hợp | Permission + service context |
-| `PATCH /queue-items/{itemId}/status`; `POST /queue-items/{itemId}/complete`; `POST /queue-items/{itemId}/skip` | `QUEUE_UPDATE_STATUS` | Chỉ transition hợp lệ; bác sĩ phụ trách/role workflow theo `QueueOperationAuthorization` | Permission + service context |
+| `PATCH /queue-items/{itemId}/status`; `POST /queue-items/{itemId}/complete`; `POST /queue-items/{itemId}/skip`; `POST /queue-items/{itemId}/re-queue` | `QUEUE_UPDATE_STATUS` | Chỉ transition hợp lệ; bác sĩ phụ trách/role workflow theo `QueueOperationAuthorization` (re-queue cho ADMIN, RECEPTIONIST) | Permission + service context |
 | `POST /clinical-orders/visits/{visitId}` → `ClinicalOrderController.create` | `NEW: CLINICAL_ORDER_CREATE` | Giữ `ClinicalOrderAuthorizationService.requireWriteAccess`, visit/record state | New catalog + service context |
 | `GET /clinical-orders/visits/{visitId}` → `getByVisitId` | `NEW: CLINICAL_ORDER_READ` | Giữ `requireReadAccess` | New catalog + service context |
 | `POST /clinical-order-items/{itemId}/results`; `PUT /clinical-results/{id}`; `POST /clinical-results/{id}/finalize` | `NEW: CLINICAL_RESULT_CREATE` / `NEW: CLINICAL_RESULT_UPDATE` / `NEW: CLINICAL_RESULT_FINALIZE` | Giữ write access, actor, finalize-state rule | New catalog + service context |

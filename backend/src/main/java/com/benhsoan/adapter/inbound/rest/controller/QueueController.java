@@ -33,6 +33,10 @@ import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetQueuesUseCase;
+import com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse;
+import com.benhsoan.port.dto.command.queue.ReQueueItemCommand;
+import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
+import com.benhsoan.port.inbound.queue.ReQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 
@@ -52,6 +56,8 @@ public class QueueController {
     private final CompleteQueueItemUseCase completeQueueItemUseCase;
     private final GetQueueItemUseCase getQueueItemUseCase;
     private final SkipQueueItemUseCase skipQueueItemUseCase;
+    private final ReQueueItemUseCase reQueueItemUseCase;
+    private final GetQueueHistoryUseCase getQueueHistoryUseCase;
     private final QueueRestMapper mapper;
 
     @GetMapping("/queues")
@@ -104,6 +110,20 @@ public class QueueController {
     @RequirePermission("QUEUE_UPDATE_STATUS")
     public QueueItemResponse skip(@PathVariable UUID itemId, @Valid @RequestBody SkipQueueItemRequest request) {
         return mapper.toResponse(skipQueueItemUseCase.skip(mapper.toCommand(itemId, request)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/re-queue")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse reQueue(@PathVariable UUID itemId) {
+        return mapper.toResponse(reQueueItemUseCase.reQueue(new ReQueueItemCommand(itemId)));
+    }
+
+    @GetMapping("/queue-items/{itemId}/history")
+    @RequirePermission("QUEUE_VIEW")
+    public List<QueueHistoryResponse> getHistory(@PathVariable UUID itemId) {
+        return getQueueHistoryUseCase.getHistory(itemId).stream()
+                .map(mapper::toResponse)
+                .toList();
     }
 
     @GetMapping("/queue-items/{itemId}")

@@ -231,4 +231,28 @@ class AppointmentTest {
 
         assertEquals(AppointmentStatus.NO_SHOW, appointment.getStatus());
     }
+
+    @Test
+    void revertsInProgressAppointmentToCheckedIn() {
+        Instant now = Instant.parse("2026-09-14T08:00:00Z");
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT-016", UUID.randomUUID(), UUID.randomUUID(),
+                now.minusSeconds(600), now.plusSeconds(1200), AppointmentStatus.IN_PROGRESS,
+                "Consultation", null, now.minusSeconds(600), null, UUID.randomUUID(), now.minusSeconds(3600));
+
+        appointment.revertToCheckedIn();
+
+        assertEquals(AppointmentStatus.CHECKED_IN, appointment.getStatus());
+    }
+
+    @Test
+    void rejectsRevertToCheckedInWhenNotInProgress() {
+        Instant now = Instant.parse("2026-09-14T08:00:00Z");
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT-017", UUID.randomUUID(), UUID.randomUUID(),
+                now.minusSeconds(600), now.plusSeconds(1200), AppointmentStatus.SCHEDULED,
+                "Consultation", null, null, null, UUID.randomUUID(), now.minusSeconds(3600));
+
+        assertThrows(AppointmentInvalidStatusException.class, appointment::revertToCheckedIn);
+    }
 }

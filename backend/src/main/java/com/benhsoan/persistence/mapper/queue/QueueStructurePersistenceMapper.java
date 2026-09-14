@@ -27,7 +27,7 @@ public class QueueStructurePersistenceMapper {
         entity.setAssignedBy(domain.getAssignedBy()); entity.setAssignedAt(domain.getAssignedAt());
         return entity;
     }
-    public QueueItem toDomain(QueueItemEntity entity) { return entity == null ? null : QueueItem.restore(entity.getId(), entity.getMedicalQueueId(), entity.getPatientId(), entity.getAppointmentId(), entity.getVisitId(), entity.getSourceType(), entity.getStatus(), entity.getQueueNumber(), entity.getQueueDate(), entity.getCheckedInAt(), entity.getCalledAt(), entity.getCompletedAt(), entity.getCancelledAt(), entity.getCancelReason(), entity.getSkippedAt(), entity.getSkipReason(), entity.getCreatedBy(), entity.getCreatedAt(), entity.getUpdatedAt()); }
+    public QueueItem toDomain(QueueItemEntity entity) { return entity == null ? null : QueueItem.restore(entity.getId(), entity.getMedicalQueueId(), entity.getPatientId(), entity.getAppointmentId(), entity.getVisitId(), entity.getSourceType(), entity.getStatus(), entity.getQueueNumber(), entity.getQueueDate(), entity.getCheckedInAt(), entity.getCalledAt(), entity.getCompletedAt(), entity.getCancelledAt(), entity.getCancelReason(), entity.getSkippedAt(), entity.getSkipReason(), entity.getCallCount(), entity.getCreatedBy(), entity.getCreatedAt(), entity.getUpdatedAt()); }
     public QueueItemEntity toEntity(QueueItem domain) {
         if (domain == null) return null;
         QueueItemEntity entity = new QueueItemEntity();
@@ -37,6 +37,7 @@ public class QueueStructurePersistenceMapper {
         entity.setCheckedInAt(domain.getCheckedInAt()); entity.setCalledAt(domain.getCalledAt()); entity.setCompletedAt(domain.getCompletedAt());
         entity.setCancelledAt(domain.getCancelledAt()); entity.setCancelReason(domain.getCancelReason()); entity.setCreatedBy(domain.getCreatedBy());
         entity.setSkippedAt(domain.getSkippedAt()); entity.setSkipReason(domain.getSkipReason());
+        entity.setCallCount(domain.getCallCount());
         entity.setCreatedAt(domain.getCreatedAt()); entity.setUpdatedAt(domain.getUpdatedAt());
         return entity;
     }

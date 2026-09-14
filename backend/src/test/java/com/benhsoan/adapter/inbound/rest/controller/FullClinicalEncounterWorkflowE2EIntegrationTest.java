@@ -298,11 +298,11 @@ class FullClinicalEncounterWorkflowE2EIntegrationTest {
                                 .status(BatchStatus.ACTIVE).createdAt(Instant.now()).updatedAt(Instant.now()).build());
 
                 receptionistAuth = createAuth(receptionistId, "receptionist.test", "RECEPTIONIST",
-                                "QUEUE_CREATE", "QUEUE_READ", "PATIENT_READ");
+                                "QUEUE_CREATE", "QUEUE_VIEW", "PATIENT_READ");
                 doctorAuth = createAuth(doctorId, "doctor.test", "DOCTOR",
                                 "MEDICAL_RECORD_CREATE", "MEDICAL_RECORD_READ", "MEDICAL_RECORD_UPDATE",
                                 "MEDICAL_RECORD_UPDATE_STATUS", "PRESCRIPTION_CREATE", "PRESCRIPTION_READ",
-                                "PRESCRIPTION_UPDATE", "QUEUE_READ", "PATIENT_READ");
+                                "PRESCRIPTION_UPDATE", "QUEUE_VIEW", "QUEUE_CALL_NEXT", "QUEUE_UPDATE_STATUS", "PATIENT_READ");
                 pharmacistAuth = createAuth(pharmacistId, "pharmacist.test", "PHARMACIST",
                                 "PRESCRIPTION_READ", "PRESCRIPTION_UPDATE_STATUS");
         }

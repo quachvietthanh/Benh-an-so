@@ -311,6 +311,16 @@ public class Appointment {
         this.status = AppointmentStatus.IN_PROGRESS;
     }
 
+    public void revertToCheckedIn() {
+        if (status != AppointmentStatus.IN_PROGRESS) {
+            throw new AppointmentInvalidStatusException(
+                    "Only in-progress appointments can be reverted to checked in."
+            );
+        }
+
+        this.status = AppointmentStatus.CHECKED_IN;
+    }
+
     public void complete(Instant completedAt) {
         if (status != AppointmentStatus.IN_PROGRESS) {
             throw new AppointmentInvalidStatusException(

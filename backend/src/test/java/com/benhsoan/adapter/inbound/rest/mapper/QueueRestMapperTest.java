@@ -73,6 +73,40 @@ class QueueRestMapperTest {
         assertEquals("Nguyễn Văn A", restored.patientName());
     }
 
+    @Test
+    void mapsCallCountCorrectly() {
+        QueueItemResult itemResult = new QueueItemResult(
+                ID, QUEUE_ID, PATIENT_ID, "BN001", "Nguyễn Văn A",
+                DOCTOR_ID, "Bác sĩ B", ROOM_ID, "P101", null,
+                VISIT_ID, "VIS001", QueueItemSourceType.WALK_IN, QueueItemStatus.WAITING,
+                1, LocalDate.of(2026, 9, 8), NOW, null, null, null, null, null, null, 3
+        );
+
+        QueueItemResponse response = mapper.toResponse(itemResult);
+        assertEquals(3, response.callCount());
+    }
+
+    @Test
+    void mapsQueueHistoryResultToResponse() {
+        UUID historyId = UUID.randomUUID();
+        UUID operatorId = UUID.randomUUID();
+        com.benhsoan.port.dto.result.QueueHistoryResult historyResult = new com.benhsoan.port.dto.result.QueueHistoryResult(
+                historyId, ID, operatorId, "Le Tan A", "DEFERRED", "SKIPPED", 2, "Patient absent", NOW
+        );
+
+        com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse response = mapper.toResponse(historyResult);
+
+        assertEquals(historyId, response.id());
+        assertEquals(ID, response.queueItemId());
+        assertEquals(operatorId, response.operatorId());
+        assertEquals("Le Tan A", response.operatorName());
+        assertEquals("DEFERRED", response.action());
+        assertEquals("SKIPPED", response.status());
+        assertEquals(2, response.callCount());
+        assertEquals("Patient absent", response.reason());
+        assertEquals(NOW, response.timestamp());
+    }
+
     private static QueueItemResult result(String patientCode, String patientName) {
         return new QueueItemResult(
                 ID, QUEUE_ID, PATIENT_ID, patientCode, patientName,

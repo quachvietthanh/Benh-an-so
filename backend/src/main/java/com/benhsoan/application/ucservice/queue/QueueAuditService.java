@@ -29,8 +29,16 @@ class QueueAuditService {
     void recordSkipped(QueueItem item, String reasonCode) {
         UUID actorId = currentUserPort.getCurrentUserId();
         auditLogRepository.save(AuditLog.create(actorId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),
-                "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"reason\":\"%s\"}"
-                        .formatted(item.getId(), item.getStatus(), reasonCode),
+                "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"reason\":\"%s\",\"callCount\":%d}"
+                        .formatted(item.getId(), item.getStatus(), reasonCode, item.getCallCount()),
+                null));
+    }
+
+    void recordReQueued(QueueItem item) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        auditLogRepository.save(AuditLog.create(actorId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),
+                "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"action\":\"RE_QUEUED\",\"callCount\":%d}"
+                        .formatted(item.getId(), item.getStatus(), item.getCallCount()),
                 null));
     }
 }

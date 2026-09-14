@@ -46,7 +46,7 @@ public class QueueRestMapper {
                 result.doctorId(), result.doctorName(), result.roomId(), result.roomNumber(), result.appointmentId(),
                 result.visitId(), result.visitCode(), result.sourceType(), result.status(), result.queueNumber(), result.queueDate(),
                 result.checkedInAt(), result.calledAt(), result.completedAt(), result.cancelledAt(), result.cancelReason(),
-                result.skippedAt(), result.skipReason());
+                result.skippedAt(), result.skipReason(), result.callCount());
     }
 
     public QueueCheckInResponse toResponse(QueueCheckInResult result) {
@@ -54,5 +54,19 @@ public class QueueRestMapper {
                 result.visitCode(), result.appointmentId(), result.patientId(), result.doctorId(), result.roomId(),
                 result.queueNumber(), result.queueDate(), result.sourceType(), result.queueItemStatus(),
                 result.visitStatus(), result.checkedInAt());
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse toResponse(
+            com.benhsoan.port.dto.result.QueueHistoryResult result) {
+        return new com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse(
+                result.id(),
+                result.queueItemId(),
+                result.operatorId(),
+                result.operatorName(),
+                result.action(),
+                result.status(),
+                result.callCount(),
+                result.reason(),
+                result.timestamp());
     }
 }

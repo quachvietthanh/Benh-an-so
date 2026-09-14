@@ -1,58 +1,100 @@
-# Implementation Plan: Khắc phục Review Findings tính năng Xác nhận lịch hẹn (NCL-03-CN-008)
+# Implementation Plan: Gọi lại và tạm hoãn bệnh nhân vắng trong hàng đợi (NCL-03-CN-009)
 
-Kế hoạch giải quyết toàn bộ các findings và khiếm khuyết được chỉ ra trong Báo cáo Review Backend cho tính năng Xác nhận lịch hẹn (`NCL-03-CN-008`), tuân thủ Clean Architecture, bảo toàn dữ liệu, chống race condition và giữ backward compatibility.
-
-## 1. TÓM TẮT QUYẾT ĐỊNH
-
-### 1.1. Danh sách Finding tiếp nhận xử lý trong đợt này
-| Mã Finding | Mức độ | Trạng thái kỹ thuật | Quyết định xử lý |
-| :--- | :---: | :---: | :--- |
-| **Finding 1** | **P1** | [Đã xác minh] | **Tiếp nhận xử lý**: Bổ sung phân giải họ tên người xác nhận (`confirmedByName`) trong `GetAppointmentByIdService` khi tra cứu chi tiết lịch hẹn qua API `GET /appointments/{id}`. |
-| **Finding 2** | **P2** | [Đã xác minh] | **Tiếp nhận xử lý**: Tinh chỉnh logic query tại `GetUnconfirmedAppointmentsService` và `AppointmentBusinessSpecification` để khi tra cứu ngày hiện tại (`today`), chỉ lấy các lịch hẹn có `startTime > now` (chưa quá giờ khám). |
-| **Finding 3** | **P2** | [Đã xác minh] | **Tiếp nhận xử lý**: Cập nhật ma trận phân quyền trong `docs/permission-matrix.md` và biên soạn hợp đồng API chuẩn tại `docs/api/appointment-confirm-contract.md`. |
-| **Finding 4** | **P3** | [Đã xác minh] | **Tiếp nhận xử lý**: Bổ sung unit test cho `writeConfirmDenied` trong `AppointmentAccessDeniedAuditWriterTest` và test case nhánh rẽ `date == null` trong `GetUnconfirmedAppointmentsServiceTest`. |
-| **Thiếu sót Mục VI** | **P2/P3** | [Đã xác minh] | **Tiếp nhận xử lý**: Bổ sung test Double Confirmation (ném `409 CONFLICT` khi đã `CONFIRMED`) cho cả luồng Lễ tân và Cổng bệnh nhân; bổ sung test hiển thị `confirmedByName` trong `GetAppointmentByIdServiceTest`. |
-
-### 1.2. Danh mục KHÔNG xử lý trong đợt này và lý do
-| Hạng mục / Lỗi | Nguồn gốc | Lý do từ chối xử lý trong phạm vi này |
-| :--- | :---: | :--- |
-| **2 failures tại `FullClinicalEncounterWorkflowE2EIntegrationTest`** | Báo cáo review mục V.2 | **Lỗi nhánh nền (`develop`)**: Do thiếu quyền `QUEUE_VIEW` khi gọi `GET /queues/me` từ tài khoản Bác sĩ trong script seed data nền của commit cũ, hoàn toàn không liên quan đến logic xác nhận lịch hẹn của `NCL-03-CN-008`. Xử lý riêng trong task bảo trì dữ liệu nền. |
-| **Cột mới trong Database** | Schema DB | [Đã xác minh] Migration `V47__add_confirmation_fields_to_appointments.sql` đã đạt chuẩn: cột cho phép `NULL`, có khóa ngoại và chỉ mục đầy đủ, đã migrate thành công. Không phát sinh script Flyway mới. |
-
-### 1.3. Các giả định và câu hỏi cần làm rõ trước khi code
-1. **[Cần xác minh] Phạm vi hiển thị `confirmedByName` trong danh sách tìm kiếm (`SearchAppointmentsService`)**:
-   - *Phân tích*: Finding 1 có trích dẫn file `SearchAppointmentsService.java:L24`. Tuy nhiên, API `GET /appointments` là API phân trang (Page). Nếu thực hiện resolve tên người xác nhận cho từng dòng trong vòng lặp bằng `userRepository.findById()` sẽ dẫn đến lỗi hiệu năng **N+1 Query**.
-   - *Giả định lựa chọn*: Đợt này chỉ xử lý triệt để tại `GetAppointmentByIdService` (màn hình chi tiết lịch hẹn - nơi cần hiển thị thông tin người xác nhận theo `NCL-03-CN-008-TC-01`). Đối với `SearchAppointmentsService`, tiếp tục giữ nguyên `null`.
-2. **[Giả định] Hành vi của API `GET /appointments/unconfirmed` khi người dùng truyền ngày trong quá khứ (`date < today`)**:
-   - *Giả định lựa chọn*: User Story xác định đây là "danh sách chưa xác nhận trước giờ khám được liệt kê để gọi nhắc". Khi người dùng truyền ngày quá khứ, toàn bộ lịch của ngày đó đều đã quá giờ khám (`startTime < now`). Do đó, hệ thống sẽ trả về danh sách rỗng (Empty Page) thay vì ném lỗi, đảm bảo an toàn cho giao diện người dùng.
+Kế hoạch kỹ thuật triển khai backend hoàn chỉnh cho User Story `NCL-03-CN-009`: **Gọi lại và tạm hoãn bệnh nhân vắng trong hàng đợi** thuộc Epic `NCL-03` (Lịch hẹn và hàng đợi khám), đảm bảo đáp ứng đầy đủ Acceptance Criteria (TC-01, TC-02, TC-03, TC-04), bảo toàn kiến trúc Hexagonal Architecture, không gây lỗi hồi quy và tuân thủ các quy tắc nghiệp vụ.
 
 ---
 
-## 2. KẾ HOẠCH TRIỂN KHAI THEO THỨ TỰ DEPENDENCY
+## 1. TÓM TẮT QUYẾT ĐỊNH VÀ GIẢI PHÁP KỸ THUẬT
 
-### Bước 1: Tầng Persistence (Database Query & Specifications)
-- **File**: `backend/src/main/java/com/benhsoan/persistence/jpaRepository/appointment/AppointmentBusinessSpecification.java`
-- **Thay đổi**: Cập nhật Specification `unconfirmedOnDate(Instant fromTime, Instant toTime)` sử dụng `cb.greaterThan(root.get("startTime"), fromTime)` và `cb.lessThanOrEqualTo(root.get("startTime"), toTime)`.
+### 1.1. Mục tiêu và Phạm vi
+* **Mục tiêu**: Xây dựng hoàn chỉnh luồng nghiệp vụ backend khi bệnh nhân vắng mặt tại thời điểm gọi khám: cho phép tạm hoãn (defer/skip), tự động chuyển lượt sang người kế tiếp, ghi nhận số lần gọi (`callCount`), và cho phép Lễ tân đưa bệnh nhân trở lại hàng đợi (`WAITING`) khi có mặt; lưu vết lịch sử phục vụ kiểm toán.
+* **Phạm vi**: Chỉ backend (Domain, Ports, Services, Persistence, REST API, Audit, Tests). Không thay đổi frontend.
 
-### Bước 2: Tầng Application / Use Case (Business Logic & Orchestration)
-- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/appointment/GetAppointmentByIdService.java`
-  - Inject `UserRepository userRepository`.
-  - Phân giải tên người xác nhận nếu `appointment.getConfirmedBy() != null`.
-- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/appointment/GetUnconfirmedAppointmentsService.java`
-  - So sánh `targetDate` với `today` (theo múi giờ `Asia/Ho_Chi_Minh`).
-  - Nếu `targetDate.isBefore(today)`: trả về `PageImpl<>(List.of(), pageable, 0)`.
-  - Nếu `targetDate.isEqual(today)`: `fromTime = clockPort.now()`.
-  - Nếu `targetDate.isAfter(today)`: `fromTime = startOfDay.minusMillis(1)`.
-  - `toTime = endOfDay`.
+### 1.2. Các quyết định kỹ thuật cốt lõi
+1. **Khắc phục Bug huỷ dữ liệu của Skip hiện tại**:
+   - Hiện tại: `SkipQueueItemService` gọi `visit.cancel()` và `appointment.cancel()`, biến `SKIPPED` thành terminal khiến bệnh nhân không thể khám tiếp khi quay lại.
+   - Giải pháp: Khi tạm hoãn, `QueueItem` chuyển sang `SKIPPED`, `Visit` được hoàn trả về trạng thái `WAITING` (thông qua phương thức `hold()`/`revertToWaiting()`), và `Appointment` hoàn trả về trạng thái `CHECKED_IN` (thông qua phương thức `revertToCheckedIn()`). Tuyệt đối **KHÔNG huỷ (`cancel`)** Visit và Appointment khi tạm hoãn.
+2. **Số lần gọi (`callCount`)**:
+   - Thêm cột `call_count INT NOT NULL DEFAULT 0` vào bảng `queue_items` thông qua migration `V48__add_queue_item_call_count_and_defer_support.sql` (tiếp nối `V47` trên nhánh `feature/call-again-and-delay-late-patient`).
+   - `callCount` tăng lên 1 mỗi khi phương thức `call()` được gọi (tại `CallNextQueueItemService`).
+3. **Cơ chế Tự chuyển người kế tiếp (TC-01)**:
+   - Trong `SkipQueueItemService`: Sau khi chuyển ca hiện tại sang tạm hoãn, use case tự động tìm ca kế tiếp đang `WAITING` trong queue để gọi (`callNext`) nếu còn bệnh nhân chờ; nếu queue rỗng thì chỉ hoàn tất tạm hoãn ca hiện tại.
+4. **Cơ chế Đưa lại vào hàng đợi (Re-queue - TC-02)**:
+   - Thêm API `POST /queue-items/{itemId}/re-queue`.
+   - Domain `QueueItem.reQueue(Instant)`: Cho phép chuyển đổi hợp lệ từ `SKIPPED -> WAITING`.
+   - Sắp xếp vị trí: Giữ nguyên `queueNumber` gốc (vì các số nhỏ hơn đã khám xong nên tự nhiên ca này sẽ nằm ở đầu danh sách `WAITING` được ưu tiên gọi sớm), đồng thời tôn trọng mức độ ưu tiên của hàng đợi (`priorityLevel`: EMERGENCY > APPOINTMENT > REGULAR).
+5. **Chặn trạng thái sai (TC-03)**:
+   - Chặn và ném `QueueItemInvalidStatusException` nếu ca đã `COMPLETED` hoặc `CANCELLED` khi gọi tạm hoãn.
+6. **Lịch sử hàng đợi (TC-04)**:
+   - Ghi audit log chi tiết qua `QueueAuditService` với `action`: `DEFERRED` / `RE_QUEUED`, lưu `callCount`, `actorId`, `timestamp`, `reason`.
+   - Cung cấp API `GET /queue-items/{itemId}/history` (hoặc `GET /queues/{queueId}/history`) trả về lịch sử thao tác hàng đợi.
 
-### Bước 3: Tầng Testing (Kiểm thử đơn vị)
-- Bổ sung test suites cho:
-  - `GetAppointmentByIdServiceTest`: test case `confirmedByName`.
-  - `GetUnconfirmedAppointmentsServiceTest`: test case `date == null`, `date` quá khứ.
-  - `AppointmentAccessDeniedAuditWriterTest`: test case `writeConfirmDenied`.
-  - `ConfirmAppointmentServiceTest`: test case Double Confirmation (409 Conflict).
-  - `PatientConfirmAppointmentServiceTest`: test case Double Confirmation (409 Conflict).
+---
 
-### Bước 4: Tầng Tài liệu hóa (Documentation)
-- Cập nhật `docs/permission-matrix.md`.
-- Tạo mới `docs/api/appointment-confirm-contract.md`.
+## 2. KẾ HOẠCH TRIỂN KHAI THEO TỪNG GIAI ĐOẠN
+
+### Giai đoạn 1: Database Migration V48 & Domain Foundation
+* **Mục tiêu**: Bổ sung schema lưu trữ `call_count`, mở rộng Domain `QueueItem`, `Visit`, `Appointment` hỗ trợ đếm số lần gọi, tạm hoãn và hoàn trả trạng thái.
+* **File tác động**:
+  * [NEW] `backend/src/main/resources/db/migration/V48__add_queue_item_call_count_and_defer_support.sql`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/domain/queue/QueueItem.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/domain/visit/Visit.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/domain/appointment/Appointment.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/persistence/entity/queue/QueueItemEntity.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/persistence/mapper/queue/QueueStructurePersistenceMapper.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/persistence/jpaRepository/queue/QueueItemDetailsProjection.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/persistence/jpaRepository/queue/JpaQueueItemRepository.java`
+* **Quy tắc nghiệp vụ**:
+  - `QueueItem.call()` tăng `callCount++`.
+  - `QueueItem.reQueue()` chỉ hợp lệ từ `SKIPPED -> WAITING`.
+  - `Visit.revertToWaiting()` từ `IN_PROGRESS -> WAITING`.
+  - `Appointment.revertToCheckedIn()` từ `IN_PROGRESS -> CHECKED_IN`.
+* **Tiêu chí verify/test**:
+  - Unit tests cho `QueueItemTest`, `VisitTest`, `AppointmentTest` bao phủ tất cả transition mới và chặn transition sai.
+  - Integration test `QueueItemReadModelJpaIntegrationTest` kiểm tra mapping và query cột `call_count`.
+
+### Giai đoạn 2: Refactor Skip Service & Xây dựng Re-Queue Use Case (Core Application)
+* **Mục tiêu**: Hoàn thiện logic nghiệp vụ tạm hoãn không phá huỷ Visit/Appointment; tự động chuyển lượt gọi sang người tiếp theo; xây dựng use case đưa lại vào hàng đợi.
+* **File tác động**:
+  * [NEW] `backend/src/main/java/com/benhsoan/port/inbound/queue/ReQueueItemUseCase.java`
+  * [NEW] `backend/src/main/java/com/benhsoan/port/dto/command/queue/ReQueueItemCommand.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/port/dto/result/QueueItemResult.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/application/ucservice/queue/SkipQueueItemService.java`
+  * [NEW] `backend/src/main/java/com/benhsoan/application/ucservice/queue/ReQueueItemService.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/application/ucservice/queue/CallNextQueueItemService.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/application/ucservice/queue/QueueOperationAuthorization.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/application/ucservice/queue/QueueAuditService.java`
+* **Quy tắc nghiệp vụ**:
+  - TC-01: Tạm hoãn -> lưu `callCount`, tự động gọi người tiếp theo (`callNext`) nếu có ca `WAITING`.
+  - TC-02: Đưa lại vào hàng đợi -> item chuyển về `WAITING`, cập nhật ngay lập tức.
+  - TC-03: Từ chối tạm hoãn nếu ca đã `COMPLETED` hoặc `CANCELLED`.
+* **Tiêu chí verify/test**:
+  - `SkipQueueItemServiceTest`: Cập nhật lại test case để verify `visit` và `appointment` không bị huỷ.
+  - `ReQueueItemServiceTest` [NEW]: Kiểm tra luồng re-queue thành công, phân quyền và kiểm tra trạng thái không hợp lệ.
+
+### Giai đoạn 3: REST API Adapters, Security & Audit Query (Web & Infrastructure)
+* **Mục tiêu**: Cung cấp API endpoints cho lễ tân thao tác, trả về `callCount`, hỗ trợ tra cứu lịch sử hàng đợi (TC-04).
+* **File tác động**:
+  * [MODIFY] `backend/src/main/java/com/benhsoan/adapter/inbound/rest/controller/QueueController.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/adapter/inbound/rest/response/queue/QueueItemResponse.java`
+  * [MODIFY] `backend/src/main/java/com/benhsoan/adapter/inbound/rest/mapper/QueueRestMapper.java`
+  * [NEW] `backend/src/main/java/com/benhsoan/port/inbound/queue/GetQueueHistoryUseCase.java`
+  * [NEW] `backend/src/main/java/com/benhsoan/application/ucservice/queue/GetQueueHistoryService.java`
+  * [NEW] `backend/src/main/java/com/benhsoan/adapter/inbound/rest/response/queue/QueueHistoryResponse.java`
+  * [MODIFY] `backend/docs/permission-matrix.md`
+* **Quy tắc nghiệp vụ**:
+  - TC-04: API lịch sử trả về `callCount`, `skippedAt` (thời điểm tạm hoãn), và người thao tác.
+  - RBAC: `RECEPTIONIST`, `ADMIN` có quyền gọi `re-queue`.
+* **Tiêu chí verify/test**:
+  - MockMvc tests trong `QueueControllerTest`: kiểm tra `POST /queue-items/{id}/re-queue`, `POST /queue-items/{id}/skip`, `GET /queue-items/{id}/history`.
+  - Security tests trong `QueueSecurityIntegrationTest`: kiểm tra 403 Forbidden khi thiếu role/permission.
+
+### Giai đoạn 4: Kiểm thử tích hợp toàn diện & Hồi quy (Verification & Regression)
+* **Mục tiêu**: Chạy toàn bộ test suites của backend, đảm bảo vòng đời hàng đợi hoạt động hoàn hảo và không gây hồi quy.
+* **File tác động**:
+  * [MODIFY] `backend/src/test/java/com/benhsoan/application/ucservice/queue/SkipQueueItemTransactionIntegrationTest.java`
+  * [MODIFY] `backend/src/test/java/com/benhsoan/application/ucservice/queue/QueueFlowServiceTest.java`
+* **Quy tắc nghiệp vụ**:
+  - Kiểm tra toàn bộ vòng đời: Check-in -> Call-next (callCount=1) -> Defer (auto call next ca khác) -> Re-queue -> Call-next lại (callCount=2) -> Complete.
+* **Tiêu chí verify/test**:
+  - Chạy `mvn test` trên toàn bộ module backend, đảm bảo 100% test pass không có failure/error nào.

@@ -51,9 +51,9 @@ public class SkipQueueItemService implements SkipQueueItemUseCase {
         var skippedAt = clockPort.now();
 
         item.skip(command.reason(), skippedAt);
-        visit.cancel(skippedAt);
+        visit.revertToWaiting(skippedAt);
         if (appointment != null) {
-            appointment.cancel(APPOINTMENT_CANCEL_REASON);
+            appointment.revertToCheckedIn();
         }
 
         queueItemRepository.save(item);
@@ -61,7 +61,26 @@ public class SkipQueueItemService implements SkipQueueItemUseCase {
         if (appointment != null) {
             appointmentRepository.save(appointment);
         }
-        queueAuditService.recordSkipped(item, APPOINTMENT_CANCEL_REASON);
+
+        var nextItemOpt = queueItemRepository.findNextWaitingForUpdate(queue.getId());
+        if (nextItemOpt.isPresent()) {
+            QueueItem nextItem = nextItemOpt.get();
+            Visit nextVisit = visitRepository.findByIdForUpdate(nextItem.getVisitId())
+                    .orElseThrow(() -> new VisitNotFoundException(nextItem.getVisitId()));
+            nextItem.call(skippedAt);
+            nextVisit.start(skippedAt);
+            if (nextItem.getAppointmentId() != null) {
+                var nextAppt = appointmentRepository.findByIdForUpdate(nextItem.getAppointmentId())
+                        .orElseThrow(() -> new AppointmentNotFoundException(nextItem.getAppointmentId()));
+                nextAppt.start();
+                appointmentRepository.save(nextAppt);
+            }
+            queueItemRepository.save(nextItem);
+            visitRepository.save(nextVisit);
+            queueAuditService.record(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, nextItem);
+        }
+
+        queueAuditService.recordSkipped(item, command.reason());
         return queueItemQueryRepository.findDetailById(item.getId())
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }
