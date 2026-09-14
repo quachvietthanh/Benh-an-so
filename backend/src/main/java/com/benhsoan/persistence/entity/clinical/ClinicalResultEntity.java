@@ -41,6 +41,10 @@ public class ClinicalResultEntity {
     ClinicalResultType resultType;
     @Column(name = "numeric_value", precision = 18, scale = 4)
     BigDecimal numericValue;
+    @Column(name = "lower_bound", precision = 18, scale = 4)
+    BigDecimal lowerBound;
+    @Column(name = "upper_bound", precision = 18, scale = 4)
+    BigDecimal upperBound;
     @Column(name = "text_value", columnDefinition = "TEXT")
     String textValue;
     @Column(length = 50)

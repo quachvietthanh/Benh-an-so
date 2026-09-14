@@ -1,6 +1,7 @@
 package com.benhsoan.domain.clinical;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -29,7 +30,7 @@ public class ClinicalServiceCatalog {
     private ClinicalServiceCatalog(UUID id, UUID serviceCatalogId, String code, String name, ClinicalServiceType type, ClinicalResultDataType dataType, String unit, String range, String description, boolean active, Instant created, Instant updated) {
         this.id = Objects.requireNonNull(id);
         this.serviceCatalogId = Objects.requireNonNull(serviceCatalogId);
-        serviceCode = Guard.require(code, "Service code");
+        serviceCode = normalizeCode(code);
         serviceName = Guard.require(name, "Service name");
         serviceType = Objects.requireNonNull(type);
         resultDataType = Objects.requireNonNull(dataType);
@@ -69,5 +70,9 @@ public class ClinicalServiceCatalog {
         referenceRange = range;
         this.description = description;
         updatedAt = Objects.requireNonNull(at);
+    }
+
+    private static String normalizeCode(String code) {
+        return Guard.require(code, "Service code").trim().toUpperCase(Locale.ROOT);
     }
 }
