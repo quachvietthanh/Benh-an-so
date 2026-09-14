@@ -11,7 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -76,8 +75,7 @@ class ConfirmAppointmentServiceTest {
                 accessDeniedAuditWriter,
                 clockPort,
                 resultMapper,
-                objectMapper
-        );
+                objectMapper);
     }
 
     @Test
@@ -86,8 +84,7 @@ class ConfirmAppointmentServiceTest {
                 appointmentId, "APT-001", patientId, doctorId,
                 now.plusSeconds(3600), now.plusSeconds(5400),
                 AppointmentStatus.SCHEDULED, "Khám tổng quát",
-                null, null, null, UUID.randomUUID(), now.minusSeconds(7200)
-        );
+                null, null, null, UUID.randomUUID(), now.minusSeconds(7200));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -114,8 +111,7 @@ class ConfirmAppointmentServiceTest {
                 appointmentId, "APT-002", patientId, doctorId,
                 now.plusSeconds(3600), now.plusSeconds(5400),
                 AppointmentStatus.CANCELLED, "Khám tổng quát",
-                "Bận việc", null, null, UUID.randomUUID(), now.minusSeconds(7200)
-        );
+                "Bận việc", null, null, UUID.randomUUID(), now.minusSeconds(7200));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
 
@@ -130,8 +126,7 @@ class ConfirmAppointmentServiceTest {
                 appointmentId, "APT-003", patientId, doctorId,
                 now.minusSeconds(60), now.plusSeconds(1800),
                 AppointmentStatus.SCHEDULED, "Khám tổng quát",
-                null, null, null, UUID.randomUUID(), now.minusSeconds(7200)
-        );
+                null, null, null, UUID.randomUUID(), now.minusSeconds(7200));
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
 
@@ -165,8 +160,7 @@ class ConfirmAppointmentServiceTest {
                 now.plusSeconds(3600), now.plusSeconds(5400),
                 AppointmentStatus.CONFIRMED, "Khám tổng quát",
                 null, null, null, UUID.randomUUID(), now.minusSeconds(7200),
-                null, now.minusSeconds(300), currentUserId
-        );
+                null, now.minusSeconds(300), currentUserId);
 
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
 
