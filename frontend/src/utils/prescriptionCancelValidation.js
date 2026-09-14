@@ -76,22 +76,14 @@ export const canCancelPrescription = ({
 
   const isPharmacist = normalizedRoles.includes('pharmacist')
   const isDoctor = normalizedRoles.includes('doctor')
-  const isAdmin = normalizedRoles.includes('admin')
-  const hasUpdatePerm = normalizedPerms.includes('PRESCRIPTION_UPDATE')
 
-  // TC-04: Dược sĩ không được phép hủy đơn thuốc (trừ khi có quyền Admin)
-  if (isPharmacist && !isAdmin && !isDoctor) {
+  // TC-04 & Chuẩn y tế: Backend (CancelPrescriptionService) chỉ cho phép tài khoản có role DOCTOR
+  if (!isDoctor) {
     return {
       allowed: false,
-      reason: 'Dược sĩ không có quyền hủy đơn thuốc. Chỉ bác sĩ kê đơn hoặc quản trị viên mới được thực hiện.',
-    }
-  }
-
-  // Phải là Bác sĩ, Admin, hoặc có quyền cập nhật đơn
-  if (!isDoctor && !isAdmin && !hasUpdatePerm) {
-    return {
-      allowed: false,
-      reason: 'Bạn không có quyền hủy đơn thuốc này. Chức năng chỉ dành cho Bác sĩ hoặc Quản trị viên.',
+      reason: isPharmacist
+        ? 'Dược sĩ không có quyền hủy đơn thuốc. Chỉ bác sĩ đã kê đơn mới được thực hiện.'
+        : 'Bạn không có quyền hủy đơn thuốc này. Chức năng chỉ dành cho Bác sĩ đã kê đơn.',
     }
   }
 
@@ -124,16 +116,16 @@ export const canCancelPrescription = ({
     }
   }
 
-  // Kiểm tra bác sĩ kê đơn (nếu có thông tin prescribedBy và currentUserId)
+  // Kiểm tra bác sĩ kê đơn: Bắt buộc đúng bác sĩ đã kê đơn (Backend kiểm tra prescribedBy == actorId)
   if (
     prescription.prescribedBy &&
     currentUserId &&
-    String(prescription.prescribedBy) !== String(currentUserId) &&
-    !isAdmin
+    String(prescription.prescribedBy).toLowerCase().replace(/-/g, '') !==
+      String(currentUserId).toLowerCase().replace(/-/g, '')
   ) {
     return {
       allowed: false,
-      reason: 'Chỉ bác sĩ đã kê đơn thuốc này (hoặc quản trị viên) mới có quyền hủy đơn.',
+      reason: 'Chỉ bác sĩ đã kê đơn thuốc này mới có quyền hủy đơn.',
     }
   }
 

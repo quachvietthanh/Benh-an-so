@@ -209,6 +209,8 @@ function PrescriptionPage() {
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [currentUser])
+  const permissions = userPermissions
+  const user = currentUser
 
   const canCreatePrescription = userPermissions.includes('PRESCRIPTION_CREATE')
   const canUpdatePrescription = userPermissions.includes('PRESCRIPTION_UPDATE')
@@ -248,7 +250,7 @@ function PrescriptionPage() {
     roles.includes('pharmacist') && !roles.includes('doctor') && !roles.includes('admin')
   )
   const canCancelPrescriptionAction = Boolean(
-    !isPharmacistOnly && (roles.includes('doctor') || roles.includes('admin') || canUpdatePrescription)
+    roles.includes('doctor')
   )
 
   const sortedMedicines = useMemo(
@@ -1187,14 +1189,14 @@ function PrescriptionPage() {
   }
 
   const handleOpenCancelModal = (prescription) => {
-    const restrictionMsg = getCancelRestrictionMessage(prescription)
-    if (restrictionMsg) {
-      message.warning(restrictionMsg)
-      return
-    }
-
-    if (isPharmacistOnly) {
-      message.error('Dược sĩ không có quyền hủy đơn thuốc. Chỉ bác sĩ kê đơn hoặc quản trị viên mới được thực hiện.')
+    const check = canCancelPrescription({
+      userRoles: roles,
+      userPermissions,
+      prescription,
+      currentUserId: currentUser?.id,
+    })
+    if (!check.allowed) {
+      message.warning(check.reason || 'Bạn không có quyền hủy đơn thuốc này.')
       return
     }
 
@@ -1206,7 +1208,6 @@ function PrescriptionPage() {
     if (!prescription?.id) return
     setCancelling(true)
     try {
-      await requireLiveInProgressQueue('hủy đơn thuốc')
       await pharmacyApi.cancelPrescription(prescription.id, { cancelReason })
       message.success(`Đã hủy đơn thuốc ${prescription.prescriptionCode || ''} thành công.`)
       setCancelModalOpen(false)
@@ -1622,6 +1623,12 @@ function PrescriptionPage() {
         )
         const canEditThis = canPrescribe && isPending
         const isInterconnected = prescription.interconnectionStatus === 'SUCCESS'
+        const cancelCheck = canCancelPrescription({
+          userRoles: roles,
+          userPermissions,
+          prescription,
+          currentUserId: currentUser?.id,
+        })
 
         const menuItems = [
           {
@@ -1654,18 +1661,18 @@ function PrescriptionPage() {
             label: 'Điều chỉnh đơn thuốc',
             onClick: () => startEditPrescription(prescription),
           },
-          // TC-04: Dược sĩ thuần túy không có thao tác hủy
-          !isPharmacistOnly && canCancelPrescriptionAction && isPending && {
+          // TC-04: Chỉ bác sĩ đã kê đơn mới có thao tác hủy đơn chưa cấp phát
+          cancelCheck.allowed && isPending && {
             type: 'divider',
           },
-          !isPharmacistOnly && canCancelPrescriptionAction && isPending && {
+          cancelCheck.allowed && isPending && {
             key: 'cancel',
             icon: <StopOutlined />,
             danger: true,
             label: 'Hủy đơn thuốc này',
             onClick: () => handleOpenCancelModal(prescription),
           },
-          !isPharmacistOnly && canCancelPrescriptionAction && prescription.status === 'DISPENSED' && {
+          roles.includes('doctor') && prescription.status === 'DISPENSED' && (prescription.prescribedBy ? String(prescription.prescribedBy).toLowerCase().replace(/-/g, '') === String(user?.id).toLowerCase().replace(/-/g, '') : true) && {
             key: 'cancel-dispensed',
             icon: <StopOutlined style={{ color: '#94a3b8' }} />,
             disabled: true,
@@ -3333,7 +3340,7 @@ function PrescriptionPage() {
         prescription={selectedPrescriptionForDetail}
         medicines={medicines}
         canEdit={canPrescribe}
-        canCancel={canCancelPrescriptionAction}
+        canCancel={canCancelPrescription({ userRoles: roles, userPermissions, prescription: selectedPrescriptionForDetail, currentUserId: currentUser?.id }).allowed}
         onCancelClick={handleOpenCancelModal}
         canSendInterconnection={canSendInterconnection}
         onInterconnectionUpdated={loadData}
