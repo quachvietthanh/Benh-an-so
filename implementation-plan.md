@@ -15,7 +15,7 @@ Kế hoạch kỹ thuật triển khai backend hoàn chỉnh cho User Story `NCL
    - Hiện tại: `SkipQueueItemService` gọi `visit.cancel()` và `appointment.cancel()`, biến `SKIPPED` thành terminal khiến bệnh nhân không thể khám tiếp khi quay lại.
    - Giải pháp: Khi tạm hoãn, `QueueItem` chuyển sang `SKIPPED`, `Visit` được hoàn trả về trạng thái `WAITING` (thông qua phương thức `hold()`/`revertToWaiting()`), và `Appointment` hoàn trả về trạng thái `CHECKED_IN` (thông qua phương thức `revertToCheckedIn()`). Tuyệt đối **KHÔNG huỷ (`cancel`)** Visit và Appointment khi tạm hoãn.
 2. **Số lần gọi (`callCount`)**:
-   - Thêm cột `call_count INT NOT NULL DEFAULT 0` vào bảng `queue_items` thông qua migration `V48__add_queue_item_call_count_and_defer_support.sql` (tiếp nối `V47` trên nhánh `feature/call-again-and-delay-late-patient`).
+   - Thêm cột `call_count INT NOT NULL DEFAULT 0` vào bảng `queue_items` thông qua migration `V51__add_queue_item_call_count_and_defer_support.sql` (tiếp nối các migration chẩn đoán, dời lịch và xác nhận lịch hẹn).
    - `callCount` tăng lên 1 mỗi khi phương thức `call()` được gọi (tại `CallNextQueueItemService`).
 3. **Cơ chế Tự chuyển người kế tiếp (TC-01)**:
    - Trong `SkipQueueItemService`: Sau khi chuyển ca hiện tại sang tạm hoãn, use case tự động tìm ca kế tiếp đang `WAITING` trong queue để gọi (`callNext`) nếu còn bệnh nhân chờ; nếu queue rỗng thì chỉ hoàn tất tạm hoãn ca hiện tại.
@@ -33,10 +33,10 @@ Kế hoạch kỹ thuật triển khai backend hoàn chỉnh cho User Story `NCL
 
 ## 2. KẾ HOẠCH TRIỂN KHAI THEO TỪNG GIAI ĐOẠN
 
-### Giai đoạn 1: Database Migration V48 & Domain Foundation
+### Giai đoạn 1: Database Migration V51 & Domain Foundation
 * **Mục tiêu**: Bổ sung schema lưu trữ `call_count`, mở rộng Domain `QueueItem`, `Visit`, `Appointment` hỗ trợ đếm số lần gọi, tạm hoãn và hoàn trả trạng thái.
 * **File tác động**:
-  * [NEW] `backend/src/main/resources/db/migration/V48__add_queue_item_call_count_and_defer_support.sql`
+  * [NEW] `backend/src/main/resources/db/migration/V51__add_queue_item_call_count_and_defer_support.sql`
   * [MODIFY] `backend/src/main/java/com/benhsoan/domain/queue/QueueItem.java`
   * [MODIFY] `backend/src/main/java/com/benhsoan/domain/visit/Visit.java`
   * [MODIFY] `backend/src/main/java/com/benhsoan/domain/appointment/Appointment.java`
