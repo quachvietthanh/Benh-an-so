@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.clinical;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -62,6 +63,7 @@ class ClinicalReferenceRangeServiceTest {
         lenient().when(clockPort.now()).thenReturn(NOW);
         lenient().when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR);
         lenient().when(serviceRepository.findById(SERVICE_ID)).thenReturn(Optional.of(service()));
+        lenient().when(serviceRepository.findByIdForUpdate(SERVICE_ID)).thenReturn(Optional.of(service()));
     }
 
     @Test
@@ -74,6 +76,7 @@ class ClinicalReferenceRangeServiceTest {
 
         assertEquals(Gender.MALE, result.gender());
         assertEquals(new BigDecimal("5"), result.lowerBound());
+        verify(serviceRepository).findByIdForUpdate(SERVICE_ID);
         verify(auditService).record(ACTOR, ActionType.CREATE, SERVICE_ID, "Reference range created: " + result.id(), NOW);
     }
 
@@ -152,6 +155,39 @@ class ClinicalReferenceRangeServiceTest {
                 () -> service.updateStatus(SERVICE_ID, rangeBId, true));
 
         verify(referenceRangeRepository, never()).save(any(ClinicalReferenceRange.class));
+    }
+
+    @Test
+    void allowsUpdatingInactiveRangeThatOverlapsActiveRange() {
+        UUID inactiveRangeId = UUID.randomUUID();
+        ClinicalReferenceRange inactive = ClinicalReferenceRange.restore(inactiveRangeId, SERVICE_ID, Gender.MALE,
+                25, 40, new BigDecimal("5"), new BigDecimal("10"), false, NOW, null);
+        when(referenceRangeRepository.findById(inactiveRangeId)).thenReturn(Optional.of(inactive));
+        when(referenceRangeRepository.save(any(ClinicalReferenceRange.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ClinicalReferenceRangeResult result = service.update(SERVICE_ID, inactiveRangeId,
+                new UpdateClinicalReferenceRangeCommand(Gender.MALE, 25, 40, new BigDecimal("5"), new BigDecimal("10")));
+
+        assertFalse(result.active());
+        assertEquals(new BigDecimal("10"), result.upperBound());
+        verify(referenceRangeRepository).save(any(ClinicalReferenceRange.class));
+        verify(referenceRangeRepository, never()).findActiveByClinicalServiceId(SERVICE_ID);
+    }
+
+    @Test
+    void activatesInactiveRangeAfterConflictingActiveRangeIsRemoved() {
+        UUID inactiveRangeId = UUID.randomUUID();
+        ClinicalReferenceRange inactive = ClinicalReferenceRange.restore(inactiveRangeId, SERVICE_ID, Gender.MALE,
+                25, 40, new BigDecimal("5"), new BigDecimal("10"), false, NOW, null);
+        when(referenceRangeRepository.findById(inactiveRangeId)).thenReturn(Optional.of(inactive));
+        when(referenceRangeRepository.findActiveByClinicalServiceId(SERVICE_ID)).thenReturn(List.of());
+        when(referenceRangeRepository.save(any(ClinicalReferenceRange.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ClinicalReferenceRangeResult result = service.updateStatus(SERVICE_ID, inactiveRangeId, true);
+
+        assertTrue(result.active());
+        verify(auditService).record(ACTOR, ActionType.ACTIVATE, SERVICE_ID,
+                "Reference range status changed: " + inactiveRangeId, NOW);
     }
 
     private ClinicalServiceCatalog service() {

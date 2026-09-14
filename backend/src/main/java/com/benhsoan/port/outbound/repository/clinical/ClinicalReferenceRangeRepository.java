@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.clinical;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +14,8 @@ public interface ClinicalReferenceRangeRepository {
     Optional<ClinicalReferenceRange> findById(UUID id);
 
     List<ClinicalReferenceRange> findByClinicalServiceId(UUID clinicalServiceId);
+
+    List<ClinicalReferenceRange> findByClinicalServiceIdIn(Collection<UUID> clinicalServiceIds);
 
     List<ClinicalReferenceRange> findActiveByClinicalServiceId(UUID clinicalServiceId);
 }

@@ -63,6 +63,8 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         FinalizeClinicalResultUseCase, GetClinicalResultUseCase, GetClinicalResultsByVisitUseCase,
         GetClinicalResultHistoryUseCase {
 
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final ClinicalOrderItemRepository clinicalOrderItemRepository;
     private final ClinicalOrderRepository clinicalOrderRepository;
     private final ClinicalServiceCatalogRepository clinicalServiceCatalogRepository;
@@ -340,7 +342,7 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         if (patient == null || patient.getDateOfBirth() == null) {
             return Optional.empty();
         }
-        LocalDate referenceDate = now.atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate referenceDate = now.atZone(CLINIC_ZONE).toLocalDate();
         int age = referenceRangeEvaluator.ageInYears(patient.getDateOfBirth(), referenceDate);
         return referenceRangeEvaluator.resolve(patient.getGender(), age,
                 clinicalReferenceRangeRepository.findActiveByClinicalServiceId(clinicalServiceId));

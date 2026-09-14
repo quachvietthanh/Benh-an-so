@@ -30,6 +30,11 @@ public class ClinicalServiceCatalogRepositoryAdapter implements ClinicalServiceC
     }
 
     @Override
+    public Optional<ClinicalServiceCatalog> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
     public Page<ClinicalServiceCatalog> findActiveByKeyword(String keyword, Pageable pageable) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         return jpaRepository.findActiveByKeyword(normalizedKeyword, pageable).map(mapper::toDomain);

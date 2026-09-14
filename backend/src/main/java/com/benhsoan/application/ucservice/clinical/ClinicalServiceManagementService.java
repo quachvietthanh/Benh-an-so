@@ -2,7 +2,9 @@ package com.benhsoan.application.ucservice.clinical;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.clinical.ClinicalReferenceRange;
 import com.benhsoan.domain.clinical.ClinicalServiceCatalog;
 import com.benhsoan.domain.clinical.exception.ClinicalServiceCatalogNotFoundException;
 import com.benhsoan.domain.clinical.exception.ClinicalServiceCodeAlreadyExistsException;
@@ -112,9 +115,16 @@ public class ClinicalServiceManagementService implements CreateClinicalServiceUs
     @Override
     @Transactional(readOnly = true)
     public Page<ClinicalServiceManagementResult> search(String keyword, Boolean active, Pageable pageable) {
-        return serviceRepository.search(keyword, active, pageable)
-                .map(service -> resultMapper.toResult(service,
-                        referenceRangeRepository.findByClinicalServiceId(service.getId())));
+        Page<ClinicalServiceCatalog> page = serviceRepository.search(keyword, active, pageable);
+        if (page.isEmpty()) {
+            return page.map(service -> resultMapper.toResult(service, List.of()));
+        }
+        List<UUID> serviceIds = page.getContent().stream().map(ClinicalServiceCatalog::getId).toList();
+        Map<UUID, List<ClinicalReferenceRange>> rangesByServiceId =
+                referenceRangeRepository.findByClinicalServiceIdIn(serviceIds).stream()
+                        .collect(Collectors.groupingBy(ClinicalReferenceRange::getClinicalServiceId));
+        return page.map(service -> resultMapper.toResult(service,
+                rangesByServiceId.getOrDefault(service.getId(), List.of())));
     }
 
     @Override

@@ -6,10 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,12 +25,18 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+
 import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.clinical.ClinicalReferenceRange;
 import com.benhsoan.domain.clinical.ClinicalServiceCatalog;
 import com.benhsoan.domain.clinical.enums.ClinicalResultDataType;
 import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
 import com.benhsoan.domain.clinical.exception.ClinicalServiceCatalogNotFoundException;
 import com.benhsoan.domain.clinical.exception.ClinicalServiceCodeAlreadyExistsException;
+import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.port.dto.command.clinical.CreateClinicalServiceCommand;
 import com.benhsoan.port.dto.command.clinical.UpdateClinicalServiceCommand;
 import com.benhsoan.port.dto.result.ClinicalServiceManagementResult;
@@ -128,6 +137,30 @@ class ClinicalServiceManagementServiceTest {
         when(serviceRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThrows(ClinicalServiceCatalogNotFoundException.class, () -> service.getById(id));
+    }
+
+    @Test
+    void searchBatchLoadsReferenceRangesInsteadOfOneQueryPerService() {
+        UUID id1 = UUID.randomUUID();
+        UUID id2 = UUID.randomUUID();
+        ClinicalServiceCatalog c1 = catalog(id1);
+        ClinicalServiceCatalog c2 = catalog(id2);
+        Page<ClinicalServiceCatalog> page = new PageImpl<>(List.of(c1, c2), PageRequest.of(0, 20), 2);
+        ClinicalReferenceRange range1 = ClinicalReferenceRange.restore(UUID.randomUUID(), id1,
+                Gender.MALE, 18, 64, new BigDecimal("5"), new BigDecimal("10"), true, NOW, null);
+
+        when(serviceRepository.search(any(), any(), any())).thenReturn(page);
+        when(referenceRangeRepository.findByClinicalServiceIdIn(any(Collection.class)))
+                .thenReturn(List.of(range1));
+
+        Page<ClinicalServiceManagementResult> result = service.search(null, null, PageRequest.of(0, 20));
+
+        assertEquals(2, result.getTotalElements());
+        assertEquals(1, result.getContent().get(0).referenceRanges().size());
+        assertEquals(0, result.getContent().get(1).referenceRanges().size());
+
+        verify(referenceRangeRepository).findByClinicalServiceIdIn(any(Collection.class));
+        verify(referenceRangeRepository, never()).findByClinicalServiceId(any(UUID.class));
     }
 
     private CreateClinicalServiceCommand command() {

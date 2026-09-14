@@ -42,7 +42,7 @@ public class ClinicalReferenceRangeService implements CreateClinicalReferenceRan
 
     @Override
     public ClinicalReferenceRangeResult create(UUID clinicalServiceId, CreateClinicalReferenceRangeCommand command) {
-        requireService(clinicalServiceId);
+        requireServiceForUpdate(clinicalServiceId);
         if (command == null) {
             throw new ValidationException("Create clinical reference range command is required.");
         }
@@ -61,7 +61,7 @@ public class ClinicalReferenceRangeService implements CreateClinicalReferenceRan
     @Override
     public ClinicalReferenceRangeResult update(UUID clinicalServiceId, UUID referenceRangeId,
             UpdateClinicalReferenceRangeCommand command) {
-        requireService(clinicalServiceId);
+        requireServiceForUpdate(clinicalServiceId);
         if (command == null) {
             throw new ValidationException("Update clinical reference range command is required.");
         }
@@ -69,7 +69,9 @@ public class ClinicalReferenceRangeService implements CreateClinicalReferenceRan
         Instant now = clockPort.now();
         range.updateInformation(command.gender(), command.minAge(), command.maxAge(),
                 command.lowerBound(), command.upperBound(), now);
-        ensureNoOverlap(range, range.getId(), clinicalServiceId);
+        if (range.isActive()) {
+            ensureNoOverlap(range, range.getId(), clinicalServiceId);
+        }
 
         ClinicalReferenceRange saved = referenceRangeRepository.save(range);
         auditService.record(currentUserPort.getCurrentUserId(), ActionType.UPDATE, clinicalServiceId,
@@ -79,7 +81,7 @@ public class ClinicalReferenceRangeService implements CreateClinicalReferenceRan
 
     @Override
     public ClinicalReferenceRangeResult updateStatus(UUID clinicalServiceId, UUID referenceRangeId, boolean active) {
-        requireService(clinicalServiceId);
+        requireServiceForUpdate(clinicalServiceId);
         ClinicalReferenceRange range = requireRange(clinicalServiceId, referenceRangeId);
         if (range.isActive() == active) {
             return resultMapper.toRangeResult(range);
@@ -111,6 +113,14 @@ public class ClinicalReferenceRangeService implements CreateClinicalReferenceRan
             throw new ValidationException("Clinical service id is required.");
         }
         serviceRepository.findById(clinicalServiceId)
+                .orElseThrow(() -> new ClinicalServiceCatalogNotFoundException(clinicalServiceId));
+    }
+
+    private void requireServiceForUpdate(UUID clinicalServiceId) {
+        if (clinicalServiceId == null) {
+            throw new ValidationException("Clinical service id is required.");
+        }
+        serviceRepository.findByIdForUpdate(clinicalServiceId)
                 .orElseThrow(() -> new ClinicalServiceCatalogNotFoundException(clinicalServiceId));
     }
 

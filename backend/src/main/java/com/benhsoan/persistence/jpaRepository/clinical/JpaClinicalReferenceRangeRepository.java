@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.clinical;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,6 +11,9 @@ import com.benhsoan.persistence.entity.clinical.ClinicalReferenceRangeEntity;
 public interface JpaClinicalReferenceRangeRepository extends JpaRepository<ClinicalReferenceRangeEntity, UUID> {
 
     List<ClinicalReferenceRangeEntity> findByClinicalServiceIdOrderByCreatedAtAscIdAsc(UUID clinicalServiceId);
+
+    List<ClinicalReferenceRangeEntity> findByClinicalServiceIdInOrderByCreatedAtAscIdAsc(
+            Collection<UUID> clinicalServiceIds);
 
     List<ClinicalReferenceRangeEntity> findByClinicalServiceIdAndActiveTrueOrderByCreatedAtAscIdAsc(UUID clinicalServiceId);
 }

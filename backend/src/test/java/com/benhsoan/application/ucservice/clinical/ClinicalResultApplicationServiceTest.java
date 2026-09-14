@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -234,7 +235,7 @@ class ClinicalResultApplicationServiceTest {
 
                 // 1) Enter the old result while the active threshold is 10..20.
                 Fixture oldFixture = fixture(serviceId, patientId);
-                stubEnter(oldFixture, serviceId, service, patient, List.of(originalRange));
+                stubEnter(oldFixture, serviceId, service, patient, List.of(originalRange), NOW);
 
                 ClinicalResultResult oldResult = clinicalResultService.enter(oldFixture.item().getId(),
                                 new EnterClinicalResultCommand(new BigDecimal("25"), null,
@@ -264,7 +265,7 @@ class ClinicalResultApplicationServiceTest {
 
                 // 3) A NEW result now resolves the updated threshold 10..30.
                 Fixture newFixture = fixture(serviceId, patientId);
-                stubEnter(newFixture, serviceId, service, patient, List.of(updatedRange));
+                stubEnter(newFixture, serviceId, service, patient, List.of(updatedRange), NOW);
 
                 ClinicalResultResult newResult = clinicalResultService.enter(newFixture.item().getId(),
                                 new EnterClinicalResultCommand(new BigDecimal("25"), null,
@@ -277,8 +278,40 @@ class ClinicalResultApplicationServiceTest {
                 verify(clinicalReferenceRangeRepository, times(2)).findActiveByClinicalServiceId(any());
         }
 
+        @Test
+        void resolvesAgeUsingClinicTimezoneAtUtcDateBoundary() {
+                UUID serviceId = UUID.randomUUID();
+                UUID patientId = UUID.randomUUID();
+                Patient patient = patient(patientId, LocalDate.of(2008, 9, 14));
+                ClinicalServiceCatalog service = numberService(serviceId);
+                ClinicalReferenceRange age17 = ClinicalReferenceRange.restore(UUID.randomUUID(), serviceId,
+                                Gender.MALE, 17, 17, new BigDecimal("1"), new BigDecimal("2"), true, NOW, null);
+                ClinicalReferenceRange age18 = ClinicalReferenceRange.restore(UUID.randomUUID(), serviceId,
+                                Gender.MALE, 18, 18, new BigDecimal("10"), new BigDecimal("20"), true, NOW, null);
+                Fixture fixture = fixture(serviceId, patientId);
+                // 2026-09-13T18:30:00Z == 2026-09-14 01:30 in Asia/Ho_Chi_Minh (UTC+7),
+                // but still 2026-09-13 under UTC. Only the clinic timezone yields age 18.
+                Instant entryNow = Instant.parse("2026-09-13T18:30:00Z");
+
+                TimeZone original = TimeZone.getDefault();
+                try {
+                        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+                        stubEnter(fixture, serviceId, service, patient, List.of(age17, age18), entryNow);
+
+                        ClinicalResultResult result = clinicalResultService.enter(fixture.item().getId(),
+                                        new EnterClinicalResultCommand(new BigDecimal("25"), null,
+                                                        ClinicalResultAbnormalFlag.NORMAL, null));
+
+                        assertEquals(new BigDecimal("10"), result.lowerBound());
+                        assertEquals(new BigDecimal("20"), result.upperBound());
+                        assertEquals(ClinicalResultAbnormalFlag.HIGH, result.abnormalFlag());
+                } finally {
+                        TimeZone.setDefault(original);
+                }
+        }
+
         private void stubEnter(Fixture fixture, UUID serviceId, ClinicalServiceCatalog service, Patient patient,
-                        List<ClinicalReferenceRange> activeRanges) {
+                        List<ClinicalReferenceRange> activeRanges, Instant entryNow) {
                 when(authorizationService.requireWriteAccess()).thenReturn(fixture.actorId());
                 when(clinicalOrderItemRepository.findById(fixture.item().getId()))
                                 .thenReturn(Optional.of(fixture.item()));
@@ -294,7 +327,7 @@ class ClinicalResultApplicationServiceTest {
                 when(patientRepository.findById(patient.getId())).thenReturn(Optional.of(patient));
                 when(clinicalReferenceRangeRepository.findActiveByClinicalServiceId(serviceId))
                                 .thenReturn(activeRanges);
-                when(clock.now()).thenReturn(NOW);
+                when(clock.now()).thenReturn(entryNow);
                 when(clinicalResultRepository.save(any(ClinicalResult.class)))
                                 .thenAnswer(call -> call.getArgument(0));
         }
@@ -322,7 +355,11 @@ class ClinicalResultApplicationServiceTest {
         }
 
         private Patient patient(UUID patientId) {
-                return Patient.restore(patientId, "PAT-001", "Test Patient", LocalDate.of(2000, 1, 1), Gender.MALE,
+                return patient(patientId, LocalDate.of(2000, 1, 1));
+        }
+
+        private Patient patient(UUID patientId, LocalDate dateOfBirth) {
+                return Patient.restore(patientId, "PAT-001", "Test Patient", dateOfBirth, Gender.MALE,
                                 null, null, null, null, null, null, null, null, true, NOW, null, null,
                                 UUID.randomUUID());
         }

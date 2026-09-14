@@ -7,8 +7,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.stereotype.Component;
-
 import com.benhsoan.domain.clinical.enums.ClinicalResultAbnormalFlag;
 import com.benhsoan.domain.patient.enums.Gender;
 
@@ -19,7 +17,6 @@ import com.benhsoan.domain.patient.enums.Gender;
  * <p>No I/O is performed here; the application layer supplies the active
  * ranges and the patient's gender/age.</p>
  */
-@Component
 public class ReferenceRangeEvaluator {
 
     /**

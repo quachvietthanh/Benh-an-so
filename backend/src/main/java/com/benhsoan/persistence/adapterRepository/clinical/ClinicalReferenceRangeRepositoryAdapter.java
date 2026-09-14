@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.clinical;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,6 +34,15 @@ public class ClinicalReferenceRangeRepositoryAdapter implements ClinicalReferenc
     @Override
     public List<ClinicalReferenceRange> findByClinicalServiceId(UUID clinicalServiceId) {
         return jpaRepository.findByClinicalServiceIdOrderByCreatedAtAscIdAsc(clinicalServiceId).stream()
+                .map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<ClinicalReferenceRange> findByClinicalServiceIdIn(Collection<UUID> clinicalServiceIds) {
+        if (clinicalServiceIds == null || clinicalServiceIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findByClinicalServiceIdInOrderByCreatedAtAscIdAsc(clinicalServiceIds).stream()
                 .map(mapper::toDomain).toList();
     }
 
