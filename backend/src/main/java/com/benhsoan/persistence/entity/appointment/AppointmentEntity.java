@@ -70,4 +70,10 @@ public class AppointmentEntity {
     @Column(name = "booking_channel", length = 30)
     private String bookingChannel;
 
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
+
+    @Column(name = "confirmed_by", columnDefinition = "BINARY(16)")
+    private UUID confirmedBy;
+
 }

@@ -10,6 +10,7 @@ import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCancelledExce
 import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCompletedException;
 import com.benhsoan.domain.appointment.exception.AppointmentInvalidStatusException;
 import com.benhsoan.domain.appointment.exception.AppointmentNotOverdueException;
+import com.benhsoan.domain.appointment.exception.AppointmentPastCutoffException;
 import com.benhsoan.domain.appointment.exception.AppointmentTimeInPastException;
 import com.benhsoan.domain.shared.Guard.Guard;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -54,6 +55,10 @@ public class Appointment {
 
     private String bookingChannel;
 
+    private Instant confirmedAt;
+
+    private UUID confirmedBy;
+
     private static final Duration NO_SHOW_THRESHOLD = Duration.ofMinutes(15);
     
     private Appointment(
@@ -70,7 +75,9 @@ public class Appointment {
             Instant completedAt,
             UUID createdBy,
             Instant createdAt,
-            String bookingChannel
+            String bookingChannel,
+            Instant confirmedAt,
+            UUID confirmedBy
     ) {
 
         this.id = Objects.requireNonNull(id);
@@ -87,6 +94,8 @@ public class Appointment {
         this.createdBy = Objects.requireNonNull(createdBy);
         this.createdAt = Objects.requireNonNull(createdAt);
         this.bookingChannel = bookingChannel;
+        this.confirmedAt = confirmedAt;
+        this.confirmedBy = confirmedBy;
     }
 
     public static Appointment create(
@@ -130,11 +139,13 @@ public class Appointment {
                 null,
                 createdBy,
                 Instant.now(),
-                bookingChannel
+                bookingChannel,
+                null,
+                null
         );
     }
 
-        public static Appointment restore(
+    public static Appointment restore(
             UUID id,
             String appointmentCode,
             UUID patientId,
@@ -150,10 +161,10 @@ public class Appointment {
             Instant createdAt
     ) {
         return restore(id, appointmentCode, patientId, doctorId, startTime, endTime,
-                status, reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, null);
+                status, reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, null, null, null);
     }
 
-        public static Appointment restore(
+    public static Appointment restore(
             UUID id,
             String appointmentCode,
             UUID patientId,
@@ -169,6 +180,28 @@ public class Appointment {
             Instant createdAt,
             String bookingChannel
     ) {
+        return restore(id, appointmentCode, patientId, doctorId, startTime, endTime,
+                status, reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, bookingChannel, null, null);
+    }
+
+    public static Appointment restore(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            String bookingChannel,
+            Instant confirmedAt,
+            UUID confirmedBy
+    ) {
         return new Appointment(
                 id,
                 appointmentCode,
@@ -183,7 +216,9 @@ public class Appointment {
                 completedAt,
                 createdBy,
                 createdAt,
-                bookingChannel
+                bookingChannel,
+                confirmedAt,
+                confirmedBy
         );
     }
 
@@ -191,20 +226,33 @@ public class Appointment {
             UUID doctorId,
             Instant startTime,
             Instant endTime,
-            String reason,
-            Instant now ) {
-
-         if (!endTime.isAfter(startTime)) 
+            Instant now
+    ) {
+        if (!endTime.isAfter(startTime)) {
             throw new ValidationException("End time must be after start time.");
-        if (startTime.isBefore(now))
+        }
+        if (startTime.isBefore(now)) {
             throw new AppointmentTimeInPastException();
-        
+        }
+
         if (status == AppointmentStatus.CANCELLED) {
             throw new AppointmentAlreadyCancelledException();
         }
 
         if (status == AppointmentStatus.COMPLETED) {
             throw new AppointmentAlreadyCompletedException();
+        }
+
+        if (status != AppointmentStatus.SCHEDULED && status != AppointmentStatus.CONFIRMED) {
+            throw new AppointmentInvalidStatusException(
+                    "Chỉ có thể đổi lịch hẹn ở trạng thái SCHEDULED hoặc CONFIRMED."
+            );
+        }
+
+        if (!this.startTime.isAfter(now)) {
+            throw new AppointmentPastCutoffException(
+                    "Lịch hẹn đã quá giờ khám, vui lòng tạo lịch hẹn mới."
+            );
         }
 
         if (endTime.isBefore(now)) {
@@ -214,13 +262,38 @@ public class Appointment {
         this.doctorId = Objects.requireNonNull(doctorId);
         this.startTime = Guard.require(startTime, "Start time");
         this.endTime = Guard.require(endTime, "End time");
-        this.reason = Guard.require(reason, "Reason");
+    }
+
+    public void reschedule(
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            String reason,
+            Instant now
+    ) {
+        reschedule(doctorId, startTime, endTime, now);
+    }
+
+    public void confirm(UUID confirmedBy, Instant now) {
+        Guard.require(now, "Current time");
+
+        if (!this.startTime.isAfter(now)) {
+            throw new AppointmentPastCutoffException("Lịch hẹn đã quá giờ khám, không thể xác nhận.");
+        }
+
+        if (this.status != AppointmentStatus.SCHEDULED) {
+            throw new AppointmentInvalidStatusException("Chỉ có thể xác nhận lịch hẹn ở trạng thái SCHEDULED.");
+        }
+
+        this.confirmedBy = Objects.requireNonNull(confirmedBy, "Confirmed by user is required.");
+        this.confirmedAt = now;
+        this.status = AppointmentStatus.CONFIRMED;
     }
 
     public void checkIn(Instant checkedInAt) {
-        if (status != AppointmentStatus.SCHEDULED) {
+        if (status != AppointmentStatus.SCHEDULED && status != AppointmentStatus.CONFIRMED) {
             throw new AppointmentInvalidStatusException(
-                    "Only scheduled appointments can be checked in."
+                    "Chỉ có thể check-in lịch hẹn ở trạng thái SCHEDULED hoặc CONFIRMED."
             );
         }
 
@@ -272,9 +345,9 @@ public class Appointment {
 
         Guard.require(now, "Current time");
 
-        if (status != AppointmentStatus.SCHEDULED) {
+        if (status != AppointmentStatus.SCHEDULED && status != AppointmentStatus.CONFIRMED) {
             throw new AppointmentInvalidStatusException(
-                    "Only scheduled appointments can be marked as no show."
+                    "Chỉ có thể đánh dấu không đến cho lịch hẹn ở trạng thái SCHEDULED hoặc CONFIRMED."
             );
         }
 
@@ -290,7 +363,7 @@ public class Appointment {
     }
 
     public boolean canCheckIn() {
-        return status == AppointmentStatus.SCHEDULED;
+        return status == AppointmentStatus.SCHEDULED || status == AppointmentStatus.CONFIRMED;
     }
 
     public boolean canStart() {
@@ -307,8 +380,17 @@ public class Appointment {
 
     public boolean canMarkNoShow(Instant now) {
         Guard.require(now, "Current time");
-        return status == AppointmentStatus.SCHEDULED
+        return (status == AppointmentStatus.SCHEDULED || status == AppointmentStatus.CONFIRMED)
                 && !now.isBefore(getNoShowThresholdTime());
+    }
+
+    public boolean canConfirm(Instant now) {
+        Guard.require(now, "Current time");
+        return status == AppointmentStatus.SCHEDULED && this.startTime.isAfter(now);
+    }
+
+    public boolean isConfirmed() {
+        return status == AppointmentStatus.CONFIRMED;
     }
 
     public boolean isScheduled() {
