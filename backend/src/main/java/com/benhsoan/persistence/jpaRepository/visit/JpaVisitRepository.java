@@ -28,6 +28,11 @@ public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {
     @Query("select visit from VisitEntity visit where visit.id = :visitId")
     Optional<VisitEntity> findByIdForUpdate(@Param("visitId") UUID visitId);
 
+    Optional<VisitEntity> findFirstByDoctorIdAndStatusNotOrderByVisitAtDescIdDesc(
+            UUID doctorId,
+            VisitStatus status
+    );
+
     List<VisitEntity> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 
     @Query("""

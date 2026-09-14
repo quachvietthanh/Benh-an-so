@@ -18,6 +18,8 @@ public interface VisitRepository {
 
     Optional<Visit> findById(UUID visitId);
 
+    Optional<Visit> findMostRecentByDoctor(UUID doctorId);
+
     Optional<Visit> findByAppointmentId(UUID appointmentId);
 
     Optional<Visit> findByIdForUpdate(UUID visitId);

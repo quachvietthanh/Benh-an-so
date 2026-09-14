@@ -31,7 +31,7 @@ public class UpdateDiagnosisCatalogService implements UpdateDiagnosisCatalogUseC
 
         DiagnosisCatalog catalog = diagnosisCatalogRepository.findById(command.diagnosisCatalogId())
                 .orElseThrow(() -> new DiagnosisCatalogNotFoundException(command.diagnosisCatalogId()));
-        catalog.updateInformation(command.name(), command.diseaseGroup(), command.description(), clockPort.now());
+        catalog.updateInformation(command.name(), command.abbreviation(), command.diseaseGroup(), command.description(), clockPort.now());
         return resultMapper.toResult(diagnosisCatalogRepository.save(catalog));
     }
 }

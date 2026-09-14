@@ -34,54 +34,65 @@ class DiagnosisCatalogServiceTest {
     private DiagnosisCatalogService service;
 
     private final UUID id = UUID.randomUUID();
+    private final Instant now = Instant.parse("2026-08-25T00:00:00Z");
 
-    private DiagnosisCatalog sampleDiagnosis(String code, String name) {
-        return DiagnosisCatalog.restore(id, code, name, "Respiratory", "Test description", true, Instant.now(), null);
+    private DiagnosisCatalog catalog(String code, String name) {
+        return DiagnosisCatalog.restore(UUID.randomUUID(), code, name, "Hệ hô hấp", null, true, now, null);
     }
 
     @Test
-    @DisplayName("Should return empty list when query is blank")
-    void searchBlankReturnsEmpty() {
-        assertTrue(service.search(null).isEmpty());
-        assertTrue(service.search("").isEmpty());
-        assertTrue(service.search("   ").isEmpty());
+    @DisplayName("Blank query and group returns empty without touching the repository")
+    void blankQueryAndGroupReturnsEmpty() {
+        assertTrue(service.search(null, (String) null).isEmpty());
+        assertTrue(service.search("", "").isEmpty());
+        assertTrue(service.search("   ", "   ").isEmpty());
         verifyNoInteractions(repository);
     }
 
     @Test
-    @DisplayName("Should search by code or name")
-    void searchReturnsResults() {
-        var catalog = sampleDiagnosis("J00", "Common cold");
-        when(repository.search("cold", true))
-                .thenReturn(List.of(catalog));
+    @DisplayName("Normalizes keyword and delegates to the bounded active search")
+    void keywordSearchDelegatesToSearchActive() {
+        when(repository.searchActive("viem hong", null, 50))
+                .thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
 
-        List<DiagnosisCatalogResult> results = service.search("cold");
+        List<DiagnosisCatalogResult> results = service.search("Viêm họng", (String) null);
 
         assertEquals(1, results.size());
-        assertEquals("J00", results.getFirst().code());
-        assertEquals("Common cold", results.getFirst().name());
-        verify(repository).search("cold", true);
+        assertEquals("J02.9", results.getFirst().code());
+        verify(repository).searchActive("viem hong", null, 50);
+        verify(repository, never()).findAllByActive(anyBoolean());
     }
 
     @Test
-    @DisplayName("Should return multiple results")
-    void searchReturnsMultiple() {
-        var c1 = sampleDiagnosis("J00", "Common cold");
-        var c2 = sampleDiagnosis("J06.9", "Acute URTI");
-        when(repository.search("J", true))
-                .thenReturn(List.of(c1, c2));
+    @DisplayName("Delegates to disease-group listing when only a group is supplied")
+    void groupOnlySearchDelegatesToGroupLookup() {
+        when(repository.findByActiveAndDiseaseGroup("Hệ hô hấp", 50))
+                .thenReturn(List.of(catalog("J00", "Cảm lạnh thông thường")));
 
-        List<DiagnosisCatalogResult> results = service.search("J");
+        List<DiagnosisCatalogResult> results = service.search(null, "Hệ hô hấp");
 
-        assertEquals(2, results.size());
-        verify(repository).search("J", true);
+        assertEquals(1, results.size());
+        assertEquals("J00", results.getFirst().code());
+        verify(repository).findByActiveAndDiseaseGroup("Hệ hô hấp", 50);
+    }
+
+    @Test
+    @DisplayName("Combines keyword and disease-group into a single bounded query")
+    void keywordAndGroupAreCombined() {
+        when(repository.searchActive("viem hong", "Hệ hô hấp", 50))
+                .thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
+
+        List<DiagnosisCatalogResult> results = service.search("viem hong", "Hệ hô hấp");
+
+        assertEquals(1, results.size());
+        verify(repository).searchActive("viem hong", "Hệ hô hấp", 50);
     }
 
     @Test
     @DisplayName("Management search can include inactive catalog entries")
     void managementSearchUsesRequestedActiveFilter() {
         var inactiveCatalog = DiagnosisCatalog.restore(
-                id, "J00", "Common cold", "Respiratory", "Test description", false, Instant.now(), null
+                id, "J00", "Common cold", "Respiratory", "Test description", false, now, null
         );
         when(repository.search(null, false)).thenReturn(List.of(inactiveCatalog));
 
@@ -100,3 +111,4 @@ class DiagnosisCatalogServiceTest {
         assertThrows(DiagnosisCatalogNotFoundException.class, () -> service.getById(id));
     }
 }
+
