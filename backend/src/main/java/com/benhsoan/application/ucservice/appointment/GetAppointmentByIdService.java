@@ -19,11 +19,15 @@ public class GetAppointmentByIdService implements GetAppointmentByIdUseCase {
 
     private final AppointmentRepository appointmentRepository;
     private final AppointmentResultMapper appointmentResultMapper;
+    private final AppointmentRescheduleHistoryAssembler historyAssembler;
 
     @Override
     public AppointmentResult getById(UUID appointmentId) {
         return appointmentRepository.findById(appointmentId)
-                .map(appointmentResultMapper::toResult)
+                .map(appointment -> {
+                    var histories = historyAssembler.getHistoriesForAppointment(appointmentId);
+                    return appointmentResultMapper.toResult(appointment, histories);
+                })
                 .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
     }
 }

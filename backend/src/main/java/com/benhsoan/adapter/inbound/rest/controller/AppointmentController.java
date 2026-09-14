@@ -37,6 +37,8 @@ import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.SendAppointmentReminderManuallyUseCase;
+import com.benhsoan.adapter.inbound.rest.request.appointment.RescheduleAppointmentRequest;
+import com.benhsoan.port.inbound.appointment.RescheduleAppointmentUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +60,8 @@ public class AppointmentController {
     private final SearchAppointmentsUseCase searchAppointmentsUseCase;
 
     private final GetAppointmentByIdUseCase getAppointmentByIdUseCase;
+
+    private final RescheduleAppointmentUseCase rescheduleAppointmentUseCase;
 
     private final SendAppointmentReminderManuallyUseCase sendAppointmentReminderManuallyUseCase;
 
@@ -124,6 +128,18 @@ public class AppointmentController {
                         id,
                         mapper.toCommand(request)
                 );
+        return mapper.toResponse(result);
+    }
+
+    @PatchMapping("/{id}/reschedule")
+    @RequirePermission("APPOINTMENT_UPDATE")
+    public AppointmentResponse reschedule(
+            @PathVariable UUID id,
+            @Valid @RequestBody RescheduleAppointmentRequest request) {
+        AppointmentResult result = rescheduleAppointmentUseCase.reschedule(
+                id,
+                mapper.toCommand(request)
+        );
         return mapper.toResponse(result);
     }
 

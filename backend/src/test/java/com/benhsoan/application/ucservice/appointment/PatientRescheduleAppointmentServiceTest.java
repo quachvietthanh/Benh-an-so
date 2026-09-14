@@ -118,7 +118,7 @@ class PatientRescheduleAppointmentServiceTest {
 
         assertEquals(NEW_START, appointment.getStartTime());
         assertEquals(NEW_END, appointment.getEndTime());
-        assertEquals("Đổi lịch", appointment.getReason());
+        assertEquals("Khám tổng quát", appointment.getReason());
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(captor.capture());

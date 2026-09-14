@@ -38,11 +38,14 @@ class GetAppointmentByIdServiceTest {
                 Instant.parse("2026-08-09T02:00:00Z")
         );
         AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
+        AppointmentRescheduleHistoryAssembler historyAssembler = mock(AppointmentRescheduleHistoryAssembler.class);
         when(appointmentRepository.findById(appointmentId)).thenReturn(Optional.of(appointment));
+        when(historyAssembler.getHistoriesForAppointment(appointmentId)).thenReturn(java.util.List.of());
 
         AppointmentResult result = new GetAppointmentByIdService(
                 appointmentRepository,
-                new AppointmentResultMapper()
+                new AppointmentResultMapper(),
+                historyAssembler
         ).getById(appointmentId);
 
         assertEquals("APT000200", result.appointmentCode());
@@ -53,11 +56,13 @@ class GetAppointmentByIdServiceTest {
     void throwsNotFoundWhenAppointmentDoesNotExist() {
         UUID appointmentId = UUID.randomUUID();
         AppointmentRepository appointmentRepository = mock(AppointmentRepository.class);
+        AppointmentRescheduleHistoryAssembler historyAssembler = mock(AppointmentRescheduleHistoryAssembler.class);
         when(appointmentRepository.findById(appointmentId)).thenReturn(Optional.empty());
 
         assertThrows(AppointmentNotFoundException.class, () -> new GetAppointmentByIdService(
                 appointmentRepository,
-                new AppointmentResultMapper()
+                new AppointmentResultMapper(),
+                historyAssembler
         ).getById(appointmentId));
     }
 }

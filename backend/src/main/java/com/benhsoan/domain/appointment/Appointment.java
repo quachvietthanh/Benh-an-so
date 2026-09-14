@@ -10,6 +10,7 @@ import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCancelledExce
 import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCompletedException;
 import com.benhsoan.domain.appointment.exception.AppointmentInvalidStatusException;
 import com.benhsoan.domain.appointment.exception.AppointmentNotOverdueException;
+import com.benhsoan.domain.appointment.exception.AppointmentPastCutoffException;
 import com.benhsoan.domain.appointment.exception.AppointmentTimeInPastException;
 import com.benhsoan.domain.shared.Guard.Guard;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -191,20 +192,33 @@ public class Appointment {
             UUID doctorId,
             Instant startTime,
             Instant endTime,
-            String reason,
-            Instant now ) {
-
-         if (!endTime.isAfter(startTime)) 
+            Instant now
+    ) {
+        if (!endTime.isAfter(startTime)) {
             throw new ValidationException("End time must be after start time.");
-        if (startTime.isBefore(now))
+        }
+        if (startTime.isBefore(now)) {
             throw new AppointmentTimeInPastException();
-        
+        }
+
         if (status == AppointmentStatus.CANCELLED) {
             throw new AppointmentAlreadyCancelledException();
         }
 
         if (status == AppointmentStatus.COMPLETED) {
             throw new AppointmentAlreadyCompletedException();
+        }
+
+        if (status != AppointmentStatus.SCHEDULED && status != AppointmentStatus.CONFIRMED) {
+            throw new AppointmentInvalidStatusException(
+                    "Chỉ có thể đổi lịch hẹn ở trạng thái SCHEDULED hoặc CONFIRMED."
+            );
+        }
+
+        if (!this.startTime.isAfter(now)) {
+            throw new AppointmentPastCutoffException(
+                    "Lịch hẹn đã quá giờ khám, vui lòng tạo lịch hẹn mới."
+            );
         }
 
         if (endTime.isBefore(now)) {
@@ -214,7 +228,16 @@ public class Appointment {
         this.doctorId = Objects.requireNonNull(doctorId);
         this.startTime = Guard.require(startTime, "Start time");
         this.endTime = Guard.require(endTime, "End time");
-        this.reason = Guard.require(reason, "Reason");
+    }
+
+    public void reschedule(
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            String reason,
+            Instant now
+    ) {
+        reschedule(doctorId, startTime, endTime, now);
     }
 
     public void checkIn(Instant checkedInAt) {
