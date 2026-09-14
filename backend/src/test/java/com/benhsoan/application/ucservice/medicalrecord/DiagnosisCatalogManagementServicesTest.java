@@ -57,11 +57,12 @@ class DiagnosisCatalogManagementServicesTest {
         when(diagnosisCatalogRepository.save(any(DiagnosisCatalog.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var result = createService.create(new CreateDiagnosisCatalogCommand(
-                " j06.9 ", "Nhiễm trùng hô hấp trên", "Hệ hô hấp", "Mô tả"
+                " j06.9 ", "Nhiễm trùng hô hấp trên", "NTHHT", "Hệ hô hấp", "Mô tả"
         ));
 
         assertEquals("J06.9", result.code());
         assertEquals("Hệ hô hấp", result.diseaseGroup());
+        assertEquals("NTHHT", result.abbreviation());
     }
 
     @Test
@@ -69,7 +70,7 @@ class DiagnosisCatalogManagementServicesTest {
         when(diagnosisCatalogRepository.existsByCode("J00")).thenReturn(true);
 
         assertThrows(DiagnosisCatalogCodeAlreadyExistsException.class, () -> createService.create(
-                new CreateDiagnosisCatalogCommand("J00", "Cảm lạnh", "Hệ hô hấp", null)
+                new CreateDiagnosisCatalogCommand("J00", "Cảm lạnh", null, "Hệ hô hấp", null)
         ));
 
         verify(diagnosisCatalogRepository, never()).save(any());
@@ -82,7 +83,7 @@ class DiagnosisCatalogManagementServicesTest {
                 .thenThrow(new DataIntegrityViolationException("duplicate"));
 
         assertThrows(DiagnosisCatalogCodeAlreadyExistsException.class, () -> createService.create(
-                new CreateDiagnosisCatalogCommand("J00", "Cảm lạnh", "Hệ hô hấp", null)
+                new CreateDiagnosisCatalogCommand("J00", "Cảm lạnh", null, "Hệ hô hấp", null)
         ));
     }
 
@@ -93,7 +94,7 @@ class DiagnosisCatalogManagementServicesTest {
         when(diagnosisCatalogRepository.save(catalog)).thenReturn(catalog);
 
         var result = updateService.update(new UpdateDiagnosisCatalogCommand(
-                catalog.getId(), "Tên mới", "Nhóm mới", "Mô tả mới"
+                catalog.getId(), "Tên mới", null, "Nhóm mới", "Mô tả mới"
         ));
 
         assertEquals("J00", result.code());

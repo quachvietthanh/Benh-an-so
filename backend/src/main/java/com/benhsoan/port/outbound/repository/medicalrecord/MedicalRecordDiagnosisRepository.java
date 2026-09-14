@@ -20,4 +20,8 @@ public interface MedicalRecordDiagnosisRepository {
             UUID medicalRecordId,
             List<MedicalRecordDiagnosis> diagnoses
     );
+
+    List<UUID> findRecentCatalogIdsByDoctor(UUID doctorId);
+
+    List<UUID> findPopularCatalogIdsBySpecialty(UUID specialtyId);
 }

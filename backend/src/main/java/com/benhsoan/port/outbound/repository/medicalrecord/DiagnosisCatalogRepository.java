@@ -15,5 +15,7 @@ public interface DiagnosisCatalogRepository {
 
     List<DiagnosisCatalog> search(String keyword, Boolean active);
 
+    List<DiagnosisCatalog> findAllByActive(boolean active);
+
     List<DiagnosisCatalog> findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(String code, String name);
 }

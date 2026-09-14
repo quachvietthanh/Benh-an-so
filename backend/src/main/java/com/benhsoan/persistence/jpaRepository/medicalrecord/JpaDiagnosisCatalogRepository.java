@@ -28,4 +28,6 @@ public interface JpaDiagnosisCatalogRepository extends JpaRepository<DiagnosisCa
     );
 
     List<DiagnosisCatalogEntity> findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(String code, String name);
+
+    List<DiagnosisCatalogEntity> findByActiveOrderByCodeAsc(boolean active);
 }

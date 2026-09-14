@@ -21,4 +21,17 @@ class DiagnosisCatalogTest {
                 "J00", "Cảm lạnh thông thường", " ", null
         ));
     }
+
+    @Test
+    void trimsAbbreviationAndNormalizesBlankToNull() {
+        DiagnosisCatalog withAbbreviation = DiagnosisCatalog.create(
+                "I10", "Tăng huyết áp", "  THA  ", "Hệ tuần hoàn", null
+        );
+        assertEquals("THA", withAbbreviation.getAbbreviation());
+
+        DiagnosisCatalog blankAbbreviation = DiagnosisCatalog.create(
+                "I10", "Tăng huyết áp", "   ", "Hệ tuần hoàn", null
+        );
+        assertEquals(null, blankAbbreviation.getAbbreviation());
+    }
 }

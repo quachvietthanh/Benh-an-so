@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 public class DiagnosisCatalog {
 
     private UUID id;
-    private String code, name, diseaseGroup, description;
+    private String code, name, abbreviation, diseaseGroup, description;
     private boolean active;
     private Instant createdAt, updatedAt;
 
@@ -26,6 +26,7 @@ public class DiagnosisCatalog {
             UUID id,
             String code,
             String name,
+            String abbreviation,
             String diseaseGroup,
             String description,
             boolean active,
@@ -35,6 +36,7 @@ public class DiagnosisCatalog {
         this.id = Objects.requireNonNull(id);
         this.code = normalizeCode(code);
         this.name = Guard.require(name, "Diagnosis name");
+        this.abbreviation = normalizeAbbreviation(abbreviation);
         this.diseaseGroup = Guard.require(diseaseGroup, "Disease group");
         this.description = description;
         this.active = active;
@@ -43,7 +45,17 @@ public class DiagnosisCatalog {
     }
 
     public static DiagnosisCatalog create(String code, String name, String diseaseGroup, String description) {
-        return new DiagnosisCatalog(UUID.randomUUID(), code, name, diseaseGroup, description, true, Instant.now(), null);
+        return new DiagnosisCatalog(UUID.randomUUID(), code, name, null, diseaseGroup, description, true, Instant.now(), null);
+    }
+
+    public static DiagnosisCatalog create(
+            String code,
+            String name,
+            String abbreviation,
+            String diseaseGroup,
+            String description
+    ) {
+        return new DiagnosisCatalog(UUID.randomUUID(), code, name, abbreviation, diseaseGroup, description, true, Instant.now(), null);
     }
 
     public static DiagnosisCatalog create(
@@ -54,7 +66,19 @@ public class DiagnosisCatalog {
             String description,
             Instant createdAt
     ) {
-        return new DiagnosisCatalog(id, code, name, diseaseGroup, description, true, createdAt, null);
+        return new DiagnosisCatalog(id, code, name, null, diseaseGroup, description, true, createdAt, null);
+    }
+
+    public static DiagnosisCatalog create(
+            UUID id,
+            String code,
+            String name,
+            String abbreviation,
+            String diseaseGroup,
+            String description,
+            Instant createdAt
+    ) {
+        return new DiagnosisCatalog(id, code, name, abbreviation, diseaseGroup, description, true, createdAt, null);
     }
 
     public static DiagnosisCatalog restore(
@@ -67,7 +91,21 @@ public class DiagnosisCatalog {
             Instant createdAt,
             Instant updatedAt
     ) {
-        return new DiagnosisCatalog(id, code, name, diseaseGroup, description, active, createdAt, updatedAt);
+        return new DiagnosisCatalog(id, code, name, null, diseaseGroup, description, active, createdAt, updatedAt);
+    }
+
+    public static DiagnosisCatalog restore(
+            UUID id,
+            String code,
+            String name,
+            String abbreviation,
+            String diseaseGroup,
+            String description,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        return new DiagnosisCatalog(id, code, name, abbreviation, diseaseGroup, description, active, createdAt, updatedAt);
     }
 
     public void activate(Instant at) {
@@ -81,7 +119,12 @@ public class DiagnosisCatalog {
     }
 
     public void updateInformation(String name, String diseaseGroup, String description, Instant at) {
+        updateInformation(name, null, diseaseGroup, description, at);
+    }
+
+    public void updateInformation(String name, String abbreviation, String diseaseGroup, String description, Instant at) {
         this.name = Guard.require(name, "Diagnosis name");
+        this.abbreviation = normalizeAbbreviation(abbreviation);
         this.diseaseGroup = Guard.require(diseaseGroup, "Disease group");
         this.description = description;
         updatedAt = Objects.requireNonNull(at);
@@ -89,5 +132,12 @@ public class DiagnosisCatalog {
 
     private static String normalizeCode(String code) {
         return Guard.require(code, "Diagnosis code").trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizeAbbreviation(String abbreviation) {
+        if (abbreviation == null || abbreviation.isBlank()) {
+            return null;
+        }
+        return abbreviation.trim();
     }
 }

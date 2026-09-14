@@ -57,4 +57,14 @@ public class MedicalRecordDiagnosisRepositoryAdapter implements MedicalRecordDia
                 .map(mapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<UUID> findRecentCatalogIdsByDoctor(UUID doctorId) {
+        return jpaRepository.findRecentCatalogIdsByDoctor(doctorId);
+    }
+
+    @Override
+    public List<UUID> findPopularCatalogIdsBySpecialty(UUID specialtyId) {
+        return jpaRepository.findPopularCatalogIdsBySpecialty(specialtyId);
+    }
 }

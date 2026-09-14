@@ -10,8 +10,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.DiagnosisCatalogRestMapper;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.DiagnosisCatalogResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.DiagnosisSuggestionResponse;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.medicalrecord.GetDiagnosisCatalogUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetDiagnosisSuggestionsUseCase;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class DiagnosisCatalogController {
 
     private final GetDiagnosisCatalogUseCase getDiagnosisCatalogUseCase;
+    private final GetDiagnosisSuggestionsUseCase getDiagnosisSuggestionsUseCase;
     private final DiagnosisCatalogRestMapper mapper;
 
     @GetMapping
@@ -29,5 +32,11 @@ public class DiagnosisCatalogController {
     public List<DiagnosisCatalogResponse> search(
             @RequestParam(required = false) String search) {
         return mapper.toResponse(getDiagnosisCatalogUseCase.search(search));
+    }
+
+    @GetMapping("/suggestions")
+    @RequirePermission("DIAGNOSIS_READ")
+    public DiagnosisSuggestionResponse suggestions() {
+        return mapper.toSuggestionResponse(getDiagnosisSuggestionsUseCase.suggest());
     }
 }

@@ -43,6 +43,11 @@ public class DiagnosisCatalogRepositoryAdapter implements DiagnosisCatalogReposi
     }
 
     @Override
+    public List<DiagnosisCatalog> findAllByActive(boolean active) {
+        return jpaRepository.findByActiveOrderByCodeAsc(active).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public List<DiagnosisCatalog> findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(String code, String name) {
         return jpaRepository.findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(code, name)
                 .stream().map(mapper::toDomain).toList();

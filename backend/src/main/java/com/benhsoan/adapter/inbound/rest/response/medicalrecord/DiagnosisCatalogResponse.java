@@ -7,6 +7,7 @@ public record DiagnosisCatalogResponse(
         UUID id,
         String code,
         String name,
+        String abbreviation,
         String diseaseGroup,
         String description,
         boolean active,

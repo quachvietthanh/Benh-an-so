@@ -34,9 +34,10 @@ class DiagnosisCatalogServiceTest {
     private DiagnosisCatalogService service;
 
     private final UUID id = UUID.randomUUID();
+    private final Instant now = Instant.parse("2026-08-25T00:00:00Z");
 
-    private DiagnosisCatalog sampleDiagnosis(String code, String name) {
-        return DiagnosisCatalog.restore(id, code, name, "Respiratory", "Test description", true, Instant.now(), null);
+    private DiagnosisCatalog catalog(String code, String name) {
+        return DiagnosisCatalog.restore(UUID.randomUUID(), code, name, "Hệ hô hấp", null, true, now, null);
     }
 
     @Test
@@ -49,39 +50,91 @@ class DiagnosisCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("Should search by code or name")
-    void searchReturnsResults() {
-        var catalog = sampleDiagnosis("J00", "Common cold");
-        when(repository.search("cold", true))
-                .thenReturn(List.of(catalog));
+    @DisplayName("Should search Vietnamese name without diacritics")
+    void searchMatchesVietnameseNameWithoutDiacritics() {
+        when(repository.findAllByActive(true)).thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
 
-        List<DiagnosisCatalogResult> results = service.search("cold");
+        List<DiagnosisCatalogResult> results = service.search("viem hong");
 
         assertEquals(1, results.size());
-        assertEquals("J00", results.getFirst().code());
-        assertEquals("Common cold", results.getFirst().name());
-        verify(repository).search("cold", true);
+        assertEquals("J02.9", results.getFirst().code());
     }
 
     @Test
-    @DisplayName("Should return multiple results")
-    void searchReturnsMultiple() {
-        var c1 = sampleDiagnosis("J00", "Common cold");
-        var c2 = sampleDiagnosis("J06.9", "Acute URTI");
-        when(repository.search("J", true))
-                .thenReturn(List.of(c1, c2));
+    @DisplayName("Should search code case-insensitively")
+    void searchMatchesCodeCaseInsensitively() {
+        when(repository.findAllByActive(true)).thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
 
-        List<DiagnosisCatalogResult> results = service.search("J");
+        List<DiagnosisCatalogResult> results = service.search("j02");
+
+        assertEquals(1, results.size());
+        assertEquals("J02.9", results.getFirst().code());
+    }
+
+    @Test
+    @DisplayName("Should rank exact code, then prefix, then substring deterministically")
+    void searchRanksByMatchLevel() {
+        var exactCode = catalog("J02", "Alpha");
+        var codePrefix = catalog("J02.9", "Beta");
+        var namePrefix = catalog("K00", "J02 something");
+        var nameSubstring = catalog("K01", "Contains j02 inside");
+        var noMatch = catalog("Z00", "Unrelated");
+        when(repository.findAllByActive(true))
+                .thenReturn(List.of(noMatch, nameSubstring, codePrefix, exactCode, namePrefix));
+
+        List<DiagnosisCatalogResult> results = service.search("j02");
+
+        assertEquals(4, results.size());
+        assertEquals("J02", results.get(0).code());
+        assertEquals("J02.9", results.get(1).code());
+        assertEquals("K00", results.get(2).code());
+        assertEquals("K01", results.get(3).code());
+    }
+
+    @Test
+    @DisplayName("Should order equal relevance by code ascending")
+    void searchOrdersEqualRankByCode() {
+        var first = catalog("J01.9", "Viêm xoang");
+        var second = catalog("J02.9", "Viêm họng cấp");
+        when(repository.findAllByActive(true)).thenReturn(List.of(second, first));
+
+        List<DiagnosisCatalogResult> results = service.search("viem");
 
         assertEquals(2, results.size());
-        verify(repository).search("J", true);
+        assertEquals("J01.9", results.get(0).code());
+        assertEquals("J02.9", results.get(1).code());
+    }
+
+    @Test
+    @DisplayName("Should search by clinical abbreviation independently of code")
+    void searchMatchesAbbreviation() {
+        var catalog = DiagnosisCatalog.restore(
+                UUID.randomUUID(), "I10", "Tăng huyết áp", "THA", "Hệ tuần hoàn", null, true, now, null);
+        when(repository.findAllByActive(true)).thenReturn(List.of(catalog));
+
+        List<DiagnosisCatalogResult> results = service.search("tha");
+
+        assertEquals(1, results.size());
+        assertEquals("I10", results.getFirst().code());
+        assertEquals("THA", results.getFirst().abbreviation());
+    }
+
+    @Test
+    @DisplayName("Should only look up active catalog entries")
+    void searchUsesActiveCatalogLookup() {
+        when(repository.findAllByActive(true)).thenReturn(List.of());
+
+        service.search("viem");
+
+        verify(repository).findAllByActive(true);
+        verify(repository, never()).search(anyString(), any());
     }
 
     @Test
     @DisplayName("Management search can include inactive catalog entries")
     void managementSearchUsesRequestedActiveFilter() {
         var inactiveCatalog = DiagnosisCatalog.restore(
-                id, "J00", "Common cold", "Respiratory", "Test description", false, Instant.now(), null
+                id, "J00", "Common cold", "Respiratory", "Test description", false, now, null
         );
         when(repository.search(null, false)).thenReturn(List.of(inactiveCatalog));
 
@@ -100,3 +153,4 @@ class DiagnosisCatalogServiceTest {
         assertThrows(DiagnosisCatalogNotFoundException.class, () -> service.getById(id));
     }
 }
+

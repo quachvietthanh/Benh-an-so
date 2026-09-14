@@ -20,7 +20,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.DiagnosisCatalogRestMapper;
 import com.benhsoan.port.dto.result.DiagnosisCatalogResult;
+import com.benhsoan.port.dto.result.DiagnosisSuggestionResult;
 import com.benhsoan.port.inbound.medicalrecord.GetDiagnosisCatalogUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetDiagnosisSuggestionsUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -38,6 +40,9 @@ class DiagnosisCatalogControllerTest {
 
     @MockitoBean
     private GetDiagnosisCatalogUseCase getDiagnosisCatalogUseCase;
+
+    @MockitoBean
+    private GetDiagnosisSuggestionsUseCase getDiagnosisSuggestionsUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -61,7 +66,7 @@ class DiagnosisCatalogControllerTest {
     void searchReturnsResults() throws Exception {
         when(getDiagnosisCatalogUseCase.search("cold"))
                 .thenReturn(List.of(new DiagnosisCatalogResult(
-                        id, "J00", "Common cold", "Respiratory", "Desc", true, Instant.now(), null)));
+                        id, "J00", "Common cold", null, "Respiratory", "Desc", true, Instant.now(), null)));
 
         mockMvc.perform(get("/diagnosis-catalog")
                         .param("search", "cold"))
@@ -92,5 +97,21 @@ class DiagnosisCatalogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /diagnosis-catalog/suggestions returns recent, popular and disease groups")
+    void suggestionsReturnsStructuredResponse() throws Exception {
+        var recent = new DiagnosisCatalogResult(id, "J02.9", "Viêm họng cấp", null, "Hệ hô hấp", null, true, Instant.now(), null);
+        when(getDiagnosisSuggestionsUseCase.suggest())
+                .thenReturn(new DiagnosisSuggestionResult(List.of(recent), List.of(), List.of("Hệ hô hấp")));
+
+        mockMvc.perform(get("/diagnosis-catalog/suggestions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recent[0].code").value("J02.9"))
+                .andExpect(jsonPath("$.recent[0].name").value("Viêm họng cấp"))
+                .andExpect(jsonPath("$.popular").isArray())
+                .andExpect(jsonPath("$.popular").isEmpty())
+                .andExpect(jsonPath("$.diseaseGroups[0]").value("Hệ hô hấp"));
     }
 }
