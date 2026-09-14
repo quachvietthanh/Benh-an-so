@@ -41,6 +41,7 @@ import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentDetailUs
 import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.PatientBookAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientCancelAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.PatientConfirmAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientRescheduleAppointmentUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -68,6 +69,7 @@ class PatientPortalAppointmentControllerTest {
     @MockitoBean private PatientBookAppointmentUseCase patientBookAppointmentUseCase;
     @MockitoBean private PatientCancelAppointmentUseCase patientCancelAppointmentUseCase;
     @MockitoBean private PatientRescheduleAppointmentUseCase patientRescheduleAppointmentUseCase;
+    @MockitoBean private PatientConfirmAppointmentUseCase patientConfirmAppointmentUseCase;
     @MockitoBean private GetPatientPortalAppointmentsUseCase getPatientPortalAppointmentsUseCase;
     @MockitoBean private GetPatientPortalAppointmentDetailUseCase getPatientPortalAppointmentDetailUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
@@ -349,4 +351,56 @@ class PatientPortalAppointmentControllerTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
+    @Test
+    void confirmAppointmentReturns200() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        Instant confirmedAt = Instant.parse("2026-08-26T03:00:00Z");
+
+        when(patientConfirmAppointmentUseCase.confirm(appointmentId))
+                .thenReturn(new PatientAppointmentResult(
+                        appointmentId, "APT000100", patientId, doctorId,
+                        Instant.parse("2099-08-10T02:00:00Z"),
+                        Instant.parse("2099-08-10T02:30:00Z"),
+                        AppointmentStatus.SCHEDULED,
+                        "Khám tổng quát",
+                        "ONLINE_PORTAL",
+                        Instant.parse("2026-08-26T02:00:00Z"),
+                        confirmedAt));
+
+        mockMvc.perform(patch("/patient-portal/appointments/{id}/confirm", appointmentId)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(appointmentId.toString()))
+                .andExpect(jsonPath("$.confirmedAt").value(confirmedAt.toString()));
+    }
+
+    @Test
+    void confirmAppointmentReturns403WhenNotOwned() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+
+        when(patientConfirmAppointmentUseCase.confirm(appointmentId))
+                .thenThrow(new AccessDeniedException("Patient may only access their own data."));
+
+        mockMvc.perform(patch("/patient-portal/appointments/{id}/confirm", appointmentId)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void confirmAppointmentReturns400WhenPastCutoff() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+
+        when(patientConfirmAppointmentUseCase.confirm(appointmentId))
+                .thenThrow(new AppointmentPastCutoffException("Cannot confirm past appointment"));
+
+        mockMvc.perform(patch("/patient-portal/appointments/{id}/confirm", appointmentId)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("APPOINTMENT_PAST_CUTOFF"));
+    }
+
 }
+

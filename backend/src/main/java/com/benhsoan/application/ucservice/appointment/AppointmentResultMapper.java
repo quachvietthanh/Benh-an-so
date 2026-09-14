@@ -21,6 +21,14 @@ public class AppointmentResultMapper {
             Appointment appointment,
             List<AppointmentRescheduleHistoryResult> histories
     ) {
+        return toResult(appointment, histories, null);
+    }
+
+    public AppointmentResult toResult(
+            Appointment appointment,
+            List<AppointmentRescheduleHistoryResult> histories,
+            String confirmedByName
+    ) {
         return AppointmentResult.builder()
                 .id(appointment.getId())
                 .appointmentCode(appointment.getAppointmentCode())
@@ -35,6 +43,9 @@ public class AppointmentResultMapper {
                 .completedAt(appointment.getCompletedAt())
                 .createdBy(appointment.getCreatedBy())
                 .createdAt(appointment.getCreatedAt())
+                .confirmedAt(appointment.getConfirmedAt())
+                .confirmedBy(appointment.getConfirmedBy())
+                .confirmedByName(confirmedByName)
                 .rescheduleHistories(histories != null ? histories : List.of())
                 .build();
     }

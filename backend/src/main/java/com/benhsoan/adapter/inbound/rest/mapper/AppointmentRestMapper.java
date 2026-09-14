@@ -70,6 +70,9 @@ public class AppointmentRestMapper {
                 .checkedInAt(result.checkedInAt())
                 .completedAt(result.completedAt())
                 .createdAt(result.createdAt())
+                .confirmedAt(result.confirmedAt())
+                .confirmedBy(result.confirmedBy())
+                .confirmedByName(result.confirmedByName())
                 .rescheduleHistories(histories)
                 .build();
 

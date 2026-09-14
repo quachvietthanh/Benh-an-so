@@ -35,6 +35,12 @@ public record AppointmentResponse(
 
         Instant createdAt,
 
+        Instant confirmedAt,
+
+        UUID confirmedBy,
+
+        String confirmedByName,
+
         List<AppointmentRescheduleHistoryResponse> rescheduleHistories
 
 ) {
@@ -42,5 +48,25 @@ public record AppointmentResponse(
         if (rescheduleHistories == null) {
             rescheduleHistories = List.of();
         }
+    }
+
+    public AppointmentResponse(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            Instant createdAt,
+            List<AppointmentRescheduleHistoryResponse> rescheduleHistories
+    ) {
+        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
+                reason, cancelReason, checkedInAt, completedAt, createdAt, null, null, null,
+                rescheduleHistories != null ? rescheduleHistories : List.of());
     }
 }

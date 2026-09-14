@@ -30,6 +30,7 @@ import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentDetailUs
 import com.benhsoan.port.inbound.appointment.GetPatientPortalAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.PatientBookAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientCancelAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.PatientConfirmAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.PatientRescheduleAppointmentUseCase;
 
 import jakarta.validation.Valid;
@@ -45,6 +46,8 @@ public class PatientPortalAppointmentController {
     private final PatientBookAppointmentUseCase patientBookAppointmentUseCase;
 
     private final PatientCancelAppointmentUseCase patientCancelAppointmentUseCase;
+
+    private final PatientConfirmAppointmentUseCase patientConfirmAppointmentUseCase;
 
     private final PatientRescheduleAppointmentUseCase patientRescheduleAppointmentUseCase;
 
@@ -86,6 +89,12 @@ public class PatientPortalAppointmentController {
         PatientAppointmentResult result =
                 patientBookAppointmentUseCase.book(mapper.toCommand(request));
 
+        return mapper.toResponse(result);
+    }
+
+    @PatchMapping("/{id}/confirm")
+    public PatientAppointmentResponse confirm(@PathVariable UUID id) {
+        PatientAppointmentResult result = patientConfirmAppointmentUseCase.confirm(id);
         return mapper.toResponse(result);
     }
 

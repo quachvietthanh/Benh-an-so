@@ -38,6 +38,12 @@ public record AppointmentResult(
 
         Instant createdAt,
 
+        Instant confirmedAt,
+
+        UUID confirmedBy,
+
+        String confirmedByName,
+
         List<AppointmentRescheduleHistoryResult> rescheduleHistories
 
 ) {
@@ -57,6 +63,50 @@ public record AppointmentResult(
             Instant createdAt
     ) {
         this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
-                reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, List.of());
+                reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, null, null, null, List.of());
+    }
+
+    public AppointmentResult(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            List<AppointmentRescheduleHistoryResult> rescheduleHistories
+    ) {
+        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
+                reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt,
+                null, null, null, rescheduleHistories != null ? rescheduleHistories : List.of());
+    }
+
+    public AppointmentResult(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            Instant confirmedAt,
+            UUID confirmedBy,
+            String confirmedByName
+    ) {
+        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
+                reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt,
+                confirmedAt, confirmedBy, confirmedByName, List.of());
     }
 }

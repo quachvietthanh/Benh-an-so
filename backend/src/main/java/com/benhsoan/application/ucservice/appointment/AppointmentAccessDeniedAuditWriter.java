@@ -59,6 +59,34 @@ public class AppointmentAccessDeniedAuditWriter {
         }
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void writeConfirmDenied(
+            UUID actorId,
+            UUID appointmentId,
+            Instant deniedAt,
+            String errorReason
+    ) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("action", "CONFIRM");
+        detail.put("error", errorReason != null ? errorReason : "User lacks RECEPTIONIST or ADMIN role to confirm appointment");
+        detail.put("deniedAt", deniedAt != null ? deniedAt.toString() : null);
+
+        try {
+            auditLogRepository.save(AuditLog.create(
+                    actorId,
+                    ActionType.ACCESS_DENIED,
+                    ResourceType.APPOINTMENT,
+                    appointmentId,
+                    toJson(detail),
+                    null,
+                    deniedAt
+            ));
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record access denied audit log for actor {} on confirming appointment {}: {}",
+                    actorId, appointmentId, exception.getMessage());
+        }
+    }
+
     private String toJson(Map<String, Object> detail) {
         try {
             return objectMapper.writeValueAsString(detail);

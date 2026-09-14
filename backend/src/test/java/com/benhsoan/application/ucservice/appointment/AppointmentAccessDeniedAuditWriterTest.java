@@ -59,4 +59,26 @@ class AppointmentAccessDeniedAuditWriterTest {
         assertEquals(appointmentId, saved.getResourceId());
         assertTrue(saved.getDetail().contains("User lacks RECEPTIONIST or ADMIN role"));
     }
+
+    @Test
+    void writesConfirmDeniedAuditEntryCorrectly_Finding4() {
+        UUID actorId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+        Instant deniedAt = Instant.parse("2026-09-14T08:00:00Z");
+        String reason = "User lacks RECEPTIONIST or ADMIN role to confirm appointment";
+
+        auditWriter.writeConfirmDenied(actorId, appointmentId, deniedAt, reason);
+
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        AuditLog saved = auditLogCaptor.getValue();
+
+        assertNotNull(saved);
+        assertEquals(actorId, saved.getUserId());
+        assertEquals(ActionType.ACCESS_DENIED, saved.getActionType());
+        assertEquals(ResourceType.APPOINTMENT, saved.getResourceType());
+        assertEquals(appointmentId, saved.getResourceId());
+        assertTrue(saved.getDetail().contains("CONFIRM"));
+        assertTrue(saved.getDetail().contains("User lacks RECEPTIONIST or ADMIN role to confirm appointment"));
+        assertTrue(saved.getDetail().contains("2026-09-14T08:00:00Z"));
+    }
 }

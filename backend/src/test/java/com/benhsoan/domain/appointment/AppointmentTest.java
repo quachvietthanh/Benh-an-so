@@ -150,4 +150,85 @@ class AppointmentTest {
         assertThrows(AppointmentTimeInPastException.class,
                 () -> appointment.reschedule(UUID.randomUUID(), now.minusSeconds(100), now.plusSeconds(1800), "Dời lịch", now));
     }
+
+    @Test
+    void confirmsSuccessfullyWhenStatusIsScheduledAndFuture() {
+        Instant now = Instant.parse("2026-09-14T08:00:00Z");
+        UUID confirmedBy = UUID.randomUUID();
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT-010", UUID.randomUUID(), UUID.randomUUID(),
+                now.plusSeconds(3600), now.plusSeconds(5400), AppointmentStatus.SCHEDULED,
+                "Consultation", null, null, null, UUID.randomUUID(), now.minusSeconds(3600));
+
+        appointment.confirm(confirmedBy, now);
+
+        assertEquals(AppointmentStatus.CONFIRMED, appointment.getStatus());
+        assertEquals(confirmedBy, appointment.getConfirmedBy());
+        assertEquals(now, appointment.getConfirmedAt());
+        assertEquals(true, appointment.isConfirmed());
+    }
+
+    @Test
+    void doesNotAllowConfirmWhenAppointmentIsPast() {
+        Instant now = Instant.parse("2026-09-14T08:00:00Z");
+        UUID confirmedBy = UUID.randomUUID();
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT-011", UUID.randomUUID(), UUID.randomUUID(),
+                now.minusSeconds(60), now.plusSeconds(1800), AppointmentStatus.SCHEDULED,
+                "Consultation", null, null, null, UUID.randomUUID(), now.minusSeconds(3600));
+
+        assertThrows(AppointmentPastCutoffException.class,
+                () -> appointment.confirm(confirmedBy, now));
+    }
+
+    @Test
+    void doesNotAllowConfirmWhenStatusIsNotScheduled() {
+        Instant now = Instant.parse("2026-09-14T08:00:00Z");
+        UUID confirmedBy = UUID.randomUUID();
+
+        // CANCELLED
+        Appointment cancelledAppointment = Appointment.restore(
+                UUID.randomUUID(), "APT-012", UUID.randomUUID(), UUID.randomUUID(),
+                now.plusSeconds(3600), now.plusSeconds(5400), AppointmentStatus.CANCELLED,
+                "Consultation", "Cancelled", null, null, UUID.randomUUID(), now.minusSeconds(3600));
+        assertThrows(AppointmentInvalidStatusException.class,
+                () -> cancelledAppointment.confirm(confirmedBy, now));
+
+        // Already CONFIRMED
+        Appointment confirmedAppointment = Appointment.restore(
+                UUID.randomUUID(), "APT-013", UUID.randomUUID(), UUID.randomUUID(),
+                now.plusSeconds(3600), now.plusSeconds(5400), AppointmentStatus.CONFIRMED,
+                "Consultation", null, null, null, UUID.randomUUID(), now.minusSeconds(3600),
+                null, now.minusSeconds(100), confirmedBy);
+        assertThrows(AppointmentInvalidStatusException.class,
+                () -> confirmedAppointment.confirm(confirmedBy, now));
+    }
+
+    @Test
+    void allowsCheckInWhenStatusIsConfirmed() {
+        Instant now = Instant.parse("2026-09-14T08:00:00Z");
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT-014", UUID.randomUUID(), UUID.randomUUID(),
+                now.plusSeconds(600), now.plusSeconds(2400), AppointmentStatus.CONFIRMED,
+                "Consultation", null, null, null, UUID.randomUUID(), now.minusSeconds(3600));
+
+        appointment.checkIn(now);
+
+        assertEquals(AppointmentStatus.CHECKED_IN, appointment.getStatus());
+        assertEquals(now, appointment.getCheckedInAt());
+    }
+
+    @Test
+    void allowsMarkNoShowWhenStatusIsConfirmed() {
+        Instant startTime = Instant.parse("2026-09-14T08:00:00Z");
+        Instant now = startTime.plusSeconds(1800); // 30 minutes after start, past 15 min threshold
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT-015", UUID.randomUUID(), UUID.randomUUID(),
+                startTime, startTime.plusSeconds(1800), AppointmentStatus.CONFIRMED,
+                "Consultation", null, null, null, UUID.randomUUID(), startTime.minusSeconds(7200));
+
+        appointment.markNoShow(now);
+
+        assertEquals(AppointmentStatus.NO_SHOW, appointment.getStatus());
+    }
 }

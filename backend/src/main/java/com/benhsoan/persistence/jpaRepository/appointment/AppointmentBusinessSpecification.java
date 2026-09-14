@@ -81,13 +81,34 @@ public final class AppointmentBusinessSpecification {
     ) {
         return (root, query, cb)
                 -> cb.and(
-                        cb.equal(
-                                root.get("status"),
-                                AppointmentStatus.SCHEDULED
+                        root.get("status").in(
+                                AppointmentStatus.SCHEDULED,
+                                AppointmentStatus.CONFIRMED
                         ),
                         cb.lessThan(
                                 root.get("startTime"),
                                 threshold
+                        )
+                );
+    }
+
+    public static Specification<AppointmentEntity> unconfirmedOnDate(
+            Instant fromTime,
+            Instant toTime
+    ) {
+        return (root, query, cb)
+                -> cb.and(
+                        cb.equal(
+                                root.get("status"),
+                                AppointmentStatus.SCHEDULED
+                        ),
+                        cb.greaterThan(
+                                root.get("startTime"),
+                                fromTime
+                        ),
+                        cb.lessThanOrEqualTo(
+                                root.get("startTime"),
+                                toTime
                         )
                 );
     }

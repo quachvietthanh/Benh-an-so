@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import java.time.LocalDate;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -31,9 +32,11 @@ import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.dto.result.AppointmentReminderResult;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.ConfirmAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
 import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
+import com.benhsoan.port.inbound.appointment.GetUnconfirmedAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.SendAppointmentReminderManuallyUseCase;
@@ -53,9 +56,13 @@ public class AppointmentController {
 
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
 
+    private final ConfirmAppointmentUseCase confirmAppointmentUseCase;
+
     private final MarkAppointmentNoShowUseCase markAppointmentNoShowUseCase;
 
     private final GetOverdueAppointmentsUseCase getOverdueAppointmentsUseCase;
+
+    private final GetUnconfirmedAppointmentsUseCase getUnconfirmedAppointmentsUseCase;
 
     private final SearchAppointmentsUseCase searchAppointmentsUseCase;
 
@@ -116,6 +123,13 @@ public class AppointmentController {
         return sendAppointmentReminderManuallyUseCase.sendManually(id);
     }
 
+    @PatchMapping("/{id}/confirm")
+    @RequirePermission("APPOINTMENT_UPDATE")
+    public AppointmentResponse confirm(@PathVariable UUID id) {
+        AppointmentResult result = confirmAppointmentUseCase.confirm(id);
+        return mapper.toResponse(result);
+    }
+
     @PatchMapping("/{id}/cancel")
     @RequirePermission("APPOINTMENT_UPDATE")
     public AppointmentResponse cancel(
@@ -140,6 +154,21 @@ public class AppointmentController {
                 id,
                 mapper.toCommand(request)
         );
+        return mapper.toResponse(result);
+    }
+
+    @GetMapping("/unconfirmed")
+    @RequirePermission("APPOINTMENT_READ")
+    public Page<AppointmentResponse> getUnconfirmed(
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ValidationException("Page must be non-negative and size must be between 1 and 100.");
+        }
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "startTime"));
+        Page<AppointmentResult> result = getUnconfirmedAppointmentsUseCase.getUnconfirmed(date, pageable);
         return mapper.toResponse(result);
     }
 

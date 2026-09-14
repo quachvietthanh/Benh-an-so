@@ -44,9 +44,11 @@ import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.ConfirmAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
 import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
+import com.benhsoan.port.inbound.appointment.GetUnconfirmedAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
 import com.benhsoan.port.inbound.appointment.RescheduleAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
@@ -71,8 +73,10 @@ class AppointmentControllerTest {
 
     @MockitoBean private CreateAppointmentUseCase createAppointmentUseCase;
     @MockitoBean private CancelAppointmentUseCase cancelAppointmentUseCase;
+    @MockitoBean private ConfirmAppointmentUseCase confirmAppointmentUseCase;
     @MockitoBean private MarkAppointmentNoShowUseCase markAppointmentNoShowUseCase;
     @MockitoBean private GetOverdueAppointmentsUseCase getOverdueAppointmentsUseCase;
+    @MockitoBean private GetUnconfirmedAppointmentsUseCase getUnconfirmedAppointmentsUseCase;
     @MockitoBean private SearchAppointmentsUseCase searchAppointmentsUseCase;
     @MockitoBean private GetAppointmentByIdUseCase getAppointmentByIdUseCase;
     @MockitoBean private RescheduleAppointmentUseCase rescheduleAppointmentUseCase;
@@ -360,7 +364,46 @@ class AppointmentControllerTest {
                 null,
                 null,
                 UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5"),
-                Instant.parse("2026-08-09T02:00:00Z")
+                Instant.parse("2026-08-09T02:00:00Z"),
+                status == AppointmentStatus.CONFIRMED ? Instant.parse("2026-08-09T03:00:00Z") : null,
+                status == AppointmentStatus.CONFIRMED ? UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5") : null,
+                status == AppointmentStatus.CONFIRMED ? "Lễ Tân Nguyễn Văn A" : null
         );
+    }
+
+    @Test
+    void confirmAppointment_returnsConfirmedResponse() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        when(confirmAppointmentUseCase.confirm(appointmentId)).thenReturn(result(appointmentId, AppointmentStatus.CONFIRMED));
+
+        mockMvc.perform(patch("/appointments/{id}/confirm", appointmentId)
+                        .with(withPermissions("APPOINTMENT_UPDATE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(appointmentId.toString()))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.confirmedByName").value("Lễ Tân Nguyễn Văn A"));
+    }
+
+    @Test
+    void confirmAppointment_withoutPermission_forbidden() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/appointments/{id}/confirm", appointmentId)
+                        .with(withPermissions("APPOINTMENT_READ")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getUnconfirmedAppointments_returnsPagedResponse() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        when(getUnconfirmedAppointmentsUseCase.getUnconfirmed(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(result(appointmentId, AppointmentStatus.SCHEDULED))));
+
+        mockMvc.perform(get("/appointments/unconfirmed")
+                        .param("date", "2026-09-14")
+                        .with(withPermissions("APPOINTMENT_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(appointmentId.toString()))
+                .andExpect(jsonPath("$.content[0].status").value("SCHEDULED"));
     }
 }
