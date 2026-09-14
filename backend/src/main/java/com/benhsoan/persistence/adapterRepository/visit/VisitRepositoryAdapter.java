@@ -40,7 +40,9 @@ public class VisitRepositoryAdapter implements VisitRepository {
 
     @Override
     public Optional<Visit> findMostRecentByDoctor(UUID doctorId) {
-        return jpaRepository.findMostRecentByDoctor(doctorId).map(mapper::toDomain);
+        return jpaRepository.findFirstByDoctorIdAndStatusNotOrderByVisitAtDescIdDesc(
+                        doctorId, VisitStatus.CANCELLED)
+                .map(mapper::toDomain);
     }
 
     @Override

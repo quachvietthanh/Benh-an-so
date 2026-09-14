@@ -64,30 +64,14 @@ class DiagnosisSuggestionServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR);
         when(diagnosisCatalogRepository.findAllByActive(true))
                 .thenReturn(List.of(catalog(catalogId, "J02.9", "Viêm họng cấp", "Hệ hô hấp")));
-        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR)).thenReturn(List.of(catalogId));
+        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, 10)).thenReturn(List.of(catalogId));
         when(visitRepository.findMostRecentByDoctor(DOCTOR)).thenReturn(Optional.empty());
 
         DiagnosisSuggestionResult result = service.suggest();
 
         assertEquals(1, result.recent().size());
         assertEquals("J02.9", result.recent().getFirst().code());
-        verify(medicalRecordDiagnosisRepository).findRecentCatalogIdsByDoctor(DOCTOR);
-    }
-
-    @Test
-    @DisplayName("Deduplicates repeated recent codes")
-    void recentDeduplicatesRepeatedCodes() {
-        UUID catalogId = UUID.randomUUID();
-        when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR);
-        when(diagnosisCatalogRepository.findAllByActive(true))
-                .thenReturn(List.of(catalog(catalogId, "J02.9", "Viêm họng cấp", "Hệ hô hấp")));
-        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR))
-                .thenReturn(List.of(catalogId, catalogId));
-        when(visitRepository.findMostRecentByDoctor(DOCTOR)).thenReturn(Optional.empty());
-
-        DiagnosisSuggestionResult result = service.suggest();
-
-        assertEquals(1, result.recent().size());
+        verify(medicalRecordDiagnosisRepository).findRecentCatalogIdsByDoctor(DOCTOR, 10);
     }
 
     @Test
@@ -96,7 +80,7 @@ class DiagnosisSuggestionServiceTest {
         UUID catalogId = UUID.randomUUID();
         when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR);
         when(diagnosisCatalogRepository.findAllByActive(true)).thenReturn(List.of());
-        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR)).thenReturn(List.of(catalogId));
+        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, 10)).thenReturn(List.of(catalogId));
         when(visitRepository.findMostRecentByDoctor(DOCTOR)).thenReturn(Optional.empty());
 
         DiagnosisSuggestionResult result = service.suggest();
@@ -109,7 +93,7 @@ class DiagnosisSuggestionServiceTest {
     void recentEmptyForDoctorWithoutHistory() {
         when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR);
         when(diagnosisCatalogRepository.findAllByActive(true)).thenReturn(List.of());
-        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR)).thenReturn(List.of());
+        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, 10)).thenReturn(List.of());
         when(visitRepository.findMostRecentByDoctor(DOCTOR)).thenReturn(Optional.empty());
 
         DiagnosisSuggestionResult result = service.suggest();
@@ -126,14 +110,14 @@ class DiagnosisSuggestionServiceTest {
         when(diagnosisCatalogRepository.findAllByActive(true))
                 .thenReturn(List.of(catalog(popularCatalogId, "I10", "Tăng huyết áp", "Hệ tuần hoàn")));
         when(visitRepository.findMostRecentByDoctor(DOCTOR)).thenReturn(Optional.of(visit(SPECIALTY)));
-        when(medicalRecordDiagnosisRepository.findPopularCatalogIdsBySpecialty(SPECIALTY))
+        when(medicalRecordDiagnosisRepository.findPopularCatalogIdsBySpecialty(SPECIALTY, 10))
                 .thenReturn(List.of(popularCatalogId));
 
         DiagnosisSuggestionResult result = service.suggest();
 
         assertEquals(1, result.popular().size());
         assertEquals("I10", result.popular().getFirst().code());
-        verify(medicalRecordDiagnosisRepository).findPopularCatalogIdsBySpecialty(SPECIALTY);
+        verify(medicalRecordDiagnosisRepository).findPopularCatalogIdsBySpecialty(SPECIALTY, 10);
     }
 
     @Test
@@ -141,13 +125,13 @@ class DiagnosisSuggestionServiceTest {
     void popularEmptyWithoutVisit() {
         when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR);
         when(diagnosisCatalogRepository.findAllByActive(true)).thenReturn(List.of());
-        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR)).thenReturn(List.of());
+        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, 10)).thenReturn(List.of());
         when(visitRepository.findMostRecentByDoctor(DOCTOR)).thenReturn(Optional.empty());
 
         DiagnosisSuggestionResult result = service.suggest();
 
         assertTrue(result.popular().isEmpty());
-        verify(medicalRecordDiagnosisRepository, never()).findPopularCatalogIdsBySpecialty(any());
+        verify(medicalRecordDiagnosisRepository, never()).findPopularCatalogIdsBySpecialty(any(), anyInt());
     }
 
     @Test
@@ -161,7 +145,7 @@ class DiagnosisSuggestionServiceTest {
                         catalog(id1, "I10", "Tăng huyết áp", "Hệ tuần hoàn"),
                         catalog(id2, "J00", "Cảm lạnh", "Hệ hô hấp"),
                         catalog(UUID.randomUUID(), "I48", "Rung nhĩ", "Hệ tuần hoàn")));
-        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR)).thenReturn(List.of());
+        when(medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, 10)).thenReturn(List.of());
         when(visitRepository.findMostRecentByDoctor(DOCTOR)).thenReturn(Optional.empty());
 
         DiagnosisSuggestionResult result = service.suggest();

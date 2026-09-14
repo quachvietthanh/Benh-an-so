@@ -45,4 +45,21 @@ class VisitRepositoryAdapterTest {
 
         assertEquals(patientId, result.orElseThrow().getPatientId());
     }
+
+    @Test
+    void findsMostRecentNonCancelledVisitByDoctor() {
+        UUID doctorId = UUID.randomUUID();
+        VisitEntity visit = VisitEntity.builder()
+                .id(UUID.randomUUID()).visitCode("VIS-001").patientId(UUID.randomUUID()).doctorId(doctorId)
+                .visitType(VisitType.WALK_IN).status(VisitStatus.COMPLETED)
+                .visitAt(Instant.parse("2026-08-20T02:00:00Z")).reason("Consultation")
+                .createdBy(doctorId).createdAt(Instant.parse("2026-08-20T02:00:00Z"))
+                .build();
+        when(jpaRepository.findFirstByDoctorIdAndStatusNotOrderByVisitAtDescIdDesc(
+                doctorId, VisitStatus.CANCELLED)).thenReturn(Optional.of(visit));
+
+        var result = adapter.findMostRecentByDoctor(doctorId);
+
+        assertEquals(visit.getId(), result.orElseThrow().getId());
+    }
 }

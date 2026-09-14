@@ -1,6 +1,5 @@
 package com.benhsoan.application.ucservice.medicalrecord;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,17 +57,11 @@ public class DiagnosisSuggestionService implements GetDiagnosisSuggestionsUseCas
     }
 
     private List<DiagnosisCatalogResult> buildRecent(UUID doctorId, Map<UUID, DiagnosisCatalog> activeById) {
-        List<UUID> recentIds = medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(doctorId).stream()
-                .distinct()
+        return medicalRecordDiagnosisRepository.findRecentCatalogIdsByDoctor(doctorId, RECENT_LIMIT).stream()
+                .map(activeById::get)
+                .filter(Objects::nonNull)
+                .map(resultMapper::toResult)
                 .toList();
-        List<DiagnosisCatalogResult> results = new ArrayList<>();
-        for (UUID catalogId : recentIds) {
-            DiagnosisCatalog catalog = activeById.get(catalogId);
-            if (catalog != null && results.size() < RECENT_LIMIT) {
-                results.add(resultMapper.toResult(catalog));
-            }
-        }
-        return results;
     }
 
     private List<DiagnosisCatalogResult> buildPopular(UUID doctorId, Map<UUID, DiagnosisCatalog> activeById) {
@@ -78,17 +71,11 @@ public class DiagnosisSuggestionService implements GetDiagnosisSuggestionsUseCas
         if (specialtyId == null) {
             return List.of();
         }
-        List<UUID> popularIds = medicalRecordDiagnosisRepository.findPopularCatalogIdsBySpecialty(specialtyId).stream()
-                .distinct()
+        return medicalRecordDiagnosisRepository.findPopularCatalogIdsBySpecialty(specialtyId, POPULAR_LIMIT).stream()
+                .map(activeById::get)
+                .filter(Objects::nonNull)
+                .map(resultMapper::toResult)
                 .toList();
-        List<DiagnosisCatalogResult> results = new ArrayList<>();
-        for (UUID catalogId : popularIds) {
-            DiagnosisCatalog catalog = activeById.get(catalogId);
-            if (catalog != null && results.size() < POPULAR_LIMIT) {
-                results.add(resultMapper.toResult(catalog));
-            }
-        }
-        return results;
     }
 
     private List<String> buildDiseaseGroups(List<DiagnosisCatalog> activeCatalogs) {

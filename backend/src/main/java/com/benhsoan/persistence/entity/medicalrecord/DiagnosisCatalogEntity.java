@@ -33,8 +33,12 @@ public class DiagnosisCatalogEntity {
     String code;
     @Column(nullable = false, length = 150)
     String name;
+    @Column(name = "name_norm", length = 150)
+    String nameNorm;
     @Column(length = 50)
     String abbreviation;
+    @Column(name = "abbreviation_norm", length = 50)
+    String abbreviationNorm;
     @Column(name = "disease_group", nullable = false, length = 100)
     String diseaseGroup;
     @Column(columnDefinition = "TEXT")

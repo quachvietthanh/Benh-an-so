@@ -90,4 +90,20 @@ class DiagnosisCatalogFlywayMySqlIntegrationTest {
                 Integer.class
         ));
     }
+
+    @Test
+    void flywayAddsNormalizedSearchColumnsAndIndex() {
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'diagnosis_catalog' "
+                        + "AND column_name IN ('name_norm', 'abbreviation_norm') AND is_nullable = 'YES'",
+                Integer.class
+        ));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.statistics "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'diagnosis_catalog' "
+                        + "AND index_name = 'idx_diagnosis_catalog_active_name_norm'",
+                Integer.class
+        ));
+    }
 }

@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
@@ -59,12 +60,12 @@ public class MedicalRecordDiagnosisRepositoryAdapter implements MedicalRecordDia
     }
 
     @Override
-    public List<UUID> findRecentCatalogIdsByDoctor(UUID doctorId) {
-        return jpaRepository.findRecentCatalogIdsByDoctor(doctorId);
+    public List<UUID> findRecentCatalogIdsByDoctor(UUID doctorId, int limit) {
+        return jpaRepository.findRecentCatalogIdsByDoctor(doctorId, PageRequest.of(0, limit));
     }
 
     @Override
-    public List<UUID> findPopularCatalogIdsBySpecialty(UUID specialtyId) {
-        return jpaRepository.findPopularCatalogIdsBySpecialty(specialtyId);
+    public List<UUID> findPopularCatalogIdsBySpecialty(UUID specialtyId, int limit) {
+        return jpaRepository.findPopularCatalogIdsBySpecialty(specialtyId, PageRequest.of(0, limit));
     }
 }

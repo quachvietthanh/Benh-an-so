@@ -16,7 +16,8 @@ public class DiagnosisCatalogPersistenceMapper {
 
     public DiagnosisCatalogEntity toEntity(DiagnosisCatalog d) {
         return d == null ? null : DiagnosisCatalogEntity.builder()
-                .id(d.getId()).code(d.getCode()).name(d.getName()).abbreviation(d.getAbbreviation()).diseaseGroup(d.getDiseaseGroup())
+                .id(d.getId()).code(d.getCode()).name(d.getName()).nameNorm(d.getNameNorm())
+                .abbreviation(d.getAbbreviation()).abbreviationNorm(d.getAbbreviationNorm()).diseaseGroup(d.getDiseaseGroup())
                 .description(d.getDescription()).active(d.isActive()).createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt())
                 .build();
     }

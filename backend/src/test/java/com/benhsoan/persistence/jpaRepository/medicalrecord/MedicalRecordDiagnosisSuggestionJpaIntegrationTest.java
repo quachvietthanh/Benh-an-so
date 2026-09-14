@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.PageRequest;
 
 import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
@@ -59,7 +60,7 @@ class MedicalRecordDiagnosisSuggestionJpaIntegrationTest {
                 freeText(record.getId())
         ));
 
-        List<UUID> recent = diagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR);
+        List<UUID> recent = diagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, PageRequest.of(0, 10));
 
         assertEquals(2, recent.size());
         assertEquals(j029.getId(), recent.get(0));
@@ -84,7 +85,7 @@ class MedicalRecordDiagnosisSuggestionJpaIntegrationTest {
                 diagnosis(s2Record.getId(), i10.getId(), NOW.minusSeconds(5))
         ));
 
-        List<UUID> popular = diagnosisRepository.findPopularCatalogIdsBySpecialty(SPECIALTY);
+        List<UUID> popular = diagnosisRepository.findPopularCatalogIdsBySpecialty(SPECIALTY, PageRequest.of(0, 10));
 
         assertEquals(2, popular.size());
         assertEquals(i10.getId(), popular.get(0));
@@ -105,7 +106,7 @@ class MedicalRecordDiagnosisSuggestionJpaIntegrationTest {
                 diagnosis(cancelledRecord.getId(), j029.getId(), NOW)
         ));
 
-        List<UUID> recent = diagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR);
+        List<UUID> recent = diagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, PageRequest.of(0, 10));
 
         assertEquals(1, recent.size());
         assertEquals(j00.getId(), recent.get(0));
@@ -125,7 +126,7 @@ class MedicalRecordDiagnosisSuggestionJpaIntegrationTest {
                 diagnosis(completedRecord.getId(), j00.getId(), NOW)
         ));
 
-        List<UUID> popular = diagnosisRepository.findPopularCatalogIdsBySpecialty(SPECIALTY);
+        List<UUID> popular = diagnosisRepository.findPopularCatalogIdsBySpecialty(SPECIALTY, PageRequest.of(0, 10));
 
         assertEquals(1, popular.size());
         assertEquals(j00.getId(), popular.get(0));
@@ -135,6 +136,45 @@ class MedicalRecordDiagnosisSuggestionJpaIntegrationTest {
         return DiagnosisCatalogEntity.builder()
                 .id(UUID.randomUUID()).code(code).name(name).diseaseGroup("Hệ hô hấp")
                 .active(true).createdAt(NOW).build();
+    }
+
+    @Test
+    void recentQueryHonorsLimit() {
+        DiagnosisCatalogEntity c1 = catalog("J00", "Cảm lạnh thông thường");
+        DiagnosisCatalogEntity c2 = catalog("J01.9", "Viêm xoang");
+        DiagnosisCatalogEntity c3 = catalog("J02.9", "Viêm họng cấp");
+        catalogRepository.saveAll(List.of(c1, c2, c3));
+
+        MedicalRecordEntity record = medicalRecordRepository.save(record(visit().getId()));
+        diagnosisRepository.saveAll(List.of(
+                diagnosis(record.getId(), c1.getId(), NOW.minusSeconds(30)),
+                diagnosis(record.getId(), c2.getId(), NOW.minusSeconds(20)),
+                diagnosis(record.getId(), c3.getId(), NOW.minusSeconds(10))
+        ));
+
+        List<UUID> recent = diagnosisRepository.findRecentCatalogIdsByDoctor(DOCTOR, PageRequest.of(0, 2));
+
+        assertEquals(2, recent.size());
+        assertEquals(c3.getId(), recent.get(0));
+        assertEquals(c2.getId(), recent.get(1));
+    }
+
+    @Test
+    void popularQueryHonorsLimit() {
+        DiagnosisCatalogEntity c1 = catalog("J00", "Cảm lạnh thông thường");
+        DiagnosisCatalogEntity c2 = catalog("J01.9", "Viêm xoang");
+        catalogRepository.saveAll(List.of(c1, c2));
+
+        MedicalRecordEntity r1 = medicalRecordRepository.save(record(visit(SPECIALTY).getId()));
+        MedicalRecordEntity r2 = medicalRecordRepository.save(record(visit(SPECIALTY).getId()));
+        diagnosisRepository.saveAll(List.of(
+                diagnosis(r1.getId(), c1.getId(), NOW.minusSeconds(20)),
+                diagnosis(r2.getId(), c2.getId(), NOW.minusSeconds(10))
+        ));
+
+        List<UUID> popular = diagnosisRepository.findPopularCatalogIdsBySpecialty(SPECIALTY, PageRequest.of(0, 1));
+
+        assertEquals(1, popular.size());
     }
 
     private VisitEntity visit() {

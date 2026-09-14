@@ -1,14 +1,12 @@
 package com.benhsoan.application.ucservice.medicalrecord;
 
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogNotFoundException;
 import com.benhsoan.domain.shared.VietnameseTextNormalizer;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -20,70 +18,50 @@ import com.benhsoan.port.outbound.repository.medicalrecord.DiagnosisCatalogRepos
 import lombok.RequiredArgsConstructor;
 
 /**
- * Step 5 (Simplicity Check): Keeping service simple - one method that delegates to repository with mapping.
+ * Doctor-facing and admin-facing diagnosis catalog queries. The doctor-facing
+ * search is pushed into the database (bounded and accent-insensitive via
+ * persisted normalized columns); no in-memory ranking is performed here.
  */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DiagnosisCatalogService implements GetDiagnosisCatalogUseCase, DiagnosisCatalogManagementQueryUseCase {
 
+    private static final int MAX_RESULTS = 50;
+
     private final DiagnosisCatalogRepository repository;
     private final DiagnosisCatalogResultMapper resultMapper;
 
     @Override
-    public List<DiagnosisCatalogResult> search(String query) {
-        if (query == null || query.isBlank()) {
-            return Collections.emptyList();
+    public List<DiagnosisCatalogResult> search(String query, String diseaseGroup) {
+        String keyword = normalizeKeyword(query);
+        String group = normalizeGroup(diseaseGroup);
+        if (keyword == null) {
+            if (group == null) {
+                return Collections.emptyList();
+            }
+            return repository.findByActiveAndDiseaseGroup(group, MAX_RESULTS).stream()
+                    .map(resultMapper::toResult)
+                    .toList();
         }
-        String keyword = VietnameseTextNormalizer.normalize(query);
-        if (keyword.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return repository.findAllByActive(true).stream()
-                .map(catalog -> new RankedMatch(catalog, rank(catalog, keyword)))
-                .filter(match -> match.rank() >= 0)
-                .sorted(Comparator.comparingInt(RankedMatch::rank)
-                        .thenComparing(match -> match.catalog().getCode())
-                        .thenComparing(match -> match.catalog().getName()))
-                .map(match -> resultMapper.toResult(match.catalog()))
+        return repository.searchActive(keyword, group, MAX_RESULTS).stream()
+                .map(resultMapper::toResult)
                 .toList();
     }
 
-    private int rank(DiagnosisCatalog catalog, String keyword) {
-        String code = VietnameseTextNormalizer.normalize(catalog.getCode());
-        String name = VietnameseTextNormalizer.normalize(catalog.getName());
-        String abbreviation = VietnameseTextNormalizer.normalize(catalog.getAbbreviation());
-        if (code.equals(keyword)) {
-            return 0;
+    private String normalizeKeyword(String query) {
+        if (query == null || query.isBlank()) {
+            return null;
         }
-        if (name.equals(keyword)) {
-            return 1;
-        }
-        if (abbreviation != null && abbreviation.equals(keyword)) {
-            return 2;
-        }
-        if (code.startsWith(keyword)) {
-            return 3;
-        }
-        if (name.startsWith(keyword)) {
-            return 4;
-        }
-        if (abbreviation != null && abbreviation.startsWith(keyword)) {
-            return 5;
-        }
-        if (code.contains(keyword)) {
-            return 6;
-        }
-        if (name.contains(keyword)) {
-            return 7;
-        }
-        if (abbreviation != null && abbreviation.contains(keyword)) {
-            return 8;
-        }
-        return -1;
+        String normalized = VietnameseTextNormalizer.normalize(query);
+        return normalized.isEmpty() ? null : normalized;
     }
 
-    private record RankedMatch(DiagnosisCatalog catalog, int rank) {
+    private String normalizeGroup(String diseaseGroup) {
+        if (diseaseGroup == null || diseaseGroup.isBlank()) {
+            return null;
+        }
+        return diseaseGroup.trim();
     }
 
     @Override

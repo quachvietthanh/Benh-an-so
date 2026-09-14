@@ -41,93 +41,51 @@ class DiagnosisCatalogServiceTest {
     }
 
     @Test
-    @DisplayName("Should return empty list when query is blank")
-    void searchBlankReturnsEmpty() {
-        assertTrue(service.search(null).isEmpty());
-        assertTrue(service.search("").isEmpty());
-        assertTrue(service.search("   ").isEmpty());
+    @DisplayName("Blank query and group returns empty without touching the repository")
+    void blankQueryAndGroupReturnsEmpty() {
+        assertTrue(service.search(null, (String) null).isEmpty());
+        assertTrue(service.search("", "").isEmpty());
+        assertTrue(service.search("   ", "   ").isEmpty());
         verifyNoInteractions(repository);
     }
 
     @Test
-    @DisplayName("Should search Vietnamese name without diacritics")
-    void searchMatchesVietnameseNameWithoutDiacritics() {
-        when(repository.findAllByActive(true)).thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
+    @DisplayName("Normalizes keyword and delegates to the bounded active search")
+    void keywordSearchDelegatesToSearchActive() {
+        when(repository.searchActive("viem hong", null, 50))
+                .thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
 
-        List<DiagnosisCatalogResult> results = service.search("viem hong");
-
-        assertEquals(1, results.size());
-        assertEquals("J02.9", results.getFirst().code());
-    }
-
-    @Test
-    @DisplayName("Should search code case-insensitively")
-    void searchMatchesCodeCaseInsensitively() {
-        when(repository.findAllByActive(true)).thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
-
-        List<DiagnosisCatalogResult> results = service.search("j02");
+        List<DiagnosisCatalogResult> results = service.search("Viêm họng", (String) null);
 
         assertEquals(1, results.size());
         assertEquals("J02.9", results.getFirst().code());
+        verify(repository).searchActive("viem hong", null, 50);
+        verify(repository, never()).findAllByActive(anyBoolean());
     }
 
     @Test
-    @DisplayName("Should rank exact code, then prefix, then substring deterministically")
-    void searchRanksByMatchLevel() {
-        var exactCode = catalog("J02", "Alpha");
-        var codePrefix = catalog("J02.9", "Beta");
-        var namePrefix = catalog("K00", "J02 something");
-        var nameSubstring = catalog("K01", "Contains j02 inside");
-        var noMatch = catalog("Z00", "Unrelated");
-        when(repository.findAllByActive(true))
-                .thenReturn(List.of(noMatch, nameSubstring, codePrefix, exactCode, namePrefix));
+    @DisplayName("Delegates to disease-group listing when only a group is supplied")
+    void groupOnlySearchDelegatesToGroupLookup() {
+        when(repository.findByActiveAndDiseaseGroup("Hệ hô hấp", 50))
+                .thenReturn(List.of(catalog("J00", "Cảm lạnh thông thường")));
 
-        List<DiagnosisCatalogResult> results = service.search("j02");
-
-        assertEquals(4, results.size());
-        assertEquals("J02", results.get(0).code());
-        assertEquals("J02.9", results.get(1).code());
-        assertEquals("K00", results.get(2).code());
-        assertEquals("K01", results.get(3).code());
-    }
-
-    @Test
-    @DisplayName("Should order equal relevance by code ascending")
-    void searchOrdersEqualRankByCode() {
-        var first = catalog("J01.9", "Viêm xoang");
-        var second = catalog("J02.9", "Viêm họng cấp");
-        when(repository.findAllByActive(true)).thenReturn(List.of(second, first));
-
-        List<DiagnosisCatalogResult> results = service.search("viem");
-
-        assertEquals(2, results.size());
-        assertEquals("J01.9", results.get(0).code());
-        assertEquals("J02.9", results.get(1).code());
-    }
-
-    @Test
-    @DisplayName("Should search by clinical abbreviation independently of code")
-    void searchMatchesAbbreviation() {
-        var catalog = DiagnosisCatalog.restore(
-                UUID.randomUUID(), "I10", "Tăng huyết áp", "THA", "Hệ tuần hoàn", null, true, now, null);
-        when(repository.findAllByActive(true)).thenReturn(List.of(catalog));
-
-        List<DiagnosisCatalogResult> results = service.search("tha");
+        List<DiagnosisCatalogResult> results = service.search(null, "Hệ hô hấp");
 
         assertEquals(1, results.size());
-        assertEquals("I10", results.getFirst().code());
-        assertEquals("THA", results.getFirst().abbreviation());
+        assertEquals("J00", results.getFirst().code());
+        verify(repository).findByActiveAndDiseaseGroup("Hệ hô hấp", 50);
     }
 
     @Test
-    @DisplayName("Should only look up active catalog entries")
-    void searchUsesActiveCatalogLookup() {
-        when(repository.findAllByActive(true)).thenReturn(List.of());
+    @DisplayName("Combines keyword and disease-group into a single bounded query")
+    void keywordAndGroupAreCombined() {
+        when(repository.searchActive("viem hong", "Hệ hô hấp", 50))
+                .thenReturn(List.of(catalog("J02.9", "Viêm họng cấp")));
 
-        service.search("viem");
+        List<DiagnosisCatalogResult> results = service.search("viem hong", "Hệ hô hấp");
 
-        verify(repository).findAllByActive(true);
-        verify(repository, never()).search(anyString(), any());
+        assertEquals(1, results.size());
+        verify(repository).searchActive("viem hong", "Hệ hô hấp", 50);
     }
 
     @Test

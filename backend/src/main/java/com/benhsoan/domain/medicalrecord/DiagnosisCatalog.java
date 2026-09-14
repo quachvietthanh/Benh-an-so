@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.benhsoan.domain.shared.Guard.Guard;
+import com.benhsoan.domain.shared.VietnameseTextNormalizer;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -19,6 +20,7 @@ public class DiagnosisCatalog {
 
     private UUID id;
     private String code, name, abbreviation, diseaseGroup, description;
+    private String nameNorm, abbreviationNorm;
     private boolean active;
     private Instant createdAt, updatedAt;
 
@@ -42,6 +44,8 @@ public class DiagnosisCatalog {
         this.active = active;
         this.createdAt = Objects.requireNonNull(createdAt);
         this.updatedAt = updatedAt;
+        this.nameNorm = VietnameseTextNormalizer.normalize(this.name);
+        this.abbreviationNorm = VietnameseTextNormalizer.normalize(this.abbreviation);
     }
 
     public static DiagnosisCatalog create(String code, String name, String diseaseGroup, String description) {
@@ -128,6 +132,8 @@ public class DiagnosisCatalog {
         this.diseaseGroup = Guard.require(diseaseGroup, "Disease group");
         this.description = description;
         updatedAt = Objects.requireNonNull(at);
+        this.nameNorm = VietnameseTextNormalizer.normalize(this.name);
+        this.abbreviationNorm = VietnameseTextNormalizer.normalize(this.abbreviation);
     }
 
     private static String normalizeCode(String code) {

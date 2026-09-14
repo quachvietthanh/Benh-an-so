@@ -64,7 +64,7 @@ class DiagnosisCatalogControllerTest {
     @Test
     @DisplayName("GET /diagnosis-catalog?search=cold returns results")
     void searchReturnsResults() throws Exception {
-        when(getDiagnosisCatalogUseCase.search("cold"))
+        when(getDiagnosisCatalogUseCase.search("cold", null))
                 .thenReturn(List.of(new DiagnosisCatalogResult(
                         id, "J00", "Common cold", null, "Respiratory", "Desc", true, Instant.now(), null)));
 
@@ -79,7 +79,7 @@ class DiagnosisCatalogControllerTest {
     @Test
     @DisplayName("GET /diagnosis-catalog without search returns empty")
     void searchWithoutParam() throws Exception {
-        when(getDiagnosisCatalogUseCase.search(null)).thenReturn(List.of());
+        when(getDiagnosisCatalogUseCase.search(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/diagnosis-catalog"))
                 .andExpect(status().isOk())
@@ -90,13 +90,27 @@ class DiagnosisCatalogControllerTest {
     @Test
     @DisplayName("GET /diagnosis-catalog?search= returns empty")
     void searchEmptyParam() throws Exception {
-        when(getDiagnosisCatalogUseCase.search("")).thenReturn(List.of());
+        when(getDiagnosisCatalogUseCase.search("", null)).thenReturn(List.of());
 
         mockMvc.perform(get("/diagnosis-catalog")
                         .param("search", ""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /diagnosis-catalog?diseaseGroup= filters by group")
+    void searchByDiseaseGroup() throws Exception {
+        when(getDiagnosisCatalogUseCase.search(null, "Hệ hô hấp"))
+                .thenReturn(List.of(new DiagnosisCatalogResult(
+                        id, "J00", "Common cold", null, "Hệ hô hấp", "Desc", true, Instant.now(), null)));
+
+        mockMvc.perform(get("/diagnosis-catalog")
+                        .param("diseaseGroup", "Hệ hô hấp"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("J00"))
+                .andExpect(jsonPath("$[0].diseaseGroup").value("Hệ hô hấp"));
     }
 
     @Test

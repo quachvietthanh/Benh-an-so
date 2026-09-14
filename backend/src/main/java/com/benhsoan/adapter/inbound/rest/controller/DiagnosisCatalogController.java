@@ -30,8 +30,9 @@ public class DiagnosisCatalogController {
     @GetMapping
     @RequirePermission("DIAGNOSIS_READ")
     public List<DiagnosisCatalogResponse> search(
-            @RequestParam(required = false) String search) {
-        return mapper.toResponse(getDiagnosisCatalogUseCase.search(search));
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String diseaseGroup) {
+        return mapper.toResponse(getDiagnosisCatalogUseCase.search(search, diseaseGroup));
     }
 
     @GetMapping("/suggestions")

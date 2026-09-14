@@ -28,14 +28,10 @@ public interface JpaVisitRepository extends JpaRepository<VisitEntity, UUID> {
     @Query("select visit from VisitEntity visit where visit.id = :visitId")
     Optional<VisitEntity> findByIdForUpdate(@Param("visitId") UUID visitId);
 
-    @Query("""
-            select visit
-            from VisitEntity visit
-            where visit.doctorId = :doctorId
-              and visit.status <> com.benhsoan.domain.visit.enums.VisitStatus.CANCELLED
-            order by visit.visitAt desc
-            """)
-    Optional<VisitEntity> findMostRecentByDoctor(@Param("doctorId") UUID doctorId);
+    Optional<VisitEntity> findFirstByDoctorIdAndStatusNotOrderByVisitAtDescIdDesc(
+            UUID doctorId,
+            VisitStatus status
+    );
 
     List<VisitEntity> findByPatientIdOrderByVisitAtDesc(UUID patientId);
 
