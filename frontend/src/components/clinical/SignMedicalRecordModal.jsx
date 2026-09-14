@@ -316,8 +316,10 @@ export default function SignMedicalRecordModal({
 
         try {
           const res = await medicalRecordApi.sign(effectiveRecordId, { signatureData })
-          if (res?.data && onSuccess) {
-            onSuccess(res.data)
+          if (res?.data) {
+            try {
+              localStorage.setItem(`signed_medical_record_${effectiveRecordId}`, JSON.stringify(res.data))
+            } catch {}
           }
         } catch (firstSignErr) {
           const errCode = firstSignErr?.response?.data?.code
@@ -332,8 +334,10 @@ export default function SignMedicalRecordModal({
           await healAndSync()
           try {
             const retryRes = await medicalRecordApi.sign(effectiveRecordId, { signatureData })
-            if (retryRes?.data && onSuccess) {
-              onSuccess(retryRes.data)
+            if (retryRes?.data) {
+              try {
+                localStorage.setItem(`signed_medical_record_${effectiveRecordId}`, JSON.stringify(retryRes.data))
+              } catch {}
             }
           } catch (retryErr) {
             console.warn('Đồng bộ ký số máy chủ ngầm (duy trì trạng thái đã ký):', retryErr)

@@ -142,7 +142,32 @@
 }
 
 .aftercare-table .ant-table-cell {
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+.aftercare-table .ant-table-placeholder .ant-table-cell {
+  position: sticky !important;
+  left: 0 !important;
+  text-align: center !important;
+  padding: 32px 16px !important;
+}
+
+.aftercare-table .ant-table-placeholder .ant-empty {
+  position: sticky !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-width: calc(100vw - 48px) !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.aftercare-table .ant-table-placeholder .ant-empty-description {
+  font-size: 14px !important;
+  color: #64748b !important;
+  margin-top: 8px !important;
 }
 
 .aftercare-person-cell {
@@ -194,5 +219,12 @@
 
   .aftercare-workspace > .ant-card-body {
     padding: 12px;
+  }
+
+  .aftercare-table .ant-table-cell-fix-left,
+  .aftercare-table .ant-table-cell-fix-left-last,
+  .aftercare-table .ant-table-cell-fix-right,
+  .aftercare-table .ant-table-cell-fix-right-first {
+    position: static !important;
   }
 }

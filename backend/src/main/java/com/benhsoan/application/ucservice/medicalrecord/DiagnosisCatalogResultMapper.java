@@ -10,7 +10,7 @@ public class DiagnosisCatalogResultMapper {
 
     public DiagnosisCatalogResult toResult(DiagnosisCatalog catalog) {
         return new DiagnosisCatalogResult(
-                catalog.getId(), catalog.getCode(), catalog.getName(), catalog.getDiseaseGroup(),
+                catalog.getId(), catalog.getCode(), catalog.getName(), catalog.getAbbreviation(), catalog.getDiseaseGroup(),
                 catalog.getDescription(), catalog.isActive(), catalog.getCreatedAt(), catalog.getUpdatedAt()
         );
     }

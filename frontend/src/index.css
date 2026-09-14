@@ -70,6 +70,60 @@ textarea {
   font-size: 13px !important;
   font-weight: 650 !important;
   background: #f8fafc !important;
+  white-space: nowrap !important;
+}
+
+.ant-table-cell {
+  vertical-align: middle !important;
+}
+
+/* Ant Design Table Empty Placeholder - ensure it stays visible on screen */
+.ant-table-wrapper .ant-table-placeholder .ant-table-cell {
+  position: sticky !important;
+  left: 0 !important;
+  text-align: center !important;
+}
+
+.ant-table-wrapper .ant-table-placeholder .ant-empty {
+  position: sticky !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-width: calc(100vw - 64px) !important;
+  margin: 36px auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ant-table-wrapper .ant-table-placeholder .ant-empty-description {
+  font-size: 13.5px !important;
+  color: #64748b !important;
+}
+
+/* =========================================================
+   ANT DESIGN ALERT STANDARDIZATION & TYPOGRAPHY
+   ========================================================= */
+.ant-alert {
+  border-radius: 10px !important;
+  padding: 14px 16px !important;
+}
+
+.ant-alert-message {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 1.45 !important;
+  color: #0f172a !important;
+}
+
+.ant-alert-description {
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  color: #334155 !important;
+}
+
+.ant-alert-with-description .ant-alert-icon {
+  font-size: 22px !important;
 }
 
 /* =========================================================
@@ -344,8 +398,23 @@ textarea {
     font-size: 12.5px;
   }
 
+  .ant-tabs-nav-wrap {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ant-tabs-nav-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
   .ant-tabs-nav-list {
-    flex-wrap: wrap;
+    flex-wrap: nowrap !important;
+  }
+
+  .ant-tabs-tab {
+    white-space: nowrap !important;
   }
 
   .ant-btn:not(.ant-btn-sm):not(.ant-btn-lg) {
@@ -454,6 +523,72 @@ textarea {
     align-items: center !important;
     justify-content: center !important;
     border-radius: 6px !important;
+  }
+
+  /* Ant Design Alert Responsive on Mobile & Tablet */
+  .ant-alert {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 8px 12px !important;
+    padding: 14px 14px !important;
+  }
+
+  .ant-alert-icon {
+    margin-right: 0 !important;
+    margin-inline-end: 0 !important;
+    font-size: 22px !important;
+    margin-top: 2px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .ant-alert-content {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  .ant-alert-message {
+    font-size: 15px !important;
+    font-weight: 650 !important;
+    line-height: 1.45 !important;
+    margin-bottom: 6px !important;
+    word-break: break-word !important;
+  }
+
+  .ant-alert-description {
+    font-size: 13.5px !important;
+    line-height: 1.6 !important;
+    color: #475569 !important;
+    word-break: break-word !important;
+  }
+
+  .ant-alert-action {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-inline-start: 0 !important;
+    margin-top: 10px !important;
+    display: flex !important;
+  }
+
+  .ant-alert-action .ant-btn {
+    width: 100% !important;
+    height: 38px !important;
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+  }
+
+  /* Prevent sticky fixed columns from pinning and obscuring table content on mobile */
+  .ant-table-cell-fix-left,
+  .ant-table-cell-fix-left-last,
+  .ant-table-cell-fix-right,
+  .ant-table-cell-fix-right-first {
+    position: static !important;
+  }
 }
 
 @media (max-width: 576px) {
@@ -477,6 +612,24 @@ textarea {
     flex: 1 1 100% !important;
     min-width: 100% !important;
     height: 40px !important;
+  }
+
+  .ant-alert {
+    padding: 12px 14px !important;
+  }
+
+  .ant-alert-message {
+    font-size: 14.5px !important;
+  }
+
+  .ant-alert-description {
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+  }
+
+  .ant-alert-action .ant-btn {
+    height: 40px !important;
+    font-size: 13.5px !important;
   }
 
   .ant-modal-footer {

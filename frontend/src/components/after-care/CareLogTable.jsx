@@ -21,12 +21,26 @@ function CareLogTable({
   performerNames,
   onOpenHistory,
 }) {
+  const hasRecords = Boolean(records && records.length > 0)
+
+  const [isMobile, setIsMobile] = React.useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 768
+  )
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const columns = [
     {
       title: 'Bệnh nhân',
       key: 'patient',
       width: 190,
-      fixed: 'left',
+      fixed: !isMobile ? 'left' : undefined,
       render: (_, record) => {
         const patient = patientsById[record.patientId]
         return (
@@ -112,7 +126,7 @@ function CareLogTable({
       title: 'Thao tác',
       key: 'actions',
       width: 90,
-      fixed: 'right',
+      fixed: !isMobile ? 'right' : undefined,
       render: (_, record) => (
         <Dropdown
           menu={{
@@ -151,7 +165,7 @@ function CareLogTable({
       dataSource={records}
       rowKey="id"
       loading={loading}
-      scroll={{ x: 1900 }}
+      scroll={hasRecords ? { x: 1750 } : undefined}
       pagination={{
         current: pagination.page + 1,
         pageSize: pagination.size,

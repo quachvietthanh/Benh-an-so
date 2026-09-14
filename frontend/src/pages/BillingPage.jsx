@@ -967,10 +967,10 @@ function BillingPage() {
   }
 
   const feeColumns = [
-    { title: 'Khoản thu / Dịch vụ', key: 'name', render: (_, r) => <Text strong style={{ color: '#0f172a' }}>{r.name}</Text> },
-    { title: 'Số lượng', dataIndex: 'quantity', key: 'quantity', width: 100, align: 'center', render: (v) => <Tag color="blue" style={{ minWidth: 28, textAlign: 'center', fontWeight: 600 }}>{v}</Tag> },
-    { title: 'Đơn giá', dataIndex: 'price', key: 'price', width: 150, align: 'right', render: (v) => <Text style={{ color: '#475569' }}>{money(v)}</Text> },
-    { title: 'Thành tiền', dataIndex: 'amount', key: 'amount', width: 160, align: 'right', render: (v) => <Text strong style={{ color: '#2563eb', fontSize: 14 }}>{money(v)}</Text> },
+    { title: 'Khoản thu / Dịch vụ', key: 'name', width: 220, render: (_, r) => <Text strong style={{ color: '#0f172a', whiteSpace: 'nowrap' }}>{r.name}</Text> },
+    { title: 'Số lượng', dataIndex: 'quantity', key: 'quantity', width: 100, align: 'center', render: (v) => <Tag color="blue" style={{ minWidth: 28, textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>{v}</Tag> },
+    { title: 'Đơn giá', dataIndex: 'price', key: 'price', width: 150, align: 'right', render: (v) => <Text style={{ color: '#475569', whiteSpace: 'nowrap' }}>{money(v)}</Text> },
+    { title: 'Thành tiền', dataIndex: 'amount', key: 'amount', width: 160, align: 'right', render: (v) => <Text strong style={{ color: '#2563eb', fontSize: 14, whiteSpace: 'nowrap' }}>{money(v)}</Text> },
   ]
 
   const feeDataSource = useMemo(() => {
@@ -1028,13 +1028,14 @@ function BillingPage() {
       title: 'Mã HĐ',
       dataIndex: 'invoiceCode',
       key: 'invoiceCode',
+      width: 170,
       render: (v, r) => (
-        <Space direction="vertical" size={0}>
-          <Text code style={{ color: '#1e40af', fontWeight: 700 }}>
+        <Space direction="vertical" size={2} style={{ whiteSpace: 'nowrap' }}>
+          <Text code style={{ color: '#1e40af', fontWeight: 700, whiteSpace: 'nowrap' }}>
             {v || r.id?.substring(0, 8)}
           </Text>
           {r.type === 'ADJUSTMENT' && r.originalInvoiceCode && (
-            <Text type="secondary" style={{ fontSize: 11 }}>
+            <Text type="secondary" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
               Điều chỉnh cho: <strong>{r.originalInvoiceCode}</strong>
             </Text>
           )}
@@ -1045,12 +1046,13 @@ function BillingPage() {
     {
       title: 'Bệnh nhân',
       key: 'patient',
+      width: 200,
       render: (_, r) => {
         if (!r.patientName && !r.patientCode) {
           return <Text type="secondary">—</Text>
         }
         return (
-          <span>
+          <span style={{ whiteSpace: 'nowrap' }}>
             <strong>{r.patientName || '—'}</strong> {r.patientCode ? <Text type="secondary">({r.patientCode})</Text> : null}
           </span>
         )
@@ -1060,12 +1062,14 @@ function BillingPage() {
       title: 'Mã lượt khám',
       dataIndex: 'visitId',
       key: 'visitId',
-      render: (v, r) => <Tag color="geekblue">{r.visitCode || formatVisitCode(v)}</Tag>,
+      width: 170,
+      render: (v, r) => <Tag color="geekblue" style={{ whiteSpace: 'nowrap' }}>{r.visitCode || formatVisitCode(v)}</Tag>,
     },
     {
       title: 'Số tiền',
       dataIndex: 'totalAmount',
       key: 'totalAmount',
+      width: 160,
       align: 'right',
       render: (v, r) => {
         const amt = Number(v || 0)
@@ -1073,49 +1077,51 @@ function BillingPage() {
         if (isAdjustment) {
           if (amt < 0) {
             return (
-              <Space direction="vertical" size={0} align="end">
-                <Text strong style={{ color: '#cf1322' }}>
+              <Space direction="vertical" size={2} align="end" style={{ whiteSpace: 'nowrap' }}>
+                <Text strong style={{ color: '#cf1322', whiteSpace: 'nowrap' }}>
                   {money(amt)}
                 </Text>
-                <Text type="secondary" style={{ fontSize: 11, color: '#cf1322' }}>
+                <Text type="secondary" style={{ fontSize: 11, color: '#cf1322', whiteSpace: 'nowrap' }}>
                   Điều chỉnh giảm
                 </Text>
               </Space>
             )
           }
           return (
-            <Space direction="vertical" size={0} align="end">
-              <Text strong style={{ color: '#3f8600' }}>
+            <Space direction="vertical" size={2} align="end" style={{ whiteSpace: 'nowrap' }}>
+              <Text strong style={{ color: '#3f8600', whiteSpace: 'nowrap' }}>
                 +{money(amt)}
               </Text>
-              <Text type="secondary" style={{ fontSize: 11, color: '#3f8600' }}>
+              <Text type="secondary" style={{ fontSize: 11, color: '#3f8600', whiteSpace: 'nowrap' }}>
                 Điều chỉnh tăng
               </Text>
             </Space>
           )
         }
-        return <Text strong style={{ color: '#1677ff' }}>{money(amt)}</Text>
+        return <Text strong style={{ color: '#1677ff', whiteSpace: 'nowrap' }}>{money(amt)}</Text>
       },
     },
     {
       title: 'Trạng thái',
       key: 'status',
+      width: 140,
       align: 'center',
       render: (_, r) => {
         if (r.status === 'REFUNDED') {
-          return <Tag color="purple" icon={<ReloadOutlined />}>Đã hoàn tiền</Tag>
+          return <Tag color="purple" icon={<ReloadOutlined />} style={{ whiteSpace: 'nowrap' }}>Đã hoàn tiền</Tag>
         }
         if (r.type === 'ADJUSTMENT') {
-          return <Tag color="magenta">Điều chỉnh</Tag>
+          return <Tag color="magenta" style={{ whiteSpace: 'nowrap' }}>Điều chỉnh</Tag>
         }
-        return <Tag color="green" icon={<CheckCircleOutlined />}>Thành công</Tag>
+        return <Tag color="green" icon={<CheckCircleOutlined />} style={{ whiteSpace: 'nowrap' }}>Thành công</Tag>
       },
     },
     {
       title: 'Thời gian lập',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (v) => formatDateTime(v),
+      width: 160,
+      render: (v) => <span style={{ whiteSpace: 'nowrap' }}>{formatDateTime(v)}</span>,
     },
     {
       title: 'Thao tác',
@@ -1718,6 +1724,7 @@ function BillingPage() {
                   pagination={{ pageSize: 10, showSizeChanger: true }}
                   size="middle"
                   bordered
+                  scroll={{ x: 1100 }}
                   locale={{ emptyText: <Empty description="Chưa có lịch sử thanh toán nào từ Backend" /> }}
                 />
               </Card>
@@ -1886,15 +1893,15 @@ function BillingPage() {
               <div style={{ display: 'inline-block', background: '#008080', color: '#ffffff', padding: '6px 16px', borderRadius: '8px 8px 0 0', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 CHI TIẾT CÁC KHOẢN THU
               </div>
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '0 10px 10px 10px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '0 10px 10px 10px', overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#008080', color: '#ffffff', fontSize: 13, fontWeight: 700 }}>
-                      <th style={{ padding: '10px 12px', textAlign: 'center', width: '60px', borderRight: '1px solid #0e7490' }}>STT</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', borderRight: '1px solid #0e7490' }}>Nội dung / Dịch vụ</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'center', width: '100px', borderRight: '1px solid #0e7490' }}>Số lượng</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'right', width: '140px', borderRight: '1px solid #0e7490' }}>Đơn giá</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'right', width: '150px' }}>Thành tiền</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center', width: '60px', borderRight: '1px solid #0e7490', whiteSpace: 'nowrap' }}>STT</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', borderRight: '1px solid #0e7490', whiteSpace: 'nowrap' }}>Nội dung / Dịch vụ</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'center', width: '100px', borderRight: '1px solid #0e7490', whiteSpace: 'nowrap' }}>Số lượng</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right', width: '140px', borderRight: '1px solid #0e7490', whiteSpace: 'nowrap' }}>Đơn giá</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right', width: '150px', borderRight: '1px solid #0e7490', whiteSpace: 'nowrap' }}>Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody>

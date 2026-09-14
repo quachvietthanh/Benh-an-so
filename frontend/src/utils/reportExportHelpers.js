@@ -4,6 +4,7 @@ export const REPORT_TYPES = [
   { value: 'VISIT_REPORT', label: 'Báo cáo lượt khám' },
   { value: 'REVENUE_REPORT', label: 'Báo cáo doanh thu' },
   { value: 'OPERATIONAL_REPORT', label: 'Báo cáo tổng hợp vận hành' },
+  { value: 'ACCESS_LOG_REPORT', label: 'Báo cáo nhật ký truy cập hồ sơ bệnh án' },
 ]
 
 export const validateExportParams = (from, to) => {
@@ -47,7 +48,34 @@ export const validateExportParams = (from, to) => {
   }
 }
 
-export const getExportFilename = (contentDisposition, reportType, from, to) => {
+export const getExportFilename = (arg1, arg2, arg3, arg4) => {
+  let contentDisposition = null
+  let reportType = null
+  let fromVal = null
+  let toVal = null
+
+  if (arg4 !== undefined || (arg3 !== undefined && typeof arg2 === 'string')) {
+    // Standard signature: (contentDisposition, reportType, from, to)
+    contentDisposition = arg1
+    reportType = arg2
+    fromVal = arg3
+    toVal = arg4
+  } else {
+    // 2-argument signature: (reportType, params) or (contentDisposition, reportType)
+    if (typeof arg1 === 'string' && (arg1.includes('filename') || arg1.includes('attachment'))) {
+      contentDisposition = arg1
+      reportType = arg2
+    } else {
+      reportType = arg1
+      if (arg2 && typeof arg2 === 'object') {
+        fromVal = arg2.from
+        toVal = arg2.to
+      } else {
+        fromVal = arg2
+      }
+    }
+  }
+
   if (contentDisposition) {
     const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
     if (utf8Match && utf8Match[1]) {
@@ -64,8 +92,8 @@ export const getExportFilename = (contentDisposition, reportType, from, to) => {
     }
   }
 
-  const fromStr = String(from || '')
-  const toStr = String(to || '')
+  const fromStr = String(fromVal || '')
+  const toStr = String(toVal || '')
 
   switch (reportType) {
     case 'VISIT_REPORT':
@@ -74,6 +102,8 @@ export const getExportFilename = (contentDisposition, reportType, from, to) => {
       return `revenue-report-${fromStr}-to-${toStr}.csv`
     case 'OPERATIONAL_REPORT':
       return `operational-report-${fromStr}-to-${toStr}.csv`
+    case 'ACCESS_LOG_REPORT':
+      return `access-log-report-${fromStr}-to-${toStr}.csv`
     default:
       return `report-${fromStr}-to-${toStr}.csv`
   }
@@ -112,16 +142,18 @@ export const getExportErrorMessage = async (error) => {
   const errorMsg = String(errorData?.message || '')
 
   if (status === 403) {
-    return 'Bạn không có quyền xuất báo cáo.'
+    return 'Bạn không có quyền xuất báo cáo (Yêu cầu quyền ACCESS_LOG_REPORT_EXPORT của Quản trị viên).'
   }
 
   if (
     status === 404 ||
+    status === 422 ||
     errorCode === 'REPORT_DATA_EMPTY' ||
     errorMsg.includes('No report data') ||
+    errorMsg.includes('No medical record access logs available') ||
     errorMsg.toLowerCase().includes('không có dữ liệu')
   ) {
-    return 'Không có dữ liệu trong khoảng thời gian đã chọn.'
+    return 'Không có dữ liệu nhật ký truy cập trong khoảng thời gian đã chọn.'
   }
 
   if (status === 400) {

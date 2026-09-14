@@ -632,11 +632,11 @@ function DoctorScheduleManagementPage() {
       ),
       children: (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+          <div className="schedule-config-header">
             <div>
               <Title level={5} style={{ margin: 0 }}>Cấu hình các ngày làm việc trong tuần</Title>
             </div>
-            <Space>
+            <div className="schedule-config-actions">
               <Tooltip title={!canUpdateWeeklySchedule ? 'Bạn không có quyền cấu hình lịch làm việc' : ''}>
                 <span>
                   <Button
@@ -661,7 +661,7 @@ function DoctorScheduleManagementPage() {
                   </Button>
                 </span>
               </Tooltip>
-            </Space>
+            </div>
           </div>
 
           {!hasExistingSchedule && !loadingWeekly && (
@@ -720,7 +720,7 @@ function DoctorScheduleManagementPage() {
 
                     <div className="day-controls">
                       {isWorking && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div className="day-time-picker-wrapper">
                           <TimePicker.RangePicker
                             value={rangeVal}
                             format="HH:mm"
@@ -767,7 +767,9 @@ function DoctorScheduleManagementPage() {
                           </Button>
                         </div>
                       )}
+                    </div>
 
+                    <div className="day-switch-wrapper">
                       <Switch
                         checked={isWorking}
                         disabled={!canUpdateWeeklySchedule}
@@ -812,11 +814,11 @@ function DoctorScheduleManagementPage() {
       ),
       children: (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+          <div className="timeoff-toolbar-header">
             <div>
               <Title level={5} style={{ margin: 0 }}>Danh sách khoảng nghỉ của Bác sĩ</Title>
             </div>
-            <Space>
+            <div className="timeoff-toolbar-actions">
               <Radio.Group value={timeOffFilter} onChange={(e) => setTimeOffFilter(e.target.value)}>
                 <Radio.Button value="ALL">Tất cả</Radio.Button>
                 <Radio.Button value="ACTIVE">Đang hiệu lực</Radio.Button>
@@ -834,7 +836,7 @@ function DoctorScheduleManagementPage() {
                   </Button>
                 </span>
               </Tooltip>
-            </Space>
+            </div>
           </div>
 
           <Table
@@ -857,11 +859,11 @@ function DoctorScheduleManagementPage() {
       ),
       children: (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+          <div className="visual-week-header">
             <div>
               <Title level={5} style={{ margin: 0 }}>Tổng hợp lịch trực & khoảng nghỉ trong tuần</Title>
             </div>
-            <Space align="center" wrap>
+            <div className="visual-week-controls">
               <Button size="small" onClick={() => setWeekOffset((prev) => prev - 1)}>
                 ← Tuần trước
               </Button>
@@ -876,7 +878,7 @@ function DoctorScheduleManagementPage() {
               <Button size="small" onClick={() => setWeekOffset((prev) => prev + 1)}>
                 Tuần sau →
               </Button>
-            </Space>
+            </div>
           </div>
 
           <div className="visual-week-grid">

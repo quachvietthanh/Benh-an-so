@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Alert,
@@ -1300,6 +1300,8 @@ function PrescriptionPage() {
     })
   }
 
+  const lastSignModalTimeRef = useRef(0)
+
   const handleSignSuccess = async (signedData) => {
     const nextStatus = signedData?.status || 'SIGNED'
     setRecord((current) => ({
@@ -1307,6 +1309,12 @@ function PrescriptionPage() {
       ...signedData,
       status: nextStatus,
     }))
+
+    const now = Date.now()
+    if (now - lastSignModalTimeRef.current < 3000) {
+      return
+    }
+    lastSignModalTimeRef.current = now
 
     Modal.success({
       title: 'Ký số bệnh án thành công!',
@@ -1650,8 +1658,13 @@ function PrescriptionPage() {
           type="warning"
           showIcon
           message="Chưa có bệnh án để kê đơn"
-          description="Màn kê đơn chỉ mở từ một lượt khám đã lưu và phải có mã bệnh án trên đường dẫn."
-          action={<Button onClick={() => navigate('/appointments')}>Về danh sách lượt khám</Button>}
+          description={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Màn kê đơn chỉ mở từ một lượt khám đã lưu.</span>
+              <span>Phải có mã bệnh án trên đường dẫn để tiếp tục.</span>
+            </div>
+          }
+          action={<Button type="primary" onClick={() => navigate('/appointments')}>Về danh sách lượt khám</Button>}
         />
       </Card>
     )

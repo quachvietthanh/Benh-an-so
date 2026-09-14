@@ -170,6 +170,7 @@ function MedicalEncounter() {
   const [primaryIcd, setPrimaryIcd] = useState(null)
   const [secondaryIcds, setSecondaryIcds] = useState([])
   const [diagnosisModalOpen, setDiagnosisModalOpen] = useState(false)
+  const lastSignModalTimeRef = useRef(0)
   const [icdSearchQuery, setIcdSearchQuery] = useState('')
   const [icdCategory, setIcdCategory] = useState('ALL')
   const [backendIcdCatalog, setBackendIcdCatalog] = useState([])
@@ -1266,8 +1267,13 @@ function MedicalEncounter() {
           type="warning"
           showIcon
           message="Chưa chọn lượt khám"
-          description="Màn khám bệnh phải được mở từ một lượt khám trong hàng đợi. Không thể chọn bệnh nhân tự do tại đây."
-          action={<Button onClick={() => navigate('/appointments')}>Mở danh sách lượt khám</Button>}
+          description={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>Màn khám bệnh phải được mở từ một lượt khám trong hàng đợi.</span>
+              <span>Không thể chọn bệnh nhân tự do tại đây.</span>
+            </div>
+          }
+          action={<Button type="primary" onClick={() => navigate('/appointments')}>Mở danh sách lượt khám</Button>}
         />
       </Card>
     )
@@ -1285,7 +1291,7 @@ function MedicalEncounter() {
         showIcon
         message="Không thể mở lượt khám"
         description={loadError}
-        action={<Button onClick={loadWorkflow}>Thử lại</Button>}
+        action={<Button type="primary" onClick={loadWorkflow}>Thử lại</Button>}
       />
     )
   }
@@ -1993,6 +1999,9 @@ function MedicalEncounter() {
           onSuccess={(signedData) => {
             setMedicalRecord((prev) => ({ ...prev, ...signedData, status: 'LOCKED' }))
             loadWorkflow().catch((err) => console.warn('Lỗi làm mới sau khi ký:', err))
+            const now = Date.now()
+            if (now - lastSignModalTimeRef.current < 3000) return
+            lastSignModalTimeRef.current = now
             Modal.confirm({
               title: 'Bệnh án đã được ký số & hoàn tất thành công',
               icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,

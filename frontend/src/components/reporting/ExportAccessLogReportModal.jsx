@@ -1,12 +1,10 @@
-import React, { useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Button,
   DatePicker,
   Divider,
-  Form,
   Modal,
-  Radio,
   Space,
   Typography,
   message,
@@ -15,82 +13,86 @@ import {
   CalendarOutlined,
   DownloadOutlined,
   FileExcelOutlined,
-  InfoCircleOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import reportApi from '../../api/reportApi'
+import reportApi from '../../api/reportApi.js'
+import { useAuthContext } from '../../context/AuthContext.jsx'
 import {
   downloadCsvBlob,
   getExportErrorMessage,
   getExportFilename,
   validateExportParams,
-} from '../../utils/reportExportHelpers'
+} from '../../utils/reportExportHelpers.js'
 
-const { Text } = Typography
 const { RangePicker } = DatePicker
+const { Text, Paragraph } = Typography
 
-const DATE_PRESETS = [
-  { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
-  { label: '7 ngày qua', value: [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
-  { label: '30 ngày qua', value: [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')] },
-  { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-]
+/**
+ * Modal for Administrators to review and export medical record access log reports (NCL-15-CN-004 / V43).
+ * Aggregates access counts per user account over a specified period.
+ */
+function ExportAccessLogReportModal({ open, onClose, onSuccess }) {
+  const { user } = useAuthContext()
+  const userRoles = useMemo(() => {
+    return (user?.roles || [user?.role || '']).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user])
+  const userPermissions = useMemo(() => {
+    return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
+  }, [user])
 
-export default function ExportAccessLogReportModal({
-  open = false,
-  onClose,
-  onSuccess,
-}) {
-  const [range, setRange] = useState([
+  const isAdmin = userRoles.includes('admin')
+  const canExport = isAdmin || userPermissions.includes('ACCESS_LOG_REPORT_EXPORT')
+
+  const [dateRange, setDateRange] = useState([
     dayjs().subtract(29, 'day').startOf('day'),
     dayjs().endOf('day'),
   ])
   const [exporting, setExporting] = useState(false)
+  const isExportingRef = useRef(false)
 
-  const handleRangePresetChange = (e) => {
-    const val = e.target.value
-    if (val === 'today') {
-      setRange([dayjs().startOf('day'), dayjs().endOf('day')])
-    } else if (val === '7d') {
-      setRange([dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')])
-    } else if (val === '30d') {
-      setRange([dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')])
-    } else if (val === 'month') {
-      setRange([dayjs().startOf('month'), dayjs().endOf('month')])
-    }
-  }
+  const rangePresets = [
+    { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+    { label: '7 ngày qua', value: [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
+    { label: '30 ngày qua', value: [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')] },
+    { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+    { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+    { label: '90 ngày qua', value: [dayjs().subtract(89, 'day').startOf('day'), dayjs().endOf('day')] },
+  ]
 
   const handleExport = async () => {
-    if (exporting) return
+    if (isExportingRef.current || exporting) return
 
-    if (!range || !range[0] || !range[1]) {
+    if (!canExport) {
+      message.error('Bạn không có quyền xuất báo cáo (Yêu cầu quyền ACCESS_LOG_REPORT_EXPORT của Quản trị viên).')
+      return
+    }
+
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
       message.error('Vui lòng chọn khoảng thời gian cần xuất báo cáo.')
       return
     }
 
-    const fromStr = range[0].format('YYYY-MM-DD')
-    const toStr = range[1].format('YYYY-MM-DD')
+    const from = dateRange[0].format('YYYY-MM-DD')
+    const to = dateRange[1].format('YYYY-MM-DD')
 
-    const validation = validateExportParams({ from: fromStr, to: toStr })
+    const validation = validateExportParams(from, to)
     if (!validation.isValid) {
-      message.error(validation.message || validation.errorMessage)
+      message.error(validation.message)
       return
     }
 
+    isExportingRef.current = true
     setExporting(true)
     try {
-      const response = await reportApi.exportAccessLog({
-        from: fromStr,
-        to: toStr,
-      })
-
+      const response = await reportApi.exportAccessLog({ from, to })
       const disposition = response.headers?.['content-disposition']
-      const filename = getExportFilename(disposition, 'ACCESS_LOG_REPORT', fromStr, toStr)
-      downloadCsvBlob(response.data, filename)
+      const filename = getExportFilename(disposition, 'ACCESS_LOG_REPORT', from, to)
 
-      message.success(`Đã xuất báo cáo ${filename} thành công!`)
+      downloadCsvBlob(response.data, filename)
+      message.success(`Đã xuất và tải về báo cáo: ${filename}`)
       if (onSuccess) {
-        onSuccess()
+        onSuccess({ from, to, filename })
       }
       if (onClose) {
         onClose()
@@ -100,6 +102,7 @@ export default function ExportAccessLogReportModal({
       const errorMsg = await getExportErrorMessage(err)
       message.error(errorMsg)
     } finally {
+      isExportingRef.current = false
       setExporting(false)
     }
   }
@@ -108,12 +111,13 @@ export default function ExportAccessLogReportModal({
     <Modal
       open={open}
       onCancel={exporting ? undefined : onClose}
-      title={
+      title={(
         <Space align="center">
-          <FileExcelOutlined style={{ color: '#16a34a', fontSize: 20 }} />
-          <span style={{ fontWeight: 600 }}>Xuất Báo Cáo Nhật Ký Truy Cập Bệnh Án (CSV)</span>
+          <SafetyCertificateOutlined style={{ color: '#2563eb', fontSize: 20 }} />
+          <span style={{ fontSize: 16, fontWeight: 600 }}>Xuất báo cáo nhật ký truy cập hồ sơ bệnh án</span>
         </Space>
-      }
+      )}
+      width={620}
       footer={[
         <Button key="cancel" onClick={onClose} disabled={exporting}>
           Hủy bỏ
@@ -123,64 +127,78 @@ export default function ExportAccessLogReportModal({
           type="primary"
           icon={<DownloadOutlined />}
           loading={exporting}
+          disabled={!canExport}
           onClick={handleExport}
-          style={{ background: '#16a34a', borderColor: '#16a34a' }}
+          style={{ backgroundColor: canExport ? '#1d4ed8' : undefined }}
         >
-          {exporting ? 'Đang xuất tệp...' : 'Tải xuống tệp CSV'}
+          {exporting ? 'Đang xuất tệp...' : 'Xuất tệp CSV'}
         </Button>,
       ]}
       destroyOnClose
-      width={560}
     >
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 12 }}>
+        {!canExport && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16, borderRadius: 8, background: '#fffbeb', borderColor: '#fde68a' }}
+            message={<strong>Giới hạn phân quyền: Yêu cầu quyền Quản trị viên</strong>}
+            description="Tài khoản hiện tại không có quyền ACCESS_LOG_REPORT_EXPORT. Tính năng xuất tệp báo cáo nhật ký truy cập hồ sơ bệnh án chỉ dành riêng cho Quản trị viên (ADMIN) hoặc tài khoản được cấp quyền giám sát an toàn y tế."
+          />
+        )}
         <Alert
           type="info"
           showIcon
-          icon={<InfoCircleOutlined />}
-          message="Phạm vi dữ liệu báo cáo"
-          description="Báo cáo được trích xuất trực tiếp từ máy chủ theo định dạng CSV chuẩn UTF-8 (BOM). Dữ liệu bao gồm các thông tin kiểm toán: thời gian, tài khoản, vai trò, loại hành động, mã hồ sơ bệnh án và địa chỉ IP."
-          style={{ marginBottom: 20 }}
+          icon={<SafetyCertificateOutlined style={{ fontSize: 18, color: '#2563eb' }} />}
+          style={{ marginBottom: 20, borderRadius: 8, background: '#eff6ff', borderColor: '#bfdbfe' }}
+          message={<strong>Mục đích giám sát an toàn thông tin y tế</strong>}
+          description={(
+            <Paragraph style={{ margin: 0, fontSize: 13, color: '#1e3a8a' }}>
+              Báo cáo tổng hợp số lượt truy cập bệnh án theo từng tài khoản nhân sự (Bác sĩ, Tiếp nhận, Quản trị viên)
+              trong kỳ được chọn. Dữ liệu này dùng để lưu hồ sơ giám sát định kỳ và trình cơ quan thanh tra khi được yêu cầu.
+            </Paragraph>
+          )}
         />
 
-        <Form layout="vertical">
-          <Form.Item label={<Text strong>Khoảng thời gian nhanh</Text>}>
-            <Radio.Group onChange={handleRangePresetChange} defaultValue="30d">
-              <Radio.Button value="today">Hôm nay</Radio.Button>
-              <Radio.Button value="7d">7 ngày qua</Radio.Button>
-              <Radio.Button value="30d">30 ngày qua</Radio.Button>
-              <Radio.Button value="month">Tháng này</Radio.Button>
-            </Radio.Group>
-          </Form.Item>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#1e293b' }}>
+            <CalendarOutlined style={{ marginRight: 6, color: '#2563eb' }} />
+            Chọn khoảng thời gian kỳ giám sát:
+          </label>
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => setDateRange(dates)}
+            presets={rangePresets}
+            format="DD/MM/YYYY"
+            style={{ width: '100%', height: 42, borderRadius: 8 }}
+            allowClear={false}
+          />
+          <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
+            * Khoảng thời gian xuất báo cáo tối đa 366 ngày (1 năm). Định dạng tệp xuất ra là CSV với chuẩn mã hóa UTF-8 BOM hiển thị chuẩn trên Microsoft Excel.
+          </Text>
+        </div>
 
-          <Form.Item
-            label={
-              <Space>
-                <CalendarOutlined style={{ color: '#2563eb' }} />
-                <Text strong>Tùy chọn khoảng thời gian giám sát (Tối đa 366 ngày)</Text>
-              </Space>
-            }
-            required
-          >
-            <RangePicker
-              value={range}
-              onChange={(dates) => setRange(dates)}
-              format="DD/MM/YYYY"
-              presets={DATE_PRESETS}
-              disabledDate={(current) => current && current > dayjs().endOf('day')}
-              style={{ width: '100%' }}
-              allowClear={false}
-            />
-          </Form.Item>
-        </Form>
+        <Divider style={{ margin: '16px 0' }} />
 
-        <Divider style={{ margin: '16px 0 12px 0' }} />
-
-        <div style={{ fontSize: 13, color: '#64748b' }}>
-          <p style={{ margin: 0 }}>
-            * Chú ý: Cần quyền <strong>ACCESS_LOG_REPORT_EXPORT</strong> (Quản trị viên) để thực hiện thao tác này.
-          </p>
+        <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+            <Space align="center">
+              <FileExcelOutlined style={{ color: '#16a34a', fontSize: 18 }} />
+              <strong>Cấu trúc dữ liệu báo cáo:</strong>
+            </Space>
+            <div style={{ fontSize: 12, color: '#475569', marginLeft: 24 }}>
+              • <strong>Account</strong>: Tên tài khoản đăng nhập (Username)<br />
+              • <strong>Full Name</strong>: Họ và tên cán bộ y tế<br />
+              • <strong>Access Count</strong>: Tổng số lượt truy cập hồ sơ bệnh án trong kỳ
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginTop: 4, marginLeft: 24 }}>
+              Lần xuất báo cáo sẽ được hệ thống ghi nhận tự động vào Nhật ký giám sát (Audit Log) theo quy định.
+            </div>
+          </Space>
         </div>
       </div>
     </Modal>
   )
 }
+
+export default ExportAccessLogReportModal

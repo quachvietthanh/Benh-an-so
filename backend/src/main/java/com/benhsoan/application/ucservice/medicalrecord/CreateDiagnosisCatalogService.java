@@ -33,7 +33,8 @@ public class CreateDiagnosisCatalogService implements CreateDiagnosisCatalogUseC
         }
 
         DiagnosisCatalog catalog = DiagnosisCatalog.create(
-                UUID.randomUUID(), command.code(), command.name(), command.diseaseGroup(), command.description(), clockPort.now()
+                UUID.randomUUID(), command.code(), command.name(), command.abbreviation(),
+                command.diseaseGroup(), command.description(), clockPort.now()
         );
         if (diagnosisCatalogRepository.existsByCode(catalog.getCode())) {
             throw new DiagnosisCatalogCodeAlreadyExistsException(catalog.getCode());
