@@ -118,14 +118,6 @@ public class UpdatePatientService
         if (PatientAnonymizer.isMaskedPhone(emergencyPhone)) {
             emergencyPhone = patient.getEmergencyPhone();
         }
-        if ((emergencyRelationship == null || emergencyRelationship.isBlank())
-                && emergencyContact != null && emergencyPhone != null) {
-            if (patient.getEmergencyRelationship() != null) {
-                emergencyRelationship = patient.getEmergencyRelationship();
-            } else if (patient.getEmergencyContact() != null) {
-                emergencyRelationship = "Người thân";
-            }
-        }
 
         if (fullName != null) {
             emergencyContact = normalizeString(emergencyContact);
