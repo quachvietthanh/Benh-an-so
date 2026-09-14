@@ -147,6 +147,18 @@ public class AppointmentRepositoryAdapter
     }
 
     @Override
+    public Page<Appointment> findUnconfirmed(
+            Instant fromTime,
+            Instant toTime,
+            Pageable pageable
+    ) {
+        return jpaRepository.findAll(
+                AppointmentBusinessSpecification.unconfirmedOnDate(fromTime, toTime),
+                pageable
+        ).map(mapper::toDomain);
+    }
+
+    @Override
     public List<UUID> findDueReminderIds(
             Instant now,
             Instant reminderDeadline,

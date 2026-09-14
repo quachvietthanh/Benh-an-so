@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -8,11 +9,15 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.appointment.CancelAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.request.appointment.CreateAppointmentRequest;
+import com.benhsoan.adapter.inbound.rest.request.appointment.RescheduleAppointmentRequest;
+import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentRescheduleHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentResponse;
 import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
 import com.benhsoan.port.dto.command.appointment.CreateAppointmentCommand;
 import com.benhsoan.port.dto.command.appointment.MarkAppointmentNoShowCommand;
+import com.benhsoan.port.dto.command.appointment.RescheduleAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
+import com.benhsoan.port.dto.result.appointment.AppointmentRescheduleHistoryResult;
 
 @Component
 public class AppointmentRestMapper {
@@ -31,9 +36,26 @@ public class AppointmentRestMapper {
 
     }
 
+    public RescheduleAppointmentCommand toCommand(
+            RescheduleAppointmentRequest request
+    ) {
+        return RescheduleAppointmentCommand.builder()
+                .newDoctorId(request.newDoctorId())
+                .startTime(request.startTime())
+                .endTime(request.endTime())
+                .reason(request.reason())
+                .build();
+    }
+
     public AppointmentResponse toResponse(
             AppointmentResult result
     ) {
+
+        List<AppointmentRescheduleHistoryResponse> histories = result.rescheduleHistories() != null
+                ? result.rescheduleHistories().stream()
+                        .map(this::toResponse)
+                        .toList()
+                : List.of();
 
         return AppointmentResponse.builder()
                 .id(result.id())
@@ -48,8 +70,33 @@ public class AppointmentRestMapper {
                 .checkedInAt(result.checkedInAt())
                 .completedAt(result.completedAt())
                 .createdAt(result.createdAt())
+                .confirmedAt(result.confirmedAt())
+                .confirmedBy(result.confirmedBy())
+                .confirmedByName(result.confirmedByName())
+                .rescheduleHistories(histories)
                 .build();
 
+    }
+
+    public AppointmentRescheduleHistoryResponse toResponse(
+            AppointmentRescheduleHistoryResult history
+    ) {
+        return AppointmentRescheduleHistoryResponse.builder()
+                .id(history.id())
+                .appointmentId(history.appointmentId())
+                .oldDoctorId(history.oldDoctorId())
+                .newDoctorId(history.newDoctorId())
+                .oldDoctorName(history.oldDoctorName())
+                .newDoctorName(history.newDoctorName())
+                .oldStartTime(history.oldStartTime())
+                .oldEndTime(history.oldEndTime())
+                .newStartTime(history.newStartTime())
+                .newEndTime(history.newEndTime())
+                .reason(history.reason())
+                .rescheduledBy(history.rescheduledBy())
+                .rescheduledByName(history.rescheduledByName())
+                .rescheduledAt(history.rescheduledAt())
+                .build();
     }
 
     public CancelAppointmentCommand toCommand(CancelAppointmentRequest request) {

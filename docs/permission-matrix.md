@@ -65,6 +65,10 @@
 | `/api/v1/appointments/{id}` | GET | ✅ | ✅ | ✅ | ❌ |
 | `/api/v1/appointments/{id}` | PUT | ✅ | ✅ | ✅ | ❌ |
 | `/api/v1/appointments/{id}` | DELETE | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/appointments/{id}/reschedule` | PATCH | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/appointments/{id}/confirm` | PATCH | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/appointments/unconfirmed` | GET | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patient-portal/appointments/{id}/confirm` | PATCH | ❌ | ❌ | ❌ | ❌ |
 | `/api/v1/appointments/me` | GET | ❌ | ✅ | ✅ | ❌ |
 |  |  |  |  |  |  |
 | **Vital Signs** |  |  |  |  |  |

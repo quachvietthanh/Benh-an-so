@@ -19,7 +19,8 @@ public class PatientAppointmentResultMapper {
                 appointment.getStatus(),
                 appointment.getReason(),
                 appointment.getBookingChannel(),
-                appointment.getCreatedAt()
+                appointment.getCreatedAt(),
+                appointment.getConfirmedAt()
         );
     }
 }

@@ -48,7 +48,8 @@ public class PatientPortalAppointmentRestMapper {
                 result.status(),
                 result.reason(),
                 result.bookingChannel(),
-                result.createdAt()
+                result.createdAt(),
+                result.confirmedAt()
         );
     }
 

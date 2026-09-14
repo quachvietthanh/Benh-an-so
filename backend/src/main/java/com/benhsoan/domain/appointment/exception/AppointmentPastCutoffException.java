@@ -12,4 +12,8 @@ public class AppointmentPastCutoffException extends AppointmentException {
         super(DomainErrorCode.APPOINTMENT_PAST_CUTOFF,
                 "Đã quá giờ hẹn. Vui lòng liên hệ lễ tân để được hỗ trợ.");
     }
+
+    public AppointmentPastCutoffException(String message) {
+        super(DomainErrorCode.APPOINTMENT_PAST_CUTOFF, message);
+    }
 }

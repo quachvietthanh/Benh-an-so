@@ -45,6 +45,8 @@ public interface AppointmentRepository {
 
     Page<Appointment> findOverdue( Instant threshold, Pageable pageable );
 
+    Page<Appointment> findUnconfirmed(Instant fromTime, Instant toTime, Pageable pageable);
+
     List<UUID> findDueReminderIds(
             Instant now,
             Instant reminderDeadline,
