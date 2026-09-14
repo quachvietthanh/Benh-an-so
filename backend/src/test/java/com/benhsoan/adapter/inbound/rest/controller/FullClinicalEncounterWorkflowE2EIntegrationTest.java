@@ -575,6 +575,23 @@ class FullClinicalEncounterWorkflowE2EIntegrationTest {
                 VisitEntity finalVisit = visitRepository.findById(visitId).orElseThrow();
                 assertEquals(VisitStatus.COMPLETED, finalVisit.getStatus());
                 assertNotNull(finalVisit.getCompletedAt());
+
+                // =========================================================================
+                // BƯỚC 9: LỊCH SỬ HÀNG ĐỢI (Kiểm tra timeline audit không bị đè trạng thái)
+                // =========================================================================
+                mockMvc.perform(get("/queue-items/{itemId}/history", queueItemId)
+                                .with(authentication(receptionistAuth)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(3))
+                                .andExpect(jsonPath("$[0].action").value("COMPLETED"))
+                                .andExpect(jsonPath("$[0].status").value("COMPLETED"))
+                                .andExpect(jsonPath("$[0].callCount").value(1))
+                                .andExpect(jsonPath("$[1].action").value("CALL"))
+                                .andExpect(jsonPath("$[1].status").value("IN_PROGRESS"))
+                                .andExpect(jsonPath("$[1].callCount").value(1))
+                                .andExpect(jsonPath("$[2].action").value("CHECK_IN"))
+                                .andExpect(jsonPath("$[2].status").value("WAITING"))
+                                .andExpect(jsonPath("$[2].callCount").value(0));
         }
 
         @Test

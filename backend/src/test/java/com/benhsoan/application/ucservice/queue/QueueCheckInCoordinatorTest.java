@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.queue.DoctorRoomAssignment;
@@ -103,7 +105,11 @@ class QueueCheckInCoordinatorTest {
         verify(visitRepository, times(2)).save(visitCaptor.capture());
         assertEquals(Specialty.GENERAL_ID, visitCaptor.getAllValues().get(0).getSpecialtyId());
         verify(queueItemRepository).save(any(QueueItem.class));
-        verify(auditLogRepository).save(any());
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        assertTrue(auditCaptor.getValue().getDetail().contains("\"action\":\"CHECK_IN\""));
+        assertTrue(auditCaptor.getValue().getDetail().contains("\"status\":\"WAITING\""));
+        assertTrue(auditCaptor.getValue().getDetail().contains("\"callCount\":0"));
     }
 
     @Test

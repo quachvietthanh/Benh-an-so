@@ -70,8 +70,8 @@ public class GetQueueHistoryService implements GetQueueHistoryUseCase {
                     continue;
                 }
 
-                String action = node.has("action") ? node.get("action").asText() : log.getActionType().name();
-                String status = node.has("status") ? node.get("status").asText() : item.getStatus().name();
+                String action = node.has("action") ? node.get("action").asText() : null;
+                String status = node.has("status") ? node.get("status").asText() : ("CHECK_IN".equals(action) ? "WAITING" : null);
                 int callCount = node.has("callCount") ? node.get("callCount").asInt() : 0;
                 String reason = node.has("reason") ? node.get("reason").asText() : null;
 

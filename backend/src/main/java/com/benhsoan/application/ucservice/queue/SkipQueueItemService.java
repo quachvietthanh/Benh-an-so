@@ -80,7 +80,7 @@ public class SkipQueueItemService implements SkipQueueItemUseCase {
                 }
                 queueItemRepository.save(nextItem);
                 visitRepository.save(nextVisit);
-                queueAuditService.record(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, nextItem);
+                queueAuditService.recordCall(nextItem);
             }
         }
 
