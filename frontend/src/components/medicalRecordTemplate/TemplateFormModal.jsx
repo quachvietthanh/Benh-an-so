@@ -135,7 +135,7 @@ function TemplateFormModal({
           {isEdit ? (
             <>
               <EditOutlined style={{ color: '#2563eb' }} />
-              <span>Chỉnh sửa Mẫu bệnh án (Phiên bản v{initialData?.currentVersionNo || 1})</span>
+              <span>Chỉnh sửa Mẫu bệnh án - Phiên bản v{initialData?.currentVersionNo || 1}</span>
             </>
           ) : (
             <>
@@ -193,7 +193,7 @@ function TemplateFormModal({
                 disabled={isEdit}
                 options={specialties.map((s) => ({
                   value: s.id,
-                  label: `${formatSpecialtyName(s.name)} (${s.code})`,
+                  label: formatSpecialtyName(s.name),
                 }))}
               />
             </Form.Item>
@@ -238,7 +238,7 @@ function TemplateFormModal({
         {isEdit && (
           <Form.Item
             name="changeNote"
-            label={<span style={{ fontWeight: 600, fontSize: 13 }}>Ghi chú thay đổi (Lý do cập nhật)</span>}
+            label={<span style={{ fontWeight: 600, fontSize: 13 }}>Ghi chú thay đổi</span>}
             rules={[
               { required: true, message: 'Vui lòng nhập ghi chú thay đổi cho phiên bản mới' },
               { max: 500, message: 'Ghi chú không vượt quá 500 ký tự' },

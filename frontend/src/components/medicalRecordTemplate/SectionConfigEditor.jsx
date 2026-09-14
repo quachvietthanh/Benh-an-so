@@ -136,7 +136,7 @@ function SectionConfigEditor({ sections = [], onChange }) {
     <div className="section-config-editor-compact">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <Text strong style={{ fontSize: 13, color: '#334155' }}>
-          Cấu hình các trường thông tin trong mẫu ({sections.length}/8)
+          Cấu hình các trường thông tin trong mẫu: {sections.length}/8
         </Text>
         {unusedFieldOptions.length > 0 && (
           <Button
@@ -206,7 +206,7 @@ function SectionConfigEditor({ sections = [], onChange }) {
                   (item) => item.code === section.fieldCode || !usedFieldCodes.has(item.code)
                 ).map((item) => ({
                   value: item.code,
-                  label: `${item.defaultLabel} (${item.code})`,
+                  label: item.defaultLabel,
                 }))
 
                 const isDragOver = dragOverIndex === index
