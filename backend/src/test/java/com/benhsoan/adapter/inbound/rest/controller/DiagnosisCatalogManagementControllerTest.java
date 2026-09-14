@@ -230,7 +230,7 @@ class DiagnosisCatalogManagementControllerTest {
 
     private DiagnosisCatalogResult result(boolean active) {
         return new DiagnosisCatalogResult(
-                CATALOG_ID, "J00", "Common cold", "Respiratory", "Desc", active, CREATED_AT, null
+                CATALOG_ID, "J00", "Common cold", null, "Respiratory", "Desc", active, CREATED_AT, null
         );
     }
 }

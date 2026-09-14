@@ -15,5 +15,11 @@ public interface DiagnosisCatalogRepository {
 
     List<DiagnosisCatalog> search(String keyword, Boolean active);
 
+    List<DiagnosisCatalog> searchActive(String normalizedKeyword, String diseaseGroup, int limit);
+
+    List<DiagnosisCatalog> findByActiveAndDiseaseGroup(String diseaseGroup, int limit);
+
+    List<DiagnosisCatalog> findAllByActive(boolean active);
+
     List<DiagnosisCatalog> findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(String code, String name);
 }

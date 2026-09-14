@@ -5,6 +5,7 @@ import java.util.UUID;
 public record UpdateDiagnosisCatalogCommand(
         UUID diagnosisCatalogId,
         String name,
+        String abbreviation,
         String diseaseGroup,
         String description
 ) {

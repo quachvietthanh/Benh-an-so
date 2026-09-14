@@ -3,6 +3,7 @@ package com.benhsoan.persistence.adapterRepository.medicalrecord;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.persistence.entity.medicalrecord.DiagnosisCatalogEntity;
@@ -53,6 +55,35 @@ class DiagnosisCatalogRepositoryAdapterTest {
         when(jpaRepository.search("cảm lạnh", true)).thenReturn(List.of(catalog));
 
         List<DiagnosisCatalog> result = adapter.search("  cảm lạnh  ", true);
+
+        assertEquals(1, result.size());
+        assertEquals("Hệ hô hấp", result.getFirst().getDiseaseGroup());
+    }
+
+    @Test
+    void searchesActiveCatalogBoundedByKeywordAndGroup() {
+        DiagnosisCatalogEntity catalog = DiagnosisCatalogEntity.builder()
+                .id(UUID.randomUUID()).code("J02.9").name("Viêm họng cấp").diseaseGroup("Hệ hô hấp")
+                .active(true).createdAt(Instant.parse("2026-08-25T00:00:00Z")).build();
+        when(jpaRepository.searchActiveByKeyword(eq("viem hong"), eq("Hệ hô hấp"), eq(PageRequest.of(0, 50))))
+                .thenReturn(List.of(catalog));
+
+        List<DiagnosisCatalog> result = adapter.searchActive("viem hong", "Hệ hô hấp", 50);
+
+        assertEquals(1, result.size());
+        assertEquals("J02.9", result.getFirst().getCode());
+        verify(jpaRepository).searchActiveByKeyword("viem hong", "Hệ hô hấp", PageRequest.of(0, 50));
+    }
+
+    @Test
+    void listsActiveCatalogByDiseaseGroup() {
+        DiagnosisCatalogEntity catalog = DiagnosisCatalogEntity.builder()
+                .id(UUID.randomUUID()).code("J00").name("Cảm lạnh thông thường").diseaseGroup("Hệ hô hấp")
+                .active(true).createdAt(Instant.parse("2026-08-25T00:00:00Z")).build();
+        when(jpaRepository.findByActiveTrueAndDiseaseGroupOrderByCodeAsc(eq("Hệ hô hấp"), eq(PageRequest.of(0, 50))))
+                .thenReturn(List.of(catalog));
+
+        List<DiagnosisCatalog> result = adapter.findByActiveAndDiseaseGroup("Hệ hô hấp", 50);
 
         assertEquals(1, result.size());
         assertEquals("Hệ hô hấp", result.getFirst().getDiseaseGroup());

@@ -9,14 +9,15 @@ public class DiagnosisCatalogPersistenceMapper {
 
     public DiagnosisCatalog toDomain(DiagnosisCatalogEntity e) {
         return e == null ? null : DiagnosisCatalog.restore(
-                e.getId(), e.getCode(), e.getName(), e.getDiseaseGroup(), e.getDescription(),
+                e.getId(), e.getCode(), e.getName(), e.getAbbreviation(), e.getDiseaseGroup(), e.getDescription(),
                 e.isActive(), e.getCreatedAt(), e.getUpdatedAt()
         );
     }
 
     public DiagnosisCatalogEntity toEntity(DiagnosisCatalog d) {
         return d == null ? null : DiagnosisCatalogEntity.builder()
-                .id(d.getId()).code(d.getCode()).name(d.getName()).diseaseGroup(d.getDiseaseGroup())
+                .id(d.getId()).code(d.getCode()).name(d.getName()).nameNorm(d.getNameNorm())
+                .abbreviation(d.getAbbreviation()).abbreviationNorm(d.getAbbreviationNorm()).diseaseGroup(d.getDiseaseGroup())
                 .description(d.getDescription()).active(d.isActive()).createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt())
                 .build();
     }

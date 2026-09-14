@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
@@ -40,6 +41,23 @@ public class DiagnosisCatalogRepositoryAdapter implements DiagnosisCatalogReposi
     public List<DiagnosisCatalog> search(String keyword, Boolean active) {
         String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
         return jpaRepository.search(normalizedKeyword, active).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<DiagnosisCatalog> searchActive(String normalizedKeyword, String diseaseGroup, int limit) {
+        return jpaRepository.searchActiveByKeyword(normalizedKeyword, diseaseGroup, PageRequest.of(0, limit))
+                .stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<DiagnosisCatalog> findByActiveAndDiseaseGroup(String diseaseGroup, int limit) {
+        return jpaRepository.findByActiveTrueAndDiseaseGroupOrderByCodeAsc(diseaseGroup, PageRequest.of(0, limit))
+                .stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<DiagnosisCatalog> findAllByActive(boolean active) {
+        return jpaRepository.findByActiveOrderByCodeAsc(active).stream().map(mapper::toDomain).toList();
     }
 
     @Override

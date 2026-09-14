@@ -6,5 +6,5 @@ import com.benhsoan.port.dto.result.DiagnosisCatalogResult;
 
 public interface GetDiagnosisCatalogUseCase {
 
-    List<DiagnosisCatalogResult> search(String query);
+    List<DiagnosisCatalogResult> search(String query, String diseaseGroup);
 }
