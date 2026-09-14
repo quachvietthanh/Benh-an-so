@@ -108,7 +108,7 @@ public class QueueController {
 
     @PostMapping("/queue-items/{itemId}/skip")
     @RequirePermission("QUEUE_UPDATE_STATUS")
-    public QueueItemResponse skip(@PathVariable UUID itemId, @Valid @RequestBody SkipQueueItemRequest request) {
+    public QueueItemResponse skip(@PathVariable UUID itemId, @Valid @RequestBody(required = false) SkipQueueItemRequest request) {
         return mapper.toResponse(skipQueueItemUseCase.skip(mapper.toCommand(itemId, request)));
     }
 

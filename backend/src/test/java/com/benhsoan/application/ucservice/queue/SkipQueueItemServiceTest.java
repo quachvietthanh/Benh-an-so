@@ -97,6 +97,36 @@ class SkipQueueItemServiceTest {
     }
 
     @Test
+    void doesNotAutoCallWhenQueueIsClosed() {
+        TestContext context = context(false);
+        context.queue.close(NOW);
+
+        UUID nextPatientId = UUID.randomUUID();
+        UUID nextVisitId = UUID.randomUUID();
+        QueueItem nextItem = QueueItem.create(context.item.getMedicalQueueId(), nextPatientId, null, nextVisitId,
+                QueueItemSourceType.WALK_IN, 2, LocalDate.of(2026, 8, 2), UUID.randomUUID(), NOW);
+
+        when(context.queueItemRepository.findNextWaitingForUpdate(context.item.getMedicalQueueId()))
+                .thenReturn(Optional.of(nextItem));
+
+        context.service.skip(new SkipQueueItemCommand(context.item.getId(), "Patient absent"));
+
+        assertEquals(QueueItemStatus.SKIPPED, context.item.getStatus());
+        assertEquals(QueueItemStatus.WAITING, nextItem.getStatus());
+        verify(context.queueItemRepository, never()).findNextWaitingForUpdate(context.item.getMedicalQueueId());
+    }
+
+    @Test
+    void throwsQueueNotFoundExceptionWhenMedicalQueueDoesNotExist() {
+        TestContext context = context(false);
+        when(context.medicalQueueRepository.findByIdForUpdate(context.item.getMedicalQueueId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(com.benhsoan.domain.queue.exception.QueueNotFoundException.class,
+                () -> context.service.skip(new SkipQueueItemCommand(context.item.getId(), "Patient absent")));
+    }
+
+    @Test
     void rejectsDoctorWhoDoesNotOwnQueue() {
         UUID queueDoctorId = UUID.randomUUID();
         MedicalQueue queue = MedicalQueue.create(queueDoctorId, UUID.randomUUID(), LocalDate.of(2026, 8, 2), NOW);
@@ -162,7 +192,7 @@ class SkipQueueItemServiceTest {
                 NOW.plusSeconds(60), "Patient absent when called");
 
         when(queueItemRepository.findByIdForUpdate(item.getId())).thenReturn(Optional.of(item));
-        when(medicalQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(medicalQueueRepository.findByIdForUpdate(queue.getId())).thenReturn(Optional.of(queue));
         when(visitRepository.findByIdForUpdate(visit.getId())).thenReturn(Optional.of(visit));
         if (appointment != null) {
             when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
@@ -175,16 +205,18 @@ class SkipQueueItemServiceTest {
         SkipQueueItemService service = new SkipQueueItemService(queueItemRepository, medicalQueueRepository,
                 visitRepository, appointmentRepository, new QueueOperationAuthorization(currentUserPort),
                 queryRepository, clockPort, auditService);
-        return new TestContext(service, item, visit, appointment, queueItemRepository, visitRepository,
-                appointmentRepository, auditService);
+        return new TestContext(service, queue, item, visit, appointment, queueItemRepository, medicalQueueRepository,
+                visitRepository, appointmentRepository, auditService);
     }
 
     private record TestContext(
             SkipQueueItemService service,
+            MedicalQueue queue,
             QueueItem item,
             Visit visit,
             Appointment appointment,
             QueueItemRepository queueItemRepository,
+            MedicalQueueRepository medicalQueueRepository,
             VisitRepository visitRepository,
             AppointmentRepository appointmentRepository,
             QueueAuditService auditService

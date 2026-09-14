@@ -36,8 +36,13 @@ public class QueueRestMapper {
         return new UpdateQueueItemStatusCommand(queueItemId, request.targetStatus(), request.cancelReason());
     }
 
+    public static final String DEFAULT_SKIP_REASON = "Bệnh nhân vắng mặt khi gọi tên";
+
     public SkipQueueItemCommand toCommand(UUID queueItemId, SkipQueueItemRequest request) {
-        return new SkipQueueItemCommand(queueItemId, request.reason());
+        String reason = (request != null && request.reason() != null && !request.reason().isBlank())
+                ? request.reason().trim()
+                : DEFAULT_SKIP_REASON;
+        return new SkipQueueItemCommand(queueItemId, reason);
     }
 
     public QueueItemResponse toResponse(QueueItemResult result) {

@@ -71,6 +71,28 @@ class ReQueueItemServiceTest {
                 () -> ctx.service.reQueue(new ReQueueItemCommand(ctx.item.getId())));
     }
 
+    @Test
+    void rejectsReQueueWhenQueueDateIsDifferent() {
+        TestContext ctx = context(true);
+        // Queue date is yesterday
+        UUID doctorId = UUID.randomUUID();
+        MedicalQueue yesterdayQueue = MedicalQueue.create(doctorId, UUID.randomUUID(), LocalDate.of(2026, 8, 1), NOW);
+        when(ctx.medicalQueueRepository.findById(ctx.item.getMedicalQueueId())).thenReturn(Optional.of(yesterdayQueue));
+
+        CheckInConflictException ex = assertThrows(CheckInConflictException.class,
+                () -> ctx.service.reQueue(new ReQueueItemCommand(ctx.item.getId())));
+        assertEquals("Cannot re-queue into a queue from a different date.", ex.getMessage());
+    }
+
+    @Test
+    void throwsQueueNotFoundExceptionWhenQueueDoesNotExist() {
+        TestContext ctx = context(true);
+        when(ctx.medicalQueueRepository.findById(ctx.item.getMedicalQueueId())).thenReturn(Optional.empty());
+
+        assertThrows(com.benhsoan.domain.queue.exception.QueueNotFoundException.class,
+                () -> ctx.service.reQueue(new ReQueueItemCommand(ctx.item.getId())));
+    }
+
     private TestContext context(boolean authorized) {
         UUID doctorId = UUID.randomUUID();
         MedicalQueue queue = MedicalQueue.create(doctorId, UUID.randomUUID(), LocalDate.of(2026, 8, 2), NOW);
@@ -106,7 +128,7 @@ class ReQueueItemServiceTest {
                 queryRepository, clockPort, auditService
         );
 
-        return new TestContext(service, queue, item, queueItemRepository, auditService);
+        return new TestContext(service, queue, item, queueItemRepository, medicalQueueRepository, auditService);
     }
 
     private record TestContext(
@@ -114,6 +136,7 @@ class ReQueueItemServiceTest {
             MedicalQueue queue,
             QueueItem item,
             QueueItemRepository queueItemRepository,
+            MedicalQueueRepository medicalQueueRepository,
             QueueAuditService auditService
     ) {}
 }

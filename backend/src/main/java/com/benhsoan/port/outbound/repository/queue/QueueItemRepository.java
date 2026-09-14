@@ -13,6 +13,8 @@ public interface QueueItemRepository {
 
     Optional<QueueItem> findByAppointmentId(UUID appointmentId);
 
+    Optional<QueueItem> findById(UUID id);
+
     Optional<QueueItem> findByIdForUpdate(UUID id);
 
     boolean existsByPatientIdAndQueueDateAndStatusIn(UUID patientId, LocalDate queueDate,

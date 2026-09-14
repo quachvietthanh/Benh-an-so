@@ -178,6 +178,22 @@ class QueueControllerTest {
     }
 
     @Test
+    void skipsQueueItemWithEmptyBody() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        when(skipQueueItemUseCase.skip(any())).thenReturn(result(itemId));
+
+        mockMvc.perform(post("/queue-items/{itemId}/skip", itemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(itemId.toString()))
+                .andExpect(jsonPath("$.skipReason").value("Patient absent when called"));
+
+        ArgumentCaptor<com.benhsoan.port.dto.command.queue.SkipQueueItemCommand> captor =
+                ArgumentCaptor.forClass(com.benhsoan.port.dto.command.queue.SkipQueueItemCommand.class);
+        org.mockito.Mockito.verify(skipQueueItemUseCase).skip(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(QueueRestMapper.DEFAULT_SKIP_REASON, captor.getValue().reason());
+    }
+
+    @Test
     void rejectsBlankSkipReason() throws Exception {
         mockMvc.perform(post("/queue-items/{itemId}/skip", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)

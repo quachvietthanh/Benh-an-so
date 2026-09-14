@@ -1,8 +1,11 @@
 package com.benhsoan.application.ucservice.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -21,6 +24,7 @@ import com.benhsoan.domain.queue.MedicalQueue;
 import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
+import com.benhsoan.domain.queue.exception.QueueNotFoundException;
 import com.benhsoan.port.dto.result.QueueHistoryResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -34,7 +38,7 @@ class GetQueueHistoryServiceTest {
     private static final Instant NOW = Instant.parse("2026-08-02T02:00:00Z");
 
     @Test
-    void returnsQueueHistoryWithParsedDetails() {
+    void returnsQueueHistoryWithParsedDetailsWithoutWriteLock() {
         UUID doctorId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         MedicalQueue queue = MedicalQueue.create(doctorId, UUID.randomUUID(), LocalDate.of(2026, 8, 2), NOW);
@@ -49,7 +53,8 @@ class GetQueueHistoryServiceTest {
                 ActionType.UPDATE,
                 ResourceType.VISIT,
                 item.getVisitId(),
-                "{\"action\":\"DEFERRED\",\"status\":\"SKIPPED\",\"callCount\":1,\"reason\":\"Patient absent\"}",
+                "{\"queueItemId\":\"%s\",\"action\":\"DEFERRED\",\"status\":\"SKIPPED\",\"callCount\":1,\"reason\":\"Patient absent\"}"
+                        .formatted(item.getId()),
                 "127.0.0.1",
                 NOW.plusSeconds(60)
         );
@@ -74,11 +79,11 @@ class GetQueueHistoryServiceTest {
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
 
         when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
-        when(queueItemRepository.findByIdForUpdate(item.getId())).thenReturn(Optional.of(item));
+        when(queueItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
         when(medicalQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
         when(auditLogRepository.findByResourceTypeAndResourceId(ResourceType.VISIT, item.getVisitId()))
                 .thenReturn(List.of(log));
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findAllById(List.of(userId))).thenReturn(List.of(user));
 
         GetQueueHistoryService service = new GetQueueHistoryService(
                 queueItemRepository, medicalQueueRepository,
@@ -97,6 +102,86 @@ class GetQueueHistoryServiceTest {
         assertEquals(1, entry.callCount());
         assertEquals("Patient absent", entry.reason());
         assertEquals(NOW.plusSeconds(60), entry.timestamp());
+
+        verify(queueItemRepository).findById(item.getId());
+        verify(queueItemRepository, never()).findByIdForUpdate(item.getId());
+    }
+
+    @Test
+    void filtersOutLogsNotBelongingToQueueItemAndDoesNotOverwriteReason() {
+        UUID doctorId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        MedicalQueue queue = MedicalQueue.create(doctorId, UUID.randomUUID(), LocalDate.of(2026, 8, 2), NOW);
+        QueueItem item = QueueItem.create(queue.getId(), UUID.randomUUID(), null, UUID.randomUUID(),
+                QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 8, 2), UUID.randomUUID(), NOW);
+        item.call(NOW.plusSeconds(30));
+        item.skip("Current skip reason", NOW.plusSeconds(60));
+
+        AuditLog nonQueueLog = AuditLog.restore(
+                UUID.randomUUID(),
+                userId,
+                ActionType.CREATE,
+                ResourceType.VISIT,
+                item.getVisitId(),
+                "{\"prescriptionId\":\"some-id\"}",
+                "127.0.0.1",
+                NOW
+        );
+
+        AuditLog checkInLog = AuditLog.restore(
+                UUID.randomUUID(),
+                userId,
+                ActionType.UPDATE,
+                ResourceType.VISIT,
+                item.getVisitId(),
+                "{\"queueItemId\":\"%s\",\"status\":\"WAITING\"}".formatted(item.getId()),
+                "127.0.0.1",
+                NOW.plusSeconds(10)
+        );
+
+        AuditLog otherItemLog = AuditLog.restore(
+                UUID.randomUUID(),
+                userId,
+                ActionType.UPDATE,
+                ResourceType.VISIT,
+                item.getVisitId(),
+                "{\"queueItemId\":\"%s\",\"status\":\"SKIPPED\"}".formatted(UUID.randomUUID()),
+                "127.0.0.1",
+                NOW.plusSeconds(20)
+        );
+
+        User user = User.restore(
+                userId, "user1", "hashed", "User One", "user1@clinic.com", "0900000001",
+                UUID.randomUUID(), true, NOW, NOW
+        );
+
+        QueueItemRepository queueItemRepository = mock(QueueItemRepository.class);
+        MedicalQueueRepository medicalQueueRepository = mock(MedicalQueueRepository.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+        when(queueItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(medicalQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(auditLogRepository.findByResourceTypeAndResourceId(ResourceType.VISIT, item.getVisitId()))
+                .thenReturn(List.of(nonQueueLog, checkInLog, otherItemLog));
+        when(userRepository.findAllById(List.of(userId))).thenReturn(List.of(user));
+
+        GetQueueHistoryService service = new GetQueueHistoryService(
+                queueItemRepository, medicalQueueRepository,
+                new QueueOperationAuthorization(currentUserPort),
+                auditLogRepository, userRepository, new ObjectMapper()
+        );
+
+        List<QueueHistoryResult> history = service.getHistory(item.getId());
+
+        assertEquals(1, history.size());
+        QueueHistoryResult entry = history.get(0);
+        assertEquals(item.getId(), entry.queueItemId());
+        assertEquals("WAITING", entry.status());
+        assertEquals(0, entry.callCount());
+        assertNull(entry.reason());
     }
 
     @Test
@@ -108,7 +193,7 @@ class GetQueueHistoryServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
 
-        when(queueItemRepository.findByIdForUpdate(nonExistentId)).thenReturn(Optional.empty());
+        when(queueItemRepository.findById(nonExistentId)).thenReturn(Optional.empty());
 
         GetQueueHistoryService service = new GetQueueHistoryService(
                 queueItemRepository, medicalQueueRepository,
@@ -117,5 +202,30 @@ class GetQueueHistoryServiceTest {
         );
 
         assertThrows(QueueItemNotFoundException.class, () -> service.getHistory(nonExistentId));
+    }
+
+    @Test
+    void throwsWhenMedicalQueueNotFound() {
+        UUID queueItemId = UUID.randomUUID();
+        UUID queueId = UUID.randomUUID();
+        QueueItem item = QueueItem.create(queueId, UUID.randomUUID(), null, UUID.randomUUID(),
+                QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 8, 2), UUID.randomUUID(), NOW);
+
+        QueueItemRepository queueItemRepository = mock(QueueItemRepository.class);
+        MedicalQueueRepository medicalQueueRepository = mock(MedicalQueueRepository.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+
+        when(queueItemRepository.findById(queueItemId)).thenReturn(Optional.of(item));
+        when(medicalQueueRepository.findById(queueId)).thenReturn(Optional.empty());
+
+        GetQueueHistoryService service = new GetQueueHistoryService(
+                queueItemRepository, medicalQueueRepository,
+                new QueueOperationAuthorization(currentUserPort),
+                auditLogRepository, userRepository, new ObjectMapper()
+        );
+
+        assertThrows(QueueNotFoundException.class, () -> service.getHistory(queueItemId));
     }
 }

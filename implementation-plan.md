@@ -98,3 +98,15 @@ Kế hoạch kỹ thuật triển khai backend hoàn chỉnh cho User Story `NCL
   - Kiểm tra toàn bộ vòng đời: Check-in -> Call-next (callCount=1) -> Defer (auto call next ca khác) -> Re-queue -> Call-next lại (callCount=2) -> Complete.
 * **Tiêu chí verify/test**:
   - Chạy `mvn test` trên toàn bộ module backend, đảm bảo 100% test pass không có failure/error nào.
+
+### Giai đoạn 5: Hoàn thiện Audit Log Call Count cho bước Gọi khám & Hoàn tất (Fix lỗi P3)
+* **Mục tiêu**: Bổ sung trường `callCount` vào định dạng JSON của audit log trong phương thức `QueueAuditService.record()` để bảo đảm bước gọi khám (`callNext`) và hoàn tất (`complete`) lưu giữ đầy đủ số lần gọi tại thời điểm thao tác.
+* **File tác động**:
+  * [MODIFY] `backend/src/main/java/com/benhsoan/application/ucservice/queue/QueueAuditService.java`
+  * [MODIFY] `backend/src/test/java/com/benhsoan/application/ucservice/queue/QueueAuditServiceTest.java`
+* **Quy tắc nghiệp vụ**:
+  - TC-04: Mọi sự kiện hàng đợi (`CALL`, `DEFERRED`, `RE_QUEUED`, `COMPLETED`) đều phản ánh đúng `callCount` lịch sử của `QueueItem`.
+* **Tiêu chí verify/test**:
+  - `QueueAuditServiceTest`: Bổ sung kiểm thử xác nhận `record(ActionType, QueueItem)` sinh ra JSON detail có `callCount`.
+  - Chạy `mvn test` xác nhận 100% test pass.
+
