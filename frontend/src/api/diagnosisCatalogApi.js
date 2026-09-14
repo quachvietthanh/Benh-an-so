@@ -4,12 +4,19 @@ const BASE_URL = '/system/diagnosis-catalog'
 
 const diagnosisCatalogApi = {
   search: async (params = {}) => {
+    if (params.search !== undefined || (params.diseaseGroup !== undefined && params.keyword === undefined)) {
+      return axiosClient.get('/diagnosis-catalog', { params })
+    }
+
     try {
       return await axiosClient.get(BASE_URL, { params })
     } catch (err) {
       if (err?.response?.status === 403) {
         const fallbackRes = await axiosClient.get('/diagnosis-catalog', {
-          params: { search: params.keyword || '' },
+          params: {
+            ...params,
+            search: params.search || params.keyword || '',
+          },
         })
         return {
           ...fallbackRes,
@@ -17,6 +24,33 @@ const diagnosisCatalogApi = {
         }
       }
       throw err
+    }
+  },
+
+  getSuggestions: async () => {
+    try {
+      return await axiosClient.get('/diagnosis-catalog/suggestions')
+    } catch (err) {
+      console.warn('Endpoint /diagnosis-catalog/suggestions gặp lỗi hoặc chưa sẵn sàng:', err?.response?.status)
+      try {
+        const fallbackRes = await axiosClient.get('/diagnosis-catalog', { params: { search: '' } })
+        const list = Array.isArray(fallbackRes.data) ? fallbackRes.data : []
+        return {
+          data: {
+            recent: [],
+            popular: list.slice(0, 15),
+            diseaseGroups: [],
+          },
+        }
+      } catch {
+        return {
+          data: {
+            recent: [],
+            popular: [],
+            diseaseGroups: [],
+          },
+        }
+      }
     }
   },
 

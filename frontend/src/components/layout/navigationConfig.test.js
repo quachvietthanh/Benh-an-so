@@ -22,25 +22,25 @@ test('getNavigationItems - excludes /doctor-schedules for irrelevant roles like 
   const patientNav = getNavigationItems(['ROLE_PATIENT'], [])
   const hasDoctorSchedulePatient = patientNav.some((item) => item.key === '/doctor-schedules')
   assert.equal(hasDoctorSchedulePatient, false, 'Patient must not see doctor schedule menu item')
+
+  // 5. Doctor (disabled on UI)
+  const doctorNav = getNavigationItems(['ROLE_DOCTOR'], ['MEDICAL_RECORD_READ', 'DOCTOR_TIMEOFF_CREATE'])
+  const hasDoctorScheduleDoc = doctorNav.some((item) => item.key === '/doctor-schedules')
+  assert.equal(hasDoctorScheduleDoc, false, 'Doctor must not see doctor schedule menu item')
 })
 
-test('getNavigationItems - includes /doctor-schedules for doctor, manager, and admin', () => {
-  // 1. Doctor
-  const doctorNav = getNavigationItems(['ROLE_DOCTOR'], ['MEDICAL_RECORD_READ'])
-  const hasDoctorScheduleDoc = doctorNav.some((item) => item.key === '/doctor-schedules')
-  assert.equal(hasDoctorScheduleDoc, true, 'Doctor must see doctor schedule menu item')
-
-  // 2. Admin
+test('getNavigationItems - includes /doctor-schedules for manager and admin', () => {
+  // 1. Admin
   const adminNav = getNavigationItems(['ROLE_ADMIN'], [])
   const hasDoctorScheduleAdmin = adminNav.some((item) => item.key === '/doctor-schedules')
   assert.equal(hasDoctorScheduleAdmin, true, 'Admin must see doctor schedule menu item')
 
-  // 3. Manager
+  // 2. Manager
   const managerNav = getNavigationItems(['ROLE_MANAGER'], [])
   const hasDoctorScheduleMgr = managerNav.some((item) => item.key === '/doctor-schedules')
   assert.equal(hasDoctorScheduleMgr, true, 'Manager must see doctor schedule menu item')
 
-  // 4. Clinic Manager
+  // 3. Clinic Manager
   const clinicMgrNav = getNavigationItems(['ROLE_CLINIC_MANAGER'], [])
   const hasDoctorScheduleClinicMgr = clinicMgrNav.some((item) => item.key === '/doctor-schedules')
   assert.equal(hasDoctorScheduleClinicMgr, true, 'Clinic Manager must see doctor schedule menu item')

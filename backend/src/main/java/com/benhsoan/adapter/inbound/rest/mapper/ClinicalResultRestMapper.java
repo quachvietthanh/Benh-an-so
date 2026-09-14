@@ -24,7 +24,8 @@ public class ClinicalResultRestMapper {
 
     public ClinicalResultResponse toResponse(ClinicalResultResult result) {
         return new ClinicalResultResponse(result.id(), result.clinicalOrderItemId(), result.visitId(),
-                result.resultType(), result.numericValue(), result.textValue(), result.unit(), result.referenceRange(),
+                result.resultType(), result.numericValue(), result.lowerBound(), result.upperBound(),
+                result.textValue(), result.unit(), result.referenceRange(),
                 result.abnormalFlag(), result.conclusion(), result.status(),
                 result.attachments().stream().map(this::toAttachmentResponse).toList(),
                 result.histories().stream().map(this::toHistoryResponse).toList());
@@ -32,7 +33,8 @@ public class ClinicalResultRestMapper {
 
     public ClinicalResultResponse.HistoryResponse toHistoryResponse(ClinicalResultResult.History history) {
         return new ClinicalResultResponse.HistoryResponse(history.id(), history.oldResultType(), history.newResultType(),
-                history.oldNumericValue(), history.newNumericValue(), history.oldTextValue(), history.newTextValue(),
+                history.oldNumericValue(), history.newNumericValue(), history.oldLowerBound(), history.newLowerBound(),
+                history.oldUpperBound(), history.newUpperBound(), history.oldTextValue(), history.newTextValue(),
                 history.oldUnit(), history.newUnit(), history.oldReferenceRange(), history.newReferenceRange(),
                 history.oldAbnormalFlag(), history.newAbnormalFlag(), history.oldConclusion(), history.newConclusion(),
                 history.oldStatus(), history.newStatus(), history.changeReason(), history.changedBy(), history.changedAt());

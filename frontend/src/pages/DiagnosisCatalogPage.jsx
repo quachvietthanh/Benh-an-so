@@ -330,9 +330,6 @@ function DiagnosisCatalogPage() {
             <ExperimentOutlined style={{ color: '#2563eb', marginRight: 8 }} />
             Quản lý Danh mục Mã Bệnh (ICD-10)
           </Title>
-          <Text type="secondary">
-            Chuẩn hóa danh mục tên gọi và mã bệnh theo phân loại quốc tế, sẵn sàng cho bác sĩ tra cứu và chỉ định khi khám bệnh.
-          </Text>
         </div>
         <div className="diagnosis-header-actions">
           <Button icon={<ReloadOutlined />} onClick={loadData} loading={loading}>

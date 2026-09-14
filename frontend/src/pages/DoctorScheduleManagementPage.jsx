@@ -783,22 +783,6 @@ function DoctorScheduleManagementPage() {
               })}
             </div>
           </Spin>
-
-          <div className="schedule-actions-bar" style={{ justifyContent: 'flex-end' }}>
-            <Tooltip title={!canUpdateWeeklySchedule ? 'Bạn không có quyền cấu hình lịch làm việc' : ''}>
-              <span>
-                <Button
-                  type="primary"
-                  icon={<SaveOutlined />}
-                  loading={savingWeekly}
-                  disabled={!canUpdateWeeklySchedule}
-                  onClick={handleSaveWeeklySchedule}
-                >
-                  Lưu lịch làm việc tuần
-                </Button>
-              </span>
-            </Tooltip>
-          </div>
         </div>
       ),
     },
