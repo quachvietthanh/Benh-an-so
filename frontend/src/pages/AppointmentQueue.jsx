@@ -8,6 +8,7 @@ import {
   Card,
   Col,
   DatePicker,
+  Divider,
   Drawer,
   Dropdown,
   Empty,
@@ -49,6 +50,7 @@ import {
   SearchOutlined,
   SendOutlined,
   StepForwardOutlined,
+  SwapOutlined,
   TeamOutlined,
   UserAddOutlined,
   UserOutlined,
@@ -77,6 +79,11 @@ import {
   saveStoredQueueItem,
 } from '../utils/storageHelpers'
 import { formatVisitCode } from '../utils/helpers'
+import ReceptionRescheduleAppointmentModal from '../components/appointment/ReceptionRescheduleAppointmentModal'
+import {
+  canRescheduleAppointment,
+  getRescheduleRestrictionMessage,
+} from '../utils/appointmentRescheduleValidation'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -184,6 +191,8 @@ function AppointmentQueue() {
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
   const [skipModalItem, setSkipModalItem] = useState(null)
   const [cancelModalItem, setCancelModalItem] = useState(null)
+  const [rescheduleModalItem, setRescheduleModalItem] = useState(null)
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
   const [detailItem, setDetailItem] = useState(null)
   const [quickPatientModalOpen, setQuickPatientModalOpen] = useState(false)
   const [quickPatientSaving, setQuickPatientSaving] = useState(false)
@@ -541,6 +550,65 @@ function AppointmentQueue() {
       message.error('Không thể hủy lịch hẹn!')
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleOpenRescheduleModal = (record) => {
+    const check = canRescheduleAppointment(record, dayjs())
+    if (!check.allowed) {
+      message.warning(check.reason || 'Không thể đổi lịch hẹn này.')
+      return
+    }
+    const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
+    const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
+    setRescheduleModalItem({
+      ...record,
+      patientName: pInfo.name,
+      patientCode: pInfo.code,
+      phone: pInfo.phone,
+      doctorName: dInfo.name,
+      department: dInfo.department,
+    })
+  }
+
+  const handleConfirmRescheduleSubmit = async (appointment, payload) => {
+    setRescheduleSubmitting(true)
+    try {
+      const res = await appointmentApi.reschedule(appointment.id, payload)
+      const updatedApp = res?.data || res
+
+      const pInfo = getPatientInfo(appointment.patientId, appointment.patientName)
+      const targetDoc = doctors.find((d) => String(d.id) === String(payload.newDoctorId))
+      const docName = targetDoc ? (targetDoc.fullName || targetDoc.username) : getDoctorInfo(appointment.doctorId).name
+      const newTimeStr = dayjs(payload.startTime).format('HH:mm DD/MM/YYYY')
+
+      saveAppointmentLog({
+        appointmentId: appointment.id,
+        appointmentCode: appointment.appointmentCode || 'Chưa có mã',
+        action: 'RESCHEDULE',
+        operatorName: user?.fullName || user?.username || 'Lễ tân',
+        details: `Lễ tân đổi lịch hẹn bệnh nhân ${pInfo.name} sang bác sĩ ${docName} lúc ${newTimeStr}. Lý do: ${payload.reason}`,
+      })
+
+      message.success(`Đổi lịch hẹn thành công cho bệnh nhân ${pInfo.name} sang ${newTimeStr}! Khung giờ cũ đã được giải phóng.`)
+      setRescheduleModalItem(null)
+      if (detailItem && detailItem.id === appointment.id) {
+        setDetailItem((prev) => ({
+          ...prev,
+          ...updatedApp,
+          patientName: pInfo.name,
+          doctorName: docName,
+          appointmentAt: payload.startTime,
+          startTime: payload.startTime,
+          endTime: payload.endTime,
+        }))
+      }
+      refreshAllData()
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message || err?.message || 'Không thể đổi lịch hẹn. Vui lòng kiểm tra lại khung giờ và ca trực của Bác sĩ.'
+      message.error(apiMessage)
+    } finally {
+      setRescheduleSubmitting(false)
     }
   }
 
@@ -989,7 +1057,7 @@ function AppointmentQueue() {
         const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
         const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
 
-        const openDetail = () => {
+        const openDetail = async () => {
           setDetailItem({
             type: 'appointment',
             ...record,
@@ -997,7 +1065,26 @@ function AppointmentQueue() {
             doctorName: dInfo.name,
             department: dInfo.department,
           })
+          if (record.id) {
+            try {
+              const res = await appointmentApi.getById(record.id)
+              const data = res?.data || res
+              if (data) {
+                setDetailItem((prev) => ({
+                  ...prev,
+                  ...data,
+                  patientName: pInfo.name,
+                  doctorName: dInfo.name,
+                  department: dInfo.department,
+                }))
+              }
+            } catch (err) {
+              console.error('Failed to load full appointment detail:', err)
+            }
+          }
         }
+
+        const reschedCheck = canRescheduleAppointment(record, dayjs())
 
         const menuItems = [
           {
@@ -1011,6 +1098,13 @@ function AppointmentQueue() {
             icon: <CheckCircleOutlined />,
             label: 'Tiếp nhận khám (Check-in)',
             onClick: () => handleCheckInAppointment(record.id),
+          },
+          ['SCHEDULED', 'CONFIRMED'].includes(record.status) && {
+            key: 'reschedule',
+            icon: <SwapOutlined />,
+            disabled: !reschedCheck.allowed,
+            label: reschedCheck.allowed ? 'Đổi lịch hẹn (Dời giờ)' : `Không thể đổi (${reschedCheck.reason})`,
+            onClick: () => handleOpenRescheduleModal(record),
           },
           record.status !== 'CANCELLED' && {
             key: 'remind',
@@ -1241,7 +1335,7 @@ function AppointmentQueue() {
               <Button icon={<HistoryOutlined />} onClick={() => setLogsDrawerOpen(true)}>
                 Nhật ký & Thông báo
               </Button>
-              {permissions.canBook && (
+              {permissions.canCreateAppointment && (
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
@@ -2537,10 +2631,25 @@ function AppointmentQueue() {
       <Modal
         title="Chi Tiết Lịch Hẹn & Hàng Đợi"
         open={!!detailItem}
+        width={detailItem?.rescheduleHistories?.length ? 720 : 540}
         onCancel={() => setDetailItem(null)}
         footer={[
+          detailItem?.type === 'appointment' && canRescheduleAppointment(detailItem, dayjs()).allowed && (
+            <Button
+              key="reschedule"
+              type="primary"
+              icon={<SwapOutlined />}
+              onClick={() => {
+                const target = { ...detailItem }
+                setDetailItem(null)
+                handleOpenRescheduleModal(target)
+              }}
+            >
+              Đổi lịch hẹn này
+            </Button>
+          ),
           <Button key="close" onClick={() => setDetailItem(null)}>Đóng</Button>,
-        ]}
+        ].filter(Boolean)}
       >
         {detailItem && (
           <div>
@@ -2552,9 +2661,75 @@ function AppointmentQueue() {
             {detailItem.reason && <Paragraph><Text type="secondary">Lý do khám:</Text> {detailItem.reason}</Paragraph>}
             {detailItem.cancelReason && <Paragraph><Text type="secondary">Lý do hủy:</Text> <Text type="danger">{detailItem.cancelReason}</Text></Paragraph>}
             {(detailItem.appointmentAt || detailItem.startTime) && <Paragraph><Text type="secondary">Thời gian hẹn:</Text> {dayjs(detailItem.appointmentAt || detailItem.startTime).format('HH:mm - DD/MM/YYYY')}</Paragraph>}
+
+            {/* TC-04: Lịch sử đổi lịch hẹn */}
+            {detailItem.rescheduleHistories && detailItem.rescheduleHistories.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <Divider style={{ margin: '12px 0' }} />
+                <Title level={5} style={{ marginBottom: 8 }}>
+                  <HistoryOutlined style={{ marginRight: 6 }} />
+                  Nhật ký dời lịch hẹn ({detailItem.rescheduleHistories.length})
+                </Title>
+                <Table
+                  dataSource={detailItem.rescheduleHistories}
+                  rowKey={(h) => h.id || `${h.rescheduledAt}-${h.rescheduledBy}`}
+                  pagination={false}
+                  size="small"
+                  columns={[
+                    {
+                      title: 'Thời điểm',
+                      dataIndex: 'rescheduledAt',
+                      width: 140,
+                      render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY'),
+                    },
+                    {
+                      title: 'Người đổi',
+                      dataIndex: 'rescheduledByName',
+                      width: 110,
+                      render: (name, h) => name || h.rescheduledBy || 'Lễ tân',
+                    },
+                    {
+                      title: 'Thay đổi',
+                      render: (_, h) => (
+                        <div style={{ fontSize: 12 }}>
+                          <div>
+                            <Text type="secondary">Giờ: </Text>
+                            <Text delete>{dayjs(h.oldStartTime).format('HH:mm DD/MM')}</Text>
+                            {' → '}
+                            <Text strong style={{ color: '#1677ff' }}>{dayjs(h.newStartTime).format('HH:mm DD/MM')}</Text>
+                          </div>
+                          {(h.oldDoctorName !== h.newDoctorName || h.oldDoctorId !== h.newDoctorId) && (
+                            <div style={{ marginTop: 2 }}>
+                              <Text type="secondary">BS: </Text>
+                              <Text delete>{h.oldDoctorName || 'BS cũ'}</Text>
+                              {' → '}
+                              <Text strong style={{ color: '#52c41a' }}>{h.newDoctorName || 'BS mới'}</Text>
+                            </div>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      title: 'Lý do',
+                      dataIndex: 'reason',
+                      render: (r) => <Text style={{ fontSize: 12 }}>{r}</Text>,
+                    },
+                  ]}
+                />
+              </div>
+            )}
           </div>
         )}
       </Modal>
+
+      <ReceptionRescheduleAppointmentModal
+        open={!!rescheduleModalItem}
+        appointment={rescheduleModalItem}
+        doctorList={doctorList}
+        loading={rescheduleSubmitting}
+        onClose={() => setRescheduleModalItem(null)}
+        onConfirm={handleConfirmRescheduleSubmit}
+      />
 
       <PatientMedicalHistoryModal
         open={historyModalOpen}
