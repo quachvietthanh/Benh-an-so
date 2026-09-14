@@ -53,8 +53,23 @@ public record MedicalRecordDetailResult(
             Gender gender,
             String phone,
             String identityNumber,
-            String insuranceNumber
+            String insuranceNumber,
+            String emergencyContact,
+            String emergencyRelationship,
+            String emergencyPhone
     ) {
+        public PatientInfo(
+                UUID id,
+                String patientCode,
+                String fullName,
+                LocalDate dateOfBirth,
+                Gender gender,
+                String phone,
+                String identityNumber,
+                String insuranceNumber
+        ) {
+            this(id, patientCode, fullName, dateOfBirth, gender, phone, identityNumber, insuranceNumber, null, null, null);
+        }
     }
 
     public record VisitInfo(

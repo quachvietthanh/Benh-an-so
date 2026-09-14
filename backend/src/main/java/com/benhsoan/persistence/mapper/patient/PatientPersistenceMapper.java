@@ -27,6 +27,7 @@ public class PatientPersistenceMapper {
                 entity.getInsuranceNumber(),
                 entity.getBloodType(),
                 entity.getEmergencyContact(),
+                entity.getEmergencyRelationship(),
                 entity.getEmergencyPhone(),
                 entity.isActive(),
                 entity.getCreatedAt(),
@@ -62,6 +63,7 @@ public class PatientPersistenceMapper {
                 .insuranceNumber(domain.getInsuranceNumber())
                 .bloodType(domain.getBloodType())
                 .emergencyContact(domain.getEmergencyContact())
+                .emergencyRelationship(domain.getEmergencyRelationship())
                 .emergencyPhone(domain.getEmergencyPhone())
                 .active(domain.isActive())
                 .createdAt(domain.getCreatedAt())

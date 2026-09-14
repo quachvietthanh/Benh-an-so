@@ -151,6 +151,31 @@ class MedicalRecordControllerTest {
     }
 
     @Test
+    @DisplayName("P3.02 / TC-01: GET /medical-records/visits/{visitId} - 200 OK trả về thông tin người liên hệ khẩn cấp cho bác sĩ")
+    void getMedicalRecordDetailReturnsEmergencyContactForDoctor() throws Exception {
+        MedicalRecordDetailResult.PatientInfo patientWithEmergency = new MedicalRecordDetailResult.PatientInfo(
+                patientId, "BN-0001", "Nguyen Van A",
+                LocalDate.of(1990, 1, 1), Gender.MALE, "0900000000", "ID-1", "BH-1",
+                "Nguyen Van B", "Bố", "0912345678"
+        );
+        MedicalRecordDetailResult detail = new MedicalRecordDetailResult(
+                patientWithEmergency,
+                new MedicalRecordDetailResult.VisitInfo(visitId, "VS-0001", VisitType.WALK_IN,
+                        VisitStatus.COMPLETED, now, now, now, "Exam", null, doctorId, "Dr. Tran B"),
+                recordId, "Headache", "Pain", "None", "Normal", "Stable", "Rest",
+                "Follow-up", "Migraine", MedicalRecordStatus.OPEN, null, null, null, null, null,
+                "G43", "Migraine", List.of("J00"), List.of());
+
+        when(getMedicalRecordUseCase.getDetailByVisitId(visitId)).thenReturn(detail);
+
+        mockMvc.perform(get("/medical-records/visits/{visitId}", visitId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.patient.emergencyContact").value("Nguyen Van B"))
+                .andExpect(jsonPath("$.patient.emergencyRelationship").value("Bố"))
+                .andExpect(jsonPath("$.patient.emergencyPhone").value("0912345678"));
+    }
+
+    @Test
     @DisplayName("GET /medical-records/patient/{patientId} - 200 OK with history list")
     void getPatientMedicalRecordsReturnsHistory() throws Exception {
         when(getMedicalRecordUseCase.getHistoryByPatientId(patientId))

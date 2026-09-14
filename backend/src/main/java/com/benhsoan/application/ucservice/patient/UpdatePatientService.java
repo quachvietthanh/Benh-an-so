@@ -35,6 +35,9 @@ import lombok.RequiredArgsConstructor;
 public class UpdatePatientService
         implements UpdatePatientUseCase {
 
+    private static final java.util.regex.Pattern PHONE_PATTERN =
+            java.util.regex.Pattern.compile("^(0|\\+84)(3|5|7|8|9)[0-9]{8}$");
+
     private final PatientRepository patientRepository;
 
     private final PatientChangeLogRepository patientChangeLogRepository;
@@ -71,6 +74,7 @@ public class UpdatePatientService
                 patient.getInsuranceNumber(),
                 patient.getBloodType(),
                 patient.getEmergencyContact(),
+                patient.getEmergencyRelationship(),
                 patient.getEmergencyPhone(),
                 patient.isActive(),
                 patient.getCreatedAt(),
@@ -95,6 +99,10 @@ public class UpdatePatientService
         String fullName = command.fullName();
         String phone = command.phone();
         String address = command.address();
+        String emergencyContact = command.emergencyContact();
+        String emergencyRelationship = command.emergencyRelationship();
+        String emergencyPhone = command.emergencyPhone();
+
         if (PatientAnonymizer.isMaskedFullName(fullName)) {
             fullName = patient.getFullName();
         }
@@ -104,8 +112,28 @@ public class UpdatePatientService
         if (PatientAnonymizer.isMaskedAddress(address)) {
             address = patient.getAddress();
         }
+        if (PatientAnonymizer.isMaskedFullName(emergencyContact)) {
+            emergencyContact = patient.getEmergencyContact();
+        }
+        if (PatientAnonymizer.isMaskedPhone(emergencyPhone)) {
+            emergencyPhone = patient.getEmergencyPhone();
+        }
+        if ((emergencyRelationship == null || emergencyRelationship.isBlank())
+                && emergencyContact != null && emergencyPhone != null) {
+            if (patient.getEmergencyRelationship() != null) {
+                emergencyRelationship = patient.getEmergencyRelationship();
+            } else if (patient.getEmergencyContact() != null) {
+                emergencyRelationship = "Người thân";
+            }
+        }
 
         if (fullName != null) {
+            emergencyContact = normalizeString(emergencyContact);
+            emergencyRelationship = normalizeString(emergencyRelationship);
+            emergencyPhone = normalizePhone(emergencyPhone);
+
+            validateEmergencyContact(emergencyContact, emergencyRelationship, emergencyPhone);
+
             patient.updateProfile(
                     fullName,
                     command.dateOfBirth(),
@@ -116,8 +144,9 @@ public class UpdatePatientService
                     normalizeIdentityNumber(command.identityNumber()),
                     command.insuranceNumber(),
                     command.bloodType(),
-                    command.emergencyContact(),
-                    command.emergencyPhone()
+                    emergencyContact,
+                    emergencyRelationship,
+                    emergencyPhone
             );
 
             if (command.active() && !patient.isActive()) {
@@ -245,6 +274,46 @@ public class UpdatePatientService
             return null;
         }
         return identityNumber.trim();
+    }
+
+    private void validateEmergencyContact(String contact, String relationship, String phone) {
+        boolean hasContact = contact != null && !contact.isBlank();
+        boolean hasRelationship = relationship != null && !relationship.isBlank();
+        boolean hasPhone = phone != null && !phone.isBlank();
+
+        if (hasContact || hasRelationship || hasPhone) {
+            if (!hasContact) {
+                throw new ValidationException("emergencyContact: Họ tên người liên hệ khẩn cấp không được để trống.");
+            }
+            if (!hasRelationship) {
+                throw new ValidationException("emergencyRelationship: Mối quan hệ với người liên hệ khẩn cấp không được để trống.");
+            }
+            if (!hasPhone) {
+                throw new ValidationException("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không được để trống.");
+            }
+            if (!PHONE_PATTERN.matcher(phone.trim()).matches()) {
+                throw new ValidationException("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng.");
+            }
+        }
+    }
+
+    private String normalizeString(String val) {
+        if (val == null || val.isBlank()) {
+            return null;
+        }
+        return val.trim();
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+
+        String trimmed = phone.trim();
+
+        return trimmed.startsWith("+84")
+                ? "0" + trimmed.substring(3)
+                : trimmed;
     }
 
 }

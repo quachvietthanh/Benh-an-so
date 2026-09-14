@@ -46,6 +46,8 @@ public class Patient {
 
     private String emergencyContact;
 
+    private String emergencyRelationship;
+
     private String emergencyPhone;
 
     private boolean active;
@@ -86,6 +88,7 @@ public class Patient {
             String insuranceNumber,
             BloodType bloodType,
             String emergencyContact,
+            String emergencyRelationship,
             String emergencyPhone,
             boolean active,
             Instant createdAt,
@@ -121,6 +124,7 @@ public class Patient {
                         : bloodType;
 
         this.emergencyContact = emergencyContact;
+        this.emergencyRelationship = emergencyRelationship;
         this.emergencyPhone = emergencyPhone;
 
         this.active = active;
@@ -151,6 +155,7 @@ public class Patient {
             String insuranceNumber,
             BloodType bloodType,
             String emergencyContact,
+            String emergencyRelationship,
             String emergencyPhone,
             boolean consentAgreed,
             String consentVersion,
@@ -175,6 +180,7 @@ public class Patient {
                 insuranceNumber,
                 bloodType,
                 emergencyContact,
+                emergencyRelationship,
                 emergencyPhone,
                 true,
                 now,
@@ -191,6 +197,43 @@ public class Patient {
         );
     }
 
+    public static Patient create(
+            String patientCode,
+            String fullName,
+            LocalDate dateOfBirth,
+            Gender gender,
+            String phone,
+            String email,
+            String address,
+            String identityNumber,
+            String insuranceNumber,
+            BloodType bloodType,
+            String emergencyContact,
+            String emergencyPhone,
+            boolean consentAgreed,
+            String consentVersion,
+            UUID createdBy
+    ) {
+        return create(
+                patientCode,
+                fullName,
+                dateOfBirth,
+                gender,
+                phone,
+                email,
+                address,
+                identityNumber,
+                insuranceNumber,
+                bloodType,
+                emergencyContact,
+                null,
+                emergencyPhone,
+                consentAgreed,
+                consentVersion,
+                createdBy
+        );
+    }
+
     public void updateProfile(
             String fullName,
             LocalDate dateOfBirth,
@@ -202,6 +245,7 @@ public class Patient {
             String insuranceNumber,
             BloodType bloodType,
             String emergencyContact,
+            String emergencyRelationship,
             String emergencyPhone
     ) {
 
@@ -222,9 +266,39 @@ public class Patient {
                         : bloodType;
 
         this.emergencyContact = emergencyContact;
+        this.emergencyRelationship = emergencyRelationship;
         this.emergencyPhone = emergencyPhone;
 
         this.updatedAt = Instant.now();
+    }
+
+    public void updateProfile(
+            String fullName,
+            LocalDate dateOfBirth,
+            Gender gender,
+            String phone,
+            String email,
+            String address,
+            String identityNumber,
+            String insuranceNumber,
+            BloodType bloodType,
+            String emergencyContact,
+            String emergencyPhone
+    ) {
+        updateProfile(
+                fullName,
+                dateOfBirth,
+                gender,
+                phone,
+                email,
+                address,
+                identityNumber,
+                insuranceNumber,
+                bloodType,
+                emergencyContact,
+                this.emergencyRelationship,
+                emergencyPhone
+        );
     }
 
     public void withdrawConsent(String reason, Instant withdrawnAt) {
@@ -276,6 +350,7 @@ public class Patient {
             String insuranceNumber,
             BloodType bloodType,
             String emergencyContact,
+            String emergencyRelationship,
             String emergencyPhone,
             boolean active,
             Instant createdAt,
@@ -304,6 +379,65 @@ public class Patient {
                 insuranceNumber,
                 bloodType,
                 emergencyContact,
+                emergencyRelationship,
+                emergencyPhone,
+                active,
+                createdAt,
+                updatedAt,
+                userId,
+                createdBy,
+                consentAgreed,
+                consentAgreedAt,
+                consentVersion,
+                consentWithdrawn,
+                consentWithdrawnAt,
+                consentWithdrawnReason,
+                nonMedicalUseRestricted
+        );
+    }
+
+    public static Patient restore(
+            UUID id,
+            String patientCode,
+            String fullName,
+            LocalDate dateOfBirth,
+            Gender gender,
+            String phone,
+            String email,
+            String address,
+            String identityNumber,
+            String insuranceNumber,
+            BloodType bloodType,
+            String emergencyContact,
+            String emergencyPhone,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt,
+            UUID userId,
+            UUID createdBy,
+            boolean consentAgreed,
+            Instant consentAgreedAt,
+            String consentVersion,
+            boolean consentWithdrawn,
+            Instant consentWithdrawnAt,
+            String consentWithdrawnReason,
+            boolean nonMedicalUseRestricted
+    ) {
+
+        return restore(
+                id,
+                patientCode,
+                fullName,
+                dateOfBirth,
+                gender,
+                phone,
+                email,
+                address,
+                identityNumber,
+                insuranceNumber,
+                bloodType,
+                emergencyContact,
+                null,
                 emergencyPhone,
                 active,
                 createdAt,
@@ -353,6 +487,7 @@ public class Patient {
                 insuranceNumber,
                 bloodType,
                 emergencyContact,
+                null,
                 emergencyPhone,
                 active,
                 createdAt,

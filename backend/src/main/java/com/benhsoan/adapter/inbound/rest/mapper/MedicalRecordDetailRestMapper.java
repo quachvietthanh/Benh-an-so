@@ -28,12 +28,20 @@ public class MedicalRecordDetailRestMapper {
     }
 
     public MedicalRecordDetailResponse toResponse(MedicalRecordDetailResult result) {
+        String emergencyContact = anonymizationModeState.isEnabled() && result.patient().emergencyContact() != null
+                ? PatientAnonymizer.maskFullName(null)
+                : result.patient().emergencyContact();
+        String emergencyPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(result.patient().emergencyPhone())
+                : result.patient().emergencyPhone();
+
         PatientInfo patient = new PatientInfo(
                 result.patient().id(), result.patient().patientCode(),
                 anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
                 result.patient().dateOfBirth(), result.patient().gender(),
                 anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone(),
-                result.patient().identityNumber(), result.patient().insuranceNumber());
+                result.patient().identityNumber(), result.patient().insuranceNumber(),
+                emergencyContact, result.patient().emergencyRelationship(), emergencyPhone);
 
         VisitInfo visit = new VisitInfo(
                 result.visit().id(), result.visit().visitCode(), result.visit().visitType(),

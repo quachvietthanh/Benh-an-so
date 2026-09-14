@@ -165,4 +165,73 @@ class RegisterPatientServiceTest {
         verify(patientRepository, never()).existsByIdentityNumber(any());
         verify(patientRepository).save(any(Patient.class));
     }
+
+    @Test
+    @DisplayName("NCL-02-CN-007 TC-01 & TC-03: Đăng ký bệnh nhân thành công với người liên hệ khẩn cấp đầy đủ và lưu change log")
+    void registersPatientWithEmergencyContactSuccessfully() {
+        when(patientCodeGenerator.generate()).thenReturn("BN000002");
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Le Thi B")
+                .emergencyRelationship("Vợ")
+                .emergencyPhone("+84909998877")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        PatientResult result = service.register(command);
+
+        assertNotNull(result);
+        assertEquals("Le Thi B", result.emergencyContact());
+        assertEquals("Vợ", result.emergencyRelationship());
+        assertEquals("0909998877", result.emergencyPhone());
+
+        verify(patientRepository).save(any(Patient.class));
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-007 TC-02: Từ chối đăng ký khi số điện thoại người liên hệ khẩn cấp sai định dạng")
+    void rejectsRegistrationWhenEmergencyPhoneIsInvalid() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Le Thi B")
+                .emergencyRelationship("Vợ")
+                .emergencyPhone("01234567890")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.register(command));
+        assertTrue(ex.getMessage().contains("emergencyPhone"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-007 Cohesive Triplet: Từ chối khi thiếu quan hệ nhân thân nhưng có họ tên và SĐT người liên hệ khẩn cấp")
+    void rejectsRegistrationWhenEmergencyRelationshipIsMissing() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Le Thi B")
+                .emergencyRelationship("   ")
+                .emergencyPhone("0909998877")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.register(command));
+        assertTrue(ex.getMessage().contains("emergencyRelationship"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
 }
