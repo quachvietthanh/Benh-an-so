@@ -11,7 +11,11 @@ const pharmacyApi = {
   getAllergyWarningLogs: (params) => axiosClient.get('/prescriptions/allergy-warning-logs', { params }),
   createPrescription: (data) => axiosClient.post('/prescriptions', data),
   updatePrescription: (id, data) => axiosClient.patch(`/prescriptions/${id}`, data),
-  cancelPrescription: (id) => axiosClient.post(`/prescriptions/${id}/cancel`),
+  cancelPrescription: (id, data) =>
+    axiosClient.post(
+      `/prescriptions/${id}/cancel`,
+      typeof data === 'string' ? { cancelReason: data } : (data || {})
+    ),
   printPrescription: (id) => axiosClient.get(`/prescriptions/${id}/print`, { responseType: 'blob' }),
   stocks: (params) => axiosClient.get('/inventory/stocks', { params }),
   lowStock: () => axiosClient.get('/inventory/low-stock'),

@@ -69,6 +69,11 @@ import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailMo
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
 import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
+import CancelPrescriptionModal from '../components/pharmacy/CancelPrescriptionModal.jsx'
+import {
+  canCancelPrescription,
+  getCancelRestrictionMessage,
+} from '../utils/prescriptionCancelValidation.js'
 import { useAuthContext } from '../context/AuthContext'
 
 import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
@@ -198,6 +203,8 @@ function PrescriptionPage() {
   const [issuedPrescriptionModalOpen, setIssuedPrescriptionModalOpen] = useState(false)
   const [justIssuedPrescription, setJustIssuedPrescription] = useState(null)
   const [signModalOpen, setSignModalOpen] = useState(false)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [prescriptionToCancel, setPrescriptionToCancel] = useState(null)
 
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -236,6 +243,13 @@ function PrescriptionPage() {
     !prescriptionBlockReason &&
     editingPrescription?.status !== 'DISPENSED' &&
     editingPrescription?.status !== 'CANCELLED'
+
+  const isPharmacistOnly = Boolean(
+    roles.includes('pharmacist') && !roles.includes('doctor') && !roles.includes('admin')
+  )
+  const canCancelPrescriptionAction = Boolean(
+    !isPharmacistOnly && (roles.includes('doctor') || roles.includes('admin') || canUpdatePrescription)
+  )
 
   const sortedMedicines = useMemo(
     () => sortMedicinesByStockAvailability(medicines),
@@ -1172,33 +1186,41 @@ function PrescriptionPage() {
     setConfirmedAllergyOverrides([])
   }
 
-  const handleCancelPrescription = (prescription) => {
-    if (prescription.status !== 'PENDING_DISPENSE') {
-      message.warning('Chỉ có thể hủy đơn thuốc khi đang chờ cấp phát.')
+  const handleOpenCancelModal = (prescription) => {
+    const restrictionMsg = getCancelRestrictionMessage(prescription)
+    if (restrictionMsg) {
+      message.warning(restrictionMsg)
       return
     }
 
-    Modal.confirm({
-      title: `Hủy đơn thuốc ${prescription.prescriptionCode}?`,
-      icon: <ExclamationCircleOutlined style={{ color: '#ef4444' }} />,
-      content: 'Đơn thuốc sẽ được chuyển sang trạng thái CANCELLED. Hành động này không thể hoàn tác.',
-      okText: 'Xác nhận hủy',
-      okButtonProps: { danger: true },
-      cancelText: 'Bỏ qua',
-      onOk: async () => {
-        setCancelling(true)
-        try {
-          await requireLiveInProgressQueue('hủy đơn thuốc')
-          await pharmacyApi.cancelPrescription(prescription.id)
-          message.success(`Đã hủy đơn thuốc ${prescription.prescriptionCode}.`)
-          await loadData()
-        } catch (error) {
-          message.error(getApiMessage(error, 'Không thể hủy đơn thuốc.'))
-        } finally {
-          setCancelling(false)
-        }
-      },
-    })
+    if (isPharmacistOnly) {
+      message.error('Dược sĩ không có quyền hủy đơn thuốc. Chỉ bác sĩ kê đơn hoặc quản trị viên mới được thực hiện.')
+      return
+    }
+
+    setPrescriptionToCancel(prescription)
+    setCancelModalOpen(true)
+  }
+
+  const handleConfirmCancelPrescription = async (prescription, cancelReason) => {
+    if (!prescription?.id) return
+    setCancelling(true)
+    try {
+      await requireLiveInProgressQueue('hủy đơn thuốc')
+      await pharmacyApi.cancelPrescription(prescription.id, { cancelReason })
+      message.success(`Đã hủy đơn thuốc ${prescription.prescriptionCode || ''} thành công.`)
+      setCancelModalOpen(false)
+      setPrescriptionToCancel(null)
+      await loadData()
+    } catch (error) {
+      message.error(getApiMessage(error, 'Không thể hủy đơn thuốc.'))
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  const handleCancelPrescription = (prescription) => {
+    handleOpenCancelModal(prescription)
   }
 
   const openDetailModal = (prescription) => {
@@ -1471,7 +1493,7 @@ function PrescriptionPage() {
       dataIndex: 'status',
       key: 'status',
       width: 150,
-      render: (value) => {
+      render: (value, row = {}) => {
         if (value === 'PENDING_DISPENSE') {
           return (
             <Tag color="orange" icon={<ClockCircleOutlined />}>
@@ -1488,9 +1510,11 @@ function PrescriptionPage() {
         }
         if (value === 'CANCELLED') {
           return (
-            <Tag color="default" icon={<CloseCircleOutlined />}>
-              Đã hủy
-            </Tag>
+            <Tooltip title={row?.cancelReason ? `Lý do hủy: ${row.cancelReason}` : 'Đơn thuốc đã hủy'}>
+              <Tag color="default" icon={<CloseCircleOutlined />} style={{ cursor: 'pointer' }}>
+                Đã hủy
+              </Tag>
+            </Tooltip>
           )
         }
         return <Tag>{value}</Tag>
@@ -1630,15 +1654,26 @@ function PrescriptionPage() {
             label: 'Điều chỉnh đơn thuốc',
             onClick: () => startEditPrescription(prescription),
           },
-          isPending && canPrescribe && {
+          // TC-04: Dược sĩ thuần túy không có thao tác hủy
+          !isPharmacistOnly && canCancelPrescriptionAction && isPending && {
             type: 'divider',
           },
-          isPending && canPrescribe && {
+          !isPharmacistOnly && canCancelPrescriptionAction && isPending && {
             key: 'cancel',
             icon: <StopOutlined />,
             danger: true,
             label: 'Hủy đơn thuốc này',
-            onClick: () => handleCancelPrescription(prescription),
+            onClick: () => handleOpenCancelModal(prescription),
+          },
+          !isPharmacistOnly && canCancelPrescriptionAction && prescription.status === 'DISPENSED' && {
+            key: 'cancel-dispensed',
+            icon: <StopOutlined style={{ color: '#94a3b8' }} />,
+            disabled: true,
+            label: (
+              <Tooltip title="Đơn thuốc đã được cấp phát. Vui lòng sử dụng chức năng trả lại thuốc nếu muốn thu hồi thuốc.">
+                <span>Hủy đơn (Đã cấp phát)</span>
+              </Tooltip>
+            ),
           },
         ].filter(Boolean)
 
@@ -3298,6 +3333,8 @@ function PrescriptionPage() {
         prescription={selectedPrescriptionForDetail}
         medicines={medicines}
         canEdit={canPrescribe}
+        canCancel={canCancelPrescriptionAction}
+        onCancelClick={handleOpenCancelModal}
         canSendInterconnection={canSendInterconnection}
         onInterconnectionUpdated={loadData}
         onEditClick={startEditPrescription}
@@ -3305,6 +3342,17 @@ function PrescriptionPage() {
           setSelectedPrescriptionForPrint(p)
           setPrintModalOpen(true)
         }}
+      />
+
+      <CancelPrescriptionModal
+        open={cancelModalOpen}
+        onClose={() => {
+          setCancelModalOpen(false)
+          setPrescriptionToCancel(null)
+        }}
+        prescription={prescriptionToCancel}
+        onConfirm={handleConfirmCancelPrescription}
+        loading={cancelling}
       />
 
       <PrescriptionPrintTemplateModal
