@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
   Modal,
   Alert,
-  Descriptions,
   Input,
   Space,
   Tag,
@@ -18,6 +17,7 @@ import {
   ClockCircleOutlined,
   FileTextOutlined,
   CheckOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
@@ -32,7 +32,7 @@ const { TextArea } = Input
 
 /**
  * Modal Hủy đơn thuốc chưa cấp phát (NCL-05-CN-005)
- * Tuân thủ quy tắc nghiệp vụ QTN-27 (hủy có lý do, không thể hoàn tác)
+ * Hủy có lý do, không thể hoàn tác
  * Tuân thủ TC-01, TC-02
  */
 export default function CancelPrescriptionModal({
@@ -67,8 +67,9 @@ export default function CancelPrescriptionModal({
   const itemCount = (prescription.items || []).length
   const patientName = fixMojibake(prescription.patientName || prescription.patient?.fullName || '—')
   const doctorName = fixMojibake(prescription.doctorName || prescription.doctor?.fullName || '—')
-  const prescribedAt = prescription.prescribedAt
-    ? dayjs(prescription.prescribedAt).format('HH:mm DD/MM/YYYY')
+  const rawDate = prescription.prescribedAt || prescription.createdAt
+  const prescribedAt = rawDate
+    ? dayjs(rawDate).format('HH:mm - DD/MM/YYYY')
     : '—'
 
   const handleSelectPreset = (presetText) => {
@@ -128,7 +129,7 @@ export default function CancelPrescriptionModal({
       }
       onCancel={onClose}
       destroyOnClose
-      width={620}
+      width={640}
       footer={[
         <Button key="back" onClick={onClose} disabled={loading}>
           Bỏ qua
@@ -149,7 +150,7 @@ export default function CancelPrescriptionModal({
       style={{ top: 30 }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
-        {/* Banner cảnh báo nghiệp vụ QTN-27 */}
+        {/* Banner cảnh báo nghiệp vụ */}
         <Alert
           type="error"
           showIcon
@@ -161,7 +162,7 @@ export default function CancelPrescriptionModal({
           }
           description={
             <div style={{ fontSize: 12.5, lineHeight: 1.5, color: '#7f1d1d', marginTop: 4 }}>
-              Theo quy tắc nghiệp vụ (<strong>QTN-27</strong>), đơn thuốc sau khi hủy sẽ chuyển sang trạng thái <strong>ĐÃ HỦY (CANCELLED)</strong>, không thể phục hồi và sẽ tự động biến mất khỏi danh sách chờ cấp phát của Dược sĩ.
+              Theo quy tắc nghiệp vụ, đơn thuốc sau khi hủy sẽ chuyển sang trạng thái <strong>ĐÃ HỦY (CANCELLED)</strong>, không thể phục hồi và sẽ tự động biến mất khỏi danh sách chờ cấp phát của Dược sĩ.
             </div>
           }
           style={{ backgroundColor: '#fef2f2', borderColor: '#fecaca', borderRadius: 8 }}
@@ -176,23 +177,60 @@ export default function CancelPrescriptionModal({
             padding: '12px 16px',
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#334155',
+              marginBottom: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
             <MedicineBoxOutlined style={{ color: '#2563eb' }} /> Thông tin đơn thuốc cần hủy:
           </div>
-          <Descriptions size="small" column={{ xs: 1, sm: 2 }} bordered={false}>
-            <Descriptions.Item label={<Text strong><UserOutlined /> Bệnh nhân</Text>}>
-              <Text strong>{patientName}</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label={<Text strong><ClockCircleOutlined /> Ngày kê đơn</Text>}>
-              {prescribedAt}
-            </Descriptions.Item>
-            <Descriptions.Item label="Bác sĩ kê đơn">
-              {doctorName}
-            </Descriptions.Item>
-            <Descriptions.Item label="Quy mô đơn">
-              <Tag color="blue">{itemCount} loại thuốc</Tag>
-            </Descriptions.Item>
-          </Descriptions>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+              rowGap: 10,
+              columnGap: 20,
+              fontSize: 13,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <UserOutlined style={{ color: '#64748b', flexShrink: 0 }} />
+              <span style={{ color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Bệnh nhân:</span>
+              <Text strong ellipsis={{ tooltip: patientName }} style={{ color: '#0f172a', minWidth: 0 }}>
+                {patientName}
+              </Text>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <ClockCircleOutlined style={{ color: '#64748b', flexShrink: 0 }} />
+              <span style={{ color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Ngày kê đơn:</span>
+              <Text strong style={{ color: '#0f172a', whiteSpace: 'nowrap' }}>
+                {prescribedAt}
+              </Text>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <IdcardOutlined style={{ color: '#64748b', flexShrink: 0 }} />
+              <span style={{ color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Bác sĩ kê đơn:</span>
+              <Text strong ellipsis={{ tooltip: doctorName }} style={{ color: '#0f172a', minWidth: 0 }}>
+                {doctorName}
+              </Text>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <FileTextOutlined style={{ color: '#64748b', flexShrink: 0 }} />
+              <span style={{ color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Quy mô đơn:</span>
+              <Tag color="blue" style={{ margin: 0, fontWeight: 500 }}>
+                {itemCount} loại thuốc
+              </Tag>
+            </div>
+          </div>
         </div>
 
         {/* Gợi ý lý do chọn nhanh */}
