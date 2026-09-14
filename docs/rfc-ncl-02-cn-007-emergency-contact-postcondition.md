@@ -57,3 +57,17 @@ Cập nhật lại câu chữ trong file `project-workbook.xlsx`:
 Các test case sau đã được bổ sung vào `UpdatePatientServiceTest.java` để bảo đảm hành vi:
 1. `allowsClearingEmergencyContactWhenAllThreeFieldsAreNullAndLogsChange`: Kiểm chứng khi gửi cả 3 trường null, thông tin được xóa sạch về null và `patient_change_logs` ghi nhận đầy đủ thay đổi.
 2. `rejectsPartialClearingWhenOnlyEmergencyContactProvided`: Kiểm chứng khi chỉ nhập/giữ tên mà bỏ trống quan hệ/SĐT thì bị ném `ValidationException` (HTTP 400).
+
+---
+
+## 5. Phụ lục Kỹ thuật & Quyết định Xử lý Review Findings (F-1 đến F-6)
+
+| Finding | Mức độ | Trạng thái | Quyết định kỹ thuật & Giải pháp triển khai |
+| :---: | :---: | :---: | :--- |
+| **F-1** | P1 (Blocking) | ✅ **FIXED** | Xóa bỏ logic tự động suy diễn/gán quan hệ trong `UpdatePatientService`. Thực thi nghiêm ngặt Cohesive Triplet Rule (reject partial triplet với HTTP 400). Đã có 7 unit test case bao phủ toàn bộ tổ hợp. |
+| **F-2** | P2 (Blocking) | ✅ **FIXED** | Xóa câu lệnh DML `UPDATE` trong `V55__add_emergency_relationship_to_patients.sql`, chỉ giữ lại DDL `ALTER TABLE ... ADD COLUMN ... NULL;`. Bảo toàn dữ liệu lịch sử ở trạng thái `NULL`. |
+| **F-3** | P3 (Non-blocking) | ✅ **FIXED** | Mở rộng `ValidationException(field, message)` mang typed field name và cập nhật `GlobalExceptionHandler` ánh xạ trực tiếp sang `details.fields`, đồng thời duy trì fallback phân tích chuỗi cũ để đảm bảo tương thích ngược 100%. |
+| **F-4** | P3 (Non-blocking) | 📋 **ADR CLOSED** | Duy trì cơ chế **Sentinel Value Guard** trong `UpdatePatientService` (dùng `PatientAnonymizer.isMasked...`). Lý do: Trong môi trường y tế thực tế, không có danh tính bệnh nhân thật nào trùng mẫu mặt nạ; việc chuyển unmasking ra REST Adapter sẽ vi phạm ranh giới giao dịch và khóa bi quan (`findByIdForUpdate`). |
+| **F-5** | P3 (Non-blocking) | 📋 **ADR CLOSED** | Tuân thủ mô hình **Aggregate Root Update** của Domain-Driven Design (DDD). DTO `UpdatePatientRequest` bắt buộc `@NotBlank fullName`, do đó khối cập nhật profile luôn được thực thi trọn vẹn. Sẽ tách riêng UseCase khi phát triển tính năng Partial Resource Update (PATCH). |
+| **F-6** | INFO | ✅ **FIXED** | Bổ sung integration test `PatientEmergencyContactPersistenceTest` kiểm thử trực tiếp JPA Entity mapping và thực thi DDL schema trên cơ sở dữ liệu thực tế (H2 in-memory). |
+

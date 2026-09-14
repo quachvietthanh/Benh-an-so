@@ -52,7 +52,10 @@ public class GlobalExceptionHandler {
     ) {
         String message = ex.getMessage();
         Map<String, Object> details = new HashMap<>();
-        if (message != null && message.contains(":")) {
+
+        if (ex.getFieldErrors() != null && !ex.getFieldErrors().isEmpty()) {
+            details.put("fields", ex.getFieldErrors());
+        } else if (message != null && message.contains(":")) {
             int colonIdx = message.indexOf(':');
             String field = message.substring(0, colonIdx).trim();
             String error = message.substring(colonIdx + 1).trim();

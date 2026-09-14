@@ -156,16 +156,16 @@ public class RegisterPatientService
 
         if (hasContact || hasRelationship || hasPhone) {
             if (!hasContact) {
-                throw new ValidationException("emergencyContact: Họ tên người liên hệ khẩn cấp không được để trống.");
+                throw new ValidationException("emergencyContact", "Họ tên người liên hệ khẩn cấp không được để trống.");
             }
             if (!hasRelationship) {
-                throw new ValidationException("emergencyRelationship: Mối quan hệ với người liên hệ khẩn cấp không được để trống.");
+                throw new ValidationException("emergencyRelationship", "Mối quan hệ với người liên hệ khẩn cấp không được để trống.");
             }
             if (!hasPhone) {
-                throw new ValidationException("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không được để trống.");
+                throw new ValidationException("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không được để trống.");
             }
             if (!PHONE_PATTERN.matcher(phone.trim()).matches()) {
-                throw new ValidationException("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng.");
+                throw new ValidationException("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng.");
             }
         }
     }
