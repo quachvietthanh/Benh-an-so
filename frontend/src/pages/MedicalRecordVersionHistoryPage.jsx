@@ -448,9 +448,6 @@ function MedicalRecordVersionHistoryPage() {
         <Title level={3} style={{ margin: 0, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
           <HistoryOutlined style={{ color: '#4f46e5' }} /> Lịch sử phiên bản bệnh án
         </Title>
-        <Text type="secondary">
-          Dành cho Quản lý phòng khám tra cứu, đối soát toàn bộ các phiên bản bệnh án và chứng minh tính minh bạch khi có khiếu nại.
-        </Text>
       </div>
 
       <Row gutter={[16, 16]}>

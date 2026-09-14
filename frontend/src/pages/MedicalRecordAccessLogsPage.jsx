@@ -45,7 +45,7 @@ import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
 import SecurityAlertsTab from '../components/security/SecurityAlertsTab'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
 const ACTION_CONFIG = {
@@ -420,9 +420,6 @@ function MedicalRecordAccessLogsPage() {
             <SafetyCertificateOutlined style={{ marginRight: 8, color: '#1677ff' }} />
             Nhật ký truy cập bệnh án & Dữ liệu y tế (Audit Logs)
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0, fontSize: 13 }}>
-            Giám sát minh bạch mọi lần xem, sửa, tạo, khóa hoặc bổ sung thông tin bệnh án theo người dùng và mốc thời gian.
-          </Paragraph>
         </div>
         <Space wrap>
           <Button icon={<ReloadOutlined />} loading={loading} onClick={loadAccessLogs}>

@@ -58,7 +58,7 @@ import {
 } from '../utils/electronicPrescriptionValidation'
 import { fixMojibake } from '../utils/workflowContract'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
 const PRESCRIPTION_STATUS_TAGS = {
@@ -503,9 +503,6 @@ function PrescriptionInterconnectionPage() {
             <CloudServerOutlined style={{ marginRight: 10, color: '#0284c7' }} />
             Tra cứu & Giám sát Liên thông Đơn thuốc
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Theo dõi tập trung tình trạng gửi đơn thuốc lên Cổng liên thông Quốc gia (mô phỏng).
-          </Paragraph>
         </div>
         <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px' }}>
           <Empty description="Tài khoản của bạn chưa được phân quyền xem dữ liệu liên thông đơn thuốc." />
@@ -532,9 +529,6 @@ function PrescriptionInterconnectionPage() {
             <CloudServerOutlined style={{ marginRight: 10, color: '#0284c7' }} />
             Tra cứu & Giám sát Liên thông Đơn thuốc
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Theo dõi tập trung tình trạng gửi đơn thuốc lên Cổng liên thông Quốc gia (mô phỏng), xử lý dứt điểm các đơn lỗi và không để tồn đọng đơn chưa gửi.
-          </Paragraph>
         </div>
 
         <Space wrap>

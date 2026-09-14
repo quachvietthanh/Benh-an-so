@@ -487,9 +487,6 @@ function RolePermissionsPage() {
               <Title level={4} style={{ margin: 0, color: '#ffffff', fontWeight: 600 }}>
                 Quản lý & Phân quyền Vai trò Hệ thống
               </Title>
-              <div style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 13, marginTop: 2 }}>
-                Ma trận kiểm soát và điều chỉnh quyền hạn từng phân hệ cho các vai trò chuẩn phòng khám.
-              </div>
             </div>
           </div>
 

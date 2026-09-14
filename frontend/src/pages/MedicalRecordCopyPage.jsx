@@ -45,7 +45,7 @@ import MedicalRecordVersionHistoryModal from '../components/medicalRecord/Medica
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { TextArea } = Input
 
 const RELATIONSHIP_OPTIONS = [
@@ -492,9 +492,6 @@ function MedicalRecordCopyPage() {
               <FileProtectOutlined style={{ marginRight: 8, color: '#2563eb' }} />
               Cấp Bản Sao Hồ Sơ Bệnh Án
             </Title>
-            <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-              Tiếp nhận yêu cầu, kiểm tra điều kiện hồ sơ pháp lý, xem trước và xuất bản sao trích lục hồ sơ bệnh án theo chuẩn Bộ Y Tế.
-            </Paragraph>
           </div>
           <Space>
             <Button

@@ -380,7 +380,7 @@ function UsersPage() {
   return (
     <div className="admin-users-panel">
       <div className="admin-section-heading">
-        <div><h2>Quản trị tài khoản</h2><p>Quản lý thông tin và phân quyền người dùng trong hệ thống.</p></div>
+        <div><h2>Quản trị tài khoản</h2></div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreateForm}>Tạo tài khoản</Button>
       </div>
 

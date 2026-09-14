@@ -38,7 +38,7 @@ import StatusToggleModal from '../components/medicalRecordTemplate/StatusToggleM
 import { formatTemplateName, formatSpecialtyName } from '../constants/medicalRecordTemplateConstants'
 import { useAuthContext } from '../context/AuthContext'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 function MedicalRecordTemplateManagementPage() {
   const { user } = useAuthContext()
@@ -341,9 +341,6 @@ function MedicalRecordTemplateManagementPage() {
               <FileTextOutlined style={{ color: '#2563eb', marginRight: 8 }} />
               Quản lý Mẫu bệnh án theo chuyên khoa
             </Title>
-            <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 13.5 }}>
-              Định nghĩa danh mục các trường thông tin chuẩn, phân loại theo chuyên khoa và bảo toàn lịch sử phiên bản bệnh án.
-            </Paragraph>
           </Col>
           <Col>
             <Space>
