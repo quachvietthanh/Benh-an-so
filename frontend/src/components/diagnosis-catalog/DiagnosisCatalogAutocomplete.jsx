@@ -166,7 +166,9 @@ function DiagnosisCatalogAutocomplete({
   const [errorMessage, setErrorMessage] = useState(null)
 
   const searchTimerRef = useRef(null)
+  const searchRequestIdRef = useRef(0)
   const hasLoadedSuggestionsRef = useRef(false)
+  const lastSuggestionsFetchTimeRef = useRef(0)
   const isMountedRef = useRef(true)
 
   useEffect(() => {
@@ -181,7 +183,10 @@ function DiagnosisCatalogAutocomplete({
 
   // Load suggestions when dropdown opens or on initial focus if input is empty
   const fetchSuggestions = useCallback(async () => {
-    if (hasLoadedSuggestionsRef.current) return
+    const isCacheFresh =
+      hasLoadedSuggestionsRef.current &&
+      Date.now() - lastSuggestionsFetchTimeRef.current < 5 * 60 * 1000
+    if (isCacheFresh) return
     try {
       setLoading(true)
       const res = await diagnosisCatalogApi.getSuggestions()
@@ -194,13 +199,14 @@ function DiagnosisCatalogAutocomplete({
         setSuggestionItems(fallbackSuggestions.slice(0, 15))
       }
       hasLoadedSuggestionsRef.current = true
+      lastSuggestionsFetchTimeRef.current = Date.now()
     } catch (err) {
       if (!isMountedRef.current) return
       console.warn('Lỗi khi tải gợi ý chẩn đoán:', err?.response?.status, err?.message)
       if (Array.isArray(fallbackSuggestions) && fallbackSuggestions.length > 0) {
         setSuggestionItems(fallbackSuggestions.slice(0, 15))
       }
-      hasLoadedSuggestionsRef.current = true
+      // Không set hasLoadedSuggestionsRef.current = true khi gặp lỗi để lần sau có thể thử lại
     } finally {
       if (isMountedRef.current) {
         setLoading(false)
@@ -220,6 +226,7 @@ function DiagnosisCatalogAutocomplete({
       }
 
       if (!keyword.trim()) {
+        searchRequestIdRef.current += 1
         setSearchResults([])
         setLoading(false)
         return
@@ -227,23 +234,24 @@ function DiagnosisCatalogAutocomplete({
 
       setLoading(true)
       searchTimerRef.current = setTimeout(async () => {
+        const currentSearchId = ++searchRequestIdRef.current
         try {
           const params = { search: keyword }
           if (diseaseGroup) {
             params.diseaseGroup = diseaseGroup
           }
           const res = await diagnosisCatalogApi.search(params)
-          if (!isMountedRef.current) return
+          if (!isMountedRef.current || currentSearchId !== searchRequestIdRef.current) return
           const data = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
           setSearchResults(data)
         } catch (err) {
-          if (!isMountedRef.current) return
+          if (!isMountedRef.current || currentSearchId !== searchRequestIdRef.current) return
           console.warn('Lỗi tìm kiếm danh mục chẩn đoán:', err)
           // Gentle inline error notification, no popup/modal
           setErrorMessage('Không thể tải kết quả tìm kiếm. Vui lòng thử lại.')
           setSearchResults([])
         } finally {
-          if (isMountedRef.current) {
+          if (isMountedRef.current && currentSearchId === searchRequestIdRef.current) {
             setLoading(false)
           }
         }
@@ -260,6 +268,7 @@ function DiagnosisCatalogAutocomplete({
         }
       } else {
         if (searchKeyword) {
+          searchRequestIdRef.current += 1
           setSearchKeyword('')
           setSearchResults([])
         }

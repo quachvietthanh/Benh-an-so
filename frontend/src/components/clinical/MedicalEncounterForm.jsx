@@ -77,8 +77,6 @@ function MedicalEncounterForm({
   setSecondaryIcds,
   addSecondaryDiagnosis,
   diagnosisOptions,
-  diagnosisSearching,
-  onDiagnosisSearch,
   setDiagnosisModalOpen,
   selectedOrders,
   orderCategory,
@@ -465,14 +463,6 @@ function MedicalEncounterForm({
                     style={{ width: '100%' }}
                     fallbackSuggestions={diagnosisOptions}
                     onSelect={(item) => selectPrimaryDiagnosis(item)}
-                    onChange={(code, item) => {
-                      if (item) {
-                        selectPrimaryDiagnosis(item)
-                      } else if (code) {
-                        const fallback = diagnosisOptions?.find((d) => d.code === code)
-                        if (fallback) selectPrimaryDiagnosis(fallback)
-                      }
-                    }}
                   />
 
                   <div style={{ marginTop: 10 }}>
@@ -526,14 +516,6 @@ function MedicalEncounterForm({
                   style={{ width: '100%' }}
                   fallbackSuggestions={diagnosisOptions}
                   onSelect={(item) => addSecondaryDiagnosis(item)}
-                  onChange={(code, item) => {
-                    if (item) {
-                      addSecondaryDiagnosis(item)
-                    } else if (code) {
-                      const fallback = diagnosisOptions?.find((diagnosis) => diagnosis.code === code)
-                      if (fallback) addSecondaryDiagnosis(fallback)
-                    }
-                  }}
                 />
               </div>
             </Form.Item>

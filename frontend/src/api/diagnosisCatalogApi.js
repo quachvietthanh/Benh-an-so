@@ -13,7 +13,10 @@ const diagnosisCatalogApi = {
     } catch (err) {
       if (err?.response?.status === 403) {
         const fallbackRes = await axiosClient.get('/diagnosis-catalog', {
-          params: { search: params.keyword || '' },
+          params: {
+            ...params,
+            search: params.search || params.keyword || '',
+          },
         })
         return {
           ...fallbackRes,

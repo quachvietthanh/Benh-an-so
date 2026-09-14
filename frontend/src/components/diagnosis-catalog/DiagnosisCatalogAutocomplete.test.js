@@ -149,13 +149,13 @@ test('TC05: Debounce - gõ liên tục nhiều ký tự chỉ gọi API 1 lần 
     }
 
     // Typing rapidly: "c", "ca", "cam" within 50ms intervals
-    const p1 = simulateDebounceSearch('c', 300)
+    simulateDebounceSearch('c', 300)
     await new Promise((r) => setTimeout(r, 50))
-    const p2 = simulateDebounceSearch('ca', 300)
+    simulateDebounceSearch('ca', 300)
     await new Promise((r) => setTimeout(r, 50))
     const p3 = simulateDebounceSearch('cam', 300)
 
-    await Promise.all([p1, p2, p3])
+    await p3
 
     assert.equal(callCount, 1, 'API should only be called once after typing stops')
     assert.equal(lastSearchParam, 'cam', 'Final search parameter should be the last typed keyword')
