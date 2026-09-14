@@ -18,7 +18,6 @@ import {
   Select,
   Space,
   Spin,
-  Statistic,
   Table,
   Tabs,
   Tag,
@@ -58,7 +57,7 @@ import {
 } from '../utils/electronicPrescriptionValidation'
 import { fixMojibake } from '../utils/workflowContract'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
 const PRESCRIPTION_STATUS_TAGS = {
@@ -503,9 +502,6 @@ function PrescriptionInterconnectionPage() {
             <CloudServerOutlined style={{ marginRight: 10, color: '#0284c7' }} />
             Tra cứu & Giám sát Liên thông Đơn thuốc
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Theo dõi tập trung tình trạng gửi đơn thuốc lên Cổng liên thông Quốc gia (mô phỏng).
-          </Paragraph>
         </div>
         <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px' }}>
           <Empty description="Tài khoản của bạn chưa được phân quyền xem dữ liệu liên thông đơn thuốc." />
@@ -528,16 +524,13 @@ function PrescriptionInterconnectionPage() {
         }}
       >
         <div>
-          <Title level={2} style={{ margin: 0 }}>
-            <CloudServerOutlined style={{ marginRight: 10, color: '#0284c7' }} />
+          <Title level={3} style={{ margin: 0, fontSize: 18, color: '#0f172a' }}>
+            <CloudServerOutlined style={{ marginRight: 8, color: '#0284c7' }} />
             Tra cứu & Giám sát Liên thông Đơn thuốc
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Theo dõi tập trung tình trạng gửi đơn thuốc lên Cổng liên thông Quốc gia (mô phỏng), xử lý dứt điểm các đơn lỗi và không để tồn đọng đơn chưa gửi.
-          </Paragraph>
         </div>
 
-        <Space wrap>
+        <Space wrap size={8}>
           {currentTabStatus === 'FAILED' && filteredData.length > 0 && canRetry && (
             <Popconfirm
               title="Gửi lại toàn bộ các đơn thuốc lỗi trên trang này?"
@@ -549,8 +542,10 @@ function PrescriptionInterconnectionPage() {
               <Button
                 type="primary"
                 danger
+                size="small"
                 icon={<SyncOutlined spin={batchRetrying} />}
                 loading={batchRetrying}
+                style={{ borderRadius: 6, fontWeight: 500 }}
               >
                 {batchRetrying
                   ? `Đang gửi lại (${batchProgress.current}/${batchProgress.total})...`
@@ -559,7 +554,13 @@ function PrescriptionInterconnectionPage() {
             </Popconfirm>
           )}
 
-          <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchData}>
+          <Button
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={fetchData}
+            style={{ borderRadius: 6 }}
+          >
             Làm mới
           </Button>
         </Space>
@@ -577,28 +578,52 @@ function PrescriptionInterconnectionPage() {
       )}
 
       {/* KPI Statistic Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={6}>
           <Card
             size="small"
             style={{
               borderRadius: 10,
               cursor: 'pointer',
-              borderColor: currentTabStatus === 'FAILED' ? '#f87171' : undefined,
+              borderColor: currentTabStatus === 'FAILED' ? '#f87171' : '#e2e8f0',
               backgroundColor: currentTabStatus === 'FAILED' ? '#fef2f2' : '#ffffff',
+              boxShadow: currentTabStatus === 'FAILED' ? '0 2px 8px rgba(220, 38, 38, 0.12)' : 'none',
+              transition: 'all 0.2s ease',
             }}
             onClick={() => {
               setCurrentTabStatus('FAILED')
               setPage(0)
             }}
           >
-            <Statistic
-              title={<span style={{ fontWeight: 600, color: '#991b1b' }}>Đơn liên thông lỗi (Cần xử lý)</span>}
-              value={statusCounts.FAILED}
-              valueStyle={{ color: '#dc2626', fontWeight: 800 }}
-              prefix={<CloseCircleOutlined />}
-              suffix={<Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>→ Xem</Text>}
-            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#991b1b', marginBottom: 4 }}>
+                  Đơn liên thông lỗi
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#dc2626', lineHeight: 1.2 }}>
+                  {statusCounts.FAILED}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#ef4444', marginTop: 4, fontWeight: 500 }}>
+                  Xem danh sách →
+                </div>
+              </div>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 10,
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  flexShrink: 0,
+                }}
+              >
+                <CloseCircleOutlined />
+              </div>
+            </div>
           </Card>
         </Col>
 
@@ -608,21 +633,45 @@ function PrescriptionInterconnectionPage() {
             style={{
               borderRadius: 10,
               cursor: 'pointer',
-              borderColor: currentTabStatus === 'NOT_SENT' ? '#93c5fd' : undefined,
+              borderColor: currentTabStatus === 'NOT_SENT' ? '#93c5fd' : '#e2e8f0',
               backgroundColor: currentTabStatus === 'NOT_SENT' ? '#f0f9ff' : '#ffffff',
+              boxShadow: currentTabStatus === 'NOT_SENT' ? '0 2px 8px rgba(2, 132, 199, 0.12)' : 'none',
+              transition: 'all 0.2s ease',
             }}
             onClick={() => {
               setCurrentTabStatus('NOT_SENT')
               setPage(0)
             }}
           >
-            <Statistic
-              title={<span style={{ fontWeight: 600, color: '#0369a1' }}>Chưa gửi liên thông</span>}
-              value={statusCounts.NOT_SENT}
-              valueStyle={{ color: '#0284c7', fontWeight: 800 }}
-              prefix={<ClockCircleOutlined />}
-              suffix={<Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>→ Xem</Text>}
-            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#0369a1', marginBottom: 4 }}>
+                  Chưa gửi liên thông
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#0284c7', lineHeight: 1.2 }}>
+                  {statusCounts.NOT_SENT}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#0284c7', marginTop: 4, fontWeight: 500 }}>
+                  Xem danh sách →
+                </div>
+              </div>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 10,
+                  backgroundColor: '#e0f2fe',
+                  color: '#0284c7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  flexShrink: 0,
+                }}
+              >
+                <ClockCircleOutlined />
+              </div>
+            </div>
           </Card>
         </Col>
 
@@ -632,37 +681,66 @@ function PrescriptionInterconnectionPage() {
             style={{
               borderRadius: 10,
               cursor: 'pointer',
-              borderColor: currentTabStatus === 'SUCCESS' ? '#86efac' : undefined,
+              borderColor: currentTabStatus === 'SUCCESS' ? '#86efac' : '#e2e8f0',
               backgroundColor: currentTabStatus === 'SUCCESS' ? '#f0fdf4' : '#ffffff',
+              boxShadow: currentTabStatus === 'SUCCESS' ? '0 2px 8px rgba(22, 163, 74, 0.12)' : 'none',
+              transition: 'all 0.2s ease',
             }}
             onClick={() => {
               setCurrentTabStatus('SUCCESS')
               setPage(0)
             }}
           >
-            <Statistic
-              title={<span style={{ fontWeight: 600, color: '#166534' }}>Đã liên thông thành công</span>}
-              value={statusCounts.SUCCESS}
-              valueStyle={{ color: '#16a34a', fontWeight: 800 }}
-              prefix={<CheckCircleOutlined />}
-              suffix={<Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>→ Xem</Text>}
-            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#166534', marginBottom: 4 }}>
+                  Đã liên thông thành công
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#16a34a', lineHeight: 1.2 }}>
+                  {statusCounts.SUCCESS}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#16a34a', marginTop: 4, fontWeight: 500 }}>
+                  Xem danh sách →
+                </div>
+              </div>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 10,
+                  backgroundColor: '#dcfce7',
+                  color: '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  flexShrink: 0,
+                }}
+              >
+                <CheckCircleOutlined />
+              </div>
+            </div>
           </Card>
         </Col>
 
         <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10 }}>
+          <Card size="small" style={{ borderRadius: 10, borderColor: '#e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: 12.5, color: '#64748b' }}>Tỷ lệ liên thông thành công</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: successRate >= 90 ? '#16a34a' : '#d97706' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                  Tỷ lệ liên thông thành công
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: successRate >= 90 ? '#16a34a' : '#d97706', lineHeight: 1.2 }}>
                   {successRate}%
+                </div>
+                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
+                  {statusCounts.SUCCESS}/{totalAll} đơn gửi
                 </div>
               </div>
               <Progress
                 type="circle"
                 percent={successRate}
-                size={44}
+                size={42}
                 strokeColor={successRate >= 90 ? '#16a34a' : '#d97706'}
               />
             </div>
@@ -686,7 +764,7 @@ function PrescriptionInterconnectionPage() {
                 label: (
                   <Space size={6} align="center">
                     <CloseCircleOutlined style={{ color: '#dc2626' }} />
-                    <span>Đơn liên thông lỗi (FAILED)</span>
+                    <span>Đơn liên thông lỗi</span>
                     <Tag
                       color="error"
                       style={{
@@ -708,7 +786,7 @@ function PrescriptionInterconnectionPage() {
                 label: (
                   <Space size={6} align="center">
                     <ClockCircleOutlined style={{ color: '#0284c7' }} />
-                    <span>Chưa gửi liên thông (NOT_SENT)</span>
+                    <span>Chưa gửi liên thông</span>
                     <Tag
                       color="blue"
                       style={{
@@ -730,7 +808,7 @@ function PrescriptionInterconnectionPage() {
                 label: (
                   <Space size={6} align="center">
                     <CheckCircleOutlined style={{ color: '#16a34a' }} />
-                    <span>Đã liên thông thành công (SUCCESS)</span>
+                    <span>Đã liên thông thành công</span>
                     <Tag
                       color="success"
                       style={{

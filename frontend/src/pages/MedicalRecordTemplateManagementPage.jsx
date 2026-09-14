@@ -20,6 +20,7 @@ import {
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  CopyOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
@@ -29,16 +30,18 @@ import {
   SearchOutlined,
   StarFilled,
   StarOutlined,
+  TagOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
 import medicalRecordTemplateApi from '../api/medicalRecordTemplateApi'
 import TemplateFormModal from '../components/medicalRecordTemplate/TemplateFormModal'
 import StatusToggleModal from '../components/medicalRecordTemplate/StatusToggleModal'
-import { formatTemplateName, formatSpecialtyName } from '../constants/medicalRecordTemplateConstants'
+import { formatTemplateName, formatSpecialtyName, formatTemplateShortId } from '../constants/medicalRecordTemplateConstants'
 import { useAuthContext } from '../context/AuthContext'
+import './medicalRecordTemplateManagement.css'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 function MedicalRecordTemplateManagementPage() {
   const { user } = useAuthContext()
@@ -227,9 +230,49 @@ function MedicalRecordTemplateManagementPage() {
               </Tag>
             )}
           </div>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            ID: {record.id}
-          </Text>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <Tooltip title={`ID hệ thống: ${record.id} (Nhấn để sao chép)`}>
+              <Tag
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.3px',
+                  borderRadius: 4,
+                  padding: '0 6px',
+                  backgroundColor: '#f1f5f9',
+                  borderColor: '#cbd5e1',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigator.clipboard.writeText(record.id)
+                  message.success(`Đã sao chép ID mẫu: ${record.id}`)
+                }}
+              >
+                <TagOutlined style={{ fontSize: 10, color: '#64748b' }} />
+                {formatTemplateShortId(record.id)}
+              </Tag>
+            </Tooltip>
+            <Tooltip title="Sao chép toàn bộ mã ID">
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined style={{ fontSize: 12, color: '#94a3b8' }} />}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigator.clipboard.writeText(record.id)
+                  message.success(`Đã sao chép ID mẫu: ${record.id}`)
+                }}
+                style={{ width: 20, height: 20, padding: 0, minWidth: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              />
+            </Tooltip>
+          </div>
         </div>
       ),
     },
@@ -334,47 +377,56 @@ function MedicalRecordTemplateManagementPage() {
 
   return (
     <div className="template-management-page">
-      <div className="template-management-header">
-        <Row justify="space-between" align="middle" gutter={[16, 16]}>
-          <Col>
-            <Title level={3} style={{ margin: 0 }}>
-              <FileTextOutlined style={{ color: '#2563eb', marginRight: 8 }} />
-              Quản lý Mẫu bệnh án theo chuyên khoa
-            </Title>
-            <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 13.5 }}>
-              Định nghĩa danh mục các trường thông tin chuẩn, phân loại theo chuyên khoa và bảo toàn lịch sử phiên bản bệnh án.
-            </Paragraph>
-          </Col>
-          <Col>
-            <Space>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  fetchSpecialties()
-                  fetchTemplates()
-                }}
-              >
-                Làm mới
-              </Button>
-              {canManage && (
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={handleOpenCreateModal}
-                  style={{ background: '#2563eb', borderColor: '#2563eb' }}
-                >
-                  Tạo mẫu bệnh án mới
-                </Button>
-              )}
-            </Space>
-          </Col>
-        </Row>
+      <div
+        className="template-management-header"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <Title level={3} style={{ margin: 0, fontSize: 18, color: '#0f172a', display: 'flex', alignItems: 'center' }}>
+          <FileTextOutlined style={{ color: '#2563eb', marginRight: 8 }} />
+          Quản lý Mẫu bệnh án theo chuyên khoa
+        </Title>
+        <Space size={10}>
+          <Button
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              fetchSpecialties()
+              fetchTemplates()
+            }}
+            style={{ borderRadius: 6 }}
+          >
+            Làm mới
+          </Button>
+          {canManage && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={handleOpenCreateModal}
+              style={{ background: '#2563eb', borderColor: '#2563eb', borderRadius: 6, fontWeight: 500 }}
+            >
+              Tạo mẫu bệnh án mới
+            </Button>
+          )}
+        </Space>
       </div>
 
-      <Card className="template-filter-card" bodyStyle={{ padding: '16px 20px' }}>
+      <Card
+        className="template-filter-card"
+        style={{ marginBottom: 20, borderRadius: 10 }}
+        styles={{ body: { padding: '18px 20px' } }}
+        bodyStyle={{ padding: '18px 20px' }}
+      >
         <Row gutter={[16, 12]} align="middle">
           <Col xs={24} sm={8} md={6}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
               Lọc theo chuyên khoa:
             </div>
             <Select
@@ -386,14 +438,14 @@ function MedicalRecordTemplateManagementPage() {
                 { value: 'ALL', label: 'Tất cả chuyên khoa' },
                 ...specialties.map((s) => ({
                   value: s.id,
-                  label: `${formatSpecialtyName(s.name)} (${s.code})`,
+                  label: formatSpecialtyName(s.name),
                 })),
               ]}
             />
           </Col>
 
           <Col xs={24} sm={8} md={6}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
               Trạng thái áp dụng:
             </div>
             <Select
@@ -402,14 +454,14 @@ function MedicalRecordTemplateManagementPage() {
               onChange={setSelectedStatus}
               options={[
                 { value: 'ALL', label: 'Tất cả trạng thái' },
-                { value: 'ACTIVE', label: 'Đang áp dụng (Active)' },
-                { value: 'INACTIVE', label: 'Ngừng áp dụng (Inactive)' },
+                { value: 'ACTIVE', label: 'Đang áp dụng' },
+                { value: 'INACTIVE', label: 'Ngừng áp dụng' },
               ]}
             />
           </Col>
 
           <Col xs={24} sm={8} md={8}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
               Tìm kiếm tên mẫu:
             </div>
             <Input
@@ -421,15 +473,15 @@ function MedicalRecordTemplateManagementPage() {
             />
           </Col>
 
-          <Col xs={24} md={4} style={{ textAlign: 'right', marginTop: { xs: 0, md: 18 } }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Tổng số: <b>{filteredTemplates.length}</b> mẫu
+          <Col xs={24} md={4} style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingTop: 20 }}>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Tổng số: <b style={{ color: '#0f172a' }}>{filteredTemplates.length}</b> mẫu
             </Text>
           </Col>
         </Row>
       </Card>
 
-      <Card className="template-table-card" bodyStyle={{ padding: 0 }}>
+      <Card className="template-table-card" styles={{ body: { padding: 0 } }} bodyStyle={{ padding: 0 }}>
         <Table
           columns={columns}
           dataSource={filteredTemplates}

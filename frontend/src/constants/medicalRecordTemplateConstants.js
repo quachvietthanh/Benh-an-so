@@ -206,3 +206,18 @@ export const formatSpecialtyName = (name) => {
   if (found) return found[1]
   return trimmed
 }
+
+export const formatTemplateShortId = (id) => {
+  if (!id) return ''
+  const str = String(id).trim()
+  const match = str.match(/0*([0-9a-fA-F]{1,4})$/)
+  if (match && match[1]) {
+    const num = parseInt(match[1], 16)
+    if (!isNaN(num) && num < 1000) {
+      return `MBA-${String(num).padStart(2, '0')}`
+    }
+  }
+  const clean = str.replace(/-/g, '')
+  return `MBA-${clean.slice(0, 6).toUpperCase()}`
+}
+

@@ -8,7 +8,7 @@ import RolePermissionsPage from './RolePermissionsPage'
 import UsersPage from './UsersPage'
 import { useAuthContext } from '../context/AuthContext'
 
-const { Title, Text } = Typography
+const { Title } = Typography
 
 function SystemManagementPage() {
   const { user } = useAuthContext()
@@ -57,7 +57,6 @@ function SystemManagementPage() {
       <div className="system-management-page">
         <div className="page-heading-block">
           <Title level={3}>Quản trị hệ thống & Giám sát an toàn dữ liệu</Title>
-          <Text type="secondary">Quản lý tài khoản, phân quyền, cấu hình thông tin phòng khám, sao lưu dữ liệu và kiểm toán nhật ký truy cập bệnh án.</Text>
         </div>
         <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px', marginTop: 16 }}>
           <Empty description="Tài khoản của bạn hiện chưa có quyền truy cập vào các module quản trị hệ thống." />
@@ -70,7 +69,6 @@ function SystemManagementPage() {
     <div className="system-management-page">
       <div className="page-heading-block">
         <Title level={3}>Quản trị hệ thống & Giám sát an toàn dữ liệu</Title>
-        <Text type="secondary">Quản lý tài khoản, phân quyền, cấu hình thông tin phòng khám, sao lưu dữ liệu và kiểm toán nhật ký truy cập bệnh án.</Text>
       </div>
       <Tabs
         className="system-tabs"
