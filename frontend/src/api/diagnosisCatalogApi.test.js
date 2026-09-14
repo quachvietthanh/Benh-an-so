@@ -133,3 +133,49 @@ test('diagnosisCatalogApi delete sends DELETE request', async () => {
     axiosClient.delete = originalDelete
   }
 })
+
+test('diagnosisCatalogApi search calls /diagnosis-catalog when search param is provided', async () => {
+  let capturedConfig = null
+  const dummyResponse = { data: [{ id: '1', code: 'I10', name: 'Tăng huyết áp vô căn' }] }
+
+  const originalGet = axiosClient.get
+  axiosClient.get = async (url, config) => {
+    capturedConfig = { url, ...config }
+    return dummyResponse
+  }
+
+  try {
+    const res = await diagnosisCatalogApi.search({ search: 'tang huyet ap', diseaseGroup: 'Tuần hoàn' })
+    assert.equal(capturedConfig.url, '/diagnosis-catalog')
+    assert.deepEqual(capturedConfig.params, { search: 'tang huyet ap', diseaseGroup: 'Tuần hoàn' })
+    assert.deepEqual(res.data, dummyResponse.data)
+  } finally {
+    axiosClient.get = originalGet
+  }
+})
+
+test('diagnosisCatalogApi getSuggestions calls /diagnosis-catalog/suggestions', async () => {
+  let capturedUrl = null
+  const dummyResponse = {
+    data: {
+      recent: [{ id: '1', code: 'I10', name: 'Tăng huyết áp' }],
+      popular: [{ id: '2', code: 'J00', name: 'Cảm lạnh' }],
+      diseaseGroups: ['Hô hấp', 'Tuần hoàn'],
+    },
+  }
+
+  const originalGet = axiosClient.get
+  axiosClient.get = async (url) => {
+    capturedUrl = url
+    return dummyResponse
+  }
+
+  try {
+    const res = await diagnosisCatalogApi.getSuggestions()
+    assert.equal(capturedUrl, '/diagnosis-catalog/suggestions')
+    assert.deepEqual(res.data, dummyResponse.data)
+  } finally {
+    axiosClient.get = originalGet
+  }
+})
+

@@ -1676,8 +1676,6 @@ function MedicalEncounter() {
                 setSecondaryIcds={setSecondaryIcds}
                 addSecondaryDiagnosis={addSecondaryDiagnosis}
                 diagnosisOptions={diagnosisSelectOptions}
-                diagnosisSearching={icdSearching}
-                onDiagnosisSearch={setIcdSearchQuery}
                 setDiagnosisModalOpen={setDiagnosisModalOpen}
                 selectedOrders={selectedOrders}
                 orderCategory={orderCategory}

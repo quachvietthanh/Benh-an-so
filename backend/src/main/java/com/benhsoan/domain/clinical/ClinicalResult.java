@@ -25,12 +25,13 @@ public class ClinicalResult {
     private UUID id, clinicalOrderItemId, visitId, enteredBy, updatedBy;
     private ClinicalResultType resultType;
     private BigDecimal numericValue;
+    private BigDecimal lowerBound, upperBound;
     private String textValue, unit, referenceRange, conclusion;
     private ClinicalResultAbnormalFlag abnormalFlag;
     private ClinicalResultStatus status;
     private Instant enteredAt, updatedAt;
 
-    private ClinicalResult(UUID id, UUID item, UUID visit, ClinicalResultType type, BigDecimal number, String text, String unit, String range, ClinicalResultAbnormalFlag flag, String conclusion, ClinicalResultStatus status, UUID enteredBy, Instant enteredAt, UUID updatedBy, Instant updatedAt) {
+    private ClinicalResult(UUID id, UUID item, UUID visit, ClinicalResultType type, BigDecimal number, String text, String unit, String range, BigDecimal lower, BigDecimal upper, ClinicalResultAbnormalFlag flag, String conclusion, ClinicalResultStatus status, UUID enteredBy, Instant enteredAt, UUID updatedBy, Instant updatedAt) {
         this.id = Objects.requireNonNull(id);
         clinicalOrderItemId = Objects.requireNonNull(item);
         visitId = Objects.requireNonNull(visit);
@@ -39,6 +40,8 @@ public class ClinicalResult {
         textValue = text;
         this.unit = unit;
         referenceRange = range;
+        lowerBound = lower;
+        upperBound = upper;
         abnormalFlag = flag == null ? ClinicalResultAbnormalFlag.UNKNOWN : flag;
         this.conclusion = conclusion;
         this.status = Objects.requireNonNull(status);
@@ -50,11 +53,19 @@ public class ClinicalResult {
     }
 
     public static ClinicalResult create(UUID item, UUID visit, ClinicalResultType type, BigDecimal number, String text, String unit, String range, ClinicalResultAbnormalFlag flag, String conclusion, UUID by, Instant at) {
-        return new ClinicalResult(UUID.randomUUID(), item, visit, type, number, text, unit, range, flag, conclusion, ClinicalResultStatus.DRAFT, by, at, null, null);
+        return create(item, visit, type, number, text, unit, range, null, null, flag, conclusion, by, at);
+    }
+
+    public static ClinicalResult create(UUID item, UUID visit, ClinicalResultType type, BigDecimal number, String text, String unit, String range, BigDecimal lower, BigDecimal upper, ClinicalResultAbnormalFlag flag, String conclusion, UUID by, Instant at) {
+        return new ClinicalResult(UUID.randomUUID(), item, visit, type, number, text, unit, range, lower, upper, flag, conclusion, ClinicalResultStatus.DRAFT, by, at, null, null);
     }
 
     public static ClinicalResult restore(UUID id, UUID item, UUID visit, ClinicalResultType type, BigDecimal number, String text, String unit, String range, ClinicalResultAbnormalFlag flag, String conclusion, ClinicalResultStatus status, UUID enteredBy, Instant enteredAt, UUID updatedBy, Instant updatedAt) {
-        return new ClinicalResult(id, item, visit, type, number, text, unit, range, flag, conclusion, status, enteredBy, enteredAt, updatedBy, updatedAt);
+        return restore(id, item, visit, type, number, text, unit, range, null, null, flag, conclusion, status, enteredBy, enteredAt, updatedBy, updatedAt);
+    }
+
+    public static ClinicalResult restore(UUID id, UUID item, UUID visit, ClinicalResultType type, BigDecimal number, String text, String unit, String range, BigDecimal lower, BigDecimal upper, ClinicalResultAbnormalFlag flag, String conclusion, ClinicalResultStatus status, UUID enteredBy, Instant enteredAt, UUID updatedBy, Instant updatedAt) {
+        return new ClinicalResult(id, item, visit, type, number, text, unit, range, lower, upper, flag, conclusion, status, enteredBy, enteredAt, updatedBy, updatedAt);
     }
 
     public void updateResult(BigDecimal n, String t, String u, String r, ClinicalResultAbnormalFlag f, String c, UUID by, Instant at) {

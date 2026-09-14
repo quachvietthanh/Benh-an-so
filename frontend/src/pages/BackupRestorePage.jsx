@@ -348,9 +348,6 @@ function BackupRestorePage() {
             <DatabaseOutlined style={{ color: '#2563eb', marginRight: 8 }} />
             SAO LƯU & PHỤC HỒI DỮ LIỆU
           </Title>
-          <Text type="secondary">
-            Quản lý các bản sao lưu dữ liệu hệ thống Bệnh Án Số và phục hồi khi có sự cố.
-          </Text>
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} loading={loading} onClick={loadBackups}>

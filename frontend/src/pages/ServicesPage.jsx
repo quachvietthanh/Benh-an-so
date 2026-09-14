@@ -50,7 +50,7 @@ import '../styles/services.css'
 
 dayjs.extend(customParseFormat)
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 const { Option } = Select
 
 function ServicesPage() {
@@ -518,9 +518,6 @@ function ServicesPage() {
           <Title level={3} className="services-header-title">
             Danh mục Dịch vụ Kỹ thuật & Bảng giá
           </Title>
-          <Paragraph type="secondary" className="services-header-desc">
-            Quản lý danh mục kỹ thuật khám, xét nghiệm, chẩn đoán hình ảnh và thiết lập bảng giá niêm yết áp dụng trong viện phí.
-          </Paragraph>
         </div>
         <div className="services-header-actions">
           <Button

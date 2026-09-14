@@ -39,6 +39,7 @@ import {
   UserOutlined,
   WarningOutlined,
   FireOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import pharmacyApi from '../../api/pharmacyApi'
@@ -77,6 +78,8 @@ function PrescriptionDetailModal({
   onPrintClick,
   onInterconnectionUpdated,
   canEdit = false,
+  canCancel = false,
+  onCancelClick,
   canSendInterconnection = true,
 }) {
   const [sendingInterconnection, setSendingInterconnection] = useState(false)
@@ -413,6 +416,20 @@ function PrescriptionDetailModal({
                 Điều chỉnh đơn này
               </Button>
             )}
+            {canCancel && isPending && (
+              <Button
+                type="primary"
+                danger
+                icon={<StopOutlined />}
+                onClick={() => {
+                  onClose()
+                  if (onCancelClick) onCancelClick(prescription)
+                }}
+                id="btn-detail-cancel-prescription"
+              >
+                Hủy đơn thuốc
+              </Button>
+            )}
             <Button onClick={onClose}>Đóng</Button>
           </Space>
         </div>
@@ -420,6 +437,33 @@ function PrescriptionDetailModal({
       width={860}
       style={{ top: 20 }}
     >
+      {isCancelled && (
+        <Alert
+          type="error"
+          showIcon
+          icon={<StopOutlined style={{ fontSize: 20, color: '#dc2626' }} />}
+          message={
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#991b1b' }}>
+              Đơn thuốc đã bị hủy (CANCELLED)
+            </div>
+          }
+          description={
+            <div style={{ fontSize: 13, marginTop: 4, color: '#7f1d1d' }}>
+              <div>
+                <strong>Lý do hủy:</strong>{' '}
+                <span style={{ color: '#b91c1c' }}>{prescription.cancelReason || 'Không có lý do chi tiết ghi nhận'}</span>
+              </div>
+              {prescription.updatedAt && (
+                <div style={{ marginTop: 2, color: '#64748b', fontSize: 12 }}>
+                  Thời gian hủy: {dayjs(prescription.updatedAt).format('HH:mm DD/MM/YYYY')}
+                </div>
+              )}
+            </div>
+          }
+          style={{ marginBottom: 14, backgroundColor: '#fef2f2', borderColor: '#fecaca', borderRadius: 8 }}
+        />
+      )}
+
       <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc' }}>
         {/* Banner mã định danh điện tử */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eff6ff', padding: '10px 14px', borderRadius: 8, marginBottom: 12, border: '1px solid #bfdbfe', flexWrap: 'wrap', gap: 8 }}>
@@ -547,6 +591,11 @@ function PrescriptionDetailModal({
           <Descriptions.Item label="Mã biên nhận liên thông">
             {interInfo.receiptCode ? <Text code strong>{interInfo.receiptCode}</Text> : <Text type="secondary">Chưa có</Text>}
           </Descriptions.Item>
+          {isCancelled && (
+            <Descriptions.Item label={<Text strong style={{ color: '#dc2626' }}>Lý do hủy</Text>} span={2}>
+              <Text type="danger" strong>{prescription.cancelReason || '—'}</Text>
+            </Descriptions.Item>
+          )}
         </Descriptions>
         {prescription.note && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e2e8f0' }}>

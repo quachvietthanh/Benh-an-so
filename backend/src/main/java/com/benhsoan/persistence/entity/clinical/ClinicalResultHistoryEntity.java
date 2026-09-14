@@ -41,6 +41,14 @@ public class ClinicalResultHistoryEntity {
     BigDecimal oldNumericValue;
     @Column(name = "new_numeric_value", precision = 18, scale = 4)
     BigDecimal newNumericValue;
+    @Column(name = "old_lower_bound", precision = 18, scale = 4)
+    BigDecimal oldLowerBound;
+    @Column(name = "new_lower_bound", precision = 18, scale = 4)
+    BigDecimal newLowerBound;
+    @Column(name = "old_upper_bound", precision = 18, scale = 4)
+    BigDecimal oldUpperBound;
+    @Column(name = "new_upper_bound", precision = 18, scale = 4)
+    BigDecimal newUpperBound;
     @Column(name = "old_text_value", columnDefinition = "TEXT")
     String oldTextValue;
     @Column(name = "new_text_value", columnDefinition = "TEXT")

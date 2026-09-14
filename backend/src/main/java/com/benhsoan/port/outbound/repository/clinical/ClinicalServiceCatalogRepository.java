@@ -13,7 +13,15 @@ public interface ClinicalServiceCatalogRepository {
 
     Optional<ClinicalServiceCatalog> findById(UUID id);
 
+    Optional<ClinicalServiceCatalog> findByIdForUpdate(UUID id);
+
     Page<ClinicalServiceCatalog> findActiveByKeyword(String keyword, Pageable pageable);
 
     List<ClinicalServiceCatalog> findActiveByIdIn(Collection<UUID> serviceIds);
+
+    ClinicalServiceCatalog save(ClinicalServiceCatalog catalog);
+
+    boolean existsByServiceCode(String serviceCode);
+
+    Page<ClinicalServiceCatalog> search(String keyword, Boolean active, Pageable pageable);
 }

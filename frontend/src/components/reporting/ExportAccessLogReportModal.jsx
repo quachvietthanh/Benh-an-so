@@ -45,19 +45,19 @@ function ExportAccessLogReportModal({ open, onClose, onSuccess }) {
   const canExport = isAdmin || userPermissions.includes('ACCESS_LOG_REPORT_EXPORT')
 
   const [dateRange, setDateRange] = useState([
-    dayjs().subtract(29, 'day'),
-    dayjs(),
+    dayjs().subtract(29, 'day').startOf('day'),
+    dayjs().endOf('day'),
   ])
   const [exporting, setExporting] = useState(false)
   const isExportingRef = useRef(false)
 
   const rangePresets = [
     { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
-    { label: '7 ngày qua', value: [dayjs().subtract(6, 'day'), dayjs()] },
-    { label: '30 ngày qua', value: [dayjs().subtract(29, 'day'), dayjs()] },
+    { label: '7 ngày qua', value: [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
+    { label: '30 ngày qua', value: [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')] },
     { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
     { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
-    { label: '90 ngày qua', value: [dayjs().subtract(89, 'day'), dayjs()] },
+    { label: '90 ngày qua', value: [dayjs().subtract(89, 'day').startOf('day'), dayjs().endOf('day')] },
   ]
 
   const handleExport = async () => {
@@ -94,7 +94,9 @@ function ExportAccessLogReportModal({ open, onClose, onSuccess }) {
       if (onSuccess) {
         onSuccess({ from, to, filename })
       }
-      onClose()
+      if (onClose) {
+        onClose()
+      }
     } catch (err) {
       console.error('Lỗi xuất báo cáo nhật ký truy cập:', err)
       const errorMsg = await getExportErrorMessage(err)
@@ -108,7 +110,7 @@ function ExportAccessLogReportModal({ open, onClose, onSuccess }) {
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={exporting ? undefined : onClose}
       title={(
         <Space align="center">
           <SafetyCertificateOutlined style={{ color: '#2563eb', fontSize: 20 }} />
@@ -129,7 +131,7 @@ function ExportAccessLogReportModal({ open, onClose, onSuccess }) {
           onClick={handleExport}
           style={{ backgroundColor: canExport ? '#1d4ed8' : undefined }}
         >
-          Xuất tệp CSV
+          {exporting ? 'Đang xuất tệp...' : 'Xuất tệp CSV'}
         </Button>,
       ]}
       destroyOnClose
