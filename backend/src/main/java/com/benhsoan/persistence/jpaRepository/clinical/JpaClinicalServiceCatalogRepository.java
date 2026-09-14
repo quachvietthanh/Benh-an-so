@@ -27,4 +27,21 @@ public interface JpaClinicalServiceCatalogRepository extends JpaRepository<Clini
     );
 
     List<ClinicalServiceCatalogEntity> findByIdInAndActiveTrue(Collection<UUID> serviceIds);
+
+    boolean existsByServiceCode(String serviceCode);
+
+    @Query("""
+            SELECT service
+            FROM ClinicalServiceCatalogEntity service
+            WHERE (:keyword = ''
+                    OR lower(service.serviceCode) LIKE lower(concat('%', :keyword, '%'))
+                    OR lower(service.serviceName) LIKE lower(concat('%', :keyword, '%')))
+              AND (:active IS NULL OR service.active = :active)
+            ORDER BY service.serviceName ASC, service.serviceCode ASC
+            """)
+    Page<ClinicalServiceCatalogEntity> search(
+            @Param("keyword") String keyword,
+            @Param("active") Boolean active,
+            Pageable pageable
+    );
 }

@@ -1,8 +1,12 @@
 package com.benhsoan.application.ucservice.clinical;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -11,11 +15,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.clinical.ClinicalReferenceRange;
 import com.benhsoan.domain.clinical.ClinicalResult;
 import com.benhsoan.domain.clinical.ClinicalResultHistory;
+import com.benhsoan.domain.clinical.ClinicalServiceCatalog;
 import com.benhsoan.domain.clinical.MedicalAttachment;
+import com.benhsoan.domain.clinical.ReferenceRangeEvaluator;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderItemStatus;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderStatus;
+import com.benhsoan.domain.clinical.enums.ClinicalResultAbnormalFlag;
 import com.benhsoan.domain.clinical.enums.ClinicalResultType;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderInvalidVisitException;
 import com.benhsoan.domain.clinical.exception.ClinicalOrderItemNotFoundException;
@@ -36,11 +44,13 @@ import com.benhsoan.port.inbound.clinical.GetClinicalResultsByVisitUseCase;
 import com.benhsoan.port.inbound.clinical.UpdateClinicalResultUseCase;
 import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
 import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderRepository;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalReferenceRangeRepository;
 import com.benhsoan.port.outbound.repository.clinical.ClinicalResultHistoryRepository;
 import com.benhsoan.port.outbound.repository.clinical.ClinicalResultRepository;
 import com.benhsoan.port.outbound.repository.clinical.ClinicalServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.clinical.MedicalAttachmentRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -61,6 +71,9 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
     private final MedicalAttachmentRepository medicalAttachmentRepository;
     private final VisitRepository visitRepository;
     private final MedicalRecordRepository medicalRecordRepository;
+    private final PatientRepository patientRepository;
+    private final ClinicalReferenceRangeRepository clinicalReferenceRangeRepository;
+    private final ReferenceRangeEvaluator referenceRangeEvaluator;
     private final ClinicalOrderAuthorizationService authorizationService;
     private final ClinicalResultAuditService auditService;
     private final ClockPort clock;
@@ -93,10 +106,12 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         ClinicalResultType resultType = ClinicalResultType.from(clinicalService.getResultDataType());
 
         Instant now = clock.now();
+        ResolvedReference reference = resolveReference(clinicalService, visit.getPatientId(), resultType,
+                command.numericValue(), command.abnormalFlag(), now);
         ClinicalResult result = clinicalResultRepository.save(ClinicalResult.create(
                 clinicalOrderItemId, visit.getId(), resultType, command.numericValue(), command.textValue(),
-                clinicalService.getUnit(), clinicalService.getReferenceRange(), command.abnormalFlag(),
-                command.conclusion(), actorId, now));
+                reference.unit(), reference.displayRange(), reference.lowerBound(), reference.upperBound(),
+                reference.abnormalFlag(), command.conclusion(), actorId, now));
         auditService.recordWrite(result.getId(), visit.getPatientId(), visit.getId(), medicalRecord.getId(), actorId,
                 MedicalRecordAccessAction.CREATE, now);
         return mapDetail(result);
@@ -110,8 +125,15 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         ClinicalResult previousResult = snapshot(result);
         Instant now = clock.now();
 
+        ClinicalResultAbnormalFlag flag = command.abnormalFlag();
+        if (result.getResultType() == ClinicalResultType.NUMBER) {
+            flag = command.numericValue() == null
+                    ? ClinicalResultAbnormalFlag.UNKNOWN
+                    : referenceRangeEvaluator.evaluate(command.numericValue(), result.getLowerBound(), result.getUpperBound());
+        }
+
         result.updateResult(command.numericValue(), command.textValue(), result.getUnit(), result.getReferenceRange(),
-                command.abnormalFlag(), command.conclusion(), actorId, now);
+                flag, command.conclusion(), actorId, now);
         ClinicalResult savedResult = clinicalResultRepository.save(result);
         clinicalResultHistoryRepository.save(ClinicalResultHistory.create(
                 previousResult, savedResult, command.changeReason(), actorId, now));
@@ -258,7 +280,8 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
     private ClinicalResult snapshot(ClinicalResult result) {
         return ClinicalResult.restore(result.getId(), result.getClinicalOrderItemId(), result.getVisitId(),
                 result.getResultType(), result.getNumericValue(), result.getTextValue(), result.getUnit(),
-                result.getReferenceRange(), result.getAbnormalFlag(), result.getConclusion(), result.getStatus(),
+                result.getReferenceRange(), result.getLowerBound(), result.getUpperBound(),
+                result.getAbnormalFlag(), result.getConclusion(), result.getStatus(),
                 result.getEnteredBy(), result.getEnteredAt(), result.getUpdatedBy(), result.getUpdatedAt());
     }
 
@@ -277,17 +300,53 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
                 .map(this::toHistoryResult)
                 .toList();
         return new ClinicalResultResult(result.getId(), result.getClinicalOrderItemId(), result.getVisitId(),
-                result.getResultType(), result.getNumericValue(), result.getTextValue(), result.getUnit(),
+                result.getResultType(), result.getNumericValue(), result.getLowerBound(), result.getUpperBound(),
+                result.getTextValue(), result.getUnit(),
                 result.getReferenceRange(), result.getAbnormalFlag(), result.getConclusion(), result.getStatus(),
                 attachmentResults, historyResults);
     }
 
     private ClinicalResultResult.History toHistoryResult(ClinicalResultHistory history) {
         return new ClinicalResultResult.History(history.getId(), history.getOldResultType(), history.getNewResultType(),
-                history.getOldNumericValue(), history.getNewNumericValue(), history.getOldTextValue(),
-                history.getNewTextValue(), history.getOldUnit(), history.getNewUnit(), history.getOldReferenceRange(),
-                history.getNewReferenceRange(), history.getOldAbnormalFlag(), history.getNewAbnormalFlag(),
+                history.getOldNumericValue(), history.getNewNumericValue(), history.getOldLowerBound(),
+                history.getNewLowerBound(), history.getOldUpperBound(), history.getNewUpperBound(),
+                history.getOldTextValue(), history.getNewTextValue(), history.getOldUnit(), history.getNewUnit(),
+                history.getOldReferenceRange(), history.getNewReferenceRange(),
+                history.getOldAbnormalFlag(), history.getNewAbnormalFlag(),
                 history.getOldConclusion(), history.getNewConclusion(), history.getOldStatus(), history.getNewStatus(),
                 history.getChangeReason(), history.getChangedBy(), history.getChangedAt());
+    }
+
+    private ResolvedReference resolveReference(ClinicalServiceCatalog service, UUID patientId,
+            ClinicalResultType resultType, BigDecimal value, ClinicalResultAbnormalFlag clientFlag, Instant now) {
+        if (resultType != ClinicalResultType.NUMBER) {
+            return new ResolvedReference(service.getUnit(), service.getReferenceRange(), null, null, clientFlag);
+        }
+        Optional<ClinicalReferenceRange> range = resolveActiveRange(service.getId(), patientId, now);
+        if (range.isEmpty()) {
+            return new ResolvedReference(service.getUnit(), service.getReferenceRange(), null, null,
+                    ClinicalResultAbnormalFlag.UNKNOWN);
+        }
+        ClinicalReferenceRange resolved = range.get();
+        ClinicalResultAbnormalFlag flag = value == null
+                ? ClinicalResultAbnormalFlag.UNKNOWN
+                : referenceRangeEvaluator.evaluate(value, resolved.getLowerBound(), resolved.getUpperBound());
+        return new ResolvedReference(service.getUnit(), resolved.toDisplayRange(),
+                resolved.getLowerBound(), resolved.getUpperBound(), flag);
+    }
+
+    private Optional<ClinicalReferenceRange> resolveActiveRange(UUID clinicalServiceId, UUID patientId, Instant now) {
+        var patient = patientRepository.findById(patientId).orElse(null);
+        if (patient == null || patient.getDateOfBirth() == null) {
+            return Optional.empty();
+        }
+        LocalDate referenceDate = now.atZone(ZoneId.systemDefault()).toLocalDate();
+        int age = referenceRangeEvaluator.ageInYears(patient.getDateOfBirth(), referenceDate);
+        return referenceRangeEvaluator.resolve(patient.getGender(), age,
+                clinicalReferenceRangeRepository.findActiveByClinicalServiceId(clinicalServiceId));
+    }
+
+    private record ResolvedReference(String unit, String displayRange, BigDecimal lowerBound, BigDecimal upperBound,
+            ClinicalResultAbnormalFlag abnormalFlag) {
     }
 }
