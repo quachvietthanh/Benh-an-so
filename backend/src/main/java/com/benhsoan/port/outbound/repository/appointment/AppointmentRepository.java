@@ -43,6 +43,13 @@ public interface AppointmentRepository {
             Instant to
     );
 
+    List<Appointment> findAppointmentsForDoctorsBetween(
+            Collection<UUID> doctorIds,
+            Instant from,
+            Instant to,
+            Collection<AppointmentStatus> statuses
+    );
+
     Page<Appointment> findOverdue( Instant threshold, Pageable pageable );
 
     Page<Appointment> findUnconfirmed(Instant fromTime, Instant toTime, Pageable pageable);
