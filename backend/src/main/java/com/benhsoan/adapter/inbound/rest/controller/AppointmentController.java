@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 
 import java.time.LocalDate;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -29,12 +30,15 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.appointment.GetOverdueAppointmentsCommand;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
+import com.benhsoan.port.dto.query.appointment.GetDoctorAvailableSlotsQuery;
+import com.benhsoan.port.dto.result.appointment.DoctorAvailableSlotResult;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.dto.result.AppointmentReminderResult;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.ConfirmAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
+import com.benhsoan.port.inbound.appointment.GetDoctorAvailableSlotsUseCase;
 import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.GetUnconfirmedAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
@@ -84,11 +88,9 @@ public class AppointmentController {
     @RequirePermission("APPOINTMENT_READ")
     public DoctorWeeklyTableResponse getDoctorWeeklyTable(
             @RequestParam(required = false) LocalDate date,
-            @RequestParam(required = false) UUID doctorId
-    ) {
+            @RequestParam(required = false) UUID doctorId) {
         DoctorWeeklyTableResult result = getDoctorWeeklyScheduleTableUseCase.getWeeklyScheduleTable(
-                new GetDoctorWeeklyScheduleTableQuery(date, doctorId)
-        );
+                new GetDoctorWeeklyScheduleTableQuery(date, doctorId));
         return mapper.toResponse(result);
     }
 
@@ -101,8 +103,7 @@ public class AppointmentController {
             @RequestParam(required = false) Instant startDate,
             @RequestParam(required = false) Instant endDate,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
+            @RequestParam(defaultValue = "20") int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw new ValidationException("Page must be non-negative and size must be between 1 and 100.");
         }
@@ -112,9 +113,17 @@ public class AppointmentController {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "startTime"));
         Page<AppointmentResult> results = searchAppointmentsUseCase.search(
-                new SearchAppointmentCommand(patientId, doctorId, status, startDate, endDate, pageable)
-        );
+                new SearchAppointmentCommand(patientId, doctorId, status, startDate, endDate, pageable));
         return mapper.toResponse(results);
+    }
+
+    @GetMapping("/available-slots")
+    @RequirePermission("APPOINTMENT_READ")
+    public List<DoctorAvailableSlotResult> getAvailableSlots(
+            @RequestParam UUID doctorId,
+            @RequestParam LocalDate date) {
+        return getDoctorAvailableSlotsUseCase.getAvailableSlots(
+                new GetDoctorAvailableSlotsQuery(doctorId, date));
     }
 
     @GetMapping("/{id}")
@@ -127,10 +136,8 @@ public class AppointmentController {
     @ResponseStatus(HttpStatus.CREATED)
     @RequirePermission("APPOINTMENT_CREATE")
     public AppointmentResponse create(@Valid @RequestBody CreateAppointmentRequest request) {
-        AppointmentResult result
-                = createAppointmentUseCase.create(
-                        mapper.toCommand(request)
-                );
+        AppointmentResult result = createAppointmentUseCase.create(
+                mapper.toCommand(request));
         return mapper.toResponse(result);
 
     }
@@ -152,14 +159,11 @@ public class AppointmentController {
     @RequirePermission("APPOINTMENT_UPDATE")
     public AppointmentResponse cancel(
             @PathVariable UUID id,
-            @Valid
-            @RequestBody CancelAppointmentRequest request) {
+            @Valid @RequestBody CancelAppointmentRequest request) {
 
-        AppointmentResult result
-                = cancelAppointmentUseCase.cancel(
-                        id,
-                        mapper.toCommand(request)
-                );
+        AppointmentResult result = cancelAppointmentUseCase.cancel(
+                id,
+                mapper.toCommand(request));
         return mapper.toResponse(result);
     }
 
@@ -170,8 +174,7 @@ public class AppointmentController {
             @Valid @RequestBody RescheduleAppointmentRequest request) {
         AppointmentResult result = rescheduleAppointmentUseCase.reschedule(
                 id,
-                mapper.toCommand(request)
-        );
+                mapper.toCommand(request));
         return mapper.toResponse(result);
     }
 
@@ -180,8 +183,7 @@ public class AppointmentController {
     public Page<AppointmentResponse> getUnconfirmed(
             @RequestParam(required = false) LocalDate date,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
+            @RequestParam(defaultValue = "20") int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw new ValidationException("Page must be non-negative and size must be between 1 and 100.");
         }
@@ -193,12 +195,10 @@ public class AppointmentController {
     @GetMapping("/overdue")
     @RequirePermission("APPOINTMENT_READ")
     public Page<AppointmentResponse> getOverdueAppointments(Pageable pageable) {
-        Page<AppointmentResult> result
-                = getOverdueAppointmentsUseCase.execute(
-                        GetOverdueAppointmentsCommand.builder()
-                                .pageable(pageable)
-                                .build()
-                );
+        Page<AppointmentResult> result = getOverdueAppointmentsUseCase.execute(
+                GetOverdueAppointmentsCommand.builder()
+                        .pageable(pageable)
+                        .build());
 
         return mapper.toResponse(result);
     }
@@ -206,10 +206,8 @@ public class AppointmentController {
     @PatchMapping("/{id}/no-show")
     @RequirePermission("APPOINTMENT_UPDATE")
     public AppointmentResponse markNoShow(@PathVariable UUID id) {
-        AppointmentResult result
-                = markAppointmentNoShowUseCase.execute(
-                        mapper.toCommand(id)
-                );
+        AppointmentResult result = markAppointmentNoShowUseCase.execute(
+                mapper.toCommand(id));
 
         return mapper.toResponse(result);
     }
