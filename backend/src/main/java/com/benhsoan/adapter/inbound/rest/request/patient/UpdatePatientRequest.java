@@ -49,7 +49,21 @@ public record UpdatePatientRequest(
 
         String consentWithdrawnReason,
 
-        String consentVersion
+        String consentVersion,
+
+        String guardianName,
+
+        @Size(max = 50, message = "Mối quan hệ với người giám hộ không được vượt quá 50 ký tự.")
+        String guardianRelationship,
+
+        @Pattern(regexp = "^(?:(0|\\+84)(3|5|7|8|9)[0-9]{8}|[0-9]{2}\\*{6}[0-9]{2})?$", message = "Số điện thoại người giám hộ không đúng định dạng.")
+        String guardianPhone,
+
+        String guardianIdentityNumber,
+
+        String consentSignerName,
+
+        Boolean transitionToAdult
 
 ) {
 }

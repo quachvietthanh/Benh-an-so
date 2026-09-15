@@ -36,4 +36,14 @@ public interface JpaDoctorTimeOffRepository extends JpaRepository<DoctorTimeOffE
             @Param("endTime") Instant endTime,
             @Param("status") TimeOffStatus status
     );
+
+    @Query("select t from DoctorTimeOffEntity t "
+            + "where t.doctorId in :doctorIds and t.status = :status "
+            + "and t.startTime < :endTime and t.endTime > :startTime order by t.startTime asc")
+    List<DoctorTimeOffEntity> findOverlappingForDoctors(
+            @Param("doctorIds") java.util.Collection<UUID> doctorIds,
+            @Param("startTime") Instant startTime,
+            @Param("endTime") Instant endTime,
+            @Param("status") TimeOffStatus status
+    );
 }
