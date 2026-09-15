@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.patient.enums.PatientStatus;
+import com.benhsoan.domain.patient.exception.PatientAlreadyMergedException;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
 
 @DisplayName("Patient Domain Entity - Unit Tests (NCL-15-CN-001 / QTN-24)")
@@ -549,5 +551,37 @@ class PatientTest {
         );
 
         assertEquals("consentSignerName", ex.getField());
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-006: Đánh dấu gộp hồ sơ thành công")
+    void markAsMergedSucceeds() {
+        Patient source = Patient.create(
+                "BN-SRC", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", createdBy
+        );
+
+        UUID targetId = UUID.randomUUID();
+        UUID operatorId = UUID.randomUUID();
+
+        assertEquals(PatientStatus.ACTIVE, source.getStatus());
+        assertFalse(source.isMerged());
+
+        source.markAsMerged(targetId, operatorId, "Hồ sơ trùng");
+
+        assertEquals(PatientStatus.MERGED, source.getStatus());
+        assertTrue(source.isMerged());
+        assertFalse(source.isActive());
+        assertEquals(targetId, source.getMergedIntoPatientId());
+        assertEquals(operatorId, source.getMergedBy());
+        assertEquals("Hồ sơ trùng", source.getMergeReason());
+        assertNotNull(source.getMergedAt());
+
+        assertThrows(PatientAlreadyMergedException.class,
+                () -> source.markAsMerged(targetId, operatorId, "Thử gộp lại"));
+
+        assertThrows(PatientAlreadyMergedException.class, source::validateCanBeUpdated);
     }
 }

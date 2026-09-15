@@ -43,7 +43,14 @@ public class PatientResultMapper {
                 patient.isConsentWithdrawn(),
                 patient.getConsentWithdrawnAt(),
                 patient.getConsentWithdrawnReason(),
-                patient.isNonMedicalUseRestricted()
+                patient.isNonMedicalUseRestricted(),
+                patient.getStatus(),
+                patient.isMerged(),
+                patient.getMergedIntoPatientId(),
+                null,
+                patient.getMergedAt(),
+                patient.getMergedBy(),
+                patient.getMergeReason()
         );
     }
 

@@ -77,6 +77,8 @@ class PatientGuardianIntegrationTest {
     @MockitoBean private UpdatePatientUseCase updatePatientUseCase;
     @MockitoBean private GetPatientByIdUseCase getPatientByIdUseCase;
     @MockitoBean private GetPatientByCodeUseCase getPatientByCodeUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.MergePatientsUseCase mergePatientsUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.FindDuplicatePatientsUseCase findDuplicatePatientsUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
