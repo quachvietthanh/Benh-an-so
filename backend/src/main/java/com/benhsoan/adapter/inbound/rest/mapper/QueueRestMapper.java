@@ -6,12 +6,14 @@ import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.adapter.inbound.rest.request.queue.CheckInWalkInRequest;
+import com.benhsoan.adapter.inbound.rest.request.queue.CloseQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueItemResponse;
 import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.queue.CheckInWalkInCommand;
+import com.benhsoan.port.dto.command.queue.CloseVisitCommand;
 import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
 import com.benhsoan.port.dto.command.queue.UpdateQueueItemStatusCommand;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
@@ -34,6 +36,10 @@ public class QueueRestMapper {
 
     public UpdateQueueItemStatusCommand toCommand(UUID queueItemId, UpdateQueueItemStatusRequest request) {
         return new UpdateQueueItemStatusCommand(queueItemId, request.targetStatus(), request.cancelReason());
+    }
+
+    public CloseVisitCommand toCommand(UUID queueItemId, CloseQueueItemRequest request) {
+        return new CloseVisitCommand(queueItemId, request.outcome(), request.reason());
     }
 
     public static final String DEFAULT_SKIP_REASON = "Bệnh nhân vắng mặt khi gọi tên";

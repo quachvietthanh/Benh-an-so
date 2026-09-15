@@ -1,6 +1,8 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,11 +31,13 @@ import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
 import com.benhsoan.domain.specialty.exception.SpecialtyNotFoundException;
+import com.benhsoan.domain.visit.enums.VisitCloseOutcome;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
 import com.benhsoan.port.dto.result.QueueHistoryResult;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.dto.command.queue.CheckInWalkInCommand;
+import com.benhsoan.port.dto.command.queue.CloseVisitCommand;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -42,6 +46,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 import com.benhsoan.port.inbound.queue.CallNextQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.CheckInAppointmentUseCase;
 import com.benhsoan.port.inbound.queue.CheckInWalkInUseCase;
+import com.benhsoan.port.inbound.queue.CloseVisitUseCase;
 import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
@@ -65,6 +70,7 @@ class QueueControllerTest {
     @MockitoBean private CallNextQueueItemUseCase callNextQueueItemUseCase;
     @MockitoBean private UpdateQueueItemStatusUseCase updateQueueItemStatusUseCase;
     @MockitoBean private CompleteQueueItemUseCase completeQueueItemUseCase;
+    @MockitoBean private CloseVisitUseCase closeVisitUseCase;
     @MockitoBean private GetQueueItemUseCase getQueueItemUseCase;
     @MockitoBean private SkipQueueItemUseCase skipQueueItemUseCase;
     @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
@@ -254,5 +260,90 @@ class QueueControllerTest {
                 QueueItemStatus.SKIPPED, 1, LocalDate.of(2026, 8, 2), now,
                 now, null, null, null, now, "Patient absent when called"
         );
+    }
+
+    @Test
+    void closesVisitWithEarlyEndedOutcome() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-02T02:00:00Z");
+        QueueItemResult closed = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "Nguyen Van A",
+                UUID.randomUUID(), "Bac si Nguyen Van B", UUID.randomUUID(), "P101",
+                null, UUID.randomUUID(), "VIS000100", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.CANCELLED, 1, LocalDate.of(2026, 8, 2), now,
+                now, null, now, "Bệnh nhân bỏ về", null, null, 1
+        );
+        when(closeVisitUseCase.close(any())).thenReturn(closed);
+
+        mockMvc.perform(post("/queue-items/{itemId}/close", itemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"EARLY_ENDED\",\"reason\":\"Bệnh nhân bỏ về\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(itemId.toString()))
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.cancelReason").value("Bệnh nhân bỏ về"));
+
+        ArgumentCaptor<CloseVisitCommand> captor = ArgumentCaptor.forClass(CloseVisitCommand.class);
+        verify(closeVisitUseCase).close(captor.capture());
+        assertEquals(itemId, captor.getValue().queueItemId());
+        assertEquals(VisitCloseOutcome.EARLY_ENDED, captor.getValue().outcome());
+        assertEquals("Bệnh nhân bỏ về", captor.getValue().reason());
+    }
+
+    @Test
+    void closesVisitWithCancelledOutcome() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        when(closeVisitUseCase.close(any())).thenReturn(result(itemId));
+
+        mockMvc.perform(post("/queue-items/{itemId}/close", itemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"CANCELLED\",\"reason\":\"Nhập nhầm lượt khám\"}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<CloseVisitCommand> captor = ArgumentCaptor.forClass(CloseVisitCommand.class);
+        verify(closeVisitUseCase).close(captor.capture());
+        assertEquals(VisitCloseOutcome.CANCELLED, captor.getValue().outcome());
+        assertEquals("Nhập nhầm lượt khám", captor.getValue().reason());
+    }
+
+    @Test
+    void rejectsCloseWithMissingOutcome() throws Exception {
+        mockMvc.perform(post("/queue-items/{itemId}/close", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Bệnh nhân bỏ về\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(closeVisitUseCase);
+    }
+
+    @Test
+    void rejectsCloseWithBlankReason() throws Exception {
+        mockMvc.perform(post("/queue-items/{itemId}/close", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"CANCELLED\",\"reason\":\" \"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(closeVisitUseCase);
+    }
+
+    @Test
+    void rejectsCloseWithReasonExceeding500Characters() throws Exception {
+        String longReason = "x".repeat(501);
+        mockMvc.perform(post("/queue-items/{itemId}/close", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"CANCELLED\",\"reason\":\"" + longReason + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(closeVisitUseCase);
+    }
+
+    @Test
+    void rejectsCloseWithInvalidOutcome() throws Exception {
+        mockMvc.perform(post("/queue-items/{itemId}/close", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"INVALID\",\"reason\":\"Bệnh nhân bỏ về\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(closeVisitUseCase);
     }
 }
