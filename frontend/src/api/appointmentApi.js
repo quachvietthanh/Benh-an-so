@@ -9,6 +9,10 @@ const appointmentApi = {
   sendReminder: (id) => axiosClient.post(`/appointments/${id}/reminder`),
   getOverdue: (params) => axiosClient.get('/appointments/overdue', { params }),
   checkIn: (id) => axiosClient.post(`/appointments/${id}/check-in`),
+  reschedule: (id, data) => axiosClient.patch(`/appointments/${id}/reschedule`, data),
+  getAvailableSlots: (doctorId, date) => axiosClient.get('/patient-portal/appointments/available-slots', { params: { doctorId, date } }),
+  confirm: (id) => axiosClient.patch(`/appointments/${id}/confirm`),
+  getUnconfirmed: (params) => axiosClient.get('/appointments/unconfirmed', { params }),
 }
 
 export default appointmentApi
