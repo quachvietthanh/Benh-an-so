@@ -29,11 +29,29 @@ public class AppointmentResultMapper {
             List<AppointmentRescheduleHistoryResult> histories,
             String confirmedByName
     ) {
+        return toResult(appointment, histories, confirmedByName, null, null, null, null, null);
+    }
+
+    public AppointmentResult toResult(
+            Appointment appointment,
+            List<AppointmentRescheduleHistoryResult> histories,
+            String confirmedByName,
+            String patientName,
+            String patientCode,
+            String patientPhone,
+            String doctorName,
+            String department
+    ) {
         return AppointmentResult.builder()
                 .id(appointment.getId())
                 .appointmentCode(appointment.getAppointmentCode())
                 .patientId(appointment.getPatientId())
+                .patientName(patientName)
+                .patientCode(patientCode)
+                .patientPhone(patientPhone)
                 .doctorId(appointment.getDoctorId())
+                .doctorName(doctorName)
+                .department(department)
                 .startTime(appointment.getStartTime())
                 .endTime(appointment.getEndTime())
                 .status(appointment.getStatus())

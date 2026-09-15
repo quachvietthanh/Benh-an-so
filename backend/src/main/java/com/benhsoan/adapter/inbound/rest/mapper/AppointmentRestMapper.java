@@ -58,6 +58,9 @@ public class AppointmentRestMapper {
     public AppointmentResponse toResponse(
             AppointmentResult result
     ) {
+        if (result == null) {
+            return null;
+        }
 
         List<AppointmentRescheduleHistoryResponse> histories = result.rescheduleHistories() != null
                 ? result.rescheduleHistories().stream()
@@ -69,7 +72,13 @@ public class AppointmentRestMapper {
                 .id(result.id())
                 .appointmentCode(result.appointmentCode())
                 .patientId(result.patientId())
+                .patientName(result.patientName())
+                .patientCode(result.patientCode())
+                .patientPhone(result.patientPhone())
+                .phone(result.patientPhone())
                 .doctorId(result.doctorId())
+                .doctorName(result.doctorName())
+                .department(result.department())
                 .startTime(result.startTime())
                 .endTime(result.endTime())
                 .status(result.status())

@@ -35,7 +35,6 @@ import lombok.RequiredArgsConstructor;
  * Acceptance Criteria: TC-01, TC-03.
  */
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class ConfirmAppointmentService implements ConfirmAppointmentUseCase {
 
@@ -49,6 +48,43 @@ public class ConfirmAppointmentService implements ConfirmAppointmentUseCase {
     private final ClockPort clockPort;
     private final AppointmentResultMapper resultMapper;
     private final ObjectMapper objectMapper;
+    private final AppointmentResultAssembler assembler;
+
+    public ConfirmAppointmentService(
+            AppointmentRepository appointmentRepository,
+            UserRepository userRepository,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter,
+            ClockPort clockPort,
+            AppointmentResultMapper resultMapper,
+            ObjectMapper objectMapper,
+            AppointmentResultAssembler assembler
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.userRepository = userRepository;
+        this.currentUserPort = currentUserPort;
+        this.auditLogRepository = auditLogRepository;
+        this.accessDeniedAuditWriter = accessDeniedAuditWriter;
+        this.clockPort = clockPort;
+        this.resultMapper = resultMapper;
+        this.objectMapper = objectMapper;
+        this.assembler = assembler;
+    }
+
+    public ConfirmAppointmentService(
+            AppointmentRepository appointmentRepository,
+            UserRepository userRepository,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter,
+            ClockPort clockPort,
+            AppointmentResultMapper resultMapper,
+            ObjectMapper objectMapper
+    ) {
+        this(appointmentRepository, userRepository, currentUserPort, auditLogRepository,
+                accessDeniedAuditWriter, clockPort, resultMapper, objectMapper, null);
+    }
 
     @Override
     public AppointmentResult confirm(UUID appointmentId) {
@@ -85,7 +121,9 @@ public class ConfirmAppointmentService implements ConfirmAppointmentUseCase {
                 .map(User::getFullName)
                 .orElse("Unknown");
 
-        return resultMapper.toResult(saved, List.of(), confirmedByName);
+        return assembler != null
+                ? assembler.toResult(saved)
+                : resultMapper.toResult(saved, List.of(), confirmedByName);
     }
 
     private String auditDetail(Appointment appointment, Instant confirmedAt) {
