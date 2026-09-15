@@ -29,6 +29,12 @@ public class PatientPersistenceMapper {
                 entity.getEmergencyContact(),
                 entity.getEmergencyRelationship(),
                 entity.getEmergencyPhone(),
+                entity.getGuardianName(),
+                entity.getGuardianRelationship(),
+                entity.getGuardianPhone(),
+                entity.getGuardianIdentityNumber(),
+                entity.getGuardianUserId(),
+                entity.getConsentSignerName(),
                 entity.isActive(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
@@ -65,6 +71,12 @@ public class PatientPersistenceMapper {
                 .emergencyContact(domain.getEmergencyContact())
                 .emergencyRelationship(domain.getEmergencyRelationship())
                 .emergencyPhone(domain.getEmergencyPhone())
+                .guardianName(domain.getGuardianName())
+                .guardianRelationship(domain.getGuardianRelationship())
+                .guardianPhone(domain.getGuardianPhone())
+                .guardianIdentityNumber(domain.getGuardianIdentityNumber())
+                .guardianUserId(domain.getGuardianUserId())
+                .consentSignerName(domain.getConsentSignerName())
                 .active(domain.isActive())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())

@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.patient;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -76,6 +77,12 @@ public class UpdatePatientService
                 patient.getEmergencyContact(),
                 patient.getEmergencyRelationship(),
                 patient.getEmergencyPhone(),
+                patient.getGuardianName(),
+                patient.getGuardianRelationship(),
+                patient.getGuardianPhone(),
+                patient.getGuardianIdentityNumber(),
+                patient.getGuardianUserId(),
+                patient.getConsentSignerName(),
                 patient.isActive(),
                 patient.getCreatedAt(),
                 patient.getUpdatedAt(),
@@ -102,6 +109,11 @@ public class UpdatePatientService
         String emergencyContact = command.emergencyContact();
         String emergencyRelationship = command.emergencyRelationship();
         String emergencyPhone = command.emergencyPhone();
+        String guardianName = command.guardianName();
+        String guardianRelationship = command.guardianRelationship();
+        String guardianPhone = command.guardianPhone();
+        String guardianIdentityNumber = command.guardianIdentityNumber();
+        String consentSignerName = command.consentSignerName();
 
         if (PatientAnonymizer.isMaskedFullName(fullName)) {
             fullName = patient.getFullName();
@@ -118,13 +130,101 @@ public class UpdatePatientService
         if (PatientAnonymizer.isMaskedPhone(emergencyPhone)) {
             emergencyPhone = patient.getEmergencyPhone();
         }
+        if (PatientAnonymizer.isMaskedFullName(guardianName) || PatientAnonymizer.isMaskedGuardianName(guardianName)) {
+            guardianName = patient.getGuardianName();
+        }
+        if (PatientAnonymizer.isMaskedPhone(guardianPhone)) {
+            guardianPhone = patient.getGuardianPhone();
+        }
+        if (PatientAnonymizer.isMaskedFullName(consentSignerName) || PatientAnonymizer.isMaskedGuardianName(consentSignerName)) {
+            consentSignerName = patient.getConsentSignerName();
+        }
+
+        boolean transitionToAdult = Boolean.TRUE.equals(command.transitionToAdult());
 
         if (fullName != null) {
             emergencyContact = normalizeString(emergencyContact);
             emergencyRelationship = normalizeString(emergencyRelationship);
             emergencyPhone = normalizePhone(emergencyPhone);
 
+            guardianName = normalizeString(guardianName);
+            guardianRelationship = normalizeString(guardianRelationship);
+            guardianPhone = normalizePhone(guardianPhone);
+            guardianIdentityNumber = normalizeIdentityNumber(guardianIdentityNumber);
+            consentSignerName = normalizeString(consentSignerName);
+
             validateEmergencyContact(emergencyContact, emergencyRelationship, emergencyPhone);
+
+            LocalDate targetDob = command.dateOfBirth() != null ? command.dateOfBirth() : patient.getDateOfBirth();
+            boolean isMinor = com.benhsoan.domain.patient.PatientMinorPolicy.isMinor(targetDob);
+
+            if (transitionToAdult) {
+                if (isMinor) {
+                    throw new ValidationException(
+                            "transitionToAdult",
+                            "Bệnh nhân chưa đủ 18 tuổi, không thể chuyển sang tự chịu trách nhiệm."
+                    );
+                }
+                guardianName = null;
+                guardianRelationship = null;
+                guardianPhone = null;
+                guardianIdentityNumber = null;
+                consentSignerName = fullName;
+            } else if (isMinor) {
+                if (guardianName == null || guardianName.isBlank()) {
+                    throw new ValidationException(
+                            "guardianName",
+                            "Hồ sơ bệnh nhân dưới 18 tuổi bắt buộc phải khai báo người giám hộ (QTN-44)."
+                    );
+                }
+                if (guardianRelationship == null || guardianRelationship.isBlank()) {
+                    throw new ValidationException(
+                            "guardianRelationship",
+                            "Mối quan hệ với người giám hộ không được để trống."
+                    );
+                }
+                if (guardianPhone == null || guardianPhone.isBlank()) {
+                    throw new ValidationException(
+                            "guardianPhone",
+                            "Số điện thoại người giám hộ không được để trống."
+                    );
+                }
+                if (!PHONE_PATTERN.matcher(guardianPhone).matches()) {
+                    throw new ValidationException(
+                            "guardianPhone",
+                            "Số điện thoại người giám hộ không đúng định dạng."
+                    );
+                }
+                if (consentSignerName != null && !consentSignerName.isBlank()
+                        && !consentSignerName.trim().equalsIgnoreCase(guardianName.trim())) {
+                    throw new ValidationException(
+                            "consentSignerName",
+                            "Đối với bệnh nhân chưa thành niên, người ký phiếu đồng ý bắt buộc phải là người giám hộ (QTN-44)."
+                    );
+                }
+                if (consentSignerName == null || consentSignerName.isBlank()) {
+                    consentSignerName = guardianName;
+                }
+            } else {
+                boolean hadGuardian = patient.getGuardianName() != null && !patient.getGuardianName().isBlank();
+                if (hadGuardian && (guardianName == null || guardianName.isBlank()) && !transitionToAdult) {
+                    throw new ValidationException(
+                            "transitionToAdult",
+                            "Bệnh nhân đã đủ 18 tuổi. Việc gỡ bỏ người giám hộ yêu cầu kích hoạt quy trình chuyển tiếp thành niên (transitionToAdult = true) để ký gia hạn phiếu đồng ý mới (TC-04)."
+                    );
+                }
+                if (guardianPhone != null && !guardianPhone.isBlank() && !PHONE_PATTERN.matcher(guardianPhone).matches()) {
+                    throw new ValidationException(
+                            "guardianPhone",
+                            "Số điện thoại người giám hộ không đúng định dạng."
+                    );
+                }
+                if (consentSignerName == null || consentSignerName.isBlank()) {
+                    consentSignerName = guardianName != null && !guardianName.isBlank() ? guardianName : fullName;
+                }
+            }
+
+            UUID guardianUserId = transitionToAdult ? null : patient.getGuardianUserId();
 
             patient.updateProfile(
                     fullName,
@@ -138,8 +238,21 @@ public class UpdatePatientService
                     command.bloodType(),
                     emergencyContact,
                     emergencyRelationship,
-                    emergencyPhone
+                    emergencyPhone,
+                    guardianName,
+                    guardianRelationship,
+                    guardianPhone,
+                    guardianIdentityNumber,
+                    guardianUserId,
+                    consentSignerName
             );
+
+            if (transitionToAdult) {
+                String consentVersion = command.consentVersion() != null && !command.consentVersion().isBlank()
+                        ? command.consentVersion()
+                        : (patient.getConsentVersion() != null ? patient.getConsentVersion() : com.benhsoan.domain.patient.PatientConsentVersion.current());
+                patient.transitionToAdult(consentVersion, Instant.now());
+            }
 
             if (command.active() && !patient.isActive()) {
                 patient.activate();
@@ -160,10 +273,11 @@ public class UpdatePatientService
         boolean isChangingWithdrawReason = command.consentWithdrawnReason() != null
                 && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason());
 
-        boolean isModifyingConsent = isChangingWithdrawal
+        boolean isModifyingConsent = (isChangingWithdrawal
                 || isChangingAgreement
                 || isChangingVersion
-                || isChangingWithdrawReason;
+                || isChangingWithdrawReason)
+                && !transitionToAdult;
 
         if (isModifyingConsent) {
             if (!currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")) {
@@ -171,29 +285,31 @@ public class UpdatePatientService
             }
         }
 
-        if (Boolean.FALSE.equals(command.consentAgreed())
-                && !Boolean.TRUE.equals(command.consentWithdrawn())) {
-            throw new ValidationException(
-                    "consentAgreed=false requires consentWithdrawn=true to withdraw consent."
-            );
-        }
-
-        if (Boolean.TRUE.equals(command.consentWithdrawn())) {
-            if (!patient.isConsentWithdrawn()) {
-                patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
-            } else if (command.consentWithdrawnReason() != null
-                    && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason())) {
-                patient.withdrawConsent(command.consentWithdrawnReason(), patient.getConsentWithdrawnAt());
-            }
-        } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {
-            if (!Boolean.TRUE.equals(command.consentAgreed())) {
+        if (!transitionToAdult) {
+            if (Boolean.FALSE.equals(command.consentAgreed())
+                    && !Boolean.TRUE.equals(command.consentWithdrawn())) {
                 throw new ValidationException(
-                        "Phải ghi nhận sự đồng ý mới trước khi gia hạn xử lý dữ liệu cá nhân (QTN-24)."
+                        "consentAgreed=false requires consentWithdrawn=true to withdraw consent."
                 );
             }
-            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
-        } else if (Boolean.TRUE.equals(command.consentAgreed()) && !patient.isConsentAgreed()) {
-            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
+
+            if (Boolean.TRUE.equals(command.consentWithdrawn())) {
+                if (!patient.isConsentWithdrawn()) {
+                    patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
+                } else if (command.consentWithdrawnReason() != null
+                        && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason())) {
+                    patient.withdrawConsent(command.consentWithdrawnReason(), patient.getConsentWithdrawnAt());
+                }
+            } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {
+                if (!Boolean.TRUE.equals(command.consentAgreed())) {
+                    throw new ValidationException(
+                            "Phải ghi nhận sự đồng ý mới trước khi gia hạn xử lý dữ liệu cá nhân (QTN-24)."
+                    );
+                }
+                patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
+            } else if (Boolean.TRUE.equals(command.consentAgreed()) && !patient.isConsentAgreed()) {
+                patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
+            }
         }
 
         String detail = changeDetailBuilder.forUpdate( oldPatient, patient );
@@ -220,6 +336,8 @@ public class UpdatePatientService
                         {
                         "patientCode":"%s",
                         "fullName":"%s",
+                        "guardianName":"%s",
+                        "consentSignerName":"%s",
                         "consentAgreed":%s,
                         "consentVersion":"%s",
                         "consentWithdrawn":%s,
@@ -229,6 +347,8 @@ public class UpdatePatientService
                         .formatted(
                                 patient.getPatientCode(),
                                 patient.getFullName(),
+                                patient.getGuardianName(),
+                                patient.getConsentSignerName(),
                                 patient.isConsentAgreed(),
                                 patient.getConsentVersion(),
                                 patient.isConsentWithdrawn(),

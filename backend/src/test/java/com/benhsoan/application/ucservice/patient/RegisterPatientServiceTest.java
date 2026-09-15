@@ -234,4 +234,159 @@ class RegisterPatientServiceTest {
         assertTrue(ex.getMessage().contains("emergencyRelationship"));
         verify(patientRepository, never()).save(any(Patient.class));
     }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-01 & TC-03: Đăng ký bệnh nhân trẻ em thành công với người giám hộ hợp lệ, consent do người giám hộ đứng tên")
+    void registersPediatricPatientWithGuardianSuccessfully() {
+        when(patientCodeGenerator.generate()).thenReturn("BN000003");
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(LocalDate.now().minusYears(5))
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Van Bo")
+                .guardianRelationship("Bố")
+                .guardianPhone("0912345678")
+                .guardianIdentityNumber("001200000001")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        PatientResult result = service.register(command);
+
+        assertNotNull(result);
+        assertEquals("BN000003", result.patientCode());
+        assertEquals("Nguyen Van Con", result.fullName());
+        assertTrue(result.isMinor());
+        org.junit.jupiter.api.Assertions.assertFalse(result.requiresAdultTransitionPrompt());
+        assertEquals("Nguyen Van Bo", result.guardianName());
+        assertEquals("Bố", result.guardianRelationship());
+        assertEquals("0912345678", result.guardianPhone());
+        assertEquals("001200000001", result.guardianIdentityNumber());
+        assertEquals("Nguyen Van Bo", result.consentSignerName(), "TC-03: Phiếu đồng ý xử lý dữ liệu cá nhân phải do người giám hộ đứng tên");
+        assertTrue(result.consentAgreed());
+
+        verify(patientRepository).save(any(Patient.class));
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-02: Từ chối đăng ký bệnh nhân trẻ em khi thiếu họ tên người giám hộ")
+    void rejectsPediatricPatientWhenGuardianNameIsMissing() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(LocalDate.now().minusYears(7))
+                .gender(Gender.MALE)
+                .guardianRelationship("Mẹ")
+                .guardianPhone("0912345678")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.register(command));
+        assertTrue(ex.getMessage().contains("guardianName"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-02: Từ chối đăng ký bệnh nhân trẻ em khi thiếu mối quan hệ với người giám hộ")
+    void rejectsPediatricPatientWhenGuardianRelationshipIsMissing() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(LocalDate.now().minusYears(7))
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Thi Me")
+                .guardianPhone("0912345678")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.register(command));
+        assertTrue(ex.getMessage().contains("guardianRelationship"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-02: Từ chối đăng ký bệnh nhân trẻ em khi thiếu số điện thoại người giám hộ")
+    void rejectsPediatricPatientWhenGuardianPhoneIsMissing() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(LocalDate.now().minusYears(7))
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Thi Me")
+                .guardianRelationship("Mẹ")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.register(command));
+        assertTrue(ex.getMessage().contains("guardianPhone"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-02: Từ chối đăng ký bệnh nhân trẻ em khi số điện thoại người giám hộ sai định dạng")
+    void rejectsPediatricPatientWhenGuardianPhoneIsInvalid() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(LocalDate.now().minusYears(7))
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Thi Me")
+                .guardianRelationship("Mẹ")
+                .guardianPhone("012345")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.register(command));
+        assertTrue(ex.getMessage().contains("guardianPhone"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008: Bệnh nhân người lớn đăng ký không cần người giám hộ, consent do chính bệnh nhân đứng tên")
+    void registersAdultPatientWithoutGuardianConsentSignedBySelf() {
+        when(patientCodeGenerator.generate()).thenReturn("BN000004");
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Tran Van Lon")
+                .dateOfBirth(LocalDate.of(1990, 1, 1))
+                .gender(Gender.FEMALE)
+                .phone("0988776655")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        PatientResult result = service.register(command);
+
+        assertNotNull(result);
+        org.junit.jupiter.api.Assertions.assertFalse(result.isMinor());
+        org.junit.jupiter.api.Assertions.assertFalse(result.requiresAdultTransitionPrompt());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianName());
+        assertEquals("Tran Van Lon", result.consentSignerName(), "Người lớn tự đứng tên phiếu đồng ý");
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P1-2 / QTN-44: Từ chối đăng ký bệnh nhân trẻ em khi consentSignerName khác người giám hộ")
+    void rejectsPediatricPatientWhenConsentSignerMismatchGuardian() {
+        RegisterPatientCommand command = RegisterPatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(LocalDate.now().minusYears(7))
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Thi Me")
+                .guardianRelationship("Mẹ")
+                .guardianPhone("0912345678")
+                .consentSignerName("Người Khác")
+                .consentAgreed(true)
+                .consentVersion("v1.0")
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.register(command));
+        assertEquals("consentSignerName", ex.getField());
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
 }

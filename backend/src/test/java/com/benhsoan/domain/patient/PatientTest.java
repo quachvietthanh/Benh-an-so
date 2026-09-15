@@ -228,4 +228,326 @@ class PatientTest {
         assertEquals("Bố", patient.getEmergencyRelationship());
         assertEquals("0908887766", patient.getEmergencyPhone());
     }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-01 & TC-03: Tạo hồ sơ trẻ em thành công kèm người giám hộ và phiếu đồng ý đứng tên người giám hộ")
+    void createMinorPatientWithGuardianSucceedsAndSetsConsentSigner() {
+        Patient child = Patient.create(
+                "BN-CHILD-01",
+                "Bé Nguyễn Văn Con",
+                LocalDate.of(2020, 5, 1),
+                Gender.MALE,
+                null,
+                null,
+                "123 Street",
+                null,
+                null,
+                BloodType.A_POSITIVE,
+                null,
+                null,
+                null,
+                "Nguyễn Văn Bố",
+                "Bố",
+                "0912345678",
+                "079090001234",
+                null,
+                null,
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        assertTrue(child.isMinor());
+        assertEquals("Nguyễn Văn Bố", child.getGuardianName());
+        assertEquals("Bố", child.getGuardianRelationship());
+        assertEquals("0912345678", child.getGuardianPhone());
+        assertEquals("079090001234", child.getGuardianIdentityNumber());
+        assertEquals("Nguyễn Văn Bố", child.getConsentSignerName(), "Phiếu đồng ý phải đứng tên người giám hộ (TC-03)");
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-02 / QTN-44: Chặn tạo hồ sơ trẻ em khi thiếu người giám hộ")
+    void createMinorPatientWithoutGuardianThrowsValidationException() {
+        com.benhsoan.domain.shared.exception.ValidationException ex = assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> Patient.create(
+                        "BN-CHILD-02",
+                        "Bé Nguyễn Văn Con",
+                        LocalDate.of(2020, 5, 1),
+                        Gender.MALE,
+                        null,
+                        null,
+                        "123 Street",
+                        null,
+                        null,
+                        BloodType.A_POSITIVE,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true,
+                        "v1.0",
+                        createdBy
+                )
+        );
+
+        assertEquals("guardianName", ex.getField());
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008: Bệnh nhân đủ tuổi thành niên không bắt buộc người giám hộ và phiếu đồng ý đứng tên chính mình")
+    void adultPatientRequiresNoGuardianAndDefaultsConsentSignerToSelf() {
+        Patient adult = Patient.create(
+                "BN-ADULT-01",
+                "Trần Thị Trưởng Thành",
+                LocalDate.of(1995, 1, 1),
+                Gender.FEMALE,
+                "0901234567",
+                null,
+                "123 Street",
+                "079095001234",
+                null,
+                BloodType.O_POSITIVE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        assertFalse(adult.isMinor());
+        assertNull(adult.getGuardianName());
+        assertEquals("Trần Thị Trưởng Thành", adult.getConsentSignerName());
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-04: Nhắc chuyển sang tự chịu trách nhiệm khi đủ tuổi và hoàn tất chuyển đổi")
+    void handlesAdultTransitionSuccessfully() {
+        Patient patient = Patient.create(
+                "BN-GROWING-01",
+                "Lê Văn Trẻ",
+                LocalDate.of(2005, 1, 1),
+                Gender.MALE,
+                "0901234567",
+                null,
+                "123 Street",
+                null,
+                null,
+                BloodType.O_POSITIVE,
+                null,
+                null,
+                null,
+                "Lê Văn Cha",
+                "Cha",
+                "0912345678",
+                null,
+                null,
+                null,
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        // Năm 2026: bệnh nhân 21 tuổi -> đủ tuổi thành niên nhưng còn người giám hộ
+        assertTrue(patient.requiresAdultTransition(LocalDate.of(2026, 1, 1)));
+
+        // Thực hiện chuyển đổi
+        patient.transitionToAdult("v1.0", Instant.now());
+
+        assertNull(patient.getGuardianName());
+        assertNull(patient.getGuardianRelationship());
+        assertNull(patient.getGuardianPhone());
+        assertEquals("Lê Văn Trẻ", patient.getConsentSignerName(), "Sau khi chuyển đổi, phiếu đồng ý đứng tên người bệnh");
+        assertFalse(patient.requiresAdultTransition(LocalDate.of(2026, 1, 1)));
+    }
+
+    @Test
+    @DisplayName("TC-04 ngoại lệ: Từ chối chuyển đổi sang tự chịu trách nhiệm nếu bệnh nhân vẫn chưa đủ 18 tuổi")
+    void rejectsAdultTransitionIfStillMinor() {
+        Patient child = Patient.create(
+                "BN-CHILD-03",
+                "Bé Nhỏ",
+                LocalDate.now().minusYears(10),
+                Gender.MALE,
+                null,
+                null,
+                "123 Street",
+                null,
+                null,
+                BloodType.O_POSITIVE,
+                null,
+                null,
+                null,
+                "Nguyễn Văn Mẹ",
+                "Mẹ",
+                "0912345678",
+                null,
+                null,
+                null,
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> child.transitionToAdult("v1.0", Instant.now())
+        );
+    }
+
+    @Test
+    @DisplayName("P1-2 / QTN-44: Chặn tạo hồ sơ trẻ em khi consentSignerName khác với guardianName")
+    void createMinorPatientWithMismatchedConsentSignerThrowsValidationException() {
+        com.benhsoan.domain.shared.exception.ValidationException ex = assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> Patient.create(
+                        "BN-CHILD-04",
+                        "Bé Nguyễn Văn Con",
+                        LocalDate.of(2020, 5, 1),
+                        Gender.MALE,
+                        null,
+                        null,
+                        "123 Street",
+                        null,
+                        null,
+                        BloodType.A_POSITIVE,
+                        null,
+                        null,
+                        null,
+                        "Nguyễn Văn Bố",
+                        "Bố",
+                        "0912345678",
+                        null,
+                        null,
+                        "Người Ký Khác",
+                        true,
+                        "v1.0",
+                        createdBy
+                )
+        );
+
+        assertEquals("consentSignerName", ex.getField());
+    }
+
+    @Test
+    @DisplayName("P1-1 / QTN-44: Chặn updateProfile hồ sơ trẻ em khi thiếu người giám hộ")
+    void updateProfileMinorPatientWithoutGuardianThrowsValidationException() {
+        Patient child = Patient.create(
+                "BN-CHILD-05",
+                "Bé Nhỏ",
+                LocalDate.of(2020, 1, 1),
+                Gender.MALE,
+                null,
+                null,
+                "123 Street",
+                null,
+                null,
+                BloodType.O_POSITIVE,
+                null,
+                null,
+                null,
+                "Nguyễn Văn Bố",
+                "Bố",
+                "0912345678",
+                null,
+                null,
+                "Nguyễn Văn Bố",
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        com.benhsoan.domain.shared.exception.ValidationException ex = assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> child.updateProfile(
+                        "Bé Nhỏ Đổi Tên",
+                        LocalDate.of(2020, 1, 1),
+                        Gender.MALE,
+                        null,
+                        null,
+                        "123 Street",
+                        null,
+                        null,
+                        BloodType.O_POSITIVE,
+                        null,
+                        null,
+                        null,
+                        null, // missing guardianName
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
+
+        assertEquals("guardianName", ex.getField());
+    }
+
+    @Test
+    @DisplayName("P1-2 / QTN-44: Chặn updateProfile hồ sơ trẻ em khi consentSignerName khác với guardianName")
+    void updateProfileMinorPatientWithMismatchedConsentSignerThrowsValidationException() {
+        Patient child = Patient.create(
+                "BN-CHILD-06",
+                "Bé Nhỏ",
+                LocalDate.of(2020, 1, 1),
+                Gender.MALE,
+                null,
+                null,
+                "123 Street",
+                null,
+                null,
+                BloodType.O_POSITIVE,
+                null,
+                null,
+                null,
+                "Nguyễn Văn Bố",
+                "Bố",
+                "0912345678",
+                null,
+                null,
+                "Nguyễn Văn Bố",
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        com.benhsoan.domain.shared.exception.ValidationException ex = assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> child.updateProfile(
+                        "Bé Nhỏ",
+                        LocalDate.of(2020, 1, 1),
+                        Gender.MALE,
+                        null,
+                        null,
+                        "123 Street",
+                        null,
+                        null,
+                        BloodType.O_POSITIVE,
+                        null,
+                        null,
+                        null,
+                        "Nguyễn Văn Bố",
+                        "Bố",
+                        "0912345678",
+                        null,
+                        null,
+                        "Người Ký Giả Mạo"
+                )
+        );
+
+        assertEquals("consentSignerName", ex.getField());
+    }
 }

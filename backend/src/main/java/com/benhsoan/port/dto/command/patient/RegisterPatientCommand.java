@@ -36,7 +36,17 @@ public record RegisterPatientCommand(
 
         Boolean consentAgreed,
 
-        String consentVersion
+        String consentVersion,
+
+        String guardianName,
+
+        String guardianRelationship,
+
+        String guardianPhone,
+
+        String guardianIdentityNumber,
+
+        String consentSignerName
 
 ) {
 }

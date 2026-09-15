@@ -37,6 +37,22 @@ public record PatientResponse(
 
         String emergencyPhone,
 
+        String guardianName,
+
+        String guardianRelationship,
+
+        String guardianPhone,
+
+        String guardianIdentityNumber,
+
+        UUID guardianUserId,
+
+        String consentSignerName,
+
+        boolean isMinor,
+
+        boolean requiresAdultTransitionPrompt,
+
         boolean active,
 
         Instant createdAt,
