@@ -29,7 +29,6 @@ import com.benhsoan.port.outbound.time.ClockPort;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class CancelAppointmentService
         implements CancelAppointmentUseCase {
@@ -47,6 +46,41 @@ public class CancelAppointmentService
     private final VisitRepository visitRepository;
 
     private final ClockPort clockPort;
+
+    private final AppointmentResultAssembler assembler;
+
+    public CancelAppointmentService(
+            AppointmentRepository appointmentRepository,
+            CurrentUserPort currentUserPort,
+            AppointmentResultMapper appointmentResultMapper,
+            AuditLogRepository auditLogRepository,
+            QueueItemRepository queueItemRepository,
+            VisitRepository visitRepository,
+            ClockPort clockPort,
+            AppointmentResultAssembler assembler
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.currentUserPort = currentUserPort;
+        this.appointmentResultMapper = appointmentResultMapper;
+        this.auditLogRepository = auditLogRepository;
+        this.queueItemRepository = queueItemRepository;
+        this.visitRepository = visitRepository;
+        this.clockPort = clockPort;
+        this.assembler = assembler;
+    }
+
+    public CancelAppointmentService(
+            AppointmentRepository appointmentRepository,
+            CurrentUserPort currentUserPort,
+            AppointmentResultMapper appointmentResultMapper,
+            AuditLogRepository auditLogRepository,
+            QueueItemRepository queueItemRepository,
+            VisitRepository visitRepository,
+            ClockPort clockPort
+    ) {
+        this(appointmentRepository, currentUserPort, appointmentResultMapper, auditLogRepository,
+                queueItemRepository, visitRepository, clockPort, null);
+    }
 
     @Override
     public AppointmentResult cancel(
@@ -101,7 +135,9 @@ public class CancelAppointmentService
                 )
         );
 
-        return appointmentResultMapper.toResult(saved);
+        return assembler != null
+                ? assembler.toResult(saved)
+                : appointmentResultMapper.toResult(saved);
     }
 
     private void validatePermission() {

@@ -18,14 +18,11 @@ import com.benhsoan.port.inbound.appointment.GetUnconfirmedAppointmentsUseCase;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
-import lombok.RequiredArgsConstructor;
-
 /**
  * NCL-03-CN-008 TC-04: Returns unconfirmed appointments for a date
  * ordered by start time ascending for receptionists to call and remind.
  */
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class GetUnconfirmedAppointmentsService implements GetUnconfirmedAppointmentsUseCase {
 
@@ -34,6 +31,27 @@ public class GetUnconfirmedAppointmentsService implements GetUnconfirmedAppointm
     private final AppointmentRepository appointmentRepository;
     private final AppointmentResultMapper resultMapper;
     private final ClockPort clockPort;
+    private final AppointmentResultAssembler assembler;
+
+    public GetUnconfirmedAppointmentsService(
+            AppointmentRepository appointmentRepository,
+            AppointmentResultMapper resultMapper,
+            ClockPort clockPort,
+            AppointmentResultAssembler assembler
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.resultMapper = resultMapper;
+        this.clockPort = clockPort;
+        this.assembler = assembler;
+    }
+
+    public GetUnconfirmedAppointmentsService(
+            AppointmentRepository appointmentRepository,
+            AppointmentResultMapper resultMapper,
+            ClockPort clockPort
+    ) {
+        this(appointmentRepository, resultMapper, clockPort, null);
+    }
 
     @Override
     public Page<AppointmentResult> getUnconfirmed(LocalDate date, Pageable pageable) {
@@ -51,6 +69,8 @@ public class GetUnconfirmedAppointmentsService implements GetUnconfirmedAppointm
         Instant endOfDay = targetDate.atTime(LocalTime.MAX).atZone(CLINIC_ZONE).toInstant();
 
         Page<Appointment> appointments = appointmentRepository.findUnconfirmed(fromTime, endOfDay, pageable);
-        return appointments.map(a -> resultMapper.toResult(a, List.of()));
+        return assembler != null
+                ? assembler.toResultPage(appointments)
+                : appointments.map(a -> resultMapper.toResult(a, List.of()));
     }
 }

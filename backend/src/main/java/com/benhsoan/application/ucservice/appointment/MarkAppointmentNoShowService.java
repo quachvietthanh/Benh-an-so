@@ -21,7 +21,6 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class MarkAppointmentNoShowService
         implements MarkAppointmentNoShowUseCase {
@@ -35,6 +34,35 @@ public class MarkAppointmentNoShowService
     private final AppointmentResultMapper appointmentResultMapper;
 
     private final QueueItemRepository queueItemRepository;
+
+    private final AppointmentResultAssembler assembler;
+
+    public MarkAppointmentNoShowService(
+            AppointmentRepository appointmentRepository,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            AppointmentResultMapper appointmentResultMapper,
+            QueueItemRepository queueItemRepository,
+            AppointmentResultAssembler assembler
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.currentUserPort = currentUserPort;
+        this.auditLogRepository = auditLogRepository;
+        this.appointmentResultMapper = appointmentResultMapper;
+        this.queueItemRepository = queueItemRepository;
+        this.assembler = assembler;
+    }
+
+    public MarkAppointmentNoShowService(
+            AppointmentRepository appointmentRepository,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            AppointmentResultMapper appointmentResultMapper,
+            QueueItemRepository queueItemRepository
+    ) {
+        this(appointmentRepository, currentUserPort, auditLogRepository,
+                appointmentResultMapper, queueItemRepository, null);
+    }
 
     @Override
     public AppointmentResult execute(
@@ -78,7 +106,9 @@ public class MarkAppointmentNoShowService
                 )
         );
 
-        return appointmentResultMapper.toResult(saved);
+        return assembler != null
+                ? assembler.toResult(saved)
+                : appointmentResultMapper.toResult(saved);
     }
 
     private void validate() {

@@ -18,7 +18,17 @@ public record AppointmentResult(
 
         UUID patientId,
 
+        String patientName,
+
+        String patientCode,
+
+        String patientPhone,
+
         UUID doctorId,
+
+        String doctorName,
+
+        String department,
 
         Instant startTime,
 
@@ -47,6 +57,12 @@ public record AppointmentResult(
         List<AppointmentRescheduleHistoryResult> rescheduleHistories
 
 ) {
+    public AppointmentResult {
+        if (rescheduleHistories == null) {
+            rescheduleHistories = List.of();
+        }
+    }
+
     public AppointmentResult(
             UUID id,
             String appointmentCode,
@@ -62,8 +78,9 @@ public record AppointmentResult(
             UUID createdBy,
             Instant createdAt
     ) {
-        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
-                reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, null, null, null, List.of());
+        this(id, appointmentCode, patientId, null, null, null, doctorId, null, null,
+                startTime, endTime, status, reason, cancelReason, checkedInAt, completedAt,
+                createdBy, createdAt, null, null, null, List.of());
     }
 
     public AppointmentResult(
@@ -82,9 +99,35 @@ public record AppointmentResult(
             Instant createdAt,
             List<AppointmentRescheduleHistoryResult> rescheduleHistories
     ) {
-        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
-                reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt,
-                null, null, null, rescheduleHistories != null ? rescheduleHistories : List.of());
+        this(id, appointmentCode, patientId, null, null, null, doctorId, null, null,
+                startTime, endTime, status, reason, cancelReason, checkedInAt, completedAt,
+                createdBy, createdAt, null, null, null,
+                rescheduleHistories != null ? rescheduleHistories : List.of());
+    }
+
+    public AppointmentResult(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            Instant confirmedAt,
+            UUID confirmedBy,
+            String confirmedByName,
+            List<AppointmentRescheduleHistoryResult> rescheduleHistories
+    ) {
+        this(id, appointmentCode, patientId, null, null, null, doctorId, null, null,
+                startTime, endTime, status, reason, cancelReason, checkedInAt, completedAt,
+                createdBy, createdAt, confirmedAt, confirmedBy, confirmedByName,
+                rescheduleHistories != null ? rescheduleHistories : List.of());
     }
 
     public AppointmentResult(
@@ -105,8 +148,8 @@ public record AppointmentResult(
             UUID confirmedBy,
             String confirmedByName
     ) {
-        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
-                reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt,
-                confirmedAt, confirmedBy, confirmedByName, List.of());
+        this(id, appointmentCode, patientId, null, null, null, doctorId, null, null,
+                startTime, endTime, status, reason, cancelReason, checkedInAt, completedAt,
+                createdBy, createdAt, confirmedAt, confirmedBy, confirmedByName, List.of());
     }
 }

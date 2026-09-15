@@ -351,24 +351,46 @@ class AppointmentControllerTest {
     }
 
     private AppointmentResult result(UUID appointmentId, AppointmentStatus status) {
-        return new AppointmentResult(
-                appointmentId,
-                "APT000500",
-                UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001"),
-                UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
-                APPOINTMENT_START,
-                APPOINTMENT_END,
-                status,
-                "Tai kham tong quat",
-                status == AppointmentStatus.CANCELLED ? "Patient requested cancellation" : null,
-                null,
-                null,
-                UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5"),
-                Instant.parse("2026-08-09T02:00:00Z"),
-                status == AppointmentStatus.CONFIRMED ? Instant.parse("2026-08-09T03:00:00Z") : null,
-                status == AppointmentStatus.CONFIRMED ? UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5") : null,
-                status == AppointmentStatus.CONFIRMED ? "Lễ Tân Nguyễn Văn A" : null
-        );
+        return AppointmentResult.builder()
+                .id(appointmentId)
+                .appointmentCode("APT000500")
+                .patientId(UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001"))
+                .patientName("Nguyễn Văn An")
+                .patientCode("BN000001")
+                .patientPhone("0912345678")
+                .doctorId(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"))
+                .doctorName("BS. Nguyễn Văn Nhất")
+                .department("Nội khoa")
+                .startTime(APPOINTMENT_START)
+                .endTime(APPOINTMENT_END)
+                .status(status)
+                .reason("Tai kham tong quat")
+                .cancelReason(status == AppointmentStatus.CANCELLED ? "Patient requested cancellation" : null)
+                .createdBy(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5"))
+                .createdAt(Instant.parse("2026-08-09T02:00:00Z"))
+                .confirmedAt(status == AppointmentStatus.CONFIRMED ? Instant.parse("2026-08-09T03:00:00Z") : null)
+                .confirmedBy(status == AppointmentStatus.CONFIRMED ? UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5") : null)
+                .confirmedByName(status == AppointmentStatus.CONFIRMED ? "Lễ Tân Nguyễn Văn A" : null)
+                .rescheduleHistories(List.of())
+                .build();
+    }
+
+    @Test
+    void getById_returnsEnrichedResponse() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        when(getAppointmentByIdUseCase.getById(appointmentId))
+                .thenReturn(result(appointmentId, AppointmentStatus.SCHEDULED));
+
+        mockMvc.perform(get("/appointments/{id}", appointmentId)
+                        .with(withPermissions("APPOINTMENT_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(appointmentId.toString()))
+                .andExpect(jsonPath("$.patientName").value("Nguyễn Văn An"))
+                .andExpect(jsonPath("$.patientCode").value("BN000001"))
+                .andExpect(jsonPath("$.patientPhone").value("0912345678"))
+                .andExpect(jsonPath("$.phone").value("0912345678"))
+                .andExpect(jsonPath("$.doctorName").value("BS. Nguyễn Văn Nhất"))
+                .andExpect(jsonPath("$.department").value("Nội khoa"));
     }
 
     @Test
@@ -381,7 +403,10 @@ class AppointmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(appointmentId.toString()))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
-                .andExpect(jsonPath("$.confirmedByName").value("Lễ Tân Nguyễn Văn A"));
+                .andExpect(jsonPath("$.confirmedByName").value("Lễ Tân Nguyễn Văn A"))
+                .andExpect(jsonPath("$.patientName").value("Nguyễn Văn An"))
+                .andExpect(jsonPath("$.doctorName").value("BS. Nguyễn Văn Nhất"))
+                .andExpect(jsonPath("$.department").value("Nội khoa"));
     }
 
     @Test
@@ -404,6 +429,12 @@ class AppointmentControllerTest {
                         .with(withPermissions("APPOINTMENT_READ")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(appointmentId.toString()))
-                .andExpect(jsonPath("$.content[0].status").value("SCHEDULED"));
+                .andExpect(jsonPath("$.content[0].status").value("SCHEDULED"))
+                .andExpect(jsonPath("$.content[0].patientName").value("Nguyễn Văn An"))
+                .andExpect(jsonPath("$.content[0].patientCode").value("BN000001"))
+                .andExpect(jsonPath("$.content[0].patientPhone").value("0912345678"))
+                .andExpect(jsonPath("$.content[0].phone").value("0912345678"))
+                .andExpect(jsonPath("$.content[0].doctorName").value("BS. Nguyễn Văn Nhất"))
+                .andExpect(jsonPath("$.content[0].department").value("Nội khoa"));
     }
 }
