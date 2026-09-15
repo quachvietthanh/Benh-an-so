@@ -27,6 +27,7 @@ import {
   FileDoneOutlined,
   FileTextOutlined,
   FilterOutlined,
+  InfoCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -156,6 +157,11 @@ export default function ClinicalServiceManagementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const isClientFilterActive = typeFilter !== 'ALL' || dataTypeFilter !== 'ALL'
+
+  // TODO: Đề nghị Backend bổ sung @RequestParam serviceType, resultDataType 
+  // vào GET /system/clinical-services để lọc đồng bộ từ server, tránh lệch 
+  // pha giữa filter client-side và pagination server-side.
   const filteredData = useMemo(() => {
     return data.filter((item) => {
       if (typeFilter !== 'ALL' && item.serviceType !== typeFilter) {
@@ -358,14 +364,28 @@ export default function ClinicalServiceManagementPage() {
       width: 105,
       align: 'center',
       render: (active, record) => (
-        <Switch
-          checked={active}
-          checkedChildren="Áp dụng"
-          unCheckedChildren="Tạm ngưng"
-          disabled={!canManage}
-          loading={actionLoadingId === record.id}
-          onChange={(val) => handleToggleStatus(record, val)}
-        />
+        <Popconfirm
+          title="Xác nhận tạm ngưng kỹ thuật"
+          description={`Bạn có chắc muốn tạm ngưng kỹ thuật "${record.serviceName}"? Bác sĩ sẽ không thể chỉ định kỹ thuật này cho đến khi được bật lại.`}
+          onConfirm={() => handleToggleStatus(record, false)}
+          okText="Tạm ngưng"
+          okButtonProps={{ danger: true }}
+          cancelText="Hủy"
+          disabled={!record.active || !canManage}
+        >
+          <Switch
+            checked={active}
+            checkedChildren="Áp dụng"
+            unCheckedChildren="Tạm ngưng"
+            disabled={!canManage}
+            loading={actionLoadingId === record.id}
+            onChange={(val) => {
+              if (val) {
+                handleToggleStatus(record, true)
+              }
+            }}
+          />
+        </Popconfirm>
       ),
     },
     {
@@ -515,7 +535,11 @@ export default function ClinicalServiceManagementPage() {
 
             <Select
               value={typeFilter}
-              onChange={setTypeFilter}
+              onChange={(val) => {
+                setTypeFilter(val)
+                setPagination((prev) => ({ ...prev, current: 1 }))
+                loadData(1, pagination.pageSize)
+              }}
               style={{ width: 195 }}
               popupMatchSelectWidth={false}
               dropdownMatchSelectWidth={false}
@@ -531,7 +555,11 @@ export default function ClinicalServiceManagementPage() {
 
             <Select
               value={dataTypeFilter}
-              onChange={setDataTypeFilter}
+              onChange={(val) => {
+                setDataTypeFilter(val)
+                setPagination((prev) => ({ ...prev, current: 1 }))
+                loadData(1, pagination.pageSize)
+              }}
               style={{ width: 220 }}
               popupMatchSelectWidth={false}
               dropdownMatchSelectWidth={false}
@@ -557,6 +585,28 @@ export default function ClinicalServiceManagementPage() {
       </div>
 
       <div className="clinical-table-card">
+        {isClientFilterActive && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: '8px 12px',
+              background: '#fffbeb',
+              border: '1px solid #fef3c7',
+              borderRadius: 6,
+              color: '#b45309',
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <InfoCircleOutlined />
+            <span>
+              Bộ lọc chỉ áp dụng trên trang hiện tại, kết quả có thể chưa đầy đủ.
+            </span>
+          </div>
+        )}
+
         <Table
           columns={columns}
           dataSource={filteredData}
@@ -566,9 +616,13 @@ export default function ClinicalServiceManagementPage() {
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: true,
+            total: isClientFilterActive ? filteredData.length : pagination.total,
+            showSizeChanger: !isClientFilterActive,
             pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: (total) =>
+              isClientFilterActive
+                ? `Hiển thị ${filteredData.length} kỹ thuật sau lọc trên trang hiện tại`
+                : `Tổng cộng ${total} kỹ thuật`,
             onChange: (page, pageSize) => loadData(page, pageSize),
           }}
           locale={{
@@ -610,6 +664,7 @@ export default function ClinicalServiceManagementPage() {
       <ClinicalReferenceRangeDrawer
         open={rangeDrawerOpen}
         service={selectedService}
+        canManage={canManage}
         onClose={() => {
           setRangeDrawerOpen(false)
           setSelectedService(null)

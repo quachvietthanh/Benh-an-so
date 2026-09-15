@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const reportApi = {
   summary: (params) => axiosClient.get('/reports/summary', { params }),

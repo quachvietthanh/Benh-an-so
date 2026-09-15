@@ -45,7 +45,7 @@ import {
 
 const { Text, Title } = Typography
 
-export default function ClinicalReferenceRangeDrawer({ open, service, onClose, onUpdated }) {
+export default function ClinicalReferenceRangeDrawer({ open, service, onClose, onUpdated, canManage = false }) {
   const [form] = Form.useForm()
   const [ranges, setRanges] = useState([])
   const [loading, setLoading] = useState(false)
@@ -81,6 +81,7 @@ export default function ClinicalReferenceRangeDrawer({ open, service, onClose, o
   }, [open, service?.id, form, loadRanges])
 
   const handleStartEdit = (record) => {
+    if (!canManage) return
     setEditingRange(record)
     setErrorMessage(null)
     form.setFieldsValue({
@@ -99,7 +100,7 @@ export default function ClinicalReferenceRangeDrawer({ open, service, onClose, o
   }
 
   const handleSubmitForm = async () => {
-    if (!service?.id) return
+    if (!canManage || !service?.id) return
 
     try {
       setErrorMessage(null)
@@ -171,7 +172,7 @@ export default function ClinicalReferenceRangeDrawer({ open, service, onClose, o
   }
 
   const handleToggleStatus = async (record, nextActive) => {
-    if (!service?.id || togglingId) return
+    if (!canManage || !service?.id || togglingId) return
 
     setTogglingId(record.id)
     setErrorMessage(null)
@@ -234,7 +235,8 @@ export default function ClinicalReferenceRangeDrawer({ open, service, onClose, o
         <Switch
           checked={active}
           checkedChildren="Áp dụng"
-          unCheckedChildren="Tạm dừng"
+          unCheckedChildren="Tạm ngưng"
+          disabled={!canManage}
           loading={togglingId === record.id}
           onChange={(val) => handleToggleStatus(record, val)}
         />
@@ -249,6 +251,7 @@ export default function ClinicalReferenceRangeDrawer({ open, service, onClose, o
           type="text"
           size="small"
           icon={<EditOutlined />}
+          disabled={!canManage}
           onClick={() => handleStartEdit(record)}
         >
           Sửa
@@ -310,111 +313,113 @@ export default function ClinicalReferenceRangeDrawer({ open, service, onClose, o
         />
       )}
 
-      <div className="reference-range-add-box">
-        <div className="reference-range-add-title">
-          {editingRange ? (
-            <>
-              <EditOutlined style={{ color: '#2563eb' }} />
-              <span>Chỉnh sửa khoảng ngưỡng tham chiếu #{editingRange.id?.slice(0, 8)}</span>
-            </>
-          ) : (
-            <>
-              <PlusOutlined style={{ color: '#16a34a' }} />
-              <span>Khai báo ngưỡng tham chiếu mới</span>
-            </>
-          )}
-        </div>
-
-        <Form form={form} layout="vertical" initialValues={{ gender: 'ALL' }}>
-          <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item
-                name="gender"
-                label="Giới tính áp dụng"
-                rules={[{ required: true, message: 'Vui lòng chọn giới tính!' }]}
-              >
-                <Select options={GENDER_OPTIONS} />
-              </Form.Item>
-            </Col>
-
-            <Col span={8}>
-              <Form.Item
-                name="minAge"
-                label="Độ tuổi từ (năm)"
-                tooltip="Bỏ trống nếu không giới hạn tuổi nhỏ nhất"
-              >
-                <InputNumber min={0} max={150} placeholder="VD: 18" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-
-            <Col span={8}>
-              <Form.Item
-                name="maxAge"
-                label="Đến tuổi (năm)"
-                tooltip="Bỏ trống nếu không giới hạn tuổi lớn nhất"
-              >
-                <InputNumber min={0} max={150} placeholder="VD: 60" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item
-                name="lowerBound"
-                label={
-                  <span>
-                    Ngưỡng dưới (Min bình thường){' '}
-                    {service?.unit && <Text type="secondary">({service.unit})</Text>}
-                  </span>
-                }
-                tooltip="Chỉ số bắt đầu bình thường (>=). Bỏ trống nếu chỉ có cận trên."
-              >
-                <InputNumber
-                  step="0.01"
-                  placeholder="VD: 3.9"
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={12}>
-              <Form.Item
-                name="upperBound"
-                label={
-                  <span>
-                    Ngưỡng trên (Max bình thường){' '}
-                    {service?.unit && <Text type="secondary">({service.unit})</Text>}
-                  </span>
-                }
-                tooltip="Chỉ số kết thúc bình thường (<=). Bỏ trống nếu chỉ có cận dưới."
-              >
-                <InputNumber
-                  step="0.01"
-                  placeholder="VD: 5.5"
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
-            {editingRange && (
-              <Button onClick={handleCancelEdit} disabled={submitting}>
-                Hủy sửa
-              </Button>
+      {canManage && (
+        <div className="reference-range-add-box">
+          <div className="reference-range-add-title">
+            {editingRange ? (
+              <>
+                <EditOutlined style={{ color: '#2563eb' }} />
+                <span>Chỉnh sửa khoảng ngưỡng tham chiếu #{editingRange.id?.slice(0, 8)}</span>
+              </>
+            ) : (
+              <>
+                <PlusOutlined style={{ color: '#16a34a' }} />
+                <span>Khai báo ngưỡng tham chiếu mới</span>
+              </>
             )}
-            <Button
-              type="primary"
-              icon={editingRange ? <SaveOutlined /> : <PlusOutlined />}
-              onClick={handleSubmitForm}
-              loading={submitting}
-            >
-              {editingRange ? 'Cập nhật ngưỡng' : 'Thêm ngưỡng tham chiếu'}
-            </Button>
           </div>
-        </Form>
-      </div>
+
+          <Form form={form} layout="vertical" initialValues={{ gender: 'ALL' }}>
+            <Row gutter={12}>
+              <Col span={8}>
+                <Form.Item
+                  name="gender"
+                  label="Giới tính áp dụng"
+                  rules={[{ required: true, message: 'Vui lòng chọn giới tính!' }]}
+                >
+                  <Select options={GENDER_OPTIONS} />
+                </Form.Item>
+              </Col>
+
+              <Col span={8}>
+                <Form.Item
+                  name="minAge"
+                  label="Độ tuổi từ (năm)"
+                  tooltip="Bỏ trống nếu không giới hạn tuổi nhỏ nhất"
+                >
+                  <InputNumber min={0} max={150} placeholder="VD: 18" style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+
+              <Col span={8}>
+                <Form.Item
+                  name="maxAge"
+                  label="Đến tuổi (năm)"
+                  tooltip="Bỏ trống nếu không giới hạn tuổi lớn nhất"
+                >
+                  <InputNumber min={0} max={150} placeholder="VD: 60" style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  name="lowerBound"
+                  label={
+                    <span>
+                      Ngưỡng dưới (Min bình thường){' '}
+                      {service?.unit && <Text type="secondary">({service.unit})</Text>}
+                    </span>
+                  }
+                  tooltip="Chỉ số bắt đầu bình thường (>=). Bỏ trống nếu chỉ có cận trên."
+                >
+                  <InputNumber
+                    step="0.01"
+                    placeholder="VD: 3.9"
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={12}>
+                <Form.Item
+                  name="upperBound"
+                  label={
+                    <span>
+                      Ngưỡng trên (Max bình thường){' '}
+                      {service?.unit && <Text type="secondary">({service.unit})</Text>}
+                    </span>
+                  }
+                  tooltip="Chỉ số kết thúc bình thường (<=). Bỏ trống nếu chỉ có cận dưới."
+                >
+                  <InputNumber
+                    step="0.01"
+                    placeholder="VD: 5.5"
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              {editingRange && (
+                <Button onClick={handleCancelEdit} disabled={submitting}>
+                  Hủy sửa
+                </Button>
+              )}
+              <Button
+                type="primary"
+                icon={editingRange ? <SaveOutlined /> : <PlusOutlined />}
+                onClick={handleSubmitForm}
+                loading={submitting}
+              >
+                {editingRange ? 'Cập nhật ngưỡng' : 'Thêm ngưỡng tham chiếu'}
+              </Button>
+            </div>
+          </Form>
+        </div>
+      )}
 
       <Alert
         type="info"

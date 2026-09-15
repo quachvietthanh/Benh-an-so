@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   AutoComplete,
@@ -42,18 +42,16 @@ export default function ClinicalServiceCreateModal({ open, onCancel, onSuccess }
   const watchedServiceType = Form.useWatch('serviceType', form)
   const watchedResultDataType = Form.useWatch('resultDataType', form)
 
-  useEffect(() => {
-    if (open) {
-      form.resetFields()
-      setErrorMessage(null)
-      loadParentServices()
-    }
-  }, [open, form])
+  const searchTimeoutRef = useRef(null)
 
-  const loadParentServices = async () => {
+  const loadParentServices = async (keyword = '') => {
     setLoadingParents(true)
     try {
-      const res = await systemApi.services({ size: 300, active: true })
+      const params = { size: 50, active: true }
+      if (keyword && keyword.trim()) {
+        params.keyword = keyword.trim()
+      }
+      const res = await systemApi.services(params)
       const list = Array.isArray(res.data?.content)
         ? res.data.content
         : Array.isArray(res.data)
@@ -67,6 +65,28 @@ export default function ClinicalServiceCreateModal({ open, onCancel, onSuccess }
       setLoadingParents(false)
     }
   }
+
+  const handleSearchParent = (value) => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      loadParentServices(value)
+    }, 300)
+  }
+
+  useEffect(() => {
+    if (open) {
+      form.resetFields()
+      setErrorMessage(null)
+      loadParentServices('')
+    }
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [open, form])
 
   const handleParentSelect = (selectedId) => {
     const parent = parentServices.find((p) => String(p.id) === String(selectedId))
@@ -199,10 +219,9 @@ export default function ClinicalServiceCreateModal({ open, onCancel, onSuccess }
                   showSearch
                   placeholder="Tìm và chọn dịch vụ viện phí (VD: Blood glucose, Head CT scan...)"
                   loading={loadingParents}
+                  onSearch={handleSearchParent}
                   onChange={handleParentSelect}
-                  filterOption={(input, option) =>
-                    (option?.label || '').toLowerCase().includes(input.toLowerCase())
-                  }
+                  filterOption={false}
                   options={parentServices.map((p) => ({
                     value: p.id,
                     label: `[${p.serviceCode}] ${p.serviceName}`,

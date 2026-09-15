@@ -1,7 +1,7 @@
 export const CLINICAL_SERVICE_TYPES = [
-  { value: 'LAB_TEST', label: 'Xét nghiệm (LAB_TEST)', shortLabel: 'Xét nghiệm', color: 'blue' },
-  { value: 'IMAGING', label: 'Chẩn đoán hình ảnh (IMAGING)', shortLabel: 'Chẩn đoán hình ảnh', color: 'cyan' },
-  { value: 'OTHER', label: 'Thăm dò chức năng & Khác (OTHER)', shortLabel: 'Thăm dò chức năng & Khác', color: 'purple' },
+  { value: 'LAB_TEST', label: 'Xét nghiệm', shortLabel: 'Xét nghiệm', color: 'blue' },
+  { value: 'IMAGING', label: 'Chẩn đoán hình ảnh', shortLabel: 'Chẩn đoán hình ảnh', color: 'cyan' },
+  { value: 'OTHER', label: 'Thăm dò chức năng & Khác', shortLabel: 'Thăm dò chức năng & Khác', color: 'purple' },
 ]
 
 export const CLINICAL_RESULT_DATA_TYPES = [
