@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const appointmentApi = {
   getAll: (params) => axiosClient.get('/appointments', { params: { size: 100, ...params } }),

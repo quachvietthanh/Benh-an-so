@@ -15,7 +15,8 @@ public record OperationalDashboardResult(
             int waiting,
             int inProgress,
             int completed,
-            int cancelled
+            int cancelled,
+            int earlyEnded
     ) {
     }
 

@@ -95,7 +95,8 @@ class GetOperationalDashboardServiceTest {
                         visit(VisitStatus.WAITING_FOR_RESULT),
                         visit(VisitStatus.COMPLETED),
                         visit(VisitStatus.COMPLETED),
-                        visit(VisitStatus.CANCELLED)
+                        visit(VisitStatus.CANCELLED),
+                        visit(VisitStatus.EARLY_ENDED)
                 ));
 
         when(paymentRepository.sumAmountPaidByStatusInAndPaidAtBetween(
@@ -118,11 +119,12 @@ class GetOperationalDashboardServiceTest {
 
         OperationalDashboardResult result = service.get();
 
-        assertEquals(7, result.visitSummary().total());
+        assertEquals(8, result.visitSummary().total());
         assertEquals(2, result.visitSummary().waiting());
         assertEquals(2, result.visitSummary().inProgress());
         assertEquals(2, result.visitSummary().completed());
         assertEquals(1, result.visitSummary().cancelled());
+        assertEquals(1, result.visitSummary().earlyEnded());
 
         assertEquals(new BigDecimal("1250.50"), result.revenueSummary().totalRevenueToday());
 
@@ -150,10 +152,34 @@ class GetOperationalDashboardServiceTest {
         assertEquals(0, result.visitSummary().inProgress());
         assertEquals(0, result.visitSummary().completed());
         assertEquals(0, result.visitSummary().cancelled());
+        assertEquals(0, result.visitSummary().earlyEnded());
         assertEquals(BigDecimal.ZERO, result.revenueSummary().totalRevenueToday());
         assertEquals(0, result.inventoryAlertSummary().lowStockCount());
         assertEquals(0, result.inventoryAlertSummary().expiryAlertCount());
         assertEquals(NOW, result.asOf());
+    }
+
+    @Test
+    void separatesEarlyEndedFromCancelled() {
+        when(visitRepository.findByVisitAtBetween(START_OF_DAY, START_OF_NEXT_DAY))
+                .thenReturn(List.of(
+                        visit(VisitStatus.CANCELLED),
+                        visit(VisitStatus.EARLY_ENDED),
+                        visit(VisitStatus.COMPLETED),
+                        visit(VisitStatus.EARLY_ENDED)
+                ));
+        when(paymentRepository.sumAmountPaidByStatusInAndPaidAtBetween(any(), eq(START_OF_DAY), eq(START_OF_NEXT_DAY)))
+                .thenReturn(BigDecimal.ZERO);
+        when(medicineRepository.findAllActive()).thenReturn(List.of());
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(any(), any()))
+                .thenReturn(Map.of());
+        when(medicineBatchRepository.findAll()).thenReturn(List.of());
+
+        OperationalDashboardResult result = service.get();
+
+        assertEquals(1, result.visitSummary().cancelled());
+        assertEquals(2, result.visitSummary().earlyEnded());
+        assertEquals(1, result.visitSummary().completed());
     }
 
     @Test
