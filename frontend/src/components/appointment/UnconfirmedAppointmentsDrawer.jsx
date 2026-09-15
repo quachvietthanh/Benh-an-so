@@ -36,40 +36,6 @@ import { handleQueueApiError } from '../../utils/queueHelpers.js'
 
 const { Text, Title, Paragraph } = Typography
 
-const DEFAULT_DOCTORS = [
-  {
-    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
-    username: 'doctor1',
-    fullName: 'Dr. Nguyen Minh Anh',
-    department: 'Nội khoa',
-  },
-  {
-    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
-    username: 'doctor2',
-    fullName: 'Dr. Tran Quang Huy',
-    department: 'Ngoại khoa',
-  },
-  {
-    id: 'u3',
-    username: 'doctor1',
-    fullName: 'BS. Phạm Hồng Anh',
-    department: 'Nội tổng hợp',
-  },
-]
-
-const DEFAULT_PATIENTS = [
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001', patientCode: 'BN000001', fullName: 'Nguyen Van An', phoneNumber: '0910000001' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002', patientCode: 'BN000002', fullName: 'Tran Thi Binh', phoneNumber: '0910000002' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003', patientCode: 'BN000003', fullName: 'Le Minh Chau', phoneNumber: '0910000003' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb004', patientCode: 'BN000004', fullName: 'Pham Ngoc Diep', phoneNumber: '0910000004' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb005', patientCode: 'BN000005', fullName: 'Hoang Gia Duc', phoneNumber: '0910000005' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb006', patientCode: 'BN000006', fullName: 'Vu Thanh Giang', phoneNumber: '0910000006' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb007', patientCode: 'BN000007', fullName: 'Do Quang Huy', phoneNumber: '0910000007' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb008', patientCode: 'BN000008', fullName: 'Bui Thu Khanh', phoneNumber: '0910000008' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb009', patientCode: 'BN000009', fullName: 'Nguyen Tuan Long', phoneNumber: '0910000009' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb010', patientCode: 'BN000010', fullName: 'Dang My Linh', phoneNumber: '0910000010' },
-]
-
 const cleanUuid = (id) => String(id || '').toLowerCase().replace(/-/g, '')
 
 const formatDoctorName = (name) => {
@@ -105,13 +71,19 @@ export default function UnconfirmedAppointmentsDrawer({
 
   const resolveDoctor = useCallback(
     (doctorId, fallbackName, fallbackDept) => {
+      if (fallbackName && fallbackName !== 'Bác sĩ phụ trách' && fallbackName !== '—') {
+        return {
+          name: fallbackName,
+          department: fallbackDept || '',
+        }
+      }
       if (getDoctorInfoProp) {
         const res = getDoctorInfoProp(doctorId, fallbackName, fallbackDept)
         if (res && res.name && res.name !== 'Bác sĩ chưa xác định' && !res.name.includes('#')) {
           return res
         }
       }
-      const allDocs = [...(doctorsProp || []), ...(localDoctors || []), ...DEFAULT_DOCTORS]
+      const allDocs = [...(doctorsProp || []), ...(localDoctors || [])]
       const targetClean = cleanUuid(doctorId)
       const doc = allDocs.find((d) => {
         const dClean = cleanUuid(d.id)
@@ -133,13 +105,20 @@ export default function UnconfirmedAppointmentsDrawer({
 
   const resolvePatient = useCallback(
     (patientId, fallbackName, fallbackCode, fallbackPhone) => {
+      if (fallbackName && fallbackName !== 'Bệnh nhân' && fallbackName !== '—') {
+        return {
+          name: fallbackName,
+          code: fallbackCode || '—',
+          phone: fallbackPhone || '',
+        }
+      }
       if (getPatientInfoProp) {
         const res = getPatientInfoProp(patientId, fallbackName, fallbackCode, fallbackPhone)
         if (res && res.name && res.name !== 'Bệnh nhân') {
           return res
         }
       }
-      const allPats = [...(patientsProp || []), ...(localPatients || []), ...DEFAULT_PATIENTS]
+      const allPats = [...(patientsProp || []), ...(localPatients || [])]
       const targetClean = cleanUuid(patientId)
       const pat = allPats.find((p) => {
         const pClean = cleanUuid(p.id)
@@ -202,11 +181,12 @@ export default function UnconfirmedAppointmentsDrawer({
         setAppointments(items)
 
         const knownPatientIds = new Set(
-          [...(patientsProp || []), ...(localPatients || []), ...DEFAULT_PATIENTS].map((p) => cleanUuid(p.id))
+          [...(patientsProp || []), ...(localPatients || [])].map((p) => cleanUuid(p.id))
         )
         const missingIds = [
           ...new Set(
             items
+              .filter((it) => !it.patientName && it.patientId)
               .map((it) => it.patientId)
               .filter((pid) => pid && !knownPatientIds.has(cleanUuid(pid)))
           ),

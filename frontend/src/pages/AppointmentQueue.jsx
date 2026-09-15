@@ -129,19 +129,6 @@ const DEFAULT_DOCTORS = [
   },
 ]
 
-const DEFAULT_PATIENTS = [
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001', patientCode: 'BN000001', fullName: 'Nguyen Van An', phoneNumber: '0910000001' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002', patientCode: 'BN000002', fullName: 'Tran Thi Binh', phoneNumber: '0910000002' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003', patientCode: 'BN000003', fullName: 'Le Minh Chau', phoneNumber: '0910000003' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb004', patientCode: 'BN000004', fullName: 'Pham Ngoc Diep', phoneNumber: '0910000004' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb005', patientCode: 'BN000005', fullName: 'Hoang Gia Duc', phoneNumber: '0910000005' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb006', patientCode: 'BN000006', fullName: 'Vu Thanh Giang', phoneNumber: '0910000006' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb007', patientCode: 'BN000007', fullName: 'Do Quang Huy', phoneNumber: '0910000007' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb008', patientCode: 'BN000008', fullName: 'Bui Thu Khanh', phoneNumber: '0910000008' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb009', patientCode: 'BN000009', fullName: 'Nguyen Tuan Long', phoneNumber: '0910000009' },
-  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb010', patientCode: 'BN000010', fullName: 'Dang My Linh', phoneNumber: '0910000010' },
-]
-
 const getAvatarStyle = (seed = '') => {
   const paletteIndex =
     [...String(seed)].reduce((sum, character) => sum + character.charCodeAt(0), 0) % avatarPalette.length
@@ -252,8 +239,7 @@ function AppointmentQueue() {
 
   const getPatientInfo = useCallback((patientId, fallbackName, fallbackCode, fallbackPhone) => {
     const cleanId = String(patientId || '').toLowerCase().replace(/-/g, '')
-    const allPats = [...(patients || []), ...DEFAULT_PATIENTS]
-    const pat = allPats.find((p) => {
+    const pat = (patients || []).find((p) => {
       const pClean = String(p.id || '').toLowerCase().replace(/-/g, '')
       return (cleanId && pClean === cleanId) || String(p.id) === String(patientId)
     })
