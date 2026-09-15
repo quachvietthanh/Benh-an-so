@@ -41,6 +41,7 @@ import {
   FileProtectOutlined,
   ArrowLeftOutlined,
   UnorderedListOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
@@ -53,8 +54,10 @@ import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModa
 import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordModal'
 import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
 import MedicalRecordSignatureStamp from '../components/clinical/MedicalRecordSignatureStamp'
+import CloseVisitModal from '../components/clinical/CloseVisitModal'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
+import { canUserCloseVisit } from '../utils/closeVisitHelpers'
 import { useAuthContext } from '../context/AuthContext'
 
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
@@ -156,6 +159,30 @@ function MedicalEncounter() {
     const status = medicalRecord?.status || encounter?.medicalRecord?.status
     return isMedicalRecordSigned(status)
   }, [medicalRecord?.status, encounter?.medicalRecord?.status])
+
+  const [closeVisitModalOpen, setCloseVisitModalOpen] = useState(false)
+
+  const canCloseThisVisit = useMemo(() => {
+    const isProgress =
+      encounter?.visit?.status === 'IN_PROGRESS' ||
+      encounter?.queueItem?.status === 'IN_PROGRESS' ||
+      (!encounter?.visit?.status && encounter?.queueItem?.status === 'IN_PROGRESS')
+    if (!isProgress) return false
+    if (isRecordSigned) return false
+    const doctorId =
+      encounter?.doctor?.id ||
+      encounter?.visit?.doctorId ||
+      encounter?.queueItem?.doctorId ||
+      encounter?.queue?.doctorId
+    return canUserCloseVisit(user, doctorId)
+  }, [encounter, isRecordSigned, user])
+
+  const handleCloseVisitSuccess = (data, outcome, reason) => {
+    setCloseVisitModalOpen(false)
+    setTimeout(() => {
+      navigate('/appointments', { replace: true })
+    }, 1200)
+  }
 
   const [vitalSigns, setVitalSigns] = useState({
     bp: '',
@@ -932,6 +959,7 @@ function MedicalEncounter() {
     }
   }
 
+
   async function saveRecord(options = { showModal: true }) {
     if (!visitId || !encounter) {
       message.error('Không có visitId hợp lệ để lưu bệnh án.')
@@ -1336,9 +1364,6 @@ function MedicalEncounter() {
           <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             <MedicineBoxOutlined style={{ color: '#2563eb' }} /> Khám bệnh & Chẩn đoán
           </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            Bệnh án gắn liền với lượt khám và số thứ tự trong hàng đợi khám.
-          </Text>
         </div>
         {canEditEncounter && (
           <Space wrap size="middle" className="encounter-header-actions">
@@ -1376,6 +1401,21 @@ function MedicalEncounter() {
             >
               Kê đơn thuốc
             </Button>
+            {canCloseThisVisit && (
+              <Button
+                danger
+                icon={<StopOutlined />}
+                onClick={() => {
+                  setCloseVisitModalOpen(true)
+                }}
+                style={{
+                  fontWeight: 600,
+                  borderColor: '#ef4444',
+                }}
+              >
+                Kết thúc sớm / Hủy ca
+              </Button>
+            )}
             {isRecordSigned && (
               <Space wrap>
                 <Tag
@@ -2094,6 +2134,24 @@ function MedicalEncounter() {
           recordId={currentRecordId || medicalRecord?.medicalRecordId || medicalRecord?.id || encounter?.medicalRecord?.id}
           canAmend={canEditEncounter && isRecordSigned}
           onOpenAmendModal={() => setAmendModalOpen(true)}
+        />
+      )}
+
+      {closeVisitModalOpen && (
+        <CloseVisitModal
+          open={closeVisitModalOpen}
+          visit={encounter?.visit}
+          queueItem={encounter?.queueItem}
+          queueItemId={encounter?.queueItem?.id || encounter?.queueItemId || location.state?.queueItemId}
+          patient={encounter?.patient || selectedPatientObj}
+          patientName={encounter?.patient?.fullName || selectedPatientObj?.fullName}
+          patientCode={encounter?.patient?.patientCode || selectedPatientObj?.patientCode}
+          medicalRecord={medicalRecord || encounter?.medicalRecord}
+          onClose={() => {
+            setCloseVisitModalOpen(false)
+          }}
+          onSuccess={handleCloseVisitSuccess}
+          onInvalidStatus={() => loadWorkflow()}
         />
       )}
     </div>

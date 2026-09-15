@@ -42,6 +42,9 @@ const queueApi = {
   skip: (itemId, reason = 'Vắng mặt khi gọi') => axiosClient.post(`/queue-items/${itemId}/skip`, { reason }),
 
   complete: (itemId) => axiosClient.post(`/queue-items/${itemId}/complete`),
+
+  close: (itemId, outcome, reason) =>
+    axiosClient.post(`/queue-items/${itemId}/close`, { outcome, reason }),
 }
 
 export default queueApi

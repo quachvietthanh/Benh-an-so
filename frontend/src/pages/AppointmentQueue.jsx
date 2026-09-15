@@ -53,6 +53,7 @@ import {
   UserAddOutlined,
   UserOutlined,
   UserSwitchOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
@@ -60,8 +61,10 @@ import patientApi from '../api/patientApi'
 import PersonalDataConsentField from '../components/patient/PersonalDataConsentField'
 import queueApi from '../api/queueApi'
 import PatientMedicalHistoryModal from '../components/clinical/PatientMedicalHistoryModal'
+import CloseVisitModal from '../components/clinical/CloseVisitModal'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
+import { canUserCloseVisit } from '../utils/closeVisitHelpers'
 import {
   APPOINTMENT_STATUS_META,
   QUEUE_STATUS_META,
@@ -183,6 +186,7 @@ function AppointmentQueue() {
   const [bookModalOpen, setBookModalOpen] = useState(false)
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
   const [skipModalItem, setSkipModalItem] = useState(null)
+  const [closeVisitModalItem, setCloseVisitModalItem] = useState(null)
   const [cancelModalItem, setCancelModalItem] = useState(null)
   const [detailItem, setDetailItem] = useState(null)
   const [quickPatientModalOpen, setQuickPatientModalOpen] = useState(false)
@@ -411,7 +415,7 @@ function AppointmentQueue() {
 
     const validItems = queues.filter((q) => {
       if (permissions.isDoctorOnly && String(q.doctorId) !== String(user?.id)) return false
-      if (q.status === 'CANCELLED') return false
+      if (queueStatusFilter !== 'CANCELLED' && q.status === 'CANCELLED') return false
       if (queueStatusFilter !== 'ALL' && q.status !== queueStatusFilter) return false
       if (queueSourceFilter !== 'ALL' && q.sourceType !== queueSourceFilter) return false
       const pInfo = getPatientInfo(q.patientId, q.patientName, q.patientCode, q.phone)
@@ -446,7 +450,14 @@ function AppointmentQueue() {
         }
         return Number(b.queueNumber || 0) - Number(a.queueNumber || 0)
       }),
-      finished: sortByNumber(items.filter((q) => ['COMPLETED', 'SKIPPED', 'CANCELLED'].includes(q.status))),
+      finished: [...items.filter((q) => ['COMPLETED', 'SKIPPED', 'CANCELLED', 'EARLY_ENDED'].includes(q.status))].sort((a, b) => {
+        const timeA = a.completedAt || a.cancelledAt || a.skippedAt || a.updatedAt || a.calledAt || 0
+        const timeB = b.completedAt || b.cancelledAt || b.skippedAt || b.updatedAt || b.calledAt || 0
+        if (timeA && timeB) {
+          return new Date(timeB) - new Date(timeA)
+        }
+        return Number(b.queueNumber || 0) - Number(a.queueNumber || 0)
+      }),
     }
   }, [permissions.isDoctorOnly, myQueueData, queues, user?.id, queueDoctorFilter])
 
@@ -1187,6 +1198,20 @@ function AppointmentQueue() {
               setSkipModalItem(record)
             },
           },
+          canUserCloseVisit(user, record.doctorId) && record.status === 'IN_PROGRESS' && {
+            key: 'close_visit',
+            icon: <StopOutlined />,
+            danger: true,
+            label: 'Kết thúc sớm / Hủy ca',
+            onClick: () => {
+              const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
+              setCloseVisitModalItem({
+                ...record,
+                patientName: pInfo.name,
+                patientCode: pInfo.code,
+              })
+            },
+          },
         ].filter(Boolean)
 
         const hasCallAction = permissions.canCallNext && record.status === 'WAITING'
@@ -1221,9 +1246,6 @@ function AppointmentQueue() {
               <Avatar size={48} icon={<CalendarOutlined />} style={{ backgroundColor: '#2563eb' }} />
               <div>
                 <Title level={4} style={{ margin: 0 }}>Quản Lý Lịch Hẹn & Hàng Đợi Khám Bệnh</Title>
-                <Text type="secondary">
-                  Theo dõi và điều phối danh sách khám bệnh theo thời gian thực.
-                </Text>
               </div>
             </Space>
           </Col>
@@ -1393,6 +1415,7 @@ function AppointmentQueue() {
                         { value: 'COMPLETED', label: 'Đã hoàn thành' },
                         { value: 'SKIPPED', label: 'Đã bỏ qua (Vắng mặt)' },
                         { value: 'CANCELLED', label: 'Đã hủy' },
+                        { value: 'EARLY_ENDED', label: 'Kết thúc sớm' },
                       ]}
                     />
                   </Col>
@@ -1991,12 +2014,21 @@ function AppointmentQueue() {
                                       SĐT: <Text style={{ color: '#334155' }}>{pInfo.phone}</Text>
                                     </span>
                                   )}
-                                  {item.completedAt && (
-                                    <span style={{ color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
-                                      <CheckCircleOutlined style={{ fontSize: 12, color: '#16a34a' }} />
-                                      <span>Hoàn tất lúc: {dayjs(item.completedAt).format('HH:mm')}</span>
-                                    </span>
-                                  )}
+                                  {(() => {
+                                    const finishTime = item.completedAt || item.cancelledAt || item.skippedAt || item.updatedAt
+                                    if (!finishTime) return null
+                                    const isCompleted = item.status === 'COMPLETED'
+                                    const isEarly = item.status === 'EARLY_ENDED'
+                                    const label = isCompleted ? 'Hoàn tất lúc:' : isEarly ? 'Kết thúc lúc:' : 'Hủy lúc:'
+                                    const color = isCompleted ? '#15803d' : isEarly ? '#ea580c' : '#dc2626'
+                                    const IconComponent = isCompleted ? CheckCircleOutlined : isEarly ? StopOutlined : CloseCircleOutlined
+                                    return (
+                                      <span style={{ color, display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                                        <IconComponent style={{ fontSize: 12, color }} />
+                                        <span>{label} {dayjs(finishTime).format('HH:mm')}</span>
+                                      </span>
+                                    )
+                                  })()}
                                 </div>
                               }
                             />
@@ -2013,7 +2045,7 @@ function AppointmentQueue() {
             key: 'completed_history',
             label: (
               <span>
-                <HistoryOutlined /> Lịch Sử Bệnh Nhân Đã Khám ({doctorQueueGroups.completed.length})
+                <HistoryOutlined /> Lịch Sử Bệnh Nhân Đã Khám / Kết Thúc ({doctorQueueGroups.finished.length})
               </span>
             ),
             children: (
@@ -2030,13 +2062,13 @@ function AppointmentQueue() {
                   </Col>
                   <Col xs={24} sm={12} md={12} style={{ textAlign: 'right' }}>
                     <Text type="secondary" style={{ fontSize: 13 }}>
-                      Danh sách các ca khám hoàn thành ngày <strong>{selectedDate.format('DD/MM/YYYY')}</strong>
+                      Danh sách các ca khám đã hoàn thành hoặc kết thúc trong ngày <strong>{selectedDate.format('DD/MM/YYYY')}</strong>
                     </Text>
                   </Col>
                 </Row>
 
                 <Table
-                  dataSource={doctorQueueGroups.completed.filter((item) => {
+                  dataSource={doctorQueueGroups.finished.filter((item) => {
                     if (!completedSearchKeyword.trim()) return true
                     const kw = completedSearchKeyword.trim().toLowerCase()
                     const pInfo = getPatientInfo(item.patientId, item.patientName)
@@ -2089,31 +2121,78 @@ function AppointmentQueue() {
                     },
                     {
                       title: 'Giờ tiếp nhận',
-                      dataIndex: 'checkedInAt',
                       key: 'checkedInAt',
                       width: 130,
-                      render: (val) => val ? dayjs(val).format('HH:mm') : '—',
+                      render: (_, record) => {
+                        const time = record.checkedInAt || record.checked_in_at || record.startTime || record.appointmentAt || record.createdAt
+                        return time ? (
+                          <span style={{ color: '#334155', fontWeight: 500 }}>
+                            {dayjs(time).format('HH:mm')}
+                          </span>
+                        ) : '—'
+                      },
                     },
                     {
-                      title: 'Giờ hoàn tất',
-                      dataIndex: 'completedAt',
-                      key: 'completedAt',
-                      width: 130,
-                      render: (val) => val ? (
-                        <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                          {dayjs(val).format('HH:mm')}
-                        </span>
-                      ) : '—',
+                      title: 'Giờ hoàn tất / kết thúc',
+                      key: 'finishTime',
+                      width: 150,
+                      render: (_, record) => {
+                        const time =
+                          record.completedAt ||
+                          record.cancelledAt ||
+                          record.skippedAt ||
+                          record.completed_at ||
+                          record.cancelled_at ||
+                          record.skipped_at ||
+                          record.endTime ||
+                          record.updatedAt ||
+                          record.updated_at
+                        if (!time) return '—'
+                        const isCompleted = record.status === 'COMPLETED'
+                        const isEarly = record.status === 'EARLY_ENDED'
+                        const isCancelled = record.status === 'CANCELLED'
+                        const color = isCompleted ? '#16a34a' : isEarly ? '#ea580c' : isCancelled ? '#dc2626' : '#64748b'
+                        return (
+                          <Tooltip title={`${isCompleted ? 'Hoàn tất lúc' : isEarly ? 'Kết thúc sớm lúc' : isCancelled ? 'Hủy lúc' : 'Thời gian'}: ${dayjs(time).format('HH:mm:ss DD/MM/YYYY')}`}>
+                            <span style={{ color, fontWeight: 600 }}>
+                              {dayjs(time).format('HH:mm')}
+                            </span>
+                          </Tooltip>
+                        )
+                      },
                     },
                     {
                       title: 'Trạng thái',
                       key: 'status',
                       width: 150,
-                      render: () => (
-                        <Tag color="success" style={{ fontWeight: 600 }}>
-                          <CheckCircleOutlined style={{ marginRight: 4 }} />Đã hoàn thành
-                        </Tag>
-                      ),
+                      render: (_, record) => {
+                        if (record.status === 'EARLY_ENDED') {
+                          return (
+                            <Tag color="warning" style={{ fontWeight: 600 }}>
+                              <StopOutlined style={{ marginRight: 4 }} />Kết thúc sớm
+                            </Tag>
+                          )
+                        }
+                        if (record.status === 'CANCELLED') {
+                          return (
+                            <Tag color="error" style={{ fontWeight: 600 }}>
+                              <CloseCircleOutlined style={{ marginRight: 4 }} />Đã hủy
+                            </Tag>
+                          )
+                        }
+                        if (record.status === 'SKIPPED') {
+                          return (
+                            <Tag color="default" style={{ fontWeight: 600 }}>
+                              Đã bỏ qua
+                            </Tag>
+                          )
+                        }
+                        return (
+                          <Tag color="success" style={{ fontWeight: 600 }}>
+                            <CheckCircleOutlined style={{ marginRight: 4 }} />Đã hoàn thành
+                          </Tag>
+                        )
+                      },
                     },
                     {
                       title: 'Thao tác',
@@ -2550,11 +2629,47 @@ function AppointmentQueue() {
             <Paragraph><Text type="secondary">Chuyên khoa:</Text> <Tag color="cyan">{detailItem.department || '—'}</Tag></Paragraph>
             <Paragraph><Text type="secondary">Trạng thái:</Text> <Tag color="blue">{detailItem.status}</Tag></Paragraph>
             {detailItem.reason && <Paragraph><Text type="secondary">Lý do khám:</Text> {detailItem.reason}</Paragraph>}
-            {detailItem.cancelReason && <Paragraph><Text type="secondary">Lý do hủy:</Text> <Text type="danger">{detailItem.cancelReason}</Text></Paragraph>}
+            {detailItem.cancelReason && <Paragraph><Text type="secondary">Lý do hủy / kết thúc sớm:</Text> <Text type="danger">{detailItem.cancelReason}</Text></Paragraph>}
+            {detailItem.cancelledAt && <Paragraph><Text type="secondary">Thời gian đóng / hủy:</Text> {dayjs(detailItem.cancelledAt).format('HH:mm - DD/MM/YYYY')}</Paragraph>}
             {(detailItem.appointmentAt || detailItem.startTime) && <Paragraph><Text type="secondary">Thời gian hẹn:</Text> {dayjs(detailItem.appointmentAt || detailItem.startTime).format('HH:mm - DD/MM/YYYY')}</Paragraph>}
           </div>
         )}
       </Modal>
+
+      {closeVisitModalItem && (
+        <CloseVisitModal
+          open={!!closeVisitModalItem}
+          queueItem={closeVisitModalItem}
+          queueItemId={closeVisitModalItem.id || closeVisitModalItem.queueItemId}
+          patientName={closeVisitModalItem.patientName}
+          patientCode={closeVisitModalItem.patientCode}
+          visit={{
+            id: closeVisitModalItem.visitId,
+            visitCode: closeVisitModalItem.visitCode,
+            status: closeVisitModalItem.status,
+            startedAt: closeVisitModalItem.calledAt || closeVisitModalItem.checkedInAt,
+            patientName: closeVisitModalItem.patientName,
+            patientCode: closeVisitModalItem.patientCode,
+          }}
+          onClose={() => {
+            setCloseVisitModalItem(null)
+          }}
+          onSuccess={async (data, outcome, reason) => {
+            if (closeVisitModalItem) {
+              saveAppointmentLog({
+                appointmentId: closeVisitModalItem.appointmentId || closeVisitModalItem.id,
+                appointmentCode: closeVisitModalItem.appointmentCode || closeVisitModalItem.visitCode || 'Lượt khám',
+                action: outcome === 'EARLY_ENDED' ? 'EARLY_ENDED' : 'CANCEL',
+                operatorName: user?.fullName || user?.username || 'Bác sĩ',
+                details: `${outcome === 'EARLY_ENDED' ? 'Kết thúc sớm' : 'Hủy'} ca khám của bệnh nhân ${closeVisitModalItem.patientName || ''}. Lý do: ${reason || ''}.`,
+              })
+            }
+            await refreshAllData()
+            setCloseVisitModalItem(null)
+          }}
+          onInvalidStatus={() => refreshAllData()}
+        />
+      )}
 
       <PatientMedicalHistoryModal
         open={historyModalOpen}
