@@ -6,5 +6,6 @@ public enum QueueSemanticAction {
     DEFERRED,
     RE_QUEUED,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    EARLY_ENDED
 }

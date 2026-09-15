@@ -108,7 +108,9 @@ public class QueueItem {
     }
 
     public void cancel(String cancelReason, Instant cancelledAt) {
-        if (status != QueueItemStatus.WAITING && status != QueueItemStatus.WAITING_FOR_RESULT) {
+        if (status != QueueItemStatus.WAITING
+                && status != QueueItemStatus.WAITING_FOR_RESULT
+                && status != QueueItemStatus.IN_PROGRESS) {
             throw new QueueItemInvalidStatusException(status, QueueItemStatus.CANCELLED);
         }
         this.status = QueueItemStatus.CANCELLED;
