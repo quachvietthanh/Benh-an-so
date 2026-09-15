@@ -39,7 +39,7 @@ export function canConfirmAppointment(appointment, nowRef = dayjs()) {
   if (status !== 'SCHEDULED') {
     return {
       allowed: false,
-      reason: 'Chỉ có thể xác nhận lịch hẹn ở trạng thái đã đặt (SCHEDULED).',
+      reason: 'Chỉ có thể xác nhận lịch hẹn ở trạng thái đã đặt.',
     }
   }
 

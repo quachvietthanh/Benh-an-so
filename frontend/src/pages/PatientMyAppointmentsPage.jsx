@@ -135,7 +135,7 @@ function PatientMyAppointmentsPage() {
     const doctorName = apt.doctor?.fullName || apt.doctor?.username || apt.doctorName || 'Bác sĩ phụ trách'
 
     Modal.confirm({
-      title: 'Xác nhận sẽ đến khám bệnh (TC-02)',
+      title: 'Xác nhận sẽ đến khám bệnh',
       icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
       content: (
         <div>

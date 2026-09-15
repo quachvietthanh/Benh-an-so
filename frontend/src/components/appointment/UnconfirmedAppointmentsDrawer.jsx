@@ -280,7 +280,7 @@ export default function UnconfirmedAppointmentsDrawer({
       title={
         <Space align="center">
           <BellOutlined style={{ color: '#eab308', fontSize: 18 }} />
-          <span>Danh Sách Lịch Hẹn Chưa Xác Nhận (TC-04)</span>
+          <span>Danh Sách Lịch Hẹn Chưa Xác Nhận</span>
           <Badge count={appointments.length} overflowCount={99} style={{ backgroundColor: '#eab308' }} />
         </Space>
       }
@@ -309,8 +309,8 @@ export default function UnconfirmedAppointmentsDrawer({
         <Alert
           type="info"
           showIcon
-          message="Quy tắc kiểm tra & nhắc lịch hẹn (QTN-08)"
-          description="Danh sách hiển thị các lịch hẹn đã đặt (SCHEDULED) trong ngày chưa được xác nhận, sắp xếp theo khung giờ khám tăng dần. Lễ tân liên hệ bệnh nhân qua SĐT để gọi nhắc và bấm 'Xác nhận' khi bệnh nhân đồng ý đến khám."
+          message="Hướng dẫn kiểm tra & nhắc lịch hẹn"
+          description="Danh sách hiển thị các lịch hẹn đã đặt trong ngày chưa được xác nhận, sắp xếp theo khung giờ khám tăng dần. Lễ tân liên hệ bệnh nhân qua số điện thoại để gọi nhắc và bấm 'Xác nhận' khi bệnh nhân đồng ý đến khám."
           style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', fontSize: 13 }}
         />
 

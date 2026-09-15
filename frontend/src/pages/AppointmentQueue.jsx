@@ -705,7 +705,7 @@ function AppointmentQueue() {
     const appTime = dayjs(timeVal)
 
     Modal.confirm({
-      title: 'Xác nhận lịch hẹn khám (TC-01)',
+      title: 'Xác nhận lịch hẹn khám',
       icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
       content: (
         <div>
@@ -2783,7 +2783,7 @@ function AppointmentQueue() {
             <Paragraph><Text type="secondary">Bệnh nhân:</Text> <Text strong>{detailItem.patientName}</Text></Paragraph>
             <Paragraph><Text type="secondary">Bác sĩ phụ trách:</Text> <Text strong>{detailItem.doctorName || 'Chưa gán'}</Text></Paragraph>
             <Paragraph><Text type="secondary">Chuyên khoa:</Text> <Tag color="cyan">{detailItem.department || '—'}</Tag></Paragraph>
-            <Paragraph><Text type="secondary">Trạng thái:</Text> <Tag color={detailItem.status === 'CONFIRMED' ? 'green' : 'blue'}>{detailItem.status}</Tag></Paragraph>
+            <Paragraph><Text type="secondary">Trạng thái:</Text> <Tag color={APPOINTMENT_STATUS_META[detailItem.status]?.tone || (detailItem.status === 'CONFIRMED' ? 'green' : 'blue')}>{APPOINTMENT_STATUS_META[detailItem.status]?.label || detailItem.status}</Tag></Paragraph>
             {detailItem.status === 'CONFIRMED' && (
               <Paragraph>
                 <Text type="secondary">Xác nhận:</Text>{' '}
