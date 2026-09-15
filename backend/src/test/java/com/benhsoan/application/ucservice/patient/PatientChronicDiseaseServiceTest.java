@@ -25,6 +25,7 @@ import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogNotFoundExcep
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChronicDisease;
 import com.benhsoan.domain.patient.exception.PatientChronicDiseaseAlreadyExistsException;
+import com.benhsoan.domain.patient.exception.PatientInactiveException;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
@@ -262,5 +263,54 @@ class PatientChronicDiseaseServiceTest {
     void retrieveRejectsUnknownPatient() {
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.empty());
         assertThrows(PatientNotFoundException.class, () -> getService.getChronicDiseases(PATIENT_ID));
+    }
+
+    @Test
+    void rejectsInactivePatient() {
+        Patient patient = mock(Patient.class);
+        when(patient.isActive()).thenReturn(false);
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+
+        assertThrows(PatientInactiveException.class, () -> addService.addChronicDisease(
+                AddPatientChronicDiseaseCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .build()));
+    }
+
+    @Test
+    void rejectsVisitOfAnotherPatient() {
+        stubActivePatient();
+        stubCatalog();
+        Visit visit = mock(Visit.class);
+        UUID anotherPatientId = UUID.randomUUID();
+        when(visit.getPatientId()).thenReturn(anotherPatientId);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> addService.addChronicDisease(
+                AddPatientChronicDiseaseCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .visitId(VISIT_ID)
+                        .build()));
+        assertEquals("Lượt khám không thuộc về bệnh nhân này.", ex.getMessage());
+    }
+
+    @Test
+    void rejectsInactiveVisit() {
+        stubActivePatient();
+        stubCatalog();
+        Visit visit = mock(Visit.class);
+        when(visit.getPatientId()).thenReturn(PATIENT_ID);
+        when(visit.isActive()).thenReturn(false);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> addService.addChronicDisease(
+                AddPatientChronicDiseaseCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .visitId(VISIT_ID)
+                        .build()));
+        assertEquals("Lượt khám đã kết thúc hoặc không còn hiệu lực.", ex.getMessage());
     }
 }

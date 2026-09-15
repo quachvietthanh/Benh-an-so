@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -109,6 +110,22 @@ class PatientFamilyHistoryControllerTest {
         assertEquals(patientId, captor.getValue().patientId());
         assertEquals(historyId, captor.getValue().familyHistoryId());
         assertEquals("Đã khỏi bệnh", captor.getValue().reason());
+    }
+
+    @Test
+    void deletesFamilyHistoryWithoutReasonParameter() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID historyId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/patients/{patientId}/family-history/{familyHistoryId}", patientId, historyId))
+                .andExpect(status().isNoContent());
+
+        ArgumentCaptor<DeletePatientFamilyHistoryCommand> captor =
+                ArgumentCaptor.forClass(DeletePatientFamilyHistoryCommand.class);
+        verify(deletePatientFamilyHistoryUseCase).deleteFamilyHistory(captor.capture());
+        assertEquals(patientId, captor.getValue().patientId());
+        assertEquals(historyId, captor.getValue().familyHistoryId());
+        assertNull(captor.getValue().reason());
     }
 
     @Test

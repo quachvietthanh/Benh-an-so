@@ -24,6 +24,7 @@ import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogNotFoundException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientFamilyHistory;
+import com.benhsoan.domain.patient.exception.PatientInactiveException;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
@@ -79,6 +80,11 @@ class PatientFamilyHistoryServiceTest {
         when(catalog.getCode()).thenReturn("E11.9");
         when(catalog.getName()).thenReturn("Đái tháo đường type 2");
         return catalog;
+    }
+
+    private void stubCatalog() {
+        DiagnosisCatalog catalog = activeCatalog();
+        when(diagnosisCatalogRepository.findById(CATALOG_ID)).thenReturn(Optional.of(catalog));
     }
 
     @Test
@@ -207,4 +213,87 @@ class PatientFamilyHistoryServiceTest {
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.empty());
         assertThrows(PatientNotFoundException.class, () -> getService.getFamilyHistory(PATIENT_ID));
     }
+
+    @Test
+    void rejectsInactivePatient() {
+        Patient patient = mock(Patient.class);
+        when(patient.isActive()).thenReturn(false);
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+
+        assertThrows(PatientInactiveException.class, () -> addService.addFamilyHistory(
+                AddPatientFamilyHistoryCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .relationship("Bố")
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .build()));
+    }
+
+    @Test
+    void rejectsVisitOfAnotherPatient() {
+        stubActivePatient();
+        stubCatalog();
+        Visit visit = mock(Visit.class);
+        UUID anotherPatientId = UUID.randomUUID();
+        when(visit.getPatientId()).thenReturn(anotherPatientId);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> addService.addFamilyHistory(
+                AddPatientFamilyHistoryCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .relationship("Bố")
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .visitId(VISIT_ID)
+                        .build()));
+        assertEquals("Lượt khám không thuộc về bệnh nhân này.", ex.getMessage());
+    }
+
+    @Test
+    void rejectsInactiveVisit() {
+        stubActivePatient();
+        stubCatalog();
+        Visit visit = mock(Visit.class);
+        when(visit.getPatientId()).thenReturn(PATIENT_ID);
+        when(visit.isActive()).thenReturn(false);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> addService.addFamilyHistory(
+                AddPatientFamilyHistoryCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .relationship("Bố")
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .visitId(VISIT_ID)
+                        .build()));
+        assertEquals("Lượt khám đã kết thúc hoặc không còn hiệu lực.", ex.getMessage());
+    }
+
+    @Test
+    void allowsMultipleFamilyHistoriesWithSameDiagnosisCatalog() {
+        stubActivePatient();
+        stubCatalog();
+        when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
+        when(clockPort.now()).thenReturn(NOW);
+        when(familyHistoryRepository.save(any(PatientFamilyHistory.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        PatientFamilyHistoryResult fatherResult = addService.addFamilyHistory(
+                AddPatientFamilyHistoryCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .relationship("Bố")
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .build());
+
+        PatientFamilyHistoryResult motherResult = addService.addFamilyHistory(
+                AddPatientFamilyHistoryCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .relationship("Mẹ")
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .build());
+
+        assertEquals("Bố", fatherResult.relationship());
+        assertEquals(CATALOG_ID, fatherResult.diagnosisCatalogId());
+        assertEquals("Mẹ", motherResult.relationship());
+        assertEquals(CATALOG_ID, motherResult.diagnosisCatalogId());
+        verify(familyHistoryRepository, times(2)).save(any());
+    }
 }
+

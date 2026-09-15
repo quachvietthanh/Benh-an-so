@@ -25,6 +25,7 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientFamilyHistory;
 import com.benhsoan.domain.patient.exception.PatientFamilyHistoryNotFoundException;
+import com.benhsoan.domain.patient.exception.PatientInactiveException;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.command.patient.DeletePatientFamilyHistoryCommand;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -157,6 +158,19 @@ class DeletePatientFamilyHistoryServiceTest {
 
         assertThrows(PatientFamilyHistoryNotFoundException.class,
                 () -> service.deleteFamilyHistory(command(null)));
+    }
+
+    @Test
+    void rejectsInactivePatient() {
+        Patient patient = mock(Patient.class);
+        when(patient.isActive()).thenReturn(false);
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+
+        assertThrows(PatientInactiveException.class,
+                () -> service.deleteFamilyHistory(command(null)));
+
+        verify(familyHistoryRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
     }
 
     private String reasonFromDetail(String detail) {

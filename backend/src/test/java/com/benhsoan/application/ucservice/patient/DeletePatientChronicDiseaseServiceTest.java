@@ -25,6 +25,7 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChronicDisease;
 import com.benhsoan.domain.patient.exception.PatientChronicDiseaseNotFoundException;
+import com.benhsoan.domain.patient.exception.PatientInactiveException;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.port.dto.command.patient.DeletePatientChronicDiseaseCommand;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -157,6 +158,19 @@ class DeletePatientChronicDiseaseServiceTest {
 
         assertThrows(PatientChronicDiseaseNotFoundException.class,
                 () -> service.deleteChronicDisease(command(null)));
+    }
+
+    @Test
+    void rejectsInactivePatient() {
+        Patient patient = mock(Patient.class);
+        when(patient.isActive()).thenReturn(false);
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+
+        assertThrows(PatientInactiveException.class,
+                () -> service.deleteChronicDisease(command(null)));
+
+        verify(chronicDiseaseRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
     }
 
     private String reasonFromDetail(String detail) {

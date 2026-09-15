@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -123,6 +124,22 @@ class PatientChronicDiseaseControllerTest {
         assertEquals(patientId, captor.getValue().patientId());
         assertEquals(diseaseId, captor.getValue().chronicDiseaseId());
         assertEquals("Đã khỏi bệnh", captor.getValue().reason());
+    }
+
+    @Test
+    void deletesChronicDiseaseWithoutReasonParameter() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID diseaseId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/patients/{patientId}/chronic-diseases/{chronicDiseaseId}", patientId, diseaseId))
+                .andExpect(status().isNoContent());
+
+        ArgumentCaptor<DeletePatientChronicDiseaseCommand> captor =
+                ArgumentCaptor.forClass(DeletePatientChronicDiseaseCommand.class);
+        verify(deletePatientChronicDiseaseUseCase).deleteChronicDisease(captor.capture());
+        assertEquals(patientId, captor.getValue().patientId());
+        assertEquals(diseaseId, captor.getValue().chronicDiseaseId());
+        assertNull(captor.getValue().reason());
     }
 
     @Test

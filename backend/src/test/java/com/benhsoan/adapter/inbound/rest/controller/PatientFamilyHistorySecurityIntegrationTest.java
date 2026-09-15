@@ -1,6 +1,8 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,6 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -23,6 +26,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PatientFamilyHistoryRestMapper;
 import com.benhsoan.config.SecurityConfig;
+import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
@@ -94,18 +100,36 @@ class PatientFamilyHistorySecurityIntegrationTest {
 
     @Test
     void userWithoutWritePermissionIsForbidden() throws Exception {
+        UUID currentUserId = UUID.randomUUID();
+        when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+
         mockMvc.perform(post("/patients/{patientId}/family-history", UUID.randomUUID())
                         .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"relationship\":\"Bố\",\"diagnosisCatalogId\":\"" + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isForbidden());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals(currentUserId, captor.getValue().getUserId());
+        assertEquals(ActionType.ACCESS_DENIED, captor.getValue().getActionType());
+        assertEquals(ResourceType.PERMISSION, captor.getValue().getResourceType());
     }
 
     @Test
     void userWithoutReadPermissionIsForbidden() throws Exception {
+        UUID currentUserId = UUID.randomUUID();
+        when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+
         mockMvc.perform(get("/patients/{patientId}/family-history", UUID.randomUUID())
                         .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
                 .andExpect(status().isForbidden());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals(currentUserId, captor.getValue().getUserId());
+        assertEquals(ActionType.ACCESS_DENIED, captor.getValue().getActionType());
+        assertEquals(ResourceType.PERMISSION, captor.getValue().getResourceType());
     }
 
     @Test
