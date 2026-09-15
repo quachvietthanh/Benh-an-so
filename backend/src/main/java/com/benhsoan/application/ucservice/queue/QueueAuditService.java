@@ -58,6 +58,17 @@ class QueueAuditService {
                 detail, null));
     }
 
+    void recordEarlyEnded(QueueItem item, String reason) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        String detail = reason != null
+                ? "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"action\":\"%s\",\"reason\":\"%s\",\"callCount\":%d}"
+                        .formatted(item.getId(), item.getStatus(), QueueSemanticAction.EARLY_ENDED, reason, item.getCallCount())
+                : "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"action\":\"%s\",\"callCount\":%d}"
+                        .formatted(item.getId(), item.getStatus(), QueueSemanticAction.EARLY_ENDED, item.getCallCount());
+        auditLogRepository.save(AuditLog.create(actorId, ActionType.CANCEL, ResourceType.VISIT, item.getVisitId(),
+                detail, null));
+    }
+
     void recordSkipped(QueueItem item, String reasonCode) {
         UUID actorId = currentUserPort.getCurrentUserId();
         auditLogRepository.save(AuditLog.create(actorId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),

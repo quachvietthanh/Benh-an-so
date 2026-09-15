@@ -112,7 +112,7 @@ public class GetOperationalDashboardService implements GetOperationalDashboardUs
                 case WAITING -> waiting++;
                 case IN_PROGRESS, WAITING_FOR_RESULT -> inProgress++;
                 case COMPLETED -> completed++;
-                case CANCELLED -> cancelled++;
+                case CANCELLED, EARLY_ENDED -> cancelled++;
             }
         }
 

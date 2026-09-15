@@ -37,13 +37,15 @@ public class Visit {
     private Instant completedAt;
     private String reason;
     private String note;
+    private String closeReason;
+    private Instant closedAt;
     private UUID createdBy;
     private Instant createdAt;
     private Instant updatedAt;
 
     private Visit(UUID id, String visitCode, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, UUID specialtyId,
             VisitType visitType, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
-            String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
+            String reason, String note, String closeReason, Instant closedAt, UUID createdBy, Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id);
         this.visitCode = Guard.require(visitCode, "Visit code");
         this.patientId = Objects.requireNonNull(patientId);
@@ -58,6 +60,8 @@ public class Visit {
         this.completedAt = completedAt;
         this.reason = Guard.require(reason, "Reason");
         this.note = note;
+        this.closeReason = closeReason;
+        this.closedAt = closedAt;
         this.createdBy = Objects.requireNonNull(createdBy);
         this.createdAt = Objects.requireNonNull(createdAt);
         this.updatedAt = updatedAt;
@@ -70,7 +74,7 @@ public class Visit {
     public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
             UUID specialtyId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy) {
         return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, specialtyId,
-                type, VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy, Instant.now(), null);
+                type, VisitStatus.WAITING, visitAt, null, null, reason, note, null, null, createdBy, Instant.now(), null);
     }
 
     public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
@@ -82,20 +86,27 @@ public class Visit {
     public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
             UUID specialtyId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy, Instant createdAt) {
         return new Visit(UUID.randomUUID(), code, patientId, doctorId, appointmentId, queueItemId, specialtyId, type,
-                VisitStatus.WAITING, visitAt, null, null, reason, note, createdBy,
+                VisitStatus.WAITING, visitAt, null, null, reason, note, null, null, createdBy,
                 Objects.requireNonNull(createdAt), null);
     }
 
     public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt, String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
         return restore(id, code, patientId, doctorId, appointmentId, queueItemId, Specialty.GENERAL_ID, type, status,
-                visitAt, startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
+                visitAt, startedAt, completedAt, reason, note, null, null, createdBy, createdAt, updatedAt);
     }
 
     public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
             UUID specialtyId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
             String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return restore(id, code, patientId, doctorId, appointmentId, queueItemId, specialtyId, type, status, visitAt,
+                startedAt, completedAt, reason, note, null, null, createdBy, createdAt, updatedAt);
+    }
+
+    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
+            String reason, String note, String closeReason, Instant closedAt, UUID createdBy, Instant createdAt, Instant updatedAt) {
         return new Visit(id, code, patientId, doctorId, appointmentId, queueItemId, specialtyId, type, status, visitAt,
-                startedAt, completedAt, reason, note, createdBy, createdAt, updatedAt);
+                startedAt, completedAt, reason, note, closeReason, closedAt, createdBy, createdAt, updatedAt);
     }
 
     public void start(Instant at) {
@@ -140,6 +151,24 @@ public class Visit {
         updatedAt = Objects.requireNonNull(at);
     }
 
+    public void earlyEnd(String reason, Instant at) {
+        requireInProgressForClose();
+        String validatedReason = requireCloseReason(reason);
+        this.status = VisitStatus.EARLY_ENDED;
+        this.closeReason = validatedReason;
+        this.closedAt = Objects.requireNonNull(at);
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void cancel(String reason, Instant at) {
+        requireInProgressForClose();
+        String validatedReason = requireCloseReason(reason);
+        this.status = VisitStatus.CANCELLED;
+        this.closeReason = validatedReason;
+        this.closedAt = Objects.requireNonNull(at);
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
     public void revertToWaiting(Instant at) {
         if (status != VisitStatus.IN_PROGRESS) {
             throw new VisitInvalidStatusException("Only in-progress visits can be reverted to waiting.");
@@ -171,7 +200,7 @@ public class Visit {
     }
 
     public void updateNote(String note, Instant at) {
-        if (status == VisitStatus.COMPLETED || status == VisitStatus.CANCELLED) {
+        if (status == VisitStatus.COMPLETED || status == VisitStatus.CANCELLED || status == VisitStatus.EARLY_ENDED) {
             throw new VisitInvalidStatusException("Finished visits cannot be updated.");
         
         }this.note = note;
@@ -188,6 +217,29 @@ public class Visit {
 
     public boolean isCancelled() {
         return status == VisitStatus.CANCELLED;
+    }
+
+    public boolean isEarlyEnded() {
+        return status == VisitStatus.EARLY_ENDED;
+    }
+
+    private void requireInProgressForClose() {
+        if (status != VisitStatus.IN_PROGRESS) {
+            if (status == VisitStatus.COMPLETED) throw new VisitAlreadyCompletedException();
+            if (status == VisitStatus.CANCELLED) throw new VisitAlreadyCancelledException();
+            throw new VisitInvalidStatusException("Only in-progress visits can be closed.");
+        }
+    }
+
+    private String requireCloseReason(String reason) {
+        String validated = reason == null ? null : reason.trim();
+        if (validated == null || validated.isBlank()) {
+            throw new ValidationException("Close reason is required.");
+        }
+        if (validated.length() > 500) {
+            throw new ValidationException("Close reason must not exceed 500 characters.");
+        }
+        return validated;
     }
 
     private void require(VisitStatus expected) {

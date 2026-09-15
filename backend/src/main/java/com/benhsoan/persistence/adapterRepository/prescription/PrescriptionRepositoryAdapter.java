@@ -108,6 +108,19 @@ public class PrescriptionRepositoryAdapter
     }
 
     @Override
+    @Transactional
+    public List<Prescription> findByMedicalRecordIdAndStatusForUpdate(
+            UUID medicalRecordId,
+            PrescriptionStatus status
+    ) {
+        return jpaRepository
+                .findByMedicalRecordIdAndStatusForUpdate(medicalRecordId, status)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Map<UUID, Long> countByMedicalRecordIdIn(Collection<UUID> medicalRecordIds) {
         if (medicalRecordIds == null || medicalRecordIds.isEmpty()) {

@@ -29,6 +29,8 @@ public interface PrescriptionRepository {
 
     List<Prescription> findByMedicalRecordId(UUID medicalRecordId);
 
+    List<Prescription> findByMedicalRecordIdAndStatusForUpdate(UUID medicalRecordId, PrescriptionStatus status);
+
     Map<UUID, Long> countByMedicalRecordIdIn(Collection<UUID> medicalRecordIds);
 
     Page<Prescription> findByStatus(PrescriptionStatus status, Pageable pageable);

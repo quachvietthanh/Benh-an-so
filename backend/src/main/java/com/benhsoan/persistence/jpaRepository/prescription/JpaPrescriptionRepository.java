@@ -55,6 +55,15 @@ public interface JpaPrescriptionRepository
             + "where prescription.id = :id")
     Optional<PrescriptionEntity> findByIdForUpdate(@Param("id") UUID id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select prescription from PrescriptionEntity prescription "
+            + "where prescription.medicalRecordId = :medicalRecordId "
+            + "and prescription.status = :status "
+            + "order by prescription.prescribedAt")
+    List<PrescriptionEntity> findByMedicalRecordIdAndStatusForUpdate(
+            @Param("medicalRecordId") UUID medicalRecordId,
+            @Param("status") PrescriptionStatus status);
+
     @Query("select prescription.id from PrescriptionEntity prescription "
             + "where prescription.medicalRecordId = :medicalRecordId")
     List<UUID> findIdsByMedicalRecordId(@Param("medicalRecordId") UUID medicalRecordId);

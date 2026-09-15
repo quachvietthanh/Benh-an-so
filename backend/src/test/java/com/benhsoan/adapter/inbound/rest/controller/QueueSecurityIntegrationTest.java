@@ -42,6 +42,7 @@ import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.inbound.queue.CallNextQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.CheckInAppointmentUseCase;
 import com.benhsoan.port.inbound.queue.CheckInWalkInUseCase;
+import com.benhsoan.port.inbound.queue.CloseVisitUseCase;
 import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
@@ -77,6 +78,7 @@ class QueueSecurityIntegrationTest {
     @MockitoBean private CallNextQueueItemUseCase callNextQueueItemUseCase;
     @MockitoBean private UpdateQueueItemStatusUseCase updateQueueItemStatusUseCase;
     @MockitoBean private CompleteQueueItemUseCase completeQueueItemUseCase;
+    @MockitoBean private CloseVisitUseCase closeVisitUseCase;
     @MockitoBean private GetQueueItemUseCase getQueueItemUseCase;
     @MockitoBean private SkipQueueItemUseCase skipQueueItemUseCase;
     @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
