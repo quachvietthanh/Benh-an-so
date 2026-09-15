@@ -117,10 +117,14 @@ Sau đợt review chuyên sâu, toàn bộ 5 finding đã được xử lý tri�
 
 | Finding | Nội dung lỗi | Giải pháp triển khai | Files thay đổi chính | Trạng thái |
 | :--- | :--- | :--- | :--- | :---: |
-| **[P1]** | Xung đột phân giải ca khi lịch tuần bị tắt (`active = false`). | Quy tắc: Lịch ngày cụ thể (`DoctorSchedule`) ghi đè lịch tuần (`DoctorWeeklySchedule`). Đồng bộ logic ở `DoctorScheduleValidator` và `GetDoctorWeeklyScheduleTableService`. | `DoctorScheduleValidator.java`, `DoctorWeeklyScheduleRepository.java`, `DoctorWeeklyScheduleRepositoryAdapter.java`, `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+| **[P1 - Blocker]** | Lỗi biên dịch `AppointmentController` do endpoint `/available-slots` bị sót/lạc scope. | Xóa bỏ hoàn toàn endpoint `GET /appointments/available-slots` và method test tương ứng, đưa controller về đúng scope NCL-03-CN-010. | `AppointmentController.java`, `AppointmentControllerTest.java` | **FIXED** |
+| **[P3 - Rule]** | Xác nhận biểu diễn `COMPLETED` và `NO_SHOW` trên weekly table. | Giữ nguyên kiến trúc 2 tầng ổn định: Slot status = `BOOKED` (khóa ô theo QTN-04), chi tiết cuộc hẹn trong `appointment.status` (phục vụ tô màu UI). | `GetDoctorWeeklyScheduleTableService.java` | **VERIFIED** |
+| **[P1 - Prior]** | Xung đột phân giải ca khi lịch tuần bị tắt (`active = false`). | Quy tắc: Lịch ngày cụ thể (`DoctorSchedule`) ghi đè lịch tuần (`DoctorWeeklySchedule`). | `DoctorScheduleValidator.java`, `DoctorWeeklyScheduleRepository.java`, `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
 | **[P2-1]** | Lịch hẹn cũ bị ẩn khi slot rơi vào ngoài giờ (`OFF_DUTY`). | Đẩy kiểm tra `matchingAppt` lên đầu vòng lặp slot; hiển thị `BOOKED`, `isBookable = false` kèm thông tin cuộc hẹn. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
 | **[P2-2]** | Thiếu kiểm tra role Bác sĩ khi truyền `doctorId`. | Bổ sung kiểm tra `!RoleConstants.DOCTOR.equals(doctor.getRoleId())` -> ném 404 `DoctorNotFoundException`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
 | **[P3-1]** | Chưa hỗ trợ chế độ ẩn danh (NCL-15-CN-003). | Bổ sung `patientCode`; tiêm `AnonymizationModeState` vào `AppointmentRestMapper`, áp dụng `PatientAnonymizer.maskFullName` và `maskPhone`. | `DoctorWeeklyTableResult.java`, `DoctorWeeklyTableResponse.java`, `AppointmentRestMapper.java`, `AppointmentRestMapperTest.java` | **FIXED** |
 | **[P3-2]** | Trùng tên biến (Variable Shadowing). | Đổi tên tham số `buildSlotsForDay` thành `doctorAppointments`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
 
-**Xác nhận kiểm thử tự động**: 53/53 tests PASS (BUILD SUCCESS).
+**Xác nhận kiểm thử tự động thực tế sau khi fix:**
+- Targeted Test Suites (6 suites): **47/47 tests PASS** (`BUILD SUCCESS`).
+- Toàn bộ Backend Test Suite: **1639/1639 tests PASS** (26 skipped, 0 failures, 0 errors, `BUILD SUCCESS`).

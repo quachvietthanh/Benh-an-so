@@ -437,23 +437,4 @@ class AppointmentControllerTest {
                                 .andExpect(jsonPath("$.content[0].id").value(appointmentId.toString()))
                                 .andExpect(jsonPath("$.content[0].status").value("SCHEDULED"));
         }
-
-        @Test
-        void getAvailableSlots_returnsSlotsSuccessfully() throws Exception {
-                UUID doctorId = UUID.randomUUID();
-                Instant slotStart = Instant.parse("2026-09-15T01:00:00Z");
-                Instant slotEnd = Instant.parse("2026-09-15T01:30:00Z");
-
-                when(getDoctorAvailableSlotsUseCase.getAvailableSlots(any()))
-                                .thenReturn(List.of(new DoctorAvailableSlotResult(slotStart, slotEnd, true)));
-
-                mockMvc.perform(get("/appointments/available-slots")
-                                .param("doctorId", doctorId.toString())
-                                .param("date", "2026-09-15")
-                                .with(withPermissions("APPOINTMENT_READ")))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$[0].startTime").value(slotStart.toString()))
-                                .andExpect(jsonPath("$[0].endTime").value(slotEnd.toString()))
-                                .andExpect(jsonPath("$[0].isAvailable").value(true));
-        }
 }

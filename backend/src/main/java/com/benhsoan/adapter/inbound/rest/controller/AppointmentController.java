@@ -113,15 +113,6 @@ public class AppointmentController {
         return mapper.toResponse(results);
     }
 
-    @GetMapping("/available-slots")
-    @RequirePermission("APPOINTMENT_READ")
-    public List<DoctorAvailableSlotResult> getAvailableSlots(
-            @RequestParam UUID doctorId,
-            @RequestParam LocalDate date) {
-        return getDoctorAvailableSlotsUseCase.getAvailableSlots(
-                new GetDoctorAvailableSlotsQuery(doctorId, date));
-    }
-
     @GetMapping("/{id}")
     @RequirePermission("APPOINTMENT_READ")
     public AppointmentResponse getById(@PathVariable UUID id) {
