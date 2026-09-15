@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const patientPortalAppointmentApi = {
   getSpecialties: (params = { active: true }) => {
@@ -38,6 +38,9 @@ const patientPortalAppointmentApi = {
   },
   getAppointmentDetail: (id) => {
     return axiosClient.get(`/patient-portal/appointments/${id}`)
+  },
+  confirmAppointment: (id) => {
+    return axiosClient.patch(`/patient-portal/appointments/${id}/confirm`)
   },
 }
 

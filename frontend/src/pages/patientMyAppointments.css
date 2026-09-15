@@ -177,6 +177,27 @@
   transition: all 0.2s ease !important;
 }
 
+.portal-action-btn-confirm {
+  height: 34px !important;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  border: 1px solid #16a34a !important;
+  color: #ffffff !important;
+  background: #16a34a !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+.portal-action-btn-confirm:hover {
+  background: #15803d !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
+}
+
 .portal-action-btn-cancel:hover {
   background: #dc2626 !important;
   color: #ffffff !important;

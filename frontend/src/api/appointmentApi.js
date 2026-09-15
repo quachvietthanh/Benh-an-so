@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const appointmentApi = {
   getAll: (params) => axiosClient.get('/appointments', { params: { size: 100, ...params } }),
@@ -11,6 +11,8 @@ const appointmentApi = {
   checkIn: (id) => axiosClient.post(`/appointments/${id}/check-in`),
   reschedule: (id, data) => axiosClient.patch(`/appointments/${id}/reschedule`, data),
   getAvailableSlots: (doctorId, date) => axiosClient.get('/appointments/available-slots', { params: { doctorId, date } }),
+  confirm: (id) => axiosClient.patch(`/appointments/${id}/confirm`),
+  getUnconfirmed: (params) => axiosClient.get('/appointments/unconfirmed', { params }),
 }
 
 export default appointmentApi

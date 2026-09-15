@@ -39,7 +39,7 @@ import RescheduleAppointmentModal from '../components/portal/RescheduleAppointme
 import { useAuthContext } from '../context/AuthContext'
 import './patientMyAppointments.css'
 
-const { Title, Text } = Typography
+const { Title, Text, Paragraph } = Typography
 
 const statusMeta = {
   SCHEDULED: { label: 'Đã đặt lịch', color: 'blue', icon: <ClockCircleOutlined /> },
@@ -58,6 +58,7 @@ function PatientMyAppointmentsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [cancellingId, setCancellingId] = useState(null)
+  const [confirmingId, setConfirmingId] = useState(null)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [targetAppointment, setTargetAppointment] = useState(null)
@@ -127,6 +128,59 @@ function PatientMyAppointmentsPage() {
     const validStatus = apt.status === 'SCHEDULED' || apt.status === 'CONFIRMED'
     const isFuture = apt.startTime ? dayjs(apt.startTime).isAfter(dayjs()) : true
     return validStatus && isFuture
+  }
+
+  const handleConfirmAttendance = (apt) => {
+    const startDayjs = apt.startTime ? dayjs(apt.startTime) : null
+    const doctorName = apt.doctor?.fullName || apt.doctor?.username || apt.doctorName || 'Bác sĩ phụ trách'
+
+    Modal.confirm({
+      title: 'Xác nhận sẽ đến khám bệnh (TC-02)',
+      icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
+      content: (
+        <div>
+          <Paragraph>
+            Bạn có chắc chắn xác nhận <strong>sẽ đến khám</strong> cho lịch hẹn này không?
+          </Paragraph>
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginTop: 8 }}>
+            <div style={{ marginBottom: 4 }}>
+              <ClockCircleOutlined style={{ color: '#2563eb', marginRight: 6 }} />
+              <strong>
+                {startDayjs?.isValid() ? startDayjs.format('HH:mm, [ngày] DD/MM/YYYY') : 'Lịch hẹn'}
+              </strong>
+            </div>
+            <div>
+              <UserOutlined style={{ color: '#2563eb', marginRight: 6 }} />
+              <strong>BS. {doctorName}</strong>
+            </div>
+          </div>
+          <Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+            Sau khi xác nhận, phòng khám sẽ giữ chỗ ưu tiên và chuẩn bị sẵn sàng hồ sơ đón tiếp bạn.
+          </Paragraph>
+        </div>
+      ),
+      okText: 'Xác nhận sẽ đến',
+      okButtonProps: { style: { backgroundColor: '#16a34a', borderColor: '#16a34a' } },
+      cancelText: 'Để sau',
+      onOk: async () => {
+        setConfirmingId(apt.id)
+        try {
+          await patientPortalAppointmentApi.confirmAppointment(apt.id)
+          message.success('Cảm ơn bạn! Lịch hẹn đã được xác nhận thành công.')
+          setAppointments((prev) =>
+            prev.map((item) =>
+              item.id === apt.id ? { ...item, status: 'CONFIRMED', confirmedAt: new Date().toISOString() } : item
+            )
+          )
+          fetchAppointments()
+        } catch (err) {
+          const msg = err?.response?.data?.message || err?.message || 'Không thể xác nhận lịch hẹn'
+          message.error(msg)
+        } finally {
+          setConfirmingId(null)
+        }
+      },
+    })
   }
 
   const handleOpenCancelModal = (apt) => {
@@ -387,9 +441,15 @@ function PatientMyAppointmentsPage() {
                           <strong style={{ fontSize: 16, color: '#1e293b' }}>
                             Mã lịch hẹn: {apt.appointmentCode || apt.id?.substring(0, 8)}
                           </strong>
-                          <Tag color={statusInfo.color} icon={statusInfo.icon} style={{ fontWeight: 600, fontSize: 12 }}>
-                            {statusInfo.label}
-                          </Tag>
+                          {apt.status === 'CONFIRMED' ? (
+                            <Tag color="green" icon={<CheckCircleOutlined />} style={{ fontWeight: 600, fontSize: 12 }}>
+                              Đã xác nhận sẽ đến
+                            </Tag>
+                          ) : (
+                            <Tag color={statusInfo.color} icon={statusInfo.icon} style={{ fontWeight: 600, fontSize: 12 }}>
+                              {statusInfo.label}
+                            </Tag>
+                          )}
                           {apt.bookingChannel === 'ONLINE_PORTAL' && (
                             <Tag color="purple" style={{ fontSize: 11 }}>
                               Đặt trực tuyến
@@ -415,12 +475,29 @@ function PatientMyAppointmentsPage() {
                               Lý do khám: {apt.reason}
                             </div>
                           )}
+                          {apt.status === 'CONFIRMED' && (
+                            <div style={{ marginTop: 4, color: '#16a34a', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <CheckCircleOutlined /> Bạn đã xác nhận sẽ đến khám. Vui lòng có mặt trước giờ hẹn 15 phút.
+                            </div>
+                          )}
                         </div>
                       </Col>
 
                       <Col xs={24} md={8} style={{ textAlign: { xs: 'left', md: 'right' } }}>
                         {canModifyAppointment(apt) ? (
                           <Space size={8} wrap>
+                            {apt.status === 'SCHEDULED' && (
+                              <Button
+                                type="primary"
+                                className="portal-action-btn-confirm"
+                                icon={<CheckCircleOutlined />}
+                                loading={confirmingId === apt.id}
+                                style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+                                onClick={() => handleConfirmAttendance(apt)}
+                              >
+                                Xác nhận sẽ đến
+                              </Button>
+                            )}
                             <Button
                               className="portal-action-btn-reschedule"
                               icon={<SwapOutlined />}

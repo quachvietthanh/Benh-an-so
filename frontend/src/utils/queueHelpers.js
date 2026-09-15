@@ -12,6 +12,7 @@ export const QUEUE_STATUS_META = {
 
 export const APPOINTMENT_STATUS_META = {
   SCHEDULED: { label: 'Đã đặt hẹn', tone: 'blue', color: '#2563eb' },
+  CONFIRMED: { label: 'Đã xác nhận', tone: 'green', color: '#16a34a' },
   CHECKED_IN: { label: 'Đã tiếp nhận (Chờ khám)', tone: 'cyan', color: '#0891b2' },
   COMPLETED: { label: 'Đã khám xong', tone: 'gray', color: '#475569' },
   CANCELLED: { label: 'Đã hủy', tone: 'red', color: '#dc2626' },
@@ -179,6 +180,7 @@ export const checkQueuePermissions = (roles = [], permissions = []) => {
     canUpdateAppointment: canUpdateApp || isAdmin || isReceptionist,
     canDeleteAppointment: canDeleteApp || isAdmin || isReceptionist,
     canRescheduleAppointment: (isAdmin || isReceptionist) && (canUpdateApp || isAdmin || isReceptionist),
+    canConfirmAppointment: (isAdmin || isReceptionist) && (canUpdateApp || isAdmin || isReceptionist),
     isDoctorOnly: isDoctor && !isAdmin && !isReceptionist,
     isAdmin,
     isReceptionist,
