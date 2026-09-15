@@ -701,6 +701,7 @@ function AppointmentQueue() {
     }
 
     const pInfo = getPatientInfo(record.patientId, record.patientName)
+    const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
     const timeVal = record.appointmentAt || record.startTime || record.date
     const appTime = dayjs(timeVal)
 
@@ -709,8 +710,12 @@ function AppointmentQueue() {
       icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
       content: (
         <div>
-          <Paragraph>
-            Ghi nhận bệnh nhân <strong>{pInfo.name}</strong> ({record.appointmentCode}) đã xác nhận sẽ đến khám?
+          <Paragraph style={{ marginBottom: 6 }}>
+            Bệnh nhân: <strong>{pInfo.name}</strong> ({record.appointmentCode})
+          </Paragraph>
+          <Paragraph style={{ marginBottom: 6 }}>
+            Bác sĩ phụ trách: <strong>{dInfo.name ? `BS. ${dInfo.name}` : 'Chưa gán'}</strong>{' '}
+            {dInfo.department && <Text type="secondary">({dInfo.department})</Text>}
           </Paragraph>
           <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 0 }}>
             Khung giờ hẹn:{' '}

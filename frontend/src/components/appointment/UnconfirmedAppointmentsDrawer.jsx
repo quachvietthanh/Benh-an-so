@@ -88,14 +88,23 @@ export default function UnconfirmedAppointmentsDrawer({
     const timeVal = record.startTime || record.appointmentAt || record.date
     const appTime = dayjs(timeVal)
     const pName = record.patientName || 'Bệnh nhân'
+    const docName = record.doctorName
+      ? `BS. ${record.doctorName}`
+      : record.doctorId
+        ? `Bác sĩ #${record.doctorId}`
+        : 'Chưa gán bác sĩ'
 
     Modal.confirm({
       title: 'Xác nhận lịch hẹn khám',
       icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
       content: (
         <div>
-          <Paragraph>
-            Ghi nhận bệnh nhân <strong>{pName}</strong> ({record.appointmentCode}) đã xác nhận sẽ đến khám?
+          <Paragraph style={{ marginBottom: 6 }}>
+            Bệnh nhân: <strong>{pName}</strong> ({record.appointmentCode || record.id})
+          </Paragraph>
+          <Paragraph style={{ marginBottom: 6 }}>
+            Bác sĩ phụ trách: <strong>{docName}</strong>{' '}
+            {record.department && <Text type="secondary">({record.department})</Text>}
           </Paragraph>
           <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 0 }}>
             Khung giờ hẹn:{' '}
