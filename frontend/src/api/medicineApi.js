@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const medicineApi = {
   search: (params = {}) => axiosClient.get('/medicines', { params }),

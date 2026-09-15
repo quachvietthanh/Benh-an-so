@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 export default {
   getAll: (params) => axiosClient.get('/invoices', { params }),

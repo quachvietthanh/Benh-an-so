@@ -106,6 +106,7 @@ public class GetOperationalDashboardService implements GetOperationalDashboardUs
         int inProgress = 0;
         int completed = 0;
         int cancelled = 0;
+        int earlyEnded = 0;
 
         for (Visit visit : visits) {
             switch (visit.getStatus()) {
@@ -113,6 +114,7 @@ public class GetOperationalDashboardService implements GetOperationalDashboardUs
                 case IN_PROGRESS, WAITING_FOR_RESULT -> inProgress++;
                 case COMPLETED -> completed++;
                 case CANCELLED -> cancelled++;
+                case EARLY_ENDED -> earlyEnded++;
             }
         }
 
@@ -121,7 +123,8 @@ public class GetOperationalDashboardService implements GetOperationalDashboardUs
                 waiting,
                 inProgress,
                 completed,
-                cancelled
+                cancelled,
+                earlyEnded
         );
     }
 

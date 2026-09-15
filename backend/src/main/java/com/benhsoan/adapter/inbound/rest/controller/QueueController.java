@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.QueueRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.queue.CheckInWalkInRequest;
+import com.benhsoan.adapter.inbound.rest.request.queue.CloseQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
@@ -29,6 +30,7 @@ import com.benhsoan.port.dto.command.queue.GetQueuesQuery;
 import com.benhsoan.port.inbound.queue.CallNextQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.CheckInAppointmentUseCase;
 import com.benhsoan.port.inbound.queue.CheckInWalkInUseCase;
+import com.benhsoan.port.inbound.queue.CloseVisitUseCase;
 import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
@@ -54,6 +56,7 @@ public class QueueController {
     private final CallNextQueueItemUseCase callNextQueueItemUseCase;
     private final UpdateQueueItemStatusUseCase updateQueueItemStatusUseCase;
     private final CompleteQueueItemUseCase completeQueueItemUseCase;
+    private final CloseVisitUseCase closeVisitUseCase;
     private final GetQueueItemUseCase getQueueItemUseCase;
     private final SkipQueueItemUseCase skipQueueItemUseCase;
     private final ReQueueItemUseCase reQueueItemUseCase;
@@ -104,6 +107,13 @@ public class QueueController {
     @RequirePermission("QUEUE_UPDATE_STATUS")
     public QueueItemResponse complete(@PathVariable UUID itemId) {
         return mapper.toResponse(completeQueueItemUseCase.complete(new CompleteQueueItemCommand(itemId)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/close")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse close(@PathVariable UUID itemId,
+            @Valid @RequestBody CloseQueueItemRequest request) {
+        return mapper.toResponse(closeVisitUseCase.close(mapper.toCommand(itemId, request)));
     }
 
     @PostMapping("/queue-items/{itemId}/skip")

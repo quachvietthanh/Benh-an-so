@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const DEFAULT_PAGE_PARAMS = { page: 0, size: 100 }
 

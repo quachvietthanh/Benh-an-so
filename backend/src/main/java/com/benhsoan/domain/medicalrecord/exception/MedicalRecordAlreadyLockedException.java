@@ -8,4 +8,8 @@ public class MedicalRecordAlreadyLockedException extends MedicalRecordException 
     public MedicalRecordAlreadyLockedException() {
         super(DomainErrorCode.MEDICAL_RECORD_LOCKED, "Medical record is already locked.");
     }
+
+    public MedicalRecordAlreadyLockedException(String message) {
+        super(DomainErrorCode.MEDICAL_RECORD_LOCKED, message);
+    }
 }
