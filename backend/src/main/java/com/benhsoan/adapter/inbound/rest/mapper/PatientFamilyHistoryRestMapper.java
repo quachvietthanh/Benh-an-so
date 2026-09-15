@@ -34,6 +34,8 @@ public class PatientFamilyHistoryRestMapper {
                 result.patientId(),
                 result.relationship(),
                 result.diagnosisCatalogId(),
+                result.diagnosisCode(),
+                result.diagnosisName(),
                 result.notes(),
                 result.active(),
                 result.createdBy(),

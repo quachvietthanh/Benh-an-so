@@ -11,6 +11,8 @@ public record PatientFamilyHistoryResult(
         UUID patientId,
         String relationship,
         UUID diagnosisCatalogId,
+        String diagnosisCode,
+        String diagnosisName,
         String notes,
         boolean active,
         UUID createdBy,

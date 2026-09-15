@@ -10,6 +10,8 @@ public record PatientChronicDiseaseResult(
         UUID id,
         UUID patientId,
         UUID diagnosisCatalogId,
+        String diagnosisCode,
+        String diagnosisName,
         Integer yearDetected,
         String notes,
         boolean active,

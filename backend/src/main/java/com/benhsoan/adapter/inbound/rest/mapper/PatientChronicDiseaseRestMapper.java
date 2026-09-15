@@ -33,6 +33,8 @@ public class PatientChronicDiseaseRestMapper {
                 result.id(),
                 result.patientId(),
                 result.diagnosisCatalogId(),
+                result.diagnosisCode(),
+                result.diagnosisName(),
                 result.yearDetected(),
                 result.notes(),
                 result.active(),

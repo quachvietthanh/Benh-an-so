@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogNotFoundException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientFamilyHistory;
@@ -67,8 +68,11 @@ public class AddPatientFamilyHistoryService implements AddPatientFamilyHistoryUs
             throw new PatientInactiveException();
         }
 
-        diagnosisCatalogRepository.findById(command.diagnosisCatalogId())
+        DiagnosisCatalog catalog = diagnosisCatalogRepository.findById(command.diagnosisCatalogId())
                 .orElseThrow(() -> new DiagnosisCatalogNotFoundException(command.diagnosisCatalogId()));
+        if (!catalog.isActive()) {
+            throw new ValidationException("Mã bệnh (chẩn đoán) không còn hiệu lực.");
+        }
 
         if (command.visitId() != null) {
             validateVisit(command.patientId(), command.visitId());
@@ -93,12 +97,12 @@ public class AddPatientFamilyHistoryService implements AddPatientFamilyHistoryUs
                 ActionType.CREATE,
                 ResourceType.PATIENT_FAMILY_HISTORY,
                 saved.getId(),
-                buildAuditDetail(saved),
+                buildAuditDetail(saved, command.visitId()),
                 null,
                 now
         ));
 
-        return resultMapper.toResult(saved);
+        return resultMapper.toResult(saved, catalog.getCode(), catalog.getName());
     }
 
     private void validateVisit(UUID patientId, UUID visitId) {
@@ -112,12 +116,15 @@ public class AddPatientFamilyHistoryService implements AddPatientFamilyHistoryUs
         }
     }
 
-    private String buildAuditDetail(PatientFamilyHistory familyHistory) {
+    private String buildAuditDetail(PatientFamilyHistory familyHistory, UUID visitId) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("familyHistoryId", familyHistory.getId().toString());
         detail.put("patientId", familyHistory.getPatientId().toString());
         detail.put("relationship", familyHistory.getRelationship());
         detail.put("diagnosisCatalogId", familyHistory.getDiagnosisCatalogId().toString());
+        if (visitId != null) {
+            detail.put("visitId", visitId.toString());
+        }
         if (familyHistory.getNotes() != null) {
             detail.put("notes", familyHistory.getNotes());
         }

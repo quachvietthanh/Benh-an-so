@@ -9,6 +9,10 @@ import com.benhsoan.port.dto.result.patient.PatientFamilyHistoryResult;
 public class PatientFamilyHistoryResultMapper {
 
     public PatientFamilyHistoryResult toResult(PatientFamilyHistory familyHistory) {
+        return toResult(familyHistory, null, null);
+    }
+
+    public PatientFamilyHistoryResult toResult(PatientFamilyHistory familyHistory, String diagnosisCode, String diagnosisName) {
         if (familyHistory == null) {
             return null;
         }
@@ -17,6 +21,8 @@ public class PatientFamilyHistoryResultMapper {
                 .patientId(familyHistory.getPatientId())
                 .relationship(familyHistory.getRelationship())
                 .diagnosisCatalogId(familyHistory.getDiagnosisCatalogId())
+                .diagnosisCode(diagnosisCode)
+                .diagnosisName(diagnosisName)
                 .notes(familyHistory.getNotes())
                 .active(familyHistory.isActive())
                 .createdBy(familyHistory.getCreatedBy())

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,7 +17,9 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogNotFoundException;
 import com.benhsoan.domain.patient.Patient;
@@ -24,6 +27,7 @@ import com.benhsoan.domain.patient.PatientChronicDisease;
 import com.benhsoan.domain.patient.exception.PatientChronicDiseaseAlreadyExistsException;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.dto.command.patient.AddPatientChronicDiseaseCommand;
 import com.benhsoan.port.dto.result.patient.PatientChronicDiseaseResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -41,6 +45,7 @@ class PatientChronicDiseaseServiceTest {
     private static final UUID PATIENT_ID = UUID.randomUUID();
     private static final UUID CATALOG_ID = UUID.randomUUID();
     private static final UUID ACTOR_ID = UUID.randomUUID();
+    private static final UUID VISIT_ID = UUID.randomUUID();
 
     private final PatientRepository patientRepository = mock(PatientRepository.class);
     private final PatientChronicDiseaseRepository chronicDiseaseRepository = mock(PatientChronicDiseaseRepository.class);
@@ -59,7 +64,8 @@ class PatientChronicDiseaseServiceTest {
         addService = new AddPatientChronicDiseaseService(
                 patientRepository, chronicDiseaseRepository, diagnosisCatalogRepository, visitRepository,
                 auditLogRepository, currentUserPort, clockPort, resultMapper, new ObjectMapper());
-        getService = new GetPatientChronicDiseasesService(patientRepository, chronicDiseaseRepository, resultMapper);
+        getService = new GetPatientChronicDiseasesService(patientRepository, chronicDiseaseRepository,
+                diagnosisCatalogRepository, resultMapper);
     }
 
     private void stubActivePatient() {
@@ -68,8 +74,16 @@ class PatientChronicDiseaseServiceTest {
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
     }
 
-    private void stubCatalog() {
+    private DiagnosisCatalog activeCatalog() {
         DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        when(catalog.isActive()).thenReturn(true);
+        when(catalog.getCode()).thenReturn("E11.9");
+        when(catalog.getName()).thenReturn("Đái tháo đường type 2");
+        return catalog;
+    }
+
+    private void stubCatalog() {
+        DiagnosisCatalog catalog = activeCatalog();
         when(diagnosisCatalogRepository.findById(CATALOG_ID)).thenReturn(Optional.of(catalog));
     }
 
@@ -94,6 +108,8 @@ class PatientChronicDiseaseServiceTest {
 
         assertEquals(PATIENT_ID, result.patientId());
         assertEquals(CATALOG_ID, result.diagnosisCatalogId());
+        assertEquals("E11.9", result.diagnosisCode());
+        assertEquals("Đái tháo đường type 2", result.diagnosisName());
         assertEquals(2015, result.yearDetected());
         assertTrue(result.active());
         verify(auditLogRepository).save(any());
@@ -130,6 +146,20 @@ class PatientChronicDiseaseServiceTest {
     }
 
     @Test
+    void rejectsInactiveDiseaseCatalog() {
+        stubActivePatient();
+        DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        when(catalog.isActive()).thenReturn(false);
+        when(diagnosisCatalogRepository.findById(CATALOG_ID)).thenReturn(Optional.of(catalog));
+
+        assertThrows(ValidationException.class, () -> addService.addChronicDisease(
+                AddPatientChronicDiseaseCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .build()));
+    }
+
+    @Test
     void rejectsDuplicateActiveChronicDisease() {
         stubActivePatient();
         stubCatalog();
@@ -153,10 +183,79 @@ class PatientChronicDiseaseServiceTest {
                 PATIENT_ID, CATALOG_ID, 2015, null, ACTOR_ID, NOW);
         when(chronicDiseaseRepository.findByPatientIdAndActiveTrue(PATIENT_ID)).thenReturn(List.of(disease));
 
+        DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        when(catalog.getId()).thenReturn(CATALOG_ID);
+        when(catalog.getCode()).thenReturn("E11.9");
+        when(catalog.getName()).thenReturn("Đái tháo đường type 2");
+        when(diagnosisCatalogRepository.findAllByIds(any())).thenReturn(List.of(catalog));
+
         List<PatientChronicDiseaseResult> results = getService.getChronicDiseases(PATIENT_ID);
 
         assertEquals(1, results.size());
         assertEquals(CATALOG_ID, results.get(0).diagnosisCatalogId());
+        assertEquals("E11.9", results.get(0).diagnosisCode());
+        assertEquals("Đái tháo đường type 2", results.get(0).diagnosisName());
+    }
+
+    @Test
+    void retrievesEmptyChronicDiseasesWithoutCatalogLookup() {
+        Patient patient = mock(Patient.class);
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+        when(chronicDiseaseRepository.findByPatientIdAndActiveTrue(PATIENT_ID)).thenReturn(List.of());
+
+        List<PatientChronicDiseaseResult> results = getService.getChronicDiseases(PATIENT_ID);
+
+        assertTrue(results.isEmpty());
+        verify(diagnosisCatalogRepository, never()).findAllByIds(any());
+    }
+
+    @Test
+    void retrievesMultipleChronicDiseasesWithSingleBatchLookup() {
+        UUID secondCatalogId = UUID.randomUUID();
+        Patient patient = mock(Patient.class);
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+        PatientChronicDisease first = PatientChronicDisease.create(
+                PATIENT_ID, CATALOG_ID, 2015, null, ACTOR_ID, NOW);
+        PatientChronicDisease second = PatientChronicDisease.create(
+                PATIENT_ID, secondCatalogId, 2019, null, ACTOR_ID, NOW);
+        when(chronicDiseaseRepository.findByPatientIdAndActiveTrue(PATIENT_ID)).thenReturn(List.of(first, second));
+
+        DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        when(catalog.getId()).thenReturn(CATALOG_ID);
+        when(catalog.getCode()).thenReturn("E11.9");
+        when(catalog.getName()).thenReturn("Đái tháo đường type 2");
+        when(diagnosisCatalogRepository.findAllByIds(any())).thenReturn(List.of(catalog));
+
+        List<PatientChronicDiseaseResult> results = getService.getChronicDiseases(PATIENT_ID);
+
+        assertEquals(2, results.size());
+        verify(diagnosisCatalogRepository, times(1)).findAllByIds(any());
+    }
+
+    @Test
+    void recordsVisitIdInAuditDetailWhenProvided() {
+        stubActivePatient();
+        stubCatalog();
+        when(chronicDiseaseRepository.existsByPatientIdAndDiagnosisCatalogIdAndActiveTrue(PATIENT_ID, CATALOG_ID))
+                .thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
+        when(clockPort.now()).thenReturn(NOW);
+        when(chronicDiseaseRepository.save(any(PatientChronicDisease.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        Visit visit = mock(Visit.class);
+        when(visit.getPatientId()).thenReturn(PATIENT_ID);
+        when(visit.isActive()).thenReturn(true);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+
+        addService.addChronicDisease(AddPatientChronicDiseaseCommand.builder()
+                .patientId(PATIENT_ID)
+                .diagnosisCatalogId(CATALOG_ID)
+                .visitId(VISIT_ID)
+                .build());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertTrue(captor.getValue().getDetail().contains(VISIT_ID.toString()));
     }
 
     @Test

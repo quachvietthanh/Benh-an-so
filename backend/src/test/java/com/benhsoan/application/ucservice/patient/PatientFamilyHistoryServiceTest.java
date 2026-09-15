@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,13 +17,16 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogNotFoundException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientFamilyHistory;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.dto.command.patient.AddPatientFamilyHistoryCommand;
 import com.benhsoan.port.dto.result.patient.PatientFamilyHistoryResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -39,6 +44,7 @@ class PatientFamilyHistoryServiceTest {
     private static final UUID PATIENT_ID = UUID.randomUUID();
     private static final UUID CATALOG_ID = UUID.randomUUID();
     private static final UUID ACTOR_ID = UUID.randomUUID();
+    private static final UUID VISIT_ID = UUID.randomUUID();
 
     private final PatientRepository patientRepository = mock(PatientRepository.class);
     private final PatientFamilyHistoryRepository familyHistoryRepository = mock(PatientFamilyHistoryRepository.class);
@@ -57,7 +63,8 @@ class PatientFamilyHistoryServiceTest {
         addService = new AddPatientFamilyHistoryService(
                 patientRepository, familyHistoryRepository, diagnosisCatalogRepository, visitRepository,
                 auditLogRepository, currentUserPort, clockPort, resultMapper, new ObjectMapper());
-        getService = new GetPatientFamilyHistoryService(patientRepository, familyHistoryRepository, resultMapper);
+        getService = new GetPatientFamilyHistoryService(patientRepository, familyHistoryRepository,
+                diagnosisCatalogRepository, resultMapper);
     }
 
     private void stubActivePatient() {
@@ -66,10 +73,18 @@ class PatientFamilyHistoryServiceTest {
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
     }
 
+    private DiagnosisCatalog activeCatalog() {
+        DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        when(catalog.isActive()).thenReturn(true);
+        when(catalog.getCode()).thenReturn("E11.9");
+        when(catalog.getName()).thenReturn("Đái tháo đường type 2");
+        return catalog;
+    }
+
     @Test
     void createsFamilyHistory() {
         stubActivePatient();
-        DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        DiagnosisCatalog catalog = activeCatalog();
         when(diagnosisCatalogRepository.findById(CATALOG_ID)).thenReturn(Optional.of(catalog));
         when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
         when(clockPort.now()).thenReturn(NOW);
@@ -85,6 +100,8 @@ class PatientFamilyHistoryServiceTest {
 
         assertEquals("Bố", result.relationship());
         assertEquals(CATALOG_ID, result.diagnosisCatalogId());
+        assertEquals("E11.9", result.diagnosisCode());
+        assertEquals("Đái tháo đường type 2", result.diagnosisName());
         assertTrue(result.active());
         verify(auditLogRepository).save(any());
     }
@@ -123,6 +140,21 @@ class PatientFamilyHistoryServiceTest {
     }
 
     @Test
+    void rejectsInactiveDiseaseCatalog() {
+        stubActivePatient();
+        DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        when(catalog.isActive()).thenReturn(false);
+        when(diagnosisCatalogRepository.findById(CATALOG_ID)).thenReturn(Optional.of(catalog));
+
+        assertThrows(ValidationException.class, () -> addService.addFamilyHistory(
+                AddPatientFamilyHistoryCommand.builder()
+                        .patientId(PATIENT_ID)
+                        .relationship("Bố")
+                        .diagnosisCatalogId(CATALOG_ID)
+                        .build()));
+    }
+
+    @Test
     void retrievesFamilyHistoryForPatient() {
         Patient patient = mock(Patient.class);
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
@@ -130,10 +162,44 @@ class PatientFamilyHistoryServiceTest {
                 PATIENT_ID, "Bố", CATALOG_ID, null, ACTOR_ID, NOW);
         when(familyHistoryRepository.findByPatientIdAndActiveTrue(PATIENT_ID)).thenReturn(List.of(familyHistory));
 
+        DiagnosisCatalog catalog = mock(DiagnosisCatalog.class);
+        when(catalog.getId()).thenReturn(CATALOG_ID);
+        when(catalog.getCode()).thenReturn("E11.9");
+        when(catalog.getName()).thenReturn("Đái tháo đường type 2");
+        when(diagnosisCatalogRepository.findAllByIds(any())).thenReturn(List.of(catalog));
+
         List<PatientFamilyHistoryResult> results = getService.getFamilyHistory(PATIENT_ID);
 
         assertEquals(1, results.size());
         assertEquals("Bố", results.get(0).relationship());
+        assertEquals("E11.9", results.get(0).diagnosisCode());
+        assertEquals("Đái tháo đường type 2", results.get(0).diagnosisName());
+    }
+
+    @Test
+    void recordsVisitIdInAuditDetailWhenProvided() {
+        stubActivePatient();
+        DiagnosisCatalog catalog = activeCatalog();
+        when(diagnosisCatalogRepository.findById(CATALOG_ID)).thenReturn(Optional.of(catalog));
+        when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
+        when(clockPort.now()).thenReturn(NOW);
+        when(familyHistoryRepository.save(any(PatientFamilyHistory.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        Visit visit = mock(Visit.class);
+        when(visit.getPatientId()).thenReturn(PATIENT_ID);
+        when(visit.isActive()).thenReturn(true);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+
+        addService.addFamilyHistory(AddPatientFamilyHistoryCommand.builder()
+                .patientId(PATIENT_ID)
+                .relationship("Bố")
+                .diagnosisCatalogId(CATALOG_ID)
+                .visitId(VISIT_ID)
+                .build());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertTrue(captor.getValue().getDetail().contains(VISIT_ID.toString()));
     }
 
     @Test
