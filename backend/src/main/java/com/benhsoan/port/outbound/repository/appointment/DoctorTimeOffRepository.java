@@ -17,6 +17,8 @@ public interface DoctorTimeOffRepository {
 
     List<DoctorTimeOff> findActiveOverlapping(UUID doctorId, Instant startTime, Instant endTime);
 
+    List<DoctorTimeOff> findActiveOverlappingForDoctors(java.util.Collection<UUID> doctorIds, Instant startTime, Instant endTime);
+
     boolean existsActiveOverlapping(UUID doctorId, Instant startTime, Instant endTime);
 
 }

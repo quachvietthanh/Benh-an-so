@@ -15,6 +15,10 @@ public interface JpaDoctorWeeklyScheduleRepository extends JpaRepository<DoctorW
 
     List<DoctorWeeklyScheduleEntity> findByDoctorIdAndActiveTrue(UUID doctorId);
 
+    List<DoctorWeeklyScheduleEntity> findByDoctorIdInAndActiveTrue(java.util.Collection<UUID> doctorIds);
+
+    List<DoctorWeeklyScheduleEntity> findByDoctorIdIn(java.util.Collection<UUID> doctorIds);
+
     Optional<DoctorWeeklyScheduleEntity> findByDoctorIdAndDayOfWeek(UUID doctorId, DayOfWeek dayOfWeek);
 
 }

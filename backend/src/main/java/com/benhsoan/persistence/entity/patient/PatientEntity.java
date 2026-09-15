@@ -73,6 +73,24 @@ public class PatientEntity {
     @Column(name = "emergency_phone", length = 20)
     private String emergencyPhone;
 
+    @Column(name = "guardian_name", length = 100)
+    private String guardianName;
+
+    @Column(name = "guardian_relationship", length = 50)
+    private String guardianRelationship;
+
+    @Column(name = "guardian_phone", length = 20)
+    private String guardianPhone;
+
+    @Column(name = "guardian_identity_number", length = 20)
+    private String guardianIdentityNumber;
+
+    @Column(name = "guardian_user_id", columnDefinition = "BINARY(16)")
+    private UUID guardianUserId;
+
+    @Column(name = "consent_signer_name", length = 100)
+    private String consentSignerName;
+
     @Column(name = "active", nullable = false)
     private boolean active;
 

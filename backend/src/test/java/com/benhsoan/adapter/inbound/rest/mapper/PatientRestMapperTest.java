@@ -80,6 +80,31 @@ class PatientRestMapperTest {
         assertEquals("Nguyễn Văn A", restored.fullName());
     }
 
+    @Test
+    void masksGuardianAndMinorConsentSignerWithDistinctGuardianLabelWhenEnabled() {
+        PatientResult withGuardian = new PatientResult(
+                ID, "BN002", "Bé Nguyễn Văn Con", java.time.LocalDate.of(2020, 1, 1), null,
+                null, null, "123 Nguyễn Trãi, Hà Nội",
+                null, null, null, null, null, null,
+                "Nguyễn Văn Bố", "Bố", "0912345678", null, null,
+                "Nguyễn Văn Bố", true, false,
+                true, null, null, true, null, "v1.0",
+                false, null, null, false
+        );
+
+        PatientResponse normal = mapper.toResponse(withGuardian);
+        assertEquals("Nguyễn Văn Bố", normal.guardianName());
+        assertEquals("0912345678", normal.guardianPhone());
+        assertEquals("Nguyễn Văn Bố", normal.consentSignerName());
+
+        state.setEnabled(true);
+        PatientResponse masked = mapper.toResponse(withGuardian);
+        assertEquals("BỆNH NHÂN #BN002", masked.fullName());
+        assertEquals("GIÁM HỘ #BN002", masked.guardianName());
+        assertEquals("09******78", masked.guardianPhone());
+        assertEquals("GIÁM HỘ #BN002", masked.consentSignerName());
+    }
+
     private static PatientResult result() {
         return new PatientResult(
                 ID, "BN001", "Nguyễn Văn A", null, null,

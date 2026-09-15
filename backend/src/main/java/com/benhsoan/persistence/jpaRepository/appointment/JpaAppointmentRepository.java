@@ -73,4 +73,17 @@ public interface JpaAppointmentRepository
             @Param("to") Instant to,
             @Param("statuses") Collection<AppointmentStatus> statuses
     );
+
+    @Query("select appointment from AppointmentEntity appointment "
+            + "where appointment.doctorId in :doctorIds "
+            + "and appointment.status in :statuses "
+            + "and appointment.startTime < :to "
+            + "and appointment.endTime > :from "
+            + "order by appointment.startTime asc")
+    List<AppointmentEntity> findAppointmentsForDoctorsBetween(
+            @Param("doctorIds") Collection<UUID> doctorIds,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            @Param("statuses") Collection<AppointmentStatus> statuses
+    );
 }

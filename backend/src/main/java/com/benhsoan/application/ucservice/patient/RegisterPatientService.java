@@ -68,6 +68,12 @@ public class RegisterPatientService
         String emergencyRelationship = normalizeString(command.emergencyRelationship());
         String emergencyPhone = normalizePhone(command.emergencyPhone());
 
+        String guardianName = normalizeString(command.guardianName());
+        String guardianRelationship = normalizeString(command.guardianRelationship());
+        String guardianPhone = normalizePhone(command.guardianPhone());
+        String guardianIdentityNumber = normalizeIdentityNumber(command.guardianIdentityNumber());
+        String consentSignerName = normalizeString(command.consentSignerName());
+
         Patient patient =
                 Patient.create(
                         patientCode,
@@ -83,6 +89,12 @@ public class RegisterPatientService
                         emergencyContact,
                         emergencyRelationship,
                         emergencyPhone,
+                        guardianName,
+                        guardianRelationship,
+                        guardianPhone,
+                        guardianIdentityNumber,
+                        null,
+                        consentSignerName,
                         consentAgreed,
                         command.consentVersion(),
                         currentUserId
@@ -113,11 +125,13 @@ public class RegisterPatientService
                         {
                         "patientCode":"%s",
                         "fullName":"%s",
+                        "guardianName":"%s",
+                        "consentSignerName":"%s",
                         "consentAgreed":%s,
                         "consentVersion":"%s"
                         }
                         """
-                        .formatted(saved.getPatientCode(), saved.getFullName(), saved.isConsentAgreed(), saved.getConsentVersion()),
+                        .formatted(saved.getPatientCode(), saved.getFullName(), saved.getGuardianName(), saved.getConsentSignerName(), saved.isConsentAgreed(), saved.getConsentVersion()),
                         null
                 )
         );
@@ -147,6 +161,42 @@ public class RegisterPatientService
                 command.emergencyRelationship(),
                 command.emergencyPhone()
         );
+
+        validateGuardian(command);
+    }
+
+    private void validateGuardian(RegisterPatientCommand command) {
+        boolean isMinor = com.benhsoan.domain.patient.PatientMinorPolicy.isMinor(command.dateOfBirth());
+        String guardianName = normalizeString(command.guardianName());
+        String guardianRelationship = normalizeString(command.guardianRelationship());
+        String guardianPhone = normalizePhone(command.guardianPhone());
+
+        if (isMinor) {
+            if (guardianName == null || guardianName.isBlank()) {
+                throw new ValidationException("guardianName", "Hồ sơ bệnh nhân dưới 18 tuổi bắt buộc phải khai báo người giám hộ (QTN-44).");
+            }
+            if (guardianRelationship == null || guardianRelationship.isBlank()) {
+                throw new ValidationException("guardianRelationship", "Mối quan hệ với người giám hộ không được để trống.");
+            }
+            if (guardianPhone == null || guardianPhone.isBlank()) {
+                throw new ValidationException("guardianPhone", "Số điện thoại người giám hộ không được để trống.");
+            }
+            if (!PHONE_PATTERN.matcher(guardianPhone).matches()) {
+                throw new ValidationException("guardianPhone", "Số điện thoại người giám hộ không đúng định dạng.");
+            }
+            String consentSignerName = normalizeString(command.consentSignerName());
+            if (consentSignerName != null && !consentSignerName.isBlank()
+                    && !consentSignerName.trim().equalsIgnoreCase(guardianName.trim())) {
+                throw new ValidationException(
+                        "consentSignerName",
+                        "Đối với bệnh nhân chưa thành niên, người ký phiếu đồng ý bắt buộc phải là người giám hộ (QTN-44)."
+                );
+            }
+        } else {
+            if (guardianPhone != null && !PHONE_PATTERN.matcher(guardianPhone).matches()) {
+                throw new ValidationException("guardianPhone", "Số điện thoại người giám hộ không đúng định dạng.");
+            }
+        }
     }
 
     private void validateEmergencyContact(String contact, String relationship, String phone) {

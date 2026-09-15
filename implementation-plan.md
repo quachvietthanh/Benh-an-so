@@ -1,133 +1,130 @@
-# Kế hoạch triển khai & Khắc phục lỗi: Người liên hệ khẩn cấp của bệnh nhân (NCL-02-CN-007)
+# Kế hoạch Triển khai: Lịch tuần theo bác sĩ dạng bảng (NCL-03-CN-010)
 
-Tài liệu này tổng hợp phân tích kỹ thuật của Tech Lead và kế hoạch triển khai xử lý toàn bộ các phát hiện (findings) từ báo cáo review mã nguồn cho tính năng **Người liên hệ khẩn cấp của bệnh nhân** (`NCL-02-CN-007`) thuộc Epic `NCL-02`.
-
----
-
-## 1. Tóm tắt quyết định kỹ thuật (Tech Lead Decision)
-
-### 1.1. Bảng đối chiếu xử lý các Findings
-
-| Mã Finding | Mức độ | Trạng thái | Hướng xử lý kỹ thuật |
-| :--- | :--- | :--- | :--- |
-| **P1.01** | P1 (Nghiêm trọng) | **Xử lý** | Mở rộng regex tại `UpdatePatientRequest.java` cho phép chuỗi mask `[0-9]{2}\*{6}[0-9]{2}` và chuỗi rỗng `""`. Tầng Use Case (`UpdatePatientService`) phục hồi giá trị unmask và validate logic. |
-| **P1.02** | P1 (Nghiêm trọng) | **Xử lý** | Cập nhật regex `@Pattern` tại `RegisterPatientRequest.java` và `UpdatePatientRequest.java` sử dụng group `(?:...)?` để chấp nhận chuỗi rỗng `""` và `null`. |
-| **P2.01** | P2 (Trung bình) | **Xử lý** | Bổ sung câu lệnh backfill dữ liệu `UPDATE patients SET emergency_relationship = 'Người thân' WHERE emergency_contact IS NOT NULL AND emergency_relationship IS NULL;` vào migration `V51`. Bổ sung fallback trong Use Case. |
-| **P2.02** | P2 (Trung bình) | **Xử lý** | Bổ sung handler cho `ValidationException` trong `GlobalExceptionHandler.java`, phân tích chuỗi `fieldName: errorDescription` nạp vào `details.fields` theo đúng chuẩn `docs/exception-conventions.md`. |
-| **P2.03** | P2 (Trung bình) | **Đã xử lý (FIXED)** | Đồng bộ tài liệu Workbook `project-workbook.xlsx` (row 85 & task 384), ban hành RFC-007 chuẩn hóa quy tắc Cohesive Triplet, và bổ sung test cases kiểm chứng lưu vết khi xóa trong `UpdatePatientServiceTest.java`. |
-| **P3.01** | P3 (Nhẹ) | **Xử lý** | Thêm Bean Validation `@Size(max = 50, message = "Mối quan hệ không được vượt quá 50 ký tự.")` cho `emergencyRelationship` ở cả 2 Request DTOs. |
-| **P3.02** | P3 (Nhẹ) | **Xử lý** | Bổ sung WebMvc test case `getMedicalRecordDetailReturnsEmergencyContactForDoctor` trong `MedicalRecordControllerTest.java` kiểm tra `GET /medical-records/visits/{visitId}` trả về đủ 3 trường người liên hệ khẩn cấp. |
-
-### 1.2. Các giả định và xác minh (Verification Status)
-- **Đã xác minh**: Regex `^(?:(0|\+84)(3|5|7|8|9)[0-9]{8}|[0-9]{2}\*{6}[0-9]{2})?$` tương thích hoàn toàn với chuẩn JSR-380, nhận diện đúng cả SĐT thật, SĐT mask (`09******78`), chuỗi rỗng `""` và `null`.
-- **Đã xác minh**: Tầng Use Case (`UpdatePatientService:118-120`) đã có sẵn logic `PatientAnonymizer.isMaskedPhone(emergencyPhone)` để khôi phục dữ liệu gốc nếu giá trị gửi lên là chuỗi mask.
-- **Đã xác minh**: Bảng `patients` trong migration `V4__seed_patients.sql` có 10 bản ghi mẫu có `emergency_contact` và `emergency_phone`, nhưng thiếu `emergency_relationship`.
-- **Đã xác minh**: `GlobalExceptionHandler.java` trước đây bắt `ValidationException` qua `handleDomainException`, trả về `details: {}` rỗng khiến frontend không trích xuất được `details.fields`.
-- **Đã xác minh (P2.03)**: Mâu thuẫn giữa câu chữ Postcondition trong Workbook và Cohesive Triplet đã được giải quyết triệt để: cập nhật trực tiếp `project-workbook.xlsx` (row 85 & task 384), ban hành `docs/rfc-ncl-02-cn-007-emergency-contact-postcondition.md`, và bổ sung bộ test kiểm chứng trong `UpdatePatientServiceTest.java`.
+Kế hoạch kỹ thuật triển khai backend hoàn chỉnh cho User Story `NCL-03-CN-010`: **Lịch tuần theo bác sĩ dạng bảng** thuộc Epic `NCL-03` (Lịch hẹn và hàng đợi khám), đảm bảo đáp ứng đầy đủ Acceptance Criteria (TC-01, TC-02, TC-03, TC-04), bảo toàn kiến trúc Hexagonal Architecture, không gây lỗi hồi quy và tuân thủ các quy tắc nghiệp vụ (QTN-04, QTN-30, QTN-01).
 
 ---
 
-## 2. Thiết kế chi tiết cho từng Finding
+## 1. TÓM TẮT YÊU CẦU NGHIỆP VỤ VÀ GIẢI PHÁP KỸ THUẬT
 
-### Finding P1.01 & P1.02: Bean Validation chặn chuỗi Mask và chuỗi rỗng trên `emergencyPhone`
-- **Root cause**: 
-  - Regex cũ `^(0|\+84)(3|5|7|8|9)[0-9]{8}$` yêu cầu chuỗi tối thiểu 10 chữ số.
-  - Khi bật chế độ ẩn danh trình diễn (QTN-43), client nhận `09******78` và submit lại form; Bean Validation ném `MethodArgumentNotValidException` (HTTP 400), làm dead code logic unmask ở Use Case.
-  - Khi form web submit chuỗi rỗng `""` (thay vì null), Bean Validation đánh giá chuỗi rỗng không khớp regex -> trả về 400.
-- **Giải pháp được chọn**:
-  - Tại `RegisterPatientRequest.java`:
-    ```java
-    @Pattern(
-            regexp = "^(?:(0|\\+84)(3|5|7|8|9)[0-9]{8})?$",
-            message = "Số điện thoại không đúng định dạng."
-    )
-    String emergencyPhone
-    ```
-  - Tại `UpdatePatientRequest.java`:
-    ```java
-    @Pattern(
-            regexp = "^(?:(0|\\+84)(3|5|7|8|9)[0-9]{8}|[0-9]{2}\\*{6}[0-9]{2})?$",
-            message = "Số điện thoại không đúng định dạng."
-    )
-    String emergencyPhone
-    ```
-- **Lợi ích**:
-  - Giữ nguyên error response contract chuẩn ở tầng REST (`400 Bad Request` kèm field `emergencyPhone`).
-  - Cho phép chuỗi rỗng `""` và chuỗi mask `09******78` vượt qua filter Bean Validation an toàn để tầng Use Case xử lý.
+### 1.1. Mục tiêu và Phạm vi
+* **Mục tiêu**: Xây dựng endpoint backend cung cấp ma trận lưới thời gian (grid/table) lịch hẹn cả tuần của các bác sĩ cho Lễ tân và Quản lý phòng khám; hỗ trợ quan sát khung giờ trống, khung giờ đã có lịch hẹn (kèm trạng thái tô màu), khung giờ khoảng nghỉ của bác sĩ; cho phép tạo lịch hẹn trực tiếp từ ô trống đúng quy tắc chống trùng lịch (QTN-04) và trong lịch làm việc (QTN-30); chặn truy cập trái quyền và ghi log kiểm toán (TC-04).
+* **Phạm vi**: Chỉ backend (Domain, Ports, DTOs, Application Service, REST API, Security & Audit, Tests). Không thay đổi frontend.
 
-### Finding P2.01: Deadlock dữ liệu cũ (Legacy Data Backfill)
-- **Root cause**: Migration `V51` thêm cột `emergency_relationship` nhưng để giá trị `NULL` cho toàn bộ dữ liệu hiện hữu. Khi cập nhật hồ sơ cũ, Use Case kiểm tra Cohesive Triplet thấy có tên và SĐT nhưng thiếu mối quan hệ nên văng `ValidationException`.
-- **Giải pháp được chọn**:
-  - Cập nhật file migration `V51__add_emergency_relationship_to_patients.sql`:
-    ```sql
-    ALTER TABLE patients ADD COLUMN emergency_relationship VARCHAR(50) NULL;
+### 1.2. Phân tích Yêu cầu, Role và Business Rules
+* **Vai trò được phép**: Lễ tân (`RECEPTIONIST`), Quản lý phòng khám (`CLINIC_MANAGER` / `ADMIN`).
+* **Vai trò bị chặn**: Dược sĩ (`PHARMACIST`) và các tài khoản không có quyền `APPOINTMENT_READ`.
+* **Business Rules áp dụng**:
+  * `QTN-04: Không trùng lịch một bác sĩ`: Một bác sĩ không được có hai lịch hẹn trong cùng khung giờ.
+  * `QTN-30: Đặt lịch trong lịch làm việc của bác sĩ`: Chỉ được đặt lịch hẹn vào khung giờ nằm trong lịch làm việc của bác sĩ và không trùng khoảng nghỉ đã đăng ký.
+  * `QTN-01: Phân quyền truy cập theo vai trò`: Kiểm soát quyền truy cập chặt chẽ qua `@RequirePermission("APPOINTMENT_READ")`.
 
-    UPDATE patients
-    SET emergency_relationship = 'Người thân'
-    WHERE emergency_contact IS NOT NULL AND emergency_relationship IS NULL;
-    ```
-  - Bổ sung fallback phòng vệ trong `UpdatePatientService.java`: tự động giữ lại mối quan hệ đã có nếu client gửi null trên hồ sơ cũ có sẵn người liên hệ.
+### 1.3. Acceptance Criteria (Tiêu chí chấp nhận)
+* **`NCL-03-CN-010-TC-01 (Luồng thành công)`**:
+  * *Given*: Đã có lịch làm việc và lịch hẹn của các bác sĩ.
+  * *When*: Lễ tân mở lịch tuần.
+  * *Then*: Bảng hiển thị đúng lịch hẹn theo cột bác sĩ và hàng khung giờ.
+* **`NCL-03-CN-010-TC-02 (Luồng thành công)`**:
+  * *Given*: Đang xem lịch tuần.
+  * *When*: Lễ tân bấm vào một ô trống để tạo lịch.
+  * *Then*: Lịch hẹn được tạo đúng bác sĩ và khung giờ của ô đó qua `POST /appointments`.
+* **`NCL-03-CN-010-TC-03 (Sai trạng thái)`**:
+  * *Given*: Ô thuộc khoảng nghỉ của bác sĩ (time-off / leave).
+  * *When*: Lễ tân bấm tạo lịch trên ô đó.
+  * *Then*: Hệ thống chặn theo `QTN-30` và báo bác sĩ không làm việc trong khung giờ đó (`DoctorNotWorkingException`).
+* **`NCL-03-CN-010-TC-04 (Không có quyền)`**:
+  * *Given*: Người đăng nhập là Dược sĩ (`PHARMACIST`).
+  * *When*: Mở màn hình lịch tuần / gọi API lịch tuần.
+  * *Then*: Hệ thống từ chối truy cập (HTTP 403) và ghi nhật ký kiểm toán (`ActionType.ACCESS_DENIED`, `ResourceType.PERMISSION`).
 
-### Finding P2.02: Error Response của `ValidationException` thiếu `details.fields`
-- **Root cause**: 
-  - `docs/exception-conventions.md:31` yêu cầu validation field errors phải được đọc từ `details.fields`.
-  - Khi Use Case ném `ValidationException("emergencyPhone: Số điện thoại không đúng định dạng.")`, `GlobalExceptionHandler` bắt qua `handleDomainException`, trả về `details: {}`.
-- **Giải pháp được chọn**:
-  - Bổ sung `@ExceptionHandler(ValidationException.class)` trong `GlobalExceptionHandler.java`:
-    Trích xuất `fieldName` và `errorDescription` từ message dạng `fieldName: errorDescription` và đưa vào `details.fields`.
-  - Nếu message không theo dạng này, `details` trả về rỗng, đảm bảo tương thích ngược 100%.
-
-### Finding P2.03: Mâu thuẫn nghiệp vụ Cohesive Triplet vs Postcondition Workbook
-- **Root cause**: Workbook ban đầu ghi "Hồ sơ có ít nhất một người liên hệ khẩn cấp", mâu thuẫn với quy tắc Cohesive Triplet cho phép xóa sạch người liên hệ khi có nhu cầu chính đáng.
-- **Giải pháp xử lý (Đã hoàn tất)**:
-  1. Ban hành tài liệu [RFC-NCL-02-CN-007-01](file:///f:/Java/Benh-so-an/docs/rfc-ncl-02-cn-007-emergency-contact-postcondition.md) phân tích và chuẩn hóa quy tắc Cohesive Triplet.
-  2. Cập nhật trực tiếp `project-workbook.xlsx` (Sheet `Product Backlog` row 85, Col 11 và Sheet `Tasks` row 384, Col 5) thành: *"Nếu ghi nhận người liên hệ khẩn cấp thì phải có đầy đủ bộ ba thông tin và mọi thay đổi đều lưu vết."*
-  3. Bổ sung các unit test trong `UpdatePatientServiceTest.java` kiểm chứng: xóa trắng cả 3 trường thành công và lưu vết đầy đủ vào `patient_change_logs`, nhưng nếu chỉ xóa 1 hoặc 2 trường thì bị chặn lập tức bởi Cohesive Triplet.
-
-### Finding P3.01: Thiếu Bean Validation `@Size(max = 50)` cho `emergencyRelationship`
-- **Root cause**: Cột DB là `VARCHAR(50)`. Nếu client gửi chuỗi > 50 ký tự, lỗi ném ra từ tầng DB là `DataIntegrityViolationException` (500/409) thay vì `400 Bad Request`.
-- **Giải pháp**: Bổ sung `@Size(max = 50, message = "Mối quan hệ không được vượt quá 50 ký tự.")` vào cả `RegisterPatientRequest` và `UpdatePatientRequest`.
-
-### Finding P3.02: Thiếu Integration Test ở Controller cho Bác sĩ xem Bệnh án
-- **Root cause**: Đã có unit test cho mapper nhưng thiếu test end-to-end tầng MockMvc Controller để đảm bảo endpoint `GET /medical-records/visits/{visitId}` serialize đầy đủ các trường người liên hệ khẩn cấp của bệnh nhân.
-- **Giải pháp**: Thêm test case `getMedicalRecordDetailReturnsEmergencyContactForDoctor` trong `MedicalRecordControllerTest.java`.
+### 1.4. Thiết kế Kỹ thuật Backend
+1. **API Endpoint**:
+   * `GET /appointments/doctor-weekly-table`
+   * Query params:
+     * `date` (LocalDate, tùy chọn, mặc định là ngày hiện tại). Backend tính tuần từ Thứ Hai 00:00:00 đến Chủ Nhật 23:59:59.999 theo múi giờ `Asia/Ho_Chi_Minh`.
+     * `doctorId` (UUID, tùy chọn, lọc riêng 1 bác sĩ nếu cần).
+2. **DTO & Model**:
+   * Enum `SlotAvailabilityStatus`: `AVAILABLE`, `BOOKED`, `ON_LEAVE`, `OFF_DUTY`, `PAST`.
+   * Result & Response models chuẩn hóa: ngày trong tuần, bác sĩ, khung giờ slot 30 phút, thông tin tóm tắt lịch hẹn (`AppointmentSummary`), lý do khoảng nghỉ.
+3. **Application Service (`GetDoctorWeeklyScheduleTableService`)**:
+   * Batch query thông tin tuần để tránh N+1: Doctors, Weekly Schedules, Specific Date Schedules, Active Time-offs, Active Appointments, Patient Profiles.
+   * Tính toán từng ô slot 30 phút cho mỗi bác sĩ theo từng ngày trong tuần.
+4. **Tạo lịch trên ô trống & Kiểm tra vi phạm**:
+   * Tái sử dụng `POST /appointments` (`CreateAppointmentService`), vốn đã có sẵn kiểm tra `DoctorScheduleValidator` (QTN-30) và `AppointmentRepository.existsActiveAppointmentConflict` (QTN-04).
+5. **Phân quyền & Kiểm toán**:
+   * Bảo vệ endpoint bằng `@RequirePermission("APPOINTMENT_READ")`.
+   * `RequirePermissionAspect` tự động ném `AccessDeniedException` và ghi `AuditLog` `ACCESS_DENIED` khi Dược sĩ truy cập.
 
 ---
 
-## 3. Kế hoạch triển khai mã nguồn theo thứ tự
+## 2. KẾ HOẠCH TRIỂN KHAI THEO TỪNG GIAI ĐOẠN
 
-### Bước 1: Database Migration (P2.01)
-- **File**: `backend/src/main/resources/db/migration/V51__add_emergency_relationship_to_patients.sql`
-- **Nội dung**: Bổ sung lệnh `UPDATE patients SET emergency_relationship = 'Người thân' WHERE emergency_contact IS NOT NULL AND emergency_relationship IS NULL;`.
+### Giai đoạn 1: Thiết kế API Contract, DTOs & Inbound Port
+* **Mục tiêu**: Định nghĩa cấu trúc hợp đồng dữ liệu chuẩn hóa cho bảng lịch tuần theo bác sĩ.
+* **Files / Layers tác động**:
+  * `[NEW]` `backend/src/main/java/com/benhsoan/domain/appointment/enums/SlotAvailabilityStatus.java`
+  * `[NEW]` `backend/src/main/java/com/benhsoan/port/inbound/appointment/GetDoctorWeeklyScheduleTableUseCase.java`
+  * `[NEW]` `backend/src/main/java/com/benhsoan/port/dto/query/appointment/GetDoctorWeeklyScheduleTableQuery.java`
+  * `[NEW]` `backend/src/main/java/com/benhsoan/port/dto/result/appointment/DoctorWeeklyTableResult.java`
+  * `[NEW]` `backend/src/main/java/com/benhsoan/adapter/inbound/rest/response/appointment/DoctorWeeklyTableResponse.java`
+* **Quy tắc**: Các model bất biến (records), phân tách rõ các trạng thái của ô lịch (`AVAILABLE`, `BOOKED`, `ON_LEAVE`, `OFF_DUTY`, `PAST`).
+* **Tiêu chí verify/test**: `mvn test-compile` thành công.
 
-### Bước 2: Application Services & Normalization (P1.01, P2.01, P2.02)
-- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/patient/UpdatePatientService.java`
-- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/patient/RegisterPatientService.java`
-- **Nội dung**:
-  - Chuẩn hóa `normalizePhone` trả về `null` thay vì `""`.
-  - Thêm fallback giữ `emergencyRelationship` cho bệnh nhân cũ hoặc chế độ ẩn danh.
-  - Đảm bảo `ValidationException` có dạng `fieldName: errorDescription`.
+### Giai đoạn 2: Xây dựng Application Service & Thuật toán Tính toán Slot
+* **Mục tiêu**: Hiện thực hóa use case truy vấn lịch tuần bác sĩ với hiệu năng tối ưu, tính toán chính xác ca làm việc, khoảng nghỉ và lịch hẹn.
+* **Files / Layers tác động**:
+  * `[NEW]` `backend/src/main/java/com/benhsoan/application/ucservice/appointment/GetDoctorWeeklyScheduleTableService.java`
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/port/outbound/repository/appointment/AppointmentRepository.java`
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/adapterRepository/appointment/AppointmentRepositoryAdapter.java`
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/jpaRepository/appointment/JpaAppointmentRepository.java`
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/port/outbound/repository/appointment/DoctorTimeOffRepository.java`
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/adapterRepository/appointment/DoctorTimeOffRepositoryAdapter.java`
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/jpaRepository/appointment/JpaDoctorTimeOffRepository.java`
+* **Quy tắc**:
+  * Chuẩn hóa tuần Thứ 2 -> Chủ nhật theo `Asia/Ho_Chi_Minh`.
+  * Tôn trọng thứ tự ưu tiên lịch làm việc (Weekly schedule làm gốc, ngày cụ thể ghi đè).
+  * Tuân thủ `QTN-30`: Phản ánh đúng khoảng nghỉ active.
+  * Tuân thủ `QTN-04`: Loại trừ lịch hẹn đã hủy (`CANCELLED`).
+* **Tiêu chí verify/test**: Unit tests cho service bao phủ các kịch bản slot: trống, có lịch, nghỉ phép, ngoài giờ, quá khứ.
 
-### Bước 3: REST Request DTOs & Global Exception Handler (P1.01, P1.02, P2.02, P3.01)
-- **File 1**: `backend/src/main/java/com/benhsoan/adapter/inbound/rest/request/patient/RegisterPatientRequest.java`
-  - Thêm `@Size(max = 50)` cho `emergencyRelationship`.
-  - Cập nhật `@Pattern` cho `emergencyPhone`.
-- **File 2**: `backend/src/main/java/com/benhsoan/adapter/inbound/rest/request/patient/UpdatePatientRequest.java`
-  - Thêm `@Size(max = 50)` cho `emergencyRelationship`.
-  - Cập nhật `@Pattern` cho `emergencyPhone` (cho phép cả chuỗi mask và chuỗi rỗng).
-- **File 3**: `backend/src/main/java/com/benhsoan/exception/GlobalExceptionHandler.java`
-  - Thêm `@ExceptionHandler(ValidationException.class)` để parse `details.fields`.
+### Giai đoạn 3: Tích hợp REST Controller, Mapper & Bảo mật
+* **Mục tiêu**: Mở endpoint REST API `GET /appointments/doctor-weekly-table`, tích hợp mapping và kiểm soát quyền hạn.
+* **Files / Layers tác động**:
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/adapter/inbound/rest/controller/AppointmentController.java`
+  * `[MODIFY]` `backend/src/main/java/com/benhsoan/adapter/inbound/rest/mapper/AppointmentRestMapper.java`
+* **Quy tắc**:
+  * Endpoint được bảo vệ bởi `@RequirePermission("APPOINTMENT_READ")`.
+  * Cho phép Lễ tân (`RECEPTIONIST`) và Quản lý phòng khám (`CLINIC_MANAGER` / `ADMIN`) truy cập.
+  * Dược sĩ (`PHARMACIST`) bị chặn 403 Forbidden và `RequirePermissionAspect` ghi nhật ký `ACCESS_DENIED`.
+* **Tiêu chí verify/test**: MockMvc tests kiểm tra phân quyền và ánh xạ response.
 
-### Bước 4: Kiểm thử Unit, Controller & Integration (P1.01, P1.02, P2.01, P2.02, P3.01, P3.02)
-- **File 1**: `backend/src/test/java/com/benhsoan/exception/GlobalExceptionHandlerTest.java`
-  - Test mapping `ValidationException` dạng `field: message` sang `details.fields`.
-- **File 2**: `backend/src/test/java/com/benhsoan/adapter/inbound/rest/controller/PatientEmergencyContactIntegrationTest.java`
-  - Test update với chuỗi mask `09******78` (P1.01).
-  - Test chấp nhận chuỗi rỗng `""` trên `emergencyPhone` (P1.02).
-  - Test từ chối `emergencyRelationship` dài hơn 50 ký tự (P3.01).
-- **File 3**: `backend/src/test/java/com/benhsoan/adapter/inbound/rest/controller/MedicalRecordControllerTest.java`
-  - Test `getMedicalRecordDetailReturnsEmergencyContactForDoctor` (P3.02).
+### Giai đoạn 4: Xây dựng Bộ Kiểm thử Tự động Toàn diện (Đảm bảo 4 ACs)
+* **Mục tiêu**: Đảm bảo 100% các tiêu chí chấp nhận trong workbook đều được tự động hóa kiểm thử và bảo toàn không lỗi hồi quy.
+* **Files / Layers tác động**:
+  * `[NEW]` `backend/src/test/java/com/benhsoan/application/ucservice/appointment/GetDoctorWeeklyScheduleTableServiceTest.java`
+  * `[NEW]` `backend/src/test/java/com/benhsoan/adapter/inbound/rest/controller/DoctorWeeklyTableIntegrationTest.java`
+* **Quy tắc kiểm thử**:
+  * TC-01: Bảng hiển thị đúng lịch hẹn theo cột bác sĩ và hàng khung giờ trong tuần.
+  * TC-02: Bấm tạo lịch trên ô trống thành công đúng bác sĩ và khung giờ.
+  * TC-03: Cố tình tạo lịch trên ô khoảng nghỉ bị chặn theo QTN-30.
+  * TC-04: Dược sĩ truy cập bị từ chối và ghi nhật ký kiểm toán vi phạm.
+* **Tiêu chí verify/test**: Toàn bộ test suite chạy pass 100% (`mvn test`).
 
-### Bước 5: Chạy toàn bộ Test Suite & Hồi quy
-- Chạy `mvn test "-Dtest=*Patient*Test,*MedicalRecord*Test,GlobalExceptionHandlerTest"`
-- Đảm bảo 100% test cases pass.
+---
+
+## 3. KẾT QUẢ TRIỂN KHAI VÀ KHẮC PHỤC 5 FINDINGS CODE REVIEW
+
+Sau đợt review chuyên sâu, toàn bộ 5 finding đã được xử lý triệt để:
+
+| Finding | Nội dung lỗi | Giải pháp triển khai | Files thay đổi chính | Trạng thái |
+| :--- | :--- | :--- | :--- | :---: |
+| **[P1 - Blocker]** | Lỗi biên dịch `AppointmentController` do endpoint `/available-slots` bị sót/lạc scope. | Xóa bỏ hoàn toàn endpoint `GET /appointments/available-slots` và method test tương ứng, đưa controller về đúng scope NCL-03-CN-010. | `AppointmentController.java`, `AppointmentControllerTest.java` | **FIXED** |
+| **[P3 - Rule]** | Xác nhận biểu diễn `COMPLETED` và `NO_SHOW` trên weekly table. | Giữ nguyên kiến trúc 2 tầng ổn định: Slot status = `BOOKED` (khóa ô theo QTN-04), chi tiết cuộc hẹn trong `appointment.status` (phục vụ tô màu UI). | `GetDoctorWeeklyScheduleTableService.java` | **VERIFIED** |
+| **[P1 - Prior]** | Xung đột phân giải ca khi lịch tuần bị tắt (`active = false`). | Quy tắc: Lịch ngày cụ thể (`DoctorSchedule`) ghi đè lịch tuần (`DoctorWeeklySchedule`). | `DoctorScheduleValidator.java`, `DoctorWeeklyScheduleRepository.java`, `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+| **[P2-1]** | Lịch hẹn cũ bị ẩn khi slot rơi vào ngoài giờ (`OFF_DUTY`). | Đẩy kiểm tra `matchingAppt` lên đầu vòng lặp slot; hiển thị `BOOKED`, `isBookable = false` kèm thông tin cuộc hẹn. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+| **[P2-2]** | Thiếu kiểm tra role Bác sĩ khi truyền `doctorId`. | Bổ sung kiểm tra `!RoleConstants.DOCTOR.equals(doctor.getRoleId())` -> ném 404 `DoctorNotFoundException`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+| **[P3-1]** | Chưa hỗ trợ chế độ ẩn danh (NCL-15-CN-003). | Bổ sung `patientCode`; tiêm `AnonymizationModeState` vào `AppointmentRestMapper`, áp dụng `PatientAnonymizer.maskFullName` và `maskPhone`. | `DoctorWeeklyTableResult.java`, `DoctorWeeklyTableResponse.java`, `AppointmentRestMapper.java`, `AppointmentRestMapperTest.java` | **FIXED** |
+| **[P3-2]** | Trùng tên biến (Variable Shadowing). | Đổi tên tham số `buildSlotsForDay` thành `doctorAppointments`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+
+**Xác nhận kiểm thử tự động thực tế sau khi fix:**
+- Targeted Test Suites (6 suites): **47/47 tests PASS** (`BUILD SUCCESS`).
+- Toàn bộ Backend Test Suite: **1639/1639 tests PASS** (26 skipped, 0 failures, 0 errors, `BUILD SUCCESS`).

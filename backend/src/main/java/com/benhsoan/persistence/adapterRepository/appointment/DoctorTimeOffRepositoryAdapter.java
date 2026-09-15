@@ -47,6 +47,16 @@ public class DoctorTimeOffRepositoryAdapter implements DoctorTimeOffRepository {
     }
 
     @Override
+    public List<DoctorTimeOff> findActiveOverlappingForDoctors(java.util.Collection<UUID> doctorIds, Instant startTime, Instant endTime) {
+        if (doctorIds == null || doctorIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findOverlappingForDoctors(doctorIds, startTime, endTime, TimeOffStatus.ACTIVE).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public boolean existsActiveOverlapping(UUID doctorId, Instant startTime, Instant endTime) {
         return jpaRepository.existsOverlapping(doctorId, startTime, endTime, TimeOffStatus.ACTIVE);
     }

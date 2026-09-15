@@ -50,6 +50,19 @@ public class Patient {
 
     private String emergencyPhone;
 
+    // Guardian fields (NCL-02-CN-008 / QTN-44)
+    private String guardianName;
+
+    private String guardianRelationship;
+
+    private String guardianPhone;
+
+    private String guardianIdentityNumber;
+
+    private UUID guardianUserId;
+
+    private String consentSignerName;
+
     private boolean active;
 
     private Instant createdAt;
@@ -90,6 +103,12 @@ public class Patient {
             String emergencyContact,
             String emergencyRelationship,
             String emergencyPhone,
+            String guardianName,
+            String guardianRelationship,
+            String guardianPhone,
+            String guardianIdentityNumber,
+            UUID guardianUserId,
+            String consentSignerName,
             boolean active,
             Instant createdAt,
             Instant updatedAt,
@@ -127,6 +146,15 @@ public class Patient {
         this.emergencyRelationship = emergencyRelationship;
         this.emergencyPhone = emergencyPhone;
 
+        this.guardianName = guardianName;
+        this.guardianRelationship = guardianRelationship;
+        this.guardianPhone = guardianPhone;
+        this.guardianIdentityNumber = guardianIdentityNumber;
+        this.guardianUserId = guardianUserId;
+        this.consentSignerName = consentSignerName != null && !consentSignerName.isBlank()
+                ? consentSignerName
+                : (PatientMinorPolicy.isMinor(dateOfBirth) ? guardianName : fullName);
+
         this.active = active;
 
         this.createdAt = Objects.requireNonNull(createdAt);
@@ -157,6 +185,12 @@ public class Patient {
             String emergencyContact,
             String emergencyRelationship,
             String emergencyPhone,
+            String guardianName,
+            String guardianRelationship,
+            String guardianPhone,
+            String guardianIdentityNumber,
+            UUID guardianUserId,
+            String consentSignerName,
             boolean consentAgreed,
             String consentVersion,
             UUID createdBy
@@ -164,6 +198,30 @@ public class Patient {
         if (!consentAgreed) {
             throw new PatientConsentRequiredException();
         }
+
+        boolean isMinor = PatientMinorPolicy.isMinor(dateOfBirth);
+        if (isMinor) {
+            if (guardianName == null || guardianName.isBlank()) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException("guardianName", "Hồ sơ bệnh nhân dưới 18 tuổi bắt buộc phải khai báo người giám hộ (QTN-44).");
+            }
+            if (guardianRelationship == null || guardianRelationship.isBlank()) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException("guardianRelationship", "Mối quan hệ với người giám hộ không được để trống.");
+            }
+            if (guardianPhone == null || guardianPhone.isBlank()) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException("guardianPhone", "Số điện thoại người giám hộ không được để trống.");
+            }
+            if (consentSignerName != null && !consentSignerName.isBlank()
+                    && !consentSignerName.trim().equalsIgnoreCase(guardianName.trim())) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException(
+                        "consentSignerName",
+                        "Đối với bệnh nhân chưa thành niên, người ký phiếu đồng ý bắt buộc phải là người giám hộ (QTN-44)."
+                );
+            }
+        }
+
+        String resolvedConsentSigner = isMinor
+                ? guardianName
+                : (consentSignerName != null && !consentSignerName.isBlank() ? consentSignerName : (guardianName != null && !guardianName.isBlank() ? guardianName : fullName));
 
         Instant now = Instant.now();
 
@@ -182,6 +240,12 @@ public class Patient {
                 emergencyContact,
                 emergencyRelationship,
                 emergencyPhone,
+                guardianName,
+                guardianRelationship,
+                guardianPhone,
+                guardianIdentityNumber,
+                guardianUserId,
+                resolvedConsentSigner,
                 true,
                 now,
                 now,
@@ -194,6 +258,50 @@ public class Patient {
                 null,
                 null,
                 false
+        );
+    }
+
+    public static Patient create(
+            String patientCode,
+            String fullName,
+            LocalDate dateOfBirth,
+            Gender gender,
+            String phone,
+            String email,
+            String address,
+            String identityNumber,
+            String insuranceNumber,
+            BloodType bloodType,
+            String emergencyContact,
+            String emergencyRelationship,
+            String emergencyPhone,
+            boolean consentAgreed,
+            String consentVersion,
+            UUID createdBy
+    ) {
+        return create(
+                patientCode,
+                fullName,
+                dateOfBirth,
+                gender,
+                phone,
+                email,
+                address,
+                identityNumber,
+                insuranceNumber,
+                bloodType,
+                emergencyContact,
+                emergencyRelationship,
+                emergencyPhone,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                consentAgreed,
+                consentVersion,
+                createdBy
         );
     }
 
@@ -228,10 +336,36 @@ public class Patient {
                 emergencyContact,
                 null,
                 emergencyPhone,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 consentAgreed,
                 consentVersion,
                 createdBy
         );
+    }
+
+    public int getAge() {
+        return PatientMinorPolicy.calculateAge(this.dateOfBirth);
+    }
+
+    public boolean isMinor() {
+        return PatientMinorPolicy.isMinor(this.dateOfBirth);
+    }
+
+    public boolean isMinor(LocalDate asOfDate) {
+        return PatientMinorPolicy.isMinor(this.dateOfBirth, asOfDate);
+    }
+
+    public boolean requiresAdultTransition() {
+        return PatientMinorPolicy.requiresAdultTransition(this.dateOfBirth, this.guardianName);
+    }
+
+    public boolean requiresAdultTransition(LocalDate asOfDate) {
+        return PatientMinorPolicy.requiresAdultTransition(this.dateOfBirth, this.guardianName, asOfDate);
     }
 
     public void updateProfile(
@@ -246,12 +380,47 @@ public class Patient {
             BloodType bloodType,
             String emergencyContact,
             String emergencyRelationship,
-            String emergencyPhone
+            String emergencyPhone,
+            String guardianName,
+            String guardianRelationship,
+            String guardianPhone,
+            String guardianIdentityNumber,
+            UUID guardianUserId,
+            String consentSignerName
     ) {
 
         this.fullName = Guard.require(fullName, "Full name");
         this.dateOfBirth = Guard.require(dateOfBirth, "Date of birth");
         this.gender = Guard.require(gender, "Gender");
+
+        boolean isMinor = PatientMinorPolicy.isMinor(dateOfBirth);
+        if (isMinor) {
+            if (guardianName == null || guardianName.isBlank()) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException(
+                        "guardianName",
+                        "Hồ sơ bệnh nhân dưới 18 tuổi bắt buộc phải khai báo người giám hộ (QTN-44)."
+                );
+            }
+            if (guardianRelationship == null || guardianRelationship.isBlank()) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException(
+                        "guardianRelationship",
+                        "Mối quan hệ với người giám hộ không được để trống."
+                );
+            }
+            if (guardianPhone == null || guardianPhone.isBlank()) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException(
+                        "guardianPhone",
+                        "Số điện thoại người giám hộ không được để trống."
+                );
+            }
+            if (consentSignerName != null && !consentSignerName.isBlank()
+                    && !consentSignerName.trim().equalsIgnoreCase(guardianName.trim())) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException(
+                        "consentSignerName",
+                        "Đối với bệnh nhân chưa thành niên, người ký phiếu đồng ý bắt buộc phải là người giám hộ (QTN-44)."
+                );
+            }
+        }
 
         this.phone = phone;
         this.email = email;
@@ -269,7 +438,54 @@ public class Patient {
         this.emergencyRelationship = emergencyRelationship;
         this.emergencyPhone = emergencyPhone;
 
+        this.guardianName = guardianName;
+        this.guardianRelationship = guardianRelationship;
+        this.guardianPhone = guardianPhone;
+        this.guardianIdentityNumber = guardianIdentityNumber;
+        this.guardianUserId = guardianUserId;
+        this.consentSignerName = isMinor
+                ? guardianName
+                : (consentSignerName != null && !consentSignerName.isBlank()
+                        ? consentSignerName
+                        : (guardianName != null && !guardianName.isBlank() ? guardianName : this.fullName));
+
         this.updatedAt = Instant.now();
+    }
+
+    public void updateProfile(
+            String fullName,
+            LocalDate dateOfBirth,
+            Gender gender,
+            String phone,
+            String email,
+            String address,
+            String identityNumber,
+            String insuranceNumber,
+            BloodType bloodType,
+            String emergencyContact,
+            String emergencyRelationship,
+            String emergencyPhone
+    ) {
+        updateProfile(
+                fullName,
+                dateOfBirth,
+                gender,
+                phone,
+                email,
+                address,
+                identityNumber,
+                insuranceNumber,
+                bloodType,
+                emergencyContact,
+                emergencyRelationship,
+                emergencyPhone,
+                this.guardianName,
+                this.guardianRelationship,
+                this.guardianPhone,
+                this.guardianIdentityNumber,
+                this.guardianUserId,
+                this.consentSignerName
+        );
     }
 
     public void updateProfile(
@@ -297,8 +513,29 @@ public class Patient {
                 bloodType,
                 emergencyContact,
                 this.emergencyRelationship,
-                emergencyPhone
+                emergencyPhone,
+                this.guardianName,
+                this.guardianRelationship,
+                this.guardianPhone,
+                this.guardianIdentityNumber,
+                this.guardianUserId,
+                this.consentSignerName
         );
+    }
+
+    public void transitionToAdult() {
+        if (PatientMinorPolicy.isMinor(this.dateOfBirth)) {
+            throw new com.benhsoan.domain.shared.exception.ValidationException(
+                    "Bệnh nhân chưa đủ 18 tuổi, không thể chuyển sang tự chịu trách nhiệm."
+            );
+        }
+        this.guardianName = null;
+        this.guardianRelationship = null;
+        this.guardianPhone = null;
+        this.guardianIdentityNumber = null;
+        this.guardianUserId = null;
+        this.consentSignerName = this.fullName;
+        this.updatedAt = Instant.now();
     }
 
     public void withdrawConsent(String reason, Instant withdrawnAt) {
@@ -352,6 +589,12 @@ public class Patient {
             String emergencyContact,
             String emergencyRelationship,
             String emergencyPhone,
+            String guardianName,
+            String guardianRelationship,
+            String guardianPhone,
+            String guardianIdentityNumber,
+            UUID guardianUserId,
+            String consentSignerName,
             boolean active,
             Instant createdAt,
             Instant updatedAt,
@@ -381,6 +624,78 @@ public class Patient {
                 emergencyContact,
                 emergencyRelationship,
                 emergencyPhone,
+                guardianName,
+                guardianRelationship,
+                guardianPhone,
+                guardianIdentityNumber,
+                guardianUserId,
+                consentSignerName != null && !consentSignerName.isBlank()
+                        ? consentSignerName
+                        : (PatientMinorPolicy.isMinor(dateOfBirth) ? guardianName : fullName),
+                active,
+                createdAt,
+                updatedAt,
+                userId,
+                createdBy,
+                consentAgreed,
+                consentAgreedAt,
+                consentVersion,
+                consentWithdrawn,
+                consentWithdrawnAt,
+                consentWithdrawnReason,
+                nonMedicalUseRestricted
+        );
+    }
+
+    public static Patient restore(
+            UUID id,
+            String patientCode,
+            String fullName,
+            LocalDate dateOfBirth,
+            Gender gender,
+            String phone,
+            String email,
+            String address,
+            String identityNumber,
+            String insuranceNumber,
+            BloodType bloodType,
+            String emergencyContact,
+            String emergencyRelationship,
+            String emergencyPhone,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt,
+            UUID userId,
+            UUID createdBy,
+            boolean consentAgreed,
+            Instant consentAgreedAt,
+            String consentVersion,
+            boolean consentWithdrawn,
+            Instant consentWithdrawnAt,
+            String consentWithdrawnReason,
+            boolean nonMedicalUseRestricted
+    ) {
+        return restore(
+                id,
+                patientCode,
+                fullName,
+                dateOfBirth,
+                gender,
+                phone,
+                email,
+                address,
+                identityNumber,
+                insuranceNumber,
+                bloodType,
+                emergencyContact,
+                emergencyRelationship,
+                emergencyPhone,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 active,
                 createdAt,
                 updatedAt,
