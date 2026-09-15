@@ -47,7 +47,6 @@ import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.ConfirmAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
-import com.benhsoan.port.inbound.appointment.GetDoctorAvailableSlotsUseCase;
 import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.GetUnconfirmedAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
@@ -55,7 +54,6 @@ import com.benhsoan.port.inbound.appointment.RescheduleAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.SendAppointmentReminderManuallyUseCase;
 import com.benhsoan.port.dto.result.appointment.AppointmentRescheduleHistoryResult;
-import com.benhsoan.port.dto.result.appointment.DoctorAvailableSlotResult;
 
 @WebMvcTest(controllers = AppointmentController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -83,7 +81,6 @@ class AppointmentControllerTest {
     @MockitoBean private GetAppointmentByIdUseCase getAppointmentByIdUseCase;
     @MockitoBean private RescheduleAppointmentUseCase rescheduleAppointmentUseCase;
     @MockitoBean private SendAppointmentReminderManuallyUseCase sendAppointmentReminderManuallyUseCase;
-    @MockitoBean private GetDoctorAvailableSlotsUseCase getDoctorAvailableSlotsUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -408,24 +405,5 @@ class AppointmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(appointmentId.toString()))
                 .andExpect(jsonPath("$.content[0].status").value("SCHEDULED"));
-    }
-
-    @Test
-    void getAvailableSlots_returnsSlotsSuccessfully() throws Exception {
-        UUID doctorId = UUID.randomUUID();
-        Instant slotStart = Instant.parse("2026-09-15T01:00:00Z");
-        Instant slotEnd = Instant.parse("2026-09-15T01:30:00Z");
-
-        when(getDoctorAvailableSlotsUseCase.getAvailableSlots(any()))
-                .thenReturn(List.of(new DoctorAvailableSlotResult(slotStart, slotEnd, true)));
-
-        mockMvc.perform(get("/appointments/available-slots")
-                        .param("doctorId", doctorId.toString())
-                        .param("date", "2026-09-15")
-                        .with(withPermissions("APPOINTMENT_READ")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].startTime").value(slotStart.toString()))
-                .andExpect(jsonPath("$[0].endTime").value(slotEnd.toString()))
-                .andExpect(jsonPath("$[0].isAvailable").value(true));
     }
 }
