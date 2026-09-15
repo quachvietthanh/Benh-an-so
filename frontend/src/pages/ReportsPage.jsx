@@ -57,7 +57,7 @@ import {
 } from '../utils/storageHelpers'
 
 const { RangePicker } = DatePicker
-const { Title, Paragraph, Text } = Typography
+const { Title, Text } = Typography
 
 const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit']
 
@@ -378,9 +378,6 @@ function ReportsPage() {
             <LineChartOutlined style={{ marginRight: 10, color: '#2563eb' }} />
             Báo cáo Vận hành & Doanh thu
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Theo dõi số liệu khám bệnh, doanh thu tài chính, thuốc và nhật ký truy cập y tế theo thời gian thực.
-          </Paragraph>
         </div>
         <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px', marginTop: 16 }}>
           <Empty description="Tài khoản của bạn chưa được phân quyền xem Báo cáo vận hành & doanh thu." />
@@ -407,9 +404,6 @@ function ReportsPage() {
             <LineChartOutlined style={{ marginRight: 10, color: '#2563eb' }} />
             Báo cáo Vận hành & Doanh thu
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Theo dõi số liệu khám bệnh, doanh thu tài chính, thuốc và nhật ký truy cập y tế theo thời gian thực.
-          </Paragraph>
         </div>
 
         <Space wrap>

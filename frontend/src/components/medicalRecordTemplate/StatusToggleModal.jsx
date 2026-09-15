@@ -171,7 +171,7 @@ function StatusToggleModal({
                 placeholder="Chọn mẫu thay thế..."
                 options={availableReplacements.map((t) => ({
                   value: t.id,
-                  label: `${t.name} (v${t.currentVersionNo})`,
+                  label: `${t.name} - v${t.currentVersionNo}`,
                 }))}
               />
             </Form.Item>

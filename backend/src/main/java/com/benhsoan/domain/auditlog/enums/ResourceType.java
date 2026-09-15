@@ -30,6 +30,8 @@ public enum ResourceType {
 
     SERVICE_PRICE,
 
+    CLINICAL_SERVICE,
+
     INVOICE,
 
     PAYMENT,

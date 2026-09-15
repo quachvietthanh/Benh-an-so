@@ -93,7 +93,7 @@ test('NCL-05-CN-005-TC-03: Từ chối hủy đơn khi trạng thái là DISPENS
   assert.equal(getCancelRestrictionMessage(pendingRx), null)
 })
 
-test('NCL-05-CN-005-TC-04: Phân quyền - Bác sĩ/Admin được phép hủy, Dược sĩ và các vai trò khác bị chặn', () => {
+test('NCL-05-CN-005-TC-04: Phân quyền - Chỉ Bác sĩ đã kê đơn được phép hủy, Dược sĩ/Admin/Bác sĩ khác bị chặn', () => {
   const pendingRx = { id: 'rx-4', status: 'PENDING_DISPENSE', prescriptionCode: 'DT-004' }
 
   // 1. Dược sĩ thuần túy (pharmacist) -> Chặn
@@ -118,29 +118,22 @@ test('NCL-05-CN-005-TC-04: Phân quyền - Bác sĩ/Admin được phép hủy, 
   })
   assert.equal(receptionistCheck.allowed, false)
 
-  // 4. Bác sĩ (doctor) -> Cho phép
+  // 4. Quản trị viên (admin) thuần túy không có role DOCTOR -> Chặn (theo chuẩn Backend CancelPrescriptionService)
+  const adminCheck = canCancelPrescription({
+    userRoles: ['admin'],
+    prescription: pendingRx,
+  })
+  assert.equal(adminCheck.allowed, false)
+  assert.ok(adminCheck.reason.includes('Chức năng chỉ dành cho Bác sĩ'))
+
+  // 5. Bác sĩ (doctor) -> Cho phép
   const doctorCheck = canCancelPrescription({
     userRoles: ['doctor'],
     prescription: pendingRx,
   })
   assert.equal(doctorCheck.allowed, true)
 
-  // 5. Quản trị viên (admin) -> Cho phép
-  const adminCheck = canCancelPrescription({
-    userRoles: ['admin'],
-    prescription: pendingRx,
-  })
-  assert.equal(adminCheck.allowed, true)
-
-  // 6. User có quyền PRESCRIPTION_UPDATE -> Cho phép
-  const permCheck = canCancelPrescription({
-    userRoles: [],
-    userPermissions: ['PERMISSION_PRESCRIPTION_UPDATE'],
-    prescription: pendingRx,
-  })
-  assert.equal(permCheck.allowed, true)
-
-  // 7. Bác sĩ khác (không phải người kê đơn) -> Chặn nếu không phải admin
+  // 6. Bác sĩ khác (không phải người kê đơn) -> Chặn
   const rxByDoc1 = { id: 'rx-5', status: 'PENDING_DISPENSE', prescribedBy: 'doc-user-1' }
   const otherDocCheck = canCancelPrescription({
     userRoles: ['doctor'],
@@ -150,21 +143,13 @@ test('NCL-05-CN-005-TC-04: Phân quyền - Bác sĩ/Admin được phép hủy, 
   assert.equal(otherDocCheck.allowed, false)
   assert.ok(otherDocCheck.reason.includes('Chỉ bác sĩ đã kê đơn'))
 
-  // 8. Đúng bác sĩ đã kê đơn -> Cho phép
+  // 7. Đúng bác sĩ đã kê đơn -> Cho phép
   const sameDocCheck = canCancelPrescription({
     userRoles: ['doctor'],
     prescription: rxByDoc1,
     currentUserId: 'doc-user-1',
   })
   assert.equal(sameDocCheck.allowed, true)
-
-  // 9. Quản trị viên (admin) -> Được phép hủy kể cả không phải người kê đơn
-  const adminOtherDocCheck = canCancelPrescription({
-    userRoles: ['admin'],
-    prescription: rxByDoc1,
-    currentUserId: 'admin-user-1',
-  })
-  assert.equal(adminOtherDocCheck.allowed, true)
 })
 
 test('NCL-05-CN-005: Danh mục lý do hủy mẫu (Preset Reasons) đầy đủ và có nghĩa lâm sàng', () => {

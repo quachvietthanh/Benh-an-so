@@ -1,23 +1,28 @@
 .template-management-page {
-  padding: 24px;
-  max-width: 1380px;
-  margin: 0 auto;
+  padding: 4px 0 24px 0;
+  width: 100%;
 }
 
 .template-management-header {
-  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
-.template-management-header h2 {
-  font-size: 22px;
+.template-management-header h2,
+.template-management-header h3 {
+  font-size: 18px;
   font-weight: 700;
   color: #0f172a;
-  margin-bottom: 4px;
+  margin: 0;
 }
 
 .template-filter-card {
   margin-bottom: 20px;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }

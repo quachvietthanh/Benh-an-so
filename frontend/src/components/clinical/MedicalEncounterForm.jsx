@@ -40,6 +40,7 @@ import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogD
 import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
 import DynamicMedicalRecordSections from './DynamicMedicalRecordSections'
 import PatientAllergyBanner from './PatientAllergyBanner'
+import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
 
@@ -76,8 +77,6 @@ function MedicalEncounterForm({
   setSecondaryIcds,
   addSecondaryDiagnosis,
   diagnosisOptions,
-  diagnosisSearching,
-  onDiagnosisSearch,
   setDiagnosisModalOpen,
   selectedOrders,
   orderCategory,
@@ -458,45 +457,12 @@ function MedicalEncounterForm({
                 </div>
               ) : (
                 <div>
-                  <Select
-                    showSearch
-                    allowClear
+                  <DiagnosisCatalogAutocomplete
                     placeholder="🔍 Tra cứu mã bệnh theo mã ICD (J00, I10...) hoặc tên bệnh (cảm cúm, đau đầu...)"
                     value={null}
                     style={{ width: '100%' }}
-                    filterOption={(input, option) => {
-                      const q = (input || '').toLowerCase().trim()
-                      const code = (option?.data?.code || '').toLowerCase()
-                      const name = (option?.data?.name || '').toLowerCase()
-                      const group = (option?.data?.diseaseGroup || option?.data?.category || '').toLowerCase()
-                      return code.includes(q) || name.includes(q) || group.includes(q)
-                    }}
-                    onSearch={onDiagnosisSearch}
-                    onChange={(code) => {
-                      if (!code) return
-                      const item = diagnosisOptions.find((d) => d.code === code)
-                      if (item) selectPrimaryDiagnosis(item)
-                    }}
-                    notFoundContent={diagnosisSearching ? 'Đang tìm trong danh mục mã bệnh...' : 'Không tìm thấy mã bệnh phù hợp'}
-                    options={diagnosisOptions.map((item) => {
-                      const groupName = item.diseaseGroup || getDiseaseGroupName(item.code, item.diseaseGroup)
-                      const groupColor = categoryMeta[item.category]?.color || 'blue'
-                      return {
-                        value: item.code,
-                        data: item,
-                        label: (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <Tag color="blue" style={{ fontWeight: 700, marginInlineEnd: 6 }}>{item.code}</Tag>
-                              <span>{fixMojibake(item.name)}</span>
-                            </span>
-                            <Tag color={groupColor} style={{ fontSize: 11, margin: 0, flexShrink: 0 }}>
-                              {groupName}
-                            </Tag>
-                          </div>
-                        ),
-                      }
-                    })}
+                    fallbackSuggestions={diagnosisOptions}
+                    onSelect={(item) => selectPrimaryDiagnosis(item)}
                   />
 
                   <div style={{ marginTop: 10 }}>
@@ -543,47 +509,13 @@ function MedicalEncounterForm({
                   </div>
                 )}
 
-                <Select
-                  showSearch
-                  allowClear
-                  placeholder={primaryIcd ? '🔍 Tìm mã hoặc tên bệnh kèm theo...' : 'Vui lòng chọn chẩn đoán chính trước'}
+                <DiagnosisCatalogAutocomplete
+                  placeholder={primaryIcd ? '🔍 Tìm mã hoặc tên bệnh kèm theo (tiếng Việt có dấu / không dấu / mã ICD)...' : 'Vui lòng chọn chẩn đoán chính trước'}
                   value={null}
                   disabled={!primaryIcd}
                   style={{ width: '100%' }}
-                  filterOption={(input, option) => {
-                    const q = (input || '').toLowerCase().trim()
-                    const code = (option?.data?.code || '').toLowerCase()
-                    const name = (option?.data?.name || '').toLowerCase()
-                    const group = (option?.data?.diseaseGroup || option?.data?.category || '').toLowerCase()
-                    return code.includes(q) || name.includes(q) || group.includes(q)
-                  }}
-                  onSearch={onDiagnosisSearch}
-                  onDropdownVisibleChange={(open) => open && onDiagnosisSearch('')}
-                  onChange={(code) => {
-                    if (!code) return
-                    const item = diagnosisOptions.find((diagnosis) => diagnosis.code === code)
-                    if (item) addSecondaryDiagnosis(item)
-                  }}
-                  notFoundContent={diagnosisSearching ? 'Đang tìm trong danh mục...' : 'Không tìm thấy chẩn đoán phù hợp'}
-                  options={diagnosisOptions.map((item) => {
-                    const groupName = item.diseaseGroup || getDiseaseGroupName(item.code, item.diseaseGroup)
-                    const groupColor = categoryMeta[item.category]?.color || 'purple'
-                    return {
-                      value: item.code,
-                      data: item,
-                      label: (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <Tag color="purple" style={{ fontWeight: 700, marginInlineEnd: 6 }}>{item.code}</Tag>
-                            <span>{fixMojibake(item.name)}</span>
-                          </span>
-                          <Tag color={groupColor} style={{ fontSize: 11, margin: 0, flexShrink: 0 }}>
-                            {groupName}
-                          </Tag>
-                        </div>
-                      ),
-                    }
-                  })}
+                  fallbackSuggestions={diagnosisOptions}
+                  onSelect={(item) => addSecondaryDiagnosis(item)}
                 />
               </div>
             </Form.Item>
