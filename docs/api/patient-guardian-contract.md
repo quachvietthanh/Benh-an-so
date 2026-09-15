@@ -24,7 +24,7 @@
    - Trường `consentSignerName` tự động ghi nhận theo họ tên của người giám hộ (`guardianName`).
 4. **Quy tắc Nhắc nhở và Chuyển tiếp Trưởng thành (TC-04)**:
    - Khi xem hồ sơ (`GET /patients/{id}` hoặc `GET /patients/code/{code}`): Nếu bệnh nhân đã đủ 18 tuổi theo ngày sinh nhưng hồ sơ vẫn còn gắn người giám hộ, response trả về `requiresAdultTransitionPrompt: true`.
-   - Khi cập nhật hồ sơ (`PUT /patients/{id}`): Lễ tân có thể gửi cờ `transitionToAdult: true` (hoặc gửi các trường `guardian_*` là null). Hệ thống gỡ bỏ liên kết người giám hộ và cập nhật phiếu đồng ý mới đứng tên chính bệnh nhân (`consentSignerName = fullName`).
+   - Khi cập nhật hồ sơ (`PUT /patients/{id}`): Lễ tân có thể gửi cờ `transitionToAdult: true` (hoặc gửi các trường `guardian_*` là null). Hệ thống gỡ bỏ liên kết người giám hộ và cập nhật người đứng tên phiếu đồng ý là chính bệnh nhân (`consentSignerName = fullName`). Trạng thái phiếu đồng ý trước đó được bảo toàn nguyên vẹn (không tự động cấp lại hoặc xóa bỏ trạng thái rút consent). Mọi hành động thay đổi, gia hạn hoặc rút consent phải tuân thủ quyền `PATIENT_CONSENT_UPDATE`.
 
 ---
 

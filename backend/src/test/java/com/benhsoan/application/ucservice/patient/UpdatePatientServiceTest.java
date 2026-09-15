@@ -988,6 +988,133 @@ class UpdatePatientServiceTest {
     }
 
     @Test
+    @DisplayName("P1 / TC-04: Bệnh nhân đủ 18 tuổi chuyển tiếp thành niên bảo toàn trạng thái rút consent (consentWithdrawn=true)")
+    void transitionsToAdultPreservesConsentWithdrawalWhenPatientHadWithdrawnConsent() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(18);
+        Patient existing = Patient.create(
+                "BN000006", "Nguyen Van Truong Thanh", adultDob, Gender.MALE,
+                "0901234567", "tt@example.com", "123 Street", "079095009999",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+        existing.withdrawConsent("Không muốn dùng dữ liệu ngoài y tế", java.time.Instant.now());
+
+        // User only has PATIENT_UPDATE, not PATIENT_CONSENT_UPDATE
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Truong Thanh")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .email("tt@example.com")
+                .address("123 Street")
+                .identityNumber("079095009999")
+                .transitionToAdult(true)
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertFalse(result.isMinor());
+        assertFalse(result.requiresAdultTransitionPrompt());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianName());
+        assertEquals("Nguyen Van Truong Thanh", result.consentSignerName());
+        assertTrue(result.consentWithdrawn(), "Trạng thái rút consent không được tự động xóa khi transitionToAdult");
+        assertTrue(result.nonMedicalUseRestricted(), "Hạn chế sử dụng dữ liệu phi y tế phải được giữ nguyên");
+        assertEquals("Không muốn dùng dữ liệu ngoài y tế", result.consentWithdrawnReason());
+
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P1: Chặn khôi phục consent khi transitionToAdult nếu user không có quyền PATIENT_CONSENT_UPDATE")
+    void rejectsConsentRenewalDuringTransitionToAdultWhenUserLacksConsentPermission() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(18);
+        Patient existing = Patient.create(
+                "BN000006", "Nguyen Van Truong Thanh", adultDob, Gender.MALE,
+                "0901234567", "tt@example.com", "123 Street", "079095009999",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+        existing.withdrawConsent("Không muốn dùng dữ liệu ngoài y tế", java.time.Instant.now());
+
+        // User does NOT have PATIENT_CONSENT_UPDATE
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(false);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Truong Thanh")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .transitionToAdult(true)
+                .consentAgreed(true)
+                .consentWithdrawn(false)
+                .consentVersion("v1.0")
+                .active(true)
+                .build();
+
+        assertThrows(
+                PatientConsentAccessDeniedException.class,
+                () -> service.update(patientId, command)
+        );
+
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P1: Cho phép chuyển tiếp thành niên và gia hạn consent thành công khi user có đủ quyền PATIENT_CONSENT_UPDATE")
+    void allowsConsentRenewalDuringTransitionToAdultWhenUserHasConsentPermission() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(18);
+        Patient existing = Patient.create(
+                "BN000006", "Nguyen Van Truong Thanh", adultDob, Gender.MALE,
+                "0901234567", "tt@example.com", "123 Street", "079095009999",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+        existing.withdrawConsent("Không muốn dùng dữ liệu ngoài y tế", java.time.Instant.now());
+
+        // User HAS PATIENT_CONSENT_UPDATE
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Truong Thanh")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .transitionToAdult(true)
+                .consentAgreed(true)
+                .consentWithdrawn(false)
+                .consentVersion("v1.0")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertFalse(result.isMinor());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianName());
+        assertEquals("Nguyen Van Truong Thanh", result.consentSignerName());
+        assertTrue(result.consentAgreed());
+        assertFalse(result.consentWithdrawn());
+        assertFalse(result.nonMedicalUseRestricted());
+        org.junit.jupiter.api.Assertions.assertNull(result.consentWithdrawnReason());
+
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
     @DisplayName("NCL-02-CN-008 TC-04: Từ chối chuyển tiếp thành niên khi bệnh nhân chưa đủ 18 tuổi")
     void rejectsTransitionToAdultWhenPatientIsStillMinor() {
         UUID patientId = UUID.randomUUID();

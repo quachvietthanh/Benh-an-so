@@ -523,7 +523,7 @@ public class Patient {
         );
     }
 
-    public void transitionToAdult(String newConsentVersion, Instant agreedAt) {
+    public void transitionToAdult() {
         if (PatientMinorPolicy.isMinor(this.dateOfBirth)) {
             throw new com.benhsoan.domain.shared.exception.ValidationException(
                     "Bệnh nhân chưa đủ 18 tuổi, không thể chuyển sang tự chịu trách nhiệm."
@@ -535,7 +535,7 @@ public class Patient {
         this.guardianIdentityNumber = null;
         this.guardianUserId = null;
         this.consentSignerName = this.fullName;
-        renewConsent(newConsentVersion, agreedAt);
+        this.updatedAt = Instant.now();
     }
 
     public void withdrawConsent(String reason, Instant withdrawnAt) {
