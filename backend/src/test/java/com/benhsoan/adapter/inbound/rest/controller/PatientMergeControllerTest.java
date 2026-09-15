@@ -184,7 +184,8 @@ class PatientMergeControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateBody)
                         .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.mergedIntoPatientId").value(retainedPatientId.toString()));
     }
 
     @Test

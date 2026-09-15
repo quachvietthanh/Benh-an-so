@@ -597,6 +597,11 @@ public class Patient {
         this.updatedAt = Instant.now();
     }
 
+    public void unlinkUser() {
+        this.userId = null;
+        this.updatedAt = Instant.now();
+    }
+
     public void deactivate() {
         this.active = false;
         this.updatedAt = Instant.now();

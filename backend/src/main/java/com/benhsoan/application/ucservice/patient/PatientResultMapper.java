@@ -10,6 +10,10 @@ import com.benhsoan.port.dto.result.PatientResult;
 public class PatientResultMapper {
 
     public PatientResult toResult(Patient patient) {
+        return toResult(patient, null);
+    }
+
+    public PatientResult toResult(Patient patient, String mergedIntoPatientCode) {
 
         return new PatientResult(
                 patient.getId(),
@@ -47,7 +51,7 @@ public class PatientResultMapper {
                 patient.getStatus(),
                 patient.isMerged(),
                 patient.getMergedIntoPatientId(),
-                null,
+                mergedIntoPatientCode,
                 patient.getMergedAt(),
                 patient.getMergedBy(),
                 patient.getMergeReason()

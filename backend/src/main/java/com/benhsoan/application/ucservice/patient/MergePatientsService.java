@@ -1,6 +1,8 @@
 package com.benhsoan.application.ucservice.patient;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -21,10 +23,13 @@ import com.benhsoan.port.dto.command.patient.MergePatientsCommand;
 import com.benhsoan.port.dto.result.patient.MergePatientsResult;
 import com.benhsoan.port.inbound.patient.MergePatientsUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientMergeDataPort;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,6 +43,8 @@ public class MergePatientsService implements MergePatientsUseCase {
     private final AuditLogRepository auditLogRepository;
     private final PatientChangeLogRepository patientChangeLogRepository;
     private final CurrentUserPort currentUserPort;
+    private final ObjectMapper objectMapper;
+    private final UserSessionRepository userSessionRepository;
 
     @Override
     public MergePatientsResult merge(MergePatientsCommand command) {
@@ -75,38 +82,52 @@ public class MergePatientsService implements MergePatientsUseCase {
         UUID currentUserId = currentUserPort.getCurrentUserId();
         Instant now = Instant.now();
 
+        // If source had user portal account, transfer or clean up to prevent duplicate user_id
+        if (sourcePatient.getUserId() != null) {
+            UUID sourceUserId = sourcePatient.getUserId();
+            if (targetPatient.getUserId() == null) {
+                targetPatient.linkUser(sourceUserId);
+                patientRepository.save(targetPatient);
+            } else {
+                userSessionRepository.revokeByUserId(sourceUserId, now);
+            }
+            sourcePatient.unlinkUser();
+        }
+
         // Mark source as merged
         sourcePatient.markAsMerged(targetId, currentUserId, command.reason(), now);
         patientRepository.save(sourcePatient);
 
-        // If source had user portal account and target did not, link to target to preserve access
-        if (sourcePatient.getUserId() != null && targetPatient.getUserId() == null) {
-            targetPatient.linkUser(sourcePatient.getUserId());
-            patientRepository.save(targetPatient);
-        }
-
         // Record PatientChangeLogs for both profiles
-        String sourceLogDetail = String.format(
-                "{\"action\":\"MERGED_INTO\",\"targetPatientId\":\"%s\",\"targetPatientCode\":\"%s\",\"reason\":\"%s\"}",
-                targetPatient.getId(), targetPatient.getPatientCode(), escapeJson(command.reason()));
+        Map<String, Object> sourceDetailMap = new LinkedHashMap<>();
+        sourceDetailMap.put("action", "MERGED_INTO");
+        sourceDetailMap.put("targetPatientId", targetPatient.getId().toString());
+        sourceDetailMap.put("targetPatientCode", targetPatient.getPatientCode());
+        sourceDetailMap.put("reason", command.reason());
         patientChangeLogRepository.save(PatientChangeLog.create(
-                sourcePatient.getId(), currentUserId, PatientChangeAction.MERGE, sourceLogDetail));
+                sourcePatient.getId(), currentUserId, PatientChangeAction.MERGE, toJson(sourceDetailMap)));
 
-        String targetLogDetail = String.format(
-                "{\"action\":\"MERGED_FROM\",\"sourcePatientId\":\"%s\",\"sourcePatientCode\":\"%s\",\"transferredVisitsCount\":%d}",
-                sourcePatient.getId(), sourcePatient.getPatientCode(), transferredVisitsCount);
+        Map<String, Object> targetDetailMap = new LinkedHashMap<>();
+        targetDetailMap.put("action", "MERGED_FROM");
+        targetDetailMap.put("sourcePatientId", sourcePatient.getId().toString());
+        targetDetailMap.put("sourcePatientCode", sourcePatient.getPatientCode());
+        targetDetailMap.put("transferredVisitsCount", transferredVisitsCount);
         patientChangeLogRepository.save(PatientChangeLog.create(
-                targetPatient.getId(), currentUserId, PatientChangeAction.MERGE, targetLogDetail));
+                targetPatient.getId(), currentUserId, PatientChangeAction.MERGE, toJson(targetDetailMap)));
 
         // System Audit Log (TC-05: Record source, target, operator, timestamp)
-        String auditDetail = String.format(
-                "{\"sourcePatientId\":\"%s\",\"sourcePatientCode\":\"%s\",\"targetPatientId\":\"%s\",\"targetPatientCode\":\"%s\",\"operatorId\":\"%s\",\"reason\":\"%s\",\"transferredVisitsCount\":%d,\"mergedAt\":\"%s\"}",
-                sourcePatient.getId(), sourcePatient.getPatientCode(),
-                targetPatient.getId(), targetPatient.getPatientCode(),
-                currentUserId, escapeJson(command.reason()), transferredVisitsCount, now);
+        Map<String, Object> auditDetailMap = new LinkedHashMap<>();
+        auditDetailMap.put("sourcePatientId", sourcePatient.getId().toString());
+        auditDetailMap.put("sourcePatientCode", sourcePatient.getPatientCode());
+        auditDetailMap.put("targetPatientId", targetPatient.getId().toString());
+        auditDetailMap.put("targetPatientCode", targetPatient.getPatientCode());
+        auditDetailMap.put("operatorId", currentUserId.toString());
+        auditDetailMap.put("reason", command.reason());
+        auditDetailMap.put("transferredVisitsCount", transferredVisitsCount);
+        auditDetailMap.put("mergedAt", now.toString());
 
         auditLogRepository.save(AuditLog.create(
-                currentUserId, ActionType.MERGE, ResourceType.PATIENT, targetId, auditDetail, null, now));
+                currentUserId, ActionType.MERGE, ResourceType.PATIENT, targetId, toJson(auditDetailMap), null, now));
 
         return MergePatientsResult.builder()
                 .sourcePatientId(sourcePatient.getId())
@@ -145,8 +166,11 @@ public class MergePatientsService implements MergePatientsUseCase {
         return str != null && !str.isBlank();
     }
 
-    private String escapeJson(String str) {
-        if (str == null) return "";
-        return str.replace("\"", "\\\"");
+    private String toJson(Object object) {
+        try {
+            return objectMapper.writeValueAsString(object);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize audit detail to JSON", e);
+        }
     }
 }

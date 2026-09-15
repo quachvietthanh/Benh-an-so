@@ -631,4 +631,23 @@ class PatientTest {
 
         assertThrows(PatientAlreadyMergedException.class, source::validateCanBeUpdated);
     }
+
+    @Test
+    @DisplayName("UT-01 / F-02: patient.unlinkUser() đặt userId về null và cập nhật updatedAt")
+    void unlinkUserSetsUserIdToNull() {
+        Patient patient = Patient.create(
+                "BN-SRC", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", createdBy
+        );
+        UUID userId = UUID.randomUUID();
+        patient.linkUser(userId);
+        assertEquals(userId, patient.getUserId());
+
+        patient.unlinkUser();
+
+        assertNull(patient.getUserId());
+        assertNotNull(patient.getUpdatedAt());
+    }
 }

@@ -1,7 +1,6 @@
 package com.benhsoan.application.ucservice.patient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
 
@@ -26,7 +25,8 @@ import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 @DisplayName("FindDuplicatePatientsService - Unit Tests (NCL-02-CN-006 / TC-01)")
 class FindDuplicatePatientsServiceTest {
 
-    @Mock private PatientRepository patientRepository;
+    @Mock
+    private PatientRepository patientRepository;
 
     private FindDuplicatePatientsService service;
     private final UUID operatorId = UUID.randomUUID();
@@ -44,16 +44,14 @@ class FindDuplicatePatientsServiceTest {
                 "BN000001", "Nguyễn Văn A", dob1, Gender.MALE,
                 "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
                 null, null, null, null, null, null, null, null, null,
-                true, "v1.0", operatorId
-        );
+                true, "v1.0", operatorId);
         p1.setIdForTest(UUID.randomUUID());
 
         Patient p2 = Patient.create(
                 "BN000002", "NGUYEN VAN A", dob1, Gender.MALE,
                 "0901234567", null, "456 Street", null, null, BloodType.UNKNOWN,
                 null, null, null, null, null, null, null, null, null,
-                true, "v1.0", operatorId
-        );
+                true, "v1.0", operatorId);
         p2.setIdForTest(UUID.randomUUID());
 
         // Single patient without duplicate (should be excluded from groups)
@@ -61,8 +59,7 @@ class FindDuplicatePatientsServiceTest {
                 "BN000003", "Trần Thị B", LocalDate.of(1995, 5, 5), Gender.FEMALE,
                 "0987654321", null, "789 Street", null, null, BloodType.UNKNOWN,
                 null, null, null, null, null, null, null, null, null,
-                true, "v1.0", operatorId
-        );
+                true, "v1.0", operatorId);
         p3.setIdForTest(UUID.randomUUID());
 
         when(patientRepository.findSuspectedDuplicates()).thenReturn(List.of(p1, p2, p3));
@@ -75,6 +72,34 @@ class FindDuplicatePatientsServiceTest {
         assertEquals("Nguyễn Văn A", group.fullName());
         assertEquals(dob1, group.dateOfBirth());
         assertEquals("0901234567", group.phone());
+        assertEquals(2, group.candidates().size());
+    }
+
+    @Test
+    @DisplayName("UT-05 / F-07: Gom nhóm thành công hai hồ sơ có số điện thoại khác nhau về khoảng trắng")
+    void groupsPatientsWithWhitespaceDifferencesInPhone() {
+        LocalDate dob = LocalDate.of(1992, 3, 15);
+        Patient p1 = Patient.create(
+                "BN000010", "Le Van C", dob, Gender.MALE,
+                "0901 234 567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", operatorId);
+        p1.setIdForTest(UUID.randomUUID());
+
+        Patient p2 = Patient.create(
+                "BN000011", "Le Van C", dob, Gender.MALE,
+                "0901234567", null, "456 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", operatorId);
+        p2.setIdForTest(UUID.randomUUID());
+
+        when(patientRepository.findSuspectedDuplicates()).thenReturn(List.of(p1, p2));
+
+        List<DuplicatePatientGroupResult> results = service.findDuplicates();
+
+        assertNotNull(results);
+        assertEquals(1, results.size(), "Cả 2 hồ sơ được gom chung vào 1 nhóm nghi trùng");
+        DuplicatePatientGroupResult group = results.get(0);
         assertEquals(2, group.candidates().size());
     }
 }

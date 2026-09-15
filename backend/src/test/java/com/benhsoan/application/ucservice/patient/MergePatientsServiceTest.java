@@ -38,10 +38,12 @@ import com.benhsoan.domain.patient.exception.PatientIdentityConflictException;
 import com.benhsoan.port.dto.command.patient.MergePatientsCommand;
 import com.benhsoan.port.dto.result.patient.MergePatientsResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientMergeDataPort;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("MergePatientsService - Unit Tests (NCL-02-CN-006 / TC-01, TC-03, TC-05, QTN-33)")
@@ -52,7 +54,9 @@ class MergePatientsServiceTest {
     @Mock private PatientChangeLogRepository patientChangeLogRepository;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private CurrentUserPort currentUserPort;
+    @Mock private UserSessionRepository userSessionRepository;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private MergePatientsService service;
     private final UUID currentUserId = UUID.randomUUID();
 
@@ -63,7 +67,9 @@ class MergePatientsServiceTest {
                 patientMergeDataPort,
                 auditLogRepository,
                 patientChangeLogRepository,
-                currentUserPort
+                currentUserPort,
+                objectMapper,
+                userSessionRepository
         );
     }
 
@@ -246,5 +252,123 @@ class MergePatientsServiceTest {
 
         assertThrows(PatientIdentityConflictException.class, () -> service.merge(command));
         verify(patientMergeDataPort, never()).transferAllPatientData(any(), any());
+    }
+
+    @Test
+    @DisplayName("F-02: Chuyển tài khoản portal sang hồ sơ đích và unlink hồ sơ nguồn khi hồ sơ đích chưa có user")
+    void successfulMerge_TransfersPortalAccount_WhenTargetHasNone_AndUnlinksSource() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UUID sourceUserId = UUID.randomUUID();
+
+        Patient sourcePatient = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        sourcePatient.setIdForTest(sourceId);
+        sourcePatient.linkUser(sourceUserId);
+
+        Patient targetPatient = Patient.create(
+                "BN000002", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        targetPatient.setIdForTest(targetId);
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+        when(patientRepository.findByIdForUpdate(sourceId)).thenReturn(Optional.of(sourcePatient));
+        when(patientRepository.findByIdForUpdate(targetId)).thenReturn(Optional.of(targetPatient));
+        when(patientMergeDataPort.transferAllPatientData(sourceId, targetId)).thenReturn(1);
+        when(patientRepository.save(any(Patient.class))).thenAnswer(i -> i.getArgument(0));
+
+        MergePatientsCommand command = new MergePatientsCommand(sourceId, targetId, "Gộp chuyển portal");
+        service.merge(command);
+
+        assertEquals(sourceUserId, targetPatient.getUserId(), "Hồ sơ đích kế thừa userId của nguồn");
+        assertEquals(null, sourcePatient.getUserId(), "Hồ sơ nguồn phải được unlinkUser để không trùng user_id");
+    }
+
+    @Test
+    @DisplayName("F-02: Thu hồi phiên đăng nhập và unlink hồ sơ nguồn khi cả hai hồ sơ đều đã có user portal")
+    void successfulMerge_RevokesSourcePortalAccount_WhenBothHaveAccount() {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UUID sourceUserId = UUID.randomUUID();
+        UUID targetUserId = UUID.randomUUID();
+
+        Patient sourcePatient = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        sourcePatient.setIdForTest(sourceId);
+        sourcePatient.linkUser(sourceUserId);
+
+        Patient targetPatient = Patient.create(
+                "BN000002", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        targetPatient.setIdForTest(targetId);
+        targetPatient.linkUser(targetUserId);
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+        when(patientRepository.findByIdForUpdate(sourceId)).thenReturn(Optional.of(sourcePatient));
+        when(patientRepository.findByIdForUpdate(targetId)).thenReturn(Optional.of(targetPatient));
+        when(patientMergeDataPort.transferAllPatientData(sourceId, targetId)).thenReturn(1);
+        when(patientRepository.save(any(Patient.class))).thenAnswer(i -> i.getArgument(0));
+
+        MergePatientsCommand command = new MergePatientsCommand(sourceId, targetId, "Gộp cả 2 đều có portal");
+        service.merge(command);
+
+        assertEquals(targetUserId, targetPatient.getUserId(), "Hồ sơ đích giữ nguyên userId");
+        assertEquals(null, sourcePatient.getUserId(), "Hồ sơ nguồn bị unlinkUser");
+        verify(userSessionRepository).revokeByUserId(any(), any());
+    }
+
+    @Test
+    @DisplayName("F-04: Serialization ObjectMapper tạo JSON hợp lệ ngay cả khi reason có newline và quote")
+    void successfulMerge_SerializesValidJson_WhenReasonHasNewlinesAndQuotes() throws Exception {
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+
+        Patient sourcePatient = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        sourcePatient.setIdForTest(sourceId);
+
+        Patient targetPatient = Patient.create(
+                "BN000002", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        targetPatient.setIdForTest(targetId);
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+        when(patientRepository.findByIdForUpdate(sourceId)).thenReturn(Optional.of(sourcePatient));
+        when(patientRepository.findByIdForUpdate(targetId)).thenReturn(Optional.of(targetPatient));
+        when(patientMergeDataPort.transferAllPatientData(sourceId, targetId)).thenReturn(2);
+        when(patientRepository.save(any(Patient.class))).thenAnswer(i -> i.getArgument(0));
+
+        String complexReason = "Dòng 1: Gộp hồ sơ\nDòng 2: Có ký tự \"ngoặc kép\" và \ttab";
+        MergePatientsCommand command = new MergePatientsCommand(sourceId, targetId, complexReason);
+        service.merge(command);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        AuditLog savedLog = captor.getValue();
+        assertNotNull(savedLog.getDetail());
+        // Verify that ObjectMapper can parse it back into a JsonNode without error
+        com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(savedLog.getDetail());
+        assertEquals(complexReason, node.get("reason").asText());
     }
 }

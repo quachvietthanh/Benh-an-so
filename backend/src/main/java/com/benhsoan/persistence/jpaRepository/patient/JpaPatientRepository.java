@@ -45,14 +45,15 @@ public interface JpaPatientRepository extends JpaRepository<PatientEntity, UUID>
     @Query("""
         SELECT p FROM PatientEntity p
         WHERE p.status = 'ACTIVE'
+          AND p.phone IS NOT NULL
+          AND TRIM(p.phone) <> ''
           AND EXISTS (
               SELECT 1 FROM PatientEntity p2
               WHERE p2.id <> p.id
                 AND p2.status = 'ACTIVE'
                 AND LOWER(p2.fullName) = LOWER(p.fullName)
                 AND p2.dateOfBirth = p.dateOfBirth
-                AND p2.phone = p.phone
-                AND p.phone IS NOT NULL
+                AND REPLACE(p2.phone, ' ', '') = REPLACE(p.phone, ' ', '')
           )
         ORDER BY p.fullName ASC, p.dateOfBirth ASC, p.createdAt ASC
     """)
