@@ -75,9 +75,11 @@ import com.benhsoan.port.outbound.time.ClockPort;
  * TC-03: Booking attempt on a doctor's leave slot rejected by QTN-30.
  * TC-04: Unauthorized Pharmacist access rejected with 403 and audited with ACCESS_DENIED.
  */
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+
 @WebMvcTest(controllers = AppointmentController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({AppointmentRestMapper.class, GlobalExceptionHandler.class, RequirePermissionAspect.class,
+@Import({AppointmentRestMapper.class, AnonymizationModeState.class, GlobalExceptionHandler.class, RequirePermissionAspect.class,
         PermissionEvaluator.class, DoctorWeeklyTableControllerTest.AspectTestConfig.class})
 class DoctorWeeklyTableControllerTest {
 
@@ -92,6 +94,7 @@ class DoctorWeeklyTableControllerTest {
     private static final LocalDate SUNDAY = LocalDate.of(2099, 8, 16);
 
     @Autowired private MockMvc mockMvc;
+    @Autowired private AnonymizationModeState anonymizationModeState;
 
     @MockitoBean private CreateAppointmentUseCase createAppointmentUseCase;
     @MockitoBean private CancelAppointmentUseCase cancelAppointmentUseCase;
@@ -114,8 +117,9 @@ class DoctorWeeklyTableControllerTest {
     @MockitoBean private AuditLogRepository auditLogRepository;
 
     @AfterEach
-    void clearSecurityContext() {
+    void cleanUp() {
         SecurityContextHolder.clearContext();
+        anonymizationModeState.setEnabled(false);
     }
 
     private RequestPostProcessor withPermissions(String... permissions) {
@@ -171,6 +175,7 @@ class DoctorWeeklyTableControllerTest {
                                                         .id(UUID.randomUUID())
                                                         .appointmentCode("APT000001")
                                                         .patientId(PATIENT_ID)
+                                                        .patientCode("BN000001")
                                                         .patientName("Tran Thi B")
                                                         .patientPhone("0901234567")
                                                         .status(AppointmentStatus.SCHEDULED)
@@ -199,6 +204,7 @@ class DoctorWeeklyTableControllerTest {
                 .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[1].status").value("BOOKED"))
                 .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[1].isBookable").value(false))
                 .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[1].appointment.appointmentCode").value("APT000001"))
+                .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[1].appointment.patientCode").value("BN000001"))
                 .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[1].appointment.patientName").value("Tran Thi B"));
     }
 
@@ -291,5 +297,67 @@ class DoctorWeeklyTableControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(ActionType.ACCESS_DENIED, savedLog.getActionType());
         org.junit.jupiter.api.Assertions.assertEquals(ResourceType.PERMISSION, savedLog.getResourceType());
         org.junit.jupiter.api.Assertions.assertEquals(pharmacistUserId, savedLog.getUserId());
+    }
+
+    @Test
+    void tc05_receptionistViewsTableWithAnonymizationEnabled() throws Exception {
+        // Given: Hệ thống bật chế độ ẩn danh (NCL-15-CN-003 / Finding P3-1)
+        anonymizationModeState.setEnabled(true);
+
+        DoctorWeeklyTableResult mockResult = DoctorWeeklyTableResult.builder()
+                .weekStartDate(MONDAY)
+                .weekEndDate(SUNDAY)
+                .clinicStartTime(LocalTime.of(7, 30))
+                .clinicEndTime(LocalTime.of(17, 30))
+                .timeSlots(List.of(LocalTime.of(8, 0)))
+                .doctors(List.of(DoctorSummaryResult.builder()
+                        .id(DOCTOR_ID)
+                        .fullName("BS. Nguyen Van A")
+                        .username("dr_a")
+                        .build()))
+                .days(List.of(DoctorDayScheduleResult.builder()
+                        .date(MONDAY)
+                        .dayOfWeek(DayOfWeek.MONDAY)
+                        .doctorSchedules(List.of(DoctorScheduleDayResult.builder()
+                                .doctorId(DOCTOR_ID)
+                                .doctorName("BS. Nguyen Van A")
+                                .workingDay(true)
+                                .workingStartTime(LocalTime.of(8, 0))
+                                .workingEndTime(LocalTime.of(17, 0))
+                                .slots(List.of(
+                                        DoctorScheduleSlotResult.builder()
+                                                .startTime(Instant.parse("2099-08-10T01:00:00Z"))
+                                                .endTime(Instant.parse("2099-08-10T01:30:00Z"))
+                                                .slotStartTime(LocalTime.of(8, 0))
+                                                .slotEndTime(LocalTime.of(8, 30))
+                                                .status(SlotAvailabilityStatus.BOOKED)
+                                                .isBookable(false)
+                                                .appointment(AppointmentSummaryResult.builder()
+                                                        .id(UUID.randomUUID())
+                                                        .appointmentCode("APT000001")
+                                                        .patientId(PATIENT_ID)
+                                                        .patientCode("BN000001")
+                                                        .patientName("Tran Thi B")
+                                                        .patientPhone("0901234567")
+                                                        .status(AppointmentStatus.SCHEDULED)
+                                                        .reason("Kham tong quat")
+                                                        .build())
+                                                .build()
+                                ))
+                                .build()))
+                        .build()))
+                .build();
+
+        when(getDoctorWeeklyScheduleTableUseCase.getWeeklyScheduleTable(any())).thenReturn(mockResult);
+
+        // When: Lễ tân gọi API
+        mockMvc.perform(get("/appointments/doctor-weekly-table")
+                        .param("date", "2099-08-10")
+                        .with(withPermissions("APPOINTMENT_READ")))
+                // Then: Tên và số điện thoại của bệnh nhân bị ẩn danh đúng chuẩn
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[0].appointment.patientCode").value("BN000001"))
+                .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[0].appointment.patientName").value("BỆNH NHÂN #BN000001"))
+                .andExpect(jsonPath("$.days[0].doctorSchedules[0].slots[0].appointment.patientPhone").value("09******67"));
     }
 }

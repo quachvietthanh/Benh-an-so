@@ -55,9 +55,11 @@ import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.SendAppointmentReminderManuallyUseCase;
 import com.benhsoan.port.dto.result.appointment.AppointmentRescheduleHistoryResult;
 
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+
 @WebMvcTest(controllers = AppointmentController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({AppointmentRestMapper.class, GlobalExceptionHandler.class, RequirePermissionAspect.class,
+@Import({AppointmentRestMapper.class, AnonymizationModeState.class, GlobalExceptionHandler.class, RequirePermissionAspect.class,
         PermissionEvaluator.class, AppointmentControllerTest.AspectTestConfig.class})
 class AppointmentControllerTest {
 

@@ -126,7 +126,7 @@ class GetDoctorWeeklyScheduleTableServiceTest {
         DoctorWeeklySchedule schedB = DoctorWeeklySchedule.create(
                 DOCTOR_B_ID, DayOfWeek.MONDAY, LocalTime.of(13, 0), LocalTime.of(17, 0)
         );
-        when(weeklyScheduleRepository.findActiveByDoctorIdIn(List.of(DOCTOR_A_ID, DOCTOR_B_ID)))
+        when(weeklyScheduleRepository.findByDoctorIdIn(List.of(DOCTOR_A_ID, DOCTOR_B_ID)))
                 .thenReturn(List.of(schedA, schedB));
 
         when(doctorScheduleRepository.findByDoctorIdInAndScheduleDateBetween(any(), any(), any()))
@@ -203,6 +203,7 @@ class GetDoctorWeeklyScheduleTableServiceTest {
         assertFalse(slot0900.isBookable());
         assertNotNull(slot0900.appointment());
         assertEquals("APT000001", slot0900.appointment().appointmentCode());
+        assertEquals("BN000001", slot0900.appointment().patientCode());
         assertEquals("Nguyen Thi Banh", slot0900.appointment().patientName());
         assertEquals(AppointmentStatus.CONFIRMED, slot0900.appointment().status());
 
@@ -251,7 +252,7 @@ class GetDoctorWeeklyScheduleTableServiceTest {
         when(clockPort.now()).thenReturn(Instant.parse("2026-09-15T00:00:00Z"));
         when(userRepository.findById(DOCTOR_A_ID)).thenReturn(Optional.of(doctorA));
         when(clinicConfigurationRepository.find()).thenReturn(Optional.empty());
-        when(weeklyScheduleRepository.findActiveByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of());
+        when(weeklyScheduleRepository.findByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of());
         when(doctorScheduleRepository.findByDoctorIdInAndScheduleDateBetween(any(), any(), any())).thenReturn(List.of());
         when(doctorTimeOffRepository.findActiveOverlappingForDoctors(any(), any(), any())).thenReturn(List.of());
         when(appointmentRepository.findAppointmentsForDoctorsBetween(any(), any(), any(), any())).thenReturn(List.of());
@@ -289,7 +290,7 @@ class GetDoctorWeeklyScheduleTableServiceTest {
         DoctorWeeklySchedule sched = DoctorWeeklySchedule.create(
                 DOCTOR_A_ID, DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(12, 0)
         );
-        when(weeklyScheduleRepository.findActiveByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of(sched));
+        when(weeklyScheduleRepository.findByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of(sched));
         when(doctorScheduleRepository.findByDoctorIdInAndScheduleDateBetween(any(), any(), any())).thenReturn(List.of());
         when(doctorTimeOffRepository.findActiveOverlappingForDoctors(any(), any(), any())).thenReturn(List.of());
         when(appointmentRepository.findAppointmentsForDoctorsBetween(any(), any(), any(), any())).thenReturn(List.of());
@@ -338,7 +339,7 @@ class GetDoctorWeeklyScheduleTableServiceTest {
         DoctorWeeklySchedule weekly = DoctorWeeklySchedule.create(
                 DOCTOR_A_ID, DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(12, 0)
         );
-        when(weeklyScheduleRepository.findActiveByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of(weekly));
+        when(weeklyScheduleRepository.findByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of(weekly));
 
         // Date override: 13:00 - 17:00
         DoctorSchedule dateOverride = DoctorSchedule.create(
@@ -370,5 +371,109 @@ class GetDoctorWeeklyScheduleTableServiceTest {
                 .findFirst().orElseThrow();
         assertEquals(SlotAvailabilityStatus.AVAILABLE, slot1300.status());
         assertTrue(slot1300.isBookable());
+    }
+
+    @Test
+    void p1_inactiveWeeklyScheduleOverriddenByActiveDateScheduleShowsAvailable() {
+        when(clockPort.now()).thenReturn(Instant.parse("2026-09-15T00:00:00Z"));
+        when(userRepository.findById(DOCTOR_A_ID)).thenReturn(Optional.of(doctorA));
+        when(clinicConfigurationRepository.find()).thenReturn(Optional.empty());
+
+        // Inactive weekly schedule: active = false
+        DoctorWeeklySchedule inactiveWeekly = DoctorWeeklySchedule.create(
+                DOCTOR_A_ID, DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(17, 0)
+        );
+        inactiveWeekly.update(LocalTime.of(8, 0), LocalTime.of(17, 0), false, Instant.now());
+        when(weeklyScheduleRepository.findByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of(inactiveWeekly));
+
+        // Active date schedule: 08:00 - 12:00
+        DoctorSchedule activeDate = DoctorSchedule.create(
+                DOCTOR_A_ID, MONDAY_DATE, LocalTime.of(8, 0), LocalTime.of(12, 0)
+        );
+        when(doctorScheduleRepository.findByDoctorIdInAndScheduleDateBetween(any(), any(), any()))
+                .thenReturn(List.of(activeDate));
+        when(doctorTimeOffRepository.findActiveOverlappingForDoctors(any(), any(), any())).thenReturn(List.of());
+        when(appointmentRepository.findAppointmentsForDoctorsBetween(any(), any(), any(), any())).thenReturn(List.of());
+
+        DoctorWeeklyTableResult result = service.getWeeklyScheduleTable(
+                new GetDoctorWeeklyScheduleTableQuery(MONDAY_DATE, DOCTOR_A_ID)
+        );
+
+        DoctorScheduleDayResult monday = result.days().get(0).doctorSchedules().get(0);
+        assertTrue(monday.workingDay());
+        assertEquals(LocalTime.of(8, 0), monday.workingStartTime());
+        assertEquals(LocalTime.of(12, 0), monday.workingEndTime());
+
+        // 08:00 - 08:30 is AVAILABLE (isBookable = true)
+        DoctorScheduleSlotResult slot0800 = monday.slots().stream()
+                .filter(s -> s.slotStartTime().equals(LocalTime.of(8, 0)))
+                .findFirst().orElseThrow();
+        assertEquals(SlotAvailabilityStatus.AVAILABLE, slot0800.status());
+        assertTrue(slot0800.isBookable());
+
+        // 13:00 is OFF_DUTY
+        DoctorScheduleSlotResult slot1300 = monday.slots().stream()
+                .filter(s -> s.slotStartTime().equals(LocalTime.of(13, 0)))
+                .findFirst().orElseThrow();
+        assertEquals(SlotAvailabilityStatus.OFF_DUTY, slot1300.status());
+        assertFalse(slot1300.isBookable());
+    }
+
+    @Test
+    void p2_existingAppointmentOutsideWorkingHoursIsNotHiddenAndShowsAsBooked() {
+        when(clockPort.now()).thenReturn(Instant.parse("2026-09-15T00:00:00Z"));
+        when(userRepository.findById(DOCTOR_A_ID)).thenReturn(Optional.of(doctorA));
+        when(clinicConfigurationRepository.find()).thenReturn(Optional.empty());
+
+        // Doctor working hours end early at 16:30
+        DoctorWeeklySchedule weekly = DoctorWeeklySchedule.create(
+                DOCTOR_A_ID, DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(16, 30)
+        );
+        when(weeklyScheduleRepository.findByDoctorIdIn(List.of(DOCTOR_A_ID))).thenReturn(List.of(weekly));
+        when(doctorScheduleRepository.findByDoctorIdInAndScheduleDateBetween(any(), any(), any())).thenReturn(List.of());
+        when(doctorTimeOffRepository.findActiveOverlappingForDoctors(any(), any(), any())).thenReturn(List.of());
+
+        // Pre-existing appointment at 17:00 - 17:30 (outside working hours)
+        Instant apptStart = MONDAY_DATE.atTime(17, 0).atZone(CLINIC_ZONE).toInstant();
+        Instant apptEnd = MONDAY_DATE.atTime(17, 30).atZone(CLINIC_ZONE).toInstant();
+        Appointment appointment = Appointment.restore(
+                UUID.randomUUID(), "APT000099", patient.getId(), DOCTOR_A_ID,
+                apptStart, apptEnd, AppointmentStatus.CONFIRMED, "Lich hen cu",
+                null, null, null, UUID.randomUUID(), Instant.now()
+        );
+        when(appointmentRepository.findAppointmentsForDoctorsBetween(any(), any(), any(), any()))
+                .thenReturn(List.of(appointment));
+        when(patientRepository.findAllById(Set.of(patient.getId()))).thenReturn(List.of(patient));
+
+        DoctorWeeklyTableResult result = service.getWeeklyScheduleTable(
+                new GetDoctorWeeklyScheduleTableQuery(MONDAY_DATE, DOCTOR_A_ID)
+        );
+
+        DoctorScheduleDayResult monday = result.days().get(0).doctorSchedules().get(0);
+
+        // Slot 17:00 - 17:30 MUST NOT be hidden or null; must show as BOOKED
+        DoctorScheduleSlotResult slot1700 = monday.slots().stream()
+                .filter(s -> s.slotStartTime().equals(LocalTime.of(17, 0)))
+                .findFirst().orElseThrow();
+        assertEquals(SlotAvailabilityStatus.BOOKED, slot1700.status());
+        assertFalse(slot1700.isBookable());
+        assertNotNull(slot1700.appointment());
+        assertEquals("APT000099", slot1700.appointment().appointmentCode());
+        assertEquals("Nguyen Thi Banh", slot1700.appointment().patientName());
+    }
+
+    @Test
+    void p2_rejectsNonDoctorRoleWhenDoctorIdSpecified() {
+        when(clockPort.now()).thenReturn(Instant.parse("2026-09-15T00:00:00Z"));
+        UUID pharmacistId = UUID.randomUUID();
+        User pharmacist = User.restore(
+                pharmacistId, "duocsia", "hash", "DS. Pham Van C",
+                "c@clinic.vn", "0900000003", RoleConstants.PHARMACIST, true, Instant.now(), Instant.now()
+        );
+        when(userRepository.findById(pharmacistId)).thenReturn(Optional.of(pharmacist));
+
+        assertThrows(DoctorNotFoundException.class, () ->
+                service.getWeeklyScheduleTable(new GetDoctorWeeklyScheduleTableQuery(MONDAY_DATE, pharmacistId))
+        );
     }
 }

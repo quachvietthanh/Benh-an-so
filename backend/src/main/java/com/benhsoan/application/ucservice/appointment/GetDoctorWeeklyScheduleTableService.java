@@ -122,7 +122,7 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
         if (query != null && query.doctorId() != null) {
             User doctor = userRepository.findById(query.doctorId())
                     .orElseThrow(() -> new DoctorNotFoundException(query.doctorId()));
-            if (!doctor.isActive()) {
+            if (!doctor.isActive() || !RoleConstants.DOCTOR.equals(doctor.getRoleId())) {
                 throw new DoctorNotFoundException(query.doctorId());
             }
             doctors = List.of(doctor);
@@ -157,7 +157,7 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
 
         // 4. Batch query schedules, time-offs, appointments, and patients
         Map<UUID, Map<DayOfWeek, DoctorWeeklySchedule>> weeklySchedulesByDoctor =
-                weeklyScheduleRepository.findActiveByDoctorIdIn(doctorIds).stream()
+                weeklyScheduleRepository.findByDoctorIdIn(doctorIds).stream()
                         .collect(Collectors.groupingBy(
                                 DoctorWeeklySchedule::getDoctorId,
                                 Collectors.toMap(DoctorWeeklySchedule::getDayOfWeek, Function.identity(), (existing, replacing) -> existing)
@@ -297,29 +297,22 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
     ) {
         String key = doctorId + "_" + date;
         DoctorSchedule dateSchedule = dateScheduleMap.get(key);
-
         DoctorWeeklySchedule weeklySchedule = weeklyMap.get(dayOfWeek);
 
-        // 1. If weekly schedule configured
-        if (weeklySchedule != null) {
-            if (!weeklySchedule.isActive()) {
-                return new EffectiveWorkingHours(false, null, null);
-            }
-            if (dateSchedule != null) {
-                if (!dateSchedule.isActive()) {
-                    return new EffectiveWorkingHours(false, null, null);
-                }
-                return new EffectiveWorkingHours(true, dateSchedule.getStartTime(), dateSchedule.getEndTime());
-            }
-            return new EffectiveWorkingHours(true, weeklySchedule.getStartTime(), weeklySchedule.getEndTime());
-        }
-
-        // 2. Fallback to specific date schedule
+        // 1. Specific date schedule takes precedence as an override
         if (dateSchedule != null) {
             if (!dateSchedule.isActive()) {
                 return new EffectiveWorkingHours(false, null, null);
             }
             return new EffectiveWorkingHours(true, dateSchedule.getStartTime(), dateSchedule.getEndTime());
+        }
+
+        // 2. Fallback to recurring weekly schedule
+        if (weeklySchedule != null) {
+            if (!weeklySchedule.isActive()) {
+                return new EffectiveWorkingHours(false, null, null);
+            }
+            return new EffectiveWorkingHours(true, weeklySchedule.getStartTime(), weeklySchedule.getEndTime());
         }
 
         return new EffectiveWorkingHours(false, null, null);
@@ -330,7 +323,7 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
             List<LocalTime> timeSlots,
             EffectiveWorkingHours workingHours,
             List<DoctorTimeOff> timeOffs,
-            List<Appointment> appointments,
+            List<Appointment> doctorAppointments,
             Map<UUID, Patient> patientMap,
             Instant now
     ) {
@@ -341,25 +334,8 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
             Instant slotStartInstant = date.atTime(slotStartTime).atZone(CLINIC_ZONE).toInstant();
             Instant slotEndInstant = date.atTime(slotEndTime).atZone(CLINIC_ZONE).toInstant();
 
-            // Check if off-duty (not a working day or outside working hours)
-            if (!workingHours.isWorkingDay()
-                    || slotStartTime.isBefore(workingHours.startTime())
-                    || slotEndTime.isAfter(workingHours.endTime())) {
-                slots.add(DoctorScheduleSlotResult.builder()
-                        .startTime(slotStartInstant)
-                        .endTime(slotEndInstant)
-                        .slotStartTime(slotStartTime)
-                        .slotEndTime(slotEndTime)
-                        .status(SlotAvailabilityStatus.OFF_DUTY)
-                        .isBookable(false)
-                        .appointment(null)
-                        .timeOffReason(null)
-                        .build());
-                continue;
-            }
-
-            // Check if an appointment occupies this slot
-            Optional<Appointment> matchingAppt = appointments.stream()
+            // 1. Check if an active appointment occupies this slot (Never hidden, even if doctor schedule changed)
+            Optional<Appointment> matchingAppt = doctorAppointments.stream()
                     .filter(a -> overlaps(a, slotStartInstant, slotEndInstant))
                     .findFirst();
 
@@ -368,11 +344,13 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
                 Patient patient = patientMap.get(appt.getPatientId());
                 String patientName = patient != null ? patient.getFullName() : "Bệnh nhân";
                 String patientPhone = patient != null ? patient.getPhone() : "";
+                String patientCode = patient != null ? patient.getPatientCode() : null;
 
                 AppointmentSummaryResult apptSummary = AppointmentSummaryResult.builder()
                         .id(appt.getId())
                         .appointmentCode(appt.getAppointmentCode())
                         .patientId(appt.getPatientId())
+                        .patientCode(patientCode)
                         .patientName(patientName)
                         .patientPhone(patientPhone)
                         .status(appt.getStatus())
@@ -392,7 +370,7 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
                 continue;
             }
 
-            // Check if an active time-off occupies this slot (QTN-30)
+            // 2. Check if an active time-off occupies this slot (QTN-30)
             Optional<DoctorTimeOff> matchingTimeOff = timeOffs.stream()
                     .filter(to -> to.overlaps(slotStartInstant, slotEndInstant))
                     .findFirst();
@@ -411,7 +389,24 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
                 continue;
             }
 
-            // Check if in the past
+            // 3. Check if off-duty (not a working day or outside working hours)
+            if (!workingHours.isWorkingDay()
+                    || slotStartTime.isBefore(workingHours.startTime())
+                    || slotEndTime.isAfter(workingHours.endTime())) {
+                slots.add(DoctorScheduleSlotResult.builder()
+                        .startTime(slotStartInstant)
+                        .endTime(slotEndInstant)
+                        .slotStartTime(slotStartTime)
+                        .slotEndTime(slotEndTime)
+                        .status(SlotAvailabilityStatus.OFF_DUTY)
+                        .isBookable(false)
+                        .appointment(null)
+                        .timeOffReason(null)
+                        .build());
+                continue;
+            }
+
+            // 4. Check if in the past
             if (slotStartInstant.isBefore(now)) {
                 slots.add(DoctorScheduleSlotResult.builder()
                         .startTime(slotStartInstant)
@@ -426,7 +421,7 @@ public class GetDoctorWeeklyScheduleTableService implements GetDoctorWeeklySched
                 continue;
             }
 
-            // Available for booking!
+            // 5. Available for booking!
             slots.add(DoctorScheduleSlotResult.builder()
                     .startTime(slotStartInstant)
                     .endTime(slotEndInstant)

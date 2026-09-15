@@ -46,6 +46,16 @@ public class DoctorWeeklyScheduleRepositoryAdapter implements DoctorWeeklySchedu
     }
 
     @Override
+    public List<DoctorWeeklySchedule> findByDoctorIdIn(java.util.Collection<UUID> doctorIds) {
+        if (doctorIds == null || doctorIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findByDoctorIdIn(doctorIds).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<DoctorWeeklySchedule> findByDoctorIdAndDayOfWeek(UUID doctorId, DayOfWeek dayOfWeek) {
         return jpaRepository.findByDoctorIdAndDayOfWeek(doctorId, dayOfWeek)
                 .map(mapper::toDomain);

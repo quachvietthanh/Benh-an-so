@@ -12,6 +12,8 @@ import com.benhsoan.adapter.inbound.rest.request.appointment.CreateAppointmentRe
 import com.benhsoan.adapter.inbound.rest.request.appointment.RescheduleAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentRescheduleHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentResponse;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
 import com.benhsoan.port.dto.command.appointment.CreateAppointmentCommand;
 import com.benhsoan.port.dto.command.appointment.MarkAppointmentNoShowCommand;
@@ -21,6 +23,12 @@ import com.benhsoan.port.dto.result.appointment.AppointmentRescheduleHistoryResu
 
 @Component
 public class AppointmentRestMapper {
+
+    private final AnonymizationModeState anonymizationModeState;
+
+    public AppointmentRestMapper(AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
+    }
 
     public CreateAppointmentCommand toCommand(
             CreateAppointmentRequest request
@@ -202,12 +210,21 @@ public class AppointmentRestMapper {
             com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult.AppointmentSummaryResult result
     ) {
         if (result == null) return null;
+
+        String patientName = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskFullName(result.patientCode())
+                : result.patientName();
+        String patientPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(result.patientPhone())
+                : result.patientPhone();
+
         return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.AppointmentSummaryResponse.builder()
                 .id(result.id())
                 .appointmentCode(result.appointmentCode())
                 .patientId(result.patientId())
-                .patientName(result.patientName())
-                .patientPhone(result.patientPhone())
+                .patientCode(result.patientCode())
+                .patientName(patientName)
+                .patientPhone(patientPhone)
                 .status(result.status())
                 .reason(result.reason())
                 .build();

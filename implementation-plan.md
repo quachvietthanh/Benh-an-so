@@ -108,3 +108,19 @@ Kế hoạch kỹ thuật triển khai backend hoàn chỉnh cho User Story `NCL
   * TC-03: Cố tình tạo lịch trên ô khoảng nghỉ bị chặn theo QTN-30.
   * TC-04: Dược sĩ truy cập bị từ chối và ghi nhật ký kiểm toán vi phạm.
 * **Tiêu chí verify/test**: Toàn bộ test suite chạy pass 100% (`mvn test`).
+
+---
+
+## 3. KẾT QUẢ TRIỂN KHAI VÀ KHẮC PHỤC 5 FINDINGS CODE REVIEW
+
+Sau đợt review chuyên sâu, toàn bộ 5 finding đã được xử lý triệt để:
+
+| Finding | Nội dung lỗi | Giải pháp triển khai | Files thay đổi chính | Trạng thái |
+| :--- | :--- | :--- | :--- | :---: |
+| **[P1]** | Xung đột phân giải ca khi lịch tuần bị tắt (`active = false`). | Quy tắc: Lịch ngày cụ thể (`DoctorSchedule`) ghi đè lịch tuần (`DoctorWeeklySchedule`). Đồng bộ logic ở `DoctorScheduleValidator` và `GetDoctorWeeklyScheduleTableService`. | `DoctorScheduleValidator.java`, `DoctorWeeklyScheduleRepository.java`, `DoctorWeeklyScheduleRepositoryAdapter.java`, `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+| **[P2-1]** | Lịch hẹn cũ bị ẩn khi slot rơi vào ngoài giờ (`OFF_DUTY`). | Đẩy kiểm tra `matchingAppt` lên đầu vòng lặp slot; hiển thị `BOOKED`, `isBookable = false` kèm thông tin cuộc hẹn. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+| **[P2-2]** | Thiếu kiểm tra role Bác sĩ khi truyền `doctorId`. | Bổ sung kiểm tra `!RoleConstants.DOCTOR.equals(doctor.getRoleId())` -> ném 404 `DoctorNotFoundException`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+| **[P3-1]** | Chưa hỗ trợ chế độ ẩn danh (NCL-15-CN-003). | Bổ sung `patientCode`; tiêm `AnonymizationModeState` vào `AppointmentRestMapper`, áp dụng `PatientAnonymizer.maskFullName` và `maskPhone`. | `DoctorWeeklyTableResult.java`, `DoctorWeeklyTableResponse.java`, `AppointmentRestMapper.java`, `AppointmentRestMapperTest.java` | **FIXED** |
+| **[P3-2]** | Trùng tên biến (Variable Shadowing). | Đổi tên tham số `buildSlotsForDay` thành `doctorAppointments`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+
+**Xác nhận kiểm thử tự động**: 53/53 tests PASS (BUILD SUCCESS).

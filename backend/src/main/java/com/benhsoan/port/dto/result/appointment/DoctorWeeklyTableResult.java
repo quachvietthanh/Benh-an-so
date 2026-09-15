@@ -70,6 +70,7 @@ public record DoctorWeeklyTableResult(
             UUID id,
             String appointmentCode,
             UUID patientId,
+            String patientCode,
             String patientName,
             String patientPhone,
             AppointmentStatus status,
