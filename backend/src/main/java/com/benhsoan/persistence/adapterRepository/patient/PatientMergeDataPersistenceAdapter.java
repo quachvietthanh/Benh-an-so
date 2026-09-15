@@ -86,6 +86,13 @@ public class PatientMergeDataPersistenceAdapter implements PatientMergeDataPort 
                                 .setParameter("sourceId", sourcePatientId)
                                 .executeUpdate();
 
+                // 11. Transfer Vital Signs (QTN-33)
+                entityManager.createQuery(
+                                "UPDATE VitalSignEntity v SET v.patientId = :targetId WHERE v.patientId = :sourceId")
+                                .setParameter("targetId", targetPatientId)
+                                .setParameter("sourceId", sourcePatientId)
+                                .executeUpdate();
+
                 return transferredVisits;
         }
 
