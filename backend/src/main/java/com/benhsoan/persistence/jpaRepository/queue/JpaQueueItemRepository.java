@@ -35,7 +35,7 @@ public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, U
                 item.appointmentId, item.visitId, visit.visitCode,
                 item.sourceType, item.status, item.queueNumber, item.queueDate,
                 item.checkedInAt, item.calledAt, item.completedAt, item.cancelledAt, item.cancelReason,
-                item.skippedAt, item.skipReason
+                item.skippedAt, item.skipReason, item.callCount
             )
             from QueueItemEntity item
             join MedicalQueueEntity queue on queue.id = item.medicalQueueId
@@ -61,7 +61,7 @@ public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, U
                 item.appointmentId, item.visitId, visit.visitCode,
                 item.sourceType, item.status, item.queueNumber, item.queueDate,
                 item.checkedInAt, item.calledAt, item.completedAt, item.cancelledAt, item.cancelReason,
-                item.skippedAt, item.skipReason
+                item.skippedAt, item.skipReason, item.callCount
             )
             from QueueItemEntity item
             join MedicalQueueEntity queue on queue.id = item.medicalQueueId

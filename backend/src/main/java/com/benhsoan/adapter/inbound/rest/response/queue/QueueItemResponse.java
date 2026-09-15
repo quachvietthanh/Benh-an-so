@@ -15,6 +15,21 @@ public record QueueItemResponse(
         UUID appointmentId, UUID visitId, String visitCode,
         QueueItemSourceType sourceType, QueueItemStatus status, int queueNumber, LocalDate queueDate,
         Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
-        Instant skippedAt, String skipReason
+        Instant skippedAt, String skipReason, int callCount
 ) {
+    public QueueItemResponse(
+            UUID id, UUID medicalQueueId,
+            UUID patientId, String patientName,
+            UUID doctorId, String doctorName,
+            UUID roomId, String roomNumber,
+            UUID appointmentId, UUID visitId, String visitCode,
+            QueueItemSourceType sourceType, QueueItemStatus status, int queueNumber, LocalDate queueDate,
+            Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
+            Instant skippedAt, String skipReason
+    ) {
+        this(id, medicalQueueId, patientId, patientName, doctorId, doctorName, roomId, roomNumber,
+                appointmentId, visitId, visitCode, sourceType, status, queueNumber, queueDate,
+                checkedInAt, calledAt, completedAt, cancelledAt, cancelReason, skippedAt, skipReason,
+                calledAt != null ? 1 : 0);
+    }
 }

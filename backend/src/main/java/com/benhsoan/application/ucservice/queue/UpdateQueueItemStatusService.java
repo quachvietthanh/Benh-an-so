@@ -67,9 +67,11 @@ public class UpdateQueueItemStatusService implements UpdateQueueItemStatusUseCas
 
         queueItemRepository.save(item);
         visitRepository.save(visit);
-        queueAuditService.record(item.getStatus() == QueueItemStatus.CANCELLED
-                ? com.benhsoan.domain.auditlog.enums.ActionType.CANCEL
-                : com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, item);
+        if (item.getStatus() == QueueItemStatus.CANCELLED) {
+            queueAuditService.recordCancelled(item, command.cancelReason());
+        } else {
+            queueAuditService.record(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, item);
+        }
         return queueItemQueryRepository.findDetailById(item.getId())
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }

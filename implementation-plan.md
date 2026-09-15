@@ -1,58 +1,133 @@
-# Implementation Plan: Khắc phục Review Findings tính năng Xác nhận lịch hẹn (NCL-03-CN-008)
+# Kế hoạch triển khai & Khắc phục lỗi: Người liên hệ khẩn cấp của bệnh nhân (NCL-02-CN-007)
 
-Kế hoạch giải quyết toàn bộ các findings và khiếm khuyết được chỉ ra trong Báo cáo Review Backend cho tính năng Xác nhận lịch hẹn (`NCL-03-CN-008`), tuân thủ Clean Architecture, bảo toàn dữ liệu, chống race condition và giữ backward compatibility.
-
-## 1. TÓM TẮT QUYẾT ĐỊNH
-
-### 1.1. Danh sách Finding tiếp nhận xử lý trong đợt này
-| Mã Finding | Mức độ | Trạng thái kỹ thuật | Quyết định xử lý |
-| :--- | :---: | :---: | :--- |
-| **Finding 1** | **P1** | [Đã xác minh] | **Tiếp nhận xử lý**: Bổ sung phân giải họ tên người xác nhận (`confirmedByName`) trong `GetAppointmentByIdService` khi tra cứu chi tiết lịch hẹn qua API `GET /appointments/{id}`. |
-| **Finding 2** | **P2** | [Đã xác minh] | **Tiếp nhận xử lý**: Tinh chỉnh logic query tại `GetUnconfirmedAppointmentsService` và `AppointmentBusinessSpecification` để khi tra cứu ngày hiện tại (`today`), chỉ lấy các lịch hẹn có `startTime > now` (chưa quá giờ khám). |
-| **Finding 3** | **P2** | [Đã xác minh] | **Tiếp nhận xử lý**: Cập nhật ma trận phân quyền trong `docs/permission-matrix.md` và biên soạn hợp đồng API chuẩn tại `docs/api/appointment-confirm-contract.md`. |
-| **Finding 4** | **P3** | [Đã xác minh] | **Tiếp nhận xử lý**: Bổ sung unit test cho `writeConfirmDenied` trong `AppointmentAccessDeniedAuditWriterTest` và test case nhánh rẽ `date == null` trong `GetUnconfirmedAppointmentsServiceTest`. |
-| **Thiếu sót Mục VI** | **P2/P3** | [Đã xác minh] | **Tiếp nhận xử lý**: Bổ sung test Double Confirmation (ném `409 CONFLICT` khi đã `CONFIRMED`) cho cả luồng Lễ tân và Cổng bệnh nhân; bổ sung test hiển thị `confirmedByName` trong `GetAppointmentByIdServiceTest`. |
-
-### 1.2. Danh mục KHÔNG xử lý trong đợt này và lý do
-| Hạng mục / Lỗi | Nguồn gốc | Lý do từ chối xử lý trong phạm vi này |
-| :--- | :---: | :--- |
-| **2 failures tại `FullClinicalEncounterWorkflowE2EIntegrationTest`** | Báo cáo review mục V.2 | **Lỗi nhánh nền (`develop`)**: Do thiếu quyền `QUEUE_VIEW` khi gọi `GET /queues/me` từ tài khoản Bác sĩ trong script seed data nền của commit cũ, hoàn toàn không liên quan đến logic xác nhận lịch hẹn của `NCL-03-CN-008`. Xử lý riêng trong task bảo trì dữ liệu nền. |
-| **Cột mới trong Database** | Schema DB | [Đã xác minh] Migration `V47__add_confirmation_fields_to_appointments.sql` đã đạt chuẩn: cột cho phép `NULL`, có khóa ngoại và chỉ mục đầy đủ, đã migrate thành công. Không phát sinh script Flyway mới. |
-
-### 1.3. Các giả định và câu hỏi cần làm rõ trước khi code
-1. **[Cần xác minh] Phạm vi hiển thị `confirmedByName` trong danh sách tìm kiếm (`SearchAppointmentsService`)**:
-   - *Phân tích*: Finding 1 có trích dẫn file `SearchAppointmentsService.java:L24`. Tuy nhiên, API `GET /appointments` là API phân trang (Page). Nếu thực hiện resolve tên người xác nhận cho từng dòng trong vòng lặp bằng `userRepository.findById()` sẽ dẫn đến lỗi hiệu năng **N+1 Query**.
-   - *Giả định lựa chọn*: Đợt này chỉ xử lý triệt để tại `GetAppointmentByIdService` (màn hình chi tiết lịch hẹn - nơi cần hiển thị thông tin người xác nhận theo `NCL-03-CN-008-TC-01`). Đối với `SearchAppointmentsService`, tiếp tục giữ nguyên `null`.
-2. **[Giả định] Hành vi của API `GET /appointments/unconfirmed` khi người dùng truyền ngày trong quá khứ (`date < today`)**:
-   - *Giả định lựa chọn*: User Story xác định đây là "danh sách chưa xác nhận trước giờ khám được liệt kê để gọi nhắc". Khi người dùng truyền ngày quá khứ, toàn bộ lịch của ngày đó đều đã quá giờ khám (`startTime < now`). Do đó, hệ thống sẽ trả về danh sách rỗng (Empty Page) thay vì ném lỗi, đảm bảo an toàn cho giao diện người dùng.
+Tài liệu này tổng hợp phân tích kỹ thuật của Tech Lead và kế hoạch triển khai xử lý toàn bộ các phát hiện (findings) từ báo cáo review mã nguồn cho tính năng **Người liên hệ khẩn cấp của bệnh nhân** (`NCL-02-CN-007`) thuộc Epic `NCL-02`.
 
 ---
 
-## 2. KẾ HOẠCH TRIỂN KHAI THEO THỨ TỰ DEPENDENCY
+## 1. Tóm tắt quyết định kỹ thuật (Tech Lead Decision)
 
-### Bước 1: Tầng Persistence (Database Query & Specifications)
-- **File**: `backend/src/main/java/com/benhsoan/persistence/jpaRepository/appointment/AppointmentBusinessSpecification.java`
-- **Thay đổi**: Cập nhật Specification `unconfirmedOnDate(Instant fromTime, Instant toTime)` sử dụng `cb.greaterThan(root.get("startTime"), fromTime)` và `cb.lessThanOrEqualTo(root.get("startTime"), toTime)`.
+### 1.1. Bảng đối chiếu xử lý các Findings
 
-### Bước 2: Tầng Application / Use Case (Business Logic & Orchestration)
-- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/appointment/GetAppointmentByIdService.java`
-  - Inject `UserRepository userRepository`.
-  - Phân giải tên người xác nhận nếu `appointment.getConfirmedBy() != null`.
-- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/appointment/GetUnconfirmedAppointmentsService.java`
-  - So sánh `targetDate` với `today` (theo múi giờ `Asia/Ho_Chi_Minh`).
-  - Nếu `targetDate.isBefore(today)`: trả về `PageImpl<>(List.of(), pageable, 0)`.
-  - Nếu `targetDate.isEqual(today)`: `fromTime = clockPort.now()`.
-  - Nếu `targetDate.isAfter(today)`: `fromTime = startOfDay.minusMillis(1)`.
-  - `toTime = endOfDay`.
+| Mã Finding | Mức độ | Trạng thái | Hướng xử lý kỹ thuật |
+| :--- | :--- | :--- | :--- |
+| **P1.01** | P1 (Nghiêm trọng) | **Xử lý** | Mở rộng regex tại `UpdatePatientRequest.java` cho phép chuỗi mask `[0-9]{2}\*{6}[0-9]{2}` và chuỗi rỗng `""`. Tầng Use Case (`UpdatePatientService`) phục hồi giá trị unmask và validate logic. |
+| **P1.02** | P1 (Nghiêm trọng) | **Xử lý** | Cập nhật regex `@Pattern` tại `RegisterPatientRequest.java` và `UpdatePatientRequest.java` sử dụng group `(?:...)?` để chấp nhận chuỗi rỗng `""` và `null`. |
+| **P2.01** | P2 (Trung bình) | **Xử lý** | Bổ sung câu lệnh backfill dữ liệu `UPDATE patients SET emergency_relationship = 'Người thân' WHERE emergency_contact IS NOT NULL AND emergency_relationship IS NULL;` vào migration `V51`. Bổ sung fallback trong Use Case. |
+| **P2.02** | P2 (Trung bình) | **Xử lý** | Bổ sung handler cho `ValidationException` trong `GlobalExceptionHandler.java`, phân tích chuỗi `fieldName: errorDescription` nạp vào `details.fields` theo đúng chuẩn `docs/exception-conventions.md`. |
+| **P2.03** | P2 (Trung bình) | **Đã xử lý (FIXED)** | Đồng bộ tài liệu Workbook `project-workbook.xlsx` (row 85 & task 384), ban hành RFC-007 chuẩn hóa quy tắc Cohesive Triplet, và bổ sung test cases kiểm chứng lưu vết khi xóa trong `UpdatePatientServiceTest.java`. |
+| **P3.01** | P3 (Nhẹ) | **Xử lý** | Thêm Bean Validation `@Size(max = 50, message = "Mối quan hệ không được vượt quá 50 ký tự.")` cho `emergencyRelationship` ở cả 2 Request DTOs. |
+| **P3.02** | P3 (Nhẹ) | **Xử lý** | Bổ sung WebMvc test case `getMedicalRecordDetailReturnsEmergencyContactForDoctor` trong `MedicalRecordControllerTest.java` kiểm tra `GET /medical-records/visits/{visitId}` trả về đủ 3 trường người liên hệ khẩn cấp. |
 
-### Bước 3: Tầng Testing (Kiểm thử đơn vị)
-- Bổ sung test suites cho:
-  - `GetAppointmentByIdServiceTest`: test case `confirmedByName`.
-  - `GetUnconfirmedAppointmentsServiceTest`: test case `date == null`, `date` quá khứ.
-  - `AppointmentAccessDeniedAuditWriterTest`: test case `writeConfirmDenied`.
-  - `ConfirmAppointmentServiceTest`: test case Double Confirmation (409 Conflict).
-  - `PatientConfirmAppointmentServiceTest`: test case Double Confirmation (409 Conflict).
+### 1.2. Các giả định và xác minh (Verification Status)
+- **Đã xác minh**: Regex `^(?:(0|\+84)(3|5|7|8|9)[0-9]{8}|[0-9]{2}\*{6}[0-9]{2})?$` tương thích hoàn toàn với chuẩn JSR-380, nhận diện đúng cả SĐT thật, SĐT mask (`09******78`), chuỗi rỗng `""` và `null`.
+- **Đã xác minh**: Tầng Use Case (`UpdatePatientService:118-120`) đã có sẵn logic `PatientAnonymizer.isMaskedPhone(emergencyPhone)` để khôi phục dữ liệu gốc nếu giá trị gửi lên là chuỗi mask.
+- **Đã xác minh**: Bảng `patients` trong migration `V4__seed_patients.sql` có 10 bản ghi mẫu có `emergency_contact` và `emergency_phone`, nhưng thiếu `emergency_relationship`.
+- **Đã xác minh**: `GlobalExceptionHandler.java` trước đây bắt `ValidationException` qua `handleDomainException`, trả về `details: {}` rỗng khiến frontend không trích xuất được `details.fields`.
+- **Đã xác minh (P2.03)**: Mâu thuẫn giữa câu chữ Postcondition trong Workbook và Cohesive Triplet đã được giải quyết triệt để: cập nhật trực tiếp `project-workbook.xlsx` (row 85 & task 384), ban hành `docs/rfc-ncl-02-cn-007-emergency-contact-postcondition.md`, và bổ sung bộ test kiểm chứng trong `UpdatePatientServiceTest.java`.
 
-### Bước 4: Tầng Tài liệu hóa (Documentation)
-- Cập nhật `docs/permission-matrix.md`.
-- Tạo mới `docs/api/appointment-confirm-contract.md`.
+---
+
+## 2. Thiết kế chi tiết cho từng Finding
+
+### Finding P1.01 & P1.02: Bean Validation chặn chuỗi Mask và chuỗi rỗng trên `emergencyPhone`
+- **Root cause**: 
+  - Regex cũ `^(0|\+84)(3|5|7|8|9)[0-9]{8}$` yêu cầu chuỗi tối thiểu 10 chữ số.
+  - Khi bật chế độ ẩn danh trình diễn (QTN-43), client nhận `09******78` và submit lại form; Bean Validation ném `MethodArgumentNotValidException` (HTTP 400), làm dead code logic unmask ở Use Case.
+  - Khi form web submit chuỗi rỗng `""` (thay vì null), Bean Validation đánh giá chuỗi rỗng không khớp regex -> trả về 400.
+- **Giải pháp được chọn**:
+  - Tại `RegisterPatientRequest.java`:
+    ```java
+    @Pattern(
+            regexp = "^(?:(0|\\+84)(3|5|7|8|9)[0-9]{8})?$",
+            message = "Số điện thoại không đúng định dạng."
+    )
+    String emergencyPhone
+    ```
+  - Tại `UpdatePatientRequest.java`:
+    ```java
+    @Pattern(
+            regexp = "^(?:(0|\\+84)(3|5|7|8|9)[0-9]{8}|[0-9]{2}\\*{6}[0-9]{2})?$",
+            message = "Số điện thoại không đúng định dạng."
+    )
+    String emergencyPhone
+    ```
+- **Lợi ích**:
+  - Giữ nguyên error response contract chuẩn ở tầng REST (`400 Bad Request` kèm field `emergencyPhone`).
+  - Cho phép chuỗi rỗng `""` và chuỗi mask `09******78` vượt qua filter Bean Validation an toàn để tầng Use Case xử lý.
+
+### Finding P2.01: Deadlock dữ liệu cũ (Legacy Data Backfill)
+- **Root cause**: Migration `V51` thêm cột `emergency_relationship` nhưng để giá trị `NULL` cho toàn bộ dữ liệu hiện hữu. Khi cập nhật hồ sơ cũ, Use Case kiểm tra Cohesive Triplet thấy có tên và SĐT nhưng thiếu mối quan hệ nên văng `ValidationException`.
+- **Giải pháp được chọn**:
+  - Cập nhật file migration `V51__add_emergency_relationship_to_patients.sql`:
+    ```sql
+    ALTER TABLE patients ADD COLUMN emergency_relationship VARCHAR(50) NULL;
+
+    UPDATE patients
+    SET emergency_relationship = 'Người thân'
+    WHERE emergency_contact IS NOT NULL AND emergency_relationship IS NULL;
+    ```
+  - Bổ sung fallback phòng vệ trong `UpdatePatientService.java`: tự động giữ lại mối quan hệ đã có nếu client gửi null trên hồ sơ cũ có sẵn người liên hệ.
+
+### Finding P2.02: Error Response của `ValidationException` thiếu `details.fields`
+- **Root cause**: 
+  - `docs/exception-conventions.md:31` yêu cầu validation field errors phải được đọc từ `details.fields`.
+  - Khi Use Case ném `ValidationException("emergencyPhone: Số điện thoại không đúng định dạng.")`, `GlobalExceptionHandler` bắt qua `handleDomainException`, trả về `details: {}`.
+- **Giải pháp được chọn**:
+  - Bổ sung `@ExceptionHandler(ValidationException.class)` trong `GlobalExceptionHandler.java`:
+    Trích xuất `fieldName` và `errorDescription` từ message dạng `fieldName: errorDescription` và đưa vào `details.fields`.
+  - Nếu message không theo dạng này, `details` trả về rỗng, đảm bảo tương thích ngược 100%.
+
+### Finding P2.03: Mâu thuẫn nghiệp vụ Cohesive Triplet vs Postcondition Workbook
+- **Root cause**: Workbook ban đầu ghi "Hồ sơ có ít nhất một người liên hệ khẩn cấp", mâu thuẫn với quy tắc Cohesive Triplet cho phép xóa sạch người liên hệ khi có nhu cầu chính đáng.
+- **Giải pháp xử lý (Đã hoàn tất)**:
+  1. Ban hành tài liệu [RFC-NCL-02-CN-007-01](file:///f:/Java/Benh-so-an/docs/rfc-ncl-02-cn-007-emergency-contact-postcondition.md) phân tích và chuẩn hóa quy tắc Cohesive Triplet.
+  2. Cập nhật trực tiếp `project-workbook.xlsx` (Sheet `Product Backlog` row 85, Col 11 và Sheet `Tasks` row 384, Col 5) thành: *"Nếu ghi nhận người liên hệ khẩn cấp thì phải có đầy đủ bộ ba thông tin và mọi thay đổi đều lưu vết."*
+  3. Bổ sung các unit test trong `UpdatePatientServiceTest.java` kiểm chứng: xóa trắng cả 3 trường thành công và lưu vết đầy đủ vào `patient_change_logs`, nhưng nếu chỉ xóa 1 hoặc 2 trường thì bị chặn lập tức bởi Cohesive Triplet.
+
+### Finding P3.01: Thiếu Bean Validation `@Size(max = 50)` cho `emergencyRelationship`
+- **Root cause**: Cột DB là `VARCHAR(50)`. Nếu client gửi chuỗi > 50 ký tự, lỗi ném ra từ tầng DB là `DataIntegrityViolationException` (500/409) thay vì `400 Bad Request`.
+- **Giải pháp**: Bổ sung `@Size(max = 50, message = "Mối quan hệ không được vượt quá 50 ký tự.")` vào cả `RegisterPatientRequest` và `UpdatePatientRequest`.
+
+### Finding P3.02: Thiếu Integration Test ở Controller cho Bác sĩ xem Bệnh án
+- **Root cause**: Đã có unit test cho mapper nhưng thiếu test end-to-end tầng MockMvc Controller để đảm bảo endpoint `GET /medical-records/visits/{visitId}` serialize đầy đủ các trường người liên hệ khẩn cấp của bệnh nhân.
+- **Giải pháp**: Thêm test case `getMedicalRecordDetailReturnsEmergencyContactForDoctor` trong `MedicalRecordControllerTest.java`.
+
+---
+
+## 3. Kế hoạch triển khai mã nguồn theo thứ tự
+
+### Bước 1: Database Migration (P2.01)
+- **File**: `backend/src/main/resources/db/migration/V51__add_emergency_relationship_to_patients.sql`
+- **Nội dung**: Bổ sung lệnh `UPDATE patients SET emergency_relationship = 'Người thân' WHERE emergency_contact IS NOT NULL AND emergency_relationship IS NULL;`.
+
+### Bước 2: Application Services & Normalization (P1.01, P2.01, P2.02)
+- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/patient/UpdatePatientService.java`
+- **File**: `backend/src/main/java/com/benhsoan/application/ucservice/patient/RegisterPatientService.java`
+- **Nội dung**:
+  - Chuẩn hóa `normalizePhone` trả về `null` thay vì `""`.
+  - Thêm fallback giữ `emergencyRelationship` cho bệnh nhân cũ hoặc chế độ ẩn danh.
+  - Đảm bảo `ValidationException` có dạng `fieldName: errorDescription`.
+
+### Bước 3: REST Request DTOs & Global Exception Handler (P1.01, P1.02, P2.02, P3.01)
+- **File 1**: `backend/src/main/java/com/benhsoan/adapter/inbound/rest/request/patient/RegisterPatientRequest.java`
+  - Thêm `@Size(max = 50)` cho `emergencyRelationship`.
+  - Cập nhật `@Pattern` cho `emergencyPhone`.
+- **File 2**: `backend/src/main/java/com/benhsoan/adapter/inbound/rest/request/patient/UpdatePatientRequest.java`
+  - Thêm `@Size(max = 50)` cho `emergencyRelationship`.
+  - Cập nhật `@Pattern` cho `emergencyPhone` (cho phép cả chuỗi mask và chuỗi rỗng).
+- **File 3**: `backend/src/main/java/com/benhsoan/exception/GlobalExceptionHandler.java`
+  - Thêm `@ExceptionHandler(ValidationException.class)` để parse `details.fields`.
+
+### Bước 4: Kiểm thử Unit, Controller & Integration (P1.01, P1.02, P2.01, P2.02, P3.01, P3.02)
+- **File 1**: `backend/src/test/java/com/benhsoan/exception/GlobalExceptionHandlerTest.java`
+  - Test mapping `ValidationException` dạng `field: message` sang `details.fields`.
+- **File 2**: `backend/src/test/java/com/benhsoan/adapter/inbound/rest/controller/PatientEmergencyContactIntegrationTest.java`
+  - Test update với chuỗi mask `09******78` (P1.01).
+  - Test chấp nhận chuỗi rỗng `""` trên `emergencyPhone` (P1.02).
+  - Test từ chối `emergencyRelationship` dài hơn 50 ký tự (P3.01).
+- **File 3**: `backend/src/test/java/com/benhsoan/adapter/inbound/rest/controller/MedicalRecordControllerTest.java`
+  - Test `getMedicalRecordDetailReturnsEmergencyContactForDoctor` (P3.02).
+
+### Bước 5: Chạy toàn bộ Test Suite & Hồi quy
+- Chạy `mvn test "-Dtest=*Patient*Test,*MedicalRecord*Test,GlobalExceptionHandlerTest"`
+- Đảm bảo 100% test cases pass.

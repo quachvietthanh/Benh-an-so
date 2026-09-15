@@ -494,4 +494,378 @@ class UpdatePatientServiceTest {
         );
         verify(patientRepository, never()).save(any(Patient.class));
     }
+
+    @Test
+    @DisplayName("NCL-02-CN-007 TC-01 & TC-03: Cập nhật thông tin người liên hệ khẩn cấp đầy đủ và ghi nhật ký thay đổi")
+    void updatesEmergencyContactAndRelationshipSuccessfully() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Tran Van C")
+                .emergencyRelationship("Bố")
+                .emergencyPhone("+84908887766")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertEquals("Tran Van C", result.emergencyContact());
+        assertEquals("Bố", result.emergencyRelationship());
+        assertEquals("0908887766", result.emergencyPhone());
+
+        verify(patientRepository).save(any(Patient.class));
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-007 TC-02: Từ chối cập nhật khi số điện thoại người liên hệ khẩn cấp sai định dạng")
+    void rejectsUpdateWhenEmergencyPhoneIsInvalid() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Tran Van C")
+                .emergencyRelationship("Bố")
+                .emergencyPhone("invalid-phone")
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyPhone"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-007 QTN-43: Bảo vệ dữ liệu gốc khi client gửi lại giá trị đã che trong chế độ ẩn danh")
+    void preservesExistingEmergencyValuesWhenMaskedFromDemoMode() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "Mẹ", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Client read data with anonymization mode on, so emergencyContact was "BỆNH NHÂN" and emergencyPhone was "09******77"
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("BỆNH NHÂN")
+                .emergencyRelationship("Mẹ")
+                .emergencyPhone("09******77")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertEquals("Le Thi B", result.emergencyContact());
+        assertEquals("0909998877", result.emergencyPhone());
+        assertEquals("Mẹ", result.emergencyRelationship());
+    }
+
+    @Test
+    @DisplayName("P2.03 Cohesive Triplet: Cho phép xóa trắng người liên hệ khẩn cấp khi gửi cả 3 trường null và lưu vết lịch sử")
+    void allowsClearingEmergencyContactWhenAllThreeFieldsAreNullAndLogsChange() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "Mẹ", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact(null)
+                .emergencyRelationship(null)
+                .emergencyPhone(null)
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        org.junit.jupiter.api.Assertions.assertNull(result.emergencyContact());
+        org.junit.jupiter.api.Assertions.assertNull(result.emergencyRelationship());
+        org.junit.jupiter.api.Assertions.assertNull(result.emergencyPhone());
+
+        verify(patientRepository).save(any(Patient.class));
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+    }
+
+    @Test
+    @DisplayName("P2.03 Cohesive Triplet: Từ chối xóa một phần khi chỉ xóa SĐT nhưng vẫn để lại họ tên người liên hệ")
+    void rejectsPartialClearingWhenOnlyEmergencyContactProvided() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "Mẹ", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Le Thi B")
+                .emergencyRelationship(null)
+                .emergencyPhone(null)
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyRelationship"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("F-1 Cohesive Triplet: Từ chối cập nhật khi có tên và SĐT nhưng bỏ trống quan hệ (null)")
+    void rejectsUpdateWhenContactAndPhoneProvidedWithoutRelationship() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "Mẹ", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Tran Van C")
+                .emergencyRelationship(null)
+                .emergencyPhone("0912345678")
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyRelationship"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("F-1 Cohesive Triplet: Từ chối cập nhật khi quan hệ là khoảng trắng")
+    void rejectsUpdateWhenRelationshipIsBlankWhitespace() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, null, null, null,
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Tran Van C")
+                .emergencyRelationship("   ")
+                .emergencyPhone("0912345678")
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyRelationship"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("F-1 Cohesive Triplet: Từ chối cập nhật khi có tên và quan hệ nhưng bỏ trống SĐT")
+    void rejectsUpdateWhenContactAndRelationshipProvidedWithoutPhone() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "Mẹ", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Tran Van C")
+                .emergencyRelationship("Bố")
+                .emergencyPhone(null)
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyPhone"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("F-1 Cohesive Triplet: Từ chối cập nhật khi có quan hệ và SĐT nhưng bỏ trống tên")
+    void rejectsUpdateWhenRelationshipAndPhoneProvidedWithoutContact() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "Mẹ", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact(null)
+                .emergencyRelationship("Bố")
+                .emergencyPhone("0912345678")
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyContact"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("F-1 Cohesive Triplet: Từ chối cập nhật khi chỉ cung cấp SĐT")
+    void rejectsUpdateWhenOnlyEmergencyPhoneProvided() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, null, null, null,
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact(null)
+                .emergencyRelationship(null)
+                .emergencyPhone("0912345678")
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyContact"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("F-1 Cohesive Triplet: Từ chối cập nhật khi chỉ cung cấp quan hệ")
+    void rejectsUpdateWhenOnlyEmergencyRelationshipProvided() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, null, null, null,
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact(null)
+                .emergencyRelationship("Bố")
+                .emergencyPhone(null)
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("emergencyContact"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("F-1 Cohesive Triplet: Cập nhật thành công khi cung cấp đầy đủ cả 3 trường hợp lệ")
+    void updatesSuccessfullyWhenAllThreeEmergencyFieldsProvided() {
+        UUID patientId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000001", "Nguyen Van A", LocalDate.of(1995, 5, 10), Gender.MALE,
+                "0909000001", "a@example.com", "123 Street", "079095001234",
+                "DN4790123456789", BloodType.O_POSITIVE, "Le Thi B", "Mẹ", "0909998877",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A")
+                .dateOfBirth(LocalDate.of(1995, 5, 10))
+                .gender(Gender.MALE)
+                .phone("0909000001")
+                .emergencyContact("Tran Van C")
+                .emergencyRelationship("Bố")
+                .emergencyPhone("0912345678")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertEquals("Tran Van C", result.emergencyContact());
+        assertEquals("Bố", result.emergencyRelationship());
+        assertEquals("0912345678", result.emergencyPhone());
+
+        verify(patientRepository).save(any(Patient.class));
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+    }
 }

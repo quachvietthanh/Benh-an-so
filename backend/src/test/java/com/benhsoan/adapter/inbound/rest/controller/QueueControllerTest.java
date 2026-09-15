@@ -3,12 +3,14 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ import com.benhsoan.domain.queue.enums.QueueItemStatus;
 import com.benhsoan.domain.specialty.exception.SpecialtyNotFoundException;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.port.dto.result.QueueCheckInResult;
+import com.benhsoan.port.dto.result.QueueHistoryResult;
 import com.benhsoan.port.dto.result.QueueItemResult;
 import com.benhsoan.port.dto.command.queue.CheckInWalkInCommand;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -41,8 +44,10 @@ import com.benhsoan.port.inbound.queue.CheckInAppointmentUseCase;
 import com.benhsoan.port.inbound.queue.CheckInWalkInUseCase;
 import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
+import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetQueuesUseCase;
+import com.benhsoan.port.inbound.queue.ReQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 
@@ -62,6 +67,8 @@ class QueueControllerTest {
     @MockitoBean private CompleteQueueItemUseCase completeQueueItemUseCase;
     @MockitoBean private GetQueueItemUseCase getQueueItemUseCase;
     @MockitoBean private SkipQueueItemUseCase skipQueueItemUseCase;
+    @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
+    @MockitoBean private GetQueueHistoryUseCase getQueueHistoryUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -171,6 +178,22 @@ class QueueControllerTest {
     }
 
     @Test
+    void skipsQueueItemWithEmptyBody() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        when(skipQueueItemUseCase.skip(any())).thenReturn(result(itemId));
+
+        mockMvc.perform(post("/queue-items/{itemId}/skip", itemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(itemId.toString()))
+                .andExpect(jsonPath("$.skipReason").value("Patient absent when called"));
+
+        ArgumentCaptor<com.benhsoan.port.dto.command.queue.SkipQueueItemCommand> captor =
+                ArgumentCaptor.forClass(com.benhsoan.port.dto.command.queue.SkipQueueItemCommand.class);
+        org.mockito.Mockito.verify(skipQueueItemUseCase).skip(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(QueueRestMapper.DEFAULT_SKIP_REASON, captor.getValue().reason());
+    }
+
+    @Test
     void rejectsBlankSkipReason() throws Exception {
         mockMvc.perform(post("/queue-items/{itemId}/skip", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -180,6 +203,46 @@ class QueueControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(skipQueueItemUseCase);
+    }
+
+    @Test
+    void reQueuesItemSuccessfully() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-02T02:00:00Z");
+        QueueItemResult waitingResult = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "Nguyen Van A",
+                UUID.randomUUID(), "Bac si Nguyen Van B", UUID.randomUUID(), "P101",
+                null, UUID.randomUUID(), "VIS000100", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.WAITING, 1, LocalDate.of(2026, 8, 2), now,
+                now, null, null, null, null, null, 1
+        );
+        when(reQueueItemUseCase.reQueue(any())).thenReturn(waitingResult);
+
+        mockMvc.perform(post("/queue-items/{itemId}/re-queue", itemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(itemId.toString()))
+                .andExpect(jsonPath("$.status").value("WAITING"))
+                .andExpect(jsonPath("$.callCount").value(1));
+    }
+
+    @Test
+    void getsQueueHistorySuccessfully() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-02T02:00:00Z");
+        QueueHistoryResult historyEntry = new QueueHistoryResult(
+                UUID.randomUUID(), itemId, UUID.randomUUID(), "Le Tan A",
+                "DEFERRED", "SKIPPED", 1, "Patient absent", now
+        );
+        when(getQueueHistoryUseCase.getHistory(itemId)).thenReturn(List.of(historyEntry));
+
+        mockMvc.perform(get("/queue-items/{itemId}/history", itemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].queueItemId").value(itemId.toString()))
+                .andExpect(jsonPath("$[0].operatorName").value("Le Tan A"))
+                .andExpect(jsonPath("$[0].action").value("DEFERRED"))
+                .andExpect(jsonPath("$[0].status").value("SKIPPED"))
+                .andExpect(jsonPath("$[0].callCount").value(1))
+                .andExpect(jsonPath("$[0].reason").value("Patient absent"));
     }
 
     private QueueItemResult result(UUID itemId) {

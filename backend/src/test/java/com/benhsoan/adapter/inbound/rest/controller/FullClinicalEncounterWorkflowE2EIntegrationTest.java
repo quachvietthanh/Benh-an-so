@@ -298,11 +298,11 @@ class FullClinicalEncounterWorkflowE2EIntegrationTest {
                                 .status(BatchStatus.ACTIVE).createdAt(Instant.now()).updatedAt(Instant.now()).build());
 
                 receptionistAuth = createAuth(receptionistId, "receptionist.test", "RECEPTIONIST",
-                                "QUEUE_CREATE", "QUEUE_READ", "PATIENT_READ");
+                                "QUEUE_CREATE", "QUEUE_VIEW", "PATIENT_READ");
                 doctorAuth = createAuth(doctorId, "doctor.test", "DOCTOR",
                                 "MEDICAL_RECORD_CREATE", "MEDICAL_RECORD_READ", "MEDICAL_RECORD_UPDATE",
                                 "MEDICAL_RECORD_UPDATE_STATUS", "PRESCRIPTION_CREATE", "PRESCRIPTION_READ",
-                                "PRESCRIPTION_UPDATE", "QUEUE_READ", "PATIENT_READ");
+                                "PRESCRIPTION_UPDATE", "QUEUE_VIEW", "QUEUE_CALL_NEXT", "QUEUE_UPDATE_STATUS", "PATIENT_READ");
                 pharmacistAuth = createAuth(pharmacistId, "pharmacist.test", "PHARMACIST",
                                 "PRESCRIPTION_READ", "PRESCRIPTION_UPDATE_STATUS");
         }
@@ -575,6 +575,23 @@ class FullClinicalEncounterWorkflowE2EIntegrationTest {
                 VisitEntity finalVisit = visitRepository.findById(visitId).orElseThrow();
                 assertEquals(VisitStatus.COMPLETED, finalVisit.getStatus());
                 assertNotNull(finalVisit.getCompletedAt());
+
+                // =========================================================================
+                // BƯỚC 9: LỊCH SỬ HÀNG ĐỢI (Kiểm tra timeline audit không bị đè trạng thái)
+                // =========================================================================
+                mockMvc.perform(get("/queue-items/{itemId}/history", queueItemId)
+                                .with(authentication(receptionistAuth)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.length()").value(3))
+                                .andExpect(jsonPath("$[0].action").value("COMPLETED"))
+                                .andExpect(jsonPath("$[0].status").value("COMPLETED"))
+                                .andExpect(jsonPath("$[0].callCount").value(1))
+                                .andExpect(jsonPath("$[1].action").value("CALL"))
+                                .andExpect(jsonPath("$[1].status").value("IN_PROGRESS"))
+                                .andExpect(jsonPath("$[1].callCount").value(1))
+                                .andExpect(jsonPath("$[2].action").value("CHECK_IN"))
+                                .andExpect(jsonPath("$[2].status").value("WAITING"))
+                                .andExpect(jsonPath("$[2].callCount").value(0));
         }
 
         @Test

@@ -59,7 +59,7 @@ public class CallNextQueueItemService implements CallNextQueueItemUseCase {
         }
         queueItemRepository.save(item);
         visitRepository.save(visit);
-        queueAuditService.record(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, item);
+        queueAuditService.recordCall(item);
         return queueItemQueryRepository.findDetailById(item.getId())
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }

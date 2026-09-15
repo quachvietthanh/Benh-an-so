@@ -24,6 +24,7 @@ import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirm
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
 import com.benhsoan.domain.shared.exception.DomainException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -44,11 +45,41 @@ public class GlobalExceptionHandler {
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
     }
 
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleValidationException(
+            ValidationException ex,
+            HttpServletRequest request
+    ) {
+        String message = ex.getMessage();
+        Map<String, Object> details = new HashMap<>();
+
+        if (ex.getFieldErrors() != null && !ex.getFieldErrors().isEmpty()) {
+            details.put("fields", ex.getFieldErrors());
+        } else if (message != null && message.contains(":")) {
+            int colonIdx = message.indexOf(':');
+            String field = message.substring(0, colonIdx).trim();
+            String error = message.substring(colonIdx + 1).trim();
+            if (!field.isEmpty() && !field.contains(" ") && !error.isEmpty()) {
+                details.put("fields", Map.of(field, error));
+            }
+        }
+        return build(
+                HttpStatus.BAD_REQUEST,
+                ex.getCode().name(),
+                message,
+                request.getRequestURI(),
+                details
+        );
+    }
+
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiErrorResponse> handleDomainException(
             DomainException ex,
             HttpServletRequest request
     ) {
+        if (ex instanceof ValidationException validationEx) {
+            return handleValidationException(validationEx, request);
+        }
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
     }
 

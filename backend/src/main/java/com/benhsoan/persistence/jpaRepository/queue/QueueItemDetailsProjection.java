@@ -30,6 +30,7 @@ public record QueueItemDetailsProjection(
         Instant cancelledAt,
         String cancelReason,
         Instant skippedAt,
-        String skipReason
+        String skipReason,
+        int callCount
 ) {
 }

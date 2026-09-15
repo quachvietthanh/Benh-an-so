@@ -38,6 +38,7 @@ public class PatientRestMapper {
                 .insuranceNumber(request.insuranceNumber())
                 .bloodType(request.bloodType())
                 .emergencyContact(request.emergencyContact())
+                .emergencyRelationship(request.emergencyRelationship())
                 .emergencyPhone(request.emergencyPhone())
                 .consentAgreed(request.consentAgreed())
                 .consentVersion(request.consentVersion())
@@ -57,6 +58,7 @@ public class PatientRestMapper {
                 .insuranceNumber(request.insuranceNumber())
                 .bloodType(request.bloodType())
                 .emergencyContact(request.emergencyContact())
+                .emergencyRelationship(request.emergencyRelationship())
                 .emergencyPhone(request.emergencyPhone())
                 .active(request.active())
                 .consentAgreed(request.consentAgreed())
@@ -81,6 +83,12 @@ public class PatientRestMapper {
         String fullName = anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.fullName();
         String phone = anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.phone()) : result.phone();
         String address = anonymizationModeState.isEnabled() ? PatientAnonymizer.maskAddress(result.address()) : result.address();
+        String emergencyContact = anonymizationModeState.isEnabled() && result.emergencyContact() != null
+                ? PatientAnonymizer.maskFullName(null)
+                : result.emergencyContact();
+        String emergencyPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(result.emergencyPhone())
+                : result.emergencyPhone();
 
         return new PatientResponse(
                 result.id(),
@@ -94,8 +102,9 @@ public class PatientRestMapper {
                 result.identityNumber(),
                 result.insuranceNumber(),
                 result.bloodType(),
-                result.emergencyContact(),
-                result.emergencyPhone(),
+                emergencyContact,
+                result.emergencyRelationship(),
+                emergencyPhone,
                 result.active(),
                 result.createdAt(),
                 result.updatedAt(),

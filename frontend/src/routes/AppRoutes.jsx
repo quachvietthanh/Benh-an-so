@@ -31,6 +31,7 @@ const ResultPage = React.lazy(() => import('../pages/ResultPage'))
 const PublicLookupPage = React.lazy(() => import('../pages/PublicLookupPage'))
 const SystemManagementPage = React.lazy(() => import('../pages/SystemManagementPage'))
 const DiagnosisCatalogPage = React.lazy(() => import('../pages/DiagnosisCatalogPage'))
+const ClinicalServiceManagementPage = React.lazy(() => import('../pages/ClinicalServiceManagementPage'))
 const MedicalRecordTemplateManagementPage = React.lazy(() => import('../pages/MedicalRecordTemplateManagementPage'))
 const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
 
@@ -148,6 +149,8 @@ function AppRoutes() {
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
         <Route path="users" element={<PrivateRoute allowedPermissions={['USER_READ', 'USER_CREATE', 'USER_UPDATE']} allowedRoles={['admin']}><LazyPage><UsersPage /></LazyPage></PrivateRoute>} />
         <Route path="services" element={<PrivateRoute allowedPermissions={['SERVICE_CATALOG_READ', 'SERVICE_CATALOG_CREATE', 'SERVICE_CATALOG_UPDATE', 'SERVICE_PRICE_MANAGE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><ServicesPage /></LazyPage></PrivateRoute>} />
+        <Route path="system/clinical-services" element={<PrivateRoute allowedPermissions={['CLINICAL_SERVICE_MANAGE']} allowedRoles={['admin']}><LazyPage><ClinicalServiceManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="clinical-services" element={<Navigate to="/system/clinical-services" replace />} />
         <Route path="system/diagnosis-catalog" element={<PrivateRoute allowedPermissions={['DIAGNOSIS_CATALOG_MANAGE']} allowedRoles={['admin']}><LazyPage><DiagnosisCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="diagnosis-catalog" element={<Navigate to="/system/diagnosis-catalog" replace />} />
         <Route path="system/medical-record-templates" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_TEMPLATE_MANAGE']} allowedRoles={['admin']}><LazyPage><MedicalRecordTemplateManagementPage /></LazyPage></PrivateRoute>} />

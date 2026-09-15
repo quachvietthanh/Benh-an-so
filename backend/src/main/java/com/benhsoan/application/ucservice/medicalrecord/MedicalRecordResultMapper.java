@@ -80,7 +80,8 @@ public class MedicalRecordResultMapper {
 
         PatientInfo patientInfo = new PatientInfo(
                 patient.getId(), patient.getPatientCode(), patient.getFullName(), patient.getDateOfBirth(),
-                patient.getGender(), patient.getPhone(), patient.getIdentityNumber(), patient.getInsuranceNumber());
+                patient.getGender(), patient.getPhone(), patient.getIdentityNumber(), patient.getInsuranceNumber(),
+                patient.getEmergencyContact(), patient.getEmergencyRelationship(), patient.getEmergencyPhone());
 
         VisitInfo visitInfo = new VisitInfo(
                 visit.getId(), visit.getVisitCode(), visit.getVisitType(), visit.getStatus(),

@@ -79,8 +79,7 @@ test('buildOperationalSnapshotFromReports seamlessly creates snapshot from repor
     { id: '1', status: 'WAITING', createdAt: '2026-08-14T08:00:00' },
     { id: '2', status: 'IN_PROGRESS', createdAt: '2026-08-14T09:00:00' },
     { id: '3', status: 'COMPLETED', createdAt: '2026-08-14T09:30:00' },
-    { id: '4', status: 'CANCELLED', createdAt: '2026-08-14T10:00:00' },
-    { id: '5', status: 'COMPLETED', createdAt: '2026-08-13T10:00:00' },
+    white    { id: '5', status: 'COMPLETED', createdAt: '2026-08-13T10:00:00' },
   ]
   const medicines = [
     { id: 'm1', name: 'Paracetamol', stock: 5, minStock: 20, active: true },

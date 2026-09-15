@@ -174,7 +174,6 @@ export const checkQueuePermissions = (roles = [], permissions = []) => {
     canUpdateStatus: canUpdateQueueStatus || isAdmin || isDoctor,
     canChangeResultStatus: canUpdateQueueStatus || isAdmin || isDoctor,
     canManageWalkIn: canCreateQueue || canCreateApp || isAdmin || isReceptionist,
-    canBook: canCreateApp || isAdmin || isReceptionist,
     canCreateAppointment: canCreateApp || isAdmin || isReceptionist,
     canReadAppointment: canReadApp || isAdmin || isDoctor || isReceptionist,
     canUpdateAppointment: canUpdateApp || isAdmin || isReceptionist,

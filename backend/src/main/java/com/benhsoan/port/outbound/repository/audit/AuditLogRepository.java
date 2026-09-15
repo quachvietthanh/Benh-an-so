@@ -15,4 +15,8 @@ public interface AuditLogRepository {
     Optional<AuditLog> findById(UUID id);
 
     Page<AuditLog> findLoginAuditLogs(UUID userId, Pageable pageable);
+
+    java.util.List<AuditLog> findByResourceTypeAndResourceId(
+            com.benhsoan.domain.auditlog.enums.ResourceType resourceType,
+            UUID resourceId);
 }

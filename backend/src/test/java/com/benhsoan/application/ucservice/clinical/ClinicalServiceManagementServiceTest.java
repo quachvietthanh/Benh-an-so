@@ -12,7 +12,6 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -150,7 +149,7 @@ class ClinicalServiceManagementServiceTest {
                 Gender.MALE, 18, 64, new BigDecimal("5"), new BigDecimal("10"), true, NOW, null);
 
         when(serviceRepository.search(any(), any(), any())).thenReturn(page);
-        when(referenceRangeRepository.findByClinicalServiceIdIn(any(Collection.class)))
+        when(referenceRangeRepository.findByClinicalServiceIdIn(any()))
                 .thenReturn(List.of(range1));
 
         Page<ClinicalServiceManagementResult> result = service.search(null, null, PageRequest.of(0, 20));
@@ -159,7 +158,7 @@ class ClinicalServiceManagementServiceTest {
         assertEquals(1, result.getContent().get(0).referenceRanges().size());
         assertEquals(0, result.getContent().get(1).referenceRanges().size());
 
-        verify(referenceRangeRepository).findByClinicalServiceIdIn(any(Collection.class));
+        verify(referenceRangeRepository).findByClinicalServiceIdIn(any());
         verify(referenceRangeRepository, never()).findByClinicalServiceId(any(UUID.class));
     }
 

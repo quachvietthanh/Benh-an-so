@@ -18,6 +18,7 @@ import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.enums.MedicalQueueStatus;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
+import com.benhsoan.domain.queue.enums.QueueSemanticAction;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
 import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
 import com.benhsoan.domain.specialty.Specialty;
@@ -99,8 +100,8 @@ class QueueCheckInCoordinator {
         Visit linkedVisit = visitRepository.save(savedVisit);
 
         auditLogRepository.save(AuditLog.create(actorId, ActionType.CREATE, ResourceType.VISIT, linkedVisit.getId(),
-                "{\"queueItemId\":\"%s\",\"sourceType\":\"%s\",\"queueNumber\":%d}"
-                        .formatted(savedQueueItem.getId(), sourceType, queueNumber), null));
+                "{\"queueItemId\":\"%s\",\"sourceType\":\"%s\",\"queueNumber\":%d,\"status\":\"%s\",\"action\":\"%s\",\"callCount\":%d}"
+                        .formatted(savedQueueItem.getId(), sourceType, queueNumber, QueueItemStatus.WAITING, QueueSemanticAction.CHECK_IN, 0), null));
 
         return new QueueCheckInResult(savedQueueItem.getId(), medicalQueue.getId(), linkedVisit.getId(),
                 linkedVisit.getVisitCode(), appointmentId, patientId, doctorId, assignment.getRoomId(), queueNumber,

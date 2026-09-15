@@ -8,4 +8,8 @@ public class QueueNotFoundException
     public QueueNotFoundException() {
         super(DomainErrorCode.QUEUE_NOT_FOUND, "Không tìm thấy hàng đợi");
     }
+
+    public QueueNotFoundException(java.util.UUID queueId) {
+        super(DomainErrorCode.QUEUE_NOT_FOUND, "Không tìm thấy hàng đợi: " + queueId);
+    }
 }
