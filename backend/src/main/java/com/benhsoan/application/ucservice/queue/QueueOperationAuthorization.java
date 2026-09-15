@@ -44,6 +44,13 @@ class QueueOperationAuthorization {
         requireOwningDoctor(queue);
     }
 
+    void requireReQueuePermission(MedicalQueue queue) {
+        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST")) {
+            return;
+        }
+        throw new UnauthorizedQueueOperationException();
+    }
+
     void requireReadPermission(MedicalQueue queue) {
         requireReadPermission(queue.getDoctorId());
     }

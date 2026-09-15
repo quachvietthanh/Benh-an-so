@@ -37,6 +37,7 @@ public class QueueItemEntity {
     @Column(name = "cancel_reason") private String cancelReason;
     @Column(name = "skipped_at") private Instant skippedAt;
     @Column(name = "skip_reason") private String skipReason;
+    @Column(name = "call_count") private int callCount;
     @Column(name = "created_by") private UUID createdBy;
     @Column(name = "created_at") private Instant createdAt;
     @Column(name = "updated_at") private Instant updatedAt;

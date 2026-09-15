@@ -140,6 +140,15 @@ public class Visit {
         updatedAt = Objects.requireNonNull(at);
     }
 
+    public void revertToWaiting(Instant at) {
+        if (status != VisitStatus.IN_PROGRESS) {
+            throw new VisitInvalidStatusException("Only in-progress visits can be reverted to waiting.");
+        }
+        this.status = VisitStatus.WAITING;
+        this.startedAt = null;
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
     public void updateRegistrationInformation(UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, Instant visitAt, String reason, String note, Instant at) {
         require(VisitStatus.WAITING);
         this.doctorId = Objects.requireNonNull(doctorId);

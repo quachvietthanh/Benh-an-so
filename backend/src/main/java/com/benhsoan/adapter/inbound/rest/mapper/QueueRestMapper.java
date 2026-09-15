@@ -36,8 +36,13 @@ public class QueueRestMapper {
         return new UpdateQueueItemStatusCommand(queueItemId, request.targetStatus(), request.cancelReason());
     }
 
+    public static final String DEFAULT_SKIP_REASON = "Bệnh nhân vắng mặt khi gọi tên";
+
     public SkipQueueItemCommand toCommand(UUID queueItemId, SkipQueueItemRequest request) {
-        return new SkipQueueItemCommand(queueItemId, request.reason());
+        String reason = (request != null && request.reason() != null && !request.reason().isBlank())
+                ? request.reason().trim()
+                : DEFAULT_SKIP_REASON;
+        return new SkipQueueItemCommand(queueItemId, reason);
     }
 
     public QueueItemResponse toResponse(QueueItemResult result) {
@@ -46,7 +51,7 @@ public class QueueRestMapper {
                 result.doctorId(), result.doctorName(), result.roomId(), result.roomNumber(), result.appointmentId(),
                 result.visitId(), result.visitCode(), result.sourceType(), result.status(), result.queueNumber(), result.queueDate(),
                 result.checkedInAt(), result.calledAt(), result.completedAt(), result.cancelledAt(), result.cancelReason(),
-                result.skippedAt(), result.skipReason());
+                result.skippedAt(), result.skipReason(), result.callCount());
     }
 
     public QueueCheckInResponse toResponse(QueueCheckInResult result) {
@@ -54,5 +59,19 @@ public class QueueRestMapper {
                 result.visitCode(), result.appointmentId(), result.patientId(), result.doctorId(), result.roomId(),
                 result.queueNumber(), result.queueDate(), result.sourceType(), result.queueItemStatus(),
                 result.visitStatus(), result.checkedInAt());
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse toResponse(
+            com.benhsoan.port.dto.result.QueueHistoryResult result) {
+        return new com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse(
+                result.id(),
+                result.queueItemId(),
+                result.operatorId(),
+                result.operatorName(),
+                result.action(),
+                result.status(),
+                result.callCount(),
+                result.reason(),
+                result.timestamp());
     }
 }

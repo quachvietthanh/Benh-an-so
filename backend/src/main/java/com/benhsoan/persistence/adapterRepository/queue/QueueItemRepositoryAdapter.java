@@ -23,6 +23,11 @@ public class QueueItemRepositoryAdapter implements QueueItemRepository {
     private final QueueStructurePersistenceMapper mapper;
 
     @Override
+    public Optional<QueueItem> findById(UUID id) {
+        return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<QueueItem> findByIdForUpdate(UUID id) {
         return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
     }

@@ -40,20 +40,19 @@ class SkipQueueItemServiceTest {
     private static final Instant NOW = Instant.parse("2026-08-02T02:00:00Z");
 
     @Test
-    void skipsAppointmentItemAndCancelsVisitAndAppointment() {
+    void skipsAppointmentItemAndRevertsVisitAndAppointment() {
         TestContext context = context(true);
 
         QueueItemResult response = context.service.skip(
                 new SkipQueueItemCommand(context.item.getId(), "Patient absent when called"));
 
         assertEquals(QueueItemStatus.SKIPPED, context.item.getStatus());
-        assertEquals(VisitStatus.CANCELLED, context.visit.getStatus());
-        assertEquals(AppointmentStatus.CANCELLED, context.appointment.getStatus());
-        assertEquals(SkipQueueItemService.APPOINTMENT_CANCEL_REASON, context.appointment.getCancelReason());
+        assertEquals(VisitStatus.WAITING, context.visit.getStatus());
+        assertEquals(AppointmentStatus.CHECKED_IN, context.appointment.getStatus());
         verify(context.queueItemRepository).save(context.item);
         verify(context.visitRepository).save(context.visit);
         verify(context.appointmentRepository).save(context.appointment);
-        verify(context.auditService).recordSkipped(context.item, SkipQueueItemService.APPOINTMENT_CANCEL_REASON);
+        verify(context.auditService).recordSkipped(context.item, "Patient absent when called");
         assertEquals("Nguyen Van A", response.patientName());
         assertEquals("Bac si Nguyen Van B", response.doctorName());
         assertEquals("P101", response.roomNumber());
@@ -67,9 +66,64 @@ class SkipQueueItemServiceTest {
         context.service.skip(new SkipQueueItemCommand(context.item.getId(), "Patient absent when called"));
 
         assertEquals(QueueItemStatus.SKIPPED, context.item.getStatus());
-        assertEquals(VisitStatus.CANCELLED, context.visit.getStatus());
+        assertEquals(VisitStatus.WAITING, context.visit.getStatus());
         verify(context.appointmentRepository, never()).findByIdForUpdate(org.mockito.ArgumentMatchers.any());
         verify(context.appointmentRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void skipsCurrentAndAutoCallsNextWaitingPatient() {
+        TestContext context = context(false);
+
+        UUID nextPatientId = UUID.randomUUID();
+        UUID nextVisitId = UUID.randomUUID();
+        Visit nextVisit = Visit.create("VIS000101", nextPatientId, context.visit.getDoctorId(), null, null,
+                VisitType.WALK_IN, NOW, "Consultation", null, UUID.randomUUID(), NOW);
+        QueueItem nextItem = QueueItem.create(context.item.getMedicalQueueId(), nextPatientId, null, nextVisitId,
+                QueueItemSourceType.WALK_IN, 2, LocalDate.of(2026, 8, 2), UUID.randomUUID(), NOW);
+
+        when(context.queueItemRepository.findNextWaitingForUpdate(context.item.getMedicalQueueId()))
+                .thenReturn(Optional.of(nextItem));
+        when(context.visitRepository.findByIdForUpdate(nextVisitId)).thenReturn(Optional.of(nextVisit));
+
+        context.service.skip(new SkipQueueItemCommand(context.item.getId(), "Patient absent"));
+
+        assertEquals(QueueItemStatus.SKIPPED, context.item.getStatus());
+        assertEquals(QueueItemStatus.IN_PROGRESS, nextItem.getStatus());
+        assertEquals(1, nextItem.getCallCount());
+        assertEquals(VisitStatus.IN_PROGRESS, nextVisit.getStatus());
+        verify(context.queueItemRepository).save(nextItem);
+        verify(context.visitRepository).save(nextVisit);
+    }
+
+    @Test
+    void doesNotAutoCallWhenQueueIsClosed() {
+        TestContext context = context(false);
+        context.queue.close(NOW);
+
+        UUID nextPatientId = UUID.randomUUID();
+        UUID nextVisitId = UUID.randomUUID();
+        QueueItem nextItem = QueueItem.create(context.item.getMedicalQueueId(), nextPatientId, null, nextVisitId,
+                QueueItemSourceType.WALK_IN, 2, LocalDate.of(2026, 8, 2), UUID.randomUUID(), NOW);
+
+        when(context.queueItemRepository.findNextWaitingForUpdate(context.item.getMedicalQueueId()))
+                .thenReturn(Optional.of(nextItem));
+
+        context.service.skip(new SkipQueueItemCommand(context.item.getId(), "Patient absent"));
+
+        assertEquals(QueueItemStatus.SKIPPED, context.item.getStatus());
+        assertEquals(QueueItemStatus.WAITING, nextItem.getStatus());
+        verify(context.queueItemRepository, never()).findNextWaitingForUpdate(context.item.getMedicalQueueId());
+    }
+
+    @Test
+    void throwsQueueNotFoundExceptionWhenMedicalQueueDoesNotExist() {
+        TestContext context = context(false);
+        when(context.medicalQueueRepository.findByIdForUpdate(context.item.getMedicalQueueId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(com.benhsoan.domain.queue.exception.QueueNotFoundException.class,
+                () -> context.service.skip(new SkipQueueItemCommand(context.item.getId(), "Patient absent")));
     }
 
     @Test
@@ -138,7 +192,7 @@ class SkipQueueItemServiceTest {
                 NOW.plusSeconds(60), "Patient absent when called");
 
         when(queueItemRepository.findByIdForUpdate(item.getId())).thenReturn(Optional.of(item));
-        when(medicalQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(medicalQueueRepository.findByIdForUpdate(queue.getId())).thenReturn(Optional.of(queue));
         when(visitRepository.findByIdForUpdate(visit.getId())).thenReturn(Optional.of(visit));
         if (appointment != null) {
             when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(Optional.of(appointment));
@@ -151,16 +205,18 @@ class SkipQueueItemServiceTest {
         SkipQueueItemService service = new SkipQueueItemService(queueItemRepository, medicalQueueRepository,
                 visitRepository, appointmentRepository, new QueueOperationAuthorization(currentUserPort),
                 queryRepository, clockPort, auditService);
-        return new TestContext(service, item, visit, appointment, queueItemRepository, visitRepository,
-                appointmentRepository, auditService);
+        return new TestContext(service, queue, item, visit, appointment, queueItemRepository, medicalQueueRepository,
+                visitRepository, appointmentRepository, auditService);
     }
 
     private record TestContext(
             SkipQueueItemService service,
+            MedicalQueue queue,
             QueueItem item,
             Visit visit,
             Appointment appointment,
             QueueItemRepository queueItemRepository,
+            MedicalQueueRepository medicalQueueRepository,
             VisitRepository visitRepository,
             AppointmentRepository appointmentRepository,
             QueueAuditService auditService

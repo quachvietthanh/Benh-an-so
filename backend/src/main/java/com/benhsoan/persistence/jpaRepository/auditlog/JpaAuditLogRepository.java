@@ -32,4 +32,8 @@ public interface JpaAuditLogRepository
     Page<AuditLogEntity> findLoginAuditLogs(
             @Param("userId") UUID userId,
             Pageable pageable);
+
+    java.util.List<AuditLogEntity> findByResourceTypeAndResourceIdOrderByCreatedAtDesc(
+            com.benhsoan.domain.auditlog.enums.ResourceType resourceType,
+            UUID resourceId);
 }
