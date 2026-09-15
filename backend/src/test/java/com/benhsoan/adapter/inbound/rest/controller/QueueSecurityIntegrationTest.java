@@ -44,8 +44,10 @@ import com.benhsoan.port.inbound.queue.CheckInAppointmentUseCase;
 import com.benhsoan.port.inbound.queue.CheckInWalkInUseCase;
 import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
+import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetQueuesUseCase;
+import com.benhsoan.port.inbound.queue.ReQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -77,6 +79,8 @@ class QueueSecurityIntegrationTest {
     @MockitoBean private CompleteQueueItemUseCase completeQueueItemUseCase;
     @MockitoBean private GetQueueItemUseCase getQueueItemUseCase;
     @MockitoBean private SkipQueueItemUseCase skipQueueItemUseCase;
+    @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
+    @MockitoBean private GetQueueHistoryUseCase getQueueHistoryUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -210,5 +214,41 @@ class QueueSecurityIntegrationTest {
                         .with(permission("RECEPTIONIST", "QUEUE_CREATE"))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void requiresQueueUpdateStatusPermissionForReQueue() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        QueueItemResult queueItem = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "BN001", "Nguyen Van A",
+                UUID.randomUUID(), "Bac si B", UUID.randomUUID(), "P101", null,
+                UUID.randomUUID(), "VIS000001", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.WAITING, 1, LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T01:00:00Z"), null, null, null, null, null, null, 1
+        );
+        when(reQueueItemUseCase.reQueue(any())).thenReturn(queueItem);
+
+        mockMvc.perform(post("/queue-items/{itemId}/re-queue", itemId)
+                        .with(permission("RECEPTIONIST", "QUEUE_VIEW")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/queue-items/{itemId}/re-queue", itemId)
+                        .with(permission("RECEPTIONIST", "QUEUE_UPDATE_STATUS")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WAITING"));
+    }
+
+    @Test
+    void requiresQueueViewPermissionForHistory() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        when(getQueueHistoryUseCase.getHistory(itemId)).thenReturn(List.of());
+
+        mockMvc.perform(get("/queue-items/{itemId}/history", itemId)
+                        .with(permission("DOCTOR", "QUEUE_UPDATE_STATUS")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/queue-items/{itemId}/history", itemId)
+                        .with(permission("DOCTOR", "QUEUE_VIEW")))
+                .andExpect(status().isOk());
     }
 }

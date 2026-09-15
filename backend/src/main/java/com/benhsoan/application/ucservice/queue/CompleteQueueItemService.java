@@ -62,7 +62,7 @@ public class CompleteQueueItemService implements CompleteQueueItemUseCase {
         }
         queueItemRepository.save(item);
         visitRepository.save(visit);
-        queueAuditService.record(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, item);
+        queueAuditService.recordCompleted(item);
         return queueItemQueryRepository.findDetailById(item.getId())
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }

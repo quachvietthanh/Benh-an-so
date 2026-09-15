@@ -4,4 +4,6 @@ class VisitTest { private final Instant now=Instant.parse("2026-01-01T00:00:00Z"
  @Test void followsLifecycle(){Visit v=visit();v.start(now);v.waitForResult(now.plusSeconds(1));v.resume(now.plusSeconds(2));v.complete(now.plusSeconds(3));assertTrue(v.isCompleted());}
  @Test void rejectsCompletionBeforeStart(){Visit v=visit();v.start(now);assertThrows(ValidationException.class,()->v.complete(now.minusSeconds(1)));}
  @Test void rejectsRegistrationChangeAfterStart(){Visit v=visit();v.start(now);assertThrows(VisitInvalidStatusException.class,()->v.updateRegistrationInformation(UUID.randomUUID(),null,null,VisitType.FOLLOW_UP,now,"R",null,now));}
+ @Test void revertsInProgressToWaiting(){Visit v=visit();v.start(now);v.revertToWaiting(now.plusSeconds(10));assertEquals(VisitStatus.WAITING,v.getStatus());assertNull(v.getStartedAt());assertEquals(now.plusSeconds(10),v.getUpdatedAt());}
+ @Test void rejectsRevertToWaitingWhenNotInProgress(){Visit v=visit();assertThrows(VisitInvalidStatusException.class,()->v.revertToWaiting(now));}
 }

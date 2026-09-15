@@ -21,11 +21,12 @@ public class QueueItem {
     private final Instant checkedInAt, createdAt;
     private Instant calledAt, completedAt, cancelledAt, skippedAt, updatedAt;
     private String cancelReason, skipReason;
+    private int callCount;
 
     private QueueItem(UUID id, UUID medicalQueueId, UUID patientId, UUID appointmentId, UUID visitId,
             QueueItemSourceType sourceType, QueueItemStatus status, int queueNumber, LocalDate queueDate,
             Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
-            Instant skippedAt, String skipReason,
+            Instant skippedAt, String skipReason, int callCount,
             UUID createdBy, Instant createdAt, Instant updatedAt) {
         this.id = Guard.require(id, "Queue item id");
         this.medicalQueueId = Guard.require(medicalQueueId, "Medical queue id");
@@ -46,6 +47,7 @@ public class QueueItem {
         this.cancelReason = cancelReason;
         this.skippedAt = skippedAt;
         this.skipReason = skipReason;
+        this.callCount = Math.max(0, callCount);
         this.createdBy = Guard.require(createdBy, "Created by");
         this.createdAt = Guard.require(createdAt, "Created at");
         this.updatedAt = Guard.require(updatedAt, "Updated at");
@@ -56,22 +58,33 @@ public class QueueItem {
             Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
             Instant skippedAt, String skipReason,
             UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return restore(id, medicalQueueId, patientId, appointmentId, visitId, sourceType, status, queueNumber,
+                queueDate, checkedInAt, calledAt, completedAt, cancelledAt, cancelReason, skippedAt, skipReason,
+                calledAt != null ? 1 : 0, createdBy, createdAt, updatedAt);
+    }
+
+    public static QueueItem restore(UUID id, UUID medicalQueueId, UUID patientId, UUID appointmentId, UUID visitId,
+            QueueItemSourceType sourceType, QueueItemStatus status, int queueNumber, LocalDate queueDate,
+            Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
+            Instant skippedAt, String skipReason, int callCount,
+            UUID createdBy, Instant createdAt, Instant updatedAt) {
         return new QueueItem(id, medicalQueueId, patientId, appointmentId, visitId, sourceType, status, queueNumber,
                 queueDate, checkedInAt, calledAt, completedAt, cancelledAt, cancelReason, skippedAt, skipReason,
-                createdBy, createdAt, updatedAt);
+                callCount, createdBy, createdAt, updatedAt);
     }
 
     public static QueueItem create(UUID medicalQueueId, UUID patientId, UUID appointmentId, UUID visitId,
             QueueItemSourceType sourceType, int queueNumber, LocalDate queueDate, UUID createdBy, Instant checkedInAt) {
         return new QueueItem(UUID.randomUUID(), medicalQueueId, patientId, appointmentId, visitId, sourceType,
                 QueueItemStatus.WAITING, queueNumber, queueDate, checkedInAt, null, null, null, null, null, null,
-                createdBy, checkedInAt, checkedInAt);
+                0, createdBy, checkedInAt, checkedInAt);
     }
 
     public void call(Instant calledAt) {
         requireStatus(QueueItemStatus.WAITING);
         this.status = QueueItemStatus.IN_PROGRESS;
         this.calledAt = Guard.require(calledAt, "Called at");
+        this.callCount++;
         this.updatedAt = calledAt;
     }
 
@@ -112,6 +125,14 @@ public class QueueItem {
         this.skipReason = Guard.require(reason, "Skip reason");
         this.skippedAt = Guard.require(skippedAt, "Skipped at");
         this.updatedAt = skippedAt;
+    }
+
+    public void reQueue(Instant reQueuedAt) {
+        if (status != QueueItemStatus.SKIPPED) {
+            throw new QueueItemInvalidStatusException(status, QueueItemStatus.WAITING);
+        }
+        this.status = QueueItemStatus.WAITING;
+        this.updatedAt = Guard.require(reQueuedAt, "Re-queued at");
     }
 
     private void requireStatus(QueueItemStatus expectedStatus) {

@@ -6,7 +6,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
 import com.benhsoan.domain.queue.QueueItem;
+import com.benhsoan.domain.queue.enums.MedicalQueueStatus;
 import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
+import com.benhsoan.domain.queue.exception.QueueNotFoundException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.queue.SkipQueueItemCommand;
@@ -41,8 +43,8 @@ public class SkipQueueItemService implements SkipQueueItemUseCase {
     public QueueItemResult skip(SkipQueueItemCommand command) {
         QueueItem item = queueItemRepository.findByIdForUpdate(command.queueItemId())
                 .orElseThrow(() -> new QueueItemNotFoundException(command.queueItemId()));
-        var queue = medicalQueueRepository.findById(item.getMedicalQueueId())
-                .orElseThrow(() -> new QueueItemNotFoundException(item.getMedicalQueueId()));
+        var queue = medicalQueueRepository.findByIdForUpdate(item.getMedicalQueueId())
+                .orElseThrow(() -> new QueueNotFoundException(item.getMedicalQueueId()));
         authorization.requireSkipPermission(queue);
 
         Visit visit = visitRepository.findByIdForUpdate(item.getVisitId())
@@ -51,9 +53,9 @@ public class SkipQueueItemService implements SkipQueueItemUseCase {
         var skippedAt = clockPort.now();
 
         item.skip(command.reason(), skippedAt);
-        visit.cancel(skippedAt);
+        visit.revertToWaiting(skippedAt);
         if (appointment != null) {
-            appointment.cancel(APPOINTMENT_CANCEL_REASON);
+            appointment.revertToCheckedIn();
         }
 
         queueItemRepository.save(item);
@@ -61,7 +63,28 @@ public class SkipQueueItemService implements SkipQueueItemUseCase {
         if (appointment != null) {
             appointmentRepository.save(appointment);
         }
-        queueAuditService.recordSkipped(item, APPOINTMENT_CANCEL_REASON);
+
+        if (queue.getStatus() == MedicalQueueStatus.OPEN) {
+            var nextItemOpt = queueItemRepository.findNextWaitingForUpdate(queue.getId());
+            if (nextItemOpt.isPresent()) {
+                QueueItem nextItem = nextItemOpt.get();
+                Visit nextVisit = visitRepository.findByIdForUpdate(nextItem.getVisitId())
+                        .orElseThrow(() -> new VisitNotFoundException(nextItem.getVisitId()));
+                nextItem.call(skippedAt);
+                nextVisit.start(skippedAt);
+                if (nextItem.getAppointmentId() != null) {
+                    var nextAppt = appointmentRepository.findByIdForUpdate(nextItem.getAppointmentId())
+                            .orElseThrow(() -> new AppointmentNotFoundException(nextItem.getAppointmentId()));
+                    nextAppt.start();
+                    appointmentRepository.save(nextAppt);
+                }
+                queueItemRepository.save(nextItem);
+                visitRepository.save(nextVisit);
+                queueAuditService.recordCall(nextItem);
+            }
+        }
+
+        queueAuditService.recordSkipped(item, command.reason());
         return queueItemQueryRepository.findDetailById(item.getId())
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }

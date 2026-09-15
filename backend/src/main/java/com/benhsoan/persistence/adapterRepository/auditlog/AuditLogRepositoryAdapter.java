@@ -45,4 +45,15 @@ public class AuditLogRepositoryAdapter
                 .map(mapper::toDomain);
     }
 
+    @Override
+    public java.util.List<AuditLog> findByResourceTypeAndResourceId(
+            com.benhsoan.domain.auditlog.enums.ResourceType resourceType, UUID resourceId) {
+        if (resourceId == null || resourceType == null) {
+            return java.util.List.of();
+        }
+        return jpaRepository.findByResourceTypeAndResourceIdOrderByCreatedAtDesc(resourceType, resourceId).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
 }

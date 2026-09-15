@@ -55,6 +55,48 @@ class QueueItemTest {
         assertEquals(skippedAt, item.getUpdatedAt());
     }
 
+    @Test
+    void callIncrementsCallCount() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem item = newWaitingItem(checkedInAt);
+        assertEquals(0, item.getCallCount());
+
+        item.call(checkedInAt.plusSeconds(30));
+        assertEquals(1, item.getCallCount());
+        assertEquals(QueueItemStatus.IN_PROGRESS, item.getStatus());
+
+        item.skip("Absent", checkedInAt.plusSeconds(60));
+        assertEquals(QueueItemStatus.SKIPPED, item.getStatus());
+
+        item.reQueue(checkedInAt.plusSeconds(90));
+        assertEquals(QueueItemStatus.WAITING, item.getStatus());
+        assertEquals(1, item.getCallCount());
+
+        item.call(checkedInAt.plusSeconds(120));
+        assertEquals(2, item.getCallCount());
+    }
+
+    @Test
+    void reQueuesSkippedItem() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem item = newWaitingItem(checkedInAt);
+        item.call(checkedInAt.plusSeconds(30));
+        item.skip("Patient absent", checkedInAt.plusSeconds(60));
+
+        Instant reQueuedAt = checkedInAt.plusSeconds(90);
+        item.reQueue(reQueuedAt);
+
+        assertEquals(QueueItemStatus.WAITING, item.getStatus());
+        assertEquals(reQueuedAt, item.getUpdatedAt());
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSkippedItems")
+    void rejectsReQueueFromStatusesOtherThanSkipped(QueueItem item) {
+        assertThrows(QueueItemInvalidStatusException.class,
+                () -> item.reQueue(Instant.now()));
+    }
+
     @ParameterizedTest
     @MethodSource("nonInProgressItems")
     void rejectsSkipFromStatusesOtherThanInProgress(QueueItem item) {
@@ -82,6 +124,27 @@ class QueueItemTest {
         skipped.skip("Patient absent when called", checkedInAt.plusSeconds(60));
 
         return Stream.of(waiting, waitingForResult, completed, cancelled, skipped);
+    }
+
+    private static Stream<QueueItem> nonSkippedItems() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem waiting = newWaitingItem(checkedInAt);
+
+        QueueItem inProgress = newWaitingItem(checkedInAt);
+        inProgress.call(checkedInAt.plusSeconds(30));
+
+        QueueItem waitingForResult = newWaitingItem(checkedInAt);
+        waitingForResult.call(checkedInAt.plusSeconds(30));
+        waitingForResult.waitForResult(checkedInAt.plusSeconds(60));
+
+        QueueItem completed = newWaitingItem(checkedInAt);
+        completed.call(checkedInAt.plusSeconds(30));
+        completed.complete(checkedInAt.plusSeconds(60));
+
+        QueueItem cancelled = newWaitingItem(checkedInAt);
+        cancelled.cancel("Cancelled", checkedInAt.plusSeconds(60));
+
+        return Stream.of(waiting, inProgress, waitingForResult, completed, cancelled);
     }
 
     private static QueueItem newWaitingItem(Instant checkedInAt) {
