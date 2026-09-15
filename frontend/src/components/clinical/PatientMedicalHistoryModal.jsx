@@ -120,8 +120,10 @@ export default function PatientMedicalHistoryModal({
         return <Tag color="gold">Chờ khám</Tag>
       case 'CANCELLED':
         return <Tag color="default">Đã hủy</Tag>
+      case 'EARLY_ENDED':
+        return <Tag color="orange">Kết thúc sớm</Tag>
       case 'SKIPPED':
-        return <Tag color="orange">Bỏ qua</Tag>
+        return <Tag color="volcano">Bỏ qua</Tag>
       default:
         return status ? <Tag>{status}</Tag> : <Text type="secondary">—</Text>
     }

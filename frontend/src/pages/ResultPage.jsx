@@ -489,9 +489,6 @@ export function ResultPage() {
             <FileDoneOutlined style={{ color: '#2563eb', marginRight: 8 }} />
             Nhập kết quả cận lâm sàng
           </Title>
-          <Text style={{ color: '#64748b', fontSize: 14 }}>
-            Nhập và xác nhận kết quả theo lượt khám đang chờ cận lâm sàng.
-          </Text>
         </div>
 
         <Space wrap>
