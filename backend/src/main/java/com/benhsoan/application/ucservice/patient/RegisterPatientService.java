@@ -13,6 +13,8 @@ import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.enums.PatientChangeAction;
 import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
+import com.benhsoan.domain.shared.exception.ValidationException;
+import java.util.regex.Pattern;
 import com.benhsoan.port.dto.command.patient.RegisterPatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
@@ -29,6 +31,9 @@ import lombok.RequiredArgsConstructor;
 @Transactional
 public class RegisterPatientService
         implements RegisterPatientUseCase {
+
+    private static final Pattern PHONE_PATTERN =
+            Pattern.compile("^(0|\\+84)(3|5|7|8|9)[0-9]{8}$");
 
     private final PatientRepository patientRepository;
 
@@ -59,6 +64,10 @@ public class RegisterPatientService
 
         String identityNumber = normalizeIdentityNumber(command.identityNumber());
 
+        String emergencyContact = normalizeString(command.emergencyContact());
+        String emergencyRelationship = normalizeString(command.emergencyRelationship());
+        String emergencyPhone = normalizePhone(command.emergencyPhone());
+
         Patient patient =
                 Patient.create(
                         patientCode,
@@ -71,8 +80,9 @@ public class RegisterPatientService
                         identityNumber,
                         command.insuranceNumber(),
                         command.bloodType(),
-                        command.emergencyContact(),
-                        command.emergencyPhone(),
+                        emergencyContact,
+                        emergencyRelationship,
+                        emergencyPhone,
                         consentAgreed,
                         command.consentVersion(),
                         currentUserId
@@ -131,6 +141,40 @@ public class RegisterPatientService
                     "identity number"
             );
         }
+
+        validateEmergencyContact(
+                command.emergencyContact(),
+                command.emergencyRelationship(),
+                command.emergencyPhone()
+        );
+    }
+
+    private void validateEmergencyContact(String contact, String relationship, String phone) {
+        boolean hasContact = contact != null && !contact.isBlank();
+        boolean hasRelationship = relationship != null && !relationship.isBlank();
+        boolean hasPhone = phone != null && !phone.isBlank();
+
+        if (hasContact || hasRelationship || hasPhone) {
+            if (!hasContact) {
+                throw new ValidationException("emergencyContact", "Họ tên người liên hệ khẩn cấp không được để trống.");
+            }
+            if (!hasRelationship) {
+                throw new ValidationException("emergencyRelationship", "Mối quan hệ với người liên hệ khẩn cấp không được để trống.");
+            }
+            if (!hasPhone) {
+                throw new ValidationException("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không được để trống.");
+            }
+            if (!PHONE_PATTERN.matcher(phone.trim()).matches()) {
+                throw new ValidationException("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng.");
+            }
+        }
+    }
+
+    private String normalizeString(String val) {
+        if (val == null || val.isBlank()) {
+            return null;
+        }
+        return val.trim();
     }
 
     private String normalizeIdentityNumber(String identityNumber) {
@@ -142,7 +186,7 @@ public class RegisterPatientService
 
     private String normalizePhone(String phone) {
         if (phone == null || phone.isBlank()) {
-            return phone;
+            return null;
         }
 
         String trimmed = phone.trim();

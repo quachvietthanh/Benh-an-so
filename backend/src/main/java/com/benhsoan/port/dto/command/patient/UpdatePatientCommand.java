@@ -30,6 +30,8 @@ public record UpdatePatientCommand(
 
         String emergencyContact,
 
+        String emergencyRelationship,
+
         String emergencyPhone,
 
         boolean active,

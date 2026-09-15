@@ -67,6 +67,9 @@ public class PatientEntity {
     @Column(name = "emergency_contact", length = 100)
     private String emergencyContact;
 
+    @Column(name = "emergency_relationship", length = 50)
+    private String emergencyRelationship;
+
     @Column(name = "emergency_phone", length = 20)
     private String emergencyPhone;
 

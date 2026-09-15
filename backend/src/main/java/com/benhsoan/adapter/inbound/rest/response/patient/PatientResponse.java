@@ -33,6 +33,8 @@ public record PatientResponse(
 
         String emergencyContact,
 
+        String emergencyRelationship,
+
         String emergencyPhone,
 
         boolean active,

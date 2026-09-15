@@ -30,6 +30,8 @@ public record RegisterPatientCommand(
 
         String emergencyContact,
 
+        String emergencyRelationship,
+
         String emergencyPhone,
 
         Boolean consentAgreed,

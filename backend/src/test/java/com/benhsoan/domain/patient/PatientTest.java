@@ -182,4 +182,50 @@ class PatientTest {
         assertFalse(restored.isConsentWithdrawn());
         assertFalse(restored.isNonMedicalUseRestricted());
     }
+
+    @Test
+    @DisplayName("NCL-02-CN-007 TC-01: Tạo và cập nhật hồ sơ với thông tin người liên hệ khẩn cấp đầy đủ (Họ tên, Mối quan hệ, SĐT)")
+    void createAndUpdatePatientWithEmergencyContactAndRelationship() {
+        Patient patient = Patient.create(
+                "BN000002",
+                "Nguyen Van A",
+                LocalDate.of(1990, 1, 1),
+                Gender.MALE,
+                "0901234567",
+                "a@example.com",
+                "123 Street",
+                "079090001234",
+                "DN4790123456789",
+                BloodType.O_POSITIVE,
+                "Le Thi B",
+                "Vợ",
+                "0909998877",
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        assertEquals("Le Thi B", patient.getEmergencyContact());
+        assertEquals("Vợ", patient.getEmergencyRelationship());
+        assertEquals("0909998877", patient.getEmergencyPhone());
+
+        patient.updateProfile(
+                "Nguyen Van A",
+                LocalDate.of(1990, 1, 1),
+                Gender.MALE,
+                "0901234567",
+                "a@example.com",
+                "123 Street",
+                "079090001234",
+                "DN4790123456789",
+                BloodType.O_POSITIVE,
+                "Nguyen Van C",
+                "Bố",
+                "0908887766"
+        );
+
+        assertEquals("Nguyen Van C", patient.getEmergencyContact());
+        assertEquals("Bố", patient.getEmergencyRelationship());
+        assertEquals("0908887766", patient.getEmergencyPhone());
+    }
 }

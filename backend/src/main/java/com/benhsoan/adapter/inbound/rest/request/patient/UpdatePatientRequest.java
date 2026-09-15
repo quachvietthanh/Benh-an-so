@@ -7,6 +7,8 @@ import com.benhsoan.domain.patient.enums.Gender;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 public record UpdatePatientRequest(
 
@@ -33,6 +35,10 @@ public record UpdatePatientRequest(
 
         String emergencyContact,
 
+        @Size(max = 50, message = "Mối quan hệ không được vượt quá 50 ký tự.")
+        String emergencyRelationship,
+
+        @Pattern(regexp = "^(?:(0|\\+84)(3|5|7|8|9)[0-9]{8}|[0-9]{2}\\*{6}[0-9]{2})?$", message = "Số điện thoại không đúng định dạng.")
         String emergencyPhone,
 
         boolean active,

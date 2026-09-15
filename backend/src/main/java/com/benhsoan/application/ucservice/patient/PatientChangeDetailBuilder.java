@@ -35,6 +35,7 @@ public class PatientChangeDetailBuilder {
         values.put("insuranceNumber", patient.getInsuranceNumber());
         values.put("bloodType", patient.getBloodType() != null ? patient.getBloodType().name() : null);
         values.put("emergencyContact", patient.getEmergencyContact());
+        values.put("emergencyRelationship", patient.getEmergencyRelationship());
         values.put("emergencyPhone", patient.getEmergencyPhone());
         values.put("active", patient.isActive());
         values.put("consentAgreed", patient.isConsentAgreed());
@@ -98,6 +99,10 @@ public class PatientChangeDetailBuilder {
         addChange(changes, "emergencyContact",
                 oldPatient.getEmergencyContact(),
                 newPatient.getEmergencyContact());
+
+        addChange(changes, "emergencyRelationship",
+                oldPatient.getEmergencyRelationship(),
+                newPatient.getEmergencyRelationship());
 
         addChange(changes, "emergencyPhone",
                 oldPatient.getEmergencyPhone(),

@@ -24,6 +24,7 @@ public class PatientResultMapper {
                 patient.getInsuranceNumber(),
                 patient.getBloodType(),
                 patient.getEmergencyContact(),
+                patient.getEmergencyRelationship(),
                 patient.getEmergencyPhone(),
                 patient.isActive(),
                 patient.getCreatedAt(),

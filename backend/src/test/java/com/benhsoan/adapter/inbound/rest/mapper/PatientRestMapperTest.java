@@ -45,6 +45,28 @@ class PatientRestMapperTest {
     }
 
     @Test
+    void masksEmergencyContactWhenEnabled() {
+        PatientResult withEmergency = new PatientResult(
+                ID, "BN001", "Nguyễn Văn A", null, null,
+                "0912345678", null, "123 Nguyễn Trãi, Hà Nội",
+                null, null, null, "Lê Thị B", "Vợ", "0987654321",
+                true, null, null, false, null, null,
+                false, null, null, false
+        );
+
+        PatientResponse normal = mapper.toResponse(withEmergency);
+        assertEquals("Lê Thị B", normal.emergencyContact());
+        assertEquals("Vợ", normal.emergencyRelationship());
+        assertEquals("0987654321", normal.emergencyPhone());
+
+        state.setEnabled(true);
+        PatientResponse masked = mapper.toResponse(withEmergency);
+        assertEquals("BỆNH NHÂN", masked.emergencyContact());
+        assertEquals("Vợ", masked.emergencyRelationship());
+        assertEquals("09******21", masked.emergencyPhone());
+    }
+
+    @Test
     void toggleIsReflectedAtRuntime() {
         PatientResponse original = mapper.toResponse(result());
         assertEquals("Nguyễn Văn A", original.fullName());

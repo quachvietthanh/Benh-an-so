@@ -121,6 +121,71 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsValidationExceptionWithFieldPrefixToDetailsFields() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/patients");
+
+        var response = handler.handleValidationException(
+                new ValidationException("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_FAILED", response.getBody().code());
+        assertEquals("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng.", response.getBody().message());
+        assertNotNull(response.getBody().details());
+        assertEquals(
+                Map.of("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                response.getBody().details().get("fields")
+        );
+    }
+
+    @Test
+    void mapsValidationExceptionWithStructuredFieldToDetailsFields() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/patients");
+
+        var response = handler.handleValidationException(
+                new ValidationException("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_FAILED", response.getBody().code());
+        assertEquals("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng.", response.getBody().message());
+        assertNotNull(response.getBody().details());
+        assertEquals(
+                Map.of("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                response.getBody().details().get("fields")
+        );
+    }
+
+    @Test
+    void mapsValidationExceptionWithMultipleFieldsToDetailsFields() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/patients");
+
+        var response = handler.handleValidationException(
+                new ValidationException(
+                        Map.of(
+                                "emergencyContact", "Họ tên người liên hệ khẩn cấp không được để trống.",
+                                "emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."
+                        ),
+                        "Validation failed for emergency contact."
+                ),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_FAILED", response.getBody().code());
+        assertNotNull(response.getBody().details());
+        assertEquals(
+                Map.of(
+                        "emergencyContact", "Họ tên người liên hệ khẩn cấp không được để trống.",
+                        "emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."
+                ),
+                response.getBody().details().get("fields")
+        );
+    }
+
+    @Test
     void mapsAuthenticationAndBusinessPreconditionExceptionsToTheirSemanticStatuses() {
         MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/auth/login");
 
