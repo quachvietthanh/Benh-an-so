@@ -1,6 +1,7 @@
 package com.benhsoan.domain.patient;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -20,6 +21,7 @@ import lombok.ToString;
 public class PatientChronicDisease {
 
     private static final int MIN_YEAR = 1900;
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private UUID id;
     private UUID patientId;
@@ -47,11 +49,11 @@ public class PatientChronicDisease {
         this.id = Objects.requireNonNull(id, "Chronic disease ID cannot be null");
         this.patientId = Guard.require(patientId, "Patient ID");
         this.diagnosisCatalogId = Guard.require(diagnosisCatalogId, "Diagnosis catalog ID");
-        this.yearDetected = validateYearDetected(yearDetected);
+        this.createdAt = Objects.requireNonNull(createdAt, "Created at cannot be null");
+        this.yearDetected = validateYearDetected(yearDetected, this.createdAt);
         this.notes = notes != null && !notes.isBlank() ? notes.trim() : null;
         this.active = active;
         this.createdBy = Guard.require(createdBy, "Created by");
-        this.createdAt = Objects.requireNonNull(createdAt, "Created at cannot be null");
         this.updatedBy = updatedBy;
         this.updatedAt = Objects.requireNonNull(updatedAt, "Updated at cannot be null");
     }
@@ -111,11 +113,12 @@ public class PatientChronicDisease {
         this.updatedAt = Objects.requireNonNull(updatedAt, "Updated at cannot be null");
     }
 
-    private static Integer validateYearDetected(Integer yearDetected) {
+    private static Integer validateYearDetected(Integer yearDetected, Instant createdAt) {
         if (yearDetected == null) {
             return null;
         }
-        if (yearDetected < MIN_YEAR || yearDetected > java.time.Year.now().getValue()) {
+        int currentYear = createdAt.atZone(CLINIC_ZONE).getYear();
+        if (yearDetected < MIN_YEAR || yearDetected > currentYear) {
             throw new ValidationException("Năm phát hiện bệnh không hợp lệ.");
         }
         return yearDetected;

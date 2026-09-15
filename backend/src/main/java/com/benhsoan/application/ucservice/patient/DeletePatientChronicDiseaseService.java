@@ -1,6 +1,8 @@
 package com.benhsoan.application.ucservice.patient;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -22,6 +24,8 @@ import com.benhsoan.port.outbound.repository.patient.PatientChronicDiseaseReposi
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +39,7 @@ public class DeletePatientChronicDiseaseService implements DeletePatientChronicD
     private final AuditLogRepository auditLogRepository;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
+    private final ObjectMapper objectMapper;
 
     @Override
     public void deleteChronicDisease(DeletePatientChronicDiseaseCommand command) {
@@ -65,9 +70,22 @@ public class DeletePatientChronicDiseaseService implements DeletePatientChronicD
                 ActionType.DELETE,
                 ResourceType.PATIENT_CHRONIC_DISEASE,
                 chronicDisease.getId(),
-                command.reason(),
+                buildDeleteAuditDetail(command.reason()),
                 null,
                 now
         ));
+    }
+
+    private String buildDeleteAuditDetail(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return null;
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("reason", reason);
+        try {
+            return objectMapper.writeValueAsString(detail);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Could not serialize delete audit detail.", exception);
+        }
     }
 }

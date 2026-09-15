@@ -1,15 +1,21 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -20,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PatientFamilyHistoryRestMapper;
 import com.benhsoan.exception.GlobalExceptionHandler;
+import com.benhsoan.port.dto.command.patient.DeletePatientFamilyHistoryCommand;
 import com.benhsoan.port.dto.result.patient.PatientFamilyHistoryResult;
 import com.benhsoan.port.inbound.patient.AddPatientFamilyHistoryUseCase;
 import com.benhsoan.port.inbound.patient.DeletePatientFamilyHistoryUseCase;
@@ -85,5 +92,46 @@ class PatientFamilyHistoryControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"relationship\":\"Bố\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deletesFamilyHistory() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID historyId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/patients/{patientId}/family-history/{familyHistoryId}", patientId, historyId)
+                        .param("reason", "Đã khỏi bệnh"))
+                .andExpect(status().isNoContent());
+
+        ArgumentCaptor<DeletePatientFamilyHistoryCommand> captor =
+                ArgumentCaptor.forClass(DeletePatientFamilyHistoryCommand.class);
+        verify(deletePatientFamilyHistoryUseCase).deleteFamilyHistory(captor.capture());
+        assertEquals(patientId, captor.getValue().patientId());
+        assertEquals(historyId, captor.getValue().familyHistoryId());
+        assertEquals("Đã khỏi bệnh", captor.getValue().reason());
+    }
+
+    @Test
+    void listsFamilyHistoryWithDiagnosisCodeAndName() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID catalogId = UUID.randomUUID();
+        PatientFamilyHistoryResult result = PatientFamilyHistoryResult.builder()
+                .id(UUID.randomUUID())
+                .patientId(patientId)
+                .relationship("Bố")
+                .diagnosisCatalogId(catalogId)
+                .diagnosisCode("E11.9")
+                .diagnosisName("Đái tháo đường type 2")
+                .active(true)
+                .createdAt(Instant.parse("2026-09-10T10:00:00Z"))
+                .updatedAt(Instant.parse("2026-09-10T10:00:00Z"))
+                .build();
+        when(getPatientFamilyHistoryUseCase.getFamilyHistory(patientId)).thenReturn(List.of(result));
+
+        mockMvc.perform(get("/patients/{patientId}/family-history", patientId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].relationship").value("Bố"))
+                .andExpect(jsonPath("$[0].diagnosisCode").value("E11.9"))
+                .andExpect(jsonPath("$[0].diagnosisName").value("Đái tháo đường type 2"));
     }
 }

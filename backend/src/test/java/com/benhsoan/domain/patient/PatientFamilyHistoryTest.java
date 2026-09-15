@@ -51,6 +51,24 @@ class PatientFamilyHistoryTest {
     }
 
     @Test
+    void acceptsRelationshipAtMaxLength() {
+        String relationship = "a".repeat(PatientFamilyHistory.MAX_RELATIONSHIP_LENGTH);
+
+        PatientFamilyHistory familyHistory = PatientFamilyHistory.create(
+                UUID.randomUUID(), relationship, UUID.randomUUID(), null, UUID.randomUUID(), NOW);
+
+        assertEquals(relationship, familyHistory.getRelationship());
+    }
+
+    @Test
+    void rejectsRelationshipOverMaxLength() {
+        String relationship = "a".repeat(PatientFamilyHistory.MAX_RELATIONSHIP_LENGTH + 1);
+
+        assertThrows(ValidationException.class, () -> PatientFamilyHistory.create(
+                UUID.randomUUID(), relationship, UUID.randomUUID(), null, UUID.randomUUID(), NOW));
+    }
+
+    @Test
     void deactivatesFamilyHistory() {
         PatientFamilyHistory familyHistory = PatientFamilyHistory.create(
                 UUID.randomUUID(), "Bố", UUID.randomUUID(), null, UUID.randomUUID(), NOW);

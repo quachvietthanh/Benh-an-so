@@ -16,6 +16,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 class PatientChronicDiseaseTest {
 
     private static final Instant NOW = Instant.parse("2026-09-10T10:00:00Z");
+    private static final int CURRENT_YEAR = NOW.atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).getYear();
 
     @Test
     void createsValidChronicDisease() {
@@ -53,10 +54,16 @@ class PatientChronicDiseaseTest {
     }
 
     @Test
+    void acceptsCurrentYear() {
+        PatientChronicDisease disease = PatientChronicDisease.create(
+                UUID.randomUUID(), UUID.randomUUID(), CURRENT_YEAR, null, UUID.randomUUID(), NOW);
+        assertEquals(CURRENT_YEAR, disease.getYearDetected());
+    }
+
+    @Test
     void rejectsYearInTheFuture() {
-        int futureYear = java.time.Year.now().getValue() + 1;
         assertThrows(ValidationException.class, () -> PatientChronicDisease.create(
-                UUID.randomUUID(), UUID.randomUUID(), futureYear, null, UUID.randomUUID(), NOW));
+                UUID.randomUUID(), UUID.randomUUID(), CURRENT_YEAR + 1, null, UUID.randomUUID(), NOW));
     }
 
     @Test
@@ -66,6 +73,14 @@ class PatientChronicDiseaseTest {
 
         assertNull(disease.getYearDetected());
         assertEquals("ghi chú", disease.getNotes());
+    }
+
+    @Test
+    void storesCurrentClinicalStatusInNotes() {
+        PatientChronicDisease disease = PatientChronicDisease.create(
+                UUID.randomUUID(), UUID.randomUUID(), 2015, "Đang điều trị, kiểm soát tốt", UUID.randomUUID(), NOW);
+
+        assertEquals("Đang điều trị, kiểm soát tốt", disease.getNotes());
     }
 
     @Test

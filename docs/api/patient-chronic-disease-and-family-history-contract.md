@@ -27,7 +27,7 @@
    - Nếu trùng lặp, hệ thống từ chối lưu và trả về HTTP `409 Conflict` (`PATIENT_CHRONIC_DISEASE_ALREADY_EXISTS`).
    - Ràng buộc được bảo vệ ở tầng cơ sở dữ liệu (unique index trên cột sinh `active_diagnosis_catalog_id`).
 5. **Xóa mềm**: Thao tác xóa chỉ chuyển trạng thái `active = false`; bản ghi vẫn được giữ lại và cho phép ghi nhận lại cùng mã bệnh sau này.
-6. **Lưu vết kiểm toán**: Mỗi thao tác tạo/xóa đều ghi `audit_logs` với `resourceType = PATIENT_CHRONIC_DISEASE` hoặc `PATIENT_FAMILY_HISTORY`. Nếu có `visitId`, mã lượt khám được đưa vào chi tiết (`detail`) để giữ bối cảnh lâm sàng.
+6. **Lưu vết kiểm toán**: Mỗi thao tác tạo/xóa đều ghi `audit_logs` với `resourceType = PATIENT_CHRONIC_DISEASE` hoặc `PATIENT_FAMILY_HISTORY`. Nếu có `visitId`, mã lượt khám được đưa vào chi tiết (`detail`) để giữ bối cảnh lâm sàng. Khi xóa, nếu có `reason` thì lý do được ghi vào `detail` dưới dạng JSON `{"reason": "<lý do>"}` (cột `detail` có kiểu `JSON`); nếu không có `reason` thì `detail` là `NULL`.
 
 > **Lưu ý:** Tiền sử bệnh mạn tính & tiền sử gia đình là dữ liệu ở cấp **bệnh nhân**. `visitId` chỉ là bối cảnh lâm sàng tùy chọn (được kiểm tra hợp lệ nếu cung cấp), không được lưu thành cột riêng trong bảng.
 
@@ -52,8 +52,8 @@
 
 *Ghi chú trường:*
 - `diagnosisCatalogId`: Bắt buộc (UUID mã bệnh/chẩn đoán).
-- `yearDetected`: Tùy chọn, số nguyên từ `1900` đến năm hiện tại.
-- `notes`: Tùy chọn.
+- `yearDetected`: Tùy chọn, số nguyên từ `1900` đến năm hiện tại (được kiểm tra ở tầng domain theo đồng hồ hệ thống `ClockPort`).
+- `notes`: Tùy chọn. Đây là trường tự do dùng để ghi **"tình trạng hiện tại"** của bệnh mạn tính (ví dụ: `"Đang điều trị, kiểm soát tốt"`). Không có trường trạng thái cấu trúc (enum) riêng — đặc tả `NCL-02-CN-009` (TC-01) chỉ yêu cầu "mã bệnh, năm phát hiện".
 - `visitId`: Tùy chọn (UUID lượt khám đang thực hiện nếu có).
 
 #### Response (201 Created)

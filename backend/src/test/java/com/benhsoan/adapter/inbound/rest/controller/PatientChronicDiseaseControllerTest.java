@@ -1,7 +1,11 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,7 +26,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PatientChronicDiseaseRestMapper;
+import com.benhsoan.domain.patient.exception.PatientChronicDiseaseNotFoundException;
 import com.benhsoan.exception.GlobalExceptionHandler;
+import com.benhsoan.port.dto.command.patient.DeletePatientChronicDiseaseCommand;
 import com.benhsoan.port.dto.result.patient.PatientChronicDiseaseResult;
 import com.benhsoan.port.inbound.patient.AddPatientChronicDiseaseUseCase;
 import com.benhsoan.port.inbound.patient.DeletePatientChronicDiseaseUseCase;
@@ -99,5 +106,33 @@ class PatientChronicDiseaseControllerTest {
         mockMvc.perform(get("/patients/{patientId}/chronic-diseases", patientId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].diagnosisCatalogId").value(catalogId.toString()));
+    }
+
+    @Test
+    void deletesChronicDisease() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID diseaseId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/patients/{patientId}/chronic-diseases/{chronicDiseaseId}", patientId, diseaseId)
+                        .param("reason", "Đã khỏi bệnh"))
+                .andExpect(status().isNoContent());
+
+        ArgumentCaptor<DeletePatientChronicDiseaseCommand> captor =
+                ArgumentCaptor.forClass(DeletePatientChronicDiseaseCommand.class);
+        verify(deletePatientChronicDiseaseUseCase).deleteChronicDisease(captor.capture());
+        assertEquals(patientId, captor.getValue().patientId());
+        assertEquals(diseaseId, captor.getValue().chronicDiseaseId());
+        assertEquals("Đã khỏi bệnh", captor.getValue().reason());
+    }
+
+    @Test
+    void mapsDeleteNotFoundTo404() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID diseaseId = UUID.randomUUID();
+        doThrow(new PatientChronicDiseaseNotFoundException(diseaseId))
+                .when(deletePatientChronicDiseaseUseCase).deleteChronicDisease(any());
+
+        mockMvc.perform(delete("/patients/{patientId}/chronic-diseases/{chronicDiseaseId}", patientId, diseaseId))
+                .andExpect(status().isNotFound());
     }
 }
