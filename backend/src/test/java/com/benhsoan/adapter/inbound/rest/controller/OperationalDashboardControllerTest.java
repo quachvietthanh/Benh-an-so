@@ -55,7 +55,7 @@ class OperationalDashboardControllerTest {
     void returnsOperationalDashboard() throws Exception {
         when(getOperationalDashboardUseCase.get())
                 .thenReturn(new OperationalDashboardResult(
-                        new OperationalDashboardResult.VisitSummary(10, 3, 2, 4, 1),
+                        new OperationalDashboardResult.VisitSummary(10, 3, 2, 4, 1, 0),
                         new OperationalDashboardResult.RevenueSummary(new BigDecimal("999.00")),
                         new OperationalDashboardResult.InventoryAlertSummary(2, 3),
                         Instant.parse("2026-08-11T08:00:00Z")
@@ -68,6 +68,7 @@ class OperationalDashboardControllerTest {
                 .andExpect(jsonPath("$.visitSummary.inProgress").value(2))
                 .andExpect(jsonPath("$.visitSummary.completed").value(4))
                 .andExpect(jsonPath("$.visitSummary.cancelled").value(1))
+                .andExpect(jsonPath("$.visitSummary.earlyEnded").value(0))
                 .andExpect(jsonPath("$.revenueSummary.totalRevenueToday").value(999.00))
                 .andExpect(jsonPath("$.inventoryAlertSummary.lowStockCount").value(2))
                 .andExpect(jsonPath("$.inventoryAlertSummary.expiryAlertCount").value(3))
@@ -79,7 +80,7 @@ class OperationalDashboardControllerTest {
     void returnsZeroesForEmptyDay() throws Exception {
         when(getOperationalDashboardUseCase.get())
                 .thenReturn(new OperationalDashboardResult(
-                        new OperationalDashboardResult.VisitSummary(0, 0, 0, 0, 0),
+                        new OperationalDashboardResult.VisitSummary(0, 0, 0, 0, 0, 0),
                         new OperationalDashboardResult.RevenueSummary(BigDecimal.ZERO),
                         new OperationalDashboardResult.InventoryAlertSummary(0, 0),
                         Instant.parse("2026-08-11T08:00:00Z")
@@ -92,6 +93,7 @@ class OperationalDashboardControllerTest {
                 .andExpect(jsonPath("$.visitSummary.inProgress").value(0))
                 .andExpect(jsonPath("$.visitSummary.completed").value(0))
                 .andExpect(jsonPath("$.visitSummary.cancelled").value(0))
+                .andExpect(jsonPath("$.visitSummary.earlyEnded").value(0))
                 .andExpect(jsonPath("$.revenueSummary.totalRevenueToday").value(0))
                 .andExpect(jsonPath("$.inventoryAlertSummary.lowStockCount").value(0))
                 .andExpect(jsonPath("$.inventoryAlertSummary.expiryAlertCount").value(0));

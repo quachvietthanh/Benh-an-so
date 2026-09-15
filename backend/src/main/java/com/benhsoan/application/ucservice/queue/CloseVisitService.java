@@ -1,7 +1,9 @@
 package com.benhsoan.application.ucservice.queue;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -37,6 +39,8 @@ import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -57,6 +61,7 @@ public class CloseVisitService implements CloseVisitUseCase {
     private final QueueAuditService queueAuditService;
     private final AuditLogRepository auditLogRepository;
     private final CurrentUserPort currentUserPort;
+    private final ObjectMapper objectMapper;
 
     @Override
     public QueueItemResult close(CloseVisitCommand command) {
@@ -79,7 +84,7 @@ public class CloseVisitService implements CloseVisitUseCase {
 
         var now = clockPort.now();
 
-        UUID medicalRecordId = lockMedicalRecordIfPresent(visit);
+        UUID medicalRecordId = resolveUnlockedMedicalRecordId(visit);
 
         if (command.outcome() == VisitCloseOutcome.EARLY_ENDED) {
             visit.earlyEnd(reason, now);
@@ -111,7 +116,7 @@ public class CloseVisitService implements CloseVisitUseCase {
                 .orElseThrow(() -> new QueueItemNotFoundException(item.getId()));
     }
 
-    private UUID lockMedicalRecordIfPresent(Visit visit) {
+    private UUID resolveUnlockedMedicalRecordId(Visit visit) {
         var existing = medicalRecordRepository.findByVisitId(visit.getId());
         if (existing.isEmpty()) {
             return null;
@@ -139,11 +144,22 @@ public class CloseVisitService implements CloseVisitUseCase {
                     ActionType.CANCEL,
                     ResourceType.PRESCRIPTION,
                     saved.getId(),
-                    "{\"prescriptionCode\":\"%s\",\"cancelReason\":\"%s\",\"cancelledAt\":\"%s\"}"
-                            .formatted(saved.getPrescriptionCode(), reason, at.toString()),
+                    buildAuditDetail(saved, reason, at),
                     null,
                     at
             ));
+        }
+    }
+
+    private String buildAuditDetail(Prescription prescription, String cancelReason, Instant cancelledAt) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("prescriptionCode", prescription.getPrescriptionCode());
+        detail.put("cancelReason", cancelReason);
+        detail.put("cancelledAt", cancelledAt.toString());
+        try {
+            return objectMapper.writeValueAsString(detail);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Could not serialize prescription cancellation audit detail.", exception);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -251,6 +252,60 @@ class QueueSecurityIntegrationTest {
 
         mockMvc.perform(get("/queue-items/{itemId}/history", itemId)
                         .with(permission("DOCTOR", "QUEUE_VIEW")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void closeRequiresQueueUpdateStatusPermission() throws Exception {
+        UUID itemId = UUID.randomUUID();
+
+        mockMvc.perform(post("/queue-items/{itemId}/close", itemId)
+                        .with(permission("DOCTOR", "QUEUE_VIEW"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"CANCELLED\",\"reason\":\"Nhập nhầm lượt khám\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void closeAllowsAuthorizedDoctor() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        QueueItemResult queueItem = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "BN001", "Nguyen Van A",
+                UUID.randomUUID(), "Bac si B", UUID.randomUUID(), "P101", null,
+                UUID.randomUUID(), "VIS000001", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.CANCELLED, 1, LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T01:00:00Z"), null, null, Instant.parse("2026-08-14T02:00:00Z"),
+                "Nhập nhầm lượt khám", null, null, 1
+        );
+        when(closeVisitUseCase.close(any())).thenReturn(queueItem);
+
+        mockMvc.perform(post("/queue-items/{itemId}/close", itemId)
+                        .with(permission("DOCTOR", "QUEUE_UPDATE_STATUS"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"CANCELLED\",\"reason\":\"Nhập nhầm lượt khám\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        verify(closeVisitUseCase).close(any());
+    }
+
+    @Test
+    void closeAllowsAdmin() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        QueueItemResult queueItem = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "BN001", "Nguyen Van A",
+                UUID.randomUUID(), "Bac si B", UUID.randomUUID(), "P101", null,
+                UUID.randomUUID(), "VIS000001", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.CANCELLED, 1, LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T01:00:00Z"), null, null, Instant.parse("2026-08-14T02:00:00Z"),
+                "Nhập nhầm lượt khám", null, null, 1
+        );
+        when(closeVisitUseCase.close(any())).thenReturn(queueItem);
+
+        mockMvc.perform(post("/queue-items/{itemId}/close", itemId)
+                        .with(permission("ADMIN", "QUEUE_UPDATE_STATUS"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"outcome\":\"CANCELLED\",\"reason\":\"Nhập nhầm lượt khám\"}"))
                 .andExpect(status().isOk());
     }
 }

@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -15,9 +16,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
@@ -47,6 +50,7 @@ import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 class CloseVisitServiceTest {
 
@@ -198,6 +202,26 @@ class CloseVisitServiceTest {
                 ctx.medicalRecordId, PrescriptionStatus.DISPENSED);
     }
 
+    @Test
+    void escapesSpecialCharactersInPrescriptionAuditDetail() throws Exception {
+        String reason = "Bệnh \"nhân\" \\ bỏ\nvề";
+        TestContext ctx = context(true, mock(MedicalRecord.class));
+        Prescription pending = pendingPrescription(UUID.randomUUID(), ctx.medicalRecordId, ctx.doctorId);
+        when(ctx.prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(
+                ctx.medicalRecordId, PrescriptionStatus.PENDING_DISPENSE)).thenReturn(List.of(pending));
+
+        ctx.service.close(new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.CANCELLED, reason));
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(ctx.auditLogRepository).save(captor.capture());
+
+        AuditLog log = captor.getValue();
+        com.fasterxml.jackson.databind.JsonNode node = new ObjectMapper().readTree(log.getDetail());
+        assertEquals(reason, node.get("cancelReason").asText());
+        assertTrue(node.has("prescriptionCode"));
+        assertTrue(node.has("cancelledAt"));
+    }
+
     private Prescription pendingPrescription(UUID id, UUID medicalRecordId, UUID doctorId) {
         return Prescription.restore(id, "RX-" + id, medicalRecordId, PrescriptionStatus.PENDING_DISPENSE,
                 "Note", doctorId, NOW, null, null,
@@ -271,7 +295,7 @@ class CloseVisitServiceTest {
         CloseVisitService service = new CloseVisitService(queueItemRepository, medicalQueueRepository,
                 visitRepository, appointmentRepository, medicalRecordRepository, prescriptionRepository,
                 new QueueOperationAuthorization(currentUserPort), queryRepository, clockPort, auditService,
-                auditLogRepository, currentUserPort);
+                auditLogRepository, currentUserPort, new com.fasterxml.jackson.databind.ObjectMapper());
 
         return new TestContext(service, queue, item, visit, appointment, medicalRecord, medicalRecordId,
                 queueItemRepository, visitRepository, appointmentRepository, prescriptionRepository, currentUserPort,

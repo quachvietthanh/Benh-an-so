@@ -66,7 +66,7 @@ class OperationalDashboardSecurityIntegrationTest {
     void onlyAdminsAndManagersCanReadOperationalDashboard() throws Exception {
         when(getOperationalDashboardUseCase.get())
                 .thenReturn(new OperationalDashboardResult(
-                        new OperationalDashboardResult.VisitSummary(0, 0, 0, 0, 0),
+                        new OperationalDashboardResult.VisitSummary(0, 0, 0, 0, 0, 0),
                         new OperationalDashboardResult.RevenueSummary(BigDecimal.ZERO),
                         new OperationalDashboardResult.InventoryAlertSummary(0, 0),
                         Instant.parse("2026-08-11T08:00:00Z")
