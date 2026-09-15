@@ -13,6 +13,8 @@ public interface DoctorWeeklyScheduleRepository {
 
     List<DoctorWeeklySchedule> findActiveByDoctorId(UUID doctorId);
 
+    List<DoctorWeeklySchedule> findActiveByDoctorIdIn(java.util.Collection<UUID> doctorIds);
+
     Optional<DoctorWeeklySchedule> findByDoctorIdAndDayOfWeek(UUID doctorId, DayOfWeek dayOfWeek);
 
     DoctorWeeklySchedule save(DoctorWeeklySchedule schedule);

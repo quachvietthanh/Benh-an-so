@@ -116,4 +116,112 @@ public class AppointmentRestMapper {
     public Page<AppointmentResponse> toResponse(Page<AppointmentResult> results) {
         return results.map(this::toResponse);
     }
+
+    public com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse toResponse(
+            com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult result
+    ) {
+        if (result == null) {
+            return null;
+        }
+        return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.builder()
+                .weekStartDate(result.weekStartDate())
+                .weekEndDate(result.weekEndDate())
+                .clinicStartTime(result.clinicStartTime())
+                .clinicEndTime(result.clinicEndTime())
+                .timeSlots(result.timeSlots())
+                .doctors(result.doctors() != null
+                        ? result.doctors().stream().map(this::toResponse).toList()
+                        : List.of())
+                .days(result.days() != null
+                        ? result.days().stream().map(this::toResponse).toList()
+                        : List.of())
+                .build();
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorSummaryResponse toResponse(
+            com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult.DoctorSummaryResult result
+    ) {
+        if (result == null) return null;
+        return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorSummaryResponse.builder()
+                .id(result.id())
+                .fullName(result.fullName())
+                .username(result.username())
+                .specialtyName(result.specialtyName())
+                .build();
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorDayScheduleResponse toResponse(
+            com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult.DoctorDayScheduleResult result
+    ) {
+        if (result == null) return null;
+        return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorDayScheduleResponse.builder()
+                .date(result.date())
+                .dayOfWeek(result.dayOfWeek())
+                .doctorSchedules(result.doctorSchedules() != null
+                        ? result.doctorSchedules().stream().map(this::toResponse).toList()
+                        : List.of())
+                .build();
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorScheduleDayResponse toResponse(
+            com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult.DoctorScheduleDayResult result
+    ) {
+        if (result == null) return null;
+        return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorScheduleDayResponse.builder()
+                .doctorId(result.doctorId())
+                .doctorName(result.doctorName())
+                .workingDay(result.workingDay())
+                .workingStartTime(result.workingStartTime())
+                .workingEndTime(result.workingEndTime())
+                .slots(result.slots() != null
+                        ? result.slots().stream().map(this::toResponse).toList()
+                        : List.of())
+                .timeOffs(result.timeOffs() != null
+                        ? result.timeOffs().stream().map(this::toResponse).toList()
+                        : List.of())
+                .build();
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorScheduleSlotResponse toResponse(
+            com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult.DoctorScheduleSlotResult result
+    ) {
+        if (result == null) return null;
+        return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorScheduleSlotResponse.builder()
+                .startTime(result.startTime())
+                .endTime(result.endTime())
+                .slotStartTime(result.slotStartTime())
+                .slotEndTime(result.slotEndTime())
+                .status(result.status())
+                .isBookable(result.isBookable())
+                .appointment(toResponse(result.appointment()))
+                .timeOffReason(result.timeOffReason())
+                .build();
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.AppointmentSummaryResponse toResponse(
+            com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult.AppointmentSummaryResult result
+    ) {
+        if (result == null) return null;
+        return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.AppointmentSummaryResponse.builder()
+                .id(result.id())
+                .appointmentCode(result.appointmentCode())
+                .patientId(result.patientId())
+                .patientName(result.patientName())
+                .patientPhone(result.patientPhone())
+                .status(result.status())
+                .reason(result.reason())
+                .build();
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorTimeOffSummaryResponse toResponse(
+            com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult.DoctorTimeOffSummaryResult result
+    ) {
+        if (result == null) return null;
+        return com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse.DoctorTimeOffSummaryResponse.builder()
+                .id(result.id())
+                .startTime(result.startTime())
+                .endTime(result.endTime())
+                .reason(result.reason())
+                .build();
+    }
 }

@@ -41,6 +41,10 @@ import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;
 import com.benhsoan.port.inbound.appointment.SearchAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.SendAppointmentReminderManuallyUseCase;
 import com.benhsoan.adapter.inbound.rest.request.appointment.RescheduleAppointmentRequest;
+import com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse;
+import com.benhsoan.port.dto.query.appointment.GetDoctorWeeklyScheduleTableQuery;
+import com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult;
+import com.benhsoan.port.inbound.appointment.GetDoctorWeeklyScheduleTableUseCase;
 import com.benhsoan.port.inbound.appointment.RescheduleAppointmentUseCase;
 
 import jakarta.validation.Valid;
@@ -72,7 +76,21 @@ public class AppointmentController {
 
     private final SendAppointmentReminderManuallyUseCase sendAppointmentReminderManuallyUseCase;
 
+    private final GetDoctorWeeklyScheduleTableUseCase getDoctorWeeklyScheduleTableUseCase;
+
     private final AppointmentRestMapper mapper;
+
+    @GetMapping("/doctor-weekly-table")
+    @RequirePermission("APPOINTMENT_READ")
+    public DoctorWeeklyTableResponse getDoctorWeeklyTable(
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) UUID doctorId
+    ) {
+        DoctorWeeklyTableResult result = getDoctorWeeklyScheduleTableUseCase.getWeeklyScheduleTable(
+                new GetDoctorWeeklyScheduleTableQuery(date, doctorId)
+        );
+        return mapper.toResponse(result);
+    }
 
     @GetMapping
     @RequirePermission("APPOINTMENT_READ")

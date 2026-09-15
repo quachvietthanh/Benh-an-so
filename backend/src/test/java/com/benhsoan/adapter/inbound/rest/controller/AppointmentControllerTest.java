@@ -81,6 +81,7 @@ class AppointmentControllerTest {
     @MockitoBean private GetAppointmentByIdUseCase getAppointmentByIdUseCase;
     @MockitoBean private RescheduleAppointmentUseCase rescheduleAppointmentUseCase;
     @MockitoBean private SendAppointmentReminderManuallyUseCase sendAppointmentReminderManuallyUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.appointment.GetDoctorWeeklyScheduleTableUseCase getDoctorWeeklyScheduleTableUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
