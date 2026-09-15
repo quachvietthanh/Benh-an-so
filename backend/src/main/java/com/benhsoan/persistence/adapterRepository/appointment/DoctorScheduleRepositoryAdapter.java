@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.adapterRepository.appointment;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +26,16 @@ public class DoctorScheduleRepositoryAdapter implements DoctorScheduleRepository
     public Optional<DoctorSchedule> findByDoctorIdAndScheduleDate(UUID doctorId, LocalDate scheduleDate) {
         return jpaRepository.findByDoctorIdAndScheduleDate(doctorId, scheduleDate)
                 .map(mapper::toDomain);
+    }
+
+    @Override
+    public List<DoctorSchedule> findByDoctorIdInAndScheduleDateBetween(java.util.Collection<UUID> doctorIds, LocalDate startDate, LocalDate endDate) {
+        if (doctorIds == null || doctorIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findByDoctorIdInAndScheduleDateBetween(doctorIds, startDate, endDate).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.jpaRepository.appointment;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,4 +26,9 @@ public interface JpaDoctorScheduleRepository extends JpaRepository<DoctorSchedul
             @Param("scheduleDate") LocalDate scheduleDate
     );
 
+    List<DoctorScheduleEntity> findByDoctorIdInAndScheduleDateBetween(
+            java.util.Collection<UUID> doctorIds,
+            LocalDate startDate,
+            LocalDate endDate
+    );
 }

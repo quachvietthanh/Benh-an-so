@@ -366,13 +366,60 @@ class PatientTest {
         assertTrue(patient.requiresAdultTransition(LocalDate.of(2026, 1, 1)));
 
         // Thực hiện chuyển đổi
-        patient.transitionToAdult("v1.0", Instant.now());
+        patient.transitionToAdult();
 
         assertNull(patient.getGuardianName());
         assertNull(patient.getGuardianRelationship());
         assertNull(patient.getGuardianPhone());
         assertEquals("Lê Văn Trẻ", patient.getConsentSignerName(), "Sau khi chuyển đổi, phiếu đồng ý đứng tên người bệnh");
         assertFalse(patient.requiresAdultTransition(LocalDate.of(2026, 1, 1)));
+    }
+
+    @Test
+    @DisplayName("P1 / TC-04: transitionToAdult bảo toàn trạng thái rút consent (consentWithdrawn) và hạn chế sử dụng dữ liệu")
+    void transitionToAdultPreservesWithdrawnConsentState() {
+        Patient patient = Patient.create(
+                "BN-ADULT-WITHDRAWN",
+                "Trần Văn Lớn",
+                LocalDate.of(2005, 1, 1),
+                Gender.MALE,
+                "0901112233",
+                "lon@example.com",
+                "123 Street",
+                "079095001234",
+                null,
+                BloodType.A_POSITIVE,
+                null,
+                null,
+                null,
+                "Trần Văn Bố",
+                "Bố",
+                "0912345678",
+                "001200000002",
+                null,
+                "Trần Văn Bố",
+                true,
+                "v1.0",
+                createdBy
+        );
+
+        // Giám hộ từng rút consent
+        patient.withdrawConsent("Không muốn chia sẻ dữ liệu nghiên cứu", Instant.now());
+        assertTrue(patient.isConsentWithdrawn());
+        assertTrue(patient.isNonMedicalUseRestricted());
+        assertEquals("Không muốn chia sẻ dữ liệu nghiên cứu", patient.getConsentWithdrawnReason());
+
+        // Chuyển sang thành niên
+        patient.transitionToAdult();
+
+        assertNull(patient.getGuardianName());
+        assertNull(patient.getGuardianRelationship());
+        assertNull(patient.getGuardianPhone());
+        assertEquals("Trần Văn Lớn", patient.getConsentSignerName(), "Phiếu đồng ý đổi sang đứng tên chính bệnh nhân");
+        // Quan trọng: trạng thái rút consent và hạn chế dữ liệu PHẢI được bảo toàn, không tự động re-grant
+        assertTrue(patient.isConsentWithdrawn(), "consentWithdrawn không được tự động reset thành false");
+        assertTrue(patient.isNonMedicalUseRestricted(), "nonMedicalUseRestricted không được tự động reset");
+        assertEquals("Không muốn chia sẻ dữ liệu nghiên cứu", patient.getConsentWithdrawnReason());
     }
 
     @Test
@@ -405,7 +452,7 @@ class PatientTest {
 
         assertThrows(
                 com.benhsoan.domain.shared.exception.ValidationException.class,
-                () -> child.transitionToAdult("v1.0", Instant.now())
+                () -> child.transitionToAdult()
         );
     }
 

@@ -324,6 +324,31 @@ class PatientGuardianIntegrationTest {
     }
 
     @Test
+    @DisplayName("P1: Trả về HTTP 403 Forbidden khi transitionToAdult kèm thay đổi consent mà user thiếu quyền PATIENT_CONSENT_UPDATE")
+    void rejectsTransitionToAdultWithConsentChangeWhenLackingConsentPermission() throws Exception {
+        UUID patientId = UUID.randomUUID();
+
+        when(updatePatientUseCase.update(eq(patientId), any(UpdatePatientCommand.class)))
+                .thenThrow(new com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException());
+
+        mockMvc.perform(put("/patients/" + patientId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Nguyen Van Truong Thanh",
+                                  "dateOfBirth": "2005-01-01",
+                                  "gender": "MALE",
+                                  "transitionToAdult": true,
+                                  "consentAgreed": true,
+                                  "active": true
+                                }
+                                """)
+                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PATIENT_CONSENT_ACCESS_DENIED"));
+    }
+
+    @Test
     @DisplayName("P1-2: Từ chối đăng ký bệnh nhân trẻ em khi consentSignerName khác người giám hộ")
     void rejectsRegistrationWhenConsentSignerMismatchGuardian() throws Exception {
         when(registerPatientUseCase.register(any(RegisterPatientCommand.class)))

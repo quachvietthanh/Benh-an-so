@@ -250,10 +250,7 @@ public class UpdatePatientService
             );
 
             if (transitionToAdult) {
-                String consentVersion = command.consentVersion() != null && !command.consentVersion().isBlank()
-                        ? command.consentVersion()
-                        : (patient.getConsentVersion() != null ? patient.getConsentVersion() : com.benhsoan.domain.patient.PatientConsentVersion.current());
-                patient.transitionToAdult(consentVersion, Instant.now());
+                patient.transitionToAdult();
             }
 
             if (command.active() && !patient.isActive()) {
@@ -275,11 +272,10 @@ public class UpdatePatientService
         boolean isChangingWithdrawReason = command.consentWithdrawnReason() != null
                 && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason());
 
-        boolean isModifyingConsent = (isChangingWithdrawal
+        boolean isModifyingConsent = isChangingWithdrawal
                 || isChangingAgreement
                 || isChangingVersion
-                || isChangingWithdrawReason)
-                && !transitionToAdult;
+                || isChangingWithdrawReason;
 
         if (isModifyingConsent) {
             if (!currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")) {
@@ -287,31 +283,29 @@ public class UpdatePatientService
             }
         }
 
-        if (!transitionToAdult) {
-            if (Boolean.FALSE.equals(command.consentAgreed())
-                    && !Boolean.TRUE.equals(command.consentWithdrawn())) {
+        if (Boolean.FALSE.equals(command.consentAgreed())
+                && !Boolean.TRUE.equals(command.consentWithdrawn())) {
+            throw new ValidationException(
+                    "consentAgreed=false requires consentWithdrawn=true to withdraw consent."
+            );
+        }
+
+        if (Boolean.TRUE.equals(command.consentWithdrawn())) {
+            if (!patient.isConsentWithdrawn()) {
+                patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
+            } else if (command.consentWithdrawnReason() != null
+                    && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason())) {
+                patient.withdrawConsent(command.consentWithdrawnReason(), patient.getConsentWithdrawnAt());
+            }
+        } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {
+            if (!Boolean.TRUE.equals(command.consentAgreed())) {
                 throw new ValidationException(
-                        "consentAgreed=false requires consentWithdrawn=true to withdraw consent."
+                        "Phải ghi nhận sự đồng ý mới trước khi gia hạn xử lý dữ liệu cá nhân (QTN-24)."
                 );
             }
-
-            if (Boolean.TRUE.equals(command.consentWithdrawn())) {
-                if (!patient.isConsentWithdrawn()) {
-                    patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
-                } else if (command.consentWithdrawnReason() != null
-                        && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason())) {
-                    patient.withdrawConsent(command.consentWithdrawnReason(), patient.getConsentWithdrawnAt());
-                }
-            } else if (Boolean.FALSE.equals(command.consentWithdrawn()) && patient.isConsentWithdrawn()) {
-                if (!Boolean.TRUE.equals(command.consentAgreed())) {
-                    throw new ValidationException(
-                            "Phải ghi nhận sự đồng ý mới trước khi gia hạn xử lý dữ liệu cá nhân (QTN-24)."
-                    );
-                }
-                patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
-            } else if (Boolean.TRUE.equals(command.consentAgreed()) && !patient.isConsentAgreed()) {
-                patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
-            }
+            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
+        } else if (Boolean.TRUE.equals(command.consentAgreed()) && !patient.isConsentAgreed()) {
+            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
         }
 
         String detail = changeDetailBuilder.forUpdate( oldPatient, patient );
