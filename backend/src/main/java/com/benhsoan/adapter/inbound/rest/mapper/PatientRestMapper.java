@@ -42,6 +42,11 @@ public class PatientRestMapper {
                 .emergencyPhone(request.emergencyPhone())
                 .consentAgreed(request.consentAgreed())
                 .consentVersion(request.consentVersion())
+                .guardianName(request.guardianName())
+                .guardianRelationship(request.guardianRelationship())
+                .guardianPhone(request.guardianPhone())
+                .guardianIdentityNumber(request.guardianIdentityNumber())
+                .consentSignerName(request.consentSignerName())
                 .build();
     }
 
@@ -65,6 +70,12 @@ public class PatientRestMapper {
                 .consentWithdrawn(request.consentWithdrawn())
                 .consentWithdrawnReason(request.consentWithdrawnReason())
                 .consentVersion(request.consentVersion())
+                .guardianName(request.guardianName())
+                .guardianRelationship(request.guardianRelationship())
+                .guardianPhone(request.guardianPhone())
+                .guardianIdentityNumber(request.guardianIdentityNumber())
+                .consentSignerName(request.consentSignerName())
+                .transitionToAdult(request.transitionToAdult())
                 .build();
     }
 
@@ -89,6 +100,15 @@ public class PatientRestMapper {
         String emergencyPhone = anonymizationModeState.isEnabled()
                 ? PatientAnonymizer.maskPhone(result.emergencyPhone())
                 : result.emergencyPhone();
+        String guardianName = anonymizationModeState.isEnabled() && result.guardianName() != null
+                ? PatientAnonymizer.maskGuardianName(result.patientCode())
+                : result.guardianName();
+        String guardianPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(result.guardianPhone())
+                : result.guardianPhone();
+        String consentSignerName = anonymizationModeState.isEnabled() && result.consentSignerName() != null
+                ? (result.isMinor() ? PatientAnonymizer.maskGuardianName(result.patientCode()) : PatientAnonymizer.maskFullName(result.patientCode()))
+                : result.consentSignerName();
 
         return new PatientResponse(
                 result.id(),
@@ -105,6 +125,14 @@ public class PatientRestMapper {
                 emergencyContact,
                 result.emergencyRelationship(),
                 emergencyPhone,
+                guardianName,
+                result.guardianRelationship(),
+                guardianPhone,
+                result.guardianIdentityNumber(),
+                result.guardianUserId(),
+                consentSignerName,
+                result.isMinor(),
+                result.requiresAdultTransitionPrompt(),
                 result.active(),
                 result.createdAt(),
                 result.updatedAt(),

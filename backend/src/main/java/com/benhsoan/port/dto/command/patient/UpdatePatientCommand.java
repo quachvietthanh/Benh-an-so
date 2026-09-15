@@ -42,7 +42,19 @@ public record UpdatePatientCommand(
 
         String consentWithdrawnReason,
 
-        String consentVersion
+        String consentVersion,
+
+        String guardianName,
+
+        String guardianRelationship,
+
+        String guardianPhone,
+
+        String guardianIdentityNumber,
+
+        String consentSignerName,
+
+        Boolean transitionToAdult
 
 ) {
 }
