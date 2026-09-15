@@ -554,6 +554,10 @@ function AppointmentQueue() {
   }
 
   const handleOpenRescheduleModal = (record) => {
+    if (!permissions.canRescheduleAppointment) {
+      message.error('Chỉ Lễ tân hoặc Admin mới có quyền đổi lịch hẹn tại quầy.')
+      return
+    }
     const check = canRescheduleAppointment(record, dayjs())
     if (!check.allowed) {
       message.warning(check.reason || 'Không thể đổi lịch hẹn này.')
@@ -605,8 +609,20 @@ function AppointmentQueue() {
       }
       refreshAllData()
     } catch (err) {
-      const apiMessage = err?.response?.data?.message || err?.message || 'Không thể đổi lịch hẹn. Vui lòng kiểm tra lại khung giờ và ca trực của Bác sĩ.'
+      let apiMessage = err?.response?.data?.message || err?.message || 'Không thể đổi lịch hẹn. Vui lòng kiểm tra lại khung giờ và ca trực của Bác sĩ.'
+      if (
+        err?.response?.status === 409 ||
+        (typeof apiMessage === 'string' && (
+          apiMessage.toLowerCase().includes('conflict') ||
+          apiMessage.toLowerCase().includes('overlap') ||
+          apiMessage.toLowerCase().includes('already booked') ||
+          apiMessage.toLowerCase().includes('trùng lịch')
+        ))
+      ) {
+        apiMessage = 'Khung giờ này đã bị trùng lịch với lịch hẹn khác của Bác sĩ. Vui lòng chọn khung giờ khác.'
+      }
       message.error(apiMessage)
+      refreshAllData()
     } finally {
       setRescheduleSubmitting(false)
     }
@@ -1099,7 +1115,7 @@ function AppointmentQueue() {
             label: 'Tiếp nhận khám (Check-in)',
             onClick: () => handleCheckInAppointment(record.id),
           },
-          ['SCHEDULED', 'CONFIRMED'].includes(record.status) && {
+          permissions.canRescheduleAppointment && ['SCHEDULED', 'CONFIRMED'].includes(record.status) && {
             key: 'reschedule',
             icon: <SwapOutlined />,
             disabled: !reschedCheck.allowed,
@@ -2634,7 +2650,7 @@ function AppointmentQueue() {
         width={detailItem?.rescheduleHistories?.length ? 720 : 540}
         onCancel={() => setDetailItem(null)}
         footer={[
-          detailItem?.type === 'appointment' && canRescheduleAppointment(detailItem, dayjs()).allowed && (
+          permissions.canRescheduleAppointment && detailItem?.type === 'appointment' && canRescheduleAppointment(detailItem, dayjs()).allowed && (
             <Button
               key="reschedule"
               type="primary"

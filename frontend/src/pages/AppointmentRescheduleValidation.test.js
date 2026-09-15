@@ -172,3 +172,73 @@ test('NCL-03-CN-007: Danh mục lý do dời lịch hẹn mẫu (Preset Reasons)
   assert.ok(PRESET_RESCHEDULE_REASONS.some((r) => r.includes('đến muộn')))
   assert.ok(PRESET_RESCHEDULE_REASONS.some((r) => r.includes('Bác sĩ')))
 })
+
+test('NCL-03-CN-007-Major-1: Chỉ RECEPTIONIST hoặc ADMIN mới có quyền đổi lịch hẹn tại quầy (canRescheduleAppointment)', async () => {
+  const { checkQueuePermissions } = await import('../utils/queueHelpers.js')
+
+  // 1. Receptionist có quyền APPOINTMENT_UPDATE -> Được phép
+  const recPerm = checkQueuePermissions(['ROLE_RECEPTIONIST'], ['APPOINTMENT_UPDATE', 'APPOINTMENT_READ'])
+  assert.equal(recPerm.canRescheduleAppointment, true)
+  assert.equal(recPerm.isReceptionist, true)
+
+  // 2. Admin có toàn quyền -> Được phép
+  const adminPerm = checkQueuePermissions(['ROLE_ADMIN'], [])
+  assert.equal(adminPerm.canRescheduleAppointment, true)
+  assert.equal(adminPerm.isAdmin, true)
+
+  // 3. Doctor (kể cả có vô tình có APPOINTMENT_UPDATE) -> Bị chặn
+  const docPerm = checkQueuePermissions(['ROLE_DOCTOR'], ['APPOINTMENT_UPDATE', 'APPOINTMENT_READ'])
+  assert.equal(docPerm.canRescheduleAppointment, false)
+
+  // 4. Pharmacist -> Bị chặn
+  const pharmPerm = checkQueuePermissions(['ROLE_PHARMACIST'], ['APPOINTMENT_UPDATE'])
+  assert.equal(pharmPerm.canRescheduleAppointment, false)
+
+  // 5. Nurse -> Bị chặn
+  const nursePerm = checkQueuePermissions(['ROLE_NURSE'], ['APPOINTMENT_UPDATE'])
+  assert.equal(nursePerm.canRescheduleAppointment, false)
+})
+
+test('NCL-03-CN-007-Blocker: Tính toán tính khả dụng của slot 30 phút theo ca trực bác sĩ', () => {
+  const now = dayjs('2026-09-15T09:00:00Z')
+
+  const sampleSlots = [
+    { startTime: '2026-09-15T08:00:00Z', endTime: '2026-09-15T08:30:00Z', isAvailable: true }, // Past
+    { startTime: '2026-09-15T08:30:00Z', endTime: '2026-09-15T09:00:00Z', isAvailable: false }, // Past & booked
+    { startTime: '2026-09-15T09:30:00Z', endTime: '2026-09-15T10:00:00Z', isAvailable: true }, // Future & free -> SELECTABLE
+    { startTime: '2026-09-15T10:00:00Z', endTime: '2026-09-15T10:30:00Z', isAvailable: false }, // Future & booked -> NOT selectable
+    { startTime: '2026-09-15T14:00:00Z', endTime: '2026-09-15T14:30:00Z', isAvailable: true }, // Afternoon & free -> SELECTABLE
+  ]
+
+  const processed = sampleSlots.map((slot) => {
+    const start = dayjs(slot.startTime)
+    const isPast = start.isBefore(now)
+    const canSelect = Boolean(slot.isAvailable) && !isPast
+    return { ...slot, isPast, canSelect }
+  })
+
+  // Slot 1: Past -> cannot select
+  assert.equal(processed[0].isPast, true)
+  assert.equal(processed[0].canSelect, false)
+
+  // Slot 2: Past & unavailable -> cannot select
+  assert.equal(processed[1].isPast, true)
+  assert.equal(processed[1].canSelect, false)
+
+  // Slot 3: Future & available -> can select
+  assert.equal(processed[2].isPast, false)
+  assert.equal(processed[2].canSelect, true)
+
+  // Slot 4: Future but unavailable (booked) -> cannot select
+  assert.equal(processed[3].isPast, false)
+  assert.equal(processed[3].canSelect, false)
+
+  // Slot 5: Afternoon & available -> can select
+  assert.equal(processed[4].isPast, false)
+  assert.equal(processed[4].canSelect, true)
+
+  // Exactly 2 selectable slots
+  const availableCount = processed.filter((s) => s.canSelect).length
+  assert.equal(availableCount, 2)
+})
+

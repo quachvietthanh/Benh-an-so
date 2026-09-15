@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Modal,
   Alert,
   DatePicker,
-  TimePicker,
   Select,
   Input,
   Space,
@@ -13,6 +12,8 @@ import {
   Row,
   Col,
   Divider,
+  Spin,
+  Empty,
 } from 'antd'
 import {
   SwapOutlined,
@@ -22,8 +23,10 @@ import {
   MedicineBoxOutlined,
   CheckOutlined,
   ExclamationCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import appointmentApi from '../../api/appointmentApi.js'
 import {
   PRESET_RESCHEDULE_REASONS,
   validateRescheduleReason,
@@ -37,8 +40,8 @@ const { TextArea } = Input
 /**
  * Modal Đổi lịch hẹn khám tại quầy tiếp đón (NCL-03-CN-007)
  * Tuân thủ quy tắc QTN-04 (Tránh trùng lịch bác sĩ)
- * Tuân thủ quy tắc QTN-30 (Trong ca trực bác sĩ)
- * Thỏa mãn TC-01, TC-03
+ * Tuân thủ quy tắc QTN-30 (Trong ca trực bác sĩ 30p/slot)
+ * Thỏa mãn TC-01, TC-02, TC-03, TC-04
  */
 export default function ReceptionRescheduleAppointmentModal({
   open,
@@ -50,10 +53,37 @@ export default function ReceptionRescheduleAppointmentModal({
 }) {
   const [selectedDoctorId, setSelectedDoctorId] = useState(undefined)
   const [newDate, setNewDate] = useState(dayjs())
-  const [newTime, setNewTime] = useState(dayjs().add(1, 'hour').minute(0))
+  const [slots, setSlots] = useState([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [slotError, setSlotError] = useState(null)
+  const [selectedSlot, setSelectedSlot] = useState(null)
   const [reason, setReason] = useState('')
   const [selectedPreset, setSelectedPreset] = useState(null)
   const [touched, setTouched] = useState(false)
+
+  // Fetch available slots from backend (QTN-30 / QTN-04)
+  const fetchSlots = useCallback(async (docId, dateDayjs) => {
+    if (!docId || !dateDayjs || !dateDayjs.isValid()) {
+      setSlots([])
+      setSelectedSlot(null)
+      return
+    }
+    const dateStr = dateDayjs.format('YYYY-MM-DD')
+    setLoadingSlots(true)
+    setSlotError(null)
+    setSelectedSlot(null)
+    try {
+      const res = await appointmentApi.getAvailableSlots(docId, dateStr)
+      const data = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+      setSlots(data)
+    } catch (err) {
+      console.warn('Lỗi khi tải khung giờ khám khả dụng:', err)
+      setSlotError('Không thể tải danh sách khung giờ từ máy chủ. Vui lòng kiểm tra lại kết nối.')
+      setSlots([])
+    } finally {
+      setLoadingSlots(false)
+    }
+  }, [])
 
   // Khởi tạo form khi mở modal
   useEffect(() => {
@@ -66,41 +96,91 @@ export default function ReceptionRescheduleAppointmentModal({
       const initialDate = currentDay.isBefore(dayjs(), 'day') ? dayjs() : currentDay
       setNewDate(initialDate)
 
-      const initialTime = currentDay.isValid() && currentDay.isAfter(dayjs())
-        ? currentDay
-        : dayjs().add(1, 'hour').minute(0)
-      setNewTime(initialTime)
-
+      setSelectedSlot(null)
       setReason('')
       setSelectedPreset(null)
       setTouched(false)
-    }
-  }, [open, appointment])
 
-  // Tính thời gian bắt đầu và kết thúc mới (+30 phút chuẩn ca khám)
+      fetchSlots(currentDocId, initialDate)
+    }
+  }, [open, appointment, fetchSlots])
+
+  // Khi thay đổi ngày hẹn
+  const handleDateChange = (d) => {
+    if (!d) return
+    setNewDate(d)
+    fetchSlots(selectedDoctorId, d)
+  }
+
+  // Khi thay đổi bác sĩ
+  const handleDoctorChange = (docId) => {
+    setSelectedDoctorId(docId)
+    fetchSlots(docId, newDate)
+  }
+
+  // Phân tách khung giờ thành Ca sáng & Ca chiều
+  const { morningSlots, afternoonSlots, totalAvailableSlots } = useMemo(() => {
+    const morning = []
+    const afternoon = []
+    let availableCount = 0
+
+    slots.forEach((slot, index) => {
+      const startDayjs = dayjs(slot.startTime)
+      const endDayjs = dayjs(slot.endTime)
+      const startStr = startDayjs.isValid() ? startDayjs.format('HH:mm') : '08:00'
+      const endStr = endDayjs.isValid() ? endDayjs.format('HH:mm') : '08:30'
+      const hour = startDayjs.isValid() ? startDayjs.hour() : 8
+      const isPast = startDayjs.isValid() ? startDayjs.isBefore(dayjs()) : false
+      const canSelect = Boolean(slot.isAvailable) && !isPast
+
+      if (canSelect) {
+        availableCount += 1
+      }
+
+      const slotItem = {
+        ...slot,
+        key: slot.id || `${slot.startTime}_${index}`,
+        startDayjs,
+        endDayjs,
+        startStr,
+        endStr,
+        label: `${startStr} – ${endStr}`,
+        isPast,
+        canSelect,
+      }
+
+      if (hour < 12) {
+        morning.push(slotItem)
+      } else {
+        afternoon.push(slotItem)
+      }
+    })
+
+    return { morningSlots: morning, afternoonSlots: afternoon, totalAvailableSlots: availableCount }
+  }, [slots])
+
+  // Tính thời gian bắt đầu và kết thúc mới từ slot đã chọn
   const computedTimes = useMemo(() => {
-    if (!newDate || !newTime) return { start: null, end: null }
-    const start = newDate
-      .hour(newTime.hour())
-      .minute(newTime.minute())
-      .second(0)
-      .millisecond(0)
-    const end = start.add(30, 'minute')
-    return { start, end }
-  }, [newDate, newTime])
+    if (!selectedSlot) return { start: null, end: null }
+    return {
+      start: dayjs(selectedSlot.startTime),
+      end: dayjs(selectedSlot.endTime),
+    }
+  }, [selectedSlot])
 
   const timeValidation = useMemo(() => {
-    if (!computedTimes.start || !computedTimes.end) {
-      return { valid: false, error: 'Chưa chọn thời gian hợp lệ.' }
+    if (!selectedSlot || !computedTimes.start || !computedTimes.end) {
+      return { valid: false, error: 'Vui lòng chọn một khung giờ khám còn trống.' }
     }
     return validateRescheduleTime(computedTimes.start, computedTimes.end, dayjs())
-  }, [computedTimes])
+  }, [selectedSlot, computedTimes])
 
   const reasonValidation = useMemo(() => {
     return validateRescheduleReason(reason)
   }, [reason])
 
-  const isFormValid = timeValidation.valid && reasonValidation.valid
+  // Submit button enabled khi đã chọn slot hợp lệ và lý do hợp lệ
+  const isFormValid = Boolean(selectedSlot) && timeValidation.valid && reasonValidation.valid
 
   if (!appointment) return null
 
@@ -148,6 +228,83 @@ export default function ReceptionRescheduleAppointmentModal({
     }
   }
 
+  const renderSlotButton = (slot) => {
+    const isSelected = selectedSlot && (
+      selectedSlot.key === slot.key ||
+      selectedSlot.startTime === slot.startTime
+    )
+
+    let borderStyle = '1px solid #cbd5e1'
+    let bgStyle = '#ffffff'
+    let textColor = '#1e293b'
+
+    if (isSelected) {
+      borderStyle = '2px solid #2563eb'
+      bgStyle = '#eff6ff'
+      textColor = '#1d4ed8'
+    } else if (!slot.canSelect) {
+      borderStyle = '1px dashed #e2e8f0'
+      bgStyle = '#f8fafc'
+      textColor = '#94a3b8'
+    }
+
+    return (
+      <Col xs={12} sm={8} md={6} key={slot.key}>
+        <div
+          role="button"
+          tabIndex={slot.canSelect ? 0 : -1}
+          onClick={() => {
+            if (slot.canSelect) {
+              setSelectedSlot(slot)
+              setTouched(true)
+            }
+          }}
+          onKeyDown={(e) => {
+            if (slot.canSelect && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault()
+              setSelectedSlot(slot)
+              setTouched(true)
+            }
+          }}
+          style={{
+            border: borderStyle,
+            backgroundColor: bgStyle,
+            borderRadius: 6,
+            padding: '8px 6px',
+            textAlign: 'center',
+            cursor: slot.canSelect ? 'pointer' : 'not-allowed',
+            opacity: slot.canSelect ? 1 : 0.65,
+            transition: 'all 0.15s ease-in-out',
+            boxShadow: isSelected ? '0 0 0 1px #2563eb' : undefined,
+          }}
+        >
+          <div style={{ fontSize: 12.5, fontWeight: isSelected ? 700 : 600, color: textColor, marginBottom: 4 }}>
+            {slot.label}
+          </div>
+          <div>
+            {isSelected ? (
+              <Tag color="blue" style={{ margin: 0, fontSize: 10.5, lineHeight: '18px', padding: '0 4px' }}>
+                Đang chọn
+              </Tag>
+            ) : slot.canSelect ? (
+              <Tag color="success" style={{ margin: 0, fontSize: 10.5, lineHeight: '18px', padding: '0 4px' }}>
+                Còn trống
+              </Tag>
+            ) : slot.isPast ? (
+              <Tag color="default" style={{ margin: 0, fontSize: 10.5, lineHeight: '18px', padding: '0 4px' }}>
+                Quá giờ
+              </Tag>
+            ) : (
+              <Tag color="error" style={{ margin: 0, fontSize: 10.5, lineHeight: '18px', padding: '0 4px' }}>
+                Đã kín
+              </Tag>
+            )}
+          </div>
+        </div>
+      </Col>
+    )
+  }
+
   return (
     <Modal
       open={open}
@@ -180,7 +337,7 @@ export default function ReceptionRescheduleAppointmentModal({
       }
       onCancel={onClose}
       destroyOnClose
-      width={660}
+      width={680}
       footer={[
         <Button key="back" onClick={onClose} disabled={loading}>
           Bỏ qua
@@ -190,7 +347,7 @@ export default function ReceptionRescheduleAppointmentModal({
           type="primary"
           icon={<SwapOutlined />}
           loading={loading}
-          disabled={loading || (touched && !isFormValid)}
+          disabled={loading || !isFormValid}
           onClick={handleSubmit}
           id="btn-confirm-reschedule-appointment"
           style={{ backgroundColor: '#2563eb' }}
@@ -198,7 +355,7 @@ export default function ReceptionRescheduleAppointmentModal({
           Xác nhận đổi lịch
         </Button>,
       ]}
-      style={{ top: 25 }}
+      style={{ top: 20, maxWidth: '95vw' }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 8 }}>
         {/* Thông tin lịch hẹn hiện tại: Bố cục 2 thẻ cân đối đối xứng */}
@@ -321,29 +478,31 @@ export default function ReceptionRescheduleAppointmentModal({
           </Row>
         </div>
 
-        {/* Form nhập thông tin dời lịch mới */}
+        {/* Form chọn thông tin dời lịch mới */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', display: 'block', marginBottom: 4 }}>
-              Bác sĩ khám mới:
-            </label>
-            <Select
-              style={{ width: '100%' }}
-              placeholder="Chọn bác sĩ phụ trách mới..."
-              value={selectedDoctorId}
-              onChange={setSelectedDoctorId}
-              options={doctorList.map((d) => ({
-                value: d.id,
-                label: `${d.fullName || d.username} — ${d.department || 'Chuyên khoa'}`,
-              }))}
-            />
-            <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 3 }}>
-              Mặc định giữ nguyên bác sĩ hiện tại. Lễ tân có thể chuyển sang bác sĩ khác nếu bệnh nhân yêu cầu.
-            </div>
-          </div>
-
           <Row gutter={12}>
-            <Col xs={24} sm={12}>
+            {/* Chọn Bác sĩ mới */}
+            <Col xs={24} sm={14}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', display: 'block', marginBottom: 4 }}>
+                Bác sĩ khám mới:
+              </label>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Chọn bác sĩ phụ trách mới..."
+                value={selectedDoctorId}
+                onChange={handleDoctorChange}
+                options={doctorList.map((d) => ({
+                  value: d.id,
+                  label: `${d.fullName || d.username} — ${d.department || 'Chuyên khoa'}`,
+                }))}
+              />
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 3 }}>
+                Lễ tân có thể chuyển sang bác sĩ khác nếu bệnh nhân yêu cầu.
+              </div>
+            </Col>
+
+            {/* Chọn Ngày hẹn mới */}
+            <Col xs={24} sm={10}>
               <label style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', display: 'block', marginBottom: 4 }}>
                 <span style={{ color: '#ef4444' }}>* </span>Ngày hẹn mới:
               </label>
@@ -351,35 +510,151 @@ export default function ReceptionRescheduleAppointmentModal({
                 format="DD/MM/YYYY"
                 style={{ width: '100%' }}
                 value={newDate}
-                onChange={(d) => d && setNewDate(d)}
+                onChange={handleDateChange}
                 disabledDate={(current) => current && current.isBefore(dayjs(), 'day')}
-                allowClear={false}
-              />
-            </Col>
-            <Col xs={24} sm={12}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', display: 'block', marginBottom: 4 }}>
-                <span style={{ color: '#ef4444' }}>* </span>Giờ bắt đầu:
-              </label>
-              <TimePicker
-                format="HH:mm"
-                minuteStep={15}
-                style={{ width: '100%' }}
-                value={newTime}
-                onChange={(t) => t && setNewTime(t)}
                 allowClear={false}
               />
             </Col>
           </Row>
 
-          {/* Preview khung giờ mới */}
-          {computedTimes.start && computedTimes.end && (
+          {/* Danh sách Khung giờ trống 30 phút theo ca trực bác sĩ (Blocker & Major 2) */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                <span style={{ color: '#ef4444' }}>* </span>Khung giờ khám 30 phút (Chọn slot trống):
+              </label>
+              <Button
+                type="link"
+                size="small"
+                icon={<ReloadOutlined />}
+                loading={loadingSlots}
+                onClick={() => fetchSlots(selectedDoctorId, newDate)}
+                style={{ padding: 0, fontSize: 12 }}
+              >
+                Làm mới slot
+              </Button>
+            </div>
+
+            {loadingSlots ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', background: '#f8fafc', borderRadius: 6 }}>
+                <Spin tip="Đang tải danh sách khung giờ trống của Bác sĩ..." />
+              </div>
+            ) : slotError ? (
+              <Alert
+                type="error"
+                showIcon
+                message="Lỗi tải khung giờ"
+                description={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                    <span>{slotError}</span>
+                    <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchSlots(selectedDoctorId, newDate)}>
+                      Thử lại
+                    </Button>
+                  </div>
+                }
+              />
+            ) : slots.length === 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="Bác sĩ không có lịch làm việc vào ngày này"
+                description="Bác sĩ không có ca trực hoặc không có khung giờ khám trong ngày được chọn. Vui lòng chọn ngày khác hoặc chuyển sang Bác sĩ khác."
+                style={{ borderRadius: 6 }}
+              />
+            ) : totalAvailableSlots === 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="Tất cả khung giờ khám đã kín lịch hoặc quá giờ"
+                description="Bác sĩ không còn khung giờ trống nào trong ngày này. Vui lòng chọn một ngày hẹn khác hoặc chuyển sang Bác sĩ khác."
+                style={{ borderRadius: 6 }}
+              />
+            ) : (
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  backgroundColor: '#fbfcfd',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}
+              >
+                {/* Ca sáng */}
+                {morningSlots.length > 0 && (
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: '#334155',
+                        textTransform: 'uppercase',
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <span>🌅 Ca sáng (07:30 – 12:00)</span>
+                      <Tag color="default" style={{ fontSize: 11, margin: 0 }}>
+                        {morningSlots.filter((s) => s.canSelect).length} slot trống
+                      </Tag>
+                    </div>
+                    <Row gutter={[8, 8]}>
+                      {morningSlots.map(renderSlotButton)}
+                    </Row>
+                  </div>
+                )}
+
+                {morningSlots.length > 0 && afternoonSlots.length > 0 && (
+                  <Divider style={{ margin: '4px 0' }} />
+                )}
+
+                {/* Ca chiều */}
+                {afternoonSlots.length > 0 && (
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: '#334155',
+                        textTransform: 'uppercase',
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <span>🌇 Ca chiều (13:00 – 17:30)</span>
+                      <Tag color="default" style={{ fontSize: 11, margin: 0 }}>
+                        {afternoonSlots.filter((s) => s.canSelect).length} slot trống
+                      </Tag>
+                    </div>
+                    <Row gutter={[8, 8]}>
+                      {afternoonSlots.map(renderSlotButton)}
+                    </Row>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {touched && !timeValidation.valid && (
+              <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <ExclamationCircleOutlined /> {timeValidation.error}
+              </div>
+            )}
+          </div>
+
+          {/* Preview khung giờ mới đã chọn */}
+          {selectedSlot && computedTimes.start && computedTimes.end && (
             <div
               style={{
                 backgroundColor: '#eff6ff',
                 border: '1px solid #bfdbfe',
                 borderRadius: 6,
-                padding: '8px 12px',
-                fontSize: 12.5,
+                padding: '10px 14px',
+                fontSize: 13,
                 color: '#1e40af',
                 display: 'flex',
                 alignItems: 'center',
@@ -387,15 +662,10 @@ export default function ReceptionRescheduleAppointmentModal({
               }}
             >
               <span>
-                <ClockCircleOutlined /> Khung giờ dự kiến mới: <strong>{computedTimes.start.format('HH:mm')} – {computedTimes.end.format('HH:mm')} ({computedTimes.start.format('DD/MM/YYYY')})</strong>
+                <ClockCircleOutlined style={{ marginRight: 6 }} />
+                Khung giờ mới đã chọn: <strong>{computedTimes.start.format('HH:mm')} – {computedTimes.end.format('HH:mm')} ({newDate.format('DD/MM/YYYY')})</strong>
               </span>
-              <Tag color="blue">30 phút</Tag>
-            </div>
-          )}
-
-          {touched && !timeValidation.valid && (
-            <div style={{ color: '#ef4444', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <ExclamationCircleOutlined /> {timeValidation.error}
+              <Tag color="blue" style={{ margin: 0 }}>30 phút</Tag>
             </div>
           )}
 
