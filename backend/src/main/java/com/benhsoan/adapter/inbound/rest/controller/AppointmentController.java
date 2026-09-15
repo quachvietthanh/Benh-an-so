@@ -2,7 +2,6 @@ package com.benhsoan.adapter.inbound.rest.controller;
 
 import java.time.LocalDate;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -30,15 +29,12 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.appointment.GetOverdueAppointmentsCommand;
 import com.benhsoan.port.dto.command.appointment.SearchAppointmentCommand;
-import com.benhsoan.port.dto.query.appointment.GetDoctorAvailableSlotsQuery;
-import com.benhsoan.port.dto.result.appointment.DoctorAvailableSlotResult;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.dto.result.AppointmentReminderResult;
 import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.ConfirmAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.CreateAppointmentUseCase;
 import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
-import com.benhsoan.port.inbound.appointment.GetDoctorAvailableSlotsUseCase;
 import com.benhsoan.port.inbound.appointment.GetOverdueAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.GetUnconfirmedAppointmentsUseCase;
 import com.benhsoan.port.inbound.appointment.MarkAppointmentNoShowUseCase;

@@ -1,4 +1,4 @@
-import axiosClient from './axiosClient'
+import axiosClient from './axiosClient.js'
 
 const roleApi = {
   getRoles: () => axiosClient.get('/roles'),
