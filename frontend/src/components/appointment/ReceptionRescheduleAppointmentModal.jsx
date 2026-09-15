@@ -735,11 +735,11 @@ export default function ReceptionRescheduleAppointmentModal({
             )}
           </div>
 
-          {/* Cảnh báo quy tắc QTN-04 và QTN-30 */}
+          {/* Cảnh báo quy tắc giải phóng khung giờ */}
           <Alert
             type="info"
             showIcon
-            message="Quy tắc giải phóng khung giờ & tránh trùng lịch (QTN-04, QTN-30)"
+            message="Quy tắc giải phóng khung giờ & tránh trùng lịch"
             description="Sau khi dời lịch thành công, khung giờ cũ sẽ được tự động giải phóng để tiếp nhận bệnh nhân khác. Hệ thống sẽ kiểm tra trùng lịch bác sĩ và lịch trực theo quy định."
             style={{ fontSize: 12, backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}
           />
