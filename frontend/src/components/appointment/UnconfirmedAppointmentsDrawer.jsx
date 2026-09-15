@@ -29,36 +29,217 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import appointmentApi from '../../api/appointmentApi'
-import { handleQueueApiError } from '../../utils/queueHelpers'
+import appointmentApi from '../../api/appointmentApi.js'
+import patientApi from '../../api/patientApi.js'
+import userApi from '../../api/userApi.js'
+import { handleQueueApiError } from '../../utils/queueHelpers.js'
 
 const { Text, Title, Paragraph } = Typography
+
+const DEFAULT_DOCTORS = [
+  {
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
+    username: 'doctor1',
+    fullName: 'Dr. Nguyen Minh Anh',
+    department: 'Nội khoa',
+  },
+  {
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
+    username: 'doctor2',
+    fullName: 'Dr. Tran Quang Huy',
+    department: 'Ngoại khoa',
+  },
+  {
+    id: 'u3',
+    username: 'doctor1',
+    fullName: 'BS. Phạm Hồng Anh',
+    department: 'Nội tổng hợp',
+  },
+]
+
+const DEFAULT_PATIENTS = [
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001', patientCode: 'BN000001', fullName: 'Nguyen Van An', phoneNumber: '0910000001' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002', patientCode: 'BN000002', fullName: 'Tran Thi Binh', phoneNumber: '0910000002' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003', patientCode: 'BN000003', fullName: 'Le Minh Chau', phoneNumber: '0910000003' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb004', patientCode: 'BN000004', fullName: 'Pham Ngoc Diep', phoneNumber: '0910000004' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb005', patientCode: 'BN000005', fullName: 'Hoang Gia Duc', phoneNumber: '0910000005' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb006', patientCode: 'BN000006', fullName: 'Vu Thanh Giang', phoneNumber: '0910000006' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb007', patientCode: 'BN000007', fullName: 'Do Quang Huy', phoneNumber: '0910000007' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb008', patientCode: 'BN000008', fullName: 'Bui Thu Khanh', phoneNumber: '0910000008' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb009', patientCode: 'BN000009', fullName: 'Nguyen Tuan Long', phoneNumber: '0910000009' },
+  { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb010', patientCode: 'BN000010', fullName: 'Dang My Linh', phoneNumber: '0910000010' },
+]
+
+const cleanUuid = (id) => String(id || '').toLowerCase().replace(/-/g, '')
+
+const formatDoctorName = (name) => {
+  if (!name || name === 'Chưa gán' || name === 'Chưa phân công' || name === '—') return 'Chưa phân công'
+  const trimmed = String(name).trim()
+  if (
+    trimmed.startsWith('BS.') ||
+    trimmed.startsWith('BS ') ||
+    trimmed.startsWith('Dr.') ||
+    trimmed.startsWith('Bác sĩ')
+  ) {
+    return trimmed
+  }
+  return `BS. ${trimmed}`
+}
 
 export default function UnconfirmedAppointmentsDrawer({
   open,
   onClose,
   onAppointmentConfirmed,
   user,
+  patients: patientsProp = [],
+  doctors: doctorsProp = [],
+  getPatientInfo: getPatientInfoProp,
+  getDoctorInfo: getDoctorInfoProp,
 }) {
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [loading, setLoading] = useState(false)
   const [appointments, setAppointments] = useState([])
   const [actionLoadingId, setActionLoadingId] = useState(null)
+  const [localDoctors, setLocalDoctors] = useState([])
+  const [localPatients, setLocalPatients] = useState([])
 
-  const fetchUnconfirmed = useCallback(async (dateObj) => {
-    setLoading(true)
-    try {
-      const dateStr = (dateObj || dayjs()).format('YYYY-MM-DD')
-      const res = await appointmentApi.getUnconfirmed({ date: dateStr, size: 50 })
-      const data = res?.data || res
-      const items = Array.isArray(data) ? data : data?.content || []
-      setAppointments(items)
-    } catch (err) {
-      handleQueueApiError(err, 'Không thể tải danh sách lịch hẹn chưa xác nhận')
-    } finally {
-      setLoading(false)
+  const resolveDoctor = useCallback(
+    (doctorId, fallbackName, fallbackDept) => {
+      if (getDoctorInfoProp) {
+        const res = getDoctorInfoProp(doctorId, fallbackName, fallbackDept)
+        if (res && res.name && res.name !== 'Bác sĩ chưa xác định' && !res.name.includes('#')) {
+          return res
+        }
+      }
+      const allDocs = [...(doctorsProp || []), ...(localDoctors || []), ...DEFAULT_DOCTORS]
+      const targetClean = cleanUuid(doctorId)
+      const doc = allDocs.find((d) => {
+        const dClean = cleanUuid(d.id)
+        return (targetClean && dClean === targetClean) || String(d.id) === String(doctorId)
+      })
+      if (doc) {
+        return {
+          name: doc.fullName || doc.name || doc.username || fallbackName || 'BS. Chưa phân công',
+          department: doc.department || fallbackDept || '',
+        }
+      }
+      return {
+        name: fallbackName || (doctorId ? `Bác sĩ #${doctorId}` : 'Chưa phân công'),
+        department: fallbackDept || '',
+      }
+    },
+    [getDoctorInfoProp, doctorsProp, localDoctors]
+  )
+
+  const resolvePatient = useCallback(
+    (patientId, fallbackName, fallbackCode, fallbackPhone) => {
+      if (getPatientInfoProp) {
+        const res = getPatientInfoProp(patientId, fallbackName, fallbackCode, fallbackPhone)
+        if (res && res.name && res.name !== 'Bệnh nhân') {
+          return res
+        }
+      }
+      const allPats = [...(patientsProp || []), ...(localPatients || []), ...DEFAULT_PATIENTS]
+      const targetClean = cleanUuid(patientId)
+      const pat = allPats.find((p) => {
+        const pClean = cleanUuid(p.id)
+        return (targetClean && pClean === targetClean) || String(p.id) === String(patientId)
+      })
+      if (pat) {
+        return {
+          name: pat.fullName || pat.name || fallbackName || 'Bệnh nhân',
+          code: pat.patientCode || pat.code || fallbackCode || '—',
+          phone: pat.phoneNumber || pat.phone || fallbackPhone || '',
+        }
+      }
+      return {
+        name: fallbackName || 'Bệnh nhân',
+        code: fallbackCode || '—',
+        phone: fallbackPhone || '',
+      }
+    },
+    [getPatientInfoProp, patientsProp, localPatients]
+  )
+
+  useEffect(() => {
+    if (!open) return
+
+    if ((!doctorsProp || doctorsProp.length === 0) && localDoctors.length === 0) {
+      userApi
+        .getDoctors()
+        .then((res) => {
+          const dData = res?.data || res
+          const list = Array.isArray(dData) ? dData : dData?.content || []
+          if (list.length > 0) {
+            setLocalDoctors(list)
+          }
+        })
+        .catch(() => {})
     }
-  }, [])
+
+    if ((!patientsProp || patientsProp.length === 0) && localPatients.length === 0) {
+      patientApi
+        .getAll({ page: 0, size: 500 })
+        .then((res) => {
+          const pData = res?.data || res
+          const list = Array.isArray(pData) ? pData : pData?.content || []
+          if (list.length > 0) {
+            setLocalPatients(list)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [open, doctorsProp, patientsProp, localDoctors.length, localPatients.length])
+
+  const fetchUnconfirmed = useCallback(
+    async (dateObj) => {
+      setLoading(true)
+      try {
+        const dateStr = (dateObj || dayjs()).format('YYYY-MM-DD')
+        const res = await appointmentApi.getUnconfirmed({ date: dateStr, size: 50 })
+        const data = res?.data || res
+        const items = Array.isArray(data) ? data : data?.content || []
+        setAppointments(items)
+
+        const knownPatientIds = new Set(
+          [...(patientsProp || []), ...(localPatients || []), ...DEFAULT_PATIENTS].map((p) => cleanUuid(p.id))
+        )
+        const missingIds = [
+          ...new Set(
+            items
+              .map((it) => it.patientId)
+              .filter((pid) => pid && !knownPatientIds.has(cleanUuid(pid)))
+          ),
+        ]
+
+        if (missingIds.length > 0) {
+          Promise.allSettled(missingIds.map((id) => patientApi.getById(id))).then((results) => {
+            const fetched = []
+            results.forEach((r) => {
+              if (r.status === 'fulfilled') {
+                const pat = r.value?.data || r.value
+                if (pat && pat.id) {
+                  fetched.push(pat)
+                }
+              }
+            })
+            if (fetched.length > 0) {
+              setLocalPatients((prev) => {
+                const existing = new Set(prev.map((p) => cleanUuid(p.id)))
+                const toAdd = fetched.filter((p) => !existing.has(cleanUuid(p.id)))
+                return toAdd.length > 0 ? [...prev, ...toAdd] : prev
+              })
+            }
+          })
+        }
+      } catch (err) {
+        handleQueueApiError(err, 'Không thể tải danh sách lịch hẹn chưa xác nhận')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [patientsProp]
+  )
 
   useEffect(() => {
     if (open) {
@@ -74,9 +255,15 @@ export default function UnconfirmedAppointmentsDrawer({
 
   const handleSendReminder = async (record) => {
     setActionLoadingId(record.id)
+    const pInfo = resolvePatient(
+      record.patientId,
+      record.patientName,
+      record.patientCode,
+      record.phone || record.patientPhone
+    )
     try {
       await appointmentApi.sendReminder(record.id)
-      message.success(`Đã gửi thông báo nhắc lịch cho bệnh nhân ${record.patientName || record.appointmentCode}`)
+      message.success(`Đã gửi thông báo nhắc lịch cho bệnh nhân ${pInfo.name}`)
     } catch (err) {
       handleQueueApiError(err, 'Không thể gửi nhắc nhở lịch hẹn')
     } finally {
@@ -87,12 +274,14 @@ export default function UnconfirmedAppointmentsDrawer({
   const handleConfirmAppointment = (record) => {
     const timeVal = record.startTime || record.appointmentAt || record.date
     const appTime = dayjs(timeVal)
-    const pName = record.patientName || 'Bệnh nhân'
-    const docName = record.doctorName
-      ? `BS. ${record.doctorName}`
-      : record.doctorId
-        ? `Bác sĩ #${record.doctorId}`
-        : 'Chưa gán bác sĩ'
+    const pInfo = resolvePatient(
+      record.patientId,
+      record.patientName,
+      record.patientCode,
+      record.phone || record.patientPhone
+    )
+    const dInfo = resolveDoctor(record.doctorId, record.doctorName, record.department)
+    const docDisplay = formatDoctorName(dInfo.name)
 
     Modal.confirm({
       title: 'Xác nhận lịch hẹn khám',
@@ -100,11 +289,11 @@ export default function UnconfirmedAppointmentsDrawer({
       content: (
         <div>
           <Paragraph style={{ marginBottom: 6 }}>
-            Bệnh nhân: <strong>{pName}</strong> ({record.appointmentCode || record.id})
+            Bệnh nhân: <strong>{pInfo.name}</strong> ({record.appointmentCode || record.id})
           </Paragraph>
           <Paragraph style={{ marginBottom: 6 }}>
-            Bác sĩ phụ trách: <strong>{docName}</strong>{' '}
-            {record.department && <Text type="secondary">({record.department})</Text>}
+            Bác sĩ phụ trách: <strong>{docDisplay}</strong>{' '}
+            {dInfo.department && <Text type="secondary">({dInfo.department})</Text>}
           </Paragraph>
           <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 0 }}>
             Khung giờ hẹn:{' '}
@@ -121,8 +310,7 @@ export default function UnconfirmedAppointmentsDrawer({
         setActionLoadingId(record.id)
         try {
           await appointmentApi.confirm(record.id)
-          message.success(`Đã xác nhận lịch hẹn của ${pName} thành công!`)
-          // Remove from local list
+          message.success(`Đã xác nhận lịch hẹn của ${pInfo.name} thành công!`)
           setAppointments((prev) => prev.filter((item) => item.id !== record.id))
           if (onAppointmentConfirmed) {
             onAppointmentConfirmed(record.id)
@@ -191,16 +379,27 @@ export default function UnconfirmedAppointmentsDrawer({
       key: 'patient',
       width: 220,
       render: (_, record) => {
-        const phone = record.phone || record.patientPhone
+        const pInfo = resolvePatient(
+          record.patientId,
+          record.patientName,
+          record.patientCode,
+          record.phone || record.patientPhone
+        )
+        const phone = pInfo.phone
         return (
           <Space orientation="left" size="small">
             <Avatar style={{ backgroundColor: '#e0f2fe', color: '#0284c7' }}>
-              {record.patientName ? record.patientName.charAt(0).toUpperCase() : <UserOutlined />}
+              {pInfo.name ? pInfo.name.charAt(0).toUpperCase() : <UserOutlined />}
             </Avatar>
             <div>
               <Text strong style={{ display: 'block', fontSize: 13, color: '#0f172a', lineHeight: 1.3 }}>
-                {record.patientName || 'Bệnh nhân'}
+                {pInfo.name}
               </Text>
+              {pInfo.code && pInfo.code !== '—' && (
+                <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                  {pInfo.code}
+                </Text>
+              )}
               {phone ? (
                 <Space size={4} style={{ marginTop: 2 }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>
@@ -228,18 +427,21 @@ export default function UnconfirmedAppointmentsDrawer({
       title: 'Bác sĩ phụ trách',
       key: 'doctor',
       width: 180,
-      render: (_, record) => (
-        <div>
-          <Text strong style={{ fontSize: 13, display: 'block' }}>
-            {record.doctorName || 'Bác sĩ phụ trách'}
-          </Text>
-          {record.department && (
-            <Tag color="cyan" style={{ fontSize: 11, marginTop: 2 }}>
-              {record.department}
-            </Tag>
-          )}
-        </div>
-      ),
+      render: (_, record) => {
+        const dInfo = resolveDoctor(record.doctorId, record.doctorName, record.department)
+        return (
+          <div>
+            <Text strong style={{ fontSize: 13, display: 'block', color: '#0f172a' }}>
+              {formatDoctorName(dInfo.name)}
+            </Text>
+            {dInfo.department && dInfo.department !== '—' && (
+              <Tag color="cyan" style={{ fontSize: 11, marginTop: 2 }}>
+                {dInfo.department}
+              </Tag>
+            )}
+          </div>
+        )
+      },
     },
     {
       title: 'Lý do khám',
