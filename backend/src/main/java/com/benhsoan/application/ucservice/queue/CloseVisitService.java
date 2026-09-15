@@ -19,6 +19,7 @@ import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedExc
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.exception.QueueItemNotFoundException;
 import com.benhsoan.domain.queue.exception.QueueNotFoundException;
@@ -86,6 +87,10 @@ public class CloseVisitService implements CloseVisitUseCase {
 
         UUID medicalRecordId = resolveUnlockedMedicalRecordId(visit);
 
+        if (command.outcome() == VisitCloseOutcome.CANCELLED) {
+            rejectIfDispensedPrescriptionExists(medicalRecordId);
+        }
+
         if (command.outcome() == VisitCloseOutcome.EARLY_ENDED) {
             visit.earlyEnd(reason, now);
         } else {
@@ -124,9 +129,24 @@ public class CloseVisitService implements CloseVisitUseCase {
         MedicalRecord record = medicalRecordRepository.findByIdForUpdate(existing.get().getId())
                 .orElseThrow(() -> new MedicalRecordNotFoundException(existing.get().getId()));
         if (record.isContentLocked()) {
-            throw new MedicalRecordAlreadyLockedException();
+            throw new MedicalRecordAlreadyLockedException(
+                    "Bệnh án đã được ký, không thể hủy lượt khám. Vui lòng lập bản đính chính theo quy định (QTN-18)."
+            );
         }
         return record.getId();
+    }
+
+    private void rejectIfDispensedPrescriptionExists(UUID medicalRecordId) {
+        if (medicalRecordId == null) {
+            return;
+        }
+        List<Prescription> dispensed = prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(
+                medicalRecordId, PrescriptionStatus.DISPENSED);
+        if (!dispensed.isEmpty()) {
+            throw new PrescriptionAlreadyDispensedException(
+                    "Cannot cancel the visit because a prescription has already been dispensed."
+            );
+        }
     }
 
     private void cancelUndispensedPrescriptions(UUID medicalRecordId, String reason, Instant at) {

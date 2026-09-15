@@ -27,6 +27,7 @@ import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.domain.queue.MedicalQueue;
 import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
@@ -95,16 +96,22 @@ class CloseVisitServiceTest {
     void rejectsWhenMedicalRecordSigned() {
         TestContext ctx = context(true, mock(MedicalRecord.class));
         when(ctx.medicalRecord.isContentLocked()).thenReturn(true);
-        assertThrows(MedicalRecordAlreadyLockedException.class, () -> ctx.service.close(
-                new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.EARLY_ENDED, "reason")));
+        MedicalRecordAlreadyLockedException ex = assertThrows(MedicalRecordAlreadyLockedException.class,
+                () -> ctx.service.close(
+                        new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.EARLY_ENDED, "reason")));
+        assertTrue(ex.getMessage().contains("QTN-18"));
+        assertTrue(ex.getMessage().contains("đính chính"));
     }
 
     @Test
     void rejectsWhenMedicalRecordLocked() {
         TestContext ctx = context(true, mock(MedicalRecord.class));
         when(ctx.medicalRecord.isContentLocked()).thenReturn(true);
-        assertThrows(MedicalRecordAlreadyLockedException.class, () -> ctx.service.close(
-                new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.CANCELLED, "reason")));
+        MedicalRecordAlreadyLockedException ex = assertThrows(MedicalRecordAlreadyLockedException.class,
+                () -> ctx.service.close(
+                        new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.CANCELLED, "reason")));
+        assertTrue(ex.getMessage().contains("QTN-18"));
+        assertTrue(ex.getMessage().contains("đính chính"));
     }
 
     @Test
@@ -192,14 +199,80 @@ class CloseVisitServiceTest {
     }
 
     @Test
-    void onlyCancelsPendingDispensePrescriptions() {
+    void cancelledRejectsWhenDispensedPrescriptionExists() {
         TestContext ctx = context(true, mock(MedicalRecord.class));
+        Prescription dispensed = dispensedPrescription(UUID.randomUUID(), ctx.medicalRecordId, ctx.doctorId);
+        when(ctx.prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(
+                ctx.medicalRecordId, PrescriptionStatus.DISPENSED)).thenReturn(List.of(dispensed));
+
+        assertThrows(PrescriptionAlreadyDispensedException.class, () -> ctx.service.close(
+                new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.CANCELLED, "reason")));
+
+        // No close-flow state changed.
+        assertEquals(VisitStatus.IN_PROGRESS, ctx.visit.getStatus());
+        assertEquals(QueueItemStatus.IN_PROGRESS, ctx.item.getStatus());
+        assertEquals(AppointmentStatus.IN_PROGRESS, ctx.appointment.getStatus());
+        assertEquals(PrescriptionStatus.DISPENSED, dispensed.getStatus());
+        verify(ctx.visitRepository, never()).save(ctx.visit);
+        verify(ctx.queueItemRepository, never()).save(ctx.item);
+        verify(ctx.appointmentRepository, never()).save(ctx.appointment);
+        verify(ctx.prescriptionRepository, never()).save(any(Prescription.class));
+        verify(ctx.auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelledRejectsWhenDispensedAndPendingPrescriptionsExist() {
+        TestContext ctx = context(true, mock(MedicalRecord.class));
+        Prescription dispensed = dispensedPrescription(UUID.randomUUID(), ctx.medicalRecordId, ctx.doctorId);
+        Prescription pending = pendingPrescription(UUID.randomUUID(), ctx.medicalRecordId, ctx.doctorId);
+        when(ctx.prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(
+                ctx.medicalRecordId, PrescriptionStatus.DISPENSED)).thenReturn(List.of(dispensed));
+        when(ctx.prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(
+                ctx.medicalRecordId, PrescriptionStatus.PENDING_DISPENSE)).thenReturn(List.of(pending));
+
+        assertThrows(PrescriptionAlreadyDispensedException.class, () -> ctx.service.close(
+                new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.CANCELLED, "reason")));
+
+        // PENDING_DISPENSE remains unchanged and no state was mutated.
+        assertEquals(PrescriptionStatus.PENDING_DISPENSE, pending.getStatus());
+        assertEquals(VisitStatus.IN_PROGRESS, ctx.visit.getStatus());
+        assertEquals(QueueItemStatus.IN_PROGRESS, ctx.item.getStatus());
+        assertEquals(AppointmentStatus.IN_PROGRESS, ctx.appointment.getStatus());
+        verify(ctx.prescriptionRepository, never()).save(any(Prescription.class));
+        verify(ctx.visitRepository, never()).save(ctx.visit);
+        verify(ctx.queueItemRepository, never()).save(ctx.item);
+        verify(ctx.auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelledSucceedsWithOnlyPendingPrescription() {
+        TestContext ctx = context(true, mock(MedicalRecord.class));
+        Prescription pending = pendingPrescription(UUID.randomUUID(), ctx.medicalRecordId, ctx.doctorId);
+        when(ctx.prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(
+                ctx.medicalRecordId, PrescriptionStatus.PENDING_DISPENSE)).thenReturn(List.of(pending));
+
         ctx.service.close(new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.CANCELLED, "reason"));
 
-        verify(ctx.prescriptionRepository).findByMedicalRecordIdAndStatusForUpdate(
-                ctx.medicalRecordId, PrescriptionStatus.PENDING_DISPENSE);
-        verify(ctx.prescriptionRepository, never()).findByMedicalRecordIdAndStatusForUpdate(
-                ctx.medicalRecordId, PrescriptionStatus.DISPENSED);
+        assertEquals(PrescriptionStatus.CANCELLED, pending.getStatus());
+        assertEquals(VisitStatus.CANCELLED, ctx.visit.getStatus());
+        assertEquals(QueueItemStatus.CANCELLED, ctx.item.getStatus());
+        verify(ctx.prescriptionRepository).save(pending);
+    }
+
+    @Test
+    void earlyEndedWithDispensedPrescriptionStillSucceeds() {
+        TestContext ctx = context(true, mock(MedicalRecord.class));
+        Prescription dispensed = dispensedPrescription(UUID.randomUUID(), ctx.medicalRecordId, ctx.doctorId);
+        when(ctx.prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(
+                ctx.medicalRecordId, PrescriptionStatus.DISPENSED)).thenReturn(List.of(dispensed));
+
+        ctx.service.close(new CloseVisitCommand(ctx.item.getId(), VisitCloseOutcome.EARLY_ENDED, "reason"));
+
+        assertEquals(VisitStatus.EARLY_ENDED, ctx.visit.getStatus());
+        assertEquals(QueueItemStatus.CANCELLED, ctx.item.getStatus());
+        // DISPENSED prescription is untouched.
+        assertEquals(PrescriptionStatus.DISPENSED, dispensed.getStatus());
+        verify(ctx.prescriptionRepository, never()).save(dispensed);
     }
 
     @Test
@@ -224,6 +297,14 @@ class CloseVisitServiceTest {
 
     private Prescription pendingPrescription(UUID id, UUID medicalRecordId, UUID doctorId) {
         return Prescription.restore(id, "RX-" + id, medicalRecordId, PrescriptionStatus.PENDING_DISPENSE,
+                "Note", doctorId, NOW, null, null,
+                List.of(PrescriptionItem.restore(UUID.randomUUID(), id, UUID.randomUUID(), "Paracetamol",
+                        "Paracetamol", "500 mg", "tablet", "1 tablet", 2, AdministrationRoute.ORAL, 2, 4, null,
+                        NOW, null)));
+    }
+
+    private Prescription dispensedPrescription(UUID id, UUID medicalRecordId, UUID doctorId) {
+        return Prescription.restore(id, "RX-" + id, medicalRecordId, PrescriptionStatus.DISPENSED,
                 "Note", doctorId, NOW, null, null,
                 List.of(PrescriptionItem.restore(UUID.randomUUID(), id, UUID.randomUUID(), "Paracetamol",
                         "Paracetamol", "500 mg", "tablet", "1 tablet", 2, AdministrationRoute.ORAL, 2, 4, null,
@@ -288,6 +369,8 @@ class CloseVisitServiceTest {
             when(medicalRecordRepository.findByIdForUpdate(medicalRecordId)).thenReturn(Optional.of(medicalRecord));
             when(prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(medicalRecordId,
                     PrescriptionStatus.PENDING_DISPENSE)).thenReturn(List.of());
+            when(prescriptionRepository.findByMedicalRecordIdAndStatusForUpdate(medicalRecordId,
+                    PrescriptionStatus.DISPENSED)).thenReturn(List.of());
         } else {
             when(medicalRecordRepository.findByVisitId(visit.getId())).thenReturn(Optional.empty());
         }
