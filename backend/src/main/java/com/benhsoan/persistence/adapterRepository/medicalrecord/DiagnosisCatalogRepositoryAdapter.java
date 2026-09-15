@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.medicalrecord;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -30,6 +31,11 @@ public class DiagnosisCatalogRepositoryAdapter implements DiagnosisCatalogReposi
     @Override
     public Optional<DiagnosisCatalog> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<DiagnosisCatalog> findAllByIds(Collection<UUID> ids) {
+        return jpaRepository.findAllById(ids).stream().map(mapper::toDomain).toList();
     }
 
     @Override
