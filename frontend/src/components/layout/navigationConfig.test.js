@@ -68,3 +68,21 @@ test('getNavigationItems - restricts /users and /system-management to admin only
   assert.equal(adminNav.some((item) => item.key === '/system-management'), true, 'Admin must see /system-management')
 })
 
+test('getNavigationItems - weekly schedule menu and admin protection', () => {
+  // 1. Lễ tân thấy mục Lịch tuần theo bác sĩ
+  const recepNav = getNavigationItems(['ROLE_RECEPTIONIST'], ['PATIENT_READ', 'APPOINTMENT_READ'])
+  const hasWeeklyScheduleRecep = recepNav.some((item) => item.key === '/appointments/weekly-schedule')
+  assert.equal(hasWeeklyScheduleRecep, true, 'Receptionist must see /appointments/weekly-schedule in navigation')
+
+  // 2. Lễ tân KHÔNG thấy Quản trị tài khoản và Quản trị hệ thống
+  const hasUsers = recepNav.some((item) => item.key === '/users')
+  const hasSystem = recepNav.some((item) => item.key === '/system-management')
+  assert.equal(hasUsers, false, 'Receptionist must not see /users')
+  assert.equal(hasSystem, false, 'Receptionist must not see /system-management')
+
+  // 3. Dược sĩ KHÔNG thấy Lịch tuần theo bác sĩ
+  const pharmNav = getNavigationItems(['ROLE_PHARMACIST'], ['PHARMACY_READ'])
+  const hasWeeklySchedulePharm = pharmNav.some((item) => item.key === '/appointments/weekly-schedule')
+  assert.equal(hasWeeklySchedulePharm, false, 'Pharmacist must not see /appointments/weekly-schedule')
+})
+

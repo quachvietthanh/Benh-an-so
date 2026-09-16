@@ -14,6 +14,7 @@ import {
   SettingOutlined,
   ShopOutlined,
   SolutionOutlined,
+  TableOutlined,
   UserOutlined,
   EyeInvisibleOutlined,
   TeamOutlined,
@@ -30,7 +31,7 @@ export const roleNames = {
 
 export const navigationSections = [
   { key: 'overview', paths: ['/'] },
-  { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments', '/after-care', '/doctor-schedules'] },
+  { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments', '/appointments/weekly-schedule', '/after-care', '/doctor-schedules'] },
   { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/version-history', '/medical-records/copy-issuance', '/prescriptions', '/clinical-results', '/results'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
@@ -58,6 +59,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, check: () => hasPerm('DASHBOARD_OPERATIONAL_READ') || isAdmin || isManager },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, check: () => !isAdmin && (hasPerm('PATIENT_READ') || hasPerm('PATIENT_CREATE') || isDoctor || isReceptionist || isManager) },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, check: () => !isAdmin && !isManager && (hasPerm('APPOINTMENT_READ') || hasPerm('APPOINTMENT_CREATE') || isDoctor || isReceptionist) },
+    { key: '/appointments/weekly-schedule', label: 'Lịch tuần theo bác sĩ', icon: TableOutlined, check: () => !isAdmin && !isManager && (hasPerm('APPOINTMENT_READ') || isReceptionist || isDoctor) },
     { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('FOLLOW_UP_REMINDER_READ') || hasPerm('CARE_LOG_READ') || isReceptionist) },
     { key: '/doctor-schedules', label: 'Lịch làm việc bác sĩ', icon: CalendarOutlined, check: () => !isReceptionist && !isPharmacist && !isDoctor && (isAdmin || isManager || hasPerm('DOCTOR_SCHEDULE_UPDATE')) },
     { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, check: () => !isAdmin && !isManager && (hasPerm('MEDICAL_RECORD_READ') || hasPerm('MEDICAL_RECORD_CREATE') || isDoctor) },
