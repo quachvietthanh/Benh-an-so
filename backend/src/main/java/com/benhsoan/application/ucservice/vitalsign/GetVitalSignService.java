@@ -9,11 +9,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAuditService;
-import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
+import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.domain.vitalsign.VitalSign;
 import com.benhsoan.domain.vitalsign.exception.VitalSignNotFoundException;
 import com.benhsoan.port.dto.result.vitalsign.VitalSignResult;
 import com.benhsoan.port.inbound.vitalsign.GetVitalSignUseCase;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.repository.vitalsign.VitalSignRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -25,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class GetVitalSignService implements GetVitalSignUseCase {
 
     private final VitalSignRepository vitalSignRepository;
+    private final VisitRepository visitRepository;
     private final VitalSignAuthorizationService authorizationService;
     private final MedicalRecordAccessAuditService accessAuditService;
     private final VitalSignResultMapper resultMapper;
@@ -32,10 +35,13 @@ public class GetVitalSignService implements GetVitalSignUseCase {
 
     @Override
     public VitalSignResult getById(UUID id) {
-        UUID actorId = authorizationService.requireReadAccess();
-
         VitalSign vitalSign = vitalSignRepository.findById(id)
                 .orElseThrow(() -> new VitalSignNotFoundException(id));
+
+        Visit visit = visitRepository.findById(vitalSign.getVisitId())
+                .orElseThrow(() -> new VisitNotFoundException(vitalSign.getVisitId()));
+
+        UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
 
         accessAuditService.recordRecordView(
                 vitalSign.getPatientId(),
@@ -50,7 +56,10 @@ public class GetVitalSignService implements GetVitalSignUseCase {
 
     @Override
     public Optional<VitalSignResult> getLatestByVisitId(UUID visitId) {
-        UUID actorId = authorizationService.requireReadAccess();
+        Visit visit = visitRepository.findById(visitId)
+                .orElseThrow(() -> new VisitNotFoundException(visitId));
+
+        UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
 
         Optional<VitalSign> vitalSignOpt = vitalSignRepository.findLatestByVisitId(visitId);
         vitalSignOpt.ifPresent(vs -> accessAuditService.recordRecordView(
@@ -66,7 +75,10 @@ public class GetVitalSignService implements GetVitalSignUseCase {
 
     @Override
     public List<VitalSignResult> getByVisitId(UUID visitId) {
-        UUID actorId = authorizationService.requireReadAccess();
+        Visit visit = visitRepository.findById(visitId)
+                .orElseThrow(() -> new VisitNotFoundException(visitId));
+
+        UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
 
         List<VitalSign> list = vitalSignRepository.findByVisitId(visitId);
         if (!list.isEmpty()) {

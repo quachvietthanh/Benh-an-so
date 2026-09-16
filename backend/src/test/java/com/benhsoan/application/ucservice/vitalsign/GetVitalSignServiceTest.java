@@ -27,7 +27,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAuditService;
 import com.benhsoan.domain.vitalsign.VitalSign;
 import com.benhsoan.domain.vitalsign.exception.VitalSignNotFoundException;
+import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.port.dto.result.vitalsign.VitalSignResult;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.repository.vitalsign.VitalSignRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -36,6 +38,8 @@ class GetVitalSignServiceTest {
 
     @Mock
     private VitalSignRepository vitalSignRepository;
+    @Mock
+    private VisitRepository visitRepository;
     @Mock
     private VitalSignAuthorizationService authorizationService;
     @Mock
@@ -58,6 +62,7 @@ class GetVitalSignServiceTest {
         resultMapper = new VitalSignResultMapper();
         service = new GetVitalSignService(
                 vitalSignRepository,
+                visitRepository,
                 authorizationService,
                 accessAuditService,
                 resultMapper,
@@ -72,14 +77,22 @@ class GetVitalSignServiceTest {
         );
     }
 
-    @Test
-    @DisplayName("Lấy chỉ số sinh tồn theo ID thành công và ghi nhận nhật ký truy cập")
-    void getByIdReturnsResultAndAudits() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
-        when(clockPort.now()).thenReturn(NOW);
+    private Visit createVisit() {
+        Visit visit = org.mockito.Mockito.mock(Visit.class);
+        when(visit.getId()).thenReturn(VISIT_ID);
+        when(visit.getDoctorId()).thenReturn(DOCTOR_ID);
+        return visit;
+    }
 
+    @Test
+    @DisplayName("Lấy chỉ số sinh tồn theo ID thành công khi bác sĩ có quyền và ghi nhận nhật ký truy cập")
+    void getByIdReturnsResultAndAudits() {
         VitalSign vs = createVitalSign(VITAL_SIGN_ID, 75);
+        Visit visit = createVisit();
         when(vitalSignRepository.findById(VITAL_SIGN_ID)).thenReturn(Optional.of(vs));
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(authorizationService.requireVisitReadAccess(DOCTOR_ID, VISIT_ID)).thenReturn(DOCTOR_ID);
+        when(clockPort.now()).thenReturn(NOW);
 
         VitalSignResult result = service.getById(VITAL_SIGN_ID);
 
@@ -96,7 +109,6 @@ class GetVitalSignServiceTest {
     @Test
     @DisplayName("Lấy chỉ số sinh tồn theo ID ném VitalSignNotFoundException khi không tìm thấy")
     void getByIdThrowsWhenNotFound() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
         when(vitalSignRepository.findById(VITAL_SIGN_ID)).thenReturn(Optional.empty());
 
         assertThrows(VitalSignNotFoundException.class, () -> service.getById(VITAL_SIGN_ID));
@@ -104,9 +116,26 @@ class GetVitalSignServiceTest {
     }
 
     @Test
+    @DisplayName("Lấy chỉ số sinh tồn theo ID ném MedicalRecordAccessDeniedException khi bác sĩ không phụ trách lượt khám (P1)")
+    void getByIdThrowsWhenDoctorUnauthorized() {
+        VitalSign vs = createVitalSign(VITAL_SIGN_ID, 75);
+        Visit visit = createVisit();
+        when(vitalSignRepository.findById(VITAL_SIGN_ID)).thenReturn(Optional.of(vs));
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(authorizationService.requireVisitReadAccess(DOCTOR_ID, VISIT_ID))
+                .thenThrow(new com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException());
+
+        assertThrows(com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException.class,
+                () -> service.getById(VITAL_SIGN_ID));
+        verify(accessAuditService, never()).recordRecordView(any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("Lấy chỉ số sinh tồn mới nhất theo visitId thành công và ghi log")
     void getLatestByVisitIdReturnsResult() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
+        Visit visit = createVisit();
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(authorizationService.requireVisitReadAccess(DOCTOR_ID, VISIT_ID)).thenReturn(DOCTOR_ID);
         when(clockPort.now()).thenReturn(NOW);
 
         VitalSign vs = createVitalSign(VITAL_SIGN_ID, 80);
@@ -124,7 +153,9 @@ class GetVitalSignServiceTest {
     @Test
     @DisplayName("Lấy chỉ số sinh tồn mới nhất theo visitId trả về rỗng khi không có bản ghi")
     void getLatestByVisitIdReturnsEmptyWhenNone() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
+        Visit visit = createVisit();
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(authorizationService.requireVisitReadAccess(DOCTOR_ID, VISIT_ID)).thenReturn(DOCTOR_ID);
         when(vitalSignRepository.findLatestByVisitId(VISIT_ID)).thenReturn(Optional.empty());
 
         Optional<VitalSignResult> resultOpt = service.getLatestByVisitId(VISIT_ID);
@@ -136,7 +167,9 @@ class GetVitalSignServiceTest {
     @Test
     @DisplayName("Lấy danh sách chỉ số sinh tồn theo visitId thành công và ghi log cho bản ghi đầu tiên")
     void getByVisitIdReturnsListAndAuditsFirst() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
+        Visit visit = createVisit();
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(authorizationService.requireVisitReadAccess(DOCTOR_ID, VISIT_ID)).thenReturn(DOCTOR_ID);
         when(clockPort.now()).thenReturn(NOW);
 
         VitalSign vs1 = createVitalSign(UUID.randomUUID(), 75);
@@ -157,12 +190,27 @@ class GetVitalSignServiceTest {
     @Test
     @DisplayName("Lấy danh sách theo visitId trả về rỗng khi không có dữ liệu")
     void getByVisitIdReturnsEmptyWhenNone() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
+        Visit visit = createVisit();
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(authorizationService.requireVisitReadAccess(DOCTOR_ID, VISIT_ID)).thenReturn(DOCTOR_ID);
         when(vitalSignRepository.findByVisitId(VISIT_ID)).thenReturn(List.of());
 
         List<VitalSignResult> list = service.getByVisitId(VISIT_ID);
 
         assertTrue(list.isEmpty());
         verify(accessAuditService, never()).recordRecordView(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Lấy danh sách theo visitId ném MedicalRecordAccessDeniedException khi bác sĩ không phụ trách (P1)")
+    void getByVisitIdThrowsWhenDoctorUnauthorized() {
+        Visit visit = createVisit();
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(authorizationService.requireVisitReadAccess(DOCTOR_ID, VISIT_ID))
+                .thenThrow(new com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException());
+
+        assertThrows(com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException.class,
+                () -> service.getByVisitId(VISIT_ID));
+        verify(vitalSignRepository, never()).findByVisitId(any());
     }
 }

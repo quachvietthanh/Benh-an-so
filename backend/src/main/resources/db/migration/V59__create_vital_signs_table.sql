@@ -18,7 +18,7 @@ CREATE TABLE vital_signs (
     respiratory_rate INT NULL,
     weight DECIMAL(5, 2) NULL,
     height DECIMAL(5, 2) NULL,
-    bmi DECIMAL(4, 1) NULL,
+    bmi DECIMAL(5, 1) NULL,
     spo2 INT NULL,
 
     is_abnormal BOOLEAN NOT NULL DEFAULT FALSE,

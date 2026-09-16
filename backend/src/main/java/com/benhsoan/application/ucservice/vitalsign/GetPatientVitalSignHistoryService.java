@@ -31,10 +31,10 @@ public class GetPatientVitalSignHistoryService implements GetPatientVitalSignHis
 
     @Override
     public List<VitalSignResult> getHistory(UUID patientId) {
-        UUID actorId = authorizationService.requireReadAccess();
-
         patientRepository.findById(patientId)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
+
+        UUID actorId = authorizationService.requirePatientHistoryReadAccess(patientId);
 
         // QTN-02: Ghi nhật ký truy cập lịch sử hồ sơ bệnh án
         accessAuditService.recordHistoryView(patientId, actorId, clockPort.now());

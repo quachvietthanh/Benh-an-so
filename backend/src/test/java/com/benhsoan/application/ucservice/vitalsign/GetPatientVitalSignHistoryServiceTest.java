@@ -68,8 +68,8 @@ class GetPatientVitalSignHistoryServiceTest {
     @Test
     @DisplayName("TC-04: Lấy lịch sử chỉ số sinh tồn của bệnh nhân theo thứ tự thời gian và ghi log QTN-02")
     void returnsPatientVitalSignHistoryInChronologicalOrder() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(mock(Patient.class)));
+        when(authorizationService.requirePatientHistoryReadAccess(PATIENT_ID)).thenReturn(DOCTOR_ID);
         when(clockPort.now()).thenReturn(NOW);
 
         VitalSign vs1 = VitalSign.create(
@@ -96,10 +96,23 @@ class GetPatientVitalSignHistoryServiceTest {
     @Test
     @DisplayName("Ném PatientNotFoundException khi bệnh nhân không tồn tại và không gọi audit log")
     void throwsPatientNotFoundExceptionWhenPatientDoesNotExist() {
-        when(authorizationService.requireReadAccess()).thenReturn(DOCTOR_ID);
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.empty());
 
         assertThrows(PatientNotFoundException.class, () -> service.getHistory(PATIENT_ID));
+
+        verify(accessAuditService, never()).recordHistoryView(any(), any(), any());
+        verify(vitalSignRepository, never()).findHistoryByPatientId(any());
+    }
+
+    @Test
+    @DisplayName("Ném MedicalRecordAccessDeniedException khi bác sĩ không có quyền truy cập hồ sơ bệnh nhân (P1)")
+    void throwsMedicalRecordAccessDeniedExceptionWhenDoctorUnauthorized() {
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(mock(Patient.class)));
+        when(authorizationService.requirePatientHistoryReadAccess(PATIENT_ID))
+                .thenThrow(new com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException());
+
+        assertThrows(com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException.class,
+                () -> service.getHistory(PATIENT_ID));
 
         verify(accessAuditService, never()).recordHistoryView(any(), any(), any());
         verify(vitalSignRepository, never()).findHistoryByPatientId(any());

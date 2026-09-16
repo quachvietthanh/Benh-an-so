@@ -222,4 +222,54 @@ class VitalSignTest {
         assertEquals(doctor2, vs.getUpdatedBy());
         assertEquals(now, vs.getUpdatedAt());
     }
+
+    @Test
+    @DisplayName("TC-DOM-01 (Finding P3): Từ chối khi chỉ số BMI tính toán vượt quá giới hạn cho phép (999.9)")
+    void rejectsWhenCalculatedBmiExceedsUpperLimit() {
+        ValidationException ex = assertThrows(ValidationException.class, () -> VitalSign.create(
+                VISIT_ID,
+                PATIENT_ID,
+                null,
+                75,
+                120,
+                80,
+                new BigDecimal("37.0"),
+                16,
+                new BigDecimal("300.0"), // 300 kg
+                new BigDecimal("20.0"),  // 20 cm -> BMI = 7500.0 > 999.9
+                98,
+                null,
+                DOCTOR_ID,
+                Instant.now()
+        ));
+
+        assertTrue(ex.getMessage().contains("Chỉ số BMI tính toán vượt quá giới hạn cho phép"));
+        assertEquals("bmi", ex.getField());
+    }
+
+    @Test
+    @DisplayName("TC-DOM-02 (Finding P3): Chấp nhận khi chỉ số BMI lớn nhưng trong giới hạn 999.9")
+    void acceptsWhenCalculatedBmiWithinUpperLimit() {
+        VitalSign vs = VitalSign.create(
+                VISIT_ID,
+                PATIENT_ID,
+                null,
+                75,
+                120,
+                80,
+                new BigDecimal("37.0"),
+                16,
+                new BigDecimal("200.0"), // 200 kg
+                new BigDecimal("140.0"), // 140 cm (1.4m) -> BMI = 200 / 1.96 = 102.0
+                98,
+                "Béo phì nặng",
+                DOCTOR_ID,
+                Instant.now()
+        );
+
+        assertNotNull(vs);
+        assertEquals(new BigDecimal("102.0"), vs.getBmi());
+        assertTrue(vs.isAbnormal());
+        assertTrue(vs.getAbnormalFlags().contains(VitalSignAbnormalFlag.OVERWEIGHT));
+    }
 }

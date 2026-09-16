@@ -57,7 +57,7 @@ public class VitalSignEntity {
     @Column(name = "height", precision = 5, scale = 2)
     private BigDecimal height;
 
-    @Column(name = "bmi", precision = 4, scale = 1)
+    @Column(name = "bmi", precision = 5, scale = 1)
     private BigDecimal bmi;
 
     @Column(name = "spo2")

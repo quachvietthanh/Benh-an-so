@@ -283,6 +283,13 @@ public class VitalSign {
         if (spo2 != null && (spo2 < 50 || spo2 > 100)) {
             throw new ValidationException("spo2", "SpO2 ngoài khoảng hợp lệ (50 - 100 %).");
         }
+
+        if (weight != null && height != null) {
+            BigDecimal computedBmi = calculateBmi(weight, height);
+            if (computedBmi != null && computedBmi.compareTo(new BigDecimal("999.9")) > 0) {
+                throw new ValidationException("bmi", "Chỉ số BMI tính toán vượt quá giới hạn cho phép (tối đa 999.9). Vui lòng kiểm tra lại chiều cao và cân nặng.");
+            }
+        }
     }
 
     public static BigDecimal calculateBmi(BigDecimal weight, BigDecimal height) {

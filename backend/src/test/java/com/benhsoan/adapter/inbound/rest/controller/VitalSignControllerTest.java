@@ -32,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.benhsoan.adapter.inbound.rest.mapper.VitalSignRestMapper;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.vitalsign.enums.VitalSignAbnormalFlag;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
@@ -347,6 +348,45 @@ class VitalSignControllerTest {
         mockMvc.perform(get("/vital-signs/visits/{visitId}", UUID.randomUUID())
                         .with(withPermission("DIFFERENT_PERMISSION")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("P1 BOLA: GET /vital-signs/{id} - 403 Forbidden khi bác sĩ không phụ trách lượt khám")
+    void getByIdReturns403WhenDoctorNotAssignedToVisit() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getVitalSignUseCase.getById(id))
+                .thenThrow(new MedicalRecordAccessDeniedException("Doctor is not assigned to this visit"));
+
+        mockMvc.perform(get("/vital-signs/{id}", id)
+                        .with(withPermission("VITAL_SIGN_READ")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("P1 BOLA: GET /vital-signs/visits/{visitId} - 403 Forbidden khi bác sĩ không phụ trách lượt khám")
+    void getByVisitIdReturns403WhenDoctorNotAssignedToVisit() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        when(getVitalSignUseCase.getByVisitId(visitId))
+                .thenThrow(new MedicalRecordAccessDeniedException("Doctor is not assigned to this visit"));
+
+        mockMvc.perform(get("/vital-signs/visits/{visitId}", visitId)
+                        .with(withPermission("VITAL_SIGN_READ")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("P1 BOLA: GET /vital-signs/patients/{patientId}/history - 403 Forbidden khi bác sĩ không phụ trách bệnh nhân")
+    void getPatientHistoryReturns403WhenDoctorNotAssignedToPatient() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        when(getPatientVitalSignHistoryUseCase.getHistory(patientId))
+                .thenThrow(new MedicalRecordAccessDeniedException("Doctor is not assigned to patient"));
+
+        mockMvc.perform(get("/vital-signs/patients/{patientId}/history", patientId)
+                        .with(withPermission("VITAL_SIGN_READ")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_ACCESS_DENIED"));
     }
 
     private RequestPostProcessor withPermission(String permission) {
