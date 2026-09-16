@@ -274,6 +274,74 @@ class VitalSignControllerTest {
     }
 
     @Test
+    @DisplayName("GET /vital-signs/{id} - 200 OK lấy chỉ số sinh tồn theo ID")
+    void getByIdReturns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getVitalSignUseCase.getById(id))
+                .thenReturn(new VitalSignResult(
+                        id, UUID.randomUUID(), UUID.randomUUID(), null, 75, 120, 80,
+                        new BigDecimal("37.0"), 16, new BigDecimal("60.0"), new BigDecimal("165.0"),
+                        new BigDecimal("22.0"), 98, false, List.of(), "Bình thường",
+                        UUID.randomUUID(), Instant.now(), null, null
+                ));
+
+        mockMvc.perform(get("/vital-signs/{id}", id)
+                        .with(withPermission("VITAL_SIGN_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.pulse").value(75));
+    }
+
+    @Test
+    @DisplayName("GET /vital-signs?patientId=... - 200 OK tìm kiếm theo patientId")
+    void searchByPatientIdReturns200() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        when(getPatientVitalSignHistoryUseCase.getHistory(patientId))
+                .thenReturn(List.of(new VitalSignResult(
+                        UUID.randomUUID(), UUID.randomUUID(), patientId, null, 75, 120, 80,
+                        new BigDecimal("37.0"), 16, new BigDecimal("60.0"), new BigDecimal("165.0"),
+                        new BigDecimal("22.0"), 98, false, List.of(), null,
+                        UUID.randomUUID(), Instant.now(), null, null
+                )));
+
+        mockMvc.perform(get("/vital-signs")
+                        .param("patientId", patientId.toString())
+                        .with(withPermission("VITAL_SIGN_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].pulse").value(75));
+    }
+
+    @Test
+    @DisplayName("GET /vital-signs?visitId=... - 200 OK tìm kiếm theo visitId")
+    void searchByVisitIdReturns200() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        when(getVitalSignUseCase.getByVisitId(visitId))
+                .thenReturn(List.of(new VitalSignResult(
+                        UUID.randomUUID(), visitId, UUID.randomUUID(), null, 80, 120, 80,
+                        new BigDecimal("37.0"), 16, new BigDecimal("60.0"), new BigDecimal("165.0"),
+                        new BigDecimal("22.0"), 98, false, List.of(), null,
+                        UUID.randomUUID(), Instant.now(), null, null
+                )));
+
+        mockMvc.perform(get("/vital-signs")
+                        .param("visitId", visitId.toString())
+                        .with(withPermission("VITAL_SIGN_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].pulse").value(80));
+    }
+
+    @Test
+    @DisplayName("GET /vital-signs - 200 OK trả về danh sách rỗng khi không có param")
+    void searchWithoutParamsReturnsEmptyList() throws Exception {
+        mockMvc.perform(get("/vital-signs")
+                        .with(withPermission("VITAL_SIGN_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     @DisplayName("Chặn khi không có quyền thao tác (403 Forbidden)")
     void rejectsWhenPermissionMissing() throws Exception {
         mockMvc.perform(get("/vital-signs/visits/{visitId}", UUID.randomUUID())

@@ -12,7 +12,9 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.exception.VisitInvalidStatusException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.domain.vitalsign.VitalSign;
@@ -50,17 +52,14 @@ public class RecordVitalSignService implements RecordVitalSignUseCase {
 
         authorizationService.requireVisitDoctorAccess(visit.getDoctorId());
 
-        if (!visit.isActive()) {
+        if (visit.getStatus() != VisitStatus.IN_PROGRESS && visit.getStatus() != VisitStatus.WAITING_FOR_RESULT) {
             throw new VisitInvalidStatusException("Chỉ được ghi nhận chỉ số sinh tồn khi lượt khám đang diễn ra.");
         }
 
-        var medicalRecordOpt = medicalRecordRepository.findByVisitId(visit.getId());
-        UUID medicalRecordId = null;
-        if (medicalRecordOpt.isPresent()) {
-            MedicalRecord record = medicalRecordOpt.get();
-            record.ensureEditable(); // QTN-07
-            medicalRecordId = record.getId();
-        }
+        MedicalRecord record = medicalRecordRepository.findByVisitId(visit.getId())
+                .orElseThrow(() -> new MedicalRecordNotFoundException(visit.getId()));
+        record.ensureEditable(); // QTN-07
+        UUID medicalRecordId = record.getId();
 
         Instant now = clockPort.now();
 

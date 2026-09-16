@@ -24,6 +24,7 @@ import com.benhsoan.application.ucservice.medicalrecord.MedicalRecordAccessAudit
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.domain.visit.exception.VisitInvalidStatusException;
@@ -89,7 +90,11 @@ class RecordVitalSignServiceTest {
     void recordsVitalSignSuccessfully() {
         when(authorizationService.requireWriteAccess()).thenReturn(DOCTOR_ID);
         Visit visit = activeVisit();
+        MedicalRecord record = MedicalRecord.create(
+                visit.getId(), "Ly do", "Trieu chung", "Tien su", "Kham", "Dien tien", "Ke hoach", "Loi dan", "Ket luan", DOCTOR_ID, NOW
+        );
         when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(medicalRecordRepository.findByVisitId(visit.getId())).thenReturn(Optional.of(record));
         when(clockPort.now()).thenReturn(NOW);
         when(vitalSignRepository.save(any(VitalSign.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -114,6 +119,35 @@ class RecordVitalSignServiceTest {
         assertEquals(80, result.bloodPressureDiastolic());
         verify(accessAuditService).recordRecordAccess(any(), any(), any(), any(), any(), any(), any());
         verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("Precondition NCL-04-CN-007: Từ chối khi ca khám mới chỉ ở trạng thái WAITING")
+    void rejectsWhenVisitIsWaiting() {
+        when(authorizationService.requireWriteAccess()).thenReturn(DOCTOR_ID);
+        Visit visit = Visit.create("VISIT-001", PATIENT_ID, DOCTOR_ID, null, null, VisitType.WALK_IN, NOW, "Khám tổng quát", null, DOCTOR_ID, NOW);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+
+        RecordVitalSignCommand cmd = new RecordVitalSignCommand(
+                VISIT_ID, 80, 120, 80, new BigDecimal("37.0"), 16, null, null, null, null
+        );
+
+        assertThrows(VisitInvalidStatusException.class, () -> service.record(cmd));
+    }
+
+    @Test
+    @DisplayName("Dependency NCL-04-CN-001: Từ chối khi bệnh án của lượt khám chưa được mở")
+    void rejectsWhenMedicalRecordNotYetCreated() {
+        when(authorizationService.requireWriteAccess()).thenReturn(DOCTOR_ID);
+        Visit visit = activeVisit();
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(medicalRecordRepository.findByVisitId(visit.getId())).thenReturn(Optional.empty());
+
+        RecordVitalSignCommand cmd = new RecordVitalSignCommand(
+                VISIT_ID, 80, 120, 80, new BigDecimal("37.0"), 16, null, null, null, null
+        );
+
+        assertThrows(MedicalRecordNotFoundException.class, () -> service.record(cmd));
     }
 
     @Test

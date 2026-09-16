@@ -13,6 +13,7 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.exception.VisitInvalidStatusException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.domain.vitalsign.VitalSign;
@@ -54,11 +55,18 @@ public class UpdateVitalSignService implements UpdateVitalSignUseCase {
 
         authorizationService.requireVisitDoctorAccess(visit.getDoctorId());
 
-        if (!visit.isActive()) {
+        if (visit.getStatus() != VisitStatus.IN_PROGRESS && visit.getStatus() != VisitStatus.WAITING_FOR_RESULT) {
             throw new VisitInvalidStatusException("Chỉ được cập nhật chỉ số sinh tồn khi lượt khám đang diễn ra.");
         }
 
-        if (vitalSign.getMedicalRecordId() != null) {
+        var medicalRecordOpt = medicalRecordRepository.findByVisitId(visit.getId());
+        if (medicalRecordOpt.isPresent()) {
+            MedicalRecord record = medicalRecordOpt.get();
+            record.ensureEditable(); // QTN-07
+            if (vitalSign.getMedicalRecordId() == null) {
+                vitalSign.attachMedicalRecord(record.getId());
+            }
+        } else if (vitalSign.getMedicalRecordId() != null) {
             medicalRecordRepository.findById(vitalSign.getMedicalRecordId())
                     .ifPresent(MedicalRecord::ensureEditable); // QTN-07
         }
