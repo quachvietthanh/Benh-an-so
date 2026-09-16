@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Alert } from 'antd'
 import { useAuthContext } from '../context/AuthContext'
 import MainLayout from '../components/layout/MainLayout'
+import { getDefaultHomePath } from '../utils/roleRouting'
 
 import PatientRoute from '../components/common/PatientRoute'
 
@@ -87,11 +88,8 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
     return children
   }
 
-  return (
-    <div style={{ padding: 24 }}>
-      <Alert type="error" showIcon message="Bạn không có quyền truy cập chức năng này." />
-    </div>
-  )
+  const defaultHome = getDefaultHomePath(user?.roles, user?.permissions)
+  return <Navigate to={defaultHome} replace />
 }
 
 function AppRoutes() {
@@ -143,11 +141,11 @@ function AppRoutes() {
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedPermissions={['REPORT_VIEW', 'REPORT_EXPORT']} allowedRoles={['admin', 'manager']}><LazyPage><ReportsPage /></LazyPage></PrivateRoute>} />
-        <Route path="system-management" element={<PrivateRoute allowedPermissions={['ROLE_READ', 'ROLE_UPDATE', 'CLINIC_CONFIGURATION_READ', 'SYSTEM_CONFIG_READ', 'USER_READ', 'BACKUP_READ']} allowedRoles={['admin']}><LazyPage><SystemManagementPage /></LazyPage></PrivateRoute>} />
-        <Route path="backup-restore" element={<PrivateRoute allowedPermissions={['BACKUP_READ', 'BACKUP_CREATE', 'BACKUP_RESTORE']} allowedRoles={['admin']}><LazyPage><BackupRestorePage /></LazyPage></PrivateRoute>} />
+        <Route path="system-management" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><SystemManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="backup-restore" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><BackupRestorePage /></LazyPage></PrivateRoute>} />
         <Route path="audit-logs" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
         <Route path="medical-records/access-logs" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
-        <Route path="users" element={<PrivateRoute allowedPermissions={['USER_READ', 'USER_CREATE', 'USER_UPDATE']} allowedRoles={['admin']}><LazyPage><UsersPage /></LazyPage></PrivateRoute>} />
+        <Route path="users" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><UsersPage /></LazyPage></PrivateRoute>} />
         <Route path="services" element={<PrivateRoute allowedPermissions={['SERVICE_CATALOG_READ', 'SERVICE_CATALOG_CREATE', 'SERVICE_CATALOG_UPDATE', 'SERVICE_PRICE_MANAGE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><ServicesPage /></LazyPage></PrivateRoute>} />
         <Route path="system/clinical-services" element={<PrivateRoute allowedPermissions={['CLINICAL_SERVICE_MANAGE']} allowedRoles={['admin']}><LazyPage><ClinicalServiceManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="clinical-services" element={<Navigate to="/system/clinical-services" replace />} />

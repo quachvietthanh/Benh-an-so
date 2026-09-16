@@ -12,6 +12,14 @@ import MedicalRecordList from './MedicalRecordList'
 import PersonalDataConsentModal from '../components/patient/PersonalDataConsentModal'
 import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import { getPatientConsentStatus } from '../constants/patientConsentConstants'
+import EmergencyContactCard from '../components/patient/EmergencyContactCard'
+import EmergencyContactFields from '../components/patient/EmergencyContactFields'
+import PatientEmergencyHistoryModal from '../components/patient/PatientEmergencyHistoryModal'
+import {
+  validateEmergencyContactTriplet,
+  saveEmergencyContactHistory,
+  formatEmergencyContactDisplay,
+} from '../utils/emergencyContactValidation'
 
 
 const { Title } = Typography
@@ -33,6 +41,7 @@ function PatientDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [consentModalOpen, setConsentModalOpen] = useState(false)
+  const [emergencyHistoryOpen, setEmergencyHistoryOpen] = useState(false)
   const [form] = Form.useForm()
 
   const loadData = useCallback(async () => {
@@ -91,25 +100,75 @@ function PatientDetail() {
 
   const updatePatient = async (values) => {
     setSaving(true)
+    const tripletValidation = validateEmergencyContactTriplet({
+      emergencyContact: values.emergencyContact,
+      emergencyRelationship: values.emergencyRelationship,
+      emergencyPhone: values.emergencyPhone,
+    })
+    if (!tripletValidation.valid) {
+      const firstError = Object.values(tripletValidation.errors)[0]
+      message.error(firstError)
+      setSaving(false)
+      return
+    }
+
     const formattedDob = values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : patient.dateOfBirth
+    const newContact = values.emergencyContact?.trim() || null
+    const newRel = values.emergencyRelationship?.trim() || null
+    const newPhone = values.emergencyPhone?.trim() || null
+
+    const oldDisplay = formatEmergencyContactDisplay(patient) || 'Chưa thiết lập'
+    const newDisplay = (newContact || newPhone)
+      ? `${newContact || ''} (${newRel || 'Người thân'}) • ${newPhone || ''}`
+      : 'Đã xóa người liên hệ'
+
+    const hasEmergencyChanged =
+      (patient?.emergencyContact || null) !== newContact ||
+      (patient?.emergencyRelationship || null) !== newRel ||
+      (patient?.emergencyPhone || null) !== newPhone
+
     const updatedObj = {
       ...patient,
       ...values,
       dateOfBirth: formattedDob,
+      emergencyContact: newContact,
+      emergencyRelationship: newRel,
+      emergencyPhone: newPhone,
       active: patient.active !== undefined ? patient.active : true,
     }
 
     try {
-      const payload = { ...values, dateOfBirth: formattedDob, active: patient.active }
+      const payload = {
+        ...values,
+        dateOfBirth: formattedDob,
+        emergencyContact: newContact,
+        emergencyRelationship: newRel,
+        emergencyPhone: newPhone,
+        active: patient.active,
+      }
       const response = await patientApi.update(id, payload)
       const resPatient = response.data ? { ...updatedObj, ...response.data } : updatedObj
       saveStoredPatient(resPatient)
       setPatient(resPatient)
+      if (hasEmergencyChanged) {
+        saveEmergencyContactHistory(id, {
+          actor: user?.fullName || user?.username || 'Lễ tân',
+          oldValue: oldDisplay,
+          newValue: newDisplay,
+        })
+      }
       setEditOpen(false)
       message.success('Thông tin hồ sơ đã được cập nhật và lưu thành công')
     } catch {
       saveStoredPatient(updatedObj)
       setPatient(updatedObj)
+      if (hasEmergencyChanged) {
+        saveEmergencyContactHistory(id, {
+          actor: user?.fullName || user?.username || 'Lễ tân',
+          oldValue: oldDisplay,
+          newValue: newDisplay,
+        })
+      }
       setEditOpen(false)
       message.success('Thông tin hồ sơ đã được cập nhật và lưu thành công')
     } finally {
@@ -177,9 +236,29 @@ function PatientDetail() {
             </div>
           </Descriptions.Item>
           <Descriptions.Item label="Liên hệ khẩn cấp">{patient.emergencyContact || '---'}</Descriptions.Item>
-          <Descriptions.Item label="SĐT khẩn cấp">{patient.emergencyPhone || '---'}</Descriptions.Item>
+          <Descriptions.Item label="Quan hệ">{patient.emergencyRelationship ? <Tag color="blue">{patient.emergencyRelationship}</Tag> : '---'}</Descriptions.Item>
+          <Descriptions.Item label="SĐT khẩn cấp" span={2}>
+            {patient.emergencyPhone ? (
+              <Space size={8}>
+                <a href={`tel:${patient.emergencyPhone}`} style={{ fontWeight: 700, color: '#0284c7' }}>
+                  {patient.emergencyPhone}
+                </a>
+                <Button size="small" type="link" onClick={() => setEmergencyHistoryOpen(true)} style={{ padding: 0 }}>
+                  Xem lịch sử thay đổi
+                </Button>
+              </Space>
+            ) : '---'}
+          </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {patient && (
+        <EmergencyContactCard
+          patient={patient}
+          onOpenEdit={canManage ? openEdit : null}
+          onOpenHistory={() => setEmergencyHistoryOpen(true)}
+        />
+      )}
 
       {patient && (
         <PatientAllergyBanner
@@ -196,6 +275,12 @@ function PatientDetail() {
         patientName={patient?.fullName}
         agreedAt={patient?.consentAgreedAt}
         version={patient?.consentVersion || 'v1.0'}
+      />
+
+      <PatientEmergencyHistoryModal
+        open={emergencyHistoryOpen}
+        onClose={() => setEmergencyHistoryOpen(false)}
+        patient={patient}
       />
 
       {canViewHistory && (
@@ -269,10 +354,7 @@ function PatientDetail() {
             <Form.Item name="insuranceNumber" label="Mã BHYT" style={{ width: '100%' }}><Input /></Form.Item>
           </Space.Compact>
           <Form.Item name="bloodType" label="Nhóm máu"><Select allowClear options={bloodTypes.map((value) => ({ value, label: value }))} /></Form.Item>
-          <Space.Compact block>
-            <Form.Item name="emergencyContact" label="Người liên hệ khẩn cấp" style={{ width: '100%', marginRight: 12 }}><Input /></Form.Item>
-            <Form.Item name="emergencyPhone" label="SĐT khẩn cấp" style={{ width: '100%' }} rules={[phoneRule]}><Input /></Form.Item>
-          </Space.Compact>
+          <EmergencyContactFields form={form} layoutGrid={false} />
         </Form>
       </Modal>
     </div>
