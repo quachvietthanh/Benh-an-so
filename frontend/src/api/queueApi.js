@@ -41,6 +41,10 @@ const queueApi = {
 
   skip: (itemId, reason = 'Vắng mặt khi gọi') => axiosClient.post(`/queue-items/${itemId}/skip`, { reason }),
 
+  reQueue: (itemId) => axiosClient.post(`/queue-items/${itemId}/re-queue`),
+
+  getHistory: (itemId) => axiosClient.get(`/queue-items/${itemId}/history`),
+
   complete: (itemId) => axiosClient.post(`/queue-items/${itemId}/complete`),
 }
 
