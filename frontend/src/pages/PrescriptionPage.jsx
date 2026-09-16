@@ -69,6 +69,7 @@ import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailMo
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
 import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
+import PatientChronicDiseaseBanner from '../components/clinical/PatientChronicDiseaseBanner'
 import CancelPrescriptionModal from '../components/pharmacy/CancelPrescriptionModal.jsx'
 import {
   canCancelPrescription,
@@ -2031,6 +2032,18 @@ function PrescriptionPage() {
         onOpenLogs={() => setAllergyLogsModalOpen(true)}
         compact={false}
       />
+
+      {/* Banner tiền sử bệnh mạn tính - Căn cứ bắt buộc cho chẩn đoán & cảnh báo chống chỉ định thuốc */}
+      {(encounter?.patient?.id || record?.patientId || routeState.patient?.id || routeState.encounter?.patient?.id) && (
+        <PatientChronicDiseaseBanner
+          patientId={encounter?.patient?.id || record?.patientId || routeState.patient?.id || routeState.encounter?.patient?.id}
+          patientName={encounter?.patient?.fullName || record?.patientName || routeState.patient?.fullName || routeState.encounter?.patient?.fullName}
+          visitId={targetVisitId}
+          currentUser={currentUser}
+          doctorName={encounter?.doctor?.fullName || record?.doctorName || currentUser?.fullName}
+          compact={false}
+        />
+      )}
 
       {prescriptionBlockReason && (
         <Alert

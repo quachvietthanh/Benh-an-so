@@ -7,6 +7,7 @@ export const QUEUE_STATUS_META = {
   WAITING_FOR_RESULT: { label: 'Chờ kết quả CĐLS', tone: 'purple', color: '#9333ea', bg: '#faf5ff' },
   COMPLETED: { label: 'Hoàn thành', tone: 'gray', color: '#475569', bg: '#f8fafc' },
   CANCELLED: { label: 'Đã hủy', tone: 'red', color: '#dc2626', bg: '#fef2f2' },
+  EARLY_ENDED: { label: 'Kết thúc sớm', tone: 'orange', color: '#ea580c', bg: '#fff7ed' },
   SKIPPED: { label: 'Vắng mặt khi gọi', tone: 'orange', color: '#d97706', bg: '#fffbeb' },
 }
 
