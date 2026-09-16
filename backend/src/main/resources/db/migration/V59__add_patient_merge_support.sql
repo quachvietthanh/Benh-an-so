@@ -1,5 +1,5 @@
 -- =====================================================
--- V58__add_patient_merge_support.sql
+-- V59__add_patient_merge_support.sql
 -- NCL-02-CN-006 / QTN-33: Support duplicate patient record merging
 -- Adds status, merged_into_patient_id, merged_at, merged_by, merge_reason.
 -- Inserts PATIENT_MERGE permission and assigns to ADMIN, RECEPTIONIST, MANAGER.

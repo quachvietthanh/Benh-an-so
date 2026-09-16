@@ -14,8 +14,9 @@ Tài liệu này chốt toàn bộ hợp đồng API, phân quyền, quy tắc n
   - Hồ sơ nguồn trở thành **Chỉ đọc (Read-only)**: Mọi thao tác cập nhật (`PUT /patients/{id}`) trên hồ sơ đã gộp sẽ bị từ chối với lỗi `409 Conflict` kèm mã lỗi `PATIENT_ALREADY_MERGED` và liên kết đến hồ sơ đích (`NCL-02-CN-006-TC-03`).
   - Chặn gộp khi có xung đột định danh: Từ chối gộp nếu số CCCD/CMND khác nhau, hoặc thông tin nhân khẩu (ngày sinh, giới tính) khác nhau trong khi cả hai hồ sơ đều đã có bệnh án ký khóa chuyên môn.
 - **Chuyển giao dữ liệu toàn diện (NCL-02-CN-006-TC-01)**:
-  - Chuyển quyền sở hữu của tất cả các thực thể lâm sàng và tài chính sang hồ sơ đích: `visits`, `appointments`, `queue_items`, `clinical_orders`, `follow_up_reminders`, `post_care_logs`, `prescription_allergy_warning_logs`, `medical_record_access_logs`.
+  - Chuyển quyền sở hữu của tất cả các thực thể lâm sàng và tài chính sang hồ sơ đích: `visits`, `appointments`, `queue_items`, `clinical_orders`, `follow_up_reminders`, `post_care_logs`, `prescription_allergy_warning_logs`, `medical_record_access_logs`, `appointment_notification_logs`, `patient_family_histories`.
   - Khử trùng thông minh dị ứng thuốc (`patient_allergies`): Nếu chất gây dị ứng đã tồn tại trên hồ sơ đích (trùng `active_normalized_name`), bản ghi trùng trên hồ sơ nguồn sẽ bị deactivate thay vì báo lỗi vi phạm unique index.
+  - Khử trùng thông minh bệnh mạn tính (`patient_chronic_diseases`): Nếu mã bệnh mạn tính (`diagnosis_catalog_id`) đã tồn tại trên hồ sơ đích ở trạng thái `active = true`, bản ghi trùng trên hồ sơ nguồn sẽ được chuyển sang trạng thái `active = false` trước khi gán sang hồ sơ đích để ngăn ngừa vi phạm ràng buộc `uk_patient_active_chronic_disease`.
 - **Tra cứu lịch sử khám bệnh liền mạch (NCL-02-CN-006-TC-02)**:
   - Khi bác sĩ tra cứu lịch sử khám bệnh của hồ sơ đích (`GET /medical-history/patients/{targetPatientId}`), toàn bộ các lượt khám từ cả hồ sơ nguồn và hồ sơ đích sẽ hiển thị theo dòng thời gian thống nhất (`visitAt DESC`).
 - **Kiểm toán & Truy vết (NCL-02-CN-006-TC-05)**:

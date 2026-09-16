@@ -1,6 +1,5 @@
 package com.benhsoan.persistence.jpaRepository.patient;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,17 +50,10 @@ public interface JpaPatientRepository extends JpaRepository<PatientEntity, UUID>
               SELECT 1 FROM PatientEntity p2
               WHERE p2.id <> p.id
                 AND p2.status = 'ACTIVE'
-                AND LOWER(p2.fullName) = LOWER(p.fullName)
                 AND p2.dateOfBirth = p.dateOfBirth
                 AND REPLACE(p2.phone, ' ', '') = REPLACE(p.phone, ' ', '')
           )
-        ORDER BY p.fullName ASC, p.dateOfBirth ASC, p.createdAt ASC
+        ORDER BY p.dateOfBirth ASC, p.phone ASC, p.createdAt ASC
     """)
     List<PatientEntity> findSuspectedDuplicates();
-
-    List<PatientEntity> findAllByFullNameIgnoreCaseAndDateOfBirthAndPhone(
-            String fullName,
-            LocalDate dateOfBirth,
-            String phone
-    );
 }

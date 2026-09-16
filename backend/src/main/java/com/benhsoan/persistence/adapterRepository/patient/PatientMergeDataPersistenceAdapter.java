@@ -6,6 +6,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 import com.benhsoan.persistence.entity.appointment.AppointmentNotificationLogEntity;
+import com.benhsoan.persistence.entity.patient.PatientChronicDiseaseEntity;
+import com.benhsoan.persistence.entity.patient.PatientFamilyHistoryEntity;
 import com.benhsoan.port.outbound.repository.patient.PatientMergeDataPort;
 
 import jakarta.persistence.EntityManager;
@@ -86,7 +88,47 @@ public class PatientMergeDataPersistenceAdapter implements PatientMergeDataPort 
                                 .setParameter("sourceId", sourcePatientId)
                                 .executeUpdate();
 
+                // 11. Transfer Patient Chronic Diseases safely (deactivate duplicates to prevent unique constraint violation)
+                transferChronicDiseasesSafely(sourcePatientId, targetPatientId);
+
+                // 12. Transfer Patient Family Histories
+                transferFamilyHistories(sourcePatientId, targetPatientId);
+
                 return transferredVisits;
+        }
+
+        private void transferChronicDiseasesSafely(UUID sourcePatientId, UUID targetPatientId) {
+                // Query target patient's active diagnosis catalog IDs
+                List<UUID> targetActiveCatalogs = entityManager.createQuery(
+                                "SELECT c.diagnosisCatalogId FROM PatientChronicDiseaseEntity c WHERE c.patientId = :targetId AND c.active = true",
+                                UUID.class)
+                                .setParameter("targetId", targetPatientId)
+                                .getResultList();
+
+                // Deactivate source patient's duplicate active chronic diseases to prevent unique
+                // constraint violation (uk_patient_active_chronic_disease)
+                if (!targetActiveCatalogs.isEmpty()) {
+                        entityManager.createQuery(
+                                        "UPDATE PatientChronicDiseaseEntity c SET c.active = false WHERE c.patientId = :sourceId AND c.active = true AND c.diagnosisCatalogId IN :targetCatalogs")
+                                        .setParameter("sourceId", sourcePatientId)
+                                        .setParameter("targetCatalogs", targetActiveCatalogs)
+                                        .executeUpdate();
+                }
+
+                // Transfer all chronic diseases of source to target
+                entityManager.createQuery(
+                                "UPDATE PatientChronicDiseaseEntity c SET c.patientId = :targetId WHERE c.patientId = :sourceId")
+                                .setParameter("targetId", targetPatientId)
+                                .setParameter("sourceId", sourcePatientId)
+                                .executeUpdate();
+        }
+
+        private void transferFamilyHistories(UUID sourcePatientId, UUID targetPatientId) {
+                entityManager.createQuery(
+                                "UPDATE PatientFamilyHistoryEntity f SET f.patientId = :targetId WHERE f.patientId = :sourceId")
+                                .setParameter("targetId", targetPatientId)
+                                .setParameter("sourceId", sourcePatientId)
+                                .executeUpdate();
         }
 
         private void transferAllergiesSafely(UUID sourcePatientId, UUID targetPatientId) {

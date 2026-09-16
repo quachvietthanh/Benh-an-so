@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.patient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
@@ -101,5 +102,59 @@ class FindDuplicatePatientsServiceTest {
         assertEquals(1, results.size(), "Cả 2 hồ sơ được gom chung vào 1 nhóm nghi trùng");
         DuplicatePatientGroupResult group = results.get(0);
         assertEquals(2, group.candidates().size());
+    }
+
+    @Test
+    @DisplayName("UT-DUP-01 / P3: Gom nhóm thành công hồ sơ có tên tiếng Việt có dấu và không dấu")
+    void groupsPatientsWithAccentedAndUnaccentedNames() {
+        LocalDate dob = LocalDate.of(1995, 8, 20);
+        Patient p1 = Patient.create(
+                "BN000020", "Nguyễn Thị Thúy", dob, Gender.FEMALE,
+                "0912345678", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", operatorId);
+        p1.setIdForTest(UUID.randomUUID());
+
+        Patient p2 = Patient.create(
+                "BN000021", "Nguyen Thi Thuy", dob, Gender.FEMALE,
+                "0912345678", null, "456 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", operatorId);
+        p2.setIdForTest(UUID.randomUUID());
+
+        when(patientRepository.findSuspectedDuplicates()).thenReturn(List.of(p1, p2));
+
+        List<DuplicatePatientGroupResult> results = service.findDuplicates();
+
+        assertNotNull(results);
+        assertEquals(1, results.size(), "Cả 2 hồ sơ (có dấu và không dấu) được gom chung vào 1 nhóm nghi trùng");
+        DuplicatePatientGroupResult group = results.get(0);
+        assertEquals(2, group.candidates().size());
+    }
+
+    @Test
+    @DisplayName("UT-DUP-02 / P3: Loại trừ hai bệnh nhân khác tên dù trùng ngày sinh và số điện thoại")
+    void excludesDifferentNamesWithSameDobAndPhone() {
+        LocalDate dob = LocalDate.of(1998, 12, 1);
+        Patient p1 = Patient.create(
+                "BN000030", "Nguyễn Văn A", dob, Gender.MALE,
+                "0933445566", null, "123 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", operatorId);
+        p1.setIdForTest(UUID.randomUUID());
+
+        Patient p2 = Patient.create(
+                "BN000031", "Trần Thị B", dob, Gender.FEMALE,
+                "0933445566", null, "456 Street", null, null, BloodType.UNKNOWN,
+                null, null, null, null, null, null, null, null, null,
+                true, "v1.0", operatorId);
+        p2.setIdForTest(UUID.randomUUID());
+
+        when(patientRepository.findSuspectedDuplicates()).thenReturn(List.of(p1, p2));
+
+        List<DuplicatePatientGroupResult> results = service.findDuplicates();
+
+        assertNotNull(results);
+        assertTrue(results.isEmpty(), "Khác tên không tạo thành nhóm nghi trùng (size = 0)");
     }
 }
