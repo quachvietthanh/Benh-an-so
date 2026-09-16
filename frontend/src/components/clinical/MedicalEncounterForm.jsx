@@ -40,6 +40,7 @@ import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogD
 import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
 import DynamicMedicalRecordSections from './DynamicMedicalRecordSections'
 import PatientAllergyBanner from './PatientAllergyBanner'
+import EmergencyContactCard from '../patient/EmergencyContactCard'
 import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
@@ -139,13 +140,20 @@ function MedicalEncounterForm({
         </div>
       )}
       {selectedPatientObj?.id && (
-        <PatientAllergyBanner
-          patientId={selectedPatientObj?.id}
-          patientName={selectedPatientObj?.fullName}
-          visitId={encounterContext?.visit?.id}
-          currentUser={currentUser}
-          canWrite={isDoctor}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <PatientAllergyBanner
+            patientId={selectedPatientObj?.id}
+            patientName={selectedPatientObj?.fullName}
+            visitId={encounterContext?.visit?.id}
+            currentUser={currentUser}
+            canWrite={isDoctor}
+          />
+          {Boolean(selectedPatientObj.emergencyContact || selectedPatientObj.emergencyPhone) && (
+            <div>
+              <EmergencyContactCard patient={selectedPatientObj} compact />
+            </div>
+          )}
+        </div>
       )}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
@@ -263,6 +271,9 @@ function MedicalEncounterForm({
                       canWrite={isDoctor}
                       compact
                     />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <EmergencyContactCard patient={selectedPatientObj} compact />
                   </div>
                 </div>
               </div>

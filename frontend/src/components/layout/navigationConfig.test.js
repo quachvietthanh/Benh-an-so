@@ -45,3 +45,26 @@ test('getNavigationItems - includes /doctor-schedules for manager and admin', ()
   const hasDoctorScheduleClinicMgr = clinicMgrNav.some((item) => item.key === '/doctor-schedules')
   assert.equal(hasDoctorScheduleClinicMgr, true, 'Clinic Manager must see doctor schedule menu item')
 })
+
+test('getNavigationItems - restricts /users and /system-management to admin only', () => {
+  // 1. Receptionist with USER_READ permission (must NOT see /users or /system-management)
+  const receptionNav = getNavigationItems(['ROLE_RECEPTIONIST'], ['PATIENT_READ', 'USER_READ', 'APPOINTMENT_READ'])
+  assert.equal(receptionNav.some((item) => item.key === '/users'), false, 'Receptionist must not see /users')
+  assert.equal(receptionNav.some((item) => item.key === '/system-management'), false, 'Receptionist must not see /system-management')
+
+  // 2. Doctor (must NOT see /users or /system-management)
+  const doctorNav = getNavigationItems(['ROLE_DOCTOR'], ['USER_READ', 'MEDICAL_RECORD_READ'])
+  assert.equal(doctorNav.some((item) => item.key === '/users'), false, 'Doctor must not see /users')
+  assert.equal(doctorNav.some((item) => item.key === '/system-management'), false, 'Doctor must not see /system-management')
+
+  // 3. Manager (must NOT see /users or /system-management)
+  const managerNav = getNavigationItems(['ROLE_MANAGER'], ['USER_READ'])
+  assert.equal(managerNav.some((item) => item.key === '/users'), false, 'Manager must not see /users')
+  assert.equal(managerNav.some((item) => item.key === '/system-management'), false, 'Manager must not see /system-management')
+
+  // 4. Admin (MUST see /users and /system-management)
+  const adminNav = getNavigationItems(['ROLE_ADMIN'], [])
+  assert.equal(adminNav.some((item) => item.key === '/users'), true, 'Admin must see /users')
+  assert.equal(adminNav.some((item) => item.key === '/system-management'), true, 'Admin must see /system-management')
+})
+
