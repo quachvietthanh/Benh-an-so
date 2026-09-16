@@ -1,7 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,7 +36,6 @@ import com.benhsoan.adapter.inbound.rest.mapper.OverdueMedicalRecordRestMapper;
 import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.auditlog.AuditLog;
-import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
@@ -268,7 +266,7 @@ class OverdueMedicalRecordSecurityIntegrationTest {
                         .with(SecurityMockMvcRequestPostProcessors.user("manager")
                                 .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_REMIND_SIGN"))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -294,6 +292,6 @@ class OverdueMedicalRecordSecurityIntegrationTest {
                         .with(SecurityMockMvcRequestPostProcessors.user("doctor")
                                 .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_OVERDUE_READ"))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+                .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_ACCESS_DENIED"));
     }
 }

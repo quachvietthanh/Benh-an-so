@@ -23,7 +23,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicalrecord.MedicalRecordSigningReminder;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
