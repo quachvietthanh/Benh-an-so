@@ -44,7 +44,8 @@ final class DomainExceptionHttpStatusMapper {
                     SERVICE_CATALOG_NOT_FOUND,
                     SPECIALTY_NOT_FOUND,
                     USER_NOT_FOUND,
-                    VISIT_NOT_FOUND -> HttpStatus.NOT_FOUND;
+                    VISIT_NOT_FOUND,
+                    VITAL_SIGN_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ACCOUNT_DISABLED,
                     ACCOUNT_LOCKED,
                     DOCTOR_INACTIVE,

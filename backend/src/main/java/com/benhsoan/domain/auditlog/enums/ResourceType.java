@@ -57,6 +57,6 @@ public enum ResourceType {
     DOCTOR_SCHEDULE,
 
     DOCTOR_TIMEOFF,
-
-    ACCESS_LOG_REPORT
+    ACCESS_LOG_REPORT,
+    VITAL_SIGN
 }
