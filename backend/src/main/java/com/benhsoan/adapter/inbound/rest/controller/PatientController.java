@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -14,14 +15,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PatientRestMapper;
+import com.benhsoan.adapter.inbound.rest.request.patient.MergePatientsRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
+import com.benhsoan.adapter.inbound.rest.response.patient.DuplicatePatientGroupResponse;
+import com.benhsoan.adapter.inbound.rest.response.patient.MergePatientsResponse;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
+import com.benhsoan.port.dto.result.patient.MergePatientsResult;
 import com.benhsoan.port.dto.result.PatientResult;
+import com.benhsoan.port.inbound.patient.FindDuplicatePatientsUseCase;
 import com.benhsoan.port.inbound.patient.GetPatientByCodeUseCase;
 import com.benhsoan.port.inbound.patient.GetPatientByIdUseCase;
+import com.benhsoan.port.inbound.patient.MergePatientsUseCase;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
 import com.benhsoan.port.inbound.patient.SearchPatientUseCase;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
@@ -44,6 +51,10 @@ public class PatientController {
     private final GetPatientByIdUseCase getPatientByIdUseCase;
 
     private final GetPatientByCodeUseCase getPatientByCodeUseCase;
+
+    private final MergePatientsUseCase mergePatientsUseCase;
+
+    private final FindDuplicatePatientsUseCase findDuplicatePatientsUseCase;
 
     private final PatientRestMapper patientRestMapper;
 
@@ -126,4 +137,25 @@ public class PatientController {
         return patientRestMapper.toResponse(result);
     }
 
+    @PostMapping("/merge")
+    @RequirePermission("PATIENT_MERGE")
+    public MergePatientsResponse mergePatients(
+            @Valid @RequestBody MergePatientsRequest request
+    ) {
+        MergePatientsResult result =
+                mergePatientsUseCase.merge(
+                        patientRestMapper.toMergeCommand(request));
+
+        return patientRestMapper.toMergeResponse(result);
+    }
+
+    @GetMapping("/duplicates")
+    @RequirePermission("PATIENT_READ")
+    public List<DuplicatePatientGroupResponse> findDuplicates() {
+        return findDuplicatePatientsUseCase.findDuplicates().stream()
+                .map(patientRestMapper::toDuplicateGroupResponse)
+                .toList();
+    }
+
 }
+

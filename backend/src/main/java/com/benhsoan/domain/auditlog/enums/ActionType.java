@@ -42,5 +42,7 @@ public enum ActionType {
 
     RESTORE,
 
-    ACCESS_DENIED
+    ACCESS_DENIED,
+
+    MERGE
 }

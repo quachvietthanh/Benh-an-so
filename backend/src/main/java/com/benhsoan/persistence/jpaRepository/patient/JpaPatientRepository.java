@@ -41,4 +41,19 @@ public interface JpaPatientRepository extends JpaRepository<PatientEntity, UUID>
     @Query("select patient from PatientEntity patient where patient.id = :patientId")
     Optional<PatientEntity> findByIdForUpdate(@Param("patientId") UUID patientId);
 
+    @Query("""
+        SELECT p FROM PatientEntity p
+        WHERE p.status = 'ACTIVE'
+          AND p.phone IS NOT NULL
+          AND TRIM(p.phone) <> ''
+          AND EXISTS (
+              SELECT 1 FROM PatientEntity p2
+              WHERE p2.id <> p.id
+                AND p2.status = 'ACTIVE'
+                AND p2.dateOfBirth = p.dateOfBirth
+                AND REPLACE(p2.phone, ' ', '') = REPLACE(p.phone, ' ', '')
+          )
+        ORDER BY p.dateOfBirth ASC, p.phone ASC, p.createdAt ASC
+    """)
+    List<PatientEntity> findSuspectedDuplicates();
 }

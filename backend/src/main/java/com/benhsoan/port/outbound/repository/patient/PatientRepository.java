@@ -37,4 +37,6 @@ public interface PatientRepository {
     Optional<Patient> findByIdForUpdate(UUID patientId);
     
     Page<Patient> search( SearchPatientCommand command);
+
+    List<Patient> findSuspectedDuplicates();
 }
