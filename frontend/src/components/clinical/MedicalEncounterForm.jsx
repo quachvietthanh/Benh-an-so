@@ -41,6 +41,7 @@ import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
 import DynamicMedicalRecordSections from './DynamicMedicalRecordSections'
 import PatientAllergyBanner from './PatientAllergyBanner'
 import PatientChronicDiseaseBanner from './PatientChronicDiseaseBanner'
+import EmergencyContactCard from '../patient/EmergencyContactCard'
 import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
@@ -140,13 +141,20 @@ function MedicalEncounterForm({
         </div>
       )}
       {selectedPatientObj?.id && (
-        <PatientAllergyBanner
-          patientId={selectedPatientObj?.id}
-          patientName={selectedPatientObj?.fullName}
-          visitId={encounterContext?.visit?.id}
-          currentUser={currentUser}
-          canWrite={isDoctor}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <PatientAllergyBanner
+            patientId={selectedPatientObj?.id}
+            patientName={selectedPatientObj?.fullName}
+            visitId={encounterContext?.visit?.id}
+            currentUser={currentUser}
+            canWrite={isDoctor}
+          />
+          {Boolean(selectedPatientObj.emergencyContact || selectedPatientObj.emergencyPhone) && (
+            <div>
+              <EmergencyContactCard patient={selectedPatientObj} compact />
+            </div>
+          )}
+        </div>
       )}
       {selectedPatientObj?.id && (
         <PatientChronicDiseaseBanner
@@ -283,6 +291,9 @@ function MedicalEncounterForm({
                       doctorName={encounterContext?.doctor?.fullName || currentUser?.fullName}
                       compact
                     />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <EmergencyContactCard patient={selectedPatientObj} compact />
                   </div>
                 </div>
               </div>

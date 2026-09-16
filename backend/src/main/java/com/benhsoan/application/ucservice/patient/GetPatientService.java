@@ -24,14 +24,24 @@ public class GetPatientService implements GetPatientByIdUseCase, GetPatientByCod
     @Override
     public PatientResult getById(UUID patientId) {
         return patientRepository.findById(patientId)
-                .map(patientResultMapper::toResult)
+                .map(this::mapWithMergedCode)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
     }
 
     @Override
     public PatientResult getByCode(String patientCode) {
         return patientRepository.findByPatientCode(patientCode)
-                .map(patientResultMapper::toResult)
+                .map(this::mapWithMergedCode)
                 .orElseThrow(() -> new PatientNotFoundException(patientCode));
+    }
+
+    private PatientResult mapWithMergedCode(com.benhsoan.domain.patient.Patient patient) {
+        if (patient.isMerged() && patient.getMergedIntoPatientId() != null) {
+            String mergedIntoPatientCode = patientRepository.findById(patient.getMergedIntoPatientId())
+                    .map(com.benhsoan.domain.patient.Patient::getPatientCode)
+                    .orElse(null);
+            return patientResultMapper.toResult(patient, mergedIntoPatientCode);
+        }
+        return patientResultMapper.toResult(patient);
     }
 }

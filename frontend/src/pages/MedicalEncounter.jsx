@@ -2012,6 +2012,21 @@ function MedicalEncounter() {
               <Descriptions.Item label="Medical record ID">{viewing.medicalRecordId}</Descriptions.Item>
               <Descriptions.Item label="Visit">{viewing.visitCode || viewing.visitId}</Descriptions.Item>
               <Descriptions.Item label="Bệnh nhân">{viewing.patientName}</Descriptions.Item>
+              {(viewing.emergencyContact || viewing.emergencyPhone) && (
+                <Descriptions.Item label="Liên hệ khẩn cấp">
+                  <Space size={6}>
+                    <Text strong>{viewing.emergencyContact || 'Chưa rõ tên'}</Text>
+                    {viewing.emergencyRelationship && (
+                      <Tag color="magenta">{viewing.emergencyRelationship}</Tag>
+                    )}
+                    {viewing.emergencyPhone && (
+                      <a href={`tel:${viewing.emergencyPhone}`} style={{ color: '#2563eb', fontWeight: 600 }}>
+                        {viewing.emergencyPhone}
+                      </a>
+                    )}
+                  </Space>
+                </Descriptions.Item>
+              )}
               <Descriptions.Item label="Bác sĩ">{viewing.doctorName || '—'}</Descriptions.Item>
               <Descriptions.Item label="Triệu chứng">{viewing.symptoms || '—'}</Descriptions.Item>
               <Descriptions.Item label="Khám lâm sàng">{viewing.physicalExamination || '—'}</Descriptions.Item>
