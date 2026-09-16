@@ -74,6 +74,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_MISSING_AUTHORIZATION,
                     MEDICAL_RECORD_MISSING_DIAGNOSIS,
                     MEDICAL_RECORD_NOT_LOCKED,
+                    MEDICAL_RECORD_NOT_OVERDUE,
                     MEDICAL_RECORD_NOT_SIGNED,
                     PATIENT_CONSENT_REQUIRED,
                     CANNOT_MERGE_SAME_PATIENT,

@@ -65,7 +65,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = MedicalRecordController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({AnonymizationModeState.class,  MedicalRecordRestMapper.class, MedicalRecordDetailRestMapper.class, MedicalRecordDiagnosisRestMapper.class })
+@Import({AnonymizationModeState.class,  MedicalRecordRestMapper.class, MedicalRecordDetailRestMapper.class, MedicalRecordDiagnosisRestMapper.class, com.benhsoan.adapter.inbound.rest.mapper.OverdueMedicalRecordRestMapper.class })
 @DisplayName("MedicalRecordController - MockMvc Tests")
 class MedicalRecordControllerTest {
 
@@ -102,6 +102,12 @@ class MedicalRecordControllerTest {
     private IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
     @MockitoBean
     private GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.medicalrecord.GetOverdueMedicalRecordsUseCase getOverdueMedicalRecordsUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.medicalrecord.SendSigningReminderUseCase sendSigningReminderUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.medicalrecord.GetSigningRemindersUseCase getSigningRemindersUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;

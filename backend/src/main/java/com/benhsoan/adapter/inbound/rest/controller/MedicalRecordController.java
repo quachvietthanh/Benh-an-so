@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -54,6 +55,17 @@ import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetOverdueMedicalRecordsUseCase;
+import com.benhsoan.port.inbound.medicalrecord.SendSigningReminderUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetSigningRemindersUseCase;
+import com.benhsoan.port.dto.command.medicalrecord.GetOverdueMedicalRecordsQuery;
+import com.benhsoan.port.dto.command.medicalrecord.SendSigningReminderCommand;
+import com.benhsoan.adapter.inbound.rest.mapper.OverdueMedicalRecordRestMapper;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.SendSigningReminderRequest;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.OverdueMedicalRecordResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.SigningReminderResponse;
+
+import com.benhsoan.domain.shared.exception.ValidationException;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -79,9 +91,13 @@ public class MedicalRecordController {
     private final ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
     private final IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
     private final GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
+    private final GetOverdueMedicalRecordsUseCase getOverdueMedicalRecordsUseCase;
+    private final SendSigningReminderUseCase sendSigningReminderUseCase;
+    private final GetSigningRemindersUseCase getSigningRemindersUseCase;
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
     private final MedicalRecordDiagnosisRestMapper diagnosisMapper;
+    private final OverdueMedicalRecordRestMapper overdueMapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -128,7 +144,8 @@ public class MedicalRecordController {
 
     @PutMapping("/{medicalRecordId}")
     @RequirePermission("MEDICAL_RECORD_UPDATE")
-    public MedicalRecordResponse update(@PathVariable UUID medicalRecordId, @RequestBody UpdateMedicalRecordRequest request) {
+    public MedicalRecordResponse update(@PathVariable UUID medicalRecordId,
+            @RequestBody UpdateMedicalRecordRequest request) {
         return mapper.toResponse(updateMedicalRecordUseCase.update(medicalRecordId, mapper.toCommand(request)));
     }
 
@@ -136,8 +153,7 @@ public class MedicalRecordController {
     @RequirePermission("MEDICAL_RECORD_UPDATE")
     public MedicalRecordResponse applyTemplate(
             @PathVariable UUID medicalRecordId,
-            @Valid @RequestBody ApplyMedicalRecordTemplateRequest request
-    ) {
+            @Valid @RequestBody ApplyMedicalRecordTemplateRequest request) {
         return mapper.toResponse(applyMedicalRecordTemplateUseCase.apply(medicalRecordId, mapper.toCommand(request)));
     }
 
@@ -145,19 +161,16 @@ public class MedicalRecordController {
     @RequirePermission("MEDICAL_RECORD_UPDATE")
     public List<MedicalRecordDiagnosisResponse> replaceDiagnoses(
             @PathVariable UUID medicalRecordId,
-            @Valid @RequestBody ReplaceMedicalRecordDiagnosesRequest request
-    ) {
+            @Valid @RequestBody ReplaceMedicalRecordDiagnosesRequest request) {
         return diagnosisMapper.toResponses(replaceMedicalRecordDiagnosesUseCase.replace(
-                medicalRecordId, diagnosisMapper.toCommand(request)
-        ));
+                medicalRecordId, diagnosisMapper.toCommand(request)));
     }
 
     @PostMapping("/{medicalRecordId}/sign")
     @RequirePermission("MEDICAL_RECORD_UPDATE_STATUS")
     public MedicalRecordResponse sign(
             @PathVariable UUID medicalRecordId,
-            @RequestBody(required = false) com.benhsoan.adapter.inbound.rest.request.medicalrecord.SignMedicalRecordRequest request
-    ) {
+            @RequestBody(required = false) com.benhsoan.adapter.inbound.rest.request.medicalrecord.SignMedicalRecordRequest request) {
         return mapper.toResponse(signMedicalRecordUseCase.sign(medicalRecordId, mapper.toCommand(request)));
     }
 
@@ -177,8 +190,7 @@ public class MedicalRecordController {
     @RequirePermission("MEDICAL_RECORD_COPY")
     public ResponseEntity<ByteArrayResource> issueCopy(
             @PathVariable UUID medicalRecordId,
-            @Valid @RequestBody IssueMedicalRecordCopyRequest request
-    ) {
+            @Valid @RequestBody IssueMedicalRecordCopyRequest request) {
         var result = issueMedicalRecordCopyUseCase.issue(mapper.toCommand(medicalRecordId, request));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.fileName() + "\"")
@@ -197,7 +209,8 @@ public class MedicalRecordController {
     @PostMapping("/{medicalRecordId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
     @RequirePermission("MEDICAL_RECORD_UPDATE")
-    public MedicalRecordAmendmentResponse amend(@PathVariable UUID medicalRecordId, @Valid @RequestBody AmendMedicalRecordRequest request) {
+    public MedicalRecordAmendmentResponse amend(@PathVariable UUID medicalRecordId,
+            @Valid @RequestBody AmendMedicalRecordRequest request) {
         return mapper.toResponse(amendMedicalRecordUseCase.amend(medicalRecordId, mapper.toCommand(request)));
     }
 
@@ -214,11 +227,9 @@ public class MedicalRecordController {
             @RequestParam(required = false) Instant from,
             @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
+            @RequestParam(defaultValue = "20") int size) {
         return mapper.toAccessLogResponse(getMedicalRecordAccessLogsUseCase.getAccessLogs(
-                mapper.toQuery(null, null, medicalRecordId, null, from, to, page, size)
-        ));
+                mapper.toQuery(null, null, medicalRecordId, null, from, to, page, size)));
     }
 
     @GetMapping("/access-logs")
@@ -228,10 +239,48 @@ public class MedicalRecordController {
             @RequestParam(required = false) Instant from,
             @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
+            @RequestParam(defaultValue = "20") int size) {
         return mapper.toAccessLogResponse(getMedicalRecordAccessLogsUseCase.getAccessLogs(
-                mapper.toQuery(null, patientId, null, null, from, to, page, size)
-        ));
+                mapper.toQuery(null, patientId, null, null, from, to, page, size)));
+    }
+
+    @GetMapping("/overdue-signing")
+    @RequirePermission("MEDICAL_RECORD_OVERDUE_READ")
+    public Page<OverdueMedicalRecordResponse> getOverdueSigningMedicalRecords(
+            @RequestParam(required = false) UUID doctorId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        validatePage(page, size);
+        return overdueMapper.toResponsePage(
+                getOverdueMedicalRecordsUseCase.getOverdueRecords(
+                        new GetOverdueMedicalRecordsQuery(doctorId, PageRequest.of(page, size))));
+    }
+
+    @PostMapping("/{medicalRecordId}/signing-reminders")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequirePermission("MEDICAL_RECORD_REMIND_SIGN")
+    public SigningReminderResponse sendSigningReminder(
+            @PathVariable UUID medicalRecordId,
+            @Valid @RequestBody(required = false) SendSigningReminderRequest request) {
+        String channel = request != null ? request.channel() : null;
+        String notes = request != null ? request.notes() : null;
+        return overdueMapper.toResponse(
+                sendSigningReminderUseCase.sendReminder(
+                        new SendSigningReminderCommand(medicalRecordId, channel, notes)));
+    }
+
+    @GetMapping("/{medicalRecordId}/signing-reminders")
+    @RequirePermission("MEDICAL_RECORD_OVERDUE_READ")
+    public List<SigningReminderResponse> getSigningReminders(@PathVariable UUID medicalRecordId) {
+        return getSigningRemindersUseCase.getReminders(medicalRecordId)
+                .stream()
+                .map(overdueMapper::toResponse)
+                .toList();
+    }
+
+    private void validatePage(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ValidationException("Page must be non-negative and size must be between 1 and 100.");
+        }
     }
 }

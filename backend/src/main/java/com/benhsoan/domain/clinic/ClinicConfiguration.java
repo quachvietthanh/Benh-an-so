@@ -16,6 +16,9 @@ public class ClinicConfiguration {
     public static final int DEFAULT_RETENTION_YEARS = 10;
     public static final int MIN_RETENTION_YEARS = 10;
 
+    public static final int DEFAULT_SIGNING_DEADLINE_HOURS = 24;
+    public static final int MIN_SIGNING_DEADLINE_HOURS = 1;
+
     private static final int MAX_CLINIC_NAME_LENGTH = 150;
     private static final int MAX_ADDRESS_LENGTH = 500;
     private static final int MAX_PHONE_LENGTH = 30;
@@ -27,6 +30,7 @@ public class ClinicConfiguration {
     private LocalTime openingTime;
     private LocalTime closingTime;
     private int retentionYears;
+    private int signingDeadlineHours;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -38,6 +42,7 @@ public class ClinicConfiguration {
             LocalTime openingTime,
             LocalTime closingTime,
             int retentionYears,
+            int signingDeadlineHours,
             Instant createdAt,
             Instant updatedAt
     ) {
@@ -52,6 +57,7 @@ public class ClinicConfiguration {
         this.closingTime = Guard.require(closingTime, "Closing time");
         validateWorkingHours(this.openingTime, this.closingTime);
         this.retentionYears = validateRetentionYears(retentionYears);
+        this.signingDeadlineHours = validateSigningDeadlineHours(signingDeadlineHours);
         this.createdAt = Guard.require(createdAt, "Created at");
         this.updatedAt = Guard.require(updatedAt, "Updated at");
     }
@@ -64,7 +70,7 @@ public class ClinicConfiguration {
             LocalTime closingTime,
             Instant now
     ) {
-        return create(clinicName, address, phone, openingTime, closingTime, DEFAULT_RETENTION_YEARS, now);
+        return create(clinicName, address, phone, openingTime, closingTime, DEFAULT_RETENTION_YEARS, DEFAULT_SIGNING_DEADLINE_HOURS, now);
     }
 
     public static ClinicConfiguration create(
@@ -76,8 +82,21 @@ public class ClinicConfiguration {
             int retentionYears,
             Instant now
     ) {
+        return create(clinicName, address, phone, openingTime, closingTime, retentionYears, DEFAULT_SIGNING_DEADLINE_HOURS, now);
+    }
+
+    public static ClinicConfiguration create(
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            int retentionYears,
+            int signingDeadlineHours,
+            Instant now
+    ) {
         return new ClinicConfiguration(
-                SINGLETON_ID, clinicName, address, phone, openingTime, closingTime, retentionYears, now, now
+                SINGLETON_ID, clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, now, now
         );
     }
 
@@ -91,7 +110,7 @@ public class ClinicConfiguration {
             Instant createdAt,
             Instant updatedAt
     ) {
-        return restore(id, clinicName, address, phone, openingTime, closingTime, DEFAULT_RETENTION_YEARS, createdAt, updatedAt);
+        return restore(id, clinicName, address, phone, openingTime, closingTime, DEFAULT_RETENTION_YEARS, DEFAULT_SIGNING_DEADLINE_HOURS, createdAt, updatedAt);
     }
 
     public static ClinicConfiguration restore(
@@ -105,8 +124,23 @@ public class ClinicConfiguration {
             Instant createdAt,
             Instant updatedAt
     ) {
+        return restore(id, clinicName, address, phone, openingTime, closingTime, retentionYears, DEFAULT_SIGNING_DEADLINE_HOURS, createdAt, updatedAt);
+    }
+
+    public static ClinicConfiguration restore(
+            int id,
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            int retentionYears,
+            int signingDeadlineHours,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
         return new ClinicConfiguration(
-                id, clinicName, address, phone, openingTime, closingTime, retentionYears, createdAt, updatedAt
+                id, clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, createdAt, updatedAt
         );
     }
 
@@ -127,8 +161,28 @@ public class ClinicConfiguration {
         this.updatedAt = Guard.require(updatedAt, "Updated at");
     }
 
+    public void update(
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            int retentionYears,
+            int signingDeadlineHours,
+            Instant updatedAt
+    ) {
+        update(clinicName, address, phone, openingTime, closingTime, updatedAt);
+        this.retentionYears = validateRetentionYears(retentionYears);
+        this.signingDeadlineHours = validateSigningDeadlineHours(signingDeadlineHours);
+    }
+
     public void updateRetentionYears(int retentionYears, Instant updatedAt) {
         this.retentionYears = validateRetentionYears(retentionYears);
+        this.updatedAt = Guard.require(updatedAt, "Updated at");
+    }
+
+    public void updateSigningDeadlineHours(int signingDeadlineHours, Instant updatedAt) {
+        this.signingDeadlineHours = validateSigningDeadlineHours(signingDeadlineHours);
         this.updatedAt = Guard.require(updatedAt, "Updated at");
     }
 
@@ -162,5 +216,12 @@ public class ClinicConfiguration {
             throw new ValidationException("Retention years must be at least " + MIN_RETENTION_YEARS + ".");
         }
         return retentionYears;
+    }
+
+    private static int validateSigningDeadlineHours(int signingDeadlineHours) {
+        if (signingDeadlineHours < MIN_SIGNING_DEADLINE_HOURS) {
+            throw new ValidationException("Signing deadline hours must be at least " + MIN_SIGNING_DEADLINE_HOURS + ".");
+        }
+        return signingDeadlineHours;
     }
 }
