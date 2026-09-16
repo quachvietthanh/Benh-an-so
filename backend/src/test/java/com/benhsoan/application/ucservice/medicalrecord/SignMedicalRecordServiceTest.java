@@ -239,6 +239,29 @@ class SignMedicalRecordServiceTest {
     }
 
     @Test
+    @DisplayName("Ký bệnh án thành công khi lượt khám đã hoàn thành (COMPLETED)")
+    void completedVisitAllowsSigning() {
+        MedicalRecord record = openRecord();
+        Visit visit = Visit.restore(
+                visitId, "VIS-001", patientId, doctorId, null, null,
+                VisitType.WALK_IN, VisitStatus.COMPLETED, now.minusSeconds(3600), now.minusSeconds(1800), now,
+                "Consultation", null, doctorId, now, now
+        );
+
+        when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(record.getId())).thenReturn(true);
+        when(clockPort.now()).thenReturn(now);
+        when(medicalRecordRepository.save(any(MedicalRecord.class))).thenAnswer(i -> i.getArgument(0));
+
+        var result = service.sign(record.getId(), new SignMedicalRecordCommand("DR_SIG"));
+
+        assertEquals(MedicalRecordStatus.SIGNED, result.status());
+        assertEquals("DR_SIG", result.signatureData());
+    }
+
+    @Test
     @DisplayName("TC-05: Ký bệnh án khi lượt khám còn chỉ định CLS chưa có kết quả (chưa xác nhận) -> ném PendingClinicalOrdersWarningException")
     void pendingClinicalOrdersWithoutAcknowledgementThrowsException() {
         MedicalRecord record = openRecord();

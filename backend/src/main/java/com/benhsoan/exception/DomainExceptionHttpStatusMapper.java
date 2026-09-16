@@ -45,7 +45,8 @@ final class DomainExceptionHttpStatusMapper {
                     SERVICE_CATALOG_NOT_FOUND,
                     SPECIALTY_NOT_FOUND,
                     USER_NOT_FOUND,
-                    VISIT_NOT_FOUND -> HttpStatus.NOT_FOUND;
+                    VISIT_NOT_FOUND,
+                    VITAL_SIGN_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ACCOUNT_DISABLED,
                     ACCOUNT_LOCKED,
                     DOCTOR_INACTIVE,
@@ -75,6 +76,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_MISSING_AUTHORIZATION,
                     MEDICAL_RECORD_MISSING_DIAGNOSIS,
                     MEDICAL_RECORD_NOT_LOCKED,
+                    MEDICAL_RECORD_NOT_OVERDUE,
                     MEDICAL_RECORD_NOT_SIGNED,
                     PATIENT_CONSENT_REQUIRED,
                     CANNOT_MERGE_SAME_PATIENT,
