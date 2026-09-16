@@ -7,8 +7,6 @@ import java.util.UUID;
 
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
-import com.benhsoan.domain.patient.enums.PatientStatus;
-import com.benhsoan.domain.patient.exception.PatientAlreadyMergedException;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
 import com.benhsoan.domain.shared.Guard.Guard;
 
@@ -90,17 +88,6 @@ public class Patient {
 
     private boolean nonMedicalUseRestricted;
 
-    // Merge fields (NCL-02-CN-006 / QTN-33)
-    private PatientStatus status;
-
-    private UUID mergedIntoPatientId;
-
-    private Instant mergedAt;
-
-    private UUID mergedBy;
-
-    private String mergeReason;
-
     private Patient(
             UUID id,
             String patientCode,
@@ -133,12 +120,7 @@ public class Patient {
             boolean consentWithdrawn,
             Instant consentWithdrawnAt,
             String consentWithdrawnReason,
-            boolean nonMedicalUseRestricted,
-            PatientStatus status,
-            UUID mergedIntoPatientId,
-            Instant mergedAt,
-            UUID mergedBy,
-            String mergeReason
+            boolean nonMedicalUseRestricted
     ) {
 
         this.id = Objects.requireNonNull(id);
@@ -187,11 +169,6 @@ public class Patient {
         this.consentWithdrawnAt = consentWithdrawnAt;
         this.consentWithdrawnReason = consentWithdrawnReason;
         this.nonMedicalUseRestricted = nonMedicalUseRestricted;
-        this.status = status != null ? status : (active ? PatientStatus.ACTIVE : PatientStatus.INACTIVE);
-        this.mergedIntoPatientId = mergedIntoPatientId;
-        this.mergedAt = mergedAt;
-        this.mergedBy = mergedBy;
-        this.mergeReason = mergeReason;
     }
 
     public static Patient create(
@@ -280,12 +257,7 @@ public class Patient {
                 false,
                 null,
                 null,
-                false,
-                PatientStatus.ACTIVE,
-                null,
-                null,
-                null,
-                null
+                false
         );
     }
 
@@ -597,127 +569,9 @@ public class Patient {
         this.updatedAt = Instant.now();
     }
 
-    public void unlinkUser() {
-        this.userId = null;
-        this.updatedAt = Instant.now();
-    }
-
     public void deactivate() {
         this.active = false;
         this.updatedAt = Instant.now();
-    }
-
-    public boolean isMerged() {
-        return this.status == PatientStatus.MERGED;
-    }
-
-    public void markAsMerged(UUID targetPatientId, UUID mergedBy, String mergeReason) {
-        markAsMerged(targetPatientId, mergedBy, mergeReason, Instant.now());
-    }
-
-    public void markAsMerged(UUID targetPatientId, UUID mergedBy, String mergeReason, Instant mergedAt) {
-        if (this.isMerged()) {
-            throw new PatientAlreadyMergedException(this.id, this.mergedIntoPatientId);
-        }
-        this.status = PatientStatus.MERGED;
-        this.active = false;
-        this.mergedIntoPatientId = Objects.requireNonNull(targetPatientId, "Target patient ID cannot be null");
-        this.mergedBy = mergedBy;
-        this.mergeReason = mergeReason;
-        this.mergedAt = mergedAt != null ? mergedAt : Instant.now();
-        this.updatedAt = this.mergedAt;
-    }
-
-    public void setIdForTest(UUID id) {
-        this.id = id;
-    }
-
-    public void validateCanBeUpdated() {
-        if (this.isMerged()) {
-            throw new PatientAlreadyMergedException(this.id, this.mergedIntoPatientId);
-        }
-    }
-
-    public static Patient restore(
-            UUID id,
-            String patientCode,
-            String fullName,
-            LocalDate dateOfBirth,
-            Gender gender,
-            String phone,
-            String email,
-            String address,
-            String identityNumber,
-            String insuranceNumber,
-            BloodType bloodType,
-            String emergencyContact,
-            String emergencyRelationship,
-            String emergencyPhone,
-            String guardianName,
-            String guardianRelationship,
-            String guardianPhone,
-            String guardianIdentityNumber,
-            UUID guardianUserId,
-            String consentSignerName,
-            boolean active,
-            Instant createdAt,
-            Instant updatedAt,
-            UUID userId,
-            UUID createdBy,
-            boolean consentAgreed,
-            Instant consentAgreedAt,
-            String consentVersion,
-            boolean consentWithdrawn,
-            Instant consentWithdrawnAt,
-            String consentWithdrawnReason,
-            boolean nonMedicalUseRestricted,
-            PatientStatus status,
-            UUID mergedIntoPatientId,
-            Instant mergedAt,
-            UUID mergedBy,
-            String mergeReason
-    ) {
-        return new Patient(
-                id,
-                patientCode,
-                fullName,
-                dateOfBirth,
-                gender,
-                phone,
-                email,
-                address,
-                identityNumber,
-                insuranceNumber,
-                bloodType,
-                emergencyContact,
-                emergencyRelationship,
-                emergencyPhone,
-                guardianName,
-                guardianRelationship,
-                guardianPhone,
-                guardianIdentityNumber,
-                guardianUserId,
-                consentSignerName != null && !consentSignerName.isBlank()
-                        ? consentSignerName
-                        : (PatientMinorPolicy.isMinor(dateOfBirth) ? guardianName : fullName),
-                active,
-                createdAt,
-                updatedAt,
-                userId,
-                createdBy,
-                consentAgreed,
-                consentAgreedAt,
-                consentVersion,
-                consentWithdrawn,
-                consentWithdrawnAt,
-                consentWithdrawnReason,
-                nonMedicalUseRestricted,
-                status,
-                mergedIntoPatientId,
-                mergedAt,
-                mergedBy,
-                mergeReason
-        );
     }
 
     public static Patient restore(
@@ -755,7 +609,7 @@ public class Patient {
             boolean nonMedicalUseRestricted
     ) {
 
-        return restore(
+        return new Patient(
                 id,
                 patientCode,
                 fullName,
@@ -775,7 +629,9 @@ public class Patient {
                 guardianPhone,
                 guardianIdentityNumber,
                 guardianUserId,
-                consentSignerName,
+                consentSignerName != null && !consentSignerName.isBlank()
+                        ? consentSignerName
+                        : (PatientMinorPolicy.isMinor(dateOfBirth) ? guardianName : fullName),
                 active,
                 createdAt,
                 updatedAt,
@@ -787,12 +643,7 @@ public class Patient {
                 consentWithdrawn,
                 consentWithdrawnAt,
                 consentWithdrawnReason,
-                nonMedicalUseRestricted,
-                active ? PatientStatus.ACTIVE : PatientStatus.INACTIVE,
-                null,
-                null,
-                null,
-                null
+                nonMedicalUseRestricted
         );
     }
 

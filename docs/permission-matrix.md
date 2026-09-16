@@ -78,12 +78,9 @@
 | `/api/v1/appointments/me` | GET | ❌ | ✅ | ✅ | ❌ |
 |  |  |  |  |  |  |
 | **Vital Signs** |  |  |  |  |  |
-| `/api/v1/vital-signs` | POST | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/vital-signs` | GET | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/vital-signs/{id}` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/vital-signs` | POST | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/vital-signs/{id}` | PUT | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/vital-signs/visits/{visitId}` | GET | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/vital-signs/patients/{patientId}/history` | GET | ✅ | ✅ | ❌ | ❌ |
 |  |  |  |  |  |  |
 | **Diagnoses** |  |  |  |  |  |
 | `/api/v1/diagnosis-catalog` | GET | ✅ | ✅ | ❌ | ❌ |

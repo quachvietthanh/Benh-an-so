@@ -46,12 +46,7 @@ public class PatientPersistenceMapper {
                 entity.isConsentWithdrawn(),
                 entity.getConsentWithdrawnAt(),
                 entity.getConsentWithdrawnReason(),
-                entity.isNonMedicalUseRestricted(),
-                entity.getStatus(),
-                entity.getMergedIntoPatientId(),
-                entity.getMergedAt(),
-                entity.getMergedBy(),
-                entity.getMergeReason()
+                entity.isNonMedicalUseRestricted()
         );
     }
 
@@ -94,11 +89,6 @@ public class PatientPersistenceMapper {
                 .consentWithdrawnAt(domain.getConsentWithdrawnAt())
                 .consentWithdrawnReason(domain.getConsentWithdrawnReason())
                 .nonMedicalUseRestricted(domain.isNonMedicalUseRestricted())
-                .status(domain.getStatus())
-                .mergedIntoPatientId(domain.getMergedIntoPatientId())
-                .mergedAt(domain.getMergedAt())
-                .mergedBy(domain.getMergedBy())
-                .mergeReason(domain.getMergeReason())
                 .build();
     }
 }

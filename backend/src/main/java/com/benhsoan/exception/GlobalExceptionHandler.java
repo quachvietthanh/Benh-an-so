@@ -91,24 +91,6 @@ public class GlobalExceptionHandler {
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
     }
 
-    @ExceptionHandler(com.benhsoan.domain.patient.exception.PatientAlreadyMergedException.class)
-    public ResponseEntity<ApiErrorResponse> handlePatientAlreadyMerged(
-            com.benhsoan.domain.patient.exception.PatientAlreadyMergedException ex,
-            HttpServletRequest request
-    ) {
-        Map<String, Object> details = new HashMap<>();
-        if (ex.getMergedIntoPatientId() != null) {
-            details.put("mergedIntoPatientId", ex.getMergedIntoPatientId().toString());
-        }
-        return build(
-                DomainExceptionHttpStatusMapper.statusFor(ex.getCode()),
-                ex.getCode().name(),
-                ex.getMessage(),
-                request.getRequestURI(),
-                details.isEmpty() ? null : details
-        );
-    }
-
     @ExceptionHandler(com.benhsoan.domain.auth.exception.WeakPasswordException.class)
     public ResponseEntity<ApiErrorResponse> handleWeakPassword(
             com.benhsoan.domain.auth.exception.WeakPasswordException ex,

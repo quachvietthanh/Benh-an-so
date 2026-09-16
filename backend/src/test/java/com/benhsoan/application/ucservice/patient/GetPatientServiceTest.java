@@ -48,25 +48,4 @@ class GetPatientServiceTest {
 
         assertThrows(PatientNotFoundException.class, () -> service.getByCode("BN999999"));
     }
-
-    @Test
-    void getsMergedPatient_ResolvesMergedIntoPatientCode() {
-        UUID sourceId = UUID.randomUUID();
-        UUID targetId = UUID.randomUUID();
-
-        Patient sourcePatient = mock(Patient.class);
-        when(sourcePatient.isMerged()).thenReturn(true);
-        when(sourcePatient.getMergedIntoPatientId()).thenReturn(targetId);
-
-        Patient targetPatient = mock(Patient.class);
-        when(targetPatient.getPatientCode()).thenReturn("BN-TARGET");
-
-        PatientResult expected = mock(PatientResult.class);
-
-        when(patientRepository.findById(sourceId)).thenReturn(Optional.of(sourcePatient));
-        when(patientRepository.findById(targetId)).thenReturn(Optional.of(targetPatient));
-        when(patientResultMapper.toResult(sourcePatient, "BN-TARGET")).thenReturn(expected);
-
-        assertEquals(expected, service.getById(sourceId));
-    }
 }

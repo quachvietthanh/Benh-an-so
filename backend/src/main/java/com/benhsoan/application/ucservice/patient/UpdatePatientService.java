@@ -57,8 +57,6 @@ public class UpdatePatientService
         Patient patient = patientRepository.findByIdForUpdate(patientId)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
 
-        patient.validateCanBeUpdated();
-
         validate(
                 patientId,
                 command

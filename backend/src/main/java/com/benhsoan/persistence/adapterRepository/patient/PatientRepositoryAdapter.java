@@ -123,18 +123,4 @@ public class PatientRepositoryAdapter implements PatientRepository {
             command.pageable()
         ).map(mapper::toDomain);
     }
-
-    @Override
-    public List<Patient> findSuspectedDuplicates() {
-        return jpaRepository.findSuspectedDuplicates().stream()
-                .map(mapper::toDomain)
-                .toList();
-    }
-
-    @Override
-    public List<Patient> findDuplicatesByDemographics(String fullName, java.time.LocalDate dateOfBirth, String phone) {
-        return jpaRepository.findAllByFullNameIgnoreCaseAndDateOfBirthAndPhone(fullName, dateOfBirth, phone).stream()
-                .map(mapper::toDomain)
-                .toList();
-    }
 }

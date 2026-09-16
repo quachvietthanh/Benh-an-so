@@ -6,14 +6,12 @@ import java.util.UUID;
 
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
-import com.benhsoan.domain.patient.enums.PatientStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -128,28 +126,4 @@ public class PatientEntity {
 
     @Column(name = "non_medical_use_restricted", nullable = false)
     private boolean nonMedicalUseRestricted;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
-    @Builder.Default
-    private PatientStatus status = PatientStatus.ACTIVE;
-
-    @Column(name = "merged_into_patient_id", columnDefinition = "BINARY(16)")
-    private UUID mergedIntoPatientId;
-
-    @Column(name = "merged_at")
-    private Instant mergedAt;
-
-    @Column(name = "merged_by", columnDefinition = "BINARY(16)")
-    private UUID mergedBy;
-
-    @Column(name = "merge_reason", length = 500)
-    private String mergeReason;
-
-    @PrePersist
-    void prePersist() {
-        if (this.status == null) {
-            this.status = PatientStatus.ACTIVE;
-        }
-    }
 }

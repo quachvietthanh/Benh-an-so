@@ -37,8 +37,4 @@ public interface PatientRepository {
     Optional<Patient> findByIdForUpdate(UUID patientId);
     
     Page<Patient> search( SearchPatientCommand command);
-
-    List<Patient> findSuspectedDuplicates();
-
-    List<Patient> findDuplicatesByDemographics(String fullName, java.time.LocalDate dateOfBirth, String phone);
 }

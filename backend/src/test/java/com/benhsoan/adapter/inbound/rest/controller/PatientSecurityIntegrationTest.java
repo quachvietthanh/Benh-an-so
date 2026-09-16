@@ -64,8 +64,6 @@ class PatientSecurityIntegrationTest {
     @MockitoBean private UpdatePatientUseCase updatePatientUseCase;
     @MockitoBean private GetPatientByIdUseCase getPatientByIdUseCase;
     @MockitoBean private GetPatientByCodeUseCase getPatientByCodeUseCase;
-    @MockitoBean private com.benhsoan.port.inbound.patient.MergePatientsUseCase mergePatientsUseCase;
-    @MockitoBean private com.benhsoan.port.inbound.patient.FindDuplicatePatientsUseCase findDuplicatePatientsUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -141,41 +139,6 @@ class PatientSecurityIntegrationTest {
 
         mockMvc.perform(post("/patients").contentType(MediaType.APPLICATION_JSON).content(patientRequest())
                         .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void allowsPatientMergeWithPatientMergePermissionOnly() throws Exception {
-        UUID sourceId = UUID.randomUUID();
-        UUID targetId = UUID.randomUUID();
-        com.benhsoan.port.dto.result.patient.MergePatientsResult mergeResult =
-                new com.benhsoan.port.dto.result.patient.MergePatientsResult(
-                        sourceId, "BN000001", targetId, "BN000002", 2, UUID.randomUUID(), "Gộp hồ sơ trùng", Instant.now());
-        when(mergePatientsUseCase.merge(any())).thenReturn(mergeResult);
-
-        String mergeBody = """
-                {"sourcePatientId":"%s","targetPatientId":"%s","reason":"Gộp hồ sơ trùng"}
-                """.formatted(sourceId, targetId);
-
-        mockMvc.perform(post("/patients/merge").contentType(MediaType.APPLICATION_JSON).content(mergeBody)
-                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_MERGE"))))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(post("/patients/merge").contentType(MediaType.APPLICATION_JSON).content(mergeBody)
-                        .with(user("doctor").roles("DOCTOR").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void allowsFindDuplicatesWithPatientReadPermission() throws Exception {
-        when(findDuplicatePatientsUseCase.findDuplicates()).thenReturn(List.of());
-
-        mockMvc.perform(get("/patients/duplicates")
-                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(get("/patients/duplicates")
-                        .with(user("pharmacist").roles("PHARMACIST")))
                 .andExpect(status().isForbidden());
     }
 

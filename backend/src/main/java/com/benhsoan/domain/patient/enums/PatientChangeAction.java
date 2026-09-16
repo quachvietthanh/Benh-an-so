@@ -6,7 +6,6 @@ public enum PatientChangeAction {
 
     UPDATE,
 
-    DELETE,
+    DELETE
 
-    MERGE
 }
