@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -107,6 +108,8 @@ class GetPatientMedicalHistoryDetailServiceTest {
         when(record.isContentLocked()).thenReturn(true);
         when(record.getId()).thenReturn(recordId);
         when(record.getDoctorInstructions()).thenReturn("Rest and hydrate");
+        when(record.getTreatmentPlan()).thenReturn("Drink water and rest for 3 days");
+        when(record.getRevisitDate()).thenReturn(LocalDate.of(2026, 9, 1));
         when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.of(record));
 
         MedicalRecordDiagnosis d1 = mock(MedicalRecordDiagnosis.class);
@@ -142,6 +145,8 @@ class GetPatientMedicalHistoryDetailServiceTest {
         assertEquals("Dr. A", result.doctorName());
         assertEquals("Internal Medicine", result.specialtyName());
         assertEquals("Rest and hydrate", result.doctorAdvice());
+        assertEquals("Drink water and rest for 3 days", result.treatmentPlan());
+        assertEquals(LocalDate.of(2026, 9, 1), result.revisitDate());
         assertEquals(1, result.diagnoses().size());
         assertEquals("I10", result.diagnoses().get(0).icd10Code());
         assertEquals(1, result.prescriptionItems().size());

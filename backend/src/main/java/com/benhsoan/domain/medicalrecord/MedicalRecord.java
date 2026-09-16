@@ -1,6 +1,7 @@
 package com.benhsoan.domain.medicalrecord;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -23,6 +24,7 @@ public class MedicalRecord {
 
     private UUID id, visitId, signedBy, lockedBy, createdBy, updatedBy, appliedTemplateVersionId, templateAppliedBy;
     private String chiefComplaint, symptoms, medicalHistory, physicalExamination, clinicalProgress, treatmentPlan, doctorInstructions, conclusion;
+    private LocalDate revisitDate;
     private String signatureData;
     private MedicalRecordStatus status;
     private Instant signedAt, lockedAt, createdAt, updatedAt, templateAppliedAt;
@@ -38,6 +40,7 @@ public class MedicalRecord {
             String treatmentPlan,
             String doctorInstructions,
             String conclusion,
+            LocalDate revisitDate,
             MedicalRecordStatus status,
             String signatureData,
             Instant signedAt,
@@ -62,6 +65,7 @@ public class MedicalRecord {
         this.treatmentPlan = treatmentPlan;
         this.doctorInstructions = doctorInstructions;
         this.conclusion = conclusion;
+        this.revisitDate = revisitDate;
         this.status = Objects.requireNonNull(status);
         this.signatureData = signatureData;
         this.signedAt = signedAt;
@@ -90,6 +94,27 @@ public class MedicalRecord {
             UUID createdBy,
             Instant createdAt
     ) {
+        return create(
+                visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion,
+                null, createdBy, createdAt
+        );
+    }
+
+    public static MedicalRecord create(
+            UUID visitId,
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            LocalDate revisitDate,
+            UUID createdBy,
+            Instant createdAt
+    ) {
         return new MedicalRecord(
                 UUID.randomUUID(),
                 visitId,
@@ -101,6 +126,7 @@ public class MedicalRecord {
                 treatmentPlan,
                 doctorInstructions,
                 conclusion,
+                revisitDate,
                 MedicalRecordStatus.DRAFT,
                 null,
                 null,
@@ -139,7 +165,7 @@ public class MedicalRecord {
             UUID updatedBy,
             Instant updatedAt
     ) {
-        return new MedicalRecord(
+        return restore(
                 id,
                 visitId,
                 chiefComplaint,
@@ -150,6 +176,7 @@ public class MedicalRecord {
                 treatmentPlan,
                 doctorInstructions,
                 conclusion,
+                null,
                 status,
                 signatureData,
                 signedAt,
@@ -173,8 +200,21 @@ public class MedicalRecord {
             Instant lockedAt, UUID lockedBy, UUID createdBy, Instant createdAt, UUID updatedBy, Instant updatedAt,
             UUID appliedTemplateVersionId, UUID templateAppliedBy, Instant templateAppliedAt
     ) {
+        return restore(id, visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, null, status, signatureData, signedAt,
+                signedBy, lockedAt, lockedBy, createdBy, createdAt, updatedBy, updatedAt, appliedTemplateVersionId,
+                templateAppliedBy, templateAppliedAt);
+    }
+
+    public static MedicalRecord restore(
+            UUID id, UUID visitId, String chiefComplaint, String symptoms, String medicalHistory,
+            String physicalExamination, String clinicalProgress, String treatmentPlan, String doctorInstructions,
+            String conclusion, LocalDate revisitDate, MedicalRecordStatus status, String signatureData, Instant signedAt, UUID signedBy,
+            Instant lockedAt, UUID lockedBy, UUID createdBy, Instant createdAt, UUID updatedBy, Instant updatedAt,
+            UUID appliedTemplateVersionId, UUID templateAppliedBy, Instant templateAppliedAt
+    ) {
         return new MedicalRecord(id, visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
-                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, status, signatureData, signedAt,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, revisitDate, status, signatureData, signedAt,
                 signedBy, lockedAt, lockedBy, createdBy, createdAt, updatedBy, updatedAt, appliedTemplateVersionId,
                 templateAppliedBy, templateAppliedAt);
     }
@@ -199,7 +239,7 @@ public class MedicalRecord {
             UUID updatedBy,
             Instant updatedAt
     ) {
-        return new MedicalRecord(
+        return restore(
                 id,
                 visitId,
                 chiefComplaint,
@@ -210,6 +250,7 @@ public class MedicalRecord {
                 treatmentPlan,
                 doctorInstructions,
                 conclusion,
+                null,
                 status,
                 signatureData,
                 null,
@@ -245,7 +286,7 @@ public class MedicalRecord {
             UUID updatedBy,
             Instant updatedAt
     ) {
-        return new MedicalRecord(
+        return restore(
                 id,
                 visitId,
                 chiefComplaint,
@@ -256,6 +297,7 @@ public class MedicalRecord {
                 treatmentPlan,
                 doctorInstructions,
                 conclusion,
+                null,
                 status,
                 null,
                 null,
@@ -284,7 +326,7 @@ public class MedicalRecord {
     public boolean hasClinicalContent() {
         return hasText(chiefComplaint) || hasText(symptoms) || hasText(medicalHistory)
                 || hasText(physicalExamination) || hasText(clinicalProgress) || hasText(treatmentPlan)
-                || hasText(doctorInstructions) || hasText(conclusion);
+                || hasText(doctorInstructions) || hasText(conclusion) || revisitDate != null;
     }
 
     public void open(UUID by, Instant at) {
@@ -308,7 +350,27 @@ public class MedicalRecord {
             UUID by,
             Instant at
     ) {
+        updateContent(chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion,
+                this.revisitDate, null, by, at);
+    }
+
+    public void updateContent(
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            LocalDate revisitDate,
+            LocalDate visitDate,
+            UUID by,
+            Instant at
+    ) {
         ensureEditable();
+        validateRevisitDate(revisitDate, visitDate);
         this.chiefComplaint = chiefComplaint;
         this.symptoms = symptoms;
         this.medicalHistory = medicalHistory;
@@ -317,8 +379,32 @@ public class MedicalRecord {
         this.treatmentPlan = treatmentPlan;
         this.doctorInstructions = doctorInstructions;
         this.conclusion = conclusion;
+        this.revisitDate = revisitDate;
         this.updatedBy = Objects.requireNonNull(by);
         this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void updateInstructionsAndTreatmentPlan(
+            String treatmentPlan,
+            String doctorInstructions,
+            LocalDate revisitDate,
+            LocalDate visitDate,
+            UUID by,
+            Instant at
+    ) {
+        ensureEditable();
+        validateRevisitDate(revisitDate, visitDate);
+        this.treatmentPlan = treatmentPlan;
+        this.doctorInstructions = doctorInstructions;
+        this.revisitDate = revisitDate;
+        this.updatedBy = Objects.requireNonNull(by);
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    private void validateRevisitDate(LocalDate revisitDate, LocalDate visitDate) {
+        if (revisitDate != null && visitDate != null && revisitDate.isBefore(visitDate)) {
+            throw new ValidationException("Ngày tái khám không được trước ngày khám.");
+        }
     }
 
     public void sign(String signatureData, UUID doctorId, Instant at) {

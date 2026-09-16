@@ -56,6 +56,7 @@ import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.UpdateInstructionsAndTreatmentPlanUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -82,6 +83,8 @@ class MedicalRecordControllerTest {
     private ApplyMedicalRecordTemplateUseCase applyMedicalRecordTemplateUseCase;
     @MockitoBean
     private UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
+    @MockitoBean
+    private UpdateInstructionsAndTreatmentPlanUseCase updateInstructionsAndTreatmentPlanUseCase;
     @MockitoBean
     private LockMedicalRecordUseCase lockMedicalRecordUseCase;
     @MockitoBean
@@ -395,5 +398,58 @@ class MedicalRecordControllerTest {
                         .content("{\"templateId\":\"" + templateId + "\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/instructions-and-treatment-plan - 200 OK cập nhật lời dặn, kế hoạch điều trị và mốc tái khám")
+    void updateInstructionsAndTreatmentPlanReturns200() throws Exception {
+        LocalDate revisitDate = LocalDate.of(2026, 8, 27);
+        MedicalRecordResult result = new MedicalRecordResult(
+                recordId, visitId, "Headache", null, null, null, null,
+                "Điều trị ngoại trú 7 ngày", "Nghỉ ngơi, uống đủ nước", "Ổn định",
+                revisitDate, MedicalRecordStatus.DRAFT, null, null, null, null, null,
+                doctorId, now, doctorId, now, null
+        );
+
+        when(updateInstructionsAndTreatmentPlanUseCase.updateInstructionsAndTreatmentPlan(
+                org.mockito.ArgumentMatchers.eq(recordId),
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(result);
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/instructions-and-treatment-plan", recordId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                    "treatmentPlan": "Điều trị ngoại trú 7 ngày",
+                                    "doctorInstructions": "Nghỉ ngơi, uống đủ nước",
+                                    "revisitDate": "2026-08-27"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(recordId.toString()))
+                .andExpect(jsonPath("$.treatmentPlan").value("Điều trị ngoại trú 7 ngày"))
+                .andExpect(jsonPath("$.doctorInstructions").value("Nghỉ ngơi, uống đủ nước"))
+                .andExpect(jsonPath("$.revisitDate").value("2026-08-27"));
+    }
+
+    @Test
+    @DisplayName("PUT /medical-records/{id}/instructions-and-treatment-plan - 409 Conflict khi bệnh án đã ký hoặc khóa")
+    void updateInstructionsAndTreatmentPlanReturns409WhenLocked() throws Exception {
+        when(updateInstructionsAndTreatmentPlanUseCase.updateInstructionsAndTreatmentPlan(
+                org.mockito.ArgumentMatchers.eq(recordId),
+                org.mockito.ArgumentMatchers.any()
+        )).thenThrow(new com.benhsoan.domain.medicalrecord.exception.MedicalRecordAlreadyLockedException());
+
+        mockMvc.perform(put("/medical-records/{medicalRecordId}/instructions-and-treatment-plan", recordId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                    "treatmentPlan": "Kế hoạch",
+                                    "doctorInstructions": "Lời dặn",
+                                    "revisitDate": "2026-08-27"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_LOCKED"));
     }
 }

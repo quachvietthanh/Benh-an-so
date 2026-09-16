@@ -83,6 +83,7 @@ class MedicalRecordAmendmentSecurityIntegrationTest {
     @MockitoBean private com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordTemplateSelectionUseCase getMedicalRecordTemplateSelectionUseCase;
     @MockitoBean private com.benhsoan.port.inbound.medicalrecord.ApplyMedicalRecordTemplateUseCase applyMedicalRecordTemplateUseCase;
     @MockitoBean private UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.UpdateInstructionsAndTreatmentPlanUseCase updateInstructionsAndTreatmentPlanUseCase;
     @MockitoBean private LockMedicalRecordUseCase lockMedicalRecordUseCase;
     @MockitoBean private SignMedicalRecordUseCase signMedicalRecordUseCase;
     @MockitoBean private AmendMedicalRecordUseCase amendMedicalRecordUseCase;

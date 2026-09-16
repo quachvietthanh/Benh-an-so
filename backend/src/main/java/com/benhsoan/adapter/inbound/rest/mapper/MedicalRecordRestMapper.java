@@ -10,6 +10,7 @@ import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecor
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ApplyMedicalRecordTemplateRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.IssueMedicalRecordCopyRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateInstructionsAndTreatmentPlanRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAmendmentResponse;
@@ -27,6 +28,7 @@ import com.benhsoan.port.dto.command.medicalrecord.ApplyMedicalRecordTemplateCom
 import com.benhsoan.port.dto.command.medicalrecord.CreateMedicalRecordCommand;
 import com.benhsoan.port.dto.command.medicalrecord.GetMedicalRecordAccessLogsQuery;
 import com.benhsoan.port.dto.command.medicalrecord.IssueMedicalRecordCopyCommand;
+import com.benhsoan.port.dto.command.medicalrecord.UpdateInstructionsAndTreatmentPlanCommand;
 import com.benhsoan.port.dto.command.medicalrecord.UpdateMedicalRecordCommand;
 import com.benhsoan.port.dto.result.MedicalRecordAccessLogResult;
 import com.benhsoan.port.dto.result.AppliedMedicalRecordTemplateResult;
@@ -44,13 +46,21 @@ public class MedicalRecordRestMapper {
     public CreateMedicalRecordCommand toCommand(CreateMedicalRecordRequest request) {
         return new CreateMedicalRecordCommand(request.visitId(), request.chiefComplaint(), request.symptoms(),
                 request.medicalHistory(), request.physicalExamination(), request.clinicalProgress(),
-                request.treatmentPlan(), request.doctorInstructions(), request.conclusion());
+                request.treatmentPlan(), request.doctorInstructions(), request.conclusion(), request.revisitDate());
     }
 
     public UpdateMedicalRecordCommand toCommand(UpdateMedicalRecordRequest request) {
         return new UpdateMedicalRecordCommand(request.chiefComplaint(), request.symptoms(), request.medicalHistory(),
                 request.physicalExamination(), request.clinicalProgress(), request.treatmentPlan(),
-                request.doctorInstructions(), request.conclusion());
+                request.doctorInstructions(), request.conclusion(), request.revisitDate());
+    }
+
+    public UpdateInstructionsAndTreatmentPlanCommand toCommand(UpdateInstructionsAndTreatmentPlanRequest request) {
+        return new UpdateInstructionsAndTreatmentPlanCommand(
+                request.treatmentPlan(),
+                request.doctorInstructions(),
+                request.revisitDate()
+        );
     }
 
     public AmendMedicalRecordCommand toCommand(AmendMedicalRecordRequest request) {
@@ -91,7 +101,7 @@ public class MedicalRecordRestMapper {
     public MedicalRecordResponse toResponse(MedicalRecordResult result) {
         return new MedicalRecordResponse(result.id(), result.visitId(), result.chiefComplaint(), result.symptoms(),
                 result.medicalHistory(), result.physicalExamination(), result.clinicalProgress(), result.treatmentPlan(),
-                result.doctorInstructions(), result.conclusion(), result.status(), result.signatureData(),
+                result.doctorInstructions(), result.conclusion(), result.revisitDate(), result.status(), result.signatureData(),
                 result.signedAt(), result.signedBy(), result.lockedAt(), result.lockedBy(),
                 result.createdBy(), result.createdAt(), result.updatedBy(), result.updatedAt(),
                 toResponse(result.appliedTemplate()));
