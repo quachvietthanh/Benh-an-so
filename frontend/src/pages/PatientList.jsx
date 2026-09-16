@@ -38,6 +38,8 @@ import { useAuthContext } from '../context/AuthContext'
 import { formatDate } from '../utils/helpers'
 import PersonalDataConsentField from '../components/patient/PersonalDataConsentField'
 import { getPatientConsentStatus } from '../constants/patientConsentConstants'
+import EmergencyContactFields from '../components/patient/EmergencyContactFields'
+import { validateEmergencyContactTriplet } from '../utils/emergencyContactValidation'
 
 const { RangePicker } = DatePicker
 
@@ -157,12 +159,27 @@ function PatientList() {
   const handleRegister = async (values) => {
     setSaving(true)
     try {
+      const tripletValidation = validateEmergencyContactTriplet({
+        emergencyContact: values.emergencyContact,
+        emergencyRelationship: values.emergencyRelationship,
+        emergencyPhone: values.emergencyPhone,
+      })
+      if (!tripletValidation.valid) {
+        const firstError = Object.values(tripletValidation.errors)[0]
+        message.error(firstError)
+        setSaving(false)
+        return
+      }
+
       const payload = {
         ...values,
         dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null,
         gender: values.gender ? values.gender.toUpperCase() : 'OTHER',
         phone: values.phone || null,
         insuranceNumber: values.insuranceNumber || null,
+        emergencyContact: values.emergencyContact?.trim() || null,
+        emergencyRelationship: values.emergencyRelationship?.trim() || null,
+        emergencyPhone: values.emergencyPhone?.trim() || null,
         consentAgreed: values.consentAgreed ?? true,
         consentVersion: 'v1.0',
       }
@@ -544,8 +561,9 @@ ${rowsXml}
             <Form.Item className="patient-register-full" name="address" label="Địa chỉ"><Input placeholder="Nhập địa chỉ hiện tại" /></Form.Item>
             <Form.Item name="identityNumber" label="CCCD/CMND"><Input placeholder="Nhập số CCCD/CMND" /></Form.Item>
             <Form.Item name="insuranceNumber" label="Mã BHYT"><Input placeholder="Nhập mã bảo hiểm y tế" /></Form.Item>
-            <Form.Item name="emergencyContact" label="Người liên hệ khẩn cấp"><Input placeholder="Họ và tên người liên hệ" /></Form.Item>
-            <Form.Item name="emergencyPhone" label="SĐT khẩn cấp"><Input placeholder="Số điện thoại liên hệ" /></Form.Item>
+            <div className="patient-register-full">
+              <EmergencyContactFields form={registerForm} layoutGrid />
+            </div>
           </div>
           <PersonalDataConsentField patientName={Form.useWatch('fullName', registerForm)} />
         </Form>
