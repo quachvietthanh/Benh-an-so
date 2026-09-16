@@ -2,6 +2,7 @@ package com.benhsoan.port.outbound.repository.inventory;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import com.benhsoan.domain.inventory.MedicineBatch;
 public interface MedicineBatchRepository {
 
     List<MedicineBatch> findAll();
+
+    List<MedicineBatch> findAllById(Collection<UUID> ids);
 
     List<MedicineBatch> findByMedicineId(UUID medicineId);
 

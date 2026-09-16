@@ -1,11 +1,13 @@
 package com.benhsoan.persistence.adapterRepository.prescription;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.prescription.Prescription;
+import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
@@ -47,16 +50,52 @@ public class PrescriptionRepositoryAdapter
                 mapper.toEntity(prescription)
         );
 
-        itemJpaRepository.deleteAllByPrescriptionId(savedEntity.getId());
+        List<PrescriptionItemEntity> existingItems = itemJpaRepository
+                .findByPrescriptionIdOrderByCreatedAtAsc(savedEntity.getId());
+        Map<UUID, PrescriptionItemEntity> existingById = existingItems.stream()
+                .collect(Collectors.toMap(
+                        PrescriptionItemEntity::getId,
+                        Function.identity()
+                ));
 
-        List<PrescriptionItemEntity> itemEntities = prescription.getItems()
-                .stream()
-                .map(itemMapper::toEntity)
-                .toList();
+        List<PrescriptionItemEntity> itemsToPersist = new ArrayList<>();
+        for (PrescriptionItem item : prescription.getItems()) {
+            PrescriptionItemEntity existing = existingById.remove(item.getId());
+            if (existing == null) {
+                itemsToPersist.add(itemMapper.toEntity(item));
+            } else {
+                updateItemInPlace(existing, item);
+                itemsToPersist.add(existing);
+            }
+        }
 
-        List<PrescriptionItemEntity> savedItemEntities = itemJpaRepository.saveAll(itemEntities);
+        if (!existingById.isEmpty()) {
+            itemJpaRepository.deleteAll(existingById.values());
+        }
+
+        List<PrescriptionItemEntity> savedItemEntities = itemJpaRepository.saveAll(itemsToPersist);
 
         return mapper.toDomain(savedEntity, savedItemEntities);
+    }
+
+    private void updateItemInPlace(PrescriptionItemEntity entity, PrescriptionItem item) {
+        entity.setPrescriptionId(item.getPrescriptionId());
+        entity.setMedicineId(item.getMedicineId());
+        entity.setMedicineName(item.getMedicineName());
+        entity.setActiveIngredient(item.getActiveIngredient());
+        entity.setStrength(item.getStrength());
+        entity.setUnit(item.getUnit());
+        entity.setDosage(item.getDosage());
+        entity.setFrequency(item.getFrequency());
+        entity.setRoute(item.getRoute());
+        entity.setDurationDays(item.getDurationDays());
+        entity.setQuantity(item.getQuantity());
+        entity.setDispensedQuantity(item.getDispensedQuantity());
+        entity.setInstructions(item.getInstructions());
+        entity.setUpdatedAt(item.getUpdatedAt());
+        // `id` and `createdAt` are intentionally preserved so that existing
+        // foreign-key references (e.g. prescription_dispense_items,
+        // stock_movements) remain intact after a prescription update.
     }
 
     @Override

@@ -33,6 +33,19 @@ public class PrescriptionReadAccessValidator {
         if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("PHARMACIST")) {
             return;
         }
+        requireDoctorOwnsVisit(prescription);
+    }
+
+    public void requireCanReadDispenseHistory(Prescription prescription) {
+        if (currentUserPort.hasRole("ADMIN")
+                || currentUserPort.hasRole("PHARMACIST")
+                || currentUserPort.hasRole("MANAGER")) {
+            return;
+        }
+        requireDoctorOwnsVisit(prescription);
+    }
+
+    private void requireDoctorOwnsVisit(Prescription prescription) {
         if (!currentUserPort.hasRole("DOCTOR")) {
             throw new AccessDeniedException("You are not allowed to view prescriptions.");
         }

@@ -245,12 +245,32 @@ public class Prescription {
         this.updatedAt = validatedDispensedAt;
     }
 
+    public void markPartiallyDispensed(UUID dispensedBy, Instant dispensedAt) {
+        if (status == PrescriptionStatus.DISPENSED) {
+            throw new PrescriptionAlreadyDispensedException();
+        }
+        if (status == PrescriptionStatus.CANCELLED) {
+            throw new PrescriptionInvalidStatusException("Cancelled prescriptions cannot be dispensed.");
+        }
+
+        UUID validatedDispensedBy = requireNonNull(dispensedBy, "Dispensing user id is required.");
+        Instant validatedDispensedAt = requireNonNull(dispensedAt, "Dispensing time is required.");
+        this.status = PrescriptionStatus.PARTIALLY_DISPENSED;
+        this.updatedBy = validatedDispensedBy;
+        this.updatedAt = validatedDispensedAt;
+    }
+
     public void cancel(String cancelReason, UUID cancelledBy, Instant cancelledAt) {
         if (status == PrescriptionStatus.CANCELLED) {
             throw new PrescriptionAlreadyCancelledException();
         }
         if (status == PrescriptionStatus.DISPENSED) {
             throw new PrescriptionAlreadyDispensedException();
+        }
+        if (status == PrescriptionStatus.PARTIALLY_DISPENSED) {
+            throw new PrescriptionAlreadyDispensedException(
+                    "Partially dispensed prescriptions cannot be cancelled. Inventory has already been deducted."
+            );
         }
 
         String validatedReason = requireText(cancelReason, "Cancellation reason is required.");
@@ -267,6 +287,10 @@ public class Prescription {
 
     public boolean isPendingDispense() {
         return status == PrescriptionStatus.PENDING_DISPENSE;
+    }
+
+    public boolean isPartiallyDispensed() {
+        return status == PrescriptionStatus.PARTIALLY_DISPENSED;
     }
 
     private void ensurePendingDispense(String message) {

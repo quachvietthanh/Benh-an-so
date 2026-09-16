@@ -88,6 +88,21 @@ class PrescriptionTest {
     }
 
     @Test
+    @DisplayName("Rejects cancellation when prescription is partially dispensed (NCL-06-CN-008)")
+    void cancel_partiallyDispensed() {
+        Prescription prescription = createPendingPrescription();
+        prescription.markPartiallyDispensed(UUID.randomUUID(), NOW.plusSeconds(100));
+        assertEquals(PrescriptionStatus.PARTIALLY_DISPENSED, prescription.getStatus());
+
+        PrescriptionAlreadyDispensedException ex = assertThrows(
+                PrescriptionAlreadyDispensedException.class,
+                () -> prescription.cancel("Đổi thuốc", UUID.randomUUID(), NOW.plusSeconds(200))
+        );
+        assertTrue(ex.getMessage().contains("cannot be cancelled"));
+        assertEquals(PrescriptionStatus.PARTIALLY_DISPENSED, prescription.getStatus());
+    }
+
+    @Test
     @DisplayName("Rejects cancellation when prescription is already cancelled (QTN-27)")
     void cancel_alreadyCancelled() {
         Prescription prescription = createPendingPrescription();
@@ -119,6 +134,34 @@ class PrescriptionTest {
         assertEquals(PrescriptionStatus.CANCELLED, prescription.getStatus());
         assertEquals("Lý do hủy đơn", prescription.getCancelReason());
         assertEquals("Ghi chú", prescription.getNote());
+    }
+
+    @Test
+    @DisplayName("Marks a pending prescription as partially dispensed (NCL-06-CN-008)")
+    void markPartiallyDispensed_setsStatus() {
+        Prescription prescription = createPendingPrescription();
+        UUID actorId = UUID.randomUUID();
+        Instant dispensedAt = NOW.plusSeconds(120);
+
+        prescription.markPartiallyDispensed(actorId, dispensedAt);
+
+        assertEquals(PrescriptionStatus.PARTIALLY_DISPENSED, prescription.getStatus());
+        assertEquals(actorId, prescription.getUpdatedBy());
+        assertEquals(dispensedAt, prescription.getUpdatedAt());
+        assertTrue(prescription.isPartiallyDispensed());
+    }
+
+    @Test
+    @DisplayName("Marks a partially dispensed prescription as fully dispensed (NCL-06-CN-008)")
+    void markDispensed_fromPartiallyDispensed() {
+        Prescription prescription = createPendingPrescription();
+        prescription.markPartiallyDispensed(UUID.randomUUID(), NOW.plusSeconds(120));
+
+        UUID actorId = UUID.randomUUID();
+        prescription.markDispensed(actorId, NOW.plusSeconds(240));
+
+        assertEquals(PrescriptionStatus.DISPENSED, prescription.getStatus());
+        assertEquals(actorId, prescription.getUpdatedBy());
     }
 
     private Prescription createPendingPrescription() {
