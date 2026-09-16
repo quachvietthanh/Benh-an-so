@@ -152,7 +152,8 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
                 saved.getId(),
                 "{\"prescriptionCode\":\"%s\",\"status\":\"%s\"}"
                         .formatted(saved.getPrescriptionCode(), saved.getStatus()),
-                null));
+                null,
+                now));
 
         return resultMapper.toResult(
                 saved,
@@ -218,7 +219,10 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
                         "Dispensed quantity exceeds the remaining prescribed quantity for item "
                                 + commandItem.prescriptionItemId() + ".");
             }
-            requested.put(item.getId(), commandItem.quantity());
+            if (requested.putIfAbsent(item.getId(), commandItem.quantity()) != null) {
+                throw new ValidationException(
+                        "Duplicate prescription item in request: " + item.getId());
+            }
         }
         return requested;
     }

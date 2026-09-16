@@ -267,6 +267,11 @@ public class Prescription {
         if (status == PrescriptionStatus.DISPENSED) {
             throw new PrescriptionAlreadyDispensedException();
         }
+        if (status == PrescriptionStatus.PARTIALLY_DISPENSED) {
+            throw new PrescriptionAlreadyDispensedException(
+                    "Partially dispensed prescriptions cannot be cancelled. Inventory has already been deducted."
+            );
+        }
 
         String validatedReason = requireText(cancelReason, "Cancellation reason is required.");
         if (validatedReason.length() > 500) {

@@ -2,6 +2,7 @@ package com.benhsoan.persistence.adapterRepository.inventory;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,6 +30,17 @@ public class MedicineBatchRepositoryAdapter implements MedicineBatchRepository {
     @Override
     public List<MedicineBatch> findAll() {
         return jpaRepository.findAllByOrderByExpiryDateAscCreatedAtAsc()
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<MedicineBatch> findAllById(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findAllById(ids)
                 .stream()
                 .map(mapper::toDomain)
                 .toList();

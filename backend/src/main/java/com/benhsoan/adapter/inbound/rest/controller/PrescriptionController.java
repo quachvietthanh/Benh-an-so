@@ -163,7 +163,7 @@ public class PrescriptionController {
         }
 
         @GetMapping("/{id}/dispense-history")
-        @RequirePermission("PRESCRIPTION_READ")
+        @RequirePermission("PRESCRIPTION_DISPENSE_HISTORY_READ")
         public java.util.List<DispenseHistoryResponse> getDispenseHistory(@PathVariable UUID id) {
                 return mapper.toDispenseHistoryResponse(
                                 getPrescriptionDispenseHistoryUseCase.getHistory(id));

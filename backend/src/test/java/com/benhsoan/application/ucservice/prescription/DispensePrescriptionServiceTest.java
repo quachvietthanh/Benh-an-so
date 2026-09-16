@@ -238,6 +238,31 @@ class DispensePrescriptionServiceTest {
         );
     }
 
+    @Test
+    void fullDispenseRecordsDispensedQuantityOnEveryItem() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        Prescription prescription = prescription(prescriptionId, medicineId);
+        PrescriptionItem prescriptionItem = prescriptionItem(prescriptionId, medicineId, 70);
+        MedicineBatch onlyBatch = batch(medicineId, "BATCH-A", LocalDate.of(2026, 10, 1), 70);
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionItemRepository.findByPrescriptionId(prescriptionId)).thenReturn(List.of(prescriptionItem));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine(medicineId, "MED-001", "Paracetamol")));
+        when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), eq(LocalDate.of(2026, 8, 7))))
+                .thenReturn(List.of(onlyBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 70));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DispensePrescriptionResult result = service.dispense(prescriptionId);
+
+        assertEquals(PrescriptionStatus.DISPENSED, result.prescription().status());
+        assertEquals(1, result.prescription().items().size());
+        assertEquals(70, result.prescription().items().get(0).dispensedQuantity());
+        assertEquals(0, result.prescription().items().get(0).remainingQuantity());
+    }
+
     private Prescription prescription(UUID prescriptionId, UUID medicineId) {
         PrescriptionItem item = prescriptionItem(prescriptionId, medicineId, 70);
         return Prescription.restore(

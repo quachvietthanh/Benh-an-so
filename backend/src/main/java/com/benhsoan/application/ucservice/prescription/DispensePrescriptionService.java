@@ -100,6 +100,9 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         );
 
         List<DispenseAllocationResult> allocations = applyAllocations(computation, actorId, now);
+        for (PrescriptionItem item : prescription.getItems()) {
+            item.recordDispense(item.getQuantity());
+        }
         prescription.markDispensed(actorId, now);
         var saved = prescriptionRepository.save(prescription);
         auditLogRepository.save(AuditLog.create(
@@ -108,7 +111,8 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
                 ResourceType.PRESCRIPTION,
                 saved.getId(),
                 "{\"prescriptionCode\":\"%s\"}".formatted(saved.getPrescriptionCode()),
-                null
+                null,
+                now
         ));
         return resultMapper.toResult(
                 saved,

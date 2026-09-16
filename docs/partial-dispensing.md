@@ -107,7 +107,7 @@ Base: `/prescriptions`
 
 - **Method:** `GET`
 - **Path:** `/prescriptions/{id}/dispense-history`
-- **Permission:** `PRESCRIPTION_READ`
+- **Permission:** `PRESCRIPTION_DISPENSE_HISTORY_READ` (granted to `ADMIN`, `DOCTOR` — own visits only, `PHARMACIST`, `MANAGER`)
 
 ```json
 [
@@ -119,7 +119,10 @@ Base: `/prescriptions`
     "medicineBatchId": "…",
     "dispensedQuantity": 12,
     "dispensedBy": "…",
-    "dispensedAt": "…"
+    "dispensedAt": "…",
+    "medicineName": "Paracetamol 500 mg",
+    "batchNumber": "BATCH-A",
+    "dispenserName": "Vo Thanh Nam"
   }
 ]
 ```
@@ -143,5 +146,5 @@ Base: `/prescriptions`
 
 ## 5. Security
 
-- `PHARMACIST`/`ADMIN` role enforced in the service; `@RequirePermission("PRESCRIPTION_UPDATE_STATUS")` on the dispense endpoint and `PRESCRIPTION_READ` on history. No new permission was added (reuses existing `PRESCRIPTION_UPDATE_STATUS`).
+- `PHARMACIST`/`ADMIN` role enforced in the service; `@RequirePermission("PRESCRIPTION_UPDATE_STATUS")` on the dispense endpoint and `PRESCRIPTION_DISPENSE_HISTORY_READ` on history. History is authorized contextually (a `DOCTOR` may only read the dispense history of their own visits); `MANAGER` is granted the dedicated history-read permission without full prescription read access.
 

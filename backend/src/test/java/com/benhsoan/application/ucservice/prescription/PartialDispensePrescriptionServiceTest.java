@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.prescription;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -23,6 +24,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.application.ucservice.inventory.EligibleStockSnapshotService;
 import com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService;
+import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.inventory.MedicineBatch;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.domain.medicine.Medicine;
@@ -209,6 +211,24 @@ class PartialDispensePrescriptionServiceTest {
     }
 
     @Test
+    void auditLogUsesInjectedClockTimestamp() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        stubMedicine();
+        stubBatch(12);
+
+        service.dispense(new DispensePrescriptionItemsCommand(prescriptionId,
+                List.of(new DispenseItemCommand(itemId, 12))));
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals(NOW, captor.getValue().getCreatedAt());
+    }
+
+    @Test
     void rejectsZeroOrNegativeQuantity() {
         UUID prescriptionId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
@@ -254,6 +274,24 @@ class PartialDispensePrescriptionServiceTest {
         assertThrows(ValidationException.class, () -> service.dispense(
                 new DispensePrescriptionItemsCommand(prescriptionId,
                         List.of(new DispenseItemCommand(UUID.randomUUID(), 5)))));
+    }
+
+    @Test
+    void rejectsDuplicatePrescriptionItemIds() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        stubMedicine();
+        stubBatch(20);
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(
+                                new DispenseItemCommand(itemId, 5),
+                                new DispenseItemCommand(itemId, 3)))));
+        assertTrue(ex.getMessage().contains("Duplicate prescription item"));
     }
 
     @Test

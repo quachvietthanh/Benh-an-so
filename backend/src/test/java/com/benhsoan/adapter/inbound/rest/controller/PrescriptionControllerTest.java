@@ -865,16 +865,21 @@ class PrescriptionControllerTest {
         UUID itemId = UUID.randomUUID();
         UUID medicineId = UUID.randomUUID();
         UUID batchId = UUID.randomUUID();
+        UUID dispenserId = UUID.randomUUID();
         when(getPrescriptionDispenseHistoryUseCase.getHistory(prescriptionId))
                 .thenReturn(List.of(new PrescriptionDispenseHistoryResult(
                         UUID.randomUUID(), prescriptionId, itemId, medicineId, batchId,
-                        12, UUID.randomUUID(), NOW)));
+                        12, dispenserId, NOW,
+                        "Paracetamol", "BATCH-A", "Vo Thanh Nam")));
 
         mockMvc.perform(get("/prescriptions/{id}/dispense-history", prescriptionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].prescriptionItemId").value(itemId.toString()))
                 .andExpect(jsonPath("$[0].medicineBatchId").value(batchId.toString()))
-                .andExpect(jsonPath("$[0].dispensedQuantity").value(12));
+                .andExpect(jsonPath("$[0].dispensedQuantity").value(12))
+                .andExpect(jsonPath("$[0].medicineName").value("Paracetamol"))
+                .andExpect(jsonPath("$[0].batchNumber").value("BATCH-A"))
+                .andExpect(jsonPath("$[0].dispenserName").value("Vo Thanh Nam"));
     }
 
     private PrescriptionResult pendingPrescription(UUID prescriptionId) {

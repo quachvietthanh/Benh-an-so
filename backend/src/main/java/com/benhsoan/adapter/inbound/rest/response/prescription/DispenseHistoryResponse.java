@@ -11,6 +11,9 @@ public record DispenseHistoryResponse(
         UUID medicineBatchId,
         int dispensedQuantity,
         UUID dispensedBy,
-        Instant dispensedAt
+        Instant dispensedAt,
+        String medicineName,
+        String batchNumber,
+        String dispenserName
 ) {
 }

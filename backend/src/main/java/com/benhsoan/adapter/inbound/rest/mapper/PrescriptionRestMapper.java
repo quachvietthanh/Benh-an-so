@@ -252,7 +252,10 @@ public class PrescriptionRestMapper {
                 result.medicineBatchId(),
                 result.dispensedQuantity(),
                 result.dispensedBy(),
-                result.dispensedAt());
+                result.dispensedAt(),
+                result.medicineName(),
+                result.batchNumber(),
+                result.dispenserName());
     }
 
     private CreatePrescriptionItemCommand toCommand(

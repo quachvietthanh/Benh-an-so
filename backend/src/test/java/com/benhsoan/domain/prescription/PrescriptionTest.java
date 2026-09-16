@@ -88,6 +88,21 @@ class PrescriptionTest {
     }
 
     @Test
+    @DisplayName("Rejects cancellation when prescription is partially dispensed (NCL-06-CN-008)")
+    void cancel_partiallyDispensed() {
+        Prescription prescription = createPendingPrescription();
+        prescription.markPartiallyDispensed(UUID.randomUUID(), NOW.plusSeconds(100));
+        assertEquals(PrescriptionStatus.PARTIALLY_DISPENSED, prescription.getStatus());
+
+        PrescriptionAlreadyDispensedException ex = assertThrows(
+                PrescriptionAlreadyDispensedException.class,
+                () -> prescription.cancel("Đổi thuốc", UUID.randomUUID(), NOW.plusSeconds(200))
+        );
+        assertTrue(ex.getMessage().contains("cannot be cancelled"));
+        assertEquals(PrescriptionStatus.PARTIALLY_DISPENSED, prescription.getStatus());
+    }
+
+    @Test
     @DisplayName("Rejects cancellation when prescription is already cancelled (QTN-27)")
     void cancel_alreadyCancelled() {
         Prescription prescription = createPendingPrescription();

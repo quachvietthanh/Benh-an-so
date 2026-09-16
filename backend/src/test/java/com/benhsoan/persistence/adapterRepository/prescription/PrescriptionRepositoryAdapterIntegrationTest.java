@@ -105,6 +105,35 @@ class PrescriptionRepositoryAdapterIntegrationTest {
     }
 
     @Test
+    void preservesPrescriptionItemIdsAcrossSavesForAppendOnlyDispenseHistory() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            prescriptionRepository.save(prescription(
+                    prescriptionId,
+                    "RX-HIST-01",
+                    null,
+                    List.of(item(itemId, prescriptionId, medicineId, "1 tablet", CREATED_AT, null))
+            ));
+        });
+
+        // Simulate a dispense that mutates the item's cumulative quantity, then re-save.
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            Prescription loaded = prescriptionRepository.findById(prescriptionId).orElseThrow();
+            loaded.getItems().get(0).recordDispense(4);
+            prescriptionRepository.save(loaded);
+        });
+
+        Prescription reloaded = prescriptionRepository.findById(prescriptionId).orElseThrow();
+        assertEquals(1, reloaded.getItems().size());
+        assertEquals(itemId, reloaded.getItems().get(0).getId());
+        assertEquals(4, reloaded.getItems().get(0).getDispensedQuantity());
+        assertEquals(6, reloaded.getItems().get(0).getRemainingQuantity());
+    }
+
+    @Test
     void findsRequestedStatusOldestFirstWithPagination() {
         UUID oldestPendingId = UUID.randomUUID();
         UUID newestPendingId = UUID.randomUUID();
