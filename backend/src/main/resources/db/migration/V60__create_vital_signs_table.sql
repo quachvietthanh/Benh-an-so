@@ -1,5 +1,5 @@
 -- =====================================================
--- V59__create_vital_signs_table.sql
+-- V60__create_vital_signs_table.sql
 -- NCL-04-CN-007 / QTN-07, QTN-02: Structured Vital Signs for Visits
 -- Stores structured clinical measurements: pulse, blood pressure,
 -- temperature, respiratory rate, weight, height, BMI, SpO2, and abnormal flags.

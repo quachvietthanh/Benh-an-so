@@ -39,6 +39,9 @@ const patientPortalAppointmentApi = {
   getAppointmentDetail: (id) => {
     return axiosClient.get(`/patient-portal/appointments/${id}`)
   },
+  confirmAppointment: (id) => {
+    return axiosClient.patch(`/patient-portal/appointments/${id}/confirm`)
+  },
 }
 
 export default patientPortalAppointmentApi

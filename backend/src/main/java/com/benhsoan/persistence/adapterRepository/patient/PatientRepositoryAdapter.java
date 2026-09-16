@@ -123,4 +123,11 @@ public class PatientRepositoryAdapter implements PatientRepository {
             command.pageable()
         ).map(mapper::toDomain);
     }
+
+    @Override
+    public List<Patient> findSuspectedDuplicates() {
+        return jpaRepository.findSuspectedDuplicates().stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
 }
