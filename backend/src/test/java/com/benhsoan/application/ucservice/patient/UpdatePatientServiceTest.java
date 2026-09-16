@@ -28,6 +28,7 @@ import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.patient.exception.PatientAlreadyMergedException;
 import com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
@@ -1237,5 +1238,32 @@ class UpdatePatientServiceTest {
         assertNotNull(result);
         assertEquals("Nguyen Van Bo", result.guardianName(), "Giá trị guardianName thật không bị ghi đè bởi nhãn ẩn danh");
         verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-006-TC-03: Chặn cập nhật hồ sơ đã gộp (Read-only)")
+    void rejectsUpdateOnMergedPatient() {
+        UUID patientId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000099", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null,
+                null, BloodType.UNKNOWN, null, null, null,
+                null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        existing.markAsMerged(targetId, currentUserId, "Gộp hồ sơ trùng");
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A Updated")
+                .dateOfBirth(LocalDate.of(1990, 1, 1))
+                .gender(Gender.MALE)
+                .active(true)
+                .build();
+
+        assertThrows(PatientAlreadyMergedException.class, () -> service.update(patientId, command));
+        verify(patientRepository, never()).save(any(Patient.class));
     }
 }
