@@ -57,7 +57,7 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
         Visit visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
 
-        if (!visit.isActive()) {
+        if (visit.isCancelled() || (!visit.isActive() && !visit.isCompleted())) {
             throw new MedicalRecordInvalidVisitException(visit.getId());
         }
 

@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -54,6 +55,16 @@ import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetOverdueMedicalRecordsUseCase;
+import com.benhsoan.port.inbound.medicalrecord.SendSigningReminderUseCase;
+import com.benhsoan.port.inbound.medicalrecord.GetSigningRemindersUseCase;
+import com.benhsoan.port.dto.command.medicalrecord.GetOverdueMedicalRecordsQuery;
+import com.benhsoan.port.dto.command.medicalrecord.SendSigningReminderCommand;
+import com.benhsoan.adapter.inbound.rest.mapper.OverdueMedicalRecordRestMapper;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.SendSigningReminderRequest;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.OverdueMedicalRecordResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.SigningReminderResponse;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -79,9 +90,13 @@ public class MedicalRecordController {
     private final ReplaceMedicalRecordDiagnosesUseCase replaceMedicalRecordDiagnosesUseCase;
     private final IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
     private final GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
+    private final GetOverdueMedicalRecordsUseCase getOverdueMedicalRecordsUseCase;
+    private final SendSigningReminderUseCase sendSigningReminderUseCase;
+    private final GetSigningRemindersUseCase getSigningRemindersUseCase;
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
     private final MedicalRecordDiagnosisRestMapper diagnosisMapper;
+    private final OverdueMedicalRecordRestMapper overdueMapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -234,4 +249,44 @@ public class MedicalRecordController {
                 mapper.toQuery(null, patientId, null, null, from, to, page, size)
         ));
     }
+
+    @GetMapping("/overdue-signing")
+    @RequirePermission("MEDICAL_RECORD_OVERDUE_READ")
+    public Page<OverdueMedicalRecordResponse> getOverdueSigningMedicalRecords(
+            @RequestParam(required = false) UUID doctorId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return overdueMapper.toResponsePage(
+                getOverdueMedicalRecordsUseCase.getOverdueRecords(
+                        new GetOverdueMedicalRecordsQuery(doctorId, PageRequest.of(page, size))
+                )
+        );
+    }
+
+    @PostMapping("/{medicalRecordId}/signing-reminders")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequirePermission("MEDICAL_RECORD_REMIND_SIGN")
+    public SigningReminderResponse sendSigningReminder(
+            @PathVariable UUID medicalRecordId,
+            @Valid @RequestBody(required = false) SendSigningReminderRequest request
+    ) {
+        String channel = request != null ? request.channel() : null;
+        String notes = request != null ? request.notes() : null;
+        return overdueMapper.toResponse(
+                sendSigningReminderUseCase.sendReminder(
+                        new SendSigningReminderCommand(medicalRecordId, channel, notes)
+                )
+        );
+    }
+
+    @GetMapping("/{medicalRecordId}/signing-reminders")
+    @RequirePermission("MEDICAL_RECORD_OVERDUE_READ")
+    public List<SigningReminderResponse> getSigningReminders(@PathVariable UUID medicalRecordId) {
+        return getSigningRemindersUseCase.getReminders(medicalRecordId)
+                .stream()
+                .map(overdueMapper::toResponse)
+                .toList();
+    }
 }
+

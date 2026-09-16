@@ -8,6 +8,7 @@ public record ClinicConfigurationResponse(
         String phone,
         LocalTime openingTime,
         LocalTime closingTime,
-        Integer retentionYears
+        Integer retentionYears,
+        Integer signingDeadlineHours
 ) {
 }

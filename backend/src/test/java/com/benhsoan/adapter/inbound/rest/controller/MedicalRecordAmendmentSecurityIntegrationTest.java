@@ -60,6 +60,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
         MedicalRecordRestMapper.class,
         MedicalRecordDetailRestMapper.class,
         MedicalRecordDiagnosisRestMapper.class,
+        com.benhsoan.adapter.inbound.rest.mapper.OverdueMedicalRecordRestMapper.class,
         GlobalExceptionHandler.class,
         SecurityConfig.class,
         JwtAuthenticationFilter.class,
@@ -92,6 +93,9 @@ class MedicalRecordAmendmentSecurityIntegrationTest {
     @MockitoBean private DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
     @MockitoBean private IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
     @MockitoBean private GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.GetOverdueMedicalRecordsUseCase getOverdueMedicalRecordsUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.SendSigningReminderUseCase sendSigningReminderUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.GetSigningRemindersUseCase getSigningRemindersUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
