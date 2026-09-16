@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, DatePicker, Descriptions, Form, Input, message, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
-import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined, FolderOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, EditOutlined, FileTextOutlined, PaperClipOutlined, FolderOutlined, SafetyCertificateOutlined, MedicineBoxOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
 import { useAuthContext } from '../context/AuthContext'
@@ -11,6 +11,7 @@ import AttachmentResultManager from '../components/attachments/AttachmentResultM
 import MedicalRecordList from './MedicalRecordList'
 import PersonalDataConsentModal from '../components/patient/PersonalDataConsentModal'
 import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
+import ChronicDiseaseList from '../components/clinical/ChronicDiseaseList'
 import { getPatientConsentStatus } from '../constants/patientConsentConstants'
 
 
@@ -217,6 +218,22 @@ function PatientDetail() {
                     rowKey="id"
                     pagination={false}
                     locale={{ emptyText: 'Bệnh nhân chưa có lượt khám' }}
+                  />
+                ),
+              },
+              {
+                key: 'chronicDiseases',
+                label: (
+                  <span>
+                    <MedicineBoxOutlined /> Tiền sử bệnh mạn tính
+                  </span>
+                ),
+                children: (
+                  <ChronicDiseaseList
+                    patientId={patient.id}
+                    patientName={patient.fullName}
+                    currentUser={user}
+                    bordered={false}
                   />
                 ),
               },

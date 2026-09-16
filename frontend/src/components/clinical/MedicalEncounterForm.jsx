@@ -40,6 +40,7 @@ import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogD
 import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
 import DynamicMedicalRecordSections from './DynamicMedicalRecordSections'
 import PatientAllergyBanner from './PatientAllergyBanner'
+import PatientChronicDiseaseBanner from './PatientChronicDiseaseBanner'
 import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
@@ -145,6 +146,15 @@ function MedicalEncounterForm({
           visitId={encounterContext?.visit?.id}
           currentUser={currentUser}
           canWrite={isDoctor}
+        />
+      )}
+      {selectedPatientObj?.id && (
+        <PatientChronicDiseaseBanner
+          patientId={selectedPatientObj?.id}
+          patientName={selectedPatientObj?.fullName}
+          visitId={encounterContext?.visit?.id}
+          currentUser={currentUser}
+          doctorName={encounterContext?.doctor?.fullName || currentUser?.fullName}
         />
       )}
       <Row gutter={[16, 16]}>
@@ -261,6 +271,16 @@ function MedicalEncounterForm({
                       visitId={encounterContext?.visit?.id}
                       currentUser={currentUser}
                       canWrite={isDoctor}
+                      compact
+                    />
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <PatientChronicDiseaseBanner
+                      patientId={selectedPatientObj?.id}
+                      patientName={selectedPatientObj?.fullName}
+                      visitId={encounterContext?.visit?.id}
+                      currentUser={currentUser}
+                      doctorName={encounterContext?.doctor?.fullName || currentUser?.fullName}
                       compact
                     />
                   </div>
