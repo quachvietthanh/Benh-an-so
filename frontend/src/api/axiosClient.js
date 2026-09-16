@@ -33,28 +33,6 @@ axiosClient.interceptors.response.use(
     if (error && typeof error === 'object') {
       error.apiError = normalizeApiError(error)
     }
-    if (error?.response?.status === 404) {
-      const isExpected404 =
-        error.config?.url?.includes('/medical-records/visits/') &&
-        error.config?.method?.toLowerCase() === 'get'
-
-      if (!isExpected404) {
-        console.error(
-          '%c[API 404 DETECTED]',
-          'background: #dc2626; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;',
-          {
-            url: error.config?.url,
-            fullUrl: `${error.config?.baseURL || ''}${error.config?.url || ''}`,
-            method: error.config?.method?.toUpperCase(),
-            params: error.config?.params,
-            data: error.config?.data,
-            responseStatus: error.response?.status,
-            responseData: error.response?.data,
-          }
-        )
-        console.trace('[API 404 STACK TRACE - Endpoint nào đang trả về 404?]')
-      }
-    }
     const errorCode = error.response?.data?.code || error.apiError?.code
     if (error.response?.status === 403 && errorCode === 'MUST_CHANGE_PASSWORD') {
       try {

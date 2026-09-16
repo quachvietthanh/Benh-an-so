@@ -199,16 +199,6 @@ export default function CloseVisitModal({
         onClose?.()
       }
     } catch (err) {
-      console.error('[CloseVisitModal API Error Caught]:', {
-        targetItemId,
-        outcome,
-        reason: val.trimmedReason,
-        status: err?.response?.status,
-        code: err?.response?.data?.code || err?.apiError?.code,
-        message: err?.response?.data?.message || err?.message,
-        responseData: err?.response?.data,
-        url: err?.config?.url,
-      })
       const mapped = mapCloseVisitErrorMessage(err, outcome)
       message.error(mapped.message)
 
@@ -629,15 +619,13 @@ export default function CloseVisitModal({
             Gợi ý lý do nhanh (nhấp để điền tự động):
           </div>
 
-          {/* Lưới nút gợi ý lý do nhanh phân bổ đều, đối xứng và gọn gàng */}
+          {/* Lưới nút gợi ý lý do nhanh flex-wrap tự co giãn theo nội dung, chống tràn màn hình mobile */}
           <div
+            className="close-visit-presets-container"
             style={{
-              display: 'grid',
-              gridTemplateColumns:
-                outcome === CLOSE_VISIT_OUTCOMES.EARLY_ENDED
-                  ? 'repeat(2, 1fr)'
-                  : 'repeat(3, 1fr)',
-              gap: '8px 10px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
               marginBottom: 10,
             }}
           >
@@ -647,19 +635,20 @@ export default function CloseVisitModal({
                 <button
                   key={preset}
                   type="button"
+                  className="close-visit-preset-btn"
                   disabled={!canProceed || isLoading}
                   onClick={() => canProceed && !isLoading && handleSelectPreset(preset)}
                   style={{
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
-                    width: '100%',
-                    height: 36,
-                    padding: '0 12px',
+                    width: 'auto',
+                    minHeight: 34,
+                    padding: '6px 12px',
                     margin: 0,
                     borderRadius: 6,
-                    fontSize: 12.5,
+                    fontSize: 13,
                     fontWeight: isSelected ? 600 : 400,
                     color: isSelected ? '#1d4ed8' : '#334155',
                     backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
@@ -670,9 +659,8 @@ export default function CloseVisitModal({
                     boxSizing: 'border-box',
                     userSelect: 'none',
                     textAlign: 'center',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
+                    wordBreak: 'break-word',
+                    lineHeight: 1.35,
                   }}
                   onMouseEnter={(e) => {
                     if (canProceed && !isLoading && !isSelected) {
@@ -689,7 +677,7 @@ export default function CloseVisitModal({
                     }
                   }}
                 >
-                  {isSelected && <CheckOutlined style={{ fontSize: 12, color: '#2563eb' }} />}
+                  {isSelected && <CheckOutlined style={{ fontSize: 12, color: '#2563eb', flexShrink: 0 }} />}
                   <span>{preset}</span>
                 </button>
               )

@@ -15,31 +15,6 @@ message.config({
   duration: 3,
 })
 
-// Hook message.error để bắt chính xác stack trace khi có toast "Resource not found." hoặc 404
-const originalMessageError = message.error
-message.error = function (...args) {
-  const content = args[0]
-  const contentStr = typeof content === 'string' ? content : (content?.content || '')
-  if (
-    typeof contentStr === 'string' &&
-    (contentStr.includes('Resource not found') ||
-      contentStr.includes('404') ||
-      contentStr.includes('RESOURCE_NOT_FOUND'))
-  ) {
-    console.error(
-      '%c[STACK TRACE - message.error("Resource not found.")]',
-      'background: #ef4444; color: white; padding: 4px 8px; font-size: 13px; font-weight: bold; border-radius: 4px;',
-      {
-        messageArgs: args,
-        location: window.location.href,
-        timestamp: new Date().toISOString(),
-      }
-    )
-    console.trace('[STACK TRACE GỌI RA TOAST "Resource not found."]')
-  }
-  return originalMessageError.apply(this, args)
-}
-
 function App() {
   return (
     <ConfigProvider

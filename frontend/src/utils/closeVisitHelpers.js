@@ -150,9 +150,38 @@ export const mapCloseVisitErrorMessage = (error, outcome) => {
   }
 
   if (code === 'VALIDATION_FAILED' || status === 400) {
+    const errorData = error?.response?.data || error?.apiError || {}
+    const fields = errorData?.fields || errorData?.details?.fields || {}
+    const fieldKeys = Object.keys(fields)
+
+    // Kiểm tra lỗi validation liên quan đến độ dài lý do đóng
+    const isReasonLength =
+      fields.reason ||
+      fields.closeReason ||
+      !backendMsg ||
+      /reason|500|exceed|lý do|quá/i.test(backendMsg)
+
+    if (isReasonLength) {
+      return {
+        code: 'VALIDATION_FAILED',
+        field: 'reason',
+        message: 'Dữ liệu không hợp lệ. Lý do đóng không được vượt quá 500 ký tự.',
+      }
+    }
+
+    if (fieldKeys.length > 0) {
+      const firstField = fieldKeys[0]
+      const msg = fields[firstField]
+      return {
+        code: 'VALIDATION_FAILED',
+        field: firstField,
+        message: `Dữ liệu không hợp lệ (${firstField}): ${msg}`,
+      }
+    }
+
     return {
       code: 'VALIDATION_FAILED',
-      message: backendMsg || 'Dữ liệu không hợp lệ. Lý do đóng không được vượt quá 500 ký tự.',
+      message: 'Dữ liệu không hợp lệ. Lý do đóng không được vượt quá 500 ký tự.',
     }
   }
 

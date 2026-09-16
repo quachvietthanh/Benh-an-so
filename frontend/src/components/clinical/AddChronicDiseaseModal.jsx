@@ -102,7 +102,6 @@ export default function AddChronicDiseaseModal({
 
   useEffect(() => {
     if (open) {
-      console.log('[AddChronicDiseaseModal Mount] patientId:', patientId, 'visitId:', visitId)
       form.resetFields()
       loadSuggestions()
     }
