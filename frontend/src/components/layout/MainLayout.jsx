@@ -174,11 +174,14 @@ function MainLayout() {
 
 
   const selectedPath = useMemo(() => {
+    if (location.pathname === '/appointments' && location.search.includes('tab=doctor_weekly_table')) {
+      return '/appointments/weekly-schedule'
+    }
     const match = navigationItems
       .filter((item) => item.key === '/' ? location.pathname === '/' : location.pathname.startsWith(item.key))
       .sort((a, b) => b.key.length - a.key.length)[0]
     return match?.key || location.pathname
-  }, [location.pathname, navigationItems])
+  }, [location.pathname, location.search, navigationItems])
 
   const primaryRole = user?.roles?.[0] || 'doctor'
   const displayName = user?.fullName || user?.username || 'Người dùng'
