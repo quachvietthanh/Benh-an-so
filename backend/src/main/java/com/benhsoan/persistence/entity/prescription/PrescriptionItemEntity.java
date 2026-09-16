@@ -71,6 +71,9 @@ public class PrescriptionItemEntity {
     @Column(name = "quantity", nullable = false)
     private int quantity;
 
+    @Column(name = "dispensed_quantity", nullable = false)
+    private int dispensedQuantity;
+
     @Column(name = "instructions", columnDefinition = "TEXT")
     private String instructions;
 

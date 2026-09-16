@@ -75,6 +75,8 @@ public class PrescriptionResultMapper {
                 item.getRoute(),
                 item.getDurationDays(),
                 item.getQuantity(),
+                item.getDispensedQuantity(),
+                item.getRemainingQuantity(),
                 item.getInstructions(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()

@@ -43,6 +43,8 @@ public class PrescriptionItem {
 
     private int quantity;
 
+    private int dispensedQuantity;
+
     private String instructions;
 
     private Instant createdAt;
@@ -62,6 +64,7 @@ public class PrescriptionItem {
             AdministrationRoute route,
             Integer durationDays,
             int quantity,
+            int dispensedQuantity,
             String instructions,
             Instant createdAt,
             Instant updatedAt
@@ -78,6 +81,7 @@ public class PrescriptionItem {
         this.route = requireNonNull(route, "Administration route is required.");
         this.durationDays = validateDurationDays(durationDays);
         this.quantity = validateQuantity(quantity);
+        this.dispensedQuantity = validateDispensedQuantity(dispensedQuantity, this.quantity);
         this.instructions = normalizeOptionalText(instructions);
         this.createdAt = requireNonNull(createdAt, "Prescription item creation time is required.");
         this.updatedAt = updatedAt;
@@ -112,6 +116,7 @@ public class PrescriptionItem {
                 route,
                 durationDays,
                 quantity,
+                0,
                 instructions,
                 createdAt,
                 null
@@ -135,6 +140,44 @@ public class PrescriptionItem {
             Instant createdAt,
             Instant updatedAt
     ) {
+        return restore(
+                id,
+                prescriptionId,
+                medicineId,
+                medicineName,
+                activeIngredient,
+                strength,
+                unit,
+                dosage,
+                frequency,
+                route,
+                durationDays,
+                quantity,
+                0,
+                instructions,
+                createdAt,
+                updatedAt
+        );
+    }
+
+    public static PrescriptionItem restore(
+            UUID id,
+            UUID prescriptionId,
+            UUID medicineId,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            String unit,
+            String dosage,
+            Integer frequency,
+            AdministrationRoute route,
+            Integer durationDays,
+            int quantity,
+            int dispensedQuantity,
+            String instructions,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
         return new PrescriptionItem(
                 id,
                 prescriptionId,
@@ -148,10 +191,40 @@ public class PrescriptionItem {
                 route,
                 durationDays,
                 quantity,
+                dispensedQuantity,
                 instructions,
                 createdAt,
                 updatedAt
         );
+    }
+
+    public void recordDispense(int additionalQuantity) {
+        if (additionalQuantity <= 0) {
+            throw new ValidationException("Dispensed quantity must be greater than zero.");
+        }
+        int newDispensedQuantity = this.dispensedQuantity + additionalQuantity;
+        if (newDispensedQuantity > this.quantity) {
+            throw new ValidationException("Dispensed quantity cannot exceed the prescribed quantity.");
+        }
+        this.dispensedQuantity = newDispensedQuantity;
+    }
+
+    public int getRemainingQuantity() {
+        return this.quantity - this.dispensedQuantity;
+    }
+
+    public boolean isFullyDispensed() {
+        return this.dispensedQuantity >= this.quantity;
+    }
+
+    private static int validateDispensedQuantity(int dispensedQuantity, int quantity) {
+        if (dispensedQuantity < 0) {
+            throw new ValidationException("Dispensed quantity must not be negative.");
+        }
+        if (dispensedQuantity > quantity) {
+            throw new ValidationException("Dispensed quantity cannot exceed the prescribed quantity.");
+        }
+        return dispensedQuantity;
     }
 
     private static int validateQuantity(int quantity) {

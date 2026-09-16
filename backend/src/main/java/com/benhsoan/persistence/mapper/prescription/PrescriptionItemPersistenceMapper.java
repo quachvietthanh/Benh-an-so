@@ -26,6 +26,7 @@ public class PrescriptionItemPersistenceMapper {
                 entity.getRoute(),
                 entity.getDurationDays(),
                 entity.getQuantity(),
+                entity.getDispensedQuantity(),
                 entity.getInstructions(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
@@ -50,6 +51,7 @@ public class PrescriptionItemPersistenceMapper {
                 .route(domain.getRoute())
                 .durationDays(domain.getDurationDays())
                 .quantity(domain.getQuantity())
+                .dispensedQuantity(domain.getDispensedQuantity())
                 .instructions(domain.getInstructions())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
