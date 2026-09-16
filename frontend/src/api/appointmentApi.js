@@ -13,6 +13,7 @@ const appointmentApi = {
   getAvailableSlots: (doctorId, date) => axiosClient.get('/patient-portal/appointments/available-slots', { params: { doctorId, date } }),
   confirm: (id) => axiosClient.patch(`/appointments/${id}/confirm`),
   getUnconfirmed: (params) => axiosClient.get('/appointments/unconfirmed', { params }),
+  getDoctorWeeklyTable: (params) => axiosClient.get('/appointments/doctor-weekly-table', { params }),
 }
 
 export default appointmentApi
