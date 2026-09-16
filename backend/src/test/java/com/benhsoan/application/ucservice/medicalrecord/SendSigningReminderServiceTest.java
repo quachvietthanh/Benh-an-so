@@ -32,6 +32,7 @@ import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.command.medicalrecord.SendSigningReminderCommand;
 import com.benhsoan.port.dto.result.SigningReminderResult;
+import com.benhsoan.port.outbound.notification.NotificationSendResult;
 import com.benhsoan.port.outbound.notification.SigningReminderMessage;
 import com.benhsoan.port.outbound.notification.SigningReminderNotificationPort;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -110,6 +111,8 @@ class SendSigningReminderServiceTest {
                 when(clinicConfigurationRepository.find()).thenReturn(Optional.empty()); // default 24h
                 when(clockPort.now()).thenReturn(now);
                 when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+                when(notificationPort.sendSigningReminder(any(SigningReminderMessage.class)))
+                                .thenReturn(NotificationSendResult.delivered());
 
                 when(reminderRepository.save(any(MedicalRecordSigningReminder.class)))
                                 .thenAnswer(inv -> inv.getArgument(0));
@@ -123,9 +126,62 @@ class SendSigningReminderServiceTest {
                 assertEquals(4, result.overdueHours()); // 28 - 24 = 4 hours
                 assertEquals("SYSTEM", result.channel());
                 assertEquals("Nhắc ký bệnh án", result.notes());
+                assertEquals("SENT", result.status());
 
                 verify(reminderRepository).save(any(MedicalRecordSigningReminder.class));
                 verify(notificationPort).sendSigningReminder(any(SigningReminderMessage.class));
+                verify(auditLogRepository).save(any(AuditLog.class));
+        }
+
+        @Test
+        @DisplayName("Successfully records reminder with FAILED status when notification delivery fails")
+        void sendReminderSuccess_NotificationFailed_SavedWithFailedStatus() {
+                MedicalRecord record = createDraftRecord();
+                Visit visit = createCompletedVisit();
+
+                when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
+                when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+                when(clinicConfigurationRepository.find()).thenReturn(Optional.empty());
+                when(clockPort.now()).thenReturn(now);
+                when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+                when(notificationPort.sendSigningReminder(any(SigningReminderMessage.class)))
+                                .thenReturn(NotificationSendResult.failed("SMS gateway timeout"));
+
+                when(reminderRepository.save(any(MedicalRecordSigningReminder.class)))
+                                .thenAnswer(inv -> inv.getArgument(0));
+
+                SigningReminderResult result = service
+                                .sendReminder(new SendSigningReminderCommand(recordId, "SYSTEM", "Nhắc ký"));
+
+                assertNotNull(result);
+                assertEquals("FAILED", result.status());
+                verify(reminderRepository).save(any(MedicalRecordSigningReminder.class));
+                verify(auditLogRepository).save(any(AuditLog.class));
+        }
+
+        @Test
+        @DisplayName("Successfully records reminder with FAILED status when notification port throws exception")
+        void sendReminderSuccess_NotificationThrowsException_CaughtAndSavedWithFailedStatus() {
+                MedicalRecord record = createDraftRecord();
+                Visit visit = createCompletedVisit();
+
+                when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
+                when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+                when(clinicConfigurationRepository.find()).thenReturn(Optional.empty());
+                when(clockPort.now()).thenReturn(now);
+                when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+                when(notificationPort.sendSigningReminder(any(SigningReminderMessage.class)))
+                                .thenThrow(new RuntimeException("Connection refused"));
+
+                when(reminderRepository.save(any(MedicalRecordSigningReminder.class)))
+                                .thenAnswer(inv -> inv.getArgument(0));
+
+                SigningReminderResult result = service
+                                .sendReminder(new SendSigningReminderCommand(recordId, "SYSTEM", "Nhắc ký"));
+
+                assertNotNull(result);
+                assertEquals("FAILED", result.status());
+                verify(reminderRepository).save(any(MedicalRecordSigningReminder.class));
                 verify(auditLogRepository).save(any(AuditLog.class));
         }
 

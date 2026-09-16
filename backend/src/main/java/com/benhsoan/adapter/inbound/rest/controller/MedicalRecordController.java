@@ -65,6 +65,8 @@ import com.benhsoan.adapter.inbound.rest.request.medicalrecord.SendSigningRemind
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.OverdueMedicalRecordResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.SigningReminderResponse;
 
+import com.benhsoan.domain.shared.exception.ValidationException;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -248,6 +250,7 @@ public class MedicalRecordController {
             @RequestParam(required = false) UUID doctorId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        validatePage(page, size);
         return overdueMapper.toResponsePage(
                 getOverdueMedicalRecordsUseCase.getOverdueRecords(
                         new GetOverdueMedicalRecordsQuery(doctorId, PageRequest.of(page, size))));
@@ -273,5 +276,11 @@ public class MedicalRecordController {
                 .stream()
                 .map(overdueMapper::toResponse)
                 .toList();
+    }
+
+    private void validatePage(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ValidationException("Page must be non-negative and size must be between 1 and 100.");
+        }
     }
 }

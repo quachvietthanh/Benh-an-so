@@ -25,6 +25,7 @@ import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.medicalrecord.SendSigningReminderCommand;
 import com.benhsoan.port.dto.result.SigningReminderResult;
 import com.benhsoan.port.inbound.medicalrecord.SendSigningReminderUseCase;
+import com.benhsoan.port.outbound.notification.NotificationSendResult;
 import com.benhsoan.port.outbound.notification.SigningReminderMessage;
 import com.benhsoan.port.outbound.notification.SigningReminderNotificationPort;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -40,7 +41,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -61,19 +64,19 @@ public class SendSigningReminderService implements SendSigningReminderUseCase {
     @Override
     public SigningReminderResult sendReminder(SendSigningReminderCommand command) {
         if (command == null || command.medicalRecordId() == null) {
-            throw new ValidationException("Medical record id is required.");
+            throw new ValidationException("Medical record ID is required.");
         }
 
-        UUID recordId = command.medicalRecordId();
-        MedicalRecord record = medicalRecordRepository.findById(recordId)
-                .orElseThrow(() -> new MedicalRecordNotFoundException(recordId));
+        MedicalRecord record = medicalRecordRepository.findById(command.medicalRecordId())
+                .orElseThrow(() -> new MedicalRecordNotFoundException(command.medicalRecordId()));
 
-        if (record.isSigned() || record.isLocked() || record.isArchived()) {
-            throw new MedicalRecordNotOverdueException("Bệnh án đã được ký hoặc đã khóa, không thể gửi nhắc.");
+        if (record.isSigned()) {
+            throw new MedicalRecordNotOverdueException("Bệnh án đã được ký số, không thể gửi nhắc.");
         }
 
-        Visit visit = visitRepository.findById(record.getVisitId())
-                .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
+        UUID visitId = record.getVisitId();
+        Visit visit = visitRepository.findById(visitId)
+                .orElseThrow(() -> new VisitNotFoundException(visitId));
 
         if (!visit.isCompleted() || visit.getCompletedAt() == null) {
             throw new MedicalRecordNotOverdueException("Lượt khám chưa hoàn thành, không thể gửi nhắc.");
@@ -106,6 +109,30 @@ public class SendSigningReminderService implements SendSigningReminderUseCase {
         Patient patient = patientRepository.findById(visit.getPatientId()).orElse(null);
         String patientName = patient != null ? patient.getFullName() : "Bệnh nhân";
 
+        String reminderStatus = "SENT";
+        try {
+            NotificationSendResult sendResult = notificationPort.sendSigningReminder(new SigningReminderMessage(
+                    record.getId(),
+                    visit.getVisitCode(),
+                    doctorId,
+                    doctorName,
+                    doctorEmail,
+                    doctorPhone,
+                    patientName,
+                    overdueHours,
+                    deadlineAt,
+                    command.notes()
+            ));
+            if (sendResult == null || !sendResult.sent()) {
+                reminderStatus = "FAILED";
+                log.warn("Signing reminder notification failed for record {}: {}", record.getId(),
+                        sendResult != null ? sendResult.failureReason() : "null result");
+            }
+        } catch (Exception e) {
+            reminderStatus = "FAILED";
+            log.error("Exception occurred while sending signing reminder notification for record {}", record.getId(), e);
+        }
+
         MedicalRecordSigningReminder reminder = MedicalRecordSigningReminder.create(
                 record.getId(),
                 doctorId,
@@ -113,29 +140,17 @@ public class SendSigningReminderService implements SendSigningReminderUseCase {
                 now,
                 overdueHours,
                 command.channel(),
-                command.notes()
+                command.notes(),
+                reminderStatus
         );
         MedicalRecordSigningReminder savedReminder = reminderRepository.save(reminder);
-
-        notificationPort.sendSigningReminder(new SigningReminderMessage(
-                record.getId(),
-                visit.getVisitCode(),
-                doctorId,
-                doctorName,
-                doctorEmail,
-                doctorPhone,
-                patientName,
-                overdueHours,
-                deadlineAt,
-                command.notes()
-        ));
 
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.SEND,
                 ResourceType.MEDICAL_RECORD,
                 record.getId(),
-                buildAuditDetail(record.getId(), visit.getVisitCode(), doctorId, doctorName, overdueHours, now),
+                buildAuditDetail(record.getId(), visit.getVisitCode(), doctorId, doctorName, overdueHours, now, reminderStatus),
                 null,
                 now
         ));
@@ -161,7 +176,8 @@ public class SendSigningReminderService implements SendSigningReminderUseCase {
             UUID doctorId,
             String doctorName,
             long overdueHours,
-            Instant remindedAt
+            Instant remindedAt,
+            String deliveryStatus
     ) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("action", "SIGNING_REMINDER");
@@ -171,6 +187,7 @@ public class SendSigningReminderService implements SendSigningReminderUseCase {
         detail.put("doctorName", doctorName);
         detail.put("overdueHours", overdueHours);
         detail.put("remindedAt", remindedAt.toString());
+        detail.put("deliveryStatus", deliveryStatus);
         try {
             return objectMapper.writeValueAsString(detail);
         } catch (JsonProcessingException exception) {

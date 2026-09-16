@@ -294,4 +294,51 @@ class OverdueMedicalRecordSecurityIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("MEDICAL_RECORD_ACCESS_DENIED"));
     }
+
+    @Test
+    @DisplayName("P3: Negative page returns 400 Bad Request (VALIDATION_FAILED)")
+    void getOverdueSigning_NegativePage_Returns400() throws Exception {
+        mockMvc.perform(get("/medical-records/overdue-signing?page=-1&size=20")
+                        .with(SecurityMockMvcRequestPostProcessors.user("manager")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_OVERDUE_READ"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("P3: Zero or negative size returns 400 Bad Request (VALIDATION_FAILED)")
+    void getOverdueSigning_ZeroOrNegativeSize_Returns400() throws Exception {
+        mockMvc.perform(get("/medical-records/overdue-signing?page=0&size=0")
+                        .with(SecurityMockMvcRequestPostProcessors.user("manager")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_OVERDUE_READ"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("P3: Size exceeding 100 returns 400 Bad Request (VALIDATION_FAILED)")
+    void getOverdueSigning_SizeExceeding100_Returns400() throws Exception {
+        mockMvc.perform(get("/medical-records/overdue-signing?page=0&size=101")
+                        .with(SecurityMockMvcRequestPostProcessors.user("manager")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_OVERDUE_READ"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("P3: Boundary values for page/size (size=1, size=100) return 200 OK")
+    void getOverdueSigning_BoundaryValues_Success() throws Exception {
+        when(getOverdueMedicalRecordsUseCase.getOverdueRecords(any(GetOverdueMedicalRecordsQuery.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 1), 0));
+
+        mockMvc.perform(get("/medical-records/overdue-signing?page=0&size=1")
+                        .with(SecurityMockMvcRequestPostProcessors.user("manager")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_OVERDUE_READ"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/medical-records/overdue-signing?page=0&size=100")
+                        .with(SecurityMockMvcRequestPostProcessors.user("manager")
+                                .authorities(new SimpleGrantedAuthority("PERMISSION_MEDICAL_RECORD_OVERDUE_READ"))))
+                .andExpect(status().isOk());
+    }
 }

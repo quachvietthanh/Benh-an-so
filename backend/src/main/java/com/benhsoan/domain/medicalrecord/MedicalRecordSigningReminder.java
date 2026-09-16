@@ -60,6 +60,28 @@ public class MedicalRecordSigningReminder {
             String channel,
             String notes
     ) {
+        return create(
+                medicalRecordId,
+                doctorId,
+                remindedBy,
+                remindedAt,
+                overdueHours,
+                channel,
+                notes,
+                "SENT"
+        );
+    }
+
+    public static MedicalRecordSigningReminder create(
+            UUID medicalRecordId,
+            UUID doctorId,
+            UUID remindedBy,
+            Instant remindedAt,
+            long overdueHours,
+            String channel,
+            String notes,
+            String status
+    ) {
         return new MedicalRecordSigningReminder(
                 UUID.randomUUID(),
                 medicalRecordId,
@@ -69,7 +91,7 @@ public class MedicalRecordSigningReminder {
                 overdueHours,
                 channel,
                 notes,
-                "SENT"
+                status
         );
     }
 
