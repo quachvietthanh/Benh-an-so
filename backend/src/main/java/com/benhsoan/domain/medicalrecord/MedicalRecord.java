@@ -413,6 +413,7 @@ public class MedicalRecord {
     }
 
     private String valueOf(MedicalRecordFieldCode fieldCode) {
+        if (fieldCode == null) return null;
         return switch (fieldCode) {
             case CHIEF_COMPLAINT -> chiefComplaint;
             case SYMPTOMS -> symptoms;

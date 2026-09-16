@@ -121,7 +121,7 @@ class ClinicalResultApplicationServiceTest {
                                 UUID.randomUUID(), null, null, VisitType.WALK_IN, VisitStatus.CANCELLED, NOW, null, NOW,
                                 "Consultation", null, fixture.actorId(), NOW, null);
                 when(authorizationService.requireWriteAccess()).thenReturn(fixture.actorId());
-                when(clinicalOrderItemRepository.findById(fixture.item().getId()))
+                when(clinicalOrderItemRepository.findByIdForUpdate(fixture.item().getId()))
                                 .thenReturn(Optional.of(fixture.item()));
                 when(clinicalResultRepository.findByClinicalOrderItemId(fixture.item().getId()))
                                 .thenReturn(Optional.empty());
@@ -198,7 +198,7 @@ class ClinicalResultApplicationServiceTest {
                 when(authorizationService.requireReadAccess()).thenReturn(UUID.randomUUID());
                 when(clinicalResultRepository.findById(clinicalResultId)).thenReturn(Optional.empty());
                 when(authorizationService.requireWriteAccess()).thenReturn(UUID.randomUUID());
-                when(clinicalOrderItemRepository.findById(clinicalOrderItemId)).thenReturn(Optional.empty());
+                when(clinicalOrderItemRepository.findByIdForUpdate(clinicalOrderItemId)).thenReturn(Optional.empty());
 
                 assertThrows(ClinicalResultNotFoundException.class,
                                 () -> clinicalResultService.getById(clinicalResultId));
@@ -313,7 +313,7 @@ class ClinicalResultApplicationServiceTest {
         private void stubEnter(Fixture fixture, UUID serviceId, ClinicalServiceCatalog service, Patient patient,
                         List<ClinicalReferenceRange> activeRanges, Instant entryNow) {
                 when(authorizationService.requireWriteAccess()).thenReturn(fixture.actorId());
-                when(clinicalOrderItemRepository.findById(fixture.item().getId()))
+                when(clinicalOrderItemRepository.findByIdForUpdate(fixture.item().getId()))
                                 .thenReturn(Optional.of(fixture.item()));
                 when(clinicalResultRepository.findByClinicalOrderItemId(fixture.item().getId()))
                                 .thenReturn(Optional.empty());
