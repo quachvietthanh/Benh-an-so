@@ -25,6 +25,9 @@ public record UpdateClinicConfigurationRequest(
         LocalTime closingTime,
 
         @Min(value = 10, message = "Retention years must be at least 10.")
-        Integer retentionYears
+        Integer retentionYears,
+
+        @Min(value = 1, message = "Signing deadline hours must be at least 1.")
+        Integer signingDeadlineHours
 ) {
 }

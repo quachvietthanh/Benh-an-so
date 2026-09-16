@@ -15,7 +15,8 @@ class ClinicConfigurationResultMapper {
                 configuration.getPhone(),
                 configuration.getOpeningTime(),
                 configuration.getClosingTime(),
-                configuration.getRetentionYears()
+                configuration.getRetentionYears(),
+                configuration.getSigningDeadlineHours()
         );
     }
 }

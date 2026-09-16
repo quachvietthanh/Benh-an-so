@@ -44,6 +44,9 @@ public class ClinicConfigurationEntity {
     @Column(name = "retention_years", nullable = false)
     private int retentionYears;
 
+    @Column(name = "signing_deadline_hours", nullable = false)
+    private int signingDeadlineHours;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

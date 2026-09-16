@@ -56,6 +56,7 @@ import {
   UserAddOutlined,
   UserOutlined,
   UserSwitchOutlined,
+  TableOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
@@ -63,6 +64,7 @@ import patientApi from '../api/patientApi'
 import PersonalDataConsentField from '../components/patient/PersonalDataConsentField'
 import queueApi from '../api/queueApi'
 import PatientMedicalHistoryModal from '../components/clinical/PatientMedicalHistoryModal'
+import DoctorWeeklyScheduleTable from '../components/appointment/DoctorWeeklyScheduleTable'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
 import {
@@ -174,9 +176,20 @@ function AppointmentQueue() {
     [user?.roles, user?.permissions],
   )
 
-  const [activeMainTab, setActiveMainTab] = useState(() =>
-    permissions.isDoctorOnly ? 'doctor_queue' : 'appointments',
-  )
+  const [activeMainTab, setActiveMainTab] = useState(() => {
+    const params = new URLSearchParams(location.search)
+    const tabParam = params.get('tab')
+    if (tabParam) return tabParam
+    return permissions.isDoctorOnly ? 'doctor_queue' : 'appointments'
+  })
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tabParam = params.get('tab')
+    if (tabParam && ['appointments', 'doctor_weekly_table', 'reception_queue', 'doctor_queue', 'completed'].includes(tabParam)) {
+      setActiveMainTab(tabParam)
+    }
+  }, [location.search])
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
@@ -1658,6 +1671,21 @@ function AppointmentQueue() {
                   scroll={{ x: 960 }}
                 />
               </Card>
+            ),
+          },
+          {
+            key: 'doctor_weekly_table',
+            label: (
+              <span>
+                <TableOutlined /> Lịch tuần bác sĩ (bảng)
+              </span>
+            ),
+            children: (
+              <DoctorWeeklyScheduleTable
+                onAppointmentBooked={() => {
+                  refreshAllData()
+                }}
+              />
             ),
           },
           {

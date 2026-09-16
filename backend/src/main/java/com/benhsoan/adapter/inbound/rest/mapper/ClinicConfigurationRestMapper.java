@@ -17,7 +17,8 @@ public class ClinicConfigurationRestMapper {
                 request.phone(),
                 request.openingTime(),
                 request.closingTime(),
-                request.retentionYears()
+                request.retentionYears(),
+                request.signingDeadlineHours()
         );
     }
 
@@ -28,7 +29,8 @@ public class ClinicConfigurationRestMapper {
                 result.phone(),
                 result.openingTime(),
                 result.closingTime(),
-                result.retentionYears()
+                result.retentionYears(),
+                result.signingDeadlineHours()
         );
     }
 }
