@@ -10,6 +10,7 @@ import ForceChangePasswordModal from './components/auth/ForceChangePasswordModal
 dayjs.locale('vi')
 
 message.config({
+  top: 20,
   maxCount: 2,
   duration: 3,
 })

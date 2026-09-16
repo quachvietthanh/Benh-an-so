@@ -14,6 +14,7 @@ import {
   RightOutlined,
   SyncOutlined,
   TeamOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 import { Navigate, useNavigate } from 'react-router-dom'
 import dashboardApi from '../api/dashboardApi'
@@ -245,6 +246,14 @@ function Dashboard() {
       value: visitSummary?.completed || 0,
       tone: 'green',
       icon: CheckCircleOutlined,
+    },
+    {
+      key: 'earlyEnded',
+      label: 'Kết thúc sớm',
+      description: 'Bệnh nhân xin về / chuyển viện (NCL-04)',
+      value: visitSummary?.earlyEnded || 0,
+      tone: 'amber',
+      icon: StopOutlined,
     },
     {
       key: 'cancelled',
