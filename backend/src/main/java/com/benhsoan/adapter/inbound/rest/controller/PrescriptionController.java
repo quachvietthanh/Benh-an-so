@@ -25,8 +25,11 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionR
 import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
-import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
+import com.benhsoan.adapter.inbound.rest.request.prescription.PartialDispensePrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.PartialDispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
@@ -37,6 +40,8 @@ import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionDispenseHistoryUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
@@ -70,6 +75,8 @@ public class PrescriptionController {
         private final GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
         private final SearchPrescriptionsUseCase searchPrescriptionsUseCase;
         private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
+        private final DispensePrescriptionItemsUseCase dispensePrescriptionItemsUseCase;
+        private final GetPrescriptionDispenseHistoryUseCase getPrescriptionDispenseHistoryUseCase;
         private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
         private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
         private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
@@ -144,6 +151,22 @@ public class PrescriptionController {
         @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
         public DispensePrescriptionResponse dispense(@PathVariable UUID id) {
                 return mapper.toResponse(dispensePrescriptionUseCase.dispense(id));
+        }
+
+        @PostMapping("/{id}/partial-dispense")
+        @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
+        public PartialDispensePrescriptionResponse partialDispense(
+                        @PathVariable UUID id,
+                        @Valid @RequestBody(required = false) PartialDispensePrescriptionRequest request) {
+                return mapper.toResponse(
+                                dispensePrescriptionItemsUseCase.dispense(mapper.toCommand(id, request)));
+        }
+
+        @GetMapping("/{id}/dispense-history")
+        @RequirePermission("PRESCRIPTION_READ")
+        public java.util.List<DispenseHistoryResponse> getDispenseHistory(@PathVariable UUID id) {
+                return mapper.toDispenseHistoryResponse(
+                                getPrescriptionDispenseHistoryUseCase.getHistory(id));
         }
 
         @PostMapping("/{id}/cancel")

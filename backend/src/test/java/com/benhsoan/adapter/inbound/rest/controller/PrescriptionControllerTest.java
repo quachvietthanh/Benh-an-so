@@ -36,6 +36,8 @@ import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.port.dto.result.DispenseAllocationResult;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
+import com.benhsoan.port.dto.result.PartialDispensePrescriptionResult;
+import com.benhsoan.port.dto.result.PrescriptionDispenseHistoryResult;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
@@ -53,6 +55,8 @@ import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionDispenseHistoryUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
@@ -96,6 +100,12 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private DispensePrescriptionUseCase dispensePrescriptionUseCase;
+
+    @MockitoBean
+    private DispensePrescriptionItemsUseCase dispensePrescriptionItemsUseCase;
+
+    @MockitoBean
+    private GetPrescriptionDispenseHistoryUseCase getPrescriptionDispenseHistoryUseCase;
 
     @MockitoBean
     private CancelPrescriptionUseCase cancelPrescriptionUseCase;
@@ -430,6 +440,8 @@ class PrescriptionControllerTest {
                         AdministrationRoute.ORAL,
                         5,
                         20,
+                        20,
+                        0,
                         "Sau an",
                         NOW.minusSeconds(3600),
                         NOW
@@ -826,6 +838,50 @@ class PrescriptionControllerTest {
                         .content(requestBody))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED_PRESCRIPTION_CANCELLATION"));
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/partial-dispense - 200 with partial dispense result")
+    void partialDispense_returnsResult() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID pharmacistId = UUID.randomUUID();
+        PrescriptionResult prescription = pendingPrescription(prescriptionId);
+        when(dispensePrescriptionItemsUseCase.dispense(any()))
+                .thenReturn(new PartialDispensePrescriptionResult(
+                        prescription, pharmacistId, NOW, List.of(), List.of()));
+
+        mockMvc.perform(post("/prescriptions/{id}/partial-dispense", prescriptionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prescription.id").value(prescriptionId.toString()))
+                .andExpect(jsonPath("$.dispensedBy").value(pharmacistId.toString()));
+    }
+
+    @Test
+    @DisplayName("GET /prescriptions/{id}/dispense-history - 200 with history list")
+    void getDispenseHistory_returnsList() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        when(getPrescriptionDispenseHistoryUseCase.getHistory(prescriptionId))
+                .thenReturn(List.of(new PrescriptionDispenseHistoryResult(
+                        UUID.randomUUID(), prescriptionId, itemId, medicineId, batchId,
+                        12, UUID.randomUUID(), NOW)));
+
+        mockMvc.perform(get("/prescriptions/{id}/dispense-history", prescriptionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].prescriptionItemId").value(itemId.toString()))
+                .andExpect(jsonPath("$[0].medicineBatchId").value(batchId.toString()))
+                .andExpect(jsonPath("$[0].dispensedQuantity").value(12));
+    }
+
+    private PrescriptionResult pendingPrescription(UUID prescriptionId) {
+        return new PrescriptionResult(
+                prescriptionId, "RX-001", UUID.randomUUID(), UUID.randomUUID(), "VISIT-001",
+                UUID.randomUUID(), "PAT-001", "Nguyen Van A", PrescriptionStatus.PENDING_DISPENSE,
+                null, UUID.randomUUID(), "Dr. B", NOW, null, null, List.of(), List.of());
     }
 }
 

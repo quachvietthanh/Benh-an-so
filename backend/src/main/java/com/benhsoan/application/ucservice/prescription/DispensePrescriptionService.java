@@ -81,6 +81,10 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         if (prescription.getStatus() == com.benhsoan.domain.prescription.enums.PrescriptionStatus.DISPENSED) {
             throw new com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException();
         }
+        if (prescription.getStatus() == com.benhsoan.domain.prescription.enums.PrescriptionStatus.PARTIALLY_DISPENSED) {
+            throw new com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException(
+                    "Partially dispensed prescriptions must be completed via partial dispensing.");
+        }
         List<PrescriptionItem> prescriptionItems = prescriptionItemRepository.findByPrescriptionId(prescriptionId);
         List<UUID> medicineIds = prescriptionItems.stream()
                 .map(PrescriptionItem::getMedicineId)

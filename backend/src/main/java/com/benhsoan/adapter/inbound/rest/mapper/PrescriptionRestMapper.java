@@ -12,10 +12,15 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescription
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.DispenseItemRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.PartialDispensePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionInteractionOverrideRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseAllocationResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseHistoryResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseItemSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.PartialDispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionWarningResponse;
@@ -26,10 +31,15 @@ import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
+import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
+import com.benhsoan.port.dto.command.prescription.DispensePrescriptionItemsCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.DispenseAllocationResult;
+import com.benhsoan.port.dto.result.DispenseItemSummaryResult;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
+import com.benhsoan.port.dto.result.PartialDispensePrescriptionResult;
+import com.benhsoan.port.dto.result.PrescriptionDispenseHistoryResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
@@ -184,6 +194,67 @@ public class PrescriptionRestMapper {
         );
     }
 
+    public DispensePrescriptionItemsCommand toCommand(
+            UUID prescriptionId,
+            PartialDispensePrescriptionRequest request
+    ) {
+        List<DispenseItemCommand> items = request == null || request.items() == null
+                ? List.of()
+                : request.items().stream()
+                        .map(this::toCommand)
+                        .toList();
+        return new DispensePrescriptionItemsCommand(prescriptionId, items);
+    }
+
+    private DispenseItemCommand toCommand(DispenseItemRequest request) {
+        return new DispenseItemCommand(request.prescriptionItemId(), request.quantity());
+    }
+
+    public PartialDispensePrescriptionResponse toResponse(
+            PartialDispensePrescriptionResult result
+    ) {
+        return new PartialDispensePrescriptionResponse(
+                toResponse(result.prescription()),
+                result.dispensedBy(),
+                result.dispensedAt(),
+                result.items().stream().map(this::toResponse).toList(),
+                result.allocations().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public DispenseItemSummaryResponse toResponse(DispenseItemSummaryResult result) {
+        return new DispenseItemSummaryResponse(
+                result.prescriptionItemId(),
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.unit(),
+                result.prescribedQuantity(),
+                result.dispensedQuantity(),
+                result.remainingQuantity());
+    }
+
+    public List<DispenseHistoryResponse> toDispenseHistoryResponse(
+            List<PrescriptionDispenseHistoryResult> results
+    ) {
+        if (results == null) {
+            return List.of();
+        }
+        return results.stream().map(this::toResponse).toList();
+    }
+
+    public DispenseHistoryResponse toResponse(PrescriptionDispenseHistoryResult result) {
+        return new DispenseHistoryResponse(
+                result.id(),
+                result.prescriptionId(),
+                result.prescriptionItemId(),
+                result.medicineId(),
+                result.medicineBatchId(),
+                result.dispensedQuantity(),
+                result.dispensedBy(),
+                result.dispensedAt());
+    }
+
     private CreatePrescriptionItemCommand toCommand(
             CreatePrescriptionItemRequest request
     ) {
@@ -237,6 +308,8 @@ public class PrescriptionRestMapper {
                 .route(result.route())
                 .durationDays(result.durationDays())
                 .quantity(result.quantity())
+                .dispensedQuantity(result.dispensedQuantity())
+                .remainingQuantity(result.remainingQuantity())
                 .instructions(result.instructions())
                 .createdAt(result.createdAt())
                 .updatedAt(result.updatedAt())
