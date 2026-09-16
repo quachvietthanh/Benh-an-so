@@ -58,6 +58,10 @@ public class VisitEntity {
     private String reason;
     @Column(columnDefinition = "TEXT")
     private String note;
+    @Column(name = "close_reason", length = 500)
+    private String closeReason;
+    @Column(name = "closed_at")
+    private Instant closedAt;
     @Column(name = "created_by", nullable = false, columnDefinition = "BINARY(16)")
     private UUID createdBy;
     @Column(name = "created_at", nullable = false)

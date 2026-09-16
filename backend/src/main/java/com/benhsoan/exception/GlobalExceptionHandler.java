@@ -45,6 +45,14 @@ public class GlobalExceptionHandler {
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
     }
 
+    @ExceptionHandler(com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handlePatientConsentAccessDenied(
+            com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException ex,
+            HttpServletRequest request
+    ) {
+        return build(HttpStatus.FORBIDDEN, ex.getCode().name(), ex.getMessage(), request.getRequestURI());
+    }
+
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(
             ValidationException ex,
@@ -81,6 +89,24 @@ public class GlobalExceptionHandler {
             return handleValidationException(validationEx, request);
         }
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(com.benhsoan.domain.patient.exception.PatientAlreadyMergedException.class)
+    public ResponseEntity<ApiErrorResponse> handlePatientAlreadyMerged(
+            com.benhsoan.domain.patient.exception.PatientAlreadyMergedException ex,
+            HttpServletRequest request
+    ) {
+        Map<String, Object> details = new HashMap<>();
+        if (ex.getMergedIntoPatientId() != null) {
+            details.put("mergedIntoPatientId", ex.getMergedIntoPatientId().toString());
+        }
+        return build(
+                DomainExceptionHttpStatusMapper.statusFor(ex.getCode()),
+                ex.getCode().name(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                details.isEmpty() ? null : details
+        );
     }
 
     @ExceptionHandler(com.benhsoan.domain.auth.exception.WeakPasswordException.class)

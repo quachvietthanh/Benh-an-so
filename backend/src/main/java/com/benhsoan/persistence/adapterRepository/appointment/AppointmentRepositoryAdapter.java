@@ -188,4 +188,23 @@ public class AppointmentRepositoryAdapter
                 .toList();
     }
 
+    @Override
+    public List<Appointment> findAppointmentsForDoctorsBetween(
+            Collection<UUID> doctorIds,
+            Instant from,
+            Instant to,
+            Collection<AppointmentStatus> statuses
+    ) {
+        if (doctorIds == null || doctorIds.isEmpty() || statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findAppointmentsForDoctorsBetween(
+                        doctorIds,
+                        from,
+                        to,
+                        statuses
+                ).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
 }

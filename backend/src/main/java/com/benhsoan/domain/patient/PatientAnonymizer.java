@@ -15,6 +15,8 @@ public final class PatientAnonymizer {
 
     private static final String MASKED_NAME_PREFIX = "BỆNH NHÂN #";
     private static final String GENERIC_MASKED_NAME = "BỆNH NHÂN";
+    private static final String MASKED_GUARDIAN_NAME_PREFIX = "GIÁM HỘ #";
+    private static final String GENERIC_MASKED_GUARDIAN_NAME = "NGƯỜI GIÁM HỘ";
     private static final String PHONE_PLACEHOLDER = "******";
 
     private PatientAnonymizer() {
@@ -29,6 +31,17 @@ public final class PatientAnonymizer {
             return GENERIC_MASKED_NAME;
         }
         return MASKED_NAME_PREFIX + patientCode.trim();
+    }
+
+    /**
+     * Replaces a guardian full name with a distinct stable label derived from the
+     * patient code so guardians and patients are easily distinguishable during demo.
+     */
+    public static String maskGuardianName(String patientCode) {
+        if (patientCode == null || patientCode.isBlank()) {
+            return GENERIC_MASKED_GUARDIAN_NAME;
+        }
+        return MASKED_GUARDIAN_NAME_PREFIX + patientCode.trim();
     }
 
     /**
@@ -86,6 +99,18 @@ public final class PatientAnonymizer {
         }
         String trimmed = value.trim();
         return trimmed.equals(GENERIC_MASKED_NAME) || trimmed.startsWith(MASKED_NAME_PREFIX);
+    }
+
+    /**
+     * True when the value is one of the synthetic masked-name forms produced by
+     * {@link #maskGuardianName(String)}.
+     */
+    public static boolean isMaskedGuardianName(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return trimmed.equals(GENERIC_MASKED_GUARDIAN_NAME) || trimmed.startsWith(MASKED_GUARDIAN_NAME_PREFIX);
     }
 
     /**

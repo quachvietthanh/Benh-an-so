@@ -37,6 +37,12 @@ public class PatientChangeDetailBuilder {
         values.put("emergencyContact", patient.getEmergencyContact());
         values.put("emergencyRelationship", patient.getEmergencyRelationship());
         values.put("emergencyPhone", patient.getEmergencyPhone());
+        values.put("guardianName", patient.getGuardianName());
+        values.put("guardianRelationship", patient.getGuardianRelationship());
+        values.put("guardianPhone", patient.getGuardianPhone());
+        values.put("guardianIdentityNumber", patient.getGuardianIdentityNumber());
+        values.put("guardianUserId", patient.getGuardianUserId() != null ? patient.getGuardianUserId().toString() : null);
+        values.put("consentSignerName", patient.getConsentSignerName());
         values.put("active", patient.isActive());
         values.put("consentAgreed", patient.isConsentAgreed());
         values.put("consentAgreedAt", patient.getConsentAgreedAt() != null ? patient.getConsentAgreedAt().toString() : null);
@@ -107,6 +113,30 @@ public class PatientChangeDetailBuilder {
         addChange(changes, "emergencyPhone",
                 oldPatient.getEmergencyPhone(),
                 newPatient.getEmergencyPhone());
+
+        addChange(changes, "guardianName",
+                oldPatient.getGuardianName(),
+                newPatient.getGuardianName());
+
+        addChange(changes, "guardianRelationship",
+                oldPatient.getGuardianRelationship(),
+                newPatient.getGuardianRelationship());
+
+        addChange(changes, "guardianPhone",
+                oldPatient.getGuardianPhone(),
+                newPatient.getGuardianPhone());
+
+        addChange(changes, "guardianIdentityNumber",
+                oldPatient.getGuardianIdentityNumber(),
+                newPatient.getGuardianIdentityNumber());
+
+        addChange(changes, "guardianUserId",
+                oldPatient.getGuardianUserId() != null ? oldPatient.getGuardianUserId().toString() : null,
+                newPatient.getGuardianUserId() != null ? newPatient.getGuardianUserId().toString() : null);
+
+        addChange(changes, "consentSignerName",
+                oldPatient.getConsentSignerName(),
+                newPatient.getConsentSignerName());
 
         addChange(changes, "active",
                 oldPatient.isActive(),

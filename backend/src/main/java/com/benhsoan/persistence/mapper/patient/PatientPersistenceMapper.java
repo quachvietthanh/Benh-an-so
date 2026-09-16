@@ -29,6 +29,12 @@ public class PatientPersistenceMapper {
                 entity.getEmergencyContact(),
                 entity.getEmergencyRelationship(),
                 entity.getEmergencyPhone(),
+                entity.getGuardianName(),
+                entity.getGuardianRelationship(),
+                entity.getGuardianPhone(),
+                entity.getGuardianIdentityNumber(),
+                entity.getGuardianUserId(),
+                entity.getConsentSignerName(),
                 entity.isActive(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
@@ -40,7 +46,12 @@ public class PatientPersistenceMapper {
                 entity.isConsentWithdrawn(),
                 entity.getConsentWithdrawnAt(),
                 entity.getConsentWithdrawnReason(),
-                entity.isNonMedicalUseRestricted()
+                entity.isNonMedicalUseRestricted(),
+                entity.getStatus(),
+                entity.getMergedIntoPatientId(),
+                entity.getMergedAt(),
+                entity.getMergedBy(),
+                entity.getMergeReason()
         );
     }
 
@@ -65,6 +76,12 @@ public class PatientPersistenceMapper {
                 .emergencyContact(domain.getEmergencyContact())
                 .emergencyRelationship(domain.getEmergencyRelationship())
                 .emergencyPhone(domain.getEmergencyPhone())
+                .guardianName(domain.getGuardianName())
+                .guardianRelationship(domain.getGuardianRelationship())
+                .guardianPhone(domain.getGuardianPhone())
+                .guardianIdentityNumber(domain.getGuardianIdentityNumber())
+                .guardianUserId(domain.getGuardianUserId())
+                .consentSignerName(domain.getConsentSignerName())
                 .active(domain.isActive())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
@@ -77,6 +94,11 @@ public class PatientPersistenceMapper {
                 .consentWithdrawnAt(domain.getConsentWithdrawnAt())
                 .consentWithdrawnReason(domain.getConsentWithdrawnReason())
                 .nonMedicalUseRestricted(domain.isNonMedicalUseRestricted())
+                .status(domain.getStatus())
+                .mergedIntoPatientId(domain.getMergedIntoPatientId())
+                .mergedAt(domain.getMergedAt())
+                .mergedBy(domain.getMergedBy())
+                .mergeReason(domain.getMergeReason())
                 .build();
     }
 }

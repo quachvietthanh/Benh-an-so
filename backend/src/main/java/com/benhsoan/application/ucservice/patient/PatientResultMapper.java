@@ -10,6 +10,10 @@ import com.benhsoan.port.dto.result.PatientResult;
 public class PatientResultMapper {
 
     public PatientResult toResult(Patient patient) {
+        return toResult(patient, null);
+    }
+
+    public PatientResult toResult(Patient patient, String mergedIntoPatientCode) {
 
         return new PatientResult(
                 patient.getId(),
@@ -26,6 +30,14 @@ public class PatientResultMapper {
                 patient.getEmergencyContact(),
                 patient.getEmergencyRelationship(),
                 patient.getEmergencyPhone(),
+                patient.getGuardianName(),
+                patient.getGuardianRelationship(),
+                patient.getGuardianPhone(),
+                patient.getGuardianIdentityNumber(),
+                patient.getGuardianUserId(),
+                patient.getConsentSignerName(),
+                patient.isMinor(),
+                patient.requiresAdultTransition(),
                 patient.isActive(),
                 patient.getCreatedAt(),
                 patient.getUpdatedAt(),
@@ -35,7 +47,14 @@ public class PatientResultMapper {
                 patient.isConsentWithdrawn(),
                 patient.getConsentWithdrawnAt(),
                 patient.getConsentWithdrawnReason(),
-                patient.isNonMedicalUseRestricted()
+                patient.isNonMedicalUseRestricted(),
+                patient.getStatus(),
+                patient.isMerged(),
+                patient.getMergedIntoPatientId(),
+                mergedIntoPatientCode,
+                patient.getMergedAt(),
+                patient.getMergedBy(),
+                patient.getMergeReason()
         );
     }
 

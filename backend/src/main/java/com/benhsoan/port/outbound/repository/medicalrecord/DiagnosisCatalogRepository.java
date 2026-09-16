@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.medicalrecord;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,6 +11,8 @@ public interface DiagnosisCatalogRepository {
     DiagnosisCatalog save(DiagnosisCatalog diagnosisCatalog);
 
     Optional<DiagnosisCatalog> findById(UUID id);
+
+    List<DiagnosisCatalog> findAllByIds(Collection<UUID> ids);
 
     boolean existsByCode(String code);
 

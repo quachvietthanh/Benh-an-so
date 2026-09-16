@@ -28,6 +28,7 @@ import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.patient.exception.PatientAlreadyMergedException;
 import com.benhsoan.domain.patient.exception.PatientConsentAccessDeniedException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
@@ -867,5 +868,402 @@ class UpdatePatientServiceTest {
 
         verify(patientRepository).save(any(Patient.class));
         verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008: Cập nhật thông tin người giám hộ thành công cho bệnh nhân trẻ em")
+    void updatesPediatricPatientGuardianSuccessfully() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate childDob = LocalDate.now().minusYears(6);
+        Patient existing = Patient.create(
+                "BN000005", "Nguyen Van Con", childDob, Gender.MALE,
+                null, null, "123 Street", null,
+                null, BloodType.UNKNOWN, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(childDob)
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Thi Me")
+                .guardianRelationship("Mẹ")
+                .guardianPhone("0987654321")
+                .guardianIdentityNumber("001200000002")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertTrue(result.isMinor());
+        assertEquals("Nguyen Thi Me", result.guardianName());
+        assertEquals("Mẹ", result.guardianRelationship());
+        assertEquals("0987654321", result.guardianPhone());
+        assertEquals("001200000002", result.guardianIdentityNumber());
+        assertEquals("Nguyen Thi Me", result.consentSignerName());
+
+        verify(patientRepository).save(any(Patient.class));
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-02: Chặn xóa người giám hộ khi bệnh nhân vẫn dưới 18 tuổi")
+    void rejectsClearingGuardianWhenPatientIsStillMinor() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate childDob = LocalDate.now().minusYears(8);
+        Patient existing = Patient.create(
+                "BN000005", "Nguyen Van Con", childDob, Gender.MALE,
+                null, null, "123 Street", null,
+                null, BloodType.UNKNOWN, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(childDob)
+                .gender(Gender.MALE)
+                .guardianName(null)
+                .guardianRelationship(null)
+                .guardianPhone(null)
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("guardianName"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-04: Bệnh nhân đủ 18 tuổi chuyển tiếp thành niên thành công, gỡ người giám hộ và đứng tên phiếu đồng ý")
+    void transitionsToAdultSuccessfullyWhenPatientReaches18() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(18);
+        Patient existing = Patient.create(
+                "BN000006", "Nguyen Van Truong Thanh", adultDob, Gender.MALE,
+                "0901234567", "tt@example.com", "123 Street", "079095009999",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+
+        // User only has PATIENT_UPDATE, not PATIENT_CONSENT_UPDATE
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Truong Thanh")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .email("tt@example.com")
+                .address("123 Street")
+                .identityNumber("079095009999")
+                .transitionToAdult(true)
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertFalse(result.isMinor());
+        assertFalse(result.requiresAdultTransitionPrompt());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianName());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianRelationship());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianPhone());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianIdentityNumber());
+        assertEquals("Nguyen Van Truong Thanh", result.consentSignerName(), "TC-04: Sau khi chuyển tiếp thành niên, bệnh nhân tự đứng tên phiếu đồng ý");
+        assertTrue(result.consentAgreed());
+        assertFalse(result.consentWithdrawn());
+
+        verify(patientRepository).save(any(Patient.class));
+        verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("P1 / TC-04: Bệnh nhân đủ 18 tuổi chuyển tiếp thành niên bảo toàn trạng thái rút consent (consentWithdrawn=true)")
+    void transitionsToAdultPreservesConsentWithdrawalWhenPatientHadWithdrawnConsent() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(18);
+        Patient existing = Patient.create(
+                "BN000006", "Nguyen Van Truong Thanh", adultDob, Gender.MALE,
+                "0901234567", "tt@example.com", "123 Street", "079095009999",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+        existing.withdrawConsent("Không muốn dùng dữ liệu ngoài y tế", java.time.Instant.now());
+
+        // User only has PATIENT_UPDATE, not PATIENT_CONSENT_UPDATE
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Truong Thanh")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .email("tt@example.com")
+                .address("123 Street")
+                .identityNumber("079095009999")
+                .transitionToAdult(true)
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertFalse(result.isMinor());
+        assertFalse(result.requiresAdultTransitionPrompt());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianName());
+        assertEquals("Nguyen Van Truong Thanh", result.consentSignerName());
+        assertTrue(result.consentWithdrawn(), "Trạng thái rút consent không được tự động xóa khi transitionToAdult");
+        assertTrue(result.nonMedicalUseRestricted(), "Hạn chế sử dụng dữ liệu phi y tế phải được giữ nguyên");
+        assertEquals("Không muốn dùng dữ liệu ngoài y tế", result.consentWithdrawnReason());
+
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P1: Chặn khôi phục consent khi transitionToAdult nếu user không có quyền PATIENT_CONSENT_UPDATE")
+    void rejectsConsentRenewalDuringTransitionToAdultWhenUserLacksConsentPermission() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(18);
+        Patient existing = Patient.create(
+                "BN000006", "Nguyen Van Truong Thanh", adultDob, Gender.MALE,
+                "0901234567", "tt@example.com", "123 Street", "079095009999",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+        existing.withdrawConsent("Không muốn dùng dữ liệu ngoài y tế", java.time.Instant.now());
+
+        // User does NOT have PATIENT_CONSENT_UPDATE
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(false);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Truong Thanh")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .transitionToAdult(true)
+                .consentAgreed(true)
+                .consentWithdrawn(false)
+                .consentVersion("v1.0")
+                .active(true)
+                .build();
+
+        assertThrows(
+                PatientConsentAccessDeniedException.class,
+                () -> service.update(patientId, command)
+        );
+
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P1: Cho phép chuyển tiếp thành niên và gia hạn consent thành công khi user có đủ quyền PATIENT_CONSENT_UPDATE")
+    void allowsConsentRenewalDuringTransitionToAdultWhenUserHasConsentPermission() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(18);
+        Patient existing = Patient.create(
+                "BN000006", "Nguyen Van Truong Thanh", adultDob, Gender.MALE,
+                "0901234567", "tt@example.com", "123 Street", "079095009999",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+        existing.withdrawConsent("Không muốn dùng dữ liệu ngoài y tế", java.time.Instant.now());
+
+        // User HAS PATIENT_CONSENT_UPDATE
+        when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Truong Thanh")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .transitionToAdult(true)
+                .consentAgreed(true)
+                .consentWithdrawn(false)
+                .consentVersion("v1.0")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertFalse(result.isMinor());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianName());
+        assertEquals("Nguyen Van Truong Thanh", result.consentSignerName());
+        assertTrue(result.consentAgreed());
+        assertFalse(result.consentWithdrawn());
+        assertFalse(result.nonMedicalUseRestricted());
+        org.junit.jupiter.api.Assertions.assertNull(result.consentWithdrawnReason());
+
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-008 TC-04: Từ chối chuyển tiếp thành niên khi bệnh nhân chưa đủ 18 tuổi")
+    void rejectsTransitionToAdultWhenPatientIsStillMinor() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate minorDob = LocalDate.now().minusYears(16);
+        Patient existing = Patient.create(
+                "BN000007", "Nguyen Van Chua Lon", minorDob, Gender.MALE,
+                null, null, "123 Street", null,
+                null, BloodType.UNKNOWN, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Chua Lon")
+                .dateOfBirth(minorDob)
+                .gender(Gender.MALE)
+                .transitionToAdult(true)
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertTrue(ex.getMessage().contains("transitionToAdult") || ex.getMessage().contains("18 tuổi"));
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P2-1 / TC-04: Từ chối gỡ bỏ người giám hộ cho bệnh nhân đủ 18 tuổi nếu không kích hoạt transitionToAdult")
+    void rejectsClearingGuardianForAdultPatientWithoutTransitionToAdult() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate adultDob = LocalDate.now().minusYears(19);
+        Patient existing = Patient.create(
+                "BN000010", "Nguyen Van Lon Roi", adultDob, Gender.MALE,
+                "0901234567", "adult@example.com", "123 Street", "079095001234",
+                null, BloodType.O_POSITIVE, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", "001200000001", null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        // Client attempts to clear guardian by sending guardianName = null, without transitionToAdult
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Lon Roi")
+                .dateOfBirth(adultDob)
+                .gender(Gender.MALE)
+                .phone("0901234567")
+                .guardianName(null)
+                .guardianRelationship(null)
+                .guardianPhone(null)
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertEquals("transitionToAdult", ex.getField());
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P1-2 / QTN-44: Từ chối cập nhật bệnh nhân trẻ em khi consentSignerName khác người giám hộ")
+    void rejectsUpdatingMinorPatientWhenConsentSignerMismatchGuardian() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate childDob = LocalDate.now().minusYears(8);
+        Patient existing = Patient.create(
+                "BN000011", "Nguyen Van Be", childDob, Gender.MALE,
+                null, null, "123 Street", null,
+                null, BloodType.UNKNOWN, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", null, null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Be")
+                .dateOfBirth(childDob)
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Van Bo")
+                .guardianRelationship("Bố")
+                .guardianPhone("0912345678")
+                .consentSignerName("Người Lạ Ký")
+                .active(true)
+                .build();
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.update(patientId, command));
+        assertEquals("consentSignerName", ex.getField());
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("P3-2: Giữ nguyên người giám hộ khi client round-trip nhãn ẩn danh dạng GIÁM HỘ #BN...")
+    void preservesGuardianNameWhenRoundTrippingMaskedGuardianName() {
+        UUID patientId = UUID.randomUUID();
+        LocalDate childDob = LocalDate.now().minusYears(8);
+        Patient existing = Patient.create(
+                "BN000012", "Nguyen Van Be", childDob, Gender.MALE,
+                null, null, "123 Street", null,
+                null, BloodType.UNKNOWN, null, null, null,
+                "Nguyen Van Bo", "Bố", "0912345678", null, null, "Nguyen Van Bo",
+                true, "v1.0", currentUserId
+        );
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Client read anonymized data and sent back "GIÁM HỘ #BN000012"
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Be")
+                .dateOfBirth(childDob)
+                .gender(Gender.MALE)
+                .guardianName("GIÁM HỘ #BN000012")
+                .guardianRelationship("Bố")
+                .guardianPhone("0912345678")
+                .active(true)
+                .build();
+
+        PatientResult result = service.update(patientId, command);
+
+        assertNotNull(result);
+        assertEquals("Nguyen Van Bo", result.guardianName(), "Giá trị guardianName thật không bị ghi đè bởi nhãn ẩn danh");
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-02-CN-006-TC-03: Chặn cập nhật hồ sơ đã gộp (Read-only)")
+    void rejectsUpdateOnMergedPatient() {
+        UUID patientId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        Patient existing = Patient.create(
+                "BN000099", "Nguyen Van A", LocalDate.of(1990, 1, 1), Gender.MALE,
+                "0901234567", null, "123 Street", null,
+                null, BloodType.UNKNOWN, null, null, null,
+                null, null, null, null, null, null,
+                true, "v1.0", currentUserId
+        );
+        existing.markAsMerged(targetId, currentUserId, "Gộp hồ sơ trùng");
+
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(existing));
+
+        UpdatePatientCommand command = UpdatePatientCommand.builder()
+                .fullName("Nguyen Van A Updated")
+                .dateOfBirth(LocalDate.of(1990, 1, 1))
+                .gender(Gender.MALE)
+                .active(true)
+                .build();
+
+        assertThrows(PatientAlreadyMergedException.class, () -> service.update(patientId, command));
+        verify(patientRepository, never()).save(any(Patient.class));
     }
 }

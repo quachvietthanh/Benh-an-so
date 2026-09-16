@@ -32,6 +32,12 @@
 | `/patients/{patientId}/allergies/{allergyId}` | PUT | ✅ | ✅ | ❌ | ❌ |
 | `/patients/{patientId}/allergies/{allergyId}` | DELETE | ✅ | ✅ | ❌ | ❌ |
 | `/patients/{patientId}/allergies/{allergyId}/history` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/patients/{patientId}/chronic-diseases` | GET | ✅ | ✅ | ❌ | ✅ |
+| `/patients/{patientId}/chronic-diseases` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/patients/{patientId}/chronic-diseases/{chronicDiseaseId}` | DELETE | ✅ | ✅ | ❌ | ❌ |
+| `/patients/{patientId}/family-history` | GET | ✅ | ✅ | ❌ | ✅ |
+| `/patients/{patientId}/family-history` | POST | ✅ | ✅ | ❌ | ❌ |
+| `/patients/{patientId}/family-history/{familyHistoryId}` | DELETE | ✅ | ✅ | ❌ | ❌ |
 |  |  |  |  |  |  |
 | **Medical Records** |  |  |  |  |  |
 | `/api/v1/medical-records` | GET | ✅ | ✅ | ❌ | ❌ |
@@ -180,7 +186,8 @@ PHARMACIST (Dược sĩ)
 USER_CREATE, USER_READ, USER_UPDATE, USER_DELETE, USER_ASSIGN_ROLE, USER_RESET_PASSWORD
 
 // Patient
-PATIENT_CREATE, PATIENT_READ, PATIENT_UPDATE, PATIENT_DELETE, PATIENT_CONSENT_UPDATE, PATIENT_ALLERGY_WRITE, PATIENT_ALLERGY_READ
+PATIENT_CREATE, PATIENT_READ, PATIENT_UPDATE, PATIENT_DELETE, PATIENT_CONSENT_UPDATE, PATIENT_ALLERGY_WRITE, PATIENT_ALLERGY_READ,
+PATIENT_CHRONIC_DISEASE_WRITE, PATIENT_CHRONIC_DISEASE_READ, PATIENT_FAMILY_HISTORY_WRITE, PATIENT_FAMILY_HISTORY_READ
 
 // Medical Record
 RECORD_CREATE, RECORD_READ, RECORD_UPDATE, RECORD_DELETE, RECORD_UPDATE_STATUS

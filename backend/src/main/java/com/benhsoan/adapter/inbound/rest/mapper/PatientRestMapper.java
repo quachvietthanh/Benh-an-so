@@ -5,14 +5,20 @@ import org.springframework.data.domain.Pageable;
 import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import org.springframework.stereotype.Component;
 
+import com.benhsoan.adapter.inbound.rest.request.patient.MergePatientsRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
+import com.benhsoan.adapter.inbound.rest.response.patient.DuplicatePatientGroupResponse;
+import com.benhsoan.adapter.inbound.rest.response.patient.MergePatientsResponse;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
 import com.benhsoan.domain.patient.PatientAnonymizer;
+import com.benhsoan.port.dto.command.patient.MergePatientsCommand;
 import com.benhsoan.port.dto.command.patient.RegisterPatientCommand;
 import com.benhsoan.port.dto.command.patient.SearchPatientCommand;
 import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
+import com.benhsoan.port.dto.result.patient.DuplicatePatientGroupResult;
+import com.benhsoan.port.dto.result.patient.MergePatientsResult;
 import com.benhsoan.port.dto.result.PatientResult;
 
 @Component
@@ -42,6 +48,11 @@ public class PatientRestMapper {
                 .emergencyPhone(request.emergencyPhone())
                 .consentAgreed(request.consentAgreed())
                 .consentVersion(request.consentVersion())
+                .guardianName(request.guardianName())
+                .guardianRelationship(request.guardianRelationship())
+                .guardianPhone(request.guardianPhone())
+                .guardianIdentityNumber(request.guardianIdentityNumber())
+                .consentSignerName(request.consentSignerName())
                 .build();
     }
 
@@ -65,6 +76,12 @@ public class PatientRestMapper {
                 .consentWithdrawn(request.consentWithdrawn())
                 .consentWithdrawnReason(request.consentWithdrawnReason())
                 .consentVersion(request.consentVersion())
+                .guardianName(request.guardianName())
+                .guardianRelationship(request.guardianRelationship())
+                .guardianPhone(request.guardianPhone())
+                .guardianIdentityNumber(request.guardianIdentityNumber())
+                .consentSignerName(request.consentSignerName())
+                .transitionToAdult(request.transitionToAdult())
                 .build();
     }
 
@@ -89,6 +106,15 @@ public class PatientRestMapper {
         String emergencyPhone = anonymizationModeState.isEnabled()
                 ? PatientAnonymizer.maskPhone(result.emergencyPhone())
                 : result.emergencyPhone();
+        String guardianName = anonymizationModeState.isEnabled() && result.guardianName() != null
+                ? PatientAnonymizer.maskGuardianName(result.patientCode())
+                : result.guardianName();
+        String guardianPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(result.guardianPhone())
+                : result.guardianPhone();
+        String consentSignerName = anonymizationModeState.isEnabled() && result.consentSignerName() != null
+                ? (result.isMinor() ? PatientAnonymizer.maskGuardianName(result.patientCode()) : PatientAnonymizer.maskFullName(result.patientCode()))
+                : result.consentSignerName();
 
         return new PatientResponse(
                 result.id(),
@@ -105,6 +131,14 @@ public class PatientRestMapper {
                 emergencyContact,
                 result.emergencyRelationship(),
                 emergencyPhone,
+                guardianName,
+                result.guardianRelationship(),
+                guardianPhone,
+                result.guardianIdentityNumber(),
+                result.guardianUserId(),
+                consentSignerName,
+                result.isMinor(),
+                result.requiresAdultTransitionPrompt(),
                 result.active(),
                 result.createdAt(),
                 result.updatedAt(),
@@ -114,7 +148,14 @@ public class PatientRestMapper {
                 result.consentWithdrawn(),
                 result.consentWithdrawnAt(),
                 result.consentWithdrawnReason(),
-                result.nonMedicalUseRestricted()
+                result.nonMedicalUseRestricted(),
+                result.status(),
+                result.isMerged(),
+                result.mergedIntoPatientId(),
+                result.mergedIntoPatientCode(),
+                result.mergedAt(),
+                result.mergedBy(),
+                result.mergeReason()
         );
     }
 
@@ -134,6 +175,38 @@ public class PatientRestMapper {
             .active(request.active())
             .pageable(pageable)
             .build();
-        }
+    }
+
+    public MergePatientsCommand toMergeCommand(MergePatientsRequest request) {
+        return new MergePatientsCommand(
+                request.sourcePatientId(),
+                request.targetPatientId(),
+                request.reason()
+        );
+    }
+
+    public MergePatientsResponse toMergeResponse(MergePatientsResult result) {
+        return new MergePatientsResponse(
+                result.sourcePatientId(),
+                result.sourcePatientCode(),
+                result.targetPatientId(),
+                result.targetPatientCode(),
+                result.transferredVisitsCount(),
+                result.mergedBy(),
+                result.reason(),
+                result.mergedAt()
+        );
+    }
+
+    public DuplicatePatientGroupResponse toDuplicateGroupResponse(DuplicatePatientGroupResult result) {
+        return new DuplicatePatientGroupResponse(
+                result.fullName(),
+                result.dateOfBirth(),
+                result.phone(),
+                result.candidates().stream()
+                        .map(this::toResponse)
+                        .toList()
+        );
+    }
 
 }
