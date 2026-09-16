@@ -31,10 +31,12 @@ import com.benhsoan.domain.medicalrecord.exception.MedicalRecordInvalidVisitExce
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordMissingDiagnosisException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordUnauthorizedSignerException;
+import com.benhsoan.domain.medicalrecord.exception.PendingClinicalOrdersWarningException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.port.dto.command.medicalrecord.SignMedicalRecordCommand;
+import com.benhsoan.port.outbound.repository.clinical.ClinicalOrderItemRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordTemplateRepository;
@@ -49,6 +51,7 @@ class SignMedicalRecordServiceTest {
     @Mock private VisitRepository visitRepository;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private MedicalRecordTemplateRepository medicalRecordTemplateRepository;
+    @Mock private ClinicalOrderItemRepository clinicalOrderItemRepository;
     @Mock private MedicalRecordAuthorizationService authorizationService;
     @Mock private MedicalRecordAccessAuditService accessAuditService;
     @Mock private MedicalRecordTemplateApplicationMapper templateMapper;
@@ -233,5 +236,60 @@ class SignMedicalRecordServiceTest {
                 () -> service.sign(record.getId(), new SignMedicalRecordCommand("signature")));
 
         verifyNoInteractions(accessAuditService);
+    }
+
+    @Test
+    @DisplayName("TC-05: Ký bệnh án khi lượt khám còn chỉ định CLS chưa có kết quả (chưa xác nhận) -> ném PendingClinicalOrdersWarningException")
+    void pendingClinicalOrdersWithoutAcknowledgementThrowsException() {
+        MedicalRecord record = openRecord();
+        Visit visit = activeVisit(doctorId);
+
+        when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(record.getId())).thenReturn(true);
+        when(clockPort.now()).thenReturn(now);
+        when(clinicalOrderItemRepository.countPendingByVisitId(visitId)).thenReturn(2L);
+        when(clinicalOrderItemRepository.findPendingServiceNamesByVisitId(visitId))
+                .thenReturn(List.of("Tổng phân tích tế bào máu", "Chụp X-quang ngực thẳng"));
+
+        PendingClinicalOrdersWarningException ex = assertThrows(
+                PendingClinicalOrdersWarningException.class,
+                () -> service.sign(record.getId(), new SignMedicalRecordCommand("SIG_123", false))
+        );
+
+        assertEquals(2, ex.getPendingServices().size());
+        verify(accessAuditService).recordRecordAccessInNewTransaction(
+                patientId, visitId, record.getId(), doctorId,
+                MedicalRecordAccessAction.SIGN,
+                "Signature blocked: Pending paraclinical orders waiting for results: Tổng phân tích tế bào máu, Chụp X-quang ngực thẳng",
+                now
+        );
+    }
+
+    @Test
+    @DisplayName("TC-06: Ký bệnh án khi lượt khám còn chỉ định CLS nhưng bác sĩ đã xác nhận (acknowledgePendingOrders = true) -> ký thành công và ghi chú audit")
+    void pendingClinicalOrdersWithAcknowledgementSignsSuccessfully() {
+        MedicalRecord record = openRecord();
+        Visit visit = activeVisit(doctorId);
+
+        when(authorizationService.requireWriteAccess()).thenReturn(doctorId);
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(record.getId())).thenReturn(true);
+        when(clockPort.now()).thenReturn(now);
+        when(clinicalOrderItemRepository.countPendingByVisitId(visitId)).thenReturn(1L);
+        when(medicalRecordRepository.save(any(MedicalRecord.class))).thenAnswer(i -> i.getArgument(0));
+
+        SignMedicalRecordCommand command = new SignMedicalRecordCommand("DR_SIG_DATA_123", true);
+        var result = service.sign(record.getId(), command);
+
+        assertEquals(MedicalRecordStatus.SIGNED, result.status());
+        verify(accessAuditService).recordRecordAccess(
+                patientId, visitId, record.getId(), doctorId,
+                MedicalRecordAccessAction.SIGN,
+                "Medical record signed (acknowledged pending paraclinical orders)",
+                now
+        );
     }
 }

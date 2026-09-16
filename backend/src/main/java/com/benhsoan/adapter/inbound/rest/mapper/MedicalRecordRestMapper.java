@@ -65,7 +65,8 @@ public class MedicalRecordRestMapper {
             com.benhsoan.adapter.inbound.rest.request.medicalrecord.SignMedicalRecordRequest request
     ) {
         return new com.benhsoan.port.dto.command.medicalrecord.SignMedicalRecordCommand(
-                request == null ? null : request.signatureData()
+                request == null ? null : request.signatureData(),
+                request != null && request.acknowledgePendingOrders() != null && request.acknowledgePendingOrders()
         );
     }
 

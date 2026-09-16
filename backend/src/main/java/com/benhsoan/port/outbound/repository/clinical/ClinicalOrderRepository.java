@@ -11,6 +11,8 @@ public interface ClinicalOrderRepository {
 
     Optional<ClinicalOrder> findById(UUID id);
 
+    Optional<ClinicalOrder> findByIdForUpdate(UUID id);
+
     ClinicalOrder save(ClinicalOrder order);
 
     Page<ClinicalOrder> findByVisitId(UUID visitId, Pageable pageable);
