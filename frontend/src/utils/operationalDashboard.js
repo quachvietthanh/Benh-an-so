@@ -12,6 +12,7 @@ export const EMPTY_OPERATIONAL_DASHBOARD = Object.freeze({
     inProgress: 0,
     completed: 0,
     cancelled: 0,
+    earlyEnded: 0,
   }),
   revenueSummary: Object.freeze({
     totalRevenueToday: 0,
@@ -42,6 +43,7 @@ export const normalizeOperationalDashboard = (payload) => {
       inProgress: toCount(visits.inProgress),
       completed: toCount(visits.completed),
       cancelled: toCount(visits.cancelled),
+      earlyEnded: toCount(visits.earlyEnded),
     },
     revenueSummary: {
       totalRevenueToday: toNonNegativeNumber(revenue.totalRevenueToday),
@@ -77,6 +79,7 @@ export const buildOperationalSnapshotFromReports = ({
   const inProgress = todayRecords.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'EXAMINING' || r.status === 'WAITING_FOR_RESULT').length
   let completed = todayRecords.filter((r) => r.status === 'COMPLETED').length
   const cancelled = todayRecords.filter((r) => r.status === 'CANCELLED').length
+  const earlyEnded = todayRecords.filter((r) => r.status === 'EARLY_ENDED').length
 
   const visitCount = summary?.visitCount != null
     ? toCount(summary.visitCount)
@@ -87,7 +90,7 @@ export const buildOperationalSnapshotFromReports = ({
   if (visitCount > 0) {
     completed = Math.max(completed, visitCount)
   }
-  const total = Math.max(waiting + inProgress + completed + cancelled, visitCount)
+  const total = Math.max(waiting + inProgress + completed + cancelled + earlyEnded, visitCount)
 
   const totalRevenue = summary?.revenue != null
     ? toNonNegativeNumber(summary.revenue)
@@ -118,6 +121,7 @@ export const buildOperationalSnapshotFromReports = ({
       inProgress,
       completed,
       cancelled,
+      earlyEnded,
     },
     revenueSummary: {
       totalRevenueToday: totalRevenue,

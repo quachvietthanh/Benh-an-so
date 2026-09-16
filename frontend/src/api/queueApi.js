@@ -46,6 +46,9 @@ const queueApi = {
   getHistory: (itemId) => axiosClient.get(`/queue-items/${itemId}/history`),
 
   complete: (itemId) => axiosClient.post(`/queue-items/${itemId}/complete`),
+
+  close: (itemId, outcome, reason) =>
+    axiosClient.post(`/queue-items/${itemId}/close`, { outcome, reason }),
 }
 
 export default queueApi

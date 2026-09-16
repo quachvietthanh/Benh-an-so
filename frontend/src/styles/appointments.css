@@ -1014,3 +1014,24 @@
   }
 }
 
+/* Nút gợi ý lý do nhanh trong CloseVisitModal - thân thiện mobile */
+.close-visit-presets-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.close-visit-preset-btn {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+@media (max-width: 480px) {
+  .close-visit-preset-btn {
+    font-size: 12px !important;
+    padding: 5px 10px !important;
+    min-height: 30px !important;
+  }
+}
+
+

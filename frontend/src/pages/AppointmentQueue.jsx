@@ -56,17 +56,19 @@ import {
   UserAddOutlined,
   UserOutlined,
   UserSwitchOutlined,
+  StopOutlined,
   TableOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
 import patientApi from '../api/patientApi'
-import PersonalDataConsentField from '../components/patient/PersonalDataConsentField'
 import queueApi from '../api/queueApi'
 import PatientMedicalHistoryModal from '../components/clinical/PatientMedicalHistoryModal'
+import CloseVisitModal from '../components/clinical/CloseVisitModal'
 import DoctorWeeklyScheduleTable from '../components/appointment/DoctorWeeklyScheduleTable'
 import userApi from '../api/userApi'
 import { useAuthContext } from '../context/AuthContext'
+import { canUserCloseVisit } from '../utils/closeVisitHelpers'
 import {
   APPOINTMENT_STATUS_META,
   QUEUE_STATUS_META,
@@ -84,6 +86,18 @@ import {
 import { formatVisitCode } from '../utils/helpers'
 import ReceptionRescheduleAppointmentModal from '../components/appointment/ReceptionRescheduleAppointmentModal'
 import UnconfirmedAppointmentsDrawer from '../components/appointment/UnconfirmedAppointmentsDrawer'
+import BookAppointmentModal from '../components/appointment-queue/BookAppointmentModal'
+import WalkInModal from '../components/appointment-queue/WalkInModal'
+import CancelAppointmentModal from '../components/appointment-queue/CancelAppointmentModal'
+import QuickPatientModal from '../components/appointment-queue/QuickPatientModal'
+import AppointmentLogsDrawer from '../components/appointment-queue/AppointmentLogsDrawer'
+import AppointmentDetailModal from '../components/appointment-queue/AppointmentDetailModal'
+import InProgressPatientList from '../components/appointment-queue/InProgressPatientList'
+import WaitingPatientList from '../components/appointment-queue/WaitingPatientList'
+import WaitingForResultList from '../components/appointment-queue/WaitingForResultList'
+import CompletedTodayList from '../components/appointment-queue/CompletedTodayList'
+import { getAppointmentColumns } from './appointment-queue/appointmentColumns'
+import { getQueueBoardColumns } from './appointment-queue/queueBoardColumns'
 import {
   canRescheduleAppointment,
   getRescheduleRestrictionMessage,
@@ -100,71 +114,16 @@ import {
   cleanQueueActionErrorMessage,
 } from '../utils/queueDeferRecallHelpers'
 
+import {
+  getInitials,
+  getAvatarStyle,
+  DEFAULT_DOCTORS,
+  normalizeQueueItem,
+  normalizeQueueList,
+  replaceQueueItem,
+} from '../utils/appointmentQueueUiHelpers'
+
 const { Text, Title, Paragraph } = Typography
-
-const avatarPalette = [
-  ['#e7f0ff', '#1c68ce'],
-  ['#fff0e5', '#bf6b32'],
-  ['#e8f7ef', '#21835a'],
-  ['#f1eaff', '#7541b7'],
-]
-
-const getInitials = (name = '') =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(-2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-
-const DEFAULT_DOCTORS = [
-  {
-    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
-    username: 'doctor1',
-    fullName: 'Dr. Nguyen Minh Anh',
-    department: 'Nội khoa',
-  },
-  {
-    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
-    username: 'doctor2',
-    fullName: 'Dr. Tran Quang Huy',
-    department: 'Ngoại khoa',
-  },
-  {
-    id: 'u3',
-    username: 'doctor1',
-    fullName: 'BS. Phạm Hồng Anh',
-    department: 'Nội tổng hợp',
-  },
-]
-
-const getAvatarStyle = (seed = '') => {
-  const paletteIndex =
-    [...String(seed)].reduce((sum, character) => sum + character.charCodeAt(0), 0) % avatarPalette.length
-  const [background, color] = avatarPalette[paletteIndex]
-  return { background, color }
-}
-
-const normalizeQueueItem = (item = {}) => ({
-  ...item,
-  id: item.id || item.queueItemId,
-  status: item.status || item.queueItemStatus,
-  roomName: item.roomName || item.roomNumber,
-})
-
-const normalizeQueueList = (payload) => {
-  const list = Array.isArray(payload) ? payload : (payload?.content || payload?.items || [])
-  return list.map(normalizeQueueItem).filter((item) => item.id)
-}
-
-const replaceQueueItem = (items, queueItem) => {
-  const list = Array.isArray(items) ? items : []
-  const exists = list.some((item) => String(item.id) === String(queueItem.id))
-  return exists
-    ? list.map((item) => (String(item.id) === String(queueItem.id) ? queueItem : item))
-    : [queueItem, ...list]
-}
 
 function AppointmentQueue() {
   const location = useLocation()
@@ -218,6 +177,7 @@ function AppointmentQueue() {
   const [skipModalItem, setSkipModalItem] = useState(null)
   const [historyQueueItem, setHistoryQueueItem] = useState(null)
   const [reQueuingId, setReQueuingId] = useState(null)
+  const [closeVisitModalItem, setCloseVisitModalItem] = useState(null)
   const [cancelModalItem, setCancelModalItem] = useState(null)
   const [rescheduleModalItem, setRescheduleModalItem] = useState(null)
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
@@ -461,7 +421,7 @@ function AppointmentQueue() {
 
     const validItems = queues.filter((q) => {
       if (permissions.isDoctorOnly && String(q.doctorId) !== String(user?.id)) return false
-      if (q.status === 'CANCELLED') return false
+      if (queueStatusFilter !== 'CANCELLED' && q.status === 'CANCELLED') return false
       if (queueStatusFilter !== 'ALL' && q.status !== queueStatusFilter) return false
       if (queueSourceFilter !== 'ALL' && q.sourceType !== queueSourceFilter) return false
       const pInfo = getPatientInfo(q.patientId, q.patientName, q.patientCode, q.phone)
@@ -497,7 +457,14 @@ function AppointmentQueue() {
         }
         return Number(b.queueNumber || 0) - Number(a.queueNumber || 0)
       }),
-      finished: sortByNumber(items.filter((q) => ['COMPLETED', 'SKIPPED', 'CANCELLED'].includes(q.status))),
+      finished: [...items.filter((q) => ['COMPLETED', 'SKIPPED', 'CANCELLED', 'EARLY_ENDED'].includes(q.status))].sort((a, b) => {
+        const timeA = a.completedAt || a.cancelledAt || a.skippedAt || a.updatedAt || a.calledAt || 0
+        const timeB = b.completedAt || b.cancelledAt || b.skippedAt || b.updatedAt || b.calledAt || 0
+        if (timeA && timeB) {
+          return new Date(timeB) - new Date(timeA)
+        }
+        return Number(b.queueNumber || 0) - Number(a.queueNumber || 0)
+      }),
     }
   }, [permissions.isDoctorOnly, myQueueData, queues, user?.id, queueDoctorFilter])
 
@@ -1137,402 +1104,114 @@ function AppointmentQueue() {
     }
   }
 
-  const appointmentColumns = [
-    {
-      title: 'Mã lịch hẹn',
-      dataIndex: 'appointmentCode',
-      key: 'appointmentCode',
-      width: 140,
-      render: (code) => (
-        <Text strong style={{ color: '#2563eb', whiteSpace: 'nowrap', display: 'inline-block' }}>
-          {code || 'Chưa có'}
-        </Text>
-      ),
-    },
-    {
-      title: 'Bệnh nhân',
-      dataIndex: 'patientName',
-      key: 'patientName',
-      width: 240,
-      render: (_, record) => {
-        const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
-        return (
-          <Space align="center" size="small">
-            <Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 150 }}>
-              <Text strong style={{ fontSize: 14, color: '#0f172a', lineHeight: '1.4', whiteSpace: 'nowrap' }}>{pInfo.name}</Text>
-              <Text type="secondary" style={{ fontSize: 12, lineHeight: '1.2', whiteSpace: 'nowrap' }}>Mã: {pInfo.code}</Text>
-            </div>
-          </Space>
-        )
-      },
-    },
-    {
-      title: 'Bác sĩ & Chuyên khoa',
-      dataIndex: 'doctorName',
-      key: 'doctorName',
-      width: 200,
-      render: (_, record) => {
-        const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
-        return (
-          <div>
-            <Text strong style={{ color: '#0f172a', display: 'block', whiteSpace: 'nowrap' }}>{dInfo.name}</Text>
-            <Tag color="cyan" style={{ whiteSpace: 'nowrap', marginTop: 2 }}>{dInfo.department}</Tag>
-          </div>
-        )
-      },
-    },
-    {
-      title: 'Khung giờ hẹn',
-      dataIndex: 'appointmentAt',
-      key: 'appointmentAt',
-      width: 180,
-      render: (at, record) => {
-        const timeVal = at || record.startTime || record.date
-        const appTime = dayjs(timeVal)
-        const timeStr = timeVal ? appTime.format('HH:mm - DD/MM/YYYY') : record.slot || 'Trong ngày'
-        const isOverdue15Min = timeVal && dayjs().isAfter(appTime.add(15, 'minute')) && record.status === 'SCHEDULED'
-        return (
-          <Space direction="vertical" size={2}>
-            <Text style={{ whiteSpace: 'nowrap' }}>{timeStr}</Text>
-            {isOverdue15Min && <Tag color="error" style={{ whiteSpace: 'nowrap' }}>Quá 15p giờ hẹn</Tag>}
-          </Space>
-        )
-      },
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 140,
-      render: (st) => {
-        const meta = APPOINTMENT_STATUS_META[st] || { label: 'Không xác định', tone: 'gray' }
-        return <Tag color={meta.tone} style={{ whiteSpace: 'nowrap' }}>{meta.label}</Tag>
-      },
-    },
-    {
-      title: 'Thao tác',
-      key: 'action',
-      width: 110,
-      align: 'center',
-      render: (_, record) => {
-        const timeVal = record.appointmentAt || record.startTime || record.date
-        const appTime = dayjs(timeVal)
-        const isOverdue15Min = timeVal && dayjs().isAfter(appTime.add(15, 'minute'))
-
-        const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
-        const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
-
-        const openDetail = async () => {
-          setDetailItem({
-            type: 'appointment',
-            ...record,
+  const handleOpenAppointmentDetail = useCallback(async (record, pInfoParam, dInfoParam) => {
+    const pInfo = pInfoParam || getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
+    const dInfo = dInfoParam || getDoctorInfo(record.doctorId, record.doctorName, record.department)
+    setDetailItem({
+      type: 'appointment',
+      ...record,
+      patientName: pInfo.name,
+      doctorName: dInfo.name,
+      department: dInfo.department,
+    })
+    if (record.id) {
+      try {
+        const res = await appointmentApi.getById(record.id)
+        const data = res?.data || res
+        if (data) {
+          setDetailItem((prev) => ({
+            ...prev,
+            ...data,
             patientName: pInfo.name,
             doctorName: dInfo.name,
             department: dInfo.department,
-          })
-          if (record.id) {
-            try {
-              const res = await appointmentApi.getById(record.id)
-              const data = res?.data || res
-              if (data) {
-                setDetailItem((prev) => ({
-                  ...prev,
-                  ...data,
-                  patientName: pInfo.name,
-                  doctorName: dInfo.name,
-                  department: dInfo.department,
-                }))
-              }
-            } catch (err) {
-              console.error('Failed to load full appointment detail:', err)
-            }
-          }
+          }))
         }
+      } catch (err) {
+        console.error('Failed to load full appointment detail:', err)
+      }
+    }
+  }, [getPatientInfo, getDoctorInfo])
 
-        const reschedCheck = canRescheduleAppointment(record, dayjs())
-        const confirmCheck = canConfirmAppointment(record, dayjs())
+  const handleOpenQueueDetail = useCallback((record, pInfoParam, dInfoParam) => {
+    const pInfo = pInfoParam || getPatientInfo(record.patientId, record.patientName)
+    const dInfo = dInfoParam || getDoctorInfo(record.doctorId, record.doctorName)
+    setDetailItem({
+      type: 'queue',
+      ...record,
+      patientName: pInfo.name,
+      doctorName: dInfo.name,
+    })
+  }, [getPatientInfo, getDoctorInfo])
 
-        const menuItems = [
-          {
-            key: 'detail',
-            icon: <EyeOutlined />,
-            label: 'Xem chi tiết lịch hẹn',
-            onClick: openDetail,
-          },
-          permissions.canConfirmAppointment && record.status === 'SCHEDULED' && {
-            key: 'confirm',
-            icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
-            disabled: !confirmCheck.allowed,
-            label: confirmCheck.allowed ? 'Xác nhận lịch hẹn' : `Không thể xác nhận (${confirmCheck.reason})`,
-            onClick: () => handleConfirmAppointment(record),
-          },
-          ['SCHEDULED', 'CONFIRMED'].includes(record.status) && permissions.canCheckIn && {
-            key: 'checkin',
-            icon: <CheckCircleOutlined />,
-            label: 'Tiếp nhận khám (Check-in)',
-            onClick: () => handleCheckInAppointment(record.id),
-          },
-          permissions.canRescheduleAppointment && ['SCHEDULED', 'CONFIRMED'].includes(record.status) && {
-            key: 'reschedule',
-            icon: <SwapOutlined />,
-            disabled: !reschedCheck.allowed,
-            label: reschedCheck.allowed ? 'Đổi lịch hẹn (Dời giờ)' : `Không thể đổi (${reschedCheck.reason})`,
-            onClick: () => handleOpenRescheduleModal(record),
-          },
-          record.status !== 'CANCELLED' && {
-            key: 'remind',
-            icon: <SendOutlined />,
-            label: 'Gửi nhắc lịch hẹn',
-            onClick: () => handleSendReminder(record),
-          },
-          ['SCHEDULED', 'CONFIRMED'].includes(record.status) && {
-            key: 'noshow',
-            icon: <CloseCircleOutlined />,
-            disabled: !isOverdue15Min || record.status === 'CHECKED_IN',
-            label: 'Đánh dấu Không đến (Quá 15p)',
-            onClick: () => handleMarkNoShow(record),
-          },
-          ['SCHEDULED', 'CONFIRMED'].includes(record.status) && {
-            type: 'divider',
-          },
-          ['SCHEDULED', 'CONFIRMED'].includes(record.status) && {
-            key: 'cancel',
-            icon: <CloseCircleOutlined />,
-            danger: true,
-            label: 'Hủy lịch hẹn này',
-            onClick: () => {
-              cancelForm.setFieldsValue({ reason: 'Bệnh nhân báo bận' })
-              setCancelModalItem(record)
-            },
-          },
-        ].filter(Boolean)
+  const appointmentColumns = useMemo(
+    () =>
+      getAppointmentColumns({
+        getPatientInfo,
+        getDoctorInfo,
+        permissions,
+        user,
+        onOpenDetail: handleOpenAppointmentDetail,
+        onConfirm: handleConfirmAppointment,
+        onCheckIn: handleCheckInAppointment,
+        onReschedule: handleOpenRescheduleModal,
+        onRemind: handleSendReminder,
+        onMarkNoShow: handleMarkNoShow,
+        onCancel: (record) => {
+          cancelForm.setFieldsValue({ reason: 'Bệnh nhân báo bận' })
+          setCancelModalItem(record)
+        },
+      }),
+    [
+      getPatientInfo,
+      getDoctorInfo,
+      permissions,
+      user,
+      handleOpenAppointmentDetail,
+      handleConfirmAppointment,
+      handleCheckInAppointment,
+      handleOpenRescheduleModal,
+      handleSendReminder,
+      handleMarkNoShow,
+      cancelForm,
+    ],
+  )
 
-        return (
-          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-            <Button size="small" icon={<MoreOutlined style={{ fontSize: 16 }} />} title="Thao tác" />
-          </Dropdown>
-        )
-      },
-    },
-  ]
-
-  const queueBoardColumns = [
-    {
-      title: 'STT',
-      dataIndex: 'queueNumber',
-      key: 'queueNumber',
-      width: 70,
-      render: (num, _, idx) => <Badge count={num || idx + 1} style={{ backgroundColor: '#2563eb' }} />,
-    },
-    {
-      title: 'Bệnh nhân',
-      dataIndex: 'patientName',
-      key: 'patientName',
-      width: 250,
-      render: (_, record) => {
-        const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
-        const callCount = Number(record.callCount) || 0
-        return (
-          <Space align="center" size="small">
-            <Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-              <Text strong style={{ fontSize: 14, color: '#0f172a', lineHeight: '1.4' }}>{pInfo.name}</Text>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <Text type="secondary" style={{ fontSize: 12, lineHeight: '1.2' }}>Mã: {pInfo.code}</Text>
-                {callCount > 0 && (
-                  <Tag color="orange" style={{ margin: 0, fontSize: 10, padding: '0 4px', lineHeight: '16px', borderRadius: 4 }}>
-                    Đã gọi: {callCount} lần
-                  </Tag>
-                )}
-              </div>
-            </div>
-          </Space>
-        )
-      },
-    },
-    {
-      title: 'Mã lượt khám',
-      dataIndex: 'visitCode',
-      key: 'visitCode',
-      width: 150,
-      render: (val, record) => {
-        const rawCode = val || record.visitId || record.id || 'Chưa có'
-        let displayCode = rawCode
-        if (displayCode.length > 20) {
-          displayCode = `VIS-${String(rawCode).slice(-6).toUpperCase()}`
-        }
-        return <Text code style={{ whiteSpace: 'nowrap', display: 'inline-block', fontSize: 13 }}>{displayCode}</Text>
-      },
-    },
-    {
-      title: 'Nguồn',
-      dataIndex: 'sourceType',
-      key: 'sourceType',
-      width: 150,
-      render: (src) => (
-        src === 'WALK_IN'
-          ? <Tag color="orange" style={{ whiteSpace: 'nowrap' }}>Bệnh nhân tự đến</Tag>
-          : <Tag color="blue" style={{ whiteSpace: 'nowrap' }}>Hẹn trước</Tag>
-      ),
-    },
-    {
-      title: 'Bác sĩ',
-      dataIndex: 'doctorName',
-      key: 'doctorName',
-      width: 180,
-      render: (_, record) => {
-        const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
-        return <span style={{ whiteSpace: 'nowrap' }}>{dInfo.name}</span>
-      },
-    },
-    {
-      title: 'Phòng',
-      dataIndex: 'roomName',
-      key: 'roomName',
-      width: 140,
-      render: (room, record) => <span style={{ whiteSpace: 'nowrap' }}>{room || record.roomNumber || record.roomCode || 'Chưa phân phòng'}</span>,
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 170,
-      render: (st, record) => {
-        const meta = QUEUE_STATUS_META[st] || { label: 'Không xác định', tone: 'gray' }
-        return (
-          <Space direction="vertical" size={2}>
-            <Tag color={meta.tone} style={{ whiteSpace: 'nowrap' }}>{meta.label}</Tag>
-            {st === 'SKIPPED' && record.skipReason && (
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', maxWidth: 150 }} ellipsis={{ tooltip: record.skipReason }}>
-                {record.skipReason}
-              </Text>
-            )}
-          </Space>
-        )
-      },
-    },
-    {
-      title: 'Thời gian đến',
-      dataIndex: 'checkedInAt',
-      key: 'checkedInAt',
-      width: 160,
-      render: (time) => <span style={{ whiteSpace: 'nowrap' }}>{time ? dayjs(time).format('HH:mm DD/MM/YYYY') : '—'}</span>,
-    },
-    {
-      title: 'Thao tác',
-      key: 'action',
-      width: 190,
-      render: (_, record) => {
-        const pInfo = getPatientInfo(record.patientId, record.patientName)
-        const dInfo = getDoctorInfo(record.doctorId, record.doctorName)
-
-        const openDetail = () => {
-          setDetailItem({
-            type: 'queue',
+  const queueBoardColumns = useMemo(
+    () =>
+      getQueueBoardColumns({
+        getPatientInfo,
+        getDoctorInfo,
+        permissions,
+        user,
+        reQueuingId,
+        onOpenDetail: handleOpenQueueDetail,
+        onCallNext: (queueId) => handleCallNext(queueId),
+        onUpdateStatus: handleUpdateItemStatus,
+        onSkip: (record) => setSkipModalItem(record),
+        onReQueue: (record) => handleReQueue(record),
+        onOpenHistory: (record) => setHistoryQueueItem(record),
+        onCloseVisit: (record) => {
+          const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
+          setCloseVisitModalItem({
             ...record,
             patientName: pInfo.name,
-            doctorName: dInfo.name,
+            patientCode: pInfo.code,
           })
-        }
-
-        const canManageReQueue = permissions.canCheckIn || permissions.canUpdateQueueStatus || permissions.isAdmin || permissions.isReceptionist
-        const menuItems = [
-          {
-            key: 'detail',
-            icon: <EyeOutlined />,
-            label: 'Xem chi tiết lượt khám',
-            onClick: openDetail,
-          },
-          permissions.canCallNext && record.status === 'WAITING' && {
-            key: 'call',
-            icon: <StepForwardOutlined />,
-            label: 'Gọi vào khám ngay',
-            onClick: () => handleCallNext(record.medicalQueueId || record.queueId || record.id),
-          },
-          permissions.canUpdateStatus && record.status === 'IN_PROGRESS' && {
-            key: 'wait_cdls',
-            label: 'Chuyển sang Chờ kết quả CĐLS',
-            onClick: () => handleUpdateItemStatus(record.id, 'WAITING_FOR_RESULT'),
-          },
-          permissions.canUpdateStatus && record.status === 'WAITING_FOR_RESULT' && {
-            key: 'resume',
-            label: 'Tiếp tục khám bệnh',
-            onClick: () => handleUpdateItemStatus(record.id, 'IN_PROGRESS'),
-          },
-          canManageReQueue && record.status === 'SKIPPED' && {
-            key: 're_queue_menu',
-            icon: <ReloadOutlined />,
-            label: 'Đưa lại vào hàng đợi',
-            onClick: () => handleReQueue(record),
-          },
-          permissions.canSkip && record.status === 'IN_PROGRESS' && {
-            type: 'divider',
-          },
-          permissions.canSkip && record.status === 'IN_PROGRESS' && {
-            key: 'skip',
-            icon: <CloseCircleOutlined />,
-            danger: true,
-            label: 'Tạm hoãn bệnh nhân (Vắng mặt)',
-            onClick: () => setSkipModalItem(record),
-          },
-          {
-            type: 'divider',
-          },
-          {
-            key: 'queue_history',
-            icon: <HistoryOutlined />,
-            label: 'Lịch sử luân chuyển hàng đợi',
-            onClick: () => setHistoryQueueItem(record),
-          },
-        ].filter(Boolean)
-
-        const hasCallAction = permissions.canCallNext && record.status === 'WAITING'
-        const hasReQueueAction = canManageReQueue && record.status === 'SKIPPED'
-        const hasDeferAction = permissions.canSkip && record.status === 'IN_PROGRESS'
-
-        return (
-          <Space size="small">
-            {hasCallAction && (
-              <Button
-                type="primary"
-                size="small"
-                icon={<StepForwardOutlined />}
-                onClick={() => handleCallNext(record.medicalQueueId || record.queueId || record.id)}
-              >
-                Gọi khám
-              </Button>
-            )}
-            {hasReQueueAction && (
-              <Button
-                type="primary"
-                size="small"
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
-                icon={<ReloadOutlined />}
-                loading={reQueuingId === record.id}
-                onClick={() => handleReQueue(record)}
-              >
-                Đưa lại hàng đợi
-              </Button>
-            )}
-            {hasDeferAction && (
-              <Button
-                size="small"
-                danger
-                icon={<CloseCircleOutlined />}
-                onClick={() => setSkipModalItem(record)}
-              >
-                Tạm hoãn
-              </Button>
-            )}
-            <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-              <Button size="small" icon={<MoreOutlined style={{ fontSize: 16 }} />} title="Thao tác" />
-            </Dropdown>
-          </Space>
-        )
-      },
-    },
-  ]
+        },
+      }),
+    [
+      getPatientInfo,
+      getDoctorInfo,
+      permissions,
+      user,
+      reQueuingId,
+      handleOpenQueueDetail,
+      handleCallNext,
+      handleUpdateItemStatus,
+      handleReQueue,
+    ],
+  )
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
@@ -1543,9 +1222,6 @@ function AppointmentQueue() {
               <Avatar size={48} icon={<CalendarOutlined />} style={{ backgroundColor: '#2563eb' }} />
               <div>
                 <Title level={4} style={{ margin: 0 }}>Quản Lý Lịch Hẹn & Hàng Đợi Khám Bệnh</Title>
-                <Text type="secondary">
-                  Theo dõi và điều phối danh sách khám bệnh theo thời gian thực.
-                </Text>
               </div>
             </Space>
           </Col>
@@ -1747,6 +1423,7 @@ function AppointmentQueue() {
                         { value: 'COMPLETED', label: 'Đã hoàn thành' },
                         { value: 'SKIPPED', label: 'Đã bỏ qua (Vắng mặt)' },
                         { value: 'CANCELLED', label: 'Đã hủy' },
+                        { value: 'EARLY_ENDED', label: 'Kết thúc sớm' },
                       ]}
                     />
                   </Col>
@@ -1826,427 +1503,42 @@ function AppointmentQueue() {
                     </Row>
                   </Card>
                 )}
-                <Card
-                  title={<Text strong style={{ color: '#16a34a' }}>🔴 BỆNH NHÂN ĐANG KHÁM ({doctorQueueGroups.inProgress.length})</Text>}
-                  style={{ borderRadius: 12, borderColor: '#bbf7d0' }}
-                >
-                  {doctorQueueGroups.inProgress.length === 0 ? (
-                    <Text type="secondary">Chưa có bệnh nhân nào đang trong phòng khám.</Text>
-                  ) : (
-                    <List
-                      dataSource={doctorQueueGroups.inProgress}
-                      renderItem={(item) => {
-                        const pInfo = getPatientInfo(item.patientId, item.patientName)
-                        const secondaryActions = [
-                          {
-                            key: 'history',
-                            label: 'Lịch sử khám của bệnh nhân',
-                            icon: <HistoryOutlined style={{ color: '#2563eb' }} />,
-                            onClick: () => openPatientHistory(item.patientId, pInfo.name, pInfo.code),
-                          },
-                          ...(permissions.canUpdateStatus
-                            ? [{
-                              key: 'wait-result',
-                              label: 'Chờ kết quả cận lâm sàng',
-                              onClick: () => handleUpdateItemStatus(item.id, 'WAITING_FOR_RESULT'),
-                            }]
-                            : []),
-                          ...(permissions.canComplete
-                            ? [{
-                              key: 'complete',
-                              label: 'Hoàn tất lượt khám',
-                              icon: <CheckCircleOutlined />,
-                              onClick: () => Modal.confirm({
-                                title: 'Xác nhận hoàn tất lượt khám?',
-                                content: 'Đảm bảo bệnh án đã được bác sĩ ký hoặc khóa trước khi hoàn tất.',
-                                okText: 'Hoàn tất',
-                                cancelText: 'Hủy',
-                                onOk: () => handleCompleteItem(item.id),
-                              }),
-                            }]
-                            : []),
-                          ...(permissions.canSkip
-                            ? [{
-                              key: 'skip',
-                              label: 'Tạm hoãn bệnh nhân (Vắng mặt)',
-                              icon: <CloseCircleOutlined />,
-                              danger: true,
-                              onClick: () => setSkipModalItem(item),
-                            }]
-                            : []),
-                          {
-                            key: 'queue-history',
-                            label: 'Lịch sử luân chuyển hàng đợi',
-                            icon: <HistoryOutlined style={{ color: '#0284c7' }} />,
-                            onClick: () => setHistoryQueueItem(item),
-                          },
-                        ]
-                        return (
-                          <List.Item
-                            actions={[
-                              (permissions.isAdmin || permissions.isDoctor) && (
-                                <Button
-                                  key="exam"
-                                  type="primary"
-                                  icon={<MedicineBoxOutlined />}
-                                  onClick={() => openEncounter(item)}
-                                >
-                                  Ghi bệnh án / Khám
-                                </Button>
-                              ),
-                              permissions.canSkip && (
-                                <Button
-                                  key="defer"
-                                  danger
-                                  icon={<CloseCircleOutlined />}
-                                  onClick={() => setSkipModalItem(item)}
-                                >
-                                  Tạm hoãn
-                                </Button>
-                              ),
-                              <Button
-                                key="history"
-                                icon={<HistoryOutlined />}
-                                onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
-                              >
-                                Lịch sử khám
-                              </Button>,
-                              secondaryActions.length > 0 && (
-                                <Dropdown key="more" menu={{ items: secondaryActions }} trigger={['click']} placement="bottomRight">
-                                  <Button icon={<MoreOutlined />} aria-label={`Thao tác khác với bệnh nhân ${pInfo.name}`} />
-                                </Dropdown>
-                              ),
-                            ].filter(Boolean)}
-                          >
-                            <List.Item.Meta
-                              avatar={
-                                <Badge status="processing" color="#16a34a" offset={[-2, 38]}>
-                                  <Avatar
-                                    size={46}
-                                    style={{
-                                      ...getAvatarStyle(pInfo.name),
-                                      fontWeight: 700,
-                                      fontSize: 16,
-                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
-                                      border: '1px solid rgba(0, 0, 0, 0.06)',
-                                    }}
-                                  >
-                                    {getInitials(pInfo.name)}
-                                  </Avatar>
-                                </Badge>
-                              }
-                              title={
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                  <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
-                                    {pInfo.name}
-                                  </Text>
-                                  <Tag
-                                    color="blue"
-                                    style={{
-                                      fontWeight: 700,
-                                      fontSize: 12,
-                                      padding: '1px 8px',
-                                      borderRadius: 4,
-                                      margin: 0,
-                                    }}
-                                  >
-                                    STT #{String(item.queueNumber || 1).padStart(2, '0')}
-                                  </Tag>
-                                  {item.sourceType === 'WALK_IN' ? (
-                                    <Tag color="orange" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
-                                      Tự đến
-                                    </Tag>
-                                  ) : (
-                                    <Tag color="cyan" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
-                                      <CalendarOutlined style={{ marginRight: 4 }} />Hẹn trước
-                                    </Tag>
-                                  )}
-                                  <Tag color="success" style={{ margin: 0, fontSize: 11, borderRadius: 4, fontWeight: 600 }}>
-                                    Đang khám
-                                  </Tag>
-                                  {Number(item.callCount) > 0 && (
-                                    <Tag color="orange" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
-                                      Đã gọi: {item.callCount} lần
-                                    </Tag>
-                                  )}
-                                </div>
-                              }
-                              description={
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap', fontSize: 12 }}>
-                                  <span style={{ color: '#64748b' }}>
-                                    Mã lượt:{' '}
-                                    <Tag
-                                      style={{
-                                        fontFamily: 'monospace',
-                                        fontWeight: 600,
-                                        fontSize: 11.5,
-                                        color: '#1d4ed8',
-                                        backgroundColor: '#eff6ff',
-                                        borderColor: '#bfdbfe',
-                                        borderRadius: 4,
-                                        margin: 0,
-                                        padding: '0 6px',
-                                      }}
-                                    >
-                                      {formatVisitCode(item.visitCode, item.visitId)}
-                                    </Tag>
-                                  </span>
-                                  {pInfo.code && pInfo.code !== '—' && (
-                                    <span style={{ color: '#64748b' }}>
-                                      Mã BN: <Text strong style={{ color: '#334155' }}>{pInfo.code}</Text>
-                                    </span>
-                                  )}
-                                  {pInfo.phone && (
-                                    <span style={{ color: '#64748b' }}>
-                                      SĐT: <Text style={{ color: '#334155' }}>{pInfo.phone}</Text>
-                                    </span>
-                                  )}
-                                  {item.checkedInAt && (
-                                    <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                      <ClockCircleOutlined style={{ fontSize: 11, color: '#94a3b8' }} />
-                                      <span>Vào lúc: {dayjs(item.checkedInAt).format('HH:mm')}</span>
-                                    </span>
-                                  )}
-                                </div>
-                              }
-                            />
-                          </List.Item>
-                        )
-                      }}
-                    />
-                  )}
-                </Card>
+                <InProgressPatientList
+                  items={doctorQueueGroups.inProgress}
+                  getPatientInfo={getPatientInfo}
+                  permissions={permissions}
+                  onOpenEncounter={openEncounter}
+                  onOpenHistory={openPatientHistory}
+                  onUpdateStatus={handleUpdateItemStatus}
+                  onComplete={handleCompleteItem}
+                  onSkip={(item) => setSkipModalItem(item)}
+                  onCloseVisit={(item) => {
+                    const pInfo = getPatientInfo(item.patientId, item.patientName, item.patientCode, item.phone)
+                    setCloseVisitModalItem({
+                      ...item,
+                      patientName: pInfo.name,
+                      patientCode: pInfo.code,
+                    })
+                  }}
+                  onOpenQueueHistory={(item) => setHistoryQueueItem(item)}
+                />
 
-                <Card
-                  title={<Text strong style={{ color: '#2563eb' }}>🟡 BỆNH NHÂN ĐANG CHỜ ({doctorQueueGroups.waiting.length})</Text>}
-                  style={{ borderRadius: 12 }}
-                >
-                  <List
-                    dataSource={doctorQueueGroups.waiting}
-                    pagination={{ pageSize: 5 }}
-                    renderItem={(item) => {
-                      const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      return (
-                        <List.Item
-                          actions={[
-                            permissions.canCallNext && (
-                              <Button
-                                key="call-next"
-                                type="primary"
-                                icon={<StepForwardOutlined />}
-                                onClick={() => handleCallNext(item.medicalQueueId || item.queueId)}
-                              >
-                                Gọi vào khám
-                              </Button>
-                            ),
-                            <Button
-                              key="history"
-                              icon={<HistoryOutlined />}
-                              onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
-                            >
-                              Lịch sử
-                            </Button>,
-                          ].filter(Boolean)}
-                        >
-                          <List.Item.Meta
-                            avatar={
-                              <Avatar
-                                size={44}
-                                style={{
-                                  ...getAvatarStyle(pInfo.name),
-                                  fontWeight: 700,
-                                  fontSize: 15,
-                                  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.06)',
-                                  border: '1px solid rgba(0, 0, 0, 0.05)',
-                                }}
-                              >
-                                {getInitials(pInfo.name)}
-                              </Avatar>
-                            }
-                            title={
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
-                                  {pInfo.name}
-                                </Text>
-                                <Tag
-                                  color="gold"
-                                  style={{
-                                    fontWeight: 700,
-                                    fontSize: 12,
-                                    padding: '1px 8px',
-                                    borderRadius: 4,
-                                    margin: 0,
-                                  }}
-                                >
-                                  STT #{String(item.queueNumber || 1).padStart(2, '0')}
-                                </Tag>
-                                {item.sourceType === 'WALK_IN' ? (
-                                  <Tag color="orange" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
-                                    Tự đến
-                                  </Tag>
-                                ) : (
-                                  <Tag color="cyan" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
-                                    <CalendarOutlined style={{ marginRight: 4 }} />Hẹn trước
-                                  </Tag>
-                                )}
-                                <Tag color="warning" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
-                                  Chờ gọi
-                                </Tag>
-                                {Number(item.callCount) > 0 && (
-                                  <Tag color="orange" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
-                                    Đã gọi: {item.callCount} lần
-                                  </Tag>
-                                )}
-                              </div>
-                            }
-                            description={
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap', fontSize: 12 }}>
-                                <span style={{ color: '#64748b' }}>
-                                  Mã lượt:{' '}
-                                  <Tag
-                                    style={{
-                                      fontFamily: 'monospace',
-                                      fontWeight: 600,
-                                      fontSize: 11.5,
-                                      color: '#1d4ed8',
-                                      backgroundColor: '#eff6ff',
-                                      borderColor: '#bfdbfe',
-                                      borderRadius: 4,
-                                      margin: 0,
-                                      padding: '0 6px',
-                                    }}
-                                  >
-                                    {formatVisitCode(item.visitCode, item.visitId)}
-                                  </Tag>
-                                </span>
-                                {pInfo.code && pInfo.code !== '—' && (
-                                  <span style={{ color: '#64748b' }}>
-                                    Mã BN: <Text strong style={{ color: '#334155' }}>{pInfo.code}</Text>
-                                  </span>
-                                )}
-                                {item.checkedInAt && (
-                                  <span style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    <ClockCircleOutlined style={{ fontSize: 11, color: '#94a3b8' }} />
-                                    <span>Đến lúc: {dayjs(item.checkedInAt).format('HH:mm DD/MM')}</span>
-                                  </span>
-                                )}
-                              </div>
-                            }
-                          />
-                        </List.Item>
-                      )
-                    }}
-                  />
-                </Card>
+                <WaitingPatientList
+                  items={doctorQueueGroups.waiting}
+                  getPatientInfo={getPatientInfo}
+                  permissions={permissions}
+                  onCallNext={(queueId) => handleCallNext(queueId)}
+                  onOpenHistory={openPatientHistory}
+                />
 
-                <Card
-                  title={<Text strong style={{ color: '#9333ea' }}>🟣 BỆNH NHÂN CHỜ KẾT QUẢ CĐLS ({doctorQueueGroups.waitingForResult.length})</Text>}
-                  style={{ borderRadius: 12, borderColor: '#e9d5ff' }}
-                >
-                  <List
-                    dataSource={doctorQueueGroups.waitingForResult}
-                    pagination={{ pageSize: 5 }}
-                    renderItem={(item) => {
-                      const pInfo = getPatientInfo(item.patientId, item.patientName)
-                      return (
-                        <List.Item
-                          actions={[
-                            permissions.canUpdateStatus && (
-                              <Button
-                                key="resume"
-                                type="primary"
-                                style={{ backgroundColor: '#16a34a' }}
-                                onClick={() => handleUpdateItemStatus(item.id, 'IN_PROGRESS')}
-                              >
-                                Tiếp tục khám
-                              </Button>
-                            ),
-                            <Button key="view-record" onClick={() => openEncounter(item)}>
-                              Xem bệnh án
-                            </Button>,
-                            <Button
-                              key="history"
-                              icon={<HistoryOutlined />}
-                              onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
-                            >
-                              Lịch sử
-                            </Button>,
-                          ].filter(Boolean)}
-                        >
-                          <List.Item.Meta
-                            avatar={
-                              <Avatar
-                                size={44}
-                                style={{
-                                  backgroundColor: '#9333ea',
-                                  fontWeight: 700,
-                                  fontSize: 15,
-                                  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.06)',
-                                }}
-                              >
-                                {getInitials(pInfo.name)}
-                              </Avatar>
-                            }
-                            title={
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
-                                  {pInfo.name}
-                                </Text>
-                                {item.queueNumber && (
-                                  <Tag
-                                    color="purple"
-                                    style={{
-                                      fontWeight: 700,
-                                      fontSize: 12,
-                                      padding: '1px 8px',
-                                      borderRadius: 4,
-                                      margin: 0,
-                                    }}
-                                  >
-                                    STT #{String(item.queueNumber).padStart(2, '0')}
-                                  </Tag>
-                                )}
-                                <Tag color="purple" style={{ margin: 0, fontSize: 11, borderRadius: 4, fontWeight: 600 }}>
-                                  Chờ kết quả CĐLS
-                                </Tag>
-                              </div>
-                            }
-                            description={
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap', fontSize: 12 }}>
-                                <span style={{ color: '#64748b' }}>
-                                  Mã lượt:{' '}
-                                  <Tag
-                                    style={{
-                                      fontFamily: 'monospace',
-                                      fontWeight: 600,
-                                      fontSize: 11.5,
-                                      color: '#1d4ed8',
-                                      backgroundColor: '#eff6ff',
-                                      borderColor: '#bfdbfe',
-                                      borderRadius: 4,
-                                      margin: 0,
-                                      padding: '0 6px',
-                                    }}
-                                  >
-                                    {formatVisitCode(item.visitCode, item.visitId)}
-                                  </Tag>
-                                </span>
-                                {pInfo.code && pInfo.code !== '—' && (
-                                  <span style={{ color: '#64748b' }}>
-                                    Mã BN: <Text strong style={{ color: '#334155' }}>{pInfo.code}</Text>
-                                  </span>
-                                )}
-                                <span style={{ color: '#7e22ce' }}>
-                                  Đang chờ phòng xét nghiệm / CĐHA trả kết quả
-                                </span>
-                              </div>
-                            }
-                          />
-                        </List.Item>
-                      )
-                    }}
-                  />
-                </Card>
+                <WaitingForResultList
+                  items={doctorQueueGroups.waitingForResult}
+                  getPatientInfo={getPatientInfo}
+                  permissions={permissions}
+                  onUpdateStatus={handleUpdateItemStatus}
+                  onOpenEncounter={openEncounter}
+                  onOpenHistory={openPatientHistory}
+                />
 
                 {/* Khối Bệnh nhân tạm hoãn (vắng mặt khi gọi) */}
                 <Card
@@ -2398,141 +1690,14 @@ function AppointmentQueue() {
                   )}
                 </Card>
 
-                {/* Khối 4: Bệnh nhân đã khám xong trong ngày */}
-                <Card
-                  title={
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                      <Text strong style={{ color: '#16a34a' }}>
-                        🟢 BỆNH NHÂN ĐÃ KHÁM XONG TRONG NGÀY ({doctorQueueGroups.completed.length})
-                      </Text>
-                      <Tag color="success" style={{ margin: 0, fontWeight: 600 }}>
-                        Ngày {selectedDate.format('DD/MM/YYYY')}
-                      </Tag>
-                    </div>
-                  }
-                  style={{ borderRadius: 12, borderColor: '#bbf7d0', backgroundColor: '#fafffa' }}
-                >
-                  {doctorQueueGroups.completed.length === 0 ? (
-                    <div style={{ padding: '24px 0', textAlign: 'center' }}>
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description={
-                          <span style={{ color: '#64748b' }}>
-                            Chưa có bệnh nhân nào hoàn tất khám trong ngày {selectedDate.format('DD/MM/YYYY')}.
-                          </span>
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <List
-                      dataSource={doctorQueueGroups.completed}
-                      pagination={{ pageSize: 5 }}
-                      renderItem={(item) => {
-                        const pInfo = getPatientInfo(item.patientId, item.patientName)
-                        return (
-                          <List.Item
-                            actions={[
-                              <Button
-                                key="view-record"
-                                icon={<FileTextOutlined />}
-                                onClick={() => openEncounter(item)}
-                              >
-                                Xem lại bệnh án
-                              </Button>,
-                              <Button
-                                key="view-history"
-                                type="primary"
-                                ghost
-                                icon={<HistoryOutlined />}
-                                onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
-                              >
-                                Lịch sử khám
-                              </Button>,
-                            ]}
-                          >
-                            <List.Item.Meta
-                              avatar={
-                                <Avatar
-                                  size={44}
-                                  style={{
-                                    backgroundColor: '#16a34a',
-                                    fontWeight: 700,
-                                    fontSize: 15,
-                                    boxShadow: '0 2px 5px rgba(22, 163, 74, 0.2)',
-                                  }}
-                                >
-                                  {getInitials(pInfo.name)}
-                                </Avatar>
-                              }
-                              title={
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                  <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
-                                    {pInfo.name}
-                                  </Text>
-                                  {item.queueNumber && (
-                                    <Tag
-                                      color="green"
-                                      style={{
-                                        fontWeight: 700,
-                                        fontSize: 12,
-                                        padding: '1px 8px',
-                                        borderRadius: 4,
-                                        margin: 0,
-                                      }}
-                                    >
-                                      STT #{String(item.queueNumber).padStart(2, '0')}
-                                    </Tag>
-                                  )}
-                                  <Tag color="success" style={{ margin: 0, fontSize: 11, borderRadius: 4, fontWeight: 600 }}>
-                                    <CheckCircleOutlined style={{ marginRight: 4 }} />Đã hoàn thành
-                                  </Tag>
-                                </div>
-                              }
-                              description={
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap', fontSize: 12 }}>
-                                  <span style={{ color: '#64748b' }}>
-                                    Mã lượt:{' '}
-                                    <Tag
-                                      style={{
-                                        fontFamily: 'monospace',
-                                        fontWeight: 600,
-                                        fontSize: 11.5,
-                                        color: '#1d4ed8',
-                                        backgroundColor: '#eff6ff',
-                                        borderColor: '#bfdbfe',
-                                        borderRadius: 4,
-                                        margin: 0,
-                                        padding: '0 6px',
-                                      }}
-                                    >
-                                      {formatVisitCode(item.visitCode, item.visitId)}
-                                    </Tag>
-                                  </span>
-                                  {pInfo.code && pInfo.code !== '—' && (
-                                    <span style={{ color: '#64748b' }}>
-                                      Mã BN: <Text strong style={{ color: '#334155' }}>{pInfo.code}</Text>
-                                    </span>
-                                  )}
-                                  {pInfo.phone && (
-                                    <span style={{ color: '#64748b' }}>
-                                      SĐT: <Text style={{ color: '#334155' }}>{pInfo.phone}</Text>
-                                    </span>
-                                  )}
-                                  {item.completedAt && (
-                                    <span style={{ color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
-                                      <CheckCircleOutlined style={{ fontSize: 12, color: '#16a34a' }} />
-                                      <span>Hoàn tất lúc: {dayjs(item.completedAt).format('HH:mm')}</span>
-                                    </span>
-                                  )}
-                                </div>
-                              }
-                            />
-                          </List.Item>
-                        )
-                      }}
-                    />
-                  )}
-                </Card>
+                <CompletedTodayList
+                  items={doctorQueueGroups.completed}
+                  getPatientInfo={getPatientInfo}
+                  permissions={permissions}
+                  selectedDate={selectedDate}
+                  onOpenEncounter={openEncounter}
+                  onOpenHistory={openPatientHistory}
+                />
               </div>
             ),
           },
@@ -2540,7 +1705,7 @@ function AppointmentQueue() {
             key: 'completed_history',
             label: (
               <span>
-                <HistoryOutlined /> Lịch Sử Bệnh Nhân Đã Khám ({doctorQueueGroups.completed.length})
+                <HistoryOutlined /> Lịch Sử Bệnh Nhân Đã Khám / Kết Thúc ({doctorQueueGroups.finished.length})
               </span>
             ),
             children: (
@@ -2557,13 +1722,13 @@ function AppointmentQueue() {
                   </Col>
                   <Col xs={24} sm={12} md={12} style={{ textAlign: 'right' }}>
                     <Text type="secondary" style={{ fontSize: 13 }}>
-                      Danh sách các ca khám hoàn thành ngày <strong>{selectedDate.format('DD/MM/YYYY')}</strong>
+                      Danh sách các ca khám đã hoàn thành hoặc kết thúc trong ngày <strong>{selectedDate.format('DD/MM/YYYY')}</strong>
                     </Text>
                   </Col>
                 </Row>
 
                 <Table
-                  dataSource={doctorQueueGroups.completed.filter((item) => {
+                  dataSource={doctorQueueGroups.finished.filter((item) => {
                     if (!completedSearchKeyword.trim()) return true
                     const kw = completedSearchKeyword.trim().toLowerCase()
                     const pInfo = getPatientInfo(item.patientId, item.patientName)
@@ -2616,31 +1781,78 @@ function AppointmentQueue() {
                     },
                     {
                       title: 'Giờ tiếp nhận',
-                      dataIndex: 'checkedInAt',
                       key: 'checkedInAt',
                       width: 130,
-                      render: (val) => val ? dayjs(val).format('HH:mm') : '—',
+                      render: (_, record) => {
+                        const time = record.checkedInAt || record.checked_in_at || record.startTime || record.appointmentAt || record.createdAt
+                        return time ? (
+                          <span style={{ color: '#334155', fontWeight: 500 }}>
+                            {dayjs(time).format('HH:mm')}
+                          </span>
+                        ) : '—'
+                      },
                     },
                     {
-                      title: 'Giờ hoàn tất',
-                      dataIndex: 'completedAt',
-                      key: 'completedAt',
-                      width: 130,
-                      render: (val) => val ? (
-                        <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                          {dayjs(val).format('HH:mm')}
-                        </span>
-                      ) : '—',
+                      title: 'Giờ hoàn tất / kết thúc',
+                      key: 'finishTime',
+                      width: 150,
+                      render: (_, record) => {
+                        const time =
+                          record.completedAt ||
+                          record.cancelledAt ||
+                          record.skippedAt ||
+                          record.completed_at ||
+                          record.cancelled_at ||
+                          record.skipped_at ||
+                          record.endTime ||
+                          record.updatedAt ||
+                          record.updated_at
+                        if (!time) return '—'
+                        const isCompleted = record.status === 'COMPLETED'
+                        const isEarly = record.status === 'EARLY_ENDED'
+                        const isCancelled = record.status === 'CANCELLED'
+                        const color = isCompleted ? '#16a34a' : isEarly ? '#ea580c' : isCancelled ? '#dc2626' : '#64748b'
+                        return (
+                          <Tooltip title={`${isCompleted ? 'Hoàn tất lúc' : isEarly ? 'Kết thúc sớm lúc' : isCancelled ? 'Hủy lúc' : 'Thời gian'}: ${dayjs(time).format('HH:mm:ss DD/MM/YYYY')}`}>
+                            <span style={{ color, fontWeight: 600 }}>
+                              {dayjs(time).format('HH:mm')}
+                            </span>
+                          </Tooltip>
+                        )
+                      },
                     },
                     {
                       title: 'Trạng thái',
                       key: 'status',
                       width: 150,
-                      render: () => (
-                        <Tag color="success" style={{ fontWeight: 600 }}>
-                          <CheckCircleOutlined style={{ marginRight: 4 }} />Đã hoàn thành
-                        </Tag>
-                      ),
+                      render: (_, record) => {
+                        if (record.status === 'EARLY_ENDED') {
+                          return (
+                            <Tag color="warning" style={{ fontWeight: 600 }}>
+                              <StopOutlined style={{ marginRight: 4 }} />Kết thúc sớm
+                            </Tag>
+                          )
+                        }
+                        if (record.status === 'CANCELLED') {
+                          return (
+                            <Tag color="error" style={{ fontWeight: 600 }}>
+                              <CloseCircleOutlined style={{ marginRight: 4 }} />Đã hủy
+                            </Tag>
+                          )
+                        }
+                        if (record.status === 'SKIPPED') {
+                          return (
+                            <Tag color="default" style={{ fontWeight: 600 }}>
+                              Đã bỏ qua
+                            </Tag>
+                          )
+                        }
+                        return (
+                          <Tag color="success" style={{ fontWeight: 600 }}>
+                            <CheckCircleOutlined style={{ marginRight: 4 }} />Đã hoàn thành
+                          </Tag>
+                        )
+                      },
                     },
                     {
                       title: 'Thao tác',
@@ -2686,290 +1898,45 @@ function AppointmentQueue() {
         })}
       />
 
-      <Modal
-        title="Đặt Lịch Hẹn Khám Bệnh Mới"
+      <BookAppointmentModal
         open={bookModalOpen}
         onCancel={() => setBookModalOpen(false)}
-        footer={null}
-        destroyOnClose
-        width={600}
-      >
-        <Form form={bookForm} layout="vertical" onFinish={handleCreateAppointmentSubmit}>
-          <Form.Item label="Bệnh nhân" required style={{ marginBottom: 8 }}>
-            <Row gutter={8}>
-              <Col span={18}>
-                <Form.Item
-                  name="patientId"
-                  noStyle
-                  rules={[{ required: true, message: 'Vui lòng chọn bệnh nhân!' }]}
-                >
-                  <Select
-                    showSearch
-                    placeholder="Chọn từ Đăng ký bệnh nhân..."
-                    optionFilterProp="children"
-                    options={patients.map((p) => ({
-                      value: p.id,
-                      label: `${p.fullName || p.name} (${p.patientCode || 'BN'} - ${p.phone || p.phoneNumber || 'Chưa có SĐT'})`,
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Button
-                  type="dashed"
-                  icon={<UserAddOutlined />}
-                  onClick={() => setQuickPatientModalOpen(true)}
-                  style={{ width: '100%' }}
-                >
-                  Tạo mới
-                </Button>
-              </Col>
-            </Row>
-          </Form.Item>
+        form={bookForm}
+        onFinish={handleCreateAppointmentSubmit}
+        patients={patients}
+        doctorList={doctorList}
+        actionLoading={actionLoading}
+        onOpenQuickPatient={() => setQuickPatientModalOpen(true)}
+      />
 
-          <Form.Item
-            name="doctorId"
-            label="Bác sĩ khám"
-            rules={[{ required: true, message: 'Vui lòng chọn bác sĩ!' }]}
-          >
-            <Select
-              placeholder="Chọn bác sĩ phụ trách..."
-              options={doctorList.map((d) => ({
-                value: d.id,
-                label: `${d.fullName || d.username} - ${d.department || 'Chuyên khoa'}`,
-              }))}
-            />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="appointmentDate"
-                label="Ngày hẹn"
-                initialValue={dayjs()}
-                rules={[{ required: true, message: 'Vui lòng chọn ngày hẹn!' }]}
-              >
-                <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="appointmentTime"
-                label="Khung giờ hẹn"
-                initialValue={dayjs().add(1, 'hour')}
-                rules={[{ required: true, message: 'Vui lòng chọn khung giờ!' }]}
-              >
-                <TimePicker format="HH:mm" minuteStep={15} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            name="reason"
-            label="Lý do khám"
-            rules={[{ required: true, message: 'Vui lòng nhập lý do khám!' }]}
-          >
-            <Input placeholder="VD: Khám định kỳ, đau ngực, ho kéo dài..." />
-          </Form.Item>
-
-          <Alert
-            type="warning"
-            showIcon
-            message="Ràng buộc kiểm tra tự động"
-            description="Hệ thống sẽ kiểm tra: (1) Khung giờ không được ở quá khứ. (2) Bác sĩ không có lịch trùng trong cùng khung giờ. Lịch hẹn tạo thành công sẽ ở trạng thái ĐÃ ĐẶT."
-            style={{ marginBottom: 16 }}
-          />
-
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setBookModalOpen(false)}>Hủy</Button>
-              <Button type="primary" htmlType="submit" loading={actionLoading}>
-                Xác nhận Đặt Lịch Hẹn
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Tiếp nhận Bệnh nhân Tự đến"
+      <WalkInModal
         open={walkInModalOpen}
         onCancel={() => setWalkInModalOpen(false)}
-        footer={null}
-        destroyOnClose
-      >
-        <Form form={walkInForm} layout="vertical" onFinish={handleCheckInWalkInSubmit}>
-          <Form.Item label="Chọn Bệnh nhân" required style={{ marginBottom: 8 }}>
-            <Row gutter={8}>
-              <Col span={18}>
-                <Form.Item
-                  name="patientId"
-                  noStyle
-                  rules={[{ required: true, message: 'Vui lòng chọn bệnh nhân!' }]}
-                >
-                  <Select
-                    showSearch
-                    placeholder="Tìm theo tên hoặc SĐT..."
-                    optionFilterProp="children"
-                    options={patients.map((p) => ({
-                      value: p.id,
-                      label: `${p.fullName || p.name} (${p.phone || p.patientCode || 'BN'})`,
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Button
-                  type="dashed"
-                  icon={<UserAddOutlined />}
-                  onClick={() => setQuickPatientModalOpen(true)}
-                  style={{ width: '100%' }}
-                >
-                  Tạo mới
-                </Button>
-              </Col>
-            </Row>
-          </Form.Item>
+        form={walkInForm}
+        onFinish={handleCheckInWalkInSubmit}
+        patients={patients}
+        doctorList={doctorList}
+        actionLoading={actionLoading}
+        onOpenQuickPatient={() => setQuickPatientModalOpen(true)}
+      />
 
-          <Form.Item
-            name="doctorId"
-            label="Chọn Bác sĩ khám"
-            rules={[{ required: true, message: 'Vui lòng chọn bác sĩ!' }]}
-          >
-            <Select
-              placeholder="Chọn bác sĩ phụ trách..."
-              options={doctorList.map((d) => ({
-                value: d.id,
-                label: `${d.fullName || d.username} (${d.department || 'Phòng khám'})`,
-              }))}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="reason"
-            label="Lý do khám"
-            rules={[{ required: true, message: 'Vui lòng nhập lý do khám!' }]}
-          >
-            <Input placeholder="VD: Đau đầu, sốt nhẹ..." />
-          </Form.Item>
-
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setWalkInModalOpen(false)}>Hủy</Button>
-              <Button type="primary" htmlType="submit" loading={actionLoading}>
-                Tiếp nhận tự đến
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Hủy Lịch Hẹn Khám"
+      <CancelAppointmentModal
         open={!!cancelModalItem}
         onCancel={() => setCancelModalItem(null)}
-        footer={null}
-        destroyOnClose
-      >
-        <Form form={cancelForm} layout="vertical" onFinish={handleCancelAppointmentSubmit}>
-          <Paragraph>
-            Lịch hẹn: <Text strong>{cancelModalItem?.appointmentCode}</Text> | Bệnh nhân: <Text strong>{getPatientInfo(cancelModalItem?.patientId, cancelModalItem?.patientName).name}</Text>
-          </Paragraph>
-          <Form.Item
-            name="reason"
-            label="Lý do hủy lịch"
-            rules={[{ required: true, message: 'Vui lòng chọn hoặc nhập lý do hủy!' }]}
-          >
-            <Select
-              options={[
-                { value: 'Bệnh nhân báo bận đột xuất', label: 'Bệnh nhân báo bận đột xuất' },
-                { value: 'Bệnh nhân muốn đổi ngày/giờ khám', label: 'Bệnh nhân muốn đổi ngày/giờ khám' },
-                { value: 'Bác sĩ bận lịch công tác đột xuất', label: 'Bác sĩ bận lịch công tác đột xuất' },
-                { value: 'Nhập trùng thông tin lịch hẹn', label: 'Nhập trùng thông tin lịch hẹn' },
-              ]}
-            />
-          </Form.Item>
-          <Alert
-            type="info"
-            showIcon
-            message="Xác nhận giải phóng khung giờ"
-            description="Khi chuyển lịch hẹn sang trạng thái ĐÃ HỦY, hệ thống sẽ giải phóng khung giờ của Bác sĩ để người khác có thể đăng ký."
-            style={{ marginBottom: 16 }}
-          />
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setCancelModalItem(null)}>Quay lại</Button>
-              <Button type="primary" danger htmlType="submit" loading={actionLoading}>
-                Xác nhận Hủy Lịch Hẹn
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+        form={cancelForm}
+        onFinish={handleCancelAppointmentSubmit}
+        cancelModalItem={cancelModalItem}
+        getPatientInfo={getPatientInfo}
+        actionLoading={actionLoading}
+      />
 
-      <Modal
-        title="Đăng Ký Nhanh Bệnh Nhân Mới (Đồng bộ Đăng ký bệnh nhân)"
+      <QuickPatientModal
         open={quickPatientModalOpen}
         onCancel={() => setQuickPatientModalOpen(false)}
-        footer={null}
-        destroyOnClose
-      >
-        <Form form={quickPatientForm} layout="vertical" onFinish={handleQuickRegisterPatientSubmit}>
-          <Form.Item
-            name="fullName"
-            label="Họ và tên bệnh nhân"
-            rules={[{ required: true, message: 'Vui lòng nhập họ và tên!' }]}
-          >
-            <Input placeholder="VD: Nguyễn Văn Nam" />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="phone"
-                label="Số điện thoại"
-                rules={[{ required: true, message: 'Vui lòng nhập SĐT!' }]}
-              >
-                <Input placeholder="0901234567" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="gender"
-                label="Giới tính"
-                initialValue="MALE"
-              >
-                <Radio.Group>
-                  <Radio value="MALE">Nam</Radio>
-                  <Radio value="FEMALE">Nữ</Radio>
-                </Radio.Group>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item
-            name="dateOfBirth"
-            label="Ngày sinh"
-            rules={[{ required: true, message: 'Vui lòng chọn ngày sinh!' }]}
-          >
-            <DatePicker
-              format="DD/MM/YYYY"
-              style={{ width: '100%' }}
-              disabledDate={(date) => date && date.isAfter(dayjs(), 'day')}
-            />
-          </Form.Item>
-          <Form.Item name="address" label="Địa chỉ">
-            <Input placeholder="Số nhà, tên đường, quận/huyện..." />
-          </Form.Item>
-          <PersonalDataConsentField patientName={Form.useWatch('fullName', quickPatientForm)} />
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setQuickPatientModalOpen(false)}>Hủy</Button>
-              <Button type="primary" htmlType="submit" loading={quickPatientSaving}>
-                Lưu Bệnh Nhân Mới
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+        form={quickPatientForm}
+        onFinish={handleQuickRegisterPatientSubmit}
+        loading={quickPatientSaving}
+      />
 
       <DeferPatientModal
         open={Boolean(skipModalItem)}
@@ -2985,181 +1952,56 @@ function AppointmentQueue() {
         onClose={() => setHistoryQueueItem(null)}
       />
 
-      <Drawer
-        title="Nhật ký lịch hẹn & thông báo"
-        width={650}
+      <AppointmentLogsDrawer
         open={logsDrawerOpen}
         onClose={() => setLogsDrawerOpen(false)}
-      >
-        <Tabs
-          items={[
-            {
-              key: 'app_logs',
-              label: 'Nhật ký Lịch hẹn',
-              children: (
-                <Table
-                  dataSource={appointmentLogs}
-                  rowKey="id"
-                  pagination={{ pageSize: 8 }}
-                  columns={[
-                    { title: 'Thời điểm', dataIndex: 'timestamp', render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY') },
-                    { title: 'Thời điểm', dataIndex: 'timestamp', render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY') },
-                    { title: 'Mã LH', dataIndex: 'appointmentCode', render: (c) => <Text code>{c}</Text> },
-                    { title: 'Người thao tác', dataIndex: 'operatorName' },
-                    { title: 'Chi tiết thao tác', dataIndex: 'details' },
-                  ]}
-                />
-              ),
-            },
-            {
-              key: 'notif_logs',
-              label: 'Nhật ký Thông báo / Nhắc lịch',
-              children: (
-                <Table
-                  dataSource={notificationLogs}
-                  rowKey="id"
-                  pagination={{ pageSize: 8 }}
-                  columns={[
-                    { title: 'Thời điểm', dataIndex: 'sentAt', render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY') },
-                    { title: 'Thời điểm', dataIndex: 'sentAt', render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY') },
-                    { title: 'Bệnh nhân', dataIndex: 'patientName' },
-                    {
-                      title: 'Kênh',
-                      dataIndex: 'channel',
-                      render: (channel) => (
-                        <Tag color="blue">
-                          {String(channel || 'Hệ thống').replace(/System/gi, 'Hệ thống')}
-                        </Tag>
-                      ),
-                    },
-                    { title: 'Nội dung nhắc', dataIndex: 'message' },
-                  ]}
-                />
-              ),
-            },
-          ]}
-        />
-      </Drawer>
+        appointmentLogs={appointmentLogs}
+        notificationLogs={notificationLogs}
+      />
 
-      <Modal
-        title="Chi Tiết Lịch Hẹn & Hàng Đợi"
+      <AppointmentDetailModal
         open={!!detailItem}
-        width={detailItem?.rescheduleHistories?.length ? 720 : 540}
-        onCancel={() => setDetailItem(null)}
-        footer={[
-          permissions.canConfirmAppointment && detailItem?.type === 'appointment' && detailItem?.status === 'SCHEDULED' && canConfirmAppointment(detailItem, dayjs()).allowed && (
-            <Button
-              key="confirm"
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
-              onClick={() => {
-                const target = { ...detailItem }
-                setDetailItem(null)
-                handleConfirmAppointment(target)
-              }}
-            >
-              Xác nhận lịch hẹn này
-            </Button>
-          ),
-          permissions.canRescheduleAppointment && detailItem?.type === 'appointment' && canRescheduleAppointment(detailItem, dayjs()).allowed && (
-            <Button
-              key="reschedule"
-              type="primary"
-              icon={<SwapOutlined />}
-              onClick={() => {
-                const target = { ...detailItem }
-                setDetailItem(null)
-                handleOpenRescheduleModal(target)
-              }}
-            >
-              Đổi lịch hẹn này
-            </Button>
-          ),
-          <Button key="close" onClick={() => setDetailItem(null)}>Đóng</Button>,
-        ].filter(Boolean)}
-      >
-        {detailItem && (
-          <div>
-            <Paragraph><Text type="secondary">Mã lịch hẹn / Lượt khám:</Text> <Text code>{detailItem.appointmentCode || detailItem.visitCode || detailItem.id}</Text></Paragraph>
-            <Paragraph><Text type="secondary">Bệnh nhân:</Text> <Text strong>{detailItem.patientName}</Text></Paragraph>
-            <Paragraph><Text type="secondary">Bác sĩ phụ trách:</Text> <Text strong>{detailItem.doctorName || 'Chưa gán'}</Text></Paragraph>
-            <Paragraph><Text type="secondary">Chuyên khoa:</Text> <Tag color="cyan">{detailItem.department || '—'}</Tag></Paragraph>
-            <Paragraph><Text type="secondary">Trạng thái:</Text> <Tag color={APPOINTMENT_STATUS_META[detailItem.status]?.tone || (detailItem.status === 'CONFIRMED' ? 'green' : 'blue')}>{APPOINTMENT_STATUS_META[detailItem.status]?.label || detailItem.status}</Tag></Paragraph>
-            {detailItem.status === 'CONFIRMED' && (
-              <Paragraph>
-                <Text type="secondary">Xác nhận:</Text>{' '}
-                <Tag color="green" icon={<CheckCircleOutlined />}>Đã xác nhận</Tag>
-                {detailItem.confirmedAt && (
-                  <Text style={{ fontSize: 13, color: '#166534', marginLeft: 6 }}>
-                    ({formatConfirmationInfo(detailItem.confirmedByName, detailItem.confirmedAt)})
-                  </Text>
-                )}
-              </Paragraph>
-            )}
-            {detailItem.reason && <Paragraph><Text type="secondary">Lý do khám:</Text> {detailItem.reason}</Paragraph>}
-            {detailItem.cancelReason && <Paragraph><Text type="secondary">Lý do hủy:</Text> <Text type="danger">{detailItem.cancelReason}</Text></Paragraph>}
-            {(detailItem.appointmentAt || detailItem.startTime) && <Paragraph><Text type="secondary">Thời gian hẹn:</Text> {dayjs(detailItem.appointmentAt || detailItem.startTime).format('HH:mm - DD/MM/YYYY')}</Paragraph>}
+        onClose={() => setDetailItem(null)}
+        detailItem={detailItem}
+        permissions={permissions}
+        onConfirm={handleConfirmAppointment}
+        onReschedule={handleOpenRescheduleModal}
+      />
 
-            {/* TC-04: Lịch sử đổi lịch hẹn */}
-            {detailItem.rescheduleHistories && detailItem.rescheduleHistories.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <Divider style={{ margin: '12px 0' }} />
-                <Title level={5} style={{ marginBottom: 8 }}>
-                  <HistoryOutlined style={{ marginRight: 6 }} />
-                  Nhật ký dời lịch hẹn ({detailItem.rescheduleHistories.length})
-                </Title>
-                <Table
-                  dataSource={detailItem.rescheduleHistories}
-                  rowKey={(h) => h.id || `${h.rescheduledAt}-${h.rescheduledBy}`}
-                  pagination={false}
-                  size="small"
-                  columns={[
-                    {
-                      title: 'Thời điểm',
-                      dataIndex: 'rescheduledAt',
-                      width: 140,
-                      render: (t) => dayjs(t).format('HH:mm - DD/MM/YYYY'),
-                    },
-                    {
-                      title: 'Người đổi',
-                      dataIndex: 'rescheduledByName',
-                      width: 110,
-                      render: (name, h) => name || h.rescheduledBy || 'Lễ tân',
-                    },
-                    {
-                      title: 'Thay đổi',
-                      render: (_, h) => (
-                        <div style={{ fontSize: 12 }}>
-                          <div>
-                            <Text type="secondary">Giờ: </Text>
-                            <Text delete>{dayjs(h.oldStartTime).format('HH:mm DD/MM')}</Text>
-                            {' → '}
-                            <Text strong style={{ color: '#1677ff' }}>{dayjs(h.newStartTime).format('HH:mm DD/MM')}</Text>
-                          </div>
-                          {(h.oldDoctorName !== h.newDoctorName || h.oldDoctorId !== h.newDoctorId) && (
-                            <div style={{ marginTop: 2 }}>
-                              <Text type="secondary">BS: </Text>
-                              <Text delete>{h.oldDoctorName || 'BS cũ'}</Text>
-                              {' → '}
-                              <Text strong style={{ color: '#52c41a' }}>{h.newDoctorName || 'BS mới'}</Text>
-                            </div>
-                          )}
-                        </div>
-                      ),
-                    },
-                    {
-                      title: 'Lý do',
-                      dataIndex: 'reason',
-                      render: (r) => <Text style={{ fontSize: 12 }}>{r}</Text>,
-                    },
-                  ]}
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+      {closeVisitModalItem && (
+        <CloseVisitModal
+          open={!!closeVisitModalItem}
+          queueItem={closeVisitModalItem}
+          queueItemId={closeVisitModalItem.id || closeVisitModalItem.queueItemId}
+          patientName={closeVisitModalItem.patientName}
+          patientCode={closeVisitModalItem.patientCode}
+          visit={{
+            id: closeVisitModalItem.visitId,
+            visitCode: closeVisitModalItem.visitCode,
+            status: closeVisitModalItem.status,
+            startedAt: closeVisitModalItem.calledAt || closeVisitModalItem.checkedInAt,
+            patientName: closeVisitModalItem.patientName,
+            patientCode: closeVisitModalItem.patientCode,
+          }}
+          onClose={() => {
+            setCloseVisitModalItem(null)
+          }}
+          onSuccess={async (data, outcome, reason) => {
+            if (closeVisitModalItem) {
+              saveAppointmentLog({
+                appointmentId: closeVisitModalItem.appointmentId || closeVisitModalItem.id,
+                appointmentCode: closeVisitModalItem.appointmentCode || closeVisitModalItem.visitCode || 'Lượt khám',
+                action: outcome === 'EARLY_ENDED' ? 'EARLY_ENDED' : 'CANCEL',
+                operatorName: user?.fullName || user?.username || 'Bác sĩ',
+                details: `${outcome === 'EARLY_ENDED' ? 'Kết thúc sớm' : 'Hủy'} ca khám của bệnh nhân ${closeVisitModalItem.patientName || ''}. Lý do: ${reason || ''}.`,
+              })
+            }
+            await refreshAllData()
+            setCloseVisitModalItem(null)
+          }}
+          onInvalidStatus={() => refreshAllData()}
+        />
+      )}
 
       <ReceptionRescheduleAppointmentModal
         open={!!rescheduleModalItem}

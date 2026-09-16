@@ -364,10 +364,10 @@ textarea {
   }
 
   /* Modal on Tablet & Mobile */
-  .ant-modal {
+  .ant-modal:not(.ant-modal-centered) {
     max-width: calc(100vw - 16px) !important;
-    margin: 8px auto !important;
-    top: 8px !important;
+    margin: 16px auto !important;
+    top: 16px !important;
     padding-bottom: 8px !important;
   }
 
