@@ -1,0 +1,459 @@
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  Alert,
+  Button,
+  Card,
+  Descriptions,
+  Divider,
+  Empty,
+  InputNumber,
+  Modal,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  message,
+} from 'antd'
+import {
+  AlertOutlined,
+  BarcodeOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  MedicineBoxOutlined,
+  RollbackOutlined,
+  WarningOutlined,
+} from '@ant-design/icons'
+import dayjs from 'dayjs'
+
+import prescriptionDispenseApi from '../../api/prescriptionDispenseApi.js'
+import pharmacyApi from '../../api/pharmacyApi.js'
+import {
+  buildPartialDispensePayload,
+  calculateItemShortage,
+  getRemainingQuantity,
+  hasShortageAfterDispense,
+  mapDispenseError,
+} from '../../utils/partialDispensingHelpers.js'
+
+const { Text, Title } = Typography
+
+/**
+ * PartialDispenseModal — Cấp phát một phần khi tồn kho không đủ (NCL-06-CN-008)
+ *
+ * Cho phép Dược sĩ điều chỉnh số lượng thực cấp cho từng mặt thuốc khi tồn kho không đủ,
+ * hệ thống trừ đúng phần đã cấp và chuyển đơn sang trạng thái PARTIALLY_DISPENSED.
+ */
+function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [prescriptionData, setPrescriptionData] = useState(null)
+  const [quantities, setQuantities] = useState({})
+  const [submitting, setSubmitting] = useState(false)
+  const [serverShortages, setServerShortages] = useState([])
+  const [errorMessage, setErrorMessage] = useState('')
+
+  // Nạp chi tiết đơn thuốc nếu chưa có items đầy đủ
+  useEffect(() => {
+    if (!open || !prescription) {
+      setPrescriptionData(null)
+      setQuantities({})
+      setServerShortages([])
+      setErrorMessage('')
+      return
+    }
+
+    const rawItems = prescription.items || []
+    if (rawItems.length > 0) {
+      setPrescriptionData(prescription)
+      initQuantities(rawItems)
+    } else if (prescription.id) {
+      setLoadingDetails(true)
+      pharmacyApi
+        .getById(prescription.id)
+        .then((res) => {
+          const data = res?.data || prescription
+          setPrescriptionData(data)
+          initQuantities(data.items || [])
+        })
+        .catch((err) => {
+          console.warn('[PartialDispenseModal] Không tải được chi tiết đơn:', err)
+          setPrescriptionData(prescription)
+          initQuantities([])
+        })
+        .finally(() => setLoadingDetails(false))
+    }
+  }, [open, prescription])
+
+  // Khởi tạo số lượng mặc định: điền sẵn = remainingQuantity (giả định đủ kho)
+  const initQuantities = (items) => {
+    const initial = {}
+    items.forEach((item) => {
+      const itemId = item.id || item.prescriptionItemId
+      if (itemId) {
+        initial[itemId] = getRemainingQuantity(item)
+      }
+    })
+    setQuantities(initial)
+    setServerShortages([])
+    setErrorMessage('')
+  }
+
+  const items = useMemo(() => {
+    return prescriptionData?.items || []
+  }, [prescriptionData])
+
+  // Xử lý khi dược sĩ đổi số lượng thực cấp cho 1 thuốc
+  const handleQuantityChange = (itemId, val, maxQuantity) => {
+    // Validate cứng tại UI: không cho nhập âm hoặc vượt quá remainingQuantity
+    let nextVal = val
+    if (nextVal === null || nextVal === undefined) {
+      nextVal = 0
+    }
+    if (nextVal < 0) {
+      nextVal = 0
+    }
+    if (nextVal > maxQuantity) {
+      nextVal = maxQuantity
+    }
+
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: nextVal,
+    }))
+    setServerShortages([])
+    setErrorMessage('')
+  }
+
+  // Thực thi submit lên Backend
+  const executeSubmit = async (payloadItems) => {
+    const rxId = prescriptionData?.id || prescription?.id
+    if (!rxId) {
+      message.error('Không tìm thấy mã đơn thuốc.')
+      return
+    }
+
+    setSubmitting(true)
+    setServerShortages([])
+    setErrorMessage('')
+
+    try {
+      // Gọi API POST /prescriptions/{id}/partial-dispense
+      const response = await prescriptionDispenseApi.partialDispense(rxId, payloadItems)
+      const data = response?.data
+
+      message.success('Cấp phát một phần đơn thuốc thành công!')
+      if (onSuccess) {
+        onSuccess(data || { status: 'PARTIALLY_DISPENSED' })
+      }
+      onClose()
+    } catch (err) {
+      const mapped = mapDispenseError(err, rxId, payloadItems)
+
+      if (mapped.status === 409 && mapped.code === 'INSUFFICIENT_STOCK') {
+        setServerShortages(mapped.shortages)
+        setErrorMessage(mapped.message)
+        message.error(mapped.message)
+      } else if (mapped.status === 500) {
+        // LƯU Ý ĐẶC BIỆT: Trường hợp lỗi 500 do DB check constraint
+        setErrorMessage(mapped.message)
+        message.error(mapped.message)
+      } else {
+        setErrorMessage(mapped.message)
+        message.error(mapped.message)
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Xử lý khi nhấn nút "Xác nhận cấp một phần"
+  const handleConfirmDispense = () => {
+    // BƯỚC 1: LỌC BỎ mọi item có quantity = 0 khỏi payload
+    // BẮT BUỘC theo contract @Min(1) của Backend:
+    const { payloadItems, hasAnyItemToDispense } = buildPartialDispensePayload(quantities, items)
+
+    if (!hasAnyItemToDispense) {
+      message.warning('Vui lòng nhập số lượng cấp phát lớn hơn 0 cho ít nhất một loại thuốc.')
+      return
+    }
+
+    // BƯỚC 2: Kiểm tra xem có thuốc nào còn thiếu hay không
+    const willHaveShortage = hasShortageAfterDispense(quantities, items)
+
+    if (willHaveShortage) {
+      // Hiện Modal.confirm cảnh báo trước khi submit theo đúng đặc tả
+      Modal.confirm({
+        title: 'Cảnh báo cấp phát một phần',
+        icon: <ExclamationCircleOutlined style={{ color: '#f59e0b', fontSize: 24 }} />,
+        content: (
+          <div style={{ marginTop: 8, fontSize: 14 }}>
+            <p style={{ color: '#334155', lineHeight: 1.6, marginBottom: 8 }}>
+              Một số thuốc sẽ không được cấp đủ theo đơn. Bệnh nhân sẽ cần quay lại nhận phần còn thiếu sau.
+            </p>
+            <p style={{ color: '#d97706', fontWeight: 600, margin: 0 }}>
+              Bạn có chắc chắn muốn tiếp tục xuất kho cho đợt cấp này?
+            </p>
+          </div>
+        ),
+        okText: 'Xác nhận cấp phát',
+        cancelText: 'Kiểm tra lại',
+        okButtonProps: {
+          type: 'primary',
+          style: { backgroundColor: '#d97706', borderColor: '#d97706' },
+        },
+        onOk: () => executeSubmit(payloadItems),
+      })
+    } else {
+      // Đủ tất cả các thuốc còn lại
+      executeSubmit(payloadItems)
+    }
+  }
+
+  const shortageDetailsColumns = [
+    { title: 'Tên thuốc', dataIndex: 'medicineName', key: 'medicineName' },
+    { title: 'Yêu cầu cấp', dataIndex: 'requiredQuantity', key: 'requiredQuantity', align: 'center' },
+    { title: 'Tồn khả dụng', dataIndex: 'availableQuantity', key: 'availableQuantity', align: 'center' },
+    {
+      title: 'Thiếu hụt',
+      dataIndex: 'shortageQuantity',
+      key: 'shortageQuantity',
+      align: 'center',
+      render: (val) => <Tag color="red">Thiếu {val}</Tag>,
+    },
+  ]
+
+  const columns = [
+    {
+      title: 'STT',
+      key: 'stt',
+      width: 50,
+      align: 'center',
+      render: (_, __, index) => index + 1,
+    },
+    {
+      title: 'Tên thuốc & Quy cách',
+      key: 'medicineName',
+      render: (_, item) => (
+        <div>
+          <Text strong style={{ color: '#1e40af', fontSize: 14 }}>
+            {item.medicineName || `Mã ${item.medicineId}`}
+          </Text>
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+            {[item.activeIngredient, item.strength].filter(Boolean).join(' · ') || item.dosage || '—'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'SL kê',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      width: 85,
+      align: 'center',
+      render: (qty, item) => (
+        <Text strong>
+          {qty} {item.unit || ''}
+        </Text>
+      ),
+    },
+    {
+      title: 'Đã cấp',
+      key: 'dispensedQuantity',
+      width: 90,
+      align: 'center',
+      render: (_, item) => {
+        const dispensed = item.dispensedQuantity || 0
+        return <Tag color={dispensed > 0 ? 'blue' : 'default'}>{dispensed} {item.unit || ''}</Tag>
+      },
+    },
+    {
+      title: 'Còn cấp',
+      key: 'remainingQuantity',
+      width: 95,
+      align: 'center',
+      render: (_, item) => {
+        const remaining = getRemainingQuantity(item)
+        return (
+          <Tag color={remaining > 0 ? 'orange' : 'green'} style={{ fontWeight: 600 }}>
+            {remaining} {item.unit || ''}
+          </Tag>
+        )
+      },
+    },
+    {
+      title: 'Số lượng thực cấp',
+      key: 'actualDispense',
+      width: 190,
+      align: 'left',
+      render: (_, item) => {
+        const itemId = item.id || item.prescriptionItemId
+        const remaining = getRemainingQuantity(item)
+        const currentVal = quantities[itemId] !== undefined ? quantities[itemId] : remaining
+        const shortage = calculateItemShortage(currentVal, remaining)
+        const isSkipped = currentVal === 0
+
+        return (
+          <div>
+            <InputNumber
+              min={0}
+              max={remaining}
+              step={1}
+              precision={0}
+              disabled={submitting || remaining <= 0}
+              value={currentVal}
+              onChange={(val) => handleQuantityChange(itemId, val, remaining)}
+              style={{ width: '100%' }}
+              addonAfter={item.unit || 'đơn vị'}
+            />
+            {remaining > 0 && shortage > 0 && !isSkipped && (
+              <div style={{ color: '#d97706', fontSize: 12, fontWeight: 500, marginTop: 4 }}>
+                Còn thiếu {shortage} sau lần cấp này
+              </div>
+            )}
+            {remaining > 0 && isSkipped && (
+              <div style={{ color: '#ef4444', fontSize: 12, fontWeight: 500, marginTop: 4 }}>
+                Không cấp đợt này (thiếu {remaining})
+              </div>
+            )}
+            {remaining === 0 && (
+              <div style={{ color: '#16a34a', fontSize: 12, marginTop: 4 }}>
+                Đã cấp đủ theo đơn
+              </div>
+            )}
+          </div>
+        )
+      },
+    },
+  ]
+
+  const rx = prescriptionData || prescription
+  const rxCode = rx?.prescriptionCode || rx?.id || '—'
+
+  return (
+    <Modal
+      title={
+        <Space align="center">
+          <MedicineBoxOutlined style={{ color: '#d97706', fontSize: 20 }} />
+          <span style={{ fontSize: 17, fontWeight: 700 }}>Cấp phát một phần khi tồn kho không đủ</span>
+        </Space>
+      }
+      open={open}
+      onCancel={() => {
+        if (!submitting) onClose()
+      }}
+      width={920}
+      destroyOnClose
+      footer={[
+        <Button key="back" icon={<RollbackOutlined />} onClick={onClose} disabled={submitting}>
+          Hủy bỏ
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          icon={<CheckCircleOutlined />}
+          loading={submitting}
+          disabled={submitting || loadingDetails || items.length === 0}
+          onClick={handleConfirmDispense}
+          style={{
+            backgroundColor: '#d97706',
+            borderColor: '#d97706',
+            fontWeight: 600,
+          }}
+        >
+          Xác nhận cấp một phần
+        </Button>,
+      ]}
+    >
+      <div style={{ marginTop: 12 }}>
+        {/* Thông tin vắn tắt đơn thuốc */}
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 16 }}>
+          <Descriptions.Item label="Mã đơn thuốc">
+            <Tag color="blue" style={{ fontWeight: 700, margin: 0 }}>
+              <BarcodeOutlined style={{ marginRight: 4 }} />
+              {rxCode}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Bệnh nhân">
+            <strong>{rx?.patientName || '—'}</strong> ({rx?.patientCode || '—'})
+          </Descriptions.Item>
+          <Descriptions.Item label="Bác sĩ kê">
+            {rx?.doctorName || '—'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Trạng thái hiện tại">
+            {rx?.status === 'PARTIALLY_DISPENSED' ? (
+              <Tag color="gold" style={{ fontWeight: 600 }}>Cấp phát một phần</Tag>
+            ) : rx?.status === 'PENDING_DISPENSE' ? (
+              <Tag color="orange">Chờ cấp phát</Tag>
+            ) : (
+              <Tag>{rx?.status || '—'}</Tag>
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label="Thời gian kê" span={2}>
+            {rx?.prescribedAt && dayjs(rx.prescribedAt).isValid()
+              ? dayjs(rx.prescribedAt).format('HH:mm DD/MM/YYYY')
+              : '—'}
+          </Descriptions.Item>
+        </Descriptions>
+
+        {/* Hướng dẫn thao tác cho Dược sĩ */}
+        <Alert
+          type="info"
+          showIcon
+          message="Hướng dẫn cấp phát một phần:"
+          description="Hệ thống tự động điền số lượng còn cần cấp. Hãy điều chỉnh giảm số lượng thực cấp cho những loại thuốc bị thiếu hàng trong kho. Những thuốc để số lượng = 0 sẽ được tự động bỏ qua đợt này để cấp sau."
+          style={{ marginBottom: 16 }}
+        />
+
+        {/* Cảnh báo lỗi 500 hoặc lỗi chung */}
+        {errorMessage && (
+          <Alert
+            type="error"
+            showIcon
+            message="Thông báo từ hệ thống"
+            description={errorMessage}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {/* Bảng chi tiết thuốc thiếu hụt nhận từ Backend 409 INSUFFICIENT_STOCK */}
+        {serverShortages.length > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            message="Máy chủ phát hiện kho không đủ số lượng bạn yêu cầu cấp phát:"
+            description={
+              <Table
+                rowKey={(r) => r.prescriptionItemId || r.medicineId}
+                columns={shortageDetailsColumns}
+                dataSource={serverShortages}
+                pagination={false}
+                size="small"
+                style={{ marginTop: 8 }}
+              />
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {/* Bảng danh sách thuốc cần cấp */}
+        <Table
+          rowKey={(r) => r.id || r.prescriptionItemId}
+          columns={columns}
+          dataSource={items}
+          loading={loadingDetails}
+          pagination={false}
+          size="middle"
+          rowClassName={(record) => {
+            const itemId = record.id || record.prescriptionItemId
+            const remaining = getRemainingQuantity(record)
+            const currentVal = quantities[itemId] !== undefined ? quantities[itemId] : remaining
+            return remaining > 0 && currentVal < remaining ? 'partial-dispense-shortage-row' : ''
+          }}
+          locale={{ emptyText: <Empty description="Đơn thuốc không có danh mục thuốc" /> }}
+        />
+      </div>
+    </Modal>
+  )
+}
+
+export default PartialDispenseModal

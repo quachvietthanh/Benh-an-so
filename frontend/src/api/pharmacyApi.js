@@ -25,6 +25,10 @@ const pharmacyApi = {
   updateMedicineStatus: (id, active) => axiosClient.patch(`/medicines/${id}/status`, { active }),
   receiveBatch: (data) => axiosClient.post('/inventory/receipts', data),
   dispense: (id) => axiosClient.post(`/prescriptions/${id}/dispense`),
+  partialDispense: (prescriptionId, items) =>
+    axiosClient.post(`/prescriptions/${prescriptionId}/partial-dispense`, { items }),
+  dispenseHistory: (prescriptionId) =>
+    axiosClient.get(`/prescriptions/${prescriptionId}/dispense-history`),
   expiryAlerts: (params) => axiosClient.get('/inventory/expiry-alerts', { params }),
   sendToInterconnection: (id) => axiosClient.post(`/prescriptions/${id}/interconnection`),
   retryInterconnection: (id) => axiosClient.post(`/prescriptions/${id}/interconnection/retry`),

@@ -706,3 +706,12 @@ textarea {
 .ant-table-tbody > tr.icd-row-secondary:hover > td {
   background-color: #f3e8ff !important;
 }
+
+/* Partial Dispensing Shortage Row Highlight */
+.ant-table-tbody > tr.partial-dispense-shortage-row > td {
+  background-color: #fffbeb !important;
+}
+
+.ant-table-tbody > tr.partial-dispense-shortage-row:hover > td {
+  background-color: #fef3c7 !important;
+}

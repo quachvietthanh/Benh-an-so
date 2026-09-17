@@ -71,6 +71,8 @@ import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModa
 import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import PatientChronicDiseaseBanner from '../components/clinical/PatientChronicDiseaseBanner'
 import CancelPrescriptionModal from '../components/pharmacy/CancelPrescriptionModal.jsx'
+import PartialDispenseModal from '../components/pharmacy/PartialDispenseModal.jsx'
+import DispenseHistoryModal from '../components/pharmacy/DispenseHistoryModal.jsx'
 import {
   canCancelPrescription,
   getCancelRestrictionMessage,
@@ -206,6 +208,10 @@ function PrescriptionPage() {
   const [signModalOpen, setSignModalOpen] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [prescriptionToCancel, setPrescriptionToCancel] = useState(null)
+  const [partialModalOpen, setPartialModalOpen] = useState(false)
+  const [selectedPrescriptionForPartial, setSelectedPrescriptionForPartial] = useState(null)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [selectedPrescriptionForHistory, setSelectedPrescriptionForHistory] = useState(null)
 
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -1503,6 +1509,13 @@ function PrescriptionPage() {
             </Tag>
           )
         }
+        if (value === 'PARTIALLY_DISPENSED') {
+          return (
+            <Tag color="gold" icon={<ClockCircleOutlined />} style={{ fontWeight: 600 }}>
+              Cấp phát một phần
+            </Tag>
+          )
+        }
         if (value === 'DISPENSED') {
           return (
             <Tag color="green" icon={<CheckCircleOutlined />}>
@@ -1616,11 +1629,12 @@ function PrescriptionPage() {
       align: 'center',
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
+        const isPartiallyDispensed = prescription.status === 'PARTIALLY_DISPENSED'
         const isPrintable = Boolean(
           canPrintPrescription &&
           prescription.id &&
           prescription.prescriptionCode &&
-          (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')
+          (isPending || isPartiallyDispensed || prescription.status === 'DISPENSED')
         )
         const canEditThis = canPrescribe && isPending
         const isInterconnected = prescription.interconnectionStatus === 'SUCCESS'
@@ -1631,12 +1645,43 @@ function PrescriptionPage() {
           currentUserId: currentUser?.id,
         })
 
+        const isPharmacistOrAdmin =
+          (roles.includes('pharmacist') || roles.includes('admin') || userPermissions.includes('PRESCRIPTION_UPDATE_STATUS')) &&
+          !roles.includes('doctor')
+        const canViewHistory =
+          roles.includes('doctor') ||
+          roles.includes('pharmacist') ||
+          roles.includes('admin') ||
+          roles.includes('manager') ||
+          userPermissions.includes('PRESCRIPTION_DISPENSE_HISTORY_READ')
+
+        const canPartialDispense = isPharmacistOrAdmin && (isPending || isPartiallyDispensed)
+        const canSeeHistory = canViewHistory && (isPartiallyDispensed || prescription.status === 'DISPENSED')
+
         const menuItems = [
           {
             key: 'detail',
             icon: <EyeOutlined />,
             label: 'Xem chi tiết đơn thuốc',
             onClick: () => openDetailModal(prescription),
+          },
+          canPartialDispense && {
+            key: 'partial-dispense',
+            icon: <MedicineBoxOutlined style={{ color: '#d97706' }} />,
+            label: 'Cấp phát một phần',
+            onClick: () => {
+              setSelectedPrescriptionForPartial(prescription)
+              setPartialModalOpen(true)
+            },
+          },
+          canSeeHistory && {
+            key: 'dispense-history',
+            icon: <HistoryOutlined style={{ color: '#1677ff' }} />,
+            label: 'Xem lịch sử cấp phát',
+            onClick: () => {
+              setSelectedPrescriptionForHistory(prescription)
+              setHistoryModalOpen(true)
+            },
           },
           canPrescribe && prescription.status !== 'CANCELLED' && {
             key: 'interconnection',
@@ -1673,13 +1718,13 @@ function PrescriptionPage() {
             label: 'Hủy đơn thuốc này',
             onClick: () => handleOpenCancelModal(prescription),
           },
-          roles.includes('doctor') && prescription.status === 'DISPENSED' && (prescription.prescribedBy ? String(prescription.prescribedBy).toLowerCase().replace(/-/g, '') === String(user?.id).toLowerCase().replace(/-/g, '') : true) && {
+          roles.includes('doctor') && (prescription.status === 'DISPENSED' || isPartiallyDispensed) && (prescription.prescribedBy ? String(prescription.prescribedBy).toLowerCase().replace(/-/g, '') === String(user?.id).toLowerCase().replace(/-/g, '') : true) && {
             key: 'cancel-dispensed',
             icon: <StopOutlined style={{ color: '#94a3b8' }} />,
             disabled: true,
             label: (
-              <Tooltip title="Đơn thuốc đã được cấp phát. Vui lòng sử dụng chức năng trả lại thuốc nếu muốn thu hồi thuốc.">
-                <span>Hủy đơn (Đã cấp phát)</span>
+              <Tooltip title="Đơn thuốc đã được xuất cấp phát tại quầy dược. Không thể hủy đơn trực tiếp.">
+                <span>Hủy đơn (Đã cấp thuốc)</span>
               </Tooltip>
             ),
           },
@@ -3373,6 +3418,27 @@ function PrescriptionPage() {
         prescription={prescriptionToCancel}
         onConfirm={handleConfirmCancelPrescription}
         loading={cancelling}
+      />
+
+      <PartialDispenseModal
+        open={partialModalOpen}
+        onClose={() => {
+          setPartialModalOpen(false)
+          setSelectedPrescriptionForPartial(null)
+        }}
+        prescription={selectedPrescriptionForPartial}
+        onSuccess={() => {
+          loadData()
+        }}
+      />
+
+      <DispenseHistoryModal
+        open={historyModalOpen}
+        onClose={() => {
+          setHistoryModalOpen(false)
+          setSelectedPrescriptionForHistory(null)
+        }}
+        prescription={selectedPrescriptionForHistory}
       />
 
       <PrescriptionPrintTemplateModal

@@ -12,6 +12,7 @@ import {
   Pagination,
   Popconfirm,
   Row,
+  Select,
   Space,
   Statistic,
   Table,
@@ -26,6 +27,7 @@ import {
   CheckCircleOutlined,
   CopyOutlined,
   FieldTimeOutlined,
+  HistoryOutlined,
   InboxOutlined,
   MedicineBoxOutlined,
   ReloadOutlined,
@@ -42,6 +44,9 @@ import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage as getErrorMessage, normalizeApiError } from '../utils/apiError'
 import { buildFefoPreview, fixMojibake } from '../utils/workflowContract'
 import { saveStoredPrescription, dispensePrescriptionHelper, mergePrescriptions } from '../utils/storageHelpers'
+import { getRemainingQuantity } from '../utils/partialDispensingHelpers'
+import PartialDispenseModal from '../components/pharmacy/PartialDispenseModal.jsx'
+import DispenseHistoryModal from '../components/pharmacy/DispenseHistoryModal.jsx'
 
 
 const { Text, Title } = Typography
@@ -91,6 +96,9 @@ function PharmacyPage() {
   const [prescriptionPage, setPrescriptionPage] = useState(0)
   const [prescriptionTotal, setPrescriptionTotal] = useState(0)
   const [prescriptionTotalPages, setPrescriptionTotalPages] = useState(0)
+  const [prescriptionStatusFilter, setPrescriptionStatusFilter] = useState('ALL') // 'ALL' | 'PENDING_DISPENSE' | 'PARTIALLY_DISPENSED'
+  const [partialModalOpen, setPartialModalOpen] = useState(false)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
   const [batches, setBatches] = useState([])
   const [stocks, setStocks] = useState([])
   const [lowStockItems, setLowStockItems] = useState([])
@@ -107,30 +115,71 @@ function PharmacyPage() {
   const prescriptionRequestIdRef = useRef(0)
   const inventoryRequestIdRef = useRef(0)
 
-  const loadPrescriptionPage = useCallback(async (pageNumber) => {
+  const loadPrescriptionPage = useCallback(async (pageNumber, filterOverride) => {
     if (!canDispense) return
+    const currentFilter = filterOverride !== undefined ? filterOverride : prescriptionStatusFilter
     const requestId = prescriptionRequestIdRef.current + 1
     prescriptionRequestIdRef.current = requestId
     setPrescriptionLoading(true)
     setPrescriptionLoadError('')
     try {
-      const prescriptionResponse = await pharmacyApi.prescriptions({
-        status: 'PENDING_DISPENSE',
-        page: pageNumber,
-        size: PRESCRIPTION_PAGE_SIZE,
-      })
+      let nextPrescriptions = []
+      let parsedTotal = 0
+      let parsedTotalPages = 0
+
+      if (currentFilter === 'ALL') {
+        const [pendingRes, partialRes] = await Promise.allSettled([
+          pharmacyApi.prescriptions({
+            status: 'PENDING_DISPENSE',
+            page: pageNumber,
+            size: PRESCRIPTION_PAGE_SIZE,
+          }),
+          pharmacyApi.prescriptions({
+            status: 'PARTIALLY_DISPENSED',
+            page: pageNumber,
+            size: PRESCRIPTION_PAGE_SIZE,
+          }),
+        ])
+
+        const rawApiPrescriptions = []
+        if (pendingRes.status === 'fulfilled') {
+          const payload = pendingRes.value?.data
+          rawApiPrescriptions.push(...toCollection(payload))
+          parsedTotal += Number(payload?.totalElements || 0)
+        }
+        if (partialRes.status === 'fulfilled') {
+          const payload = partialRes.value?.data
+          rawApiPrescriptions.push(...toCollection(payload))
+          parsedTotal += Number(payload?.totalElements || 0)
+        }
+
+        nextPrescriptions = mergePrescriptions(rawApiPrescriptions)
+          .filter((item) => item?.status === 'PENDING_DISPENSE' || item?.status === 'PARTIALLY_DISPENSED')
+          .sort((first, second) =>
+            String(first.prescribedAt || first.createdAt || '').localeCompare(String(second.prescribedAt || second.createdAt || '')),
+          )
+      } else {
+        const prescriptionResponse = await pharmacyApi.prescriptions({
+          status: currentFilter,
+          page: pageNumber,
+          size: PRESCRIPTION_PAGE_SIZE,
+        })
+        if (requestId !== prescriptionRequestIdRef.current) return
+
+        const payload = prescriptionResponse.data
+        const rawApiPrescriptions = toCollection(payload)
+        nextPrescriptions = mergePrescriptions(rawApiPrescriptions)
+          .filter((item) => item?.status === currentFilter)
+          .sort((first, second) =>
+            String(first.prescribedAt || first.createdAt || '').localeCompare(String(second.prescribedAt || second.createdAt || '')),
+          )
+        parsedTotal = Number(payload?.totalElements)
+        parsedTotalPages = Number(payload?.totalPages)
+      }
+
       if (requestId !== prescriptionRequestIdRef.current) return
 
-      const payload = prescriptionResponse.data
-      const rawApiPrescriptions = toCollection(payload)
-      const nextPrescriptions = mergePrescriptions(rawApiPrescriptions)
-        .filter((item) => item?.status === 'PENDING_DISPENSE')
-        .sort((first, second) =>
-          String(first.prescribedAt || first.createdAt || '').localeCompare(String(second.prescribedAt || second.createdAt || '')),
-        )
-      const parsedTotal = Number(payload?.totalElements)
       const nextTotal = Number.isFinite(parsedTotal) ? Math.max(parsedTotal, 0) : nextPrescriptions.length
-      const parsedTotalPages = Number(payload?.totalPages)
       const calculatedTotalPages = Math.ceil(nextTotal / PRESCRIPTION_PAGE_SIZE)
       const nextTotalPages = Number.isFinite(parsedTotalPages)
         && (parsedTotalPages > 0 || nextTotal === 0)
@@ -164,7 +213,7 @@ function PharmacyPage() {
     } catch (error) {
       if (requestId === prescriptionRequestIdRef.current) {
         if (error?.response?.status !== 403) {
-          setPrescriptionLoadError(getErrorMessage(error, 'Không thể tải danh sách đơn chờ cấp phát.'))
+          setPrescriptionLoadError(getErrorMessage(error, 'Không thể tải danh sách đơn thuốc.'))
         }
       }
     } finally {
@@ -172,7 +221,7 @@ function PharmacyPage() {
         setPrescriptionLoading(false)
       }
     }
-  }, [canDispense])
+  }, [canDispense, prescriptionStatusFilter])
 
   const loadInventoryData = useCallback(async () => {
     if (!canDispense) return
@@ -253,10 +302,18 @@ function PharmacyPage() {
     [stocks],
   )
 
-  const fefoPreview = useMemo(
-    () => buildFefoPreview(parseItems(selectedPrescription?.items), batches),
-    [selectedPrescription, batches],
-  )
+  const fefoPreview = useMemo(() => {
+    const rawItems = parseItems(selectedPrescription?.items)
+    const normalizedItems = rawItems.map((item) => {
+      const remaining = getRemainingQuantity(item)
+      return {
+        ...item,
+        quantity: selectedPrescription?.status === 'PARTIALLY_DISPENSED' ? remaining : item.quantity,
+        prescribedQuantity: item.quantity,
+      }
+    })
+    return buildFefoPreview(normalizedItems, batches)
+  }, [selectedPrescription, batches])
   const hasPreviewShortage = fefoPreview.some((item) => Number(item.shortageQuantity) > 0)
 
   const selectPrescription = (prescriptionId) => {
@@ -336,11 +393,34 @@ function PharmacyPage() {
       ),
     },
     {
+      title: selectedPrescription?.status === 'PARTIALLY_DISPENSED' ? 'Kê / Đã cấp' : 'Kê đơn',
+      key: 'prescribedQuantity',
+      width: 105,
+      align: 'center',
+      render: (_, item) => {
+        const prescribed = item.prescribedQuantity ?? item.quantity
+        const dispensed = item.dispensedQuantity || 0
+        if (selectedPrescription?.status === 'PARTIALLY_DISPENSED') {
+          return (
+            <Space direction="vertical" size={0}>
+              <Text strong>{prescribed} {item.unit || ''}</Text>
+              <Text type="secondary" style={{ fontSize: 11 }}>Đã cấp: {dispensed}</Text>
+            </Space>
+          )
+        }
+        return <Text strong>{prescribed} {item.unit || ''}</Text>
+      },
+    },
+    {
       title: 'Cần cấp',
       dataIndex: 'requiredQuantity',
       width: 90,
       align: 'center',
-      render: (quantity, item) => <Text strong>{quantity} {item.unit || ''}</Text>,
+      render: (quantity, item) => (
+        <Text strong style={{ color: '#d97706' }}>
+          {quantity} {item.unit || ''}
+        </Text>
+      ),
     },
     {
       title: 'Tồn khả dụng',
@@ -562,7 +642,26 @@ function PharmacyPage() {
       <Row gutter={[16, 16]} align="stretch">
         <Col xs={24} xl={9}>
           <Card
-            title={`Danh sách đơn chờ (${prescriptionTotal})`}
+            title={(
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <span>Đơn cần cấp ({prescriptionTotal})</span>
+                <Select
+                  size="small"
+                  value={prescriptionStatusFilter}
+                  onChange={(val) => {
+                    setPrescriptionStatusFilter(val)
+                    setPrescriptionPage(0)
+                    loadPrescriptionPage(0, val)
+                  }}
+                  style={{ width: 145 }}
+                  options={[
+                    { value: 'ALL', label: 'Tất cả cần cấp' },
+                    { value: 'PENDING_DISPENSE', label: 'Chờ cấp phát' },
+                    { value: 'PARTIALLY_DISPENSED', label: 'Cấp một phần' },
+                  ]}
+                />
+              </div>
+            )}
             styles={{ body: { padding: 12 } }}
             style={{ height: '100%' }}
           >
@@ -624,14 +723,18 @@ function PharmacyPage() {
                               onClick={(e) => {
                                 e.stopPropagation()
                                 if (displayCode) {
-                                  navigator.clipboard.writeText(displayCode)
-                                  message.success(`Đã sao chép mã đơn: ${displayCode}`)
+                                   navigator.clipboard.writeText(displayCode)
+                                   message.success(`Đã sao chép mã đơn: ${displayCode}`)
                                 }
                               }}
                               style={{ padding: '0 4px', height: 20, width: 20 }}
                             />
                           </Tooltip>
-                          <Tag color="orange">Chờ cấp phát</Tag>
+                          {item.status === 'PARTIALLY_DISPENSED' ? (
+                            <Tag color="gold" style={{ fontWeight: 600, margin: 0 }}>Cấp một phần</Tag>
+                          ) : (
+                            <Tag color="orange" style={{ margin: 0 }}>Chờ cấp phát</Tag>
+                          )}
                         </Space>
                       )}
                       description={(
@@ -712,15 +815,29 @@ function PharmacyPage() {
                       <Tag color="default">Chưa gửi liên thông</Tag>
                     )}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Ghi chú" span={2}>{selectedPrescription.note || 'Không có'}</Descriptions.Item>
+                  <Descriptions.Item label="Trạng thái">
+                    {selectedPrescription.status === 'PARTIALLY_DISPENSED' ? (
+                      <Tag color="gold" style={{ fontWeight: 600 }}>Cấp phát một phần</Tag>
+                    ) : (
+                      <Tag color="orange">Chờ cấp phát</Tag>
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ghi chú">{selectedPrescription.note || 'Không có'}</Descriptions.Item>
                 </Descriptions>
 
                 {hasPreviewShortage && (
                   <Alert
-                    type="error"
+                    type="warning"
                     showIcon
-                    message="Không đủ tồn khả dụng để cấp toàn bộ đơn"
-                    description="Xem từng dòng thuốc bên dưới và nhập bổ sung trước khi cấp phát."
+                    message="Tồn kho khả dụng không đủ để cấp toàn bộ đơn thuốc"
+                    description={
+                      <div>
+                        <div>Số lượng tồn trong kho không đáp ứng đủ tất cả các thuốc theo đơn kê.</div>
+                        <div style={{ marginTop: 6, color: '#b45309', fontWeight: 600 }}>
+                          👉 Dược sĩ hãy sử dụng nút "Cấp phát một phần" bên dưới để xuất phần thuốc đang có cho người bệnh, phần còn lại sẽ được lưu vết để cấp bù sau.
+                        </div>
+                      </div>
+                    }
                   />
                 )}
 
@@ -751,54 +868,79 @@ function PharmacyPage() {
                   />
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Popconfirm
-                    title={
-                      <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
-                        Xác nhận cấp phát đơn thuốc
-                      </Text>
-                    }
-                    description={
-                      <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
-                        <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
-                          Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
-                          <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
-                            {selectedPrescription.prescriptionCode || selectedPrescription.id}
-                          </Text>?
-                        </div>
-                        <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
-                          <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
-                          <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
-                        </div>
-                      </div>
-                    }
-                    icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
-                    okText="Xác nhận cấp phát"
-                    cancelText="Kiểm tra lại"
-                    okButtonProps={{
-                      type: 'primary',
-                      icon: <CheckCircleOutlined />,
-                      style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-                    }}
-                    cancelButtonProps={{
-                      icon: <RollbackOutlined />,
-                      style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-                    }}
-                    onConfirm={handleDispense}
-                    disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
-                    overlayClassName="dispense-confirm-popconfirm"
-                    overlayStyle={{ maxWidth: 500 }}
-                  >
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+                  {selectedPrescription.status === 'PARTIALLY_DISPENSED' && (
                     <Button
-                      type="primary"
+                      icon={<HistoryOutlined />}
                       size="large"
-                      icon={<CheckCircleOutlined />}
-                      loading={dispensingId === selectedPrescription.id}
-                      disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                      onClick={() => setHistoryModalOpen(true)}
                     >
-                      Xác nhận cấp phát theo FEFO
+                      Xem lịch sử cấp phát
                     </Button>
-                  </Popconfirm>
+                  )}
+                  <Button
+                    type={hasPreviewShortage || selectedPrescription.status === 'PARTIALLY_DISPENSED' ? 'primary' : 'default'}
+                    size="large"
+                    icon={<MedicineBoxOutlined />}
+                    style={
+                      hasPreviewShortage || selectedPrescription.status === 'PARTIALLY_DISPENSED'
+                        ? { backgroundColor: '#d97706', borderColor: '#d97706', fontWeight: 600 }
+                        : {}
+                    }
+                    disabled={!canDispense}
+                    onClick={() => setPartialModalOpen(true)}
+                  >
+                    Cấp phát một phần
+                  </Button>
+                  {selectedPrescription.status !== 'PARTIALLY_DISPENSED' && (
+                    <Popconfirm
+                      title={
+                        <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
+                          Xác nhận cấp phát đơn thuốc
+                        </Text>
+                      }
+                      description={
+                        <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
+                          <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
+                            Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
+                            <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
+                              {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                            </Text>?
+                          </div>
+                          <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
+                            <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
+                            <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
+                          </div>
+                        </div>
+                      }
+                      icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
+                      okText="Xác nhận cấp phát"
+                      cancelText="Kiểm tra lại"
+                      okButtonProps={{
+                        type: 'primary',
+                        icon: <CheckCircleOutlined />,
+                        style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+                      }}
+                      cancelButtonProps={{
+                        icon: <RollbackOutlined />,
+                        style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+                      }}
+                      onConfirm={handleDispense}
+                      disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                      overlayClassName="dispense-confirm-popconfirm"
+                      overlayStyle={{ maxWidth: 500 }}
+                    >
+                      <Button
+                        type="primary"
+                        size="large"
+                        icon={<CheckCircleOutlined />}
+                        loading={dispensingId === selectedPrescription.id}
+                        disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                      >
+                        Xác nhận cấp phát theo FEFO
+                      </Button>
+                    </Popconfirm>
+                  )}
                 </div>
                 {!canDispense && <Text type="danger">Tài khoản hiện tại không có quyền cấp phát thuốc.</Text>}
               </Space>
@@ -912,6 +1054,23 @@ function PharmacyPage() {
           ]}
         />
       </Modal>
+
+      {/* Modal Cấp phát một phần khi tồn kho không đủ (NCL-06-CN-008) */}
+      <PartialDispenseModal
+        open={partialModalOpen}
+        onClose={() => setPartialModalOpen(false)}
+        prescription={selectedPrescription}
+        onSuccess={() => {
+          loadData()
+        }}
+      />
+
+      {/* Modal Lịch sử các lần cấp phát của đơn */}
+      <DispenseHistoryModal
+        open={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        prescription={selectedPrescription}
+      />
     </div>
   )
 }

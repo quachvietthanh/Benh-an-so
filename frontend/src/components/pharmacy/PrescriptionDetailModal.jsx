@@ -221,17 +221,46 @@ function PrescriptionDetailModal({
       render: (days) => (days ? `${days} ngày` : '—'),
     },
     {
-      title: 'Số lượng',
+      title: 'SL kê',
       dataIndex: 'quantity',
       key: 'quantity',
-      width: 90,
-      align: 'right',
+      width: 80,
+      align: 'center',
       render: (qty, item) => (
         <Text strong style={{ fontSize: 14 }}>
-          {qty} {item.unit || 'đơn vị'}
+          {qty} {item.unit || ''}
         </Text>
       ),
     },
+    ...(items.some((it) => (it.dispensedQuantity != null && it.dispensedQuantity > 0) || it.remainingQuantity != null) || prescription.status === 'PARTIALLY_DISPENSED'
+      ? [
+          {
+            title: 'Đã cấp',
+            key: 'dispensedQuantity',
+            width: 80,
+            align: 'center',
+            render: (_, item) => (
+              <Tag color={Number(item.dispensedQuantity) > 0 ? 'blue' : 'default'}>
+                {item.dispensedQuantity || 0} {item.unit || ''}
+              </Tag>
+            ),
+          },
+          {
+            title: 'Còn lại',
+            key: 'remainingQuantity',
+            width: 80,
+            align: 'center',
+            render: (_, item) => {
+              const remaining = item.remainingQuantity != null ? item.remainingQuantity : Math.max(0, Number(item.quantity || 0) - Number(item.dispensedQuantity || 0))
+              return (
+                <Tag color={remaining > 0 ? 'orange' : 'green'} style={{ fontWeight: 600 }}>
+                  {remaining} {item.unit || ''}
+                </Tag>
+              )
+            },
+          },
+        ]
+      : []),
     {
       title: 'Hướng dẫn sử dụng',
       dataIndex: 'instructions',
@@ -245,19 +274,23 @@ function PrescriptionDetailModal({
       color={
         prescription.status === 'DISPENSED'
           ? 'green'
-          : prescription.status === 'CANCELLED'
-            ? 'default'
-            : 'orange'
+          : prescription.status === 'PARTIALLY_DISPENSED'
+            ? 'gold'
+            : prescription.status === 'CANCELLED'
+              ? 'default'
+              : 'orange'
       }
-      style={{ fontSize: 13, padding: '2px 8px' }}
+      style={{ fontSize: 13, padding: '2px 8px', fontWeight: prescription.status === 'PARTIALLY_DISPENSED' ? 600 : undefined }}
     >
       {prescription.status === 'PENDING_DISPENSE'
         ? 'Chờ cấp phát (PENDING_DISPENSE)'
-        : prescription.status === 'DISPENSED'
-          ? 'Đã cấp phát (DISPENSED)'
-          : prescription.status === 'CANCELLED'
-            ? 'Đã hủy (CANCELLED)'
-            : prescription.status}
+        : prescription.status === 'PARTIALLY_DISPENSED'
+          ? 'Cấp phát một phần (PARTIALLY_DISPENSED)'
+          : prescription.status === 'DISPENSED'
+            ? 'Đã cấp phát (DISPENSED)'
+            : prescription.status === 'CANCELLED'
+              ? 'Đã hủy (CANCELLED)'
+              : prescription.status}
     </Tag>
   )
 
