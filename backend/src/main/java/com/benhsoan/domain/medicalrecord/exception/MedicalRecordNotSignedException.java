@@ -13,4 +13,8 @@ public class MedicalRecordNotSignedException extends DomainException {
                 "Medical record with ID " + medicalRecordId + " must be signed before it can be locked."
         );
     }
+
+    public MedicalRecordNotSignedException(UUID medicalRecordId, String message) {
+        super(DomainErrorCode.MEDICAL_RECORD_NOT_SIGNED, message);
+    }
 }

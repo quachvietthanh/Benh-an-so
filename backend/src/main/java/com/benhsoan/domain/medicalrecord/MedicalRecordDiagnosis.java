@@ -53,4 +53,8 @@ public class MedicalRecordDiagnosis {
         diagnosisType = Objects.requireNonNull(type);
         updatedAt = Objects.requireNonNull(at);
     }
+
+    public boolean isPrimary() {
+        return diagnosisType == DiagnosisType.PRIMARY;
+    }
 }
