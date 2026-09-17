@@ -15,6 +15,7 @@ import {
   Card,
   Row,
   Col,
+  Checkbox,
 } from 'antd'
 import {
   SwapOutlined,
@@ -48,6 +49,7 @@ export default function MergePatientModal({
   const [sourcePatient, setSourcePatient] = useState(initialSourcePatient)
   const [reasonPreset, setReasonPreset] = useState(MERGE_REASON_PRESETS[0])
   const [customReason, setCustomReason] = useState('')
+  const [confirmedAgreement, setConfirmedAgreement] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   // Sync state when props change
@@ -57,6 +59,7 @@ export default function MergePatientModal({
       setSourcePatient(initialSourcePatient)
       setReasonPreset(MERGE_REASON_PRESETS[0])
       setCustomReason('')
+      setConfirmedAgreement(false)
     }
   }, [open, initialTargetPatient, initialSourcePatient])
 
@@ -180,6 +183,17 @@ export default function MergePatientModal({
                   {patient.guardianName} ({patient.guardianRelationship || 'Giám hộ'}) - SĐT: {patient.guardianPhone || '---'}
                 </Descriptions.Item>
               )}
+              <Descriptions.Item label="Đồng ý DLCN">
+                {patient.consentAgreed ? (
+                  <Tag color="green" style={{ fontSize: 12, padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+                    Đã đồng ý (v{patient.consentVersion || '1.0'})
+                  </Tag>
+                ) : (
+                  <Tag color="orange" style={{ fontSize: 12, padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+                    Chưa có phiếu đồng ý
+                  </Tag>
+                )}
+              </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
                 {isMerged ? (
                   <Tag color="magenta">Đã gộp (MERGED)</Tag>
@@ -339,6 +353,58 @@ export default function MergePatientModal({
         )}
       </div>
 
+      {/* Khu vực cam kết và xác nhận đồng ý gộp hồ sơ to, nổi bật */}
+      <Card
+        size="small"
+        style={{
+          borderRadius: 10,
+          border: confirmedAgreement ? '2px solid #16a34a' : '2px solid #f59e0b',
+          background: confirmedAgreement ? '#f0fdf4' : '#fffbeb',
+          marginBottom: 16,
+          boxShadow: confirmedAgreement ? '0 2px 8px rgba(22, 163, 74, 0.12)' : '0 2px 8px rgba(245, 158, 11, 0.12)',
+          transition: 'all 0.25s ease-in-out',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '6px 4px' }}>
+          <Checkbox
+            id="checkbox-merge-agreement"
+            checked={confirmedAgreement}
+            onChange={(e) => setConfirmedAgreement(e.target.checked)}
+            disabled={!validation.allowed}
+            style={{ marginTop: 2, transform: 'scale(1.25)' }}
+          />
+          <div
+            style={{ flex: 1, cursor: validation.allowed ? 'pointer' : 'default' }}
+            onClick={() => validation.allowed && setConfirmedAgreement(!confirmedAgreement)}
+          >
+            <Text
+              strong
+              style={{
+                fontSize: 15,
+                color: confirmedAgreement ? '#15803d' : '#92400e',
+                display: 'block',
+                marginBottom: 4,
+              }}
+            >
+              Xác nhận đồng ý gộp hồ sơ và chuyển giao toàn bộ dữ liệu y tế
+            </Text>
+            <div style={{ fontSize: 13.5, color: '#4b5563', lineHeight: 1.55 }}>
+              Tôi đã đối soát kỹ lưỡng và xác nhận hai hồ sơ trên thuộc cùng một bệnh nhân. Tôi{' '}
+              <strong style={{ color: '#111827' }}>đồng ý</strong> chuyển toàn bộ lịch sử khám, đơn thuốc,
+              viện phí sang hồ sơ chính{' '}
+              <Tag color="green" style={{ fontWeight: 600, fontSize: 12 }}>
+                {targetPatient?.patientCode || 'Hồ sơ giữ lại'}
+              </Tag>{' '}
+              và khóa vĩnh viễn hồ sơ phụ{' '}
+              <Tag color="red" style={{ fontWeight: 600, fontSize: 12 }}>
+                {sourcePatient?.patientCode || 'Hồ sơ bị gộp'}
+              </Tag>
+              .
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {!validation.allowed && (
         <Alert
           type="error"
@@ -349,34 +415,145 @@ export default function MergePatientModal({
         />
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
-        <Button onClick={onClose} disabled={submitting}>
+      <style>{`
+        .large-merge-popconfirm .ant-popconfirm-buttons {
+          margin-top: 18px !important;
+          display: flex !important;
+          justify-content: flex-end !important;
+          align-items: center !important;
+          gap: 12px !important;
+        }
+        .large-merge-popconfirm .ant-popconfirm-buttons .ant-btn {
+          height: 48px !important;
+          font-size: 16px !important;
+          font-weight: 600 !important;
+          border-radius: 8px !important;
+          padding: 0 24px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+        .large-merge-popconfirm .ant-popconfirm-buttons .ant-btn-dangerous,
+        .large-merge-popconfirm .ant-popconfirm-buttons .ant-btn-primary {
+          font-weight: 700 !important;
+          font-size: 16px !important;
+          min-width: 220px !important;
+          height: 48px !important;
+          box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35) !important;
+        }
+      `}</style>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: 16,
+          marginTop: 20,
+          paddingTop: 16,
+          borderTop: '1px solid #f1f5f9',
+        }}
+      >
+        <Button
+          size="large"
+          onClick={onClose}
+          disabled={submitting}
+          style={{ minWidth: 130, height: 48, borderRadius: 8, fontSize: 16, fontWeight: 600 }}
+        >
           Hủy bỏ
         </Button>
 
         <Popconfirm
-          title="Xác nhận gộp hồ sơ bệnh nhân"
+          placement="topRight"
+          overlayClassName="large-merge-popconfirm"
+          overlayStyle={{ width: 560, maxWidth: '92vw' }}
+          overlayInnerStyle={{
+            padding: '24px 28px',
+            borderRadius: 14,
+            boxShadow: '0 16px 44px rgba(0, 0, 0, 0.22)',
+            border: '1px solid #fed7aa',
+            background: '#ffffff',
+          }}
+          title={
+            <span style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
+              Xác nhận gộp hồ sơ bệnh nhân
+            </span>
+          }
           description={
-            <div style={{ maxWidth: 360 }}>
-              Toàn bộ dữ liệu của hồ sơ <strong>{sourcePatient?.patientCode} ({sourcePatient?.fullName})</strong> sẽ được chuyển sang{' '}
-              <strong>{targetPatient?.patientCode} ({targetPatient?.fullName})</strong>. Hồ sơ nguồn sẽ bị khóa chỉnh sửa. Bạn có chắc chắn?
+            <div style={{ fontSize: 15, lineHeight: 1.7, color: '#334155', padding: '12px 0 16px 0' }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: 15 }}>
+                Toàn bộ dữ liệu của hồ sơ{' '}
+                <strong style={{ color: '#dc2626', fontSize: 15.5 }}>
+                  {sourcePatient?.patientCode} ({sourcePatient?.fullName})
+                </strong>{' '}
+                sẽ được chuyển sang{' '}
+                <strong style={{ color: '#16a34a', fontSize: 15.5 }}>
+                  {targetPatient?.patientCode} ({targetPatient?.fullName})
+                </strong>
+                .
+              </p>
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fee2e2',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  color: '#b91c1c',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span>⚠️ Hồ sơ nguồn sẽ bị khóa và không thể hoàn tác. Bạn có chắc chắn?</span>
+              </div>
             </div>
           }
-          icon={<ExclamationCircleOutlined style={{ color: '#dc2626' }} />}
-          okText="Đồng ý gộp"
+          icon={<ExclamationCircleOutlined style={{ color: '#dc2626', fontSize: 28, marginTop: 2, marginRight: 8 }} />}
+          okText="Tôi đồng ý gộp hồ sơ"
           cancelText="Xem lại"
-          okButtonProps={{ danger: true, loading: submitting }}
+          okButtonProps={{
+            danger: true,
+            size: 'large',
+            loading: submitting,
+            style: {
+              fontWeight: 700,
+              borderRadius: 8,
+              minWidth: 220,
+              height: 48,
+              fontSize: 16,
+              padding: '0 24px',
+              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)',
+            },
+          }}
+          cancelButtonProps={{
+            size: 'large',
+            style: { borderRadius: 8, height: 48, minWidth: 130, fontSize: 16, fontWeight: 600, padding: '0 20px' },
+          }}
           onConfirm={handleExecuteMerge}
-          disabled={!validation.allowed || submitting}
+          disabled={!validation.allowed || !confirmedAgreement || submitting}
         >
           <Button
             type="primary"
             danger
-            icon={<CheckCircleOutlined />}
+            size="large"
+            icon={<CheckCircleOutlined style={{ fontSize: 20 }} />}
             loading={submitting}
-            disabled={!validation.allowed}
+            disabled={!validation.allowed || !confirmedAgreement}
+            style={{
+              minWidth: 270,
+              height: 48,
+              fontSize: 16,
+              fontWeight: 700,
+              borderRadius: 8,
+              boxShadow:
+                validation.allowed && confirmedAgreement
+                  ? '0 4px 14px rgba(220, 38, 38, 0.35)'
+                  : 'none',
+            }}
           >
-            Xác nhận gộp hồ sơ
+            Xác nhận đồng ý gộp hồ sơ
           </Button>
         </Popconfirm>
       </div>
