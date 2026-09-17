@@ -18,6 +18,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -352,6 +354,32 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(400, response.getStatusCode().value());
         assertEquals("PRESCRIPTION_NO_CHANGES", response.getBody().code());
+    }
+
+    @Test
+    void mapsTransactionSystemExceptionWrappingDataIntegrityViolationToConflict() {
+        TransactionSystemException ex = new TransactionSystemException(
+                "Could not commit JPA transaction",
+                new DataIntegrityViolationException("constraint violation")
+        );
+
+        var response = handler.handleTransactionSystemException(ex, request);
+
+        assertEquals(409, response.getStatusCode().value());
+        assertEquals("DATA_INTEGRITY_VIOLATION", response.getBody().code());
+    }
+
+    @Test
+    void mapsUnrelatedTransactionSystemExceptionToInternalServerError() {
+        TransactionSystemException ex = new TransactionSystemException(
+                "Could not commit JPA transaction",
+                new IllegalStateException("unrelated infrastructure failure")
+        );
+
+        var response = handler.handleTransactionSystemException(ex, request);
+
+        assertEquals(500, response.getStatusCode().value());
+        assertEquals("INTERNAL_SERVER_ERROR", response.getBody().code());
     }
 
     private ApiErrorResponse assertContract(
