@@ -84,5 +84,15 @@ test('getNavigationItems - weekly schedule menu and admin protection', () => {
   const pharmNav = getNavigationItems(['ROLE_PHARMACIST'], ['PHARMACY_READ'])
   const hasWeeklySchedulePharm = pharmNav.some((item) => item.key === '/appointments/weekly-schedule')
   assert.equal(hasWeeklySchedulePharm, false, 'Pharmacist must not see /appointments/weekly-schedule')
+
+  // 4. Bác sĩ KHÔNG thấy Lịch tuần theo bác sĩ
+  const doctorNav = getNavigationItems(['ROLE_DOCTOR'], ['MEDICAL_RECORD_READ', 'APPOINTMENT_READ'])
+  const hasWeeklyScheduleDoc = doctorNav.some((item) => item.key === '/appointments/weekly-schedule')
+  assert.equal(hasWeeklyScheduleDoc, false, 'Doctor must not see /appointments/weekly-schedule')
+
+  // 5. Quản lý phòng khám thấy Lịch tuần theo bác sĩ để điều phối
+  const managerNav = getNavigationItems(['ROLE_MANAGER'], ['APPOINTMENT_READ'])
+  const hasWeeklyScheduleMgr = managerNav.some((item) => item.key === '/appointments/weekly-schedule')
+  assert.equal(hasWeeklyScheduleMgr, true, 'Manager must see /appointments/weekly-schedule')
 })
 

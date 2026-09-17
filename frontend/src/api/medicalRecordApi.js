@@ -115,6 +115,9 @@ const medicalRecordApi = {
   applyTemplate: (medicalRecordId, templateId) => {
     return axiosClient.put(`/medical-records/${medicalRecordId}/template`, { templateId })
   },
+  updateInstructionsAndTreatmentPlan: (medicalRecordId, data) => {
+    return axiosClient.put(`/medical-records/${medicalRecordId}/instructions-and-treatment-plan`, data)
+  },
 }
 
 export default medicalRecordApi

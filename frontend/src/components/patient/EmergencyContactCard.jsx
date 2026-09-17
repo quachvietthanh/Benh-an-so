@@ -130,22 +130,22 @@ export default function EmergencyContactCard({
           <Space size={8}>
             {onOpenHistory && (
               <Button
-                size="small"
-                icon={<HistoryOutlined />}
+                size="middle"
+                icon={<HistoryOutlined style={{ fontSize: 14 }} />}
                 onClick={onOpenHistory}
-                style={{ fontSize: 12 }}
+                style={{ height: 34, fontSize: 13, borderRadius: 6 }}
               >
                 Lịch sử thay đổi
               </Button>
             )}
             {onOpenEdit && (
               <Button
-                size="small"
+                size="middle"
                 type="primary"
                 ghost
-                icon={<EditOutlined />}
+                icon={<EditOutlined style={{ fontSize: 14 }} />}
                 onClick={onOpenEdit}
-                style={{ fontSize: 12 }}
+                style={{ height: 34, fontSize: 13, fontWeight: 600, borderRadius: 6 }}
               >
                 Cập nhật
               </Button>

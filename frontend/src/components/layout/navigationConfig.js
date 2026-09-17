@@ -59,7 +59,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, check: () => hasPerm('DASHBOARD_OPERATIONAL_READ') || isAdmin || isManager },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, check: () => !isAdmin && (hasPerm('PATIENT_READ') || hasPerm('PATIENT_CREATE') || isDoctor || isReceptionist || isManager) },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, check: () => !isAdmin && !isManager && (hasPerm('APPOINTMENT_READ') || hasPerm('APPOINTMENT_CREATE') || isDoctor || isReceptionist) },
-    { key: '/appointments/weekly-schedule', label: 'Lịch tuần theo bác sĩ', icon: TableOutlined, check: () => !isAdmin && !isManager && (hasPerm('APPOINTMENT_READ') || isReceptionist || isDoctor) },
+    { key: '/appointments/weekly-schedule', label: 'Lịch tuần theo bác sĩ', icon: TableOutlined, check: () => !isAdmin && !isDoctor && (isReceptionist || isManager || hasPerm('APPOINTMENT_READ')) },
     { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('FOLLOW_UP_REMINDER_READ') || hasPerm('CARE_LOG_READ') || isReceptionist) },
     { key: '/doctor-schedules', label: 'Lịch làm việc bác sĩ', icon: CalendarOutlined, check: () => !isReceptionist && !isPharmacist && !isDoctor && (isAdmin || isManager || hasPerm('DOCTOR_SCHEDULE_UPDATE')) },
     { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, check: () => !isAdmin && !isManager && (hasPerm('MEDICAL_RECORD_READ') || hasPerm('MEDICAL_RECORD_CREATE') || isDoctor) },

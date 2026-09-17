@@ -388,29 +388,33 @@ function PendingClinicalOrdersPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 60,
+      width: 75,
       align: 'center',
       render: (_, record) => {
         const actionMenuItems = [
           {
             key: 'medical-record',
-            icon: <SolutionOutlined style={{ color: '#2563eb' }} />,
-            label: 'Xem bệnh án lượt khám',
+            icon: <SolutionOutlined style={{ color: '#2563eb', fontSize: 16 }} />,
+            label: <span style={{ fontSize: 14, fontWeight: 500, color: '#1e293b' }}>Xem bệnh án lượt khám</span>,
+            style: { padding: '10px 16px', borderRadius: 6, minHeight: 40, display: 'flex', alignItems: 'center' },
             onClick: () => navigate(`/medical-records/visits/${record.visitId}`),
           },
           {
             key: 'results',
-            icon: <FileDoneOutlined style={{ color: '#16a34a' }} />,
-            label: 'Nhập / Xem kết quả CLS',
+            icon: <FileDoneOutlined style={{ color: '#16a34a', fontSize: 16 }} />,
+            label: <span style={{ fontSize: 14, fontWeight: 500, color: '#1e293b' }}>Nhập / Xem kết quả CLS</span>,
+            style: { padding: '10px 16px', borderRadius: 6, minHeight: 40, display: 'flex', alignItems: 'center' },
             onClick: () => navigate(`/clinical-results?orderItemId=${record.orderItemId}&visitId=${record.visitId}`),
           },
           {
             type: 'divider',
+            style: { margin: '4px 0' },
           },
           {
             key: 'cancel',
-            icon: <DeleteOutlined />,
-            label: 'Hủy chỉ định cận lâm sàng',
+            icon: <DeleteOutlined style={{ fontSize: 16 }} />,
+            label: <span style={{ fontSize: 14, fontWeight: 500 }}>Hủy chỉ định cận lâm sàng</span>,
+            style: { padding: '10px 16px', borderRadius: 6, minHeight: 40, display: 'flex', alignItems: 'center' },
             danger: true,
             onClick: () => handleOpenCancelModal(record),
           },
@@ -418,25 +422,33 @@ function PendingClinicalOrdersPage() {
 
         return (
           <Dropdown
-            menu={{ items: actionMenuItems }}
+            menu={{
+              items: actionMenuItems,
+              style: {
+                minWidth: 235,
+                padding: '6px',
+                borderRadius: 10,
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+              },
+            }}
             trigger={['click']}
             placement="bottomRight"
           >
             <Tooltip title="Thao tác">
               <Button
                 type="text"
-                size="small"
-                icon={<EllipsisOutlined style={{ fontSize: 20, color: '#334155' }} />}
+                icon={<EllipsisOutlined style={{ fontSize: 22, color: '#334155' }} />}
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 6,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   background: '#f8fafc',
                   cursor: 'pointer',
+                  transition: 'all 0.2s',
                 }}
               />
             </Tooltip>
