@@ -34,6 +34,10 @@ public record PrescriptionItemResponse(
 
         int quantity,
 
+        int dispensedQuantity,
+
+        int remainingQuantity,
+
         String instructions,
 
         Instant createdAt,

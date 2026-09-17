@@ -81,6 +81,10 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         if (prescription.getStatus() == com.benhsoan.domain.prescription.enums.PrescriptionStatus.DISPENSED) {
             throw new com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException();
         }
+        if (prescription.getStatus() == com.benhsoan.domain.prescription.enums.PrescriptionStatus.PARTIALLY_DISPENSED) {
+            throw new com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException(
+                    "Partially dispensed prescriptions must be completed via partial dispensing.");
+        }
         List<PrescriptionItem> prescriptionItems = prescriptionItemRepository.findByPrescriptionId(prescriptionId);
         List<UUID> medicineIds = prescriptionItems.stream()
                 .map(PrescriptionItem::getMedicineId)
@@ -96,6 +100,9 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         );
 
         List<DispenseAllocationResult> allocations = applyAllocations(computation, actorId, now);
+        for (PrescriptionItem item : prescription.getItems()) {
+            item.recordDispense(item.getQuantity());
+        }
         prescription.markDispensed(actorId, now);
         var saved = prescriptionRepository.save(prescription);
         auditLogRepository.save(AuditLog.create(
@@ -104,7 +111,8 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
                 ResourceType.PRESCRIPTION,
                 saved.getId(),
                 "{\"prescriptionCode\":\"%s\"}".formatted(saved.getPrescriptionCode()),
-                null
+                null,
+                now
         ));
         return resultMapper.toResult(
                 saved,
