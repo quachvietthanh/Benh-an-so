@@ -53,21 +53,23 @@ public class DeactivateUserService implements DeactivateUserUseCase {
         Role role = roleRepository.findById(saved.getRoleId())
                 .orElseThrow(RoleNotFoundException::new);
 
-        adminOperationAuditService.record(
-                currentUserPort.getCurrentUserId(),
-                ActionType.DEACTIVATE,
-                ResourceType.USER,
-                saved.getId(),
-                AdminOperationAuditService.fields(
-                        "username", saved.getUsername(),
-                        "role", role.getName(),
-                        "active", beforeActive),
-                AdminOperationAuditService.fields(
-                        "username", saved.getUsername(),
-                        "role", role.getName(),
-                        "active", saved.isActive()),
-                clockPort.now()
-        );
+        if (beforeActive) {
+            adminOperationAuditService.record(
+                    currentUserPort.getCurrentUserId(),
+                    ActionType.DEACTIVATE,
+                    ResourceType.USER,
+                    saved.getId(),
+                    AdminOperationAuditService.fields(
+                            "username", saved.getUsername(),
+                            "role", role.getName(),
+                            "active", true),
+                    AdminOperationAuditService.fields(
+                            "username", saved.getUsername(),
+                            "role", role.getName(),
+                            "active", false),
+                    clockPort.now()
+            );
+        }
         return userResultMapper.toResult(user, role);
     }
 }

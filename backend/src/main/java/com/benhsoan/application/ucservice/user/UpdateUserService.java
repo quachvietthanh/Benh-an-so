@@ -1,5 +1,6 @@
 package com.benhsoan.application.ucservice.user;
 
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -70,6 +71,15 @@ public class UpdateUserService implements UpdateUserUseCase {
 
         Role role = roleRepository.findByName(command.roleName())
                 .orElseThrow(RoleNotFoundException::new);
+
+        boolean changed = !beforeFullName.equals(command.fullName())
+                || !beforeEmail.equals(command.email())
+                || !Objects.equals(beforePhone, command.phone())
+                || !beforeRole.getId().equals(role.getId());
+
+        if (!changed) {
+            return userResultMapper.toResult(user, role);
+        }
 
         user.updateProfile(
                 command.fullName(),

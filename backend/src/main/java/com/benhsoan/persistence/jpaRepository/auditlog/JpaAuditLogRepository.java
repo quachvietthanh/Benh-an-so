@@ -73,7 +73,6 @@ public interface JpaAuditLogRepository
                 AND (:resourceType IS NULL OR a.resourceType = :resourceType)
                 AND (:from IS NULL OR a.createdAt >= :from)
                 AND (:to IS NULL OR a.createdAt < :to)
-                ORDER BY a.createdAt DESC
             """)
     Page<AuditLogEntity> findAdminOperationLogs(
             @Param("actorId") UUID actorId,

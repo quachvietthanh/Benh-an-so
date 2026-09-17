@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -127,6 +129,28 @@ class AuditLogRepositoryAdapterIntegrationTest {
         var result = repository.findAdminOperationLogs(null, null, null, null, PageRequest.of(0, 20));
 
         assertEquals(15, result.getTotalElements());
+    }
+
+    @Test
+    void findAdminOperationLogsRespectsSuppliedSort() {
+        UUID actor = UUID.randomUUID();
+        Instant t1 = Instant.parse("2026-01-01T00:00:00Z");
+        Instant t2 = Instant.parse("2026-01-02T00:00:00Z");
+        Instant t3 = Instant.parse("2026-01-03T00:00:00Z");
+
+        repository.save(AuditLog.create(actor, ActionType.CREATE, ResourceType.MEDICINE, UUID.randomUUID(), null, null, t3));
+        repository.save(AuditLog.create(actor, ActionType.CREATE, ResourceType.MEDICINE, UUID.randomUUID(), null, null, t1));
+        repository.save(AuditLog.create(actor, ActionType.CREATE, ResourceType.MEDICINE, UUID.randomUUID(), null, null, t2));
+
+        var ascending = repository.findAdminOperationLogs(null, null, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "createdAt")));
+        assertEquals(List.of(t1, t2, t3),
+                ascending.getContent().stream().map(AuditLog::getCreatedAt).toList());
+
+        var descending = repository.findAdminOperationLogs(null, null, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
+        assertEquals(List.of(t3, t2, t1),
+                descending.getContent().stream().map(AuditLog::getCreatedAt).toList());
     }
 
     @Test

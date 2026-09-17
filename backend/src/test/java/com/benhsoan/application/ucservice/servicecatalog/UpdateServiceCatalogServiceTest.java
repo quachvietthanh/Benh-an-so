@@ -2,7 +2,6 @@ package com.benhsoan.application.ucservice.servicecatalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -102,8 +101,15 @@ class UpdateServiceCatalogServiceTest {
         assertEquals(newDate, result.effectiveFrom());
         assertEquals(0, initialPrice.getPrice().compareTo(new BigDecimal("95000.00")));
         verify(servicePriceRepository).save(any(ServicePrice.class));
-        verify(adminOperationAuditService, org.mockito.Mockito.times(2))
-                .record(any(), any(), any(), any(), any(), any(), any());
+
+        // Price-only change must not produce a fake SERVICE_CATALOG / UPDATE audit.
+        ArgumentCaptor<ActionType> actionCaptor = ArgumentCaptor.forClass(ActionType.class);
+        ArgumentCaptor<ResourceType> resourceCaptor = ArgumentCaptor.forClass(ResourceType.class);
+        verify(adminOperationAuditService, org.mockito.Mockito.times(1))
+                .record(any(), actionCaptor.capture(), resourceCaptor.capture(), any(), any(), any(), any());
+
+        assertEquals(ActionType.CREATE, actionCaptor.getValue());
+        assertEquals(ResourceType.SERVICE_PRICE, resourceCaptor.getValue());
     }
 
     @Test
@@ -161,17 +167,16 @@ class UpdateServiceCatalogServiceTest {
         ArgumentCaptor<Map> beforeCaptor = ArgumentCaptor.forClass(Map.class);
         ArgumentCaptor<Map> afterCaptor = ArgumentCaptor.forClass(Map.class);
         ArgumentCaptor<Instant> atCaptor = ArgumentCaptor.forClass(Instant.class);
-        verify(adminOperationAuditService, org.mockito.Mockito.times(2)).record(
+        verify(adminOperationAuditService, org.mockito.Mockito.times(1)).record(
                 actorCaptor.capture(), any(), resourceCaptor.capture(), any(),
                 beforeCaptor.capture(), afterCaptor.capture(), atCaptor.capture());
 
-        int priceIndex = resourceCaptor.getAllValues().indexOf(ResourceType.SERVICE_PRICE);
-        assertTrue(priceIndex >= 0, "A SERVICE_PRICE audit record must be produced");
-        assertEquals(ACTOR_ID, actorCaptor.getAllValues().get(priceIndex));
-        assertEquals(NOW, atCaptor.getAllValues().get(priceIndex));
-        assertEquals(new BigDecimal("95000.00"), beforeCaptor.getAllValues().get(priceIndex).get("price"));
-        assertEquals(new BigDecimal("120000.00"), afterCaptor.getAllValues().get(priceIndex).get("price"));
-        assertEquals(newDate, afterCaptor.getAllValues().get(priceIndex).get("effectiveFrom"));
+        assertEquals(ACTOR_ID, actorCaptor.getValue());
+        assertEquals(ResourceType.SERVICE_PRICE, resourceCaptor.getValue());
+        assertEquals(NOW, atCaptor.getValue());
+        assertEquals(new BigDecimal("95000.00"), beforeCaptor.getValue().get("price"));
+        assertEquals(new BigDecimal("120000.00"), afterCaptor.getValue().get("price"));
+        assertEquals(newDate, afterCaptor.getValue().get("effectiveFrom"));
     }
 
     private void prepareExistingData() {

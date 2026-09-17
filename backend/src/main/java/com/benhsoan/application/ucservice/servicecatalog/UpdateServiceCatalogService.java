@@ -138,7 +138,7 @@ public class UpdateServiceCatalogService implements UpdateServiceCatalogUseCase 
             boolean statusChanged,
             boolean priceCreated
     ) {
-        if (nameChanged || priceCreated) {
+        if (nameChanged) {
             adminOperationAuditService.record(
                     actorId,
                     ActionType.UPDATE,

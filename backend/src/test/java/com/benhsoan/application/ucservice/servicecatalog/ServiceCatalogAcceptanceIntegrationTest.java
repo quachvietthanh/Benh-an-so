@@ -180,10 +180,10 @@ class ServiceCatalogAcceptanceIntegrationTest {
                 .orElseThrow().getPrice());
 
         var audits = auditLogJpaRepository.findAll();
-        assertEquals(4, audits.size());
-        assertTrue(audits.stream().anyMatch(audit ->
+        assertEquals(3, audits.size());
+        assertEquals(0, audits.stream().filter(audit ->
                 audit.getActionType() == ActionType.UPDATE
-                        && audit.getResourceType() == ResourceType.SERVICE_CATALOG));
+                        && audit.getResourceType() == ResourceType.SERVICE_CATALOG).count());
         assertEquals(2, audits.stream().filter(audit ->
                 audit.getActionType() == ActionType.CREATE
                         && audit.getResourceType() == ResourceType.SERVICE_PRICE).count());

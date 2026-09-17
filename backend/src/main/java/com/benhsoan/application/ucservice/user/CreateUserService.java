@@ -101,6 +101,7 @@ public class CreateUserService implements CreateUserUseCase {
                         "username", saved.getUsername(),
                         "fullName", saved.getFullName(),
                         "email", saved.getEmail(),
+                        "phone", saved.getPhone(),
                         "role", role.getName(),
                         "active", saved.isActive()),
                 clockPort.now()
