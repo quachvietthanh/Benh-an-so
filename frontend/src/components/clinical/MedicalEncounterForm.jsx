@@ -43,6 +43,7 @@ import PatientAllergyBanner from './PatientAllergyBanner'
 import PatientChronicDiseaseBanner from './PatientChronicDiseaseBanner'
 import EmergencyContactCard from '../patient/EmergencyContactCard'
 import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
+import VitalSignCard from './VitalSignCard'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
 
@@ -70,6 +71,10 @@ function MedicalEncounterForm({
   vitalSigns,
   setVitalSigns,
   bmiValue,
+  onSaveVitalSigns,
+  onOpenVitalSignHistory,
+  vitalSignSaving = false,
+  vitalSignBackendFlags = [],
   diagnosisType,
   setDiagnosisType,
   primaryIcd,
@@ -300,76 +305,16 @@ function MedicalEncounterForm({
             )}
           </Card>
 
-          <Card
-            title={<span style={{ color: '#047857' }}><HeartOutlined /> Chỉ Số Sinh Hiệu Bệnh Nhân</span>}
-            bordered
-          >
-            <Row gutter={8}>
-              <Col span={12}>
-                <Form.Item label="Huyết áp (mmHg)">
-                  <Input
-                    placeholder="120/80"
-                    value={vitalSigns.bp}
-                    onChange={(e) => setVitalSigns((v) => ({ ...v, bp: e.target.value }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="Nhịp mạch (lần/phút)">
-                  <Input
-                    placeholder="75"
-                    value={vitalSigns.pulse}
-                    onChange={(e) => setVitalSigns((v) => ({ ...v, pulse: e.target.value }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="Nhiệt độ cơ thể (°C)">
-                  <Input
-                    placeholder="37.0"
-                    value={vitalSigns.temp}
-                    onChange={(e) => setVitalSigns((v) => ({ ...v, temp: e.target.value }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="Oxy trong máu (SpO2 %)">
-                  <Input
-                    placeholder="98"
-                    value={vitalSigns.spO2}
-                    onChange={(e) => setVitalSigns((v) => ({ ...v, spO2: e.target.value }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="Cân nặng (kg)">
-                  <Input
-                    placeholder="60"
-                    value={vitalSigns.weight}
-                    onChange={(e) => setVitalSigns((v) => ({ ...v, weight: e.target.value }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="Chiều cao (cm)">
-                  <Input
-                    placeholder="165"
-                    value={vitalSigns.height}
-                    onChange={(e) => setVitalSigns((v) => ({ ...v, height: e.target.value }))}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            {bmiValue && (
-              <div style={{ background: '#ECFDF5', padding: '8px 12px', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong style={{ color: '#065F46' }}>Chỉ số thể trạng (BMI):</Text>
-                <Tag color={bmiValue >= 25 ? 'volcano' : bmiValue < 18.5 ? 'orange' : 'green'} style={{ fontWeight: 700, fontSize: 13 }}>
-                  {bmiValue} kg/m² ({bmiValue >= 25 ? 'Thừa cân' : bmiValue < 18.5 ? 'Thiếu cân' : 'Bình thường'})
-                </Tag>
-              </div>
-            )}
-          </Card>
+          <VitalSignCard
+            vitalSigns={vitalSigns}
+            onChange={setVitalSigns}
+            onSave={onSaveVitalSigns}
+            onOpenHistory={onOpenVitalSignHistory}
+            saving={vitalSignSaving}
+            readOnly={isSigned}
+            backendFlags={vitalSignBackendFlags}
+            patientId={selectedPatientObj?.id || encounterContext?.patient?.id || encounterContext?.visit?.patientId}
+          />
         </Col>
 
         <Col xs={24} lg={16}>
