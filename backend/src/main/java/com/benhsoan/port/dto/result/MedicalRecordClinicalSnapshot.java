@@ -1,5 +1,6 @@
 package com.benhsoan.port.dto.result;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -15,9 +16,25 @@ public record MedicalRecordClinicalSnapshot(
         String treatmentPlan,
         String doctorInstructions,
         String conclusion,
+        LocalDate revisitDate,
         List<String> diagnoses
 ) {
     public MedicalRecordClinicalSnapshot {
-        diagnoses = List.copyOf(diagnoses);
+        diagnoses = diagnoses == null ? List.of() : List.copyOf(diagnoses);
+    }
+
+    public MedicalRecordClinicalSnapshot(
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            List<String> diagnoses
+    ) {
+        this(chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, null, diagnoses);
     }
 }
