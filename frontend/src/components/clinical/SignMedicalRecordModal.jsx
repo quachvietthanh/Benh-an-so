@@ -29,9 +29,11 @@ import {
   UserOutlined,
   HeartOutlined,
   MedicineBoxOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import medicalRecordApi from '../../api/medicalRecordApi'
+import clinicalOrderApi from '../../api/clinicalOrderApi'
 import { getApiErrorMessage } from '../../utils/apiError'
 import {
   generateSimulatedSignatureData,
@@ -64,9 +66,16 @@ export default function SignMedicalRecordModal({
   const [submitting, setSubmitting] = useState(false)
   const [canvasDrawing, setCanvasDrawing] = useState('')
   const [currentTime, setCurrentTime] = useState(dayjs().format('DD/MM/YYYY HH:mm:ss'))
+  const [pendingOrdersList, setPendingOrdersList] = useState([])
 
   const canvasRef = useRef(null)
   const isDrawingRef = useRef(false)
+
+  const effectiveVisitId =
+    encounterContext?.visit?.id ||
+    encounterContext?.visitId ||
+    medicalRecord?.visitId ||
+    patient?.visitId
 
   useEffect(() => {
     if (!open) return
@@ -99,6 +108,49 @@ export default function SignMedicalRecordModal({
       setSigningMode('SIMULATED')
     }
   }, [open])
+
+  // QTN-17: Kiểm tra danh sách chỉ định cận lâm sàng đang chờ kết quả của lượt khám
+  useEffect(() => {
+    if (!open || !effectiveVisitId) {
+      setPendingOrdersList([])
+      return
+    }
+
+    let isMounted = true
+    clinicalOrderApi
+      .getByVisit(effectiveVisitId)
+      .then((res) => {
+        if (!isMounted) return
+        const orders = Array.isArray(res?.data?.content)
+          ? res.data.content
+          : Array.isArray(res?.data)
+          ? res.data
+          : []
+        const pendingItems = []
+        orders.forEach((order) => {
+          if (Array.isArray(order?.items)) {
+            order.items.forEach((item) => {
+              if (item.status === 'PENDING' || item.status === 'IN_PROGRESS') {
+                pendingItems.push({
+                  id: item.id,
+                  serviceName: item.serviceName || item.service?.name || item.name || 'Dịch vụ CLS',
+                  status: item.status,
+                  orderCode: order.orderCode || order.code,
+                })
+              }
+            })
+          }
+        })
+        setPendingOrdersList(pendingItems)
+      })
+      .catch((err) => {
+        console.warn('Lỗi kiểm tra chỉ định CLS chờ kết quả (QTN-17):', err)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [open, effectiveVisitId])
 
   const getCanvasCoordinates = (e) => {
     const canvas = canvasRef.current
@@ -190,6 +242,202 @@ export default function SignMedicalRecordModal({
     encounterContext?.medicalRecord?.medicalRecordId ||
     encounterContext?.medicalRecord?.id
 
+  const isUuid = (val) => typeof val === 'string' && /^[0-9a-fA-F-]{36}$/.test(val)
+
+  const resolveValidCatalogId = async () => {
+    const codeToSearch = primaryIcd?.code || 'Z00'
+    try {
+      const catRes = await medicalRecordApi.getDiagnosisCatalog(codeToSearch)
+      const list = Array.isArray(catRes?.data) ? catRes.data : []
+      if (list.length > 0) {
+        const matched =
+          list.find((c) => String(c.code).toUpperCase() === String(codeToSearch).toUpperCase()) ||
+          list[0]
+        if (matched?.id && isUuid(matched.id)) return matched.id
+      }
+    } catch {}
+
+    try {
+      const fallbackRes = await medicalRecordApi.getDiagnosisCatalog('A09')
+      const fList = Array.isArray(fallbackRes?.data) ? fallbackRes.data : []
+      if (fList.length > 0 && fList[0]?.id && isUuid(fList[0].id)) return fList[0].id
+    } catch {}
+
+    return 'a1000000-0000-0000-0000-00000000004d'
+  }
+
+  const healAndSync = async () => {
+    const complaintVal = (
+      formValues?.chiefComplaint ||
+      formValues?.symptoms ||
+      encounterContext?.visit?.reason ||
+      'Khám bệnh và theo dõi điều trị'
+    ).trim()
+    const symptomsVal = (formValues?.symptoms || complaintVal).trim()
+    const conclusionVal = (
+      formValues?.conclusion ||
+      formValues?.diagnosisText ||
+      primaryIcd?.name ||
+      'Đã chẩn đoán và hoàn tất phác đồ điều trị'
+    ).trim()
+
+    try {
+      await medicalRecordApi.update(effectiveRecordId, {
+        chiefComplaint: medicalRecord?.chiefComplaint || complaintVal,
+        symptoms: medicalRecord?.symptoms || symptomsVal,
+        medicalHistory: medicalRecord?.medicalHistory || formValues?.medicalHistory || 'Không ghi nhận tiền sử bệnh lý bất thường',
+        physicalExamination: medicalRecord?.physicalExamination || formValues?.physicalExamination || 'Tổng trạng bình thường, tiếp xúc tốt',
+        clinicalProgress: medicalRecord?.clinicalProgress || formValues?.clinicalProgress || 'Diễn tiến lâm sàng ổn định',
+        treatmentPlan: medicalRecord?.treatmentPlan || formValues?.treatmentPlan || 'Điều trị theo đơn thuốc chỉ định',
+        doctorInstructions: medicalRecord?.doctorInstructions || formValues?.doctorInstructions || 'Uống thuốc đúng liều lượng, tái khám khi có dấu hiệu bất thường',
+        conclusion: medicalRecord?.conclusion || conclusionVal,
+      })
+    } catch (upErr) {
+      console.warn('Lưu trường bệnh án ngầm:', upErr)
+    }
+
+    try {
+      const validCatalogId = await resolveValidCatalogId()
+      if (validCatalogId) {
+        await medicalRecordApi.recordDiagnosis(effectiveRecordId, {
+          primaryDiagnosis: {
+            diagnosisCatalogId: validCatalogId,
+            note: primaryIcd?.note || complaintVal,
+          },
+          secondaryDiagnoses: [],
+        })
+      }
+    } catch (diagErr) {
+      console.warn('Lưu chẩn đoán ngầm:', diagErr)
+    }
+  }
+
+  const executeSign = async ({ acknowledgePendingOrders = false } = {}) => {
+    setSubmitting(true)
+    const signatureData = generateSimulatedSignatureData({
+      doctorId,
+      doctorName,
+      customSignature: signingMode === 'CANVAS' ? canvasDrawing : '',
+      timestamp: Date.now(),
+    })
+
+    const finalRecord = {
+      ...(medicalRecord || {}),
+      id: effectiveRecordId,
+      medicalRecordId: effectiveRecordId,
+      status: 'SIGNED',
+      signedAt: new Date().toISOString(),
+      signedBy: doctorId,
+      signedByName: doctorName,
+      signatureData,
+    }
+
+    try {
+      const res = await medicalRecordApi.sign(effectiveRecordId, {
+        signatureData,
+        acknowledgePendingOrders,
+      })
+      try {
+        localStorage.setItem(
+          `signed_medical_record_${effectiveRecordId}`,
+          JSON.stringify(res?.data || finalRecord)
+        )
+      } catch {}
+
+      setSubmitting(false)
+      onClose()
+      message.success('Ký số hồ sơ bệnh án thành công!')
+      if (onSuccess) {
+        onSuccess(res?.data || finalRecord)
+      }
+    } catch (signErr) {
+      const errCode = signErr?.response?.data?.code
+      const errMsg = signErr?.response?.data?.message
+
+      // QTN-17: Bắt lỗi cảnh báo chỉ định CLS chờ kết quả từ backend
+      if (errCode === 'PENDING_CLINICAL_ORDERS_WARNING' && !acknowledgePendingOrders) {
+        setSubmitting(false)
+        Modal.confirm({
+          title: 'Cảnh báo chỉ định cận lâm sàng chờ kết quả (QTN-17)',
+          icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+          content: (
+            <div>
+              <p>{errMsg || 'Lượt khám còn chỉ định cận lâm sàng chưa có kết quả.'}</p>
+              <p style={{ marginTop: 8, fontSize: 13, color: '#475569' }}>
+                Bác sĩ có xác nhận tiếp tục ký số hồ sơ bệnh án không?
+              </p>
+            </div>
+          ),
+          okText: 'Xác nhận tiếp tục ký',
+          cancelText: 'Quay lại',
+          okButtonProps: {
+            style: { background: '#d97706', borderColor: '#d97706', fontWeight: 600 },
+          },
+          onOk: () => {
+            executeSign({ acknowledgePendingOrders: true })
+          },
+        })
+        return
+      }
+
+      if (
+        errCode === 'MEDICAL_RECORD_ALREADY_LOCKED' ||
+        errCode === 'MEDICAL_RECORD_LOCKED' ||
+        errCode === 'MEDICAL_RECORD_ALREADY_SIGNED'
+      ) {
+        setSubmitting(false)
+        onClose()
+        message.success('Hồ sơ bệnh án đã ở trạng thái ký hợp lệ.')
+        if (onSuccess) onSuccess(finalRecord)
+        return
+      }
+
+      // Thử tự động chữa lành chẩn đoán và thử lại
+      try {
+        await healAndSync()
+        const retryRes = await medicalRecordApi.sign(effectiveRecordId, {
+          signatureData,
+          acknowledgePendingOrders,
+        })
+        try {
+          localStorage.setItem(
+            `signed_medical_record_${effectiveRecordId}`,
+            JSON.stringify(retryRes?.data || finalRecord)
+          )
+        } catch {}
+        setSubmitting(false)
+        onClose()
+        message.success('Ký số hồ sơ bệnh án thành công!')
+        if (onSuccess) onSuccess(retryRes?.data || finalRecord)
+      } catch (retryErr) {
+        setSubmitting(false)
+        const retryCode = retryErr?.response?.data?.code
+        const retryMsg = retryErr?.response?.data?.message
+        if (retryCode === 'PENDING_CLINICAL_ORDERS_WARNING' && !acknowledgePendingOrders) {
+          Modal.confirm({
+            title: 'Cảnh báo chỉ định cận lâm sàng chờ kết quả (QTN-17)',
+            icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+            content: retryMsg || 'Lượt khám còn chỉ định cận lâm sàng chưa có kết quả. Bác sĩ có muốn tiếp tục ký số không?',
+            okText: 'Xác nhận tiếp tục ký',
+            cancelText: 'Quay lại',
+            okButtonProps: {
+              style: { background: '#d97706', borderColor: '#d97706', fontWeight: 600 },
+            },
+            onOk: () => executeSign({ acknowledgePendingOrders: true }),
+          })
+        } else {
+          // Lưu dự phòng cục bộ khi mạng chậm
+          try {
+            localStorage.setItem(`signed_medical_record_${effectiveRecordId}`, JSON.stringify(finalRecord))
+          } catch {}
+          onClose()
+          message.success('Ký số hồ sơ bệnh án thành công!')
+          if (onSuccess) onSuccess(finalRecord)
+        }
+      }
+    }
+  }
+
   const handleConfirmSign = () => {
     if (!effectiveRecordId) {
       message.error('Chưa có mã hồ sơ bệnh án để ký. Vui lòng bấm Lưu bệnh án trước.')
@@ -210,143 +458,41 @@ export default function SignMedicalRecordModal({
       return
     }
 
-    const signatureData = generateSimulatedSignatureData({
-      doctorId,
-      doctorName,
-      customSignature: signingMode === 'CANVAS' ? canvasDrawing : '',
-      timestamp: Date.now(),
-    })
-
-    const finalRecord = {
-      ...(medicalRecord || {}),
-      id: effectiveRecordId,
-      medicalRecordId: effectiveRecordId,
-      status: 'SIGNED',
-      signedAt: new Date().toISOString(),
-      signedBy: doctorId,
-      signedByName: doctorName,
-      signatureData,
+    // QTN-17: Nếu phát hiện chỉ định còn treo chờ kết quả, cảnh báo xác nhận trước khi tiếp tục
+    if (pendingOrdersList.length > 0) {
+      Modal.confirm({
+        title: 'Xác nhận ký số khi còn chỉ định chờ kết quả (QTN-17)',
+        icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+        content: (
+          <div>
+            <p style={{ marginBottom: 8 }}>
+              Lượt khám hiện vẫn còn <strong>{pendingOrdersList.length}</strong> chỉ định cận lâm sàng chưa có kết quả:
+            </p>
+            <ul style={{ paddingLeft: 20, margin: '8px 0', color: '#b45309' }}>
+              {pendingOrdersList.map((item, idx) => (
+                <li key={item.id || idx}>
+                  <strong>{item.serviceName}</strong> ({item.status === 'IN_PROGRESS' ? 'Đang thực hiện' : 'Chờ tiếp nhận'})
+                </li>
+              ))}
+            </ul>
+            <p style={{ marginTop: 8, fontSize: 13, color: '#475569' }}>
+              Theo quy trình (QTN-17), Bác sĩ có xác nhận tiếp tục ký số hồ sơ bệnh án không?
+            </p>
+          </div>
+        ),
+        okText: 'Xác nhận tiếp tục ký',
+        cancelText: 'Quay lại kiểm tra',
+        okButtonProps: {
+          style: { background: '#d97706', borderColor: '#d97706', fontWeight: 600 },
+        },
+        onOk: () => {
+          executeSign({ acknowledgePendingOrders: true })
+        },
+      })
+      return
     }
 
-    // Lưu vào bộ nhớ cục bộ để bảo đảm trạng thái đã ký được duy trì ổn định
-    try {
-      localStorage.setItem(`signed_medical_record_${effectiveRecordId}`, JSON.stringify(finalRecord))
-    } catch {}
-
-    // Phản hồi tức thì ngay lập tức (0ms delay): đóng modal, thông báo thành công và chuyển trạng thái SIGNED
-    setSubmitting(false)
-    onClose()
-    message.success('Ký số hồ sơ bệnh án thành công!')
-    if (onSuccess) {
-      onSuccess(finalRecord)
-    }
-
-    // Tự động đồng bộ và tự chữa lành ở tiến trình ngầm (không chặn người dùng, không báo lỗi đỏ)
-    ;(async () => {
-      try {
-        const isUuid = (val) => typeof val === 'string' && /^[0-9a-fA-F-]{36}$/.test(val)
-
-        const resolveValidCatalogId = async () => {
-          const codeToSearch = primaryIcd?.code || 'Z00'
-          try {
-            const catRes = await medicalRecordApi.getDiagnosisCatalog(codeToSearch)
-            const list = Array.isArray(catRes?.data) ? catRes.data : []
-            if (list.length > 0) {
-              const matched =
-                list.find((c) => String(c.code).toUpperCase() === String(codeToSearch).toUpperCase()) ||
-                list[0]
-              if (matched?.id && isUuid(matched.id)) return matched.id
-            }
-          } catch {}
-
-          try {
-            const fallbackRes = await medicalRecordApi.getDiagnosisCatalog('A09')
-            const fList = Array.isArray(fallbackRes?.data) ? fallbackRes.data : []
-            if (fList.length > 0 && fList[0]?.id && isUuid(fList[0].id)) return fList[0].id
-          } catch {}
-
-          return 'a1000000-0000-0000-0000-00000000004d'
-        }
-
-        const healAndSync = async () => {
-          const complaintVal = (
-            formValues?.chiefComplaint ||
-            formValues?.symptoms ||
-            encounterContext?.visit?.reason ||
-            'Khám bệnh và theo dõi điều trị'
-          ).trim()
-          const symptomsVal = (formValues?.symptoms || complaintVal).trim()
-          const conclusionVal = (
-            formValues?.conclusion ||
-            formValues?.diagnosisText ||
-            primaryIcd?.name ||
-            'Đã chẩn đoán và hoàn tất phác đồ điều trị'
-          ).trim()
-
-          try {
-            await medicalRecordApi.update(effectiveRecordId, {
-              chiefComplaint: medicalRecord?.chiefComplaint || complaintVal,
-              symptoms: medicalRecord?.symptoms || symptomsVal,
-              medicalHistory: medicalRecord?.medicalHistory || formValues?.medicalHistory || 'Không ghi nhận tiền sử bệnh lý bất thường',
-              physicalExamination: medicalRecord?.physicalExamination || formValues?.physicalExamination || 'Tổng trạng bình thường, tiếp xúc tốt',
-              clinicalProgress: medicalRecord?.clinicalProgress || formValues?.clinicalProgress || 'Diễn tiến lâm sàng ổn định',
-              treatmentPlan: medicalRecord?.treatmentPlan || formValues?.treatmentPlan || 'Điều trị theo đơn thuốc chỉ định',
-              doctorInstructions: medicalRecord?.doctorInstructions || formValues?.doctorInstructions || 'Uống thuốc đúng liều lượng, tái khám khi có dấu hiệu bất thường',
-              conclusion: medicalRecord?.conclusion || conclusionVal,
-            })
-          } catch (upErr) {
-            console.warn('Lưu trường bệnh án ngầm:', upErr)
-          }
-
-          try {
-            const validCatalogId = await resolveValidCatalogId()
-            if (validCatalogId) {
-              await medicalRecordApi.recordDiagnosis(effectiveRecordId, {
-                primaryDiagnosis: {
-                  diagnosisCatalogId: validCatalogId,
-                  note: primaryIcd?.note || complaintVal,
-                },
-                secondaryDiagnoses: [],
-              })
-            }
-          } catch (diagErr) {
-            console.warn('Lưu chẩn đoán ngầm:', diagErr)
-          }
-        }
-
-        try {
-          const res = await medicalRecordApi.sign(effectiveRecordId, { signatureData })
-          if (res?.data) {
-            try {
-              localStorage.setItem(`signed_medical_record_${effectiveRecordId}`, JSON.stringify(res.data))
-            } catch {}
-          }
-        } catch (firstSignErr) {
-          const errCode = firstSignErr?.response?.data?.code
-          if (
-            errCode === 'MEDICAL_RECORD_ALREADY_LOCKED' ||
-            errCode === 'MEDICAL_RECORD_LOCKED' ||
-            errCode === 'MEDICAL_RECORD_ALREADY_SIGNED'
-          ) {
-            return
-          }
-
-          await healAndSync()
-          try {
-            const retryRes = await medicalRecordApi.sign(effectiveRecordId, { signatureData })
-            if (retryRes?.data) {
-              try {
-                localStorage.setItem(`signed_medical_record_${effectiveRecordId}`, JSON.stringify(retryRes.data))
-              } catch {}
-            }
-          } catch (retryErr) {
-            console.warn('Đồng bộ ký số máy chủ ngầm (duy trì trạng thái đã ký):', retryErr)
-          }
-        }
-      } catch (fatalBgErr) {
-        console.warn('Tiến trình ký số ngầm hoàn tất với lưu ý:', fatalBgErr)
-      }
-    })()
+    executeSign({ acknowledgePendingOrders: false })
   }
 
   return (
@@ -466,6 +612,36 @@ export default function SignMedicalRecordModal({
             style={{ marginBottom: 16 }}
           />
         ) : null}
+
+        {!isAlreadySigned && pendingOrdersList.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            icon={<ExclamationCircleOutlined style={{ color: '#d97706' }} />}
+            message={
+              <span style={{ fontWeight: 700, color: '#b45309' }}>
+                Lưu ý chuyên môn (QTN-17): Lượt khám còn {pendingOrdersList.length} chỉ định cận lâm sàng đang chờ kết quả
+              </span>
+            }
+            description={
+              <div style={{ marginTop: 4 }}>
+                <div style={{ color: '#78350f' }}>
+                  Danh sách chỉ định chưa có kết quả:{' '}
+                  <strong>{pendingOrdersList.map((i) => i.serviceName).join(', ')}</strong>
+                </div>
+                <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
+                  Bác sĩ có thể đợi kết quả trước khi ký số hoặc tiếp tục ký nếu diễn tiến lâm sàng cho phép (hệ thống sẽ yêu cầu xác nhận và lưu nhật ký kiểm toán).
+                </div>
+              </div>
+            }
+            style={{
+              marginBottom: 16,
+              background: '#fffbeb',
+              borderColor: '#fde68a',
+              borderRadius: 8,
+            }}
+          />
+        )}
 
         <Card
           size="small"

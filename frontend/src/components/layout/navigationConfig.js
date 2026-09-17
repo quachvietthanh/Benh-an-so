@@ -32,7 +32,7 @@ export const roleNames = {
 export const navigationSections = [
   { key: 'overview', paths: ['/'] },
   { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments', '/appointments/weekly-schedule', '/after-care', '/doctor-schedules'] },
-  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/version-history', '/medical-records/copy-issuance', '/prescriptions', '/clinical-results', '/results'] },
+  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/version-history', '/medical-records/copy-issuance', '/prescriptions', '/clinical-orders', '/clinical-results', '/results'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
@@ -66,6 +66,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/medical-records/version-history', label: 'Lịch sử phiên bản bệnh án', icon: HistoryOutlined, check: () => isAdmin || isManager || hasPerm('MEDICAL_RECORD_VERSION_HISTORY_READ') || hasPerm('AUDIT_READ') },
     { key: '/medical-records/copy-issuance', label: 'Cấp bản sao hồ sơ', icon: CopyOutlined, check: () => isAdmin || isManager || hasPerm('REPORT_EXPORT') },
     { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, check: () => !isAdmin && !isManager && (hasPerm('PRESCRIPTION_READ') || hasPerm('PRESCRIPTION_CREATE') || isDoctor) },
+    { key: '/clinical-orders', label: 'Theo dõi chỉ định CĐLS', icon: ExperimentOutlined, check: () => !isAdmin && !isManager && (hasPerm('CLINICAL_ORDER_READ') || isDoctor) },
     { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, check: () => !isAdmin && !isManager && (hasPerm('CLINICAL_RESULT_READ') || hasPerm('CLINICAL_RESULT_CREATE') || isDoctor) },
     { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('PHARMACY_READ') || isPharmacist) },
     { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('PHARMACY_READ') || isPharmacist) },
