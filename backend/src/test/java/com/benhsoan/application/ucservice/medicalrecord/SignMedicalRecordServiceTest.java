@@ -142,7 +142,7 @@ class SignMedicalRecordServiceTest {
         assertThrows(MedicalRecordUnauthorizedSignerException.class,
                 () -> service.sign(record.getId(), new SignMedicalRecordCommand(null)));
 
-        verify(accessAuditService).recordRecordAccess(
+        verify(accessAuditService).recordRecordAccessInNewTransaction(
                 patientId, visitId, record.getId(), otherDoctorId,
                 MedicalRecordAccessAction.SIGN, "Signature rejected: User is not doctor in charge", now
         );
@@ -312,6 +312,36 @@ class SignMedicalRecordServiceTest {
                 patientId, visitId, record.getId(), doctorId,
                 MedicalRecordAccessAction.SIGN,
                 "Medical record signed (acknowledged pending paraclinical orders)",
+                now
+        );
+    }
+
+    @Test
+    @DisplayName("TC-04: Bác sĩ tiếp nhận ký bệnh án sau khi bàn giao -> ký thành công và audit log bảo lưu bác sĩ ban đầu")
+    void signingAfterHandoverRecordsInitialDoctorInAudit() {
+        UUID initialDoctorId = UUID.randomUUID();
+        UUID targetDoctorId = UUID.randomUUID();
+        MedicalRecord record = openRecord();
+        Visit visit = activeVisit(initialDoctorId);
+        visit.handover(targetDoctorId, "Bàn giao ca bệnh", now);
+
+        when(authorizationService.requireWriteAccess()).thenReturn(targetDoctorId);
+        when(medicalRecordRepository.findByIdForUpdate(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(medicalRecordDiagnosisRepository.existsByMedicalRecordId(record.getId())).thenReturn(true);
+        when(clockPort.now()).thenReturn(now);
+        when(clinicalOrderItemRepository.countPendingByVisitId(visitId)).thenReturn(0L);
+        when(medicalRecordRepository.save(any(MedicalRecord.class))).thenAnswer(i -> i.getArgument(0));
+
+        SignMedicalRecordCommand command = new SignMedicalRecordCommand("DR_TARGET_SIG_DATA");
+        var result = service.sign(record.getId(), command);
+
+        assertEquals(MedicalRecordStatus.SIGNED, result.status());
+        assertEquals(targetDoctorId, result.signedBy());
+        verify(accessAuditService).recordRecordAccess(
+                patientId, visitId, record.getId(), targetDoctorId,
+                MedicalRecordAccessAction.SIGN,
+                "Medical record signed (handed over from initial doctor: " + initialDoctorId + ")",
                 now
         );
     }

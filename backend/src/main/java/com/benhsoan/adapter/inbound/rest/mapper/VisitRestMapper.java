@@ -61,4 +61,42 @@ public class VisitRestMapper {
                 : new VisitEncounterResponse.MedicalRecordInfo(
                         medicalRecord.id(), medicalRecord.status(), medicalRecord.lockedAt());
     }
+
+    public com.benhsoan.adapter.inbound.rest.response.visit.VisitHandoverResponse toResponse(
+            com.benhsoan.port.dto.result.VisitHandoverResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.visit.VisitHandoverResponse(
+                result.id(),
+                result.visitId(),
+                result.fromDoctorId(),
+                result.fromDoctorName(),
+                result.toDoctorId(),
+                result.toDoctorName(),
+                result.reason(),
+                result.handedOverAt()
+        );
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.visit.HandoverDoctorResponse toHandoverDoctorResponse(
+            com.benhsoan.port.dto.result.UserResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.visit.HandoverDoctorResponse(
+                result.id(),
+                result.fullName()
+        );
+    }
+
+    public java.util.List<com.benhsoan.adapter.inbound.rest.response.visit.HandoverDoctorResponse> toHandoverDoctorResponseList(
+            java.util.List<com.benhsoan.port.dto.result.UserResult> results) {
+        if (results == null) {
+            return java.util.Collections.emptyList();
+        }
+        return results.stream()
+                .map(this::toHandoverDoctorResponse)
+                .toList();
+    }
 }
