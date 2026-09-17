@@ -123,7 +123,7 @@ export const hasShortageAfterDispense = (quantities = {}, items = []) => {
 
 /**
  * Map mã lỗi trả về từ Backend sang thông báo thân thiện và phân loại dữ liệu.
- * Đặc biệt xử lý trường hợp lỗi 500 do DB CHECK constraint với log console chuẩn.
+ * Phân loại và ánh xạ mã lỗi: 409 INSUFFICIENT_STOCK, 409 DATA_INTEGRITY_VIOLATION, 400, 403, và 500 fallback.
  * 
  * @param {object} error
  * @param {string} prescriptionId
@@ -147,12 +147,23 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
+  // Case 1b: 409 DATA_INTEGRITY_VIOLATION - Lỗi xung đột ràng buộc hệ thống
+  if (code === 'DATA_INTEGRITY_VIOLATION' || (status === 409 && code === 'DATA_INTEGRITY_VIOLATION')) {
+    return {
+      status: 409,
+      code: 'DATA_INTEGRITY_VIOLATION',
+      message:
+        'Dữ liệu cấp phát không hợp lệ hoặc bị xung đột ràng buộc hệ thống. Vui lòng tải lại trang và thử lại. Nếu lỗi vẫn tiếp diễn, liên hệ quản trị viên hệ thống.',
+      shortages: [],
+    }
+  }
+
   // Case 2: 409 khác - Đơn đã hủy hoặc đã cấp phát xong
   if (status === 409) {
     return {
       status: 409,
       code: code || 'PRESCRIPTION_INVALID_STATUS',
-      message: 'Đơn thuốc đã được cấp phát đầy đủ hoặc đã bị hủy, không thể tiếp tục cấp phát.',
+      message: responseData?.message || 'Đơn thuốc đã được cấp phát đầy đủ hoặc đã bị hủy, không thể tiếp tục cấp phát.',
       shortages: [],
     }
   }
@@ -177,7 +188,7 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
-  // Case 5: 500 - Lỗi hệ thống Backend (như bug DB check constraint đã ghi nhận)
+  // Case 5: 500 - Lớp phòng vệ lỗi hệ thống Backend
   if (status === 500) {
     console.error('[PartialDispense 500 Error]', {
       prescriptionId,

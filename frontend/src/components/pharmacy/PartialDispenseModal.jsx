@@ -148,13 +148,18 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
       onClose()
     } catch (err) {
       const mapped = mapDispenseError(err, rxId, payloadItems)
+      const errorCode = mapped.code || ''
 
-      if (mapped.status === 409 && mapped.code === 'INSUFFICIENT_STOCK') {
+      if (errorCode === 'INSUFFICIENT_STOCK' && mapped.status === 409) {
         setServerShortages(mapped.shortages)
         setErrorMessage(mapped.message)
         message.error(mapped.message)
+      } else if (errorCode === 'DATA_INTEGRITY_VIOLATION') {
+        setErrorMessage(mapped.message)
+        message.error(
+          'Dữ liệu cấp phát không hợp lệ hoặc bị xung đột ràng buộc hệ thống. Vui lòng tải lại trang và thử lại. Nếu lỗi vẫn tiếp diễn, liên hệ quản trị viên hệ thống.'
+        )
       } else if (mapped.status === 500) {
-        // LƯU Ý ĐẶC BIỆT: Trường hợp lỗi 500 do DB check constraint
         setErrorMessage(mapped.message)
         message.error(mapped.message)
       } else {

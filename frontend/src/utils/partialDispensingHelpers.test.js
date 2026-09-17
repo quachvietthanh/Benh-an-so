@@ -159,6 +159,23 @@ test('mapDispenseError accurately maps 409 closed / cancelled prescription', () 
   assert.match(res.message, /Đơn thuốc đã được cấp phát đầy đủ hoặc đã bị hủy/)
 })
 
+test('mapDispenseError accurately maps 409 DATA_INTEGRITY_VIOLATION error', () => {
+  const mockError = {
+    response: {
+      status: 409,
+      data: {
+        code: 'DATA_INTEGRITY_VIOLATION',
+        message: 'Dữ liệu không hợp lệ hoặc bị xung đột ràng buộc hệ thống.',
+      },
+    },
+  }
+
+  const res = mapDispenseError(mockError, 'rx-123', [])
+  assert.equal(res.status, 409)
+  assert.equal(res.code, 'DATA_INTEGRITY_VIOLATION')
+  assert.match(res.message, /Dữ liệu cấp phát không hợp lệ hoặc bị xung đột ràng buộc hệ thống/)
+})
+
 test('mapDispenseError accurately maps 400 invalid quantity', () => {
   const mockError = {
     response: {
