@@ -27,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -59,6 +60,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
         ServiceCatalogRepositoryAdapter.class,
         ServicePriceRepositoryAdapter.class,
         AuditLogRepositoryAdapter.class,
+        AdminOperationAuditService.class,
         ServiceCatalogPersistenceMapper.class,
         ServicePricePersistenceMapper.class,
         AuditLogPersistenceMapper.class

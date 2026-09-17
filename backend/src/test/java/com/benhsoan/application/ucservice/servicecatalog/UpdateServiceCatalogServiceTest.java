@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.servicecatalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -20,13 +22,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
 import com.benhsoan.domain.servicecatalog.ServicePrice;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.servicecatalog.UpdateServiceCatalogCommand;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -46,7 +48,7 @@ class UpdateServiceCatalogServiceTest {
     @Mock
     private ServicePriceRepository servicePriceRepository;
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private AdminOperationAuditService adminOperationAuditService;
     @Mock
     private CurrentUserPort currentUserPort;
     @Mock
@@ -61,7 +63,7 @@ class UpdateServiceCatalogServiceTest {
         service = new UpdateServiceCatalogService(
                 serviceCatalogRepository,
                 servicePriceRepository,
-                auditLogRepository,
+                adminOperationAuditService,
                 currentUserPort,
                 clockPort,
                 new ServiceCatalogResultMapper()
@@ -85,15 +87,13 @@ class UpdateServiceCatalogServiceTest {
 
         assertEquals(INITIAL_DATE, result.effectiveFrom());
         verify(servicePriceRepository, never()).save(any());
-        verify(auditLogRepository, never()).save(any());
+        verify(adminOperationAuditService, never()).record(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void newEffectiveDateAppendsPriceAndPreservesExistingPrice() {
         prepareExistingData();
         when(servicePriceRepository.save(any(ServicePrice.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(auditLogRepository.save(any(AuditLog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         LocalDate newDate = LocalDate.of(2026, 9, 1);
 
@@ -102,7 +102,8 @@ class UpdateServiceCatalogServiceTest {
         assertEquals(newDate, result.effectiveFrom());
         assertEquals(0, initialPrice.getPrice().compareTo(new BigDecimal("95000.00")));
         verify(servicePriceRepository).save(any(ServicePrice.class));
-        verify(auditLogRepository, org.mockito.Mockito.times(2)).save(any(AuditLog.class));
+        verify(adminOperationAuditService, org.mockito.Mockito.times(2))
+                .record(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -122,14 +123,12 @@ class UpdateServiceCatalogServiceTest {
         prepareExistingData();
         when(serviceCatalogRepository.save(any(ServiceCatalog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(auditLogRepository.save(any(AuditLog.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
         service.update(command("Công thức máu", false, "95000.00", INITIAL_DATE));
 
-        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(auditCaptor.capture());
-        assertEquals(ActionType.DEACTIVATE, auditCaptor.getValue().getActionType());
+        ArgumentCaptor<ActionType> actionCaptor = ArgumentCaptor.forClass(ActionType.class);
+        verify(adminOperationAuditService).record(any(), actionCaptor.capture(), any(), any(), any(), any(), any());
+        assertEquals(ActionType.DEACTIVATE, actionCaptor.getValue());
     }
 
     @Test
@@ -146,6 +145,33 @@ class UpdateServiceCatalogServiceTest {
         );
 
         verify(serviceCatalogRepository, never()).save(any());
+    }
+
+    @Test
+    void priceChangeRecordsOldAndNewPriceWithActorAndTimestamp() {
+        prepareExistingData();
+        when(servicePriceRepository.save(any(ServicePrice.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        LocalDate newDate = LocalDate.of(2026, 9, 1);
+
+        service.update(command("Công thức máu", true, "120000.00", newDate));
+
+        ArgumentCaptor<UUID> actorCaptor = ArgumentCaptor.forClass(UUID.class);
+        ArgumentCaptor<ResourceType> resourceCaptor = ArgumentCaptor.forClass(ResourceType.class);
+        ArgumentCaptor<Map> beforeCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map> afterCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Instant> atCaptor = ArgumentCaptor.forClass(Instant.class);
+        verify(adminOperationAuditService, org.mockito.Mockito.times(2)).record(
+                actorCaptor.capture(), any(), resourceCaptor.capture(), any(),
+                beforeCaptor.capture(), afterCaptor.capture(), atCaptor.capture());
+
+        int priceIndex = resourceCaptor.getAllValues().indexOf(ResourceType.SERVICE_PRICE);
+        assertTrue(priceIndex >= 0, "A SERVICE_PRICE audit record must be produced");
+        assertEquals(ACTOR_ID, actorCaptor.getAllValues().get(priceIndex));
+        assertEquals(NOW, atCaptor.getAllValues().get(priceIndex));
+        assertEquals(new BigDecimal("95000.00"), beforeCaptor.getAllValues().get(priceIndex).get("price"));
+        assertEquals(new BigDecimal("120000.00"), afterCaptor.getAllValues().get(priceIndex).get("price"));
+        assertEquals(newDate, afterCaptor.getAllValues().get(priceIndex).get("effectiveFrom"));
     }
 
     private void prepareExistingData() {

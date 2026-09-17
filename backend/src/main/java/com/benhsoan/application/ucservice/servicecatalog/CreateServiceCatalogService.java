@@ -8,7 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
@@ -17,7 +17,6 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.servicecatalog.CreateServiceCatalogCommand;
 import com.benhsoan.port.dto.result.servicecatalog.ServiceCatalogResult;
 import com.benhsoan.port.inbound.servicecatalog.CreateServiceCatalogUseCase;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -32,7 +31,7 @@ public class CreateServiceCatalogService implements CreateServiceCatalogUseCase 
 
     private final ServiceCatalogRepository serviceCatalogRepository;
     private final ServicePriceRepository servicePriceRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AdminOperationAuditService adminOperationAuditService;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
     private final ServiceCatalogResultMapper resultMapper;
@@ -62,14 +61,16 @@ public class CreateServiceCatalogService implements CreateServiceCatalogUseCase 
 
         validateUniqueness(serviceCatalog);
 
+        ServiceCatalog savedCatalog;
+        ServicePrice savedPrice;
         try {
-            ServiceCatalog savedCatalog = serviceCatalogRepository.save(serviceCatalog);
-            ServicePrice savedPrice = servicePriceRepository.save(servicePrice);
-            auditCreation(savedCatalog, savedPrice, actorId, now);
-            return resultMapper.toResult(savedCatalog, savedPrice);
+            savedCatalog = serviceCatalogRepository.save(serviceCatalog);
+            savedPrice = servicePriceRepository.save(servicePrice);
         } catch (DataIntegrityViolationException exception) {
             throw ServiceCatalogConflictTranslator.translate(exception);
         }
+        auditCreation(savedCatalog, savedPrice, actorId, now);
+        return resultMapper.toResult(savedCatalog, savedPrice);
     }
 
     private void validateUniqueness(ServiceCatalog serviceCatalog) {
@@ -90,24 +91,29 @@ public class CreateServiceCatalogService implements CreateServiceCatalogUseCase 
             UUID actorId,
             Instant now
     ) {
-        auditLogRepository.save(AuditLog.create(
+        adminOperationAuditService.record(
                 actorId,
                 ActionType.CREATE,
                 ResourceType.SERVICE_CATALOG,
                 serviceCatalog.getId(),
-                "Service created: " + serviceCatalog.getServiceCode(),
                 null,
+                AdminOperationAuditService.fields(
+                        "serviceCode", serviceCatalog.getServiceCode(),
+                        "serviceName", serviceCatalog.getServiceName()),
                 now
-        ));
-        auditLogRepository.save(AuditLog.create(
+        );
+        adminOperationAuditService.record(
                 actorId,
                 ActionType.CREATE,
                 ResourceType.SERVICE_PRICE,
                 servicePrice.getId(),
-                "Initial price created for service: " + serviceCatalog.getServiceCode(),
                 null,
+                AdminOperationAuditService.fields(
+                        "serviceCode", serviceCatalog.getServiceCode(),
+                        "price", servicePrice.getPrice(),
+                        "effectiveFrom", servicePrice.getEffectiveFrom()),
                 now
-        ));
+        );
     }
 
     private static String normalize(String value) {

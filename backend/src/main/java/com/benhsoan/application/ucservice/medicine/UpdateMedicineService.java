@@ -5,12 +5,16 @@ import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.medicine.UpdateMedicineCommand;
 import com.benhsoan.port.dto.result.MedicineResult;
 import com.benhsoan.port.inbound.medicine.UpdateMedicineUseCase;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,10 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
 
     private final ClockPort clockPort;
 
+    private final AdminOperationAuditService adminOperationAuditService;
+
+    private final CurrentUserPort currentUserPort;
+
     @Override
     public MedicineResult update(UpdateMedicineCommand command) {
         requireCommand(command);
@@ -37,6 +45,15 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
                 .orElseThrow(() -> new ValidationException(
                         "Medicine not found: " + command.medicineId()
                 ));
+
+        var before = AdminOperationAuditService.fields(
+                "medicineName", medicine.getMedicineName(),
+                "activeIngredient", medicine.getActiveIngredient(),
+                "strength", medicine.getStrength(),
+                "dosageForm", medicine.getDosageForm(),
+                "unit", medicine.getUnit(),
+                "defaultRoute", medicine.getDefaultRoute(),
+                "minStockThreshold", medicine.getMinStockThreshold());
 
         medicine.updateInformation(
                 command.medicineName(),
@@ -50,7 +67,25 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
         );
         validateUniqueness(medicine);
 
-        return resultMapper.toResult(medicineRepository.save(medicine));
+        Medicine saved = medicineRepository.save(medicine);
+        adminOperationAuditService.record(
+                currentUserPort.getCurrentUserId(),
+                ActionType.UPDATE,
+                ResourceType.MEDICINE,
+                saved.getId(),
+                before,
+                AdminOperationAuditService.fields(
+                        "medicineName", saved.getMedicineName(),
+                        "activeIngredient", saved.getActiveIngredient(),
+                        "strength", saved.getStrength(),
+                        "dosageForm", saved.getDosageForm(),
+                        "unit", saved.getUnit(),
+                        "defaultRoute", saved.getDefaultRoute(),
+                        "minStockThreshold", saved.getMinStockThreshold()),
+                clockPort.now()
+        );
+
+        return resultMapper.toResult(saved);
     }
 
     private void validateUniqueness(Medicine medicine) {

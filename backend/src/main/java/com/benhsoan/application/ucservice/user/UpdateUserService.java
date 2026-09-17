@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
@@ -19,8 +19,8 @@ import com.benhsoan.port.dto.result.UserResult;
 import com.benhsoan.port.inbound.user.UpdateUserUseCase;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,9 +35,11 @@ public class UpdateUserService implements UpdateUserUseCase {
 
     private final UserResultMapper userResultMapper;
 
-    private final AuditLogRepository auditLogRepository;
+    private final AdminOperationAuditService adminOperationAuditService;
 
     private final CurrentUserPort currentUserPort;
+
+    private final ClockPort clockPort;
 
     @Override
     public UserResult update(
@@ -59,6 +61,12 @@ public class UpdateUserService implements UpdateUserUseCase {
                 && userRepository.existsByPhone(command.phone())) {
             throw new PhoneAlreadyExistsException();
         }
+
+        Role beforeRole = roleRepository.findById(user.getRoleId())
+                .orElseThrow(RoleNotFoundException::new);
+        String beforeFullName = user.getFullName();
+        String beforeEmail = user.getEmail();
+        String beforePhone = user.getPhone();
 
         Role role = roleRepository.findByName(command.roleName())
                 .orElseThrow(RoleNotFoundException::new);
@@ -84,26 +92,26 @@ public class UpdateUserService implements UpdateUserUseCase {
 
         User saved = userRepository.save(user);
 
-        auditLogRepository.save(
-                AuditLog.create(
-                        currentUserPort.getCurrentUserId(),
-                        ActionType.CREATE,
-                        ResourceType.USER,
-                        saved.getId(),
-                        """
-                        {
-                        "username":"%s",
-                        "fullName":"%s",
-                        "email":"%s",
-                        "role":"%s"
-                        }
-                        """.formatted(
-                                saved.getUsername(),
-                                saved.getFullName(),
-                                saved.getEmail(),
-                                role.getName()),
-                        null
-                )
+        adminOperationAuditService.record(
+                currentUserPort.getCurrentUserId(),
+                ActionType.UPDATE,
+                ResourceType.USER,
+                saved.getId(),
+                AdminOperationAuditService.fields(
+                        "username", saved.getUsername(),
+                        "fullName", beforeFullName,
+                        "email", beforeEmail,
+                        "phone", beforePhone,
+                        "role", beforeRole.getName(),
+                        "active", saved.isActive()),
+                AdminOperationAuditService.fields(
+                        "username", saved.getUsername(),
+                        "fullName", saved.getFullName(),
+                        "email", saved.getEmail(),
+                        "phone", saved.getPhone(),
+                        "role", role.getName(),
+                        "active", saved.isActive()),
+                clockPort.now()
         );
 
         return userResultMapper.toResult(saved, role);
