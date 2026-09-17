@@ -86,6 +86,10 @@ export const mapChronicDiseaseErrorMessage = (
     return backendMsg || 'Không tìm thấy tài nguyên yêu cầu trên hệ thống (404).'
   }
 
+  if (status === 403 || code === 'FORBIDDEN') {
+    return 'Bạn không có quyền ghi nhận tiền sử bệnh mạn tính.'
+  }
+
   if (error?.response?.data?.message && typeof error.response.data.message === 'string') {
     return error.response.data.message
   }

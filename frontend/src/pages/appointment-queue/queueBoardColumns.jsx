@@ -3,7 +3,9 @@ import { Avatar, Badge, Button, Dropdown, Space, Tag, Typography } from 'antd'
 import {
   CloseCircleOutlined,
   EyeOutlined,
+  HistoryOutlined,
   MoreOutlined,
+  ReloadOutlined,
   StepForwardOutlined,
   StopOutlined,
 } from '@ant-design/icons'
@@ -19,10 +21,13 @@ export const getQueueBoardColumns = ({
   getDoctorInfo,
   permissions = {},
   user,
+  reQueuingId,
   onOpenDetail,
   onCallNext,
   onUpdateStatus,
   onSkip,
+  onReQueue,
+  onOpenHistory,
   onCloseVisit,
 }) => [
   {
@@ -36,9 +41,10 @@ export const getQueueBoardColumns = ({
     title: 'Bệnh nhân',
     dataIndex: 'patientName',
     key: 'patientName',
-    width: 240,
+    width: 250,
     render: (_, record) => {
       const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
+      const callCount = Number(record.callCount) || 0
       return (
         <Space align="center" size="small">
           <Avatar style={getAvatarStyle(pInfo.name)}>{getInitials(pInfo.name)}</Avatar>
@@ -46,9 +52,16 @@ export const getQueueBoardColumns = ({
             <Text strong style={{ fontSize: 14, color: '#0f172a', lineHeight: '1.4' }}>
               {pInfo.name}
             </Text>
-            <Text type="secondary" style={{ fontSize: 12, lineHeight: '1.2' }}>
-              Mã: {pInfo.code}
-            </Text>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Text type="secondary" style={{ fontSize: 12, lineHeight: '1.2' }}>
+                Mã: {pInfo.code}
+              </Text>
+              {callCount > 0 && (
+                <Tag color="orange" style={{ margin: 0, fontSize: 10, padding: '0 4px', lineHeight: '16px', borderRadius: 4 }}>
+                  Đã gọi: {callCount} lần
+                </Tag>
+              )}
+            </div>
           </div>
         </Space>
       )
@@ -113,10 +126,19 @@ export const getQueueBoardColumns = ({
     title: 'Trạng thái',
     dataIndex: 'status',
     key: 'status',
-    width: 150,
-    render: (st) => {
+    width: 170,
+    render: (st, record) => {
       const meta = QUEUE_STATUS_META[st] || { label: 'Không xác định', tone: 'gray' }
-      return <Tag color={meta.tone} style={{ whiteSpace: 'nowrap' }}>{meta.label}</Tag>
+      return (
+        <Space direction="vertical" size={2}>
+          <Tag color={meta.tone} style={{ whiteSpace: 'nowrap' }}>{meta.label}</Tag>
+          {st === 'SKIPPED' && record?.skipReason && (
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', maxWidth: 150 }} ellipsis={{ tooltip: record.skipReason }}>
+              {record.skipReason}
+            </Text>
+          )}
+        </Space>
+      )
     },
   },
   {
@@ -133,10 +155,16 @@ export const getQueueBoardColumns = ({
   {
     title: 'Thao tác',
     key: 'action',
-    width: 150,
+    width: 190,
     render: (_, record) => {
       const pInfo = getPatientInfo(record.patientId, record.patientName)
       const dInfo = getDoctorInfo(record.doctorId, record.doctorName)
+
+      const canManageReQueue =
+        permissions.canCheckIn ||
+        permissions.canUpdateQueueStatus ||
+        permissions.isAdmin ||
+        permissions.isReceptionist
 
       const menuItems = [
         {
@@ -164,6 +192,13 @@ export const getQueueBoardColumns = ({
             label: 'Tiếp tục khám bệnh',
             onClick: () => onUpdateStatus && onUpdateStatus(record.id, 'IN_PROGRESS'),
           },
+        canManageReQueue &&
+          record.status === 'SKIPPED' && {
+            key: 're_queue_menu',
+            icon: <ReloadOutlined />,
+            label: 'Đưa lại vào hàng đợi',
+            onClick: () => onReQueue && onReQueue(record),
+          },
         permissions.canSkip &&
           record.status === 'IN_PROGRESS' && {
             type: 'divider',
@@ -173,7 +208,7 @@ export const getQueueBoardColumns = ({
             key: 'skip',
             icon: <CloseCircleOutlined />,
             danger: true,
-            label: 'Bỏ qua lượt (Vắng mặt)',
+            label: 'Tạm hoãn lượt khám (Vắng mặt)',
             onClick: () => onSkip && onSkip(record),
           },
         canUserCloseVisit(user, record.doctorId) &&
@@ -184,9 +219,20 @@ export const getQueueBoardColumns = ({
             label: 'Kết thúc sớm / Hủy ca',
             onClick: () => onCloseVisit && onCloseVisit(record),
           },
+        {
+          type: 'divider',
+        },
+        onOpenHistory && {
+          key: 'queue_history',
+          icon: <HistoryOutlined />,
+          label: 'Lịch sử luân chuyển hàng đợi',
+          onClick: () => onOpenHistory(record),
+        },
       ].filter(Boolean)
 
       const hasCallAction = permissions.canCallNext && record.status === 'WAITING'
+      const hasReQueueAction = onReQueue && canManageReQueue && record.status === 'SKIPPED'
+      const hasDeferAction = permissions.canSkip && record.status === 'IN_PROGRESS'
 
       return (
         <Space size="small">
@@ -198,6 +244,28 @@ export const getQueueBoardColumns = ({
               onClick={() => onCallNext && onCallNext(record.medicalQueueId || record.queueId || record.id)}
             >
               Gọi khám
+            </Button>
+          )}
+          {hasReQueueAction && (
+            <Button
+              type="primary"
+              size="small"
+              style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+              icon={<ReloadOutlined />}
+              loading={reQueuingId === record.id}
+              onClick={() => onReQueue && onReQueue(record)}
+            >
+              Đưa lại hàng đợi
+            </Button>
+          )}
+          {hasDeferAction && (
+            <Button
+              size="small"
+              danger
+              icon={<CloseCircleOutlined />}
+              onClick={() => onSkip && onSkip(record)}
+            >
+              Tạm hoãn
             </Button>
           )}
           <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">

@@ -53,11 +53,17 @@ import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
 import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordModal'
 import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
-import MedicalRecordSignatureStamp from '../components/clinical/MedicalRecordSignatureStamp'
 import CloseVisitModal from '../components/clinical/CloseVisitModal'
+import VitalSignHistoryModal from '../components/clinical/VitalSignHistoryModal'
+import vitalSignApi from '../api/vitalSignApi'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
 import { canUserCloseVisit } from '../utils/closeVisitHelpers'
+import {
+  formatBloodPressure,
+  mapVitalSignErrorMessage,
+  validateVitalSignForm,
+} from '../utils/vitalSignHelpers'
 import { useAuthContext } from '../context/AuthContext'
 
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
@@ -187,12 +193,90 @@ function MedicalEncounter() {
   const [vitalSigns, setVitalSigns] = useState({
     bp: '',
     pulse: '',
+    bloodPressureSystolic: null,
+    bloodPressureDiastolic: null,
+    temperature: '37.0',
     temp: '37.0',
+    respiratoryRate: 16,
     respRate: '16',
     weight: '',
     height: '',
+    spo2: 98,
     spO2: '98',
+    note: '',
   })
+  const [vitalSignId, setVitalSignId] = useState(null)
+  const [vitalSignBackendFlags, setVitalSignBackendFlags] = useState([])
+  const [vitalSignSaving, setVitalSignSaving] = useState(false)
+  const [vitalSignHistoryModalOpen, setVitalSignHistoryModalOpen] = useState(false)
+
+  const handleVitalSignsChange = (newValues) => {
+    let bpStr = newValues.bp
+    if (newValues.bloodPressureSystolic != null || newValues.bloodPressureDiastolic != null) {
+      const s = newValues.bloodPressureSystolic != null ? newValues.bloodPressureSystolic : ''
+      const d = newValues.bloodPressureDiastolic != null ? newValues.bloodPressureDiastolic : ''
+      bpStr = `${s}/${d}`
+    }
+    setVitalSigns({
+      ...newValues,
+      bp: bpStr || '',
+      temp: newValues.temperature != null ? String(newValues.temperature) : (newValues.temp || ''),
+      respRate: newValues.respiratoryRate != null ? String(newValues.respiratoryRate) : (newValues.respRate || ''),
+      spO2: newValues.spo2 != null ? String(newValues.spo2) : (newValues.spO2 || ''),
+    })
+  }
+
+  const handleSaveVitalSigns = async (customValues = null) => {
+    if (!visitId) return false
+    const isSyntheticEvent = customValues && (customValues.nativeEvent || customValues.target || typeof customValues.preventDefault === 'function')
+    const valuesToSave = (!isSyntheticEvent && customValues && typeof customValues === 'object') ? customValues : vitalSigns
+    const validation = validateVitalSignForm(valuesToSave)
+    if (!validation.valid) {
+      const firstErr = Object.values(validation.errors)[0]
+      message.error(firstErr || 'Chỉ số sinh tồn không hợp lệ.')
+      return false
+    }
+
+    setVitalSignSaving(true)
+    try {
+      const payload = {
+        visitId,
+        pulse: valuesToSave.pulse ? parseInt(valuesToSave.pulse, 10) : null,
+        bloodPressureSystolic: valuesToSave.bloodPressureSystolic != null && valuesToSave.bloodPressureSystolic !== ''
+          ? parseInt(valuesToSave.bloodPressureSystolic, 10)
+          : null,
+        bloodPressureDiastolic: valuesToSave.bloodPressureDiastolic != null && valuesToSave.bloodPressureDiastolic !== ''
+          ? parseInt(valuesToSave.bloodPressureDiastolic, 10)
+          : null,
+        temperature: valuesToSave.temperature ? parseFloat(valuesToSave.temperature) : (valuesToSave.temp ? parseFloat(valuesToSave.temp) : null),
+        respiratoryRate: valuesToSave.respiratoryRate ? parseInt(valuesToSave.respiratoryRate, 10) : (valuesToSave.respRate ? parseInt(valuesToSave.respRate, 10) : null),
+        weight: valuesToSave.weight ? parseFloat(valuesToSave.weight) : null,
+        height: valuesToSave.height ? parseFloat(valuesToSave.height) : null,
+        spo2: valuesToSave.spo2 ? parseInt(valuesToSave.spo2, 10) : (valuesToSave.spO2 ? parseInt(valuesToSave.spO2, 10) : null),
+        note: valuesToSave.note || null,
+      }
+
+      let res
+      if (vitalSignId) {
+        res = await vitalSignApi.update(vitalSignId, payload)
+      } else {
+        res = await vitalSignApi.record(payload)
+      }
+
+      if (res?.data) {
+        setVitalSignId(res.data.id)
+        setVitalSignBackendFlags(res.data.abnormalFlags || [])
+      }
+      message.success('Đã lưu chỉ số sinh tồn thành công.')
+      return true
+    } catch (err) {
+      const msg = mapVitalSignErrorMessage(err)
+      message.error(msg)
+      return false
+    } finally {
+      setVitalSignSaving(false)
+    }
+  }
   const [diagnosisType, setDiagnosisType] = useState('DEFINITIVE')
   const [primaryIcd, setPrimaryIcd] = useState(null)
   const [secondaryIcds, setSecondaryIcds] = useState([])
@@ -538,6 +622,34 @@ function MedicalEncounter() {
 
       if (!recordData && visitId) {
         draftInitPromiseRef.current = ensureDraftRecord(visitId, effectiveTmplId)
+      }
+
+      // Tải chỉ số sinh tồn của lượt khám từ Backend
+      try {
+        const vsRes = await vitalSignApi.getByVisitId(visitId)
+        const vsList = Array.isArray(vsRes?.data) ? vsRes.data : (vsRes?.data ? [vsRes.data] : [])
+        if (vsList.length > 0) {
+          const vs = vsList[0]
+          setVitalSignId(vs.id)
+          setVitalSignBackendFlags(vs.abnormalFlags || [])
+          setVitalSigns({
+            pulse: vs.pulse != null ? vs.pulse : '',
+            bloodPressureSystolic: vs.bloodPressureSystolic != null ? vs.bloodPressureSystolic : null,
+            bloodPressureDiastolic: vs.bloodPressureDiastolic != null ? vs.bloodPressureDiastolic : null,
+            bp: formatBloodPressure(vs.bloodPressureSystolic, vs.bloodPressureDiastolic).replace(' mmHg', ''),
+            temperature: vs.temperature != null ? String(vs.temperature) : '37.0',
+            temp: vs.temperature != null ? String(vs.temperature) : '37.0',
+            respiratoryRate: vs.respiratoryRate != null ? vs.respiratoryRate : 16,
+            respRate: vs.respiratoryRate != null ? String(vs.respiratoryRate) : '16',
+            weight: vs.weight != null ? String(vs.weight) : '',
+            height: vs.height != null ? String(vs.height) : '',
+            spo2: vs.spo2 != null ? vs.spo2 : 98,
+            spO2: vs.spo2 != null ? String(vs.spo2) : '98',
+            note: vs.note || '',
+          })
+        }
+      } catch {
+        // Chưa có bản ghi chỉ số sinh tồn cho lượt khám này
       }
 
       if (clinicalServices.length === 0) {
@@ -1132,6 +1244,23 @@ function MedicalEncounter() {
           }
         }
 
+        // Tự động đồng bộ lưu chỉ số sinh tồn của lượt khám vào Backend nếu có
+        const hasAnyVital = Boolean(
+          vitalSigns.pulse ||
+          vitalSigns.bloodPressureSystolic != null ||
+          vitalSigns.bloodPressureDiastolic != null ||
+          vitalSigns.temperature ||
+          vitalSigns.respiratoryRate ||
+          vitalSigns.weight ||
+          vitalSigns.height ||
+          vitalSigns.spo2
+        )
+        if (hasAnyVital) {
+          handleSaveVitalSigns(vitalSigns).catch((vsErr) => {
+            console.warn('Đồng bộ chỉ số sinh tồn có độ trễ:', vsErr)
+          })
+        }
+
         if (selectedOrders.length > 0) {
           try {
             const liveQueueResponse = await queueApi.getById(encounter.queueItem.id)
@@ -1705,8 +1834,12 @@ function MedicalEncounter() {
                 encounterContext={encounter}
                 selectedPatientObj={selectedPatientObj}
                 vitalSigns={vitalSigns}
-                setVitalSigns={setVitalSigns}
+                setVitalSigns={handleVitalSignsChange}
                 bmiValue={bmiValue}
+                onSaveVitalSigns={handleSaveVitalSigns}
+                onOpenVitalSignHistory={() => setVitalSignHistoryModalOpen(true)}
+                vitalSignSaving={vitalSignSaving}
+                vitalSignBackendFlags={vitalSignBackendFlags}
                 diagnosisType={diagnosisType}
                 setDiagnosisType={setDiagnosisType}
                 primaryIcd={primaryIcd}
@@ -2169,6 +2302,14 @@ function MedicalEncounter() {
           onInvalidStatus={() => loadWorkflow()}
         />
       )}
+
+      <VitalSignHistoryModal
+        open={vitalSignHistoryModalOpen}
+        onClose={() => setVitalSignHistoryModalOpen(false)}
+        patientId={selectedPatientObj?.id || encounter?.patient?.id || encounter?.visit?.patientId}
+        patientName={selectedPatientObj?.fullName || encounter?.patient?.fullName}
+        patientCode={selectedPatientObj?.patientCode || encounter?.patient?.patientCode}
+      />
     </div>
   )
 }
