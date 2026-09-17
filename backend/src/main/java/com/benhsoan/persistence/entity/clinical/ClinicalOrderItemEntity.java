@@ -46,4 +46,10 @@ public class ClinicalOrderItemEntity {
     Instant createdAt;
     @Column(name = "updated_at")
     Instant updatedAt;
+    @Column(name = "cancel_reason", length = 500)
+    String cancelReason;
+    @Column(name = "cancelled_by", columnDefinition = "BINARY(16)")
+    UUID cancelledBy;
+    @Column(name = "cancelled_at")
+    Instant cancelledAt;
 }

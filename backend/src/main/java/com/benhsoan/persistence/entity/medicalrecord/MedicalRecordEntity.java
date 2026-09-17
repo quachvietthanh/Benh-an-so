@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.entity.medicalrecord;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
@@ -56,6 +57,9 @@ public class MedicalRecordEntity {
 
     @Column(name = "conclusion", columnDefinition = "TEXT")
     private String conclusion;
+
+    @Column(name = "revisit_date")
+    private LocalDate revisitDate;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)

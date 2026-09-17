@@ -25,13 +25,13 @@ public class ClinicalOrderResultMapper {
         List<ClinicalOrderResult.OrderItemResult> itemResults = items.stream()
                 .map(item -> new ClinicalOrderResult.OrderItemResult(
                         item.getId(), item.getServiceCode(), item.getServiceName(), item.getInstruction(),
-                        item.getStatus().name()
+                        item.getStatus().name(), item.getCancelReason(), item.getCancelledAt()
                 ))
                 .toList();
         return new ClinicalOrderResult(
                 order.getId(), order.getOrderCode(), order.getVisitId(), order.getPatientId(), order.getOrderedBy(),
                 order.getClinicalReason(), order.getStatus().name(), order.getOrderedAt(), order.getCompletedAt(),
-                itemResults
+                itemResults, order.getCancelReason(), order.getCancelledAt()
         );
     }
 }

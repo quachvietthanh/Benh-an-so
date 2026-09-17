@@ -33,7 +33,9 @@ public class PatientPortalMedicalHistoryRestMapper {
                 result.specialtyName(),
                 toDiagnoses(result.diagnoses()),
                 toItems(result.prescriptionItems()),
-                result.doctorAdvice()
+                result.doctorAdvice(),
+                result.treatmentPlan(),
+                result.revisitDate()
         );
     }
 

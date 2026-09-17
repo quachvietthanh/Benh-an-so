@@ -109,6 +109,24 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(com.benhsoan.domain.medicalrecord.exception.PendingClinicalOrdersWarningException.class)
+    public ResponseEntity<ApiErrorResponse> handlePendingClinicalOrdersWarning(
+            com.benhsoan.domain.medicalrecord.exception.PendingClinicalOrdersWarningException ex,
+            HttpServletRequest request
+    ) {
+        Map<String, Object> details = new HashMap<>();
+        if (ex.getPendingServices() != null) {
+            details.put("pendingServices", ex.getPendingServices());
+        }
+        return build(
+                DomainExceptionHttpStatusMapper.statusFor(ex.getCode()),
+                ex.getCode().name(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                details.isEmpty() ? null : details
+        );
+    }
+
     @ExceptionHandler(com.benhsoan.domain.auth.exception.WeakPasswordException.class)
     public ResponseEntity<ApiErrorResponse> handleWeakPassword(
             com.benhsoan.domain.auth.exception.WeakPasswordException ex,

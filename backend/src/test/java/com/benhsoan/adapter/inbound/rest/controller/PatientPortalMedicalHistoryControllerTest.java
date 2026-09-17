@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -89,14 +90,18 @@ class PatientPortalMedicalHistoryControllerTest {
                         List.of(new PatientMedicalHistoryDetailResult.DiagnosisItem("I10", "Essential hypertension")),
                         List.of(new PatientMedicalHistoryDetailResult.PrescriptionItemView(
                                 "Paracetamol", 10, "500mg", "After meals")),
-                        "Rest and hydrate"));
+                        "Rest and hydrate",
+                        "Phác đồ điều trị 7 ngày",
+                        LocalDate.of(2099, 1, 17)));
 
         mockMvc.perform(get("/patient-portal/medical-history/{visitId}", visitId)
                         .with(user("patient").roles("PATIENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.diagnoses[0].icd10Code").value("I10"))
                 .andExpect(jsonPath("$.prescriptionItems[0].medicineName").value("Paracetamol"))
-                .andExpect(jsonPath("$.doctorAdvice").value("Rest and hydrate"));
+                .andExpect(jsonPath("$.doctorAdvice").value("Rest and hydrate"))
+                .andExpect(jsonPath("$.treatmentPlan").value("Phác đồ điều trị 7 ngày"))
+                .andExpect(jsonPath("$.revisitDate").value("2099-01-17"));
     }
 
     @Test

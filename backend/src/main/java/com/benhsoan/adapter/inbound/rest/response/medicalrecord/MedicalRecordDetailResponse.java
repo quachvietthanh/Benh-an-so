@@ -22,6 +22,7 @@ public record MedicalRecordDetailResponse(
         String treatmentPlan,
         String doctorInstructions,
         String conclusion,
+        LocalDate revisitDate,
         MedicalRecordStatus status,
         String signatureData,
         Instant signedAt,
@@ -39,9 +40,20 @@ public record MedicalRecordDetailResponse(
             String treatmentPlan, String doctorInstructions, String conclusion, MedicalRecordStatus status,
             String signatureData, Instant signedAt, UUID signedBy, Instant lockedAt, UUID lockedBy,
             String primaryIcdCode, String primaryIcdName, List<String> secondaryIcdCodes,
+            List<MedicalRecordDiagnosisResponse> diagnoses, AppliedMedicalRecordTemplateResponse appliedTemplate) {
+        this(patient, visit, medicalRecordId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, null, status, signatureData, signedAt,
+                signedBy, lockedAt, lockedBy, primaryIcdCode, primaryIcdName, secondaryIcdCodes, diagnoses, appliedTemplate);
+    }
+
+    public MedicalRecordDetailResponse(PatientInfo patient, VisitInfo visit, UUID medicalRecordId, String chiefComplaint,
+            String symptoms, String medicalHistory, String physicalExamination, String clinicalProgress,
+            String treatmentPlan, String doctorInstructions, String conclusion, MedicalRecordStatus status,
+            String signatureData, Instant signedAt, UUID signedBy, Instant lockedAt, UUID lockedBy,
+            String primaryIcdCode, String primaryIcdName, List<String> secondaryIcdCodes,
             List<MedicalRecordDiagnosisResponse> diagnoses) {
         this(patient, visit, medicalRecordId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
-                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, status, signatureData, signedAt,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, null, status, signatureData, signedAt,
                 signedBy, lockedAt, lockedBy, primaryIcdCode, primaryIcdName, secondaryIcdCodes, diagnoses, null);
     }
 

@@ -1,11 +1,18 @@
 package com.benhsoan.persistence.adapterRepository.clinical;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
+
+import com.benhsoan.persistence.jpaRepository.clinical.PendingClinicalOrderItemView;
+import com.benhsoan.port.dto.result.PendingClinicalOrderResult;
 
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderItemStatus;
@@ -27,6 +34,11 @@ public class ClinicalOrderItemRepositoryAdapter implements ClinicalOrderItemRepo
     @Override
     public Optional<ClinicalOrderItem> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<ClinicalOrderItem> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
     }
 
     @Override
@@ -71,5 +83,68 @@ public class ClinicalOrderItemRepositoryAdapter implements ClinicalOrderItemRepo
     @Override
     public boolean existsByClinicalOrderIdAndClinicalServiceId(UUID clinicalOrderId, UUID clinicalServiceId) {
         return jpaRepository.existsByClinicalOrderIdAndClinicalServiceId(clinicalOrderId, clinicalServiceId);
+    }
+
+    @Override
+    public long countPendingByVisitId(UUID visitId) {
+        if (visitId == null) {
+            return 0;
+        }
+        return jpaRepository.countByVisitIdAndStatus(visitId, ClinicalOrderItemStatus.PENDING);
+    }
+
+    @Override
+    public List<String> findPendingServiceNamesByVisitId(UUID visitId) {
+        if (visitId == null) {
+            return List.of();
+        }
+        return jpaRepository.findPendingServiceNamesByVisitId(visitId, ClinicalOrderItemStatus.PENDING);
+    }
+
+    @Override
+    public Page<PendingClinicalOrderResult> findPendingOrders(
+            UUID patientId,
+            UUID doctorId,
+            Instant fromDate,
+            Instant toDate,
+            Instant now,
+            Pageable pageable
+    ) {
+        return jpaRepository.findPendingItems(
+                ClinicalOrderItemStatus.PENDING,
+                patientId,
+                doctorId,
+                fromDate,
+                toDate,
+                pageable
+        ).map(view -> mapToPendingResult(view, now));
+    }
+
+    private PendingClinicalOrderResult mapToPendingResult(PendingClinicalOrderItemView view, Instant now) {
+        long waitingMinutes = 0;
+        if (view.getOrderedAt() != null && now != null) {
+            waitingMinutes = Math.max(0, Duration.between(view.getOrderedAt(), now).toMinutes());
+        }
+        return new PendingClinicalOrderResult(
+                view.getOrderItemId(),
+                view.getOrderId(),
+                view.getOrderCode(),
+                view.getVisitId(),
+                view.getVisitCode(),
+                view.getPatientId(),
+                view.getPatientCode(),
+                view.getPatientFullName(),
+                view.getDoctorId(),
+                view.getDoctorFullName(),
+                view.getClinicalServiceId(),
+                view.getServiceCode(),
+                view.getServiceName(),
+                view.getServiceType(),
+                view.getInstruction(),
+                view.getClinicalReason(),
+                view.getStatus(),
+                view.getOrderedAt(),
+                waitingMinutes
+        );
     }
 }

@@ -122,7 +122,9 @@ public class GetPatientMedicalHistoryDetailService implements GetPatientMedicalH
                 specialtyRepository.findById(visit.getSpecialtyId()).map(Specialty::getName).orElse(null),
                 diagnoses,
                 items,
-                record.getDoctorInstructions()
+                record.getDoctorInstructions(),
+                record.getTreatmentPlan(),
+                record.getRevisitDate()
         );
     }
 

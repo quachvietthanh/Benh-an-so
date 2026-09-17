@@ -8,10 +8,26 @@ import com.benhsoan.persistence.entity.clinical.ClinicalOrderItemEntity;
 public class ClinicalOrderItemPersistenceMapper {
 
     public ClinicalOrderItem toDomain(ClinicalOrderItemEntity e) {
-        return e == null ? null : ClinicalOrderItem.restore(e.getId(), e.getClinicalOrderId(), e.getClinicalServiceId(), e.getServiceCode(), e.getServiceName(), e.getInstruction(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
+        return e == null ? null : ClinicalOrderItem.restore(
+                e.getId(), e.getClinicalOrderId(), e.getClinicalServiceId(), e.getServiceCode(),
+                e.getServiceName(), e.getInstruction(), e.getStatus(), e.getCreatedAt(),
+                e.getUpdatedAt(), e.getCancelReason(), e.getCancelledBy(), e.getCancelledAt());
     }
 
     public ClinicalOrderItemEntity toEntity(ClinicalOrderItem d) {
-        return d == null ? null : ClinicalOrderItemEntity.builder().id(d.getId()).clinicalOrderId(d.getClinicalOrderId()).clinicalServiceId(d.getClinicalServiceId()).serviceCode(d.getServiceCode()).serviceName(d.getServiceName()).instruction(d.getInstruction()).status(d.getStatus()).createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt()).build();
+        return d == null ? null : ClinicalOrderItemEntity.builder()
+                .id(d.getId())
+                .clinicalOrderId(d.getClinicalOrderId())
+                .clinicalServiceId(d.getClinicalServiceId())
+                .serviceCode(d.getServiceCode())
+                .serviceName(d.getServiceName())
+                .instruction(d.getInstruction())
+                .status(d.getStatus())
+                .createdAt(d.getCreatedAt())
+                .updatedAt(d.getUpdatedAt())
+                .cancelReason(d.getCancelReason())
+                .cancelledBy(d.getCancelledBy())
+                .cancelledAt(d.getCancelledAt())
+                .build();
     }
 }

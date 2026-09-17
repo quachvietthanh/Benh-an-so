@@ -28,6 +28,11 @@ public class ClinicalOrderRepositoryAdapter implements ClinicalOrderRepository {
     }
 
     @Override
+    public Optional<ClinicalOrder> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
     public ClinicalOrder save(ClinicalOrder order) {
         ClinicalOrderEntity savedEntity = jpaRepository.save(mapper.toEntity(order));
         return mapper.toDomain(savedEntity);

@@ -33,8 +33,11 @@ import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.ClinicalOrderResult;
+import com.benhsoan.port.dto.result.PendingClinicalOrderResult;
+import com.benhsoan.port.inbound.clinical.CancelClinicalOrderUseCase;
 import com.benhsoan.port.inbound.clinical.CreateClinicalOrderUseCase;
 import com.benhsoan.port.inbound.clinical.GetClinicalOrdersByVisitUseCase;
+import com.benhsoan.port.inbound.clinical.GetPendingClinicalOrdersUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -63,6 +66,12 @@ class ClinicalOrderControllerTest {
 
     @MockitoBean
     private GetClinicalOrdersByVisitUseCase getClinicalOrdersByVisitUseCase;
+
+    @MockitoBean
+    private GetPendingClinicalOrdersUseCase getPendingClinicalOrdersUseCase;
+
+    @MockitoBean
+    private CancelClinicalOrderUseCase cancelClinicalOrderUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -156,9 +165,114 @@ class ClinicalOrderControllerTest {
     }
 
     @Test
+    @DisplayName("GET /clinical-orders/pending - 200 OK")
+    void getPendingOrdersReturns200() throws Exception {
+        UUID orderItemId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        when(getPendingClinicalOrdersUseCase.getPendingOrders(any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(
+                        new PendingClinicalOrderResult(
+                                orderItemId, orderId, "ORD-PENDING", UUID.randomUUID(), "VIS-01",
+                                UUID.randomUUID(), "BN001", "Nguyen Van A",
+                                UUID.randomUUID(), "Dr. Smith",
+                                UUID.randomUUID(), "LAB-01", "Cong thuc mau",
+                                com.benhsoan.domain.clinical.enums.ClinicalServiceType.LAB_TEST,
+                                "Lay mau buoi sang", "Kiem tra dinh ky",
+                                com.benhsoan.domain.clinical.enums.ClinicalOrderItemStatus.PENDING,
+                                Instant.parse("2026-08-20T01:00:00Z"),
+                                45L
+                        )
+                )));
+
+        mockMvc.perform(get("/clinical-orders/pending")
+                        .with(withPermission("CLINICAL_ORDER_READ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].orderCode").value("ORD-PENDING"))
+                .andExpect(jsonPath("$.content[0].waitingMinutes").value(45))
+                .andExpect(jsonPath("$.content[0].serviceName").value("Cong thuc mau"));
+    }
+
+    @Test
+    @DisplayName("POST /clinical-orders/{orderId}/cancel - 200 OK")
+    void cancelOrderReturns200() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        when(cancelClinicalOrderUseCase.cancelOrder(any()))
+                .thenReturn(new ClinicalOrderResult(
+                        orderId, "ORD-123", UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                        "Clinical reason", "CANCELLED", Instant.parse("2026-08-20T01:00:00Z"), null, List.of(),
+                        "Benh nhan tu choi", Instant.parse("2026-08-20T02:00:00Z")
+                ));
+
+        String body = """
+                {
+                    "cancelReason": "Benh nhan tu choi"
+                }
+                """;
+
+        mockMvc.perform(post("/clinical-orders/{orderId}/cancel", orderId)
+                        .with(withPermission("CLINICAL_ORDER_CANCEL"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.cancelReason").value("Benh nhan tu choi"));
+    }
+
+    @Test
+    @DisplayName("POST /clinical-orders/{orderId}/cancel - 400 Bad Request when reason is blank")
+    void cancelOrderRejectsBlankReason() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        String body = """
+                {
+                    "cancelReason": "   "
+                }
+                """;
+
+        mockMvc.perform(post("/clinical-orders/{orderId}/cancel", orderId)
+                        .with(withPermission("CLINICAL_ORDER_CANCEL"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /clinical-orders/items/{itemId}/cancel - 200 OK")
+    void cancelOrderItemReturns200() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        when(cancelClinicalOrderUseCase.cancelOrderItem(any()))
+                .thenReturn(new ClinicalOrderResult(
+                        UUID.randomUUID(), "ORD-123", UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                        "Clinical reason", "PARTIALLY_COMPLETED", Instant.parse("2026-08-20T01:00:00Z"), null, List.of(),
+                        null, null
+                ));
+
+        String body = """
+                {
+                    "cancelReason": "Chi dinh nham"
+                }
+                """;
+
+        mockMvc.perform(post("/clinical-orders/items/{itemId}/cancel", itemId)
+                        .with(withPermission("CLINICAL_ORDER_CANCEL"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PARTIALLY_COMPLETED"));
+    }
+
+    @Test
     void rejectsMissingClinicalOrderPermission() throws Exception {
         mockMvc.perform(get("/clinical-orders/visits/{visitId}", UUID.randomUUID())
                         .with(withPermission("CLINICAL_ORDER_CREATE")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectsMissingCancelPermission() throws Exception {
+        mockMvc.perform(post("/clinical-orders/{orderId}/cancel", UUID.randomUUID())
+                        .with(withPermission("CLINICAL_ORDER_READ"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cancelReason\": \"reason\"}"))
                 .andExpect(status().isForbidden());
     }
 
