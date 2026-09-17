@@ -60,4 +60,57 @@ class CreateMedicalRecordServiceTest {
         verify(accessAuditService).recordRecordAccessInCurrentTransaction(patientId, visitId, result.id(), userId,
                 MedicalRecordAccessAction.CREATE, "Medical record created", now);
     }
+
+    @Test
+    void createsRecordWithRevisitDateSuccessfully() {
+        UUID visitId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        java.time.LocalDate revisitDate = java.time.LocalDate.of(2026, 8, 27);
+        Visit visit = Visit.restore(visitId, "VIS-001", patientId, UUID.randomUUID(), null, null,
+                VisitType.WALK_IN, VisitStatus.IN_PROGRESS, now, now, null,
+                "Consultation", null, userId, now, null);
+        when(authorizationService.requireWriteAccess()).thenReturn(userId);
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(medicalRecordRepository.existsByVisitId(visitId)).thenReturn(false);
+        when(clockPort.now()).thenReturn(now);
+        when(medicalRecordRepository.save(any(MedicalRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = service.create(new CreateMedicalRecordCommand(
+                visitId, "Headache", null, null, null, null,
+                "Treatment plan", "Doctor instructions", "Stable", revisitDate
+        ));
+
+        assertEquals(visitId, result.visitId());
+        assertEquals(revisitDate, result.revisitDate());
+        verify(accessAuditService).recordRecordAccessInCurrentTransaction(patientId, visitId, result.id(), userId,
+                MedicalRecordAccessAction.CREATE, "Medical record created", now);
+    }
+
+    @Test
+    void rejectsCreateWhenRevisitDateIsBeforeVisitDate() {
+        UUID visitId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        java.time.LocalDate invalidRevisitDate = java.time.LocalDate.of(2026, 8, 15);
+        Visit visit = Visit.restore(visitId, "VIS-001", patientId, UUID.randomUUID(), null, null,
+                VisitType.WALK_IN, VisitStatus.IN_PROGRESS, now, now, null,
+                "Consultation", null, userId, now, null);
+        when(authorizationService.requireWriteAccess()).thenReturn(userId);
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(medicalRecordRepository.existsByVisitId(visitId)).thenReturn(false);
+        when(clockPort.now()).thenReturn(now);
+
+        var command = new CreateMedicalRecordCommand(
+                visitId, "Headache", null, null, null, null,
+                "Treatment plan", "Doctor instructions", "Stable", invalidRevisitDate
+        );
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> service.create(command)
+        );
+    }
 }

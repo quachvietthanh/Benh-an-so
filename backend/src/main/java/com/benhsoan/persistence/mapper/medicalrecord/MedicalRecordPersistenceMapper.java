@@ -23,6 +23,7 @@ public class MedicalRecordPersistenceMapper {
                 entity.getTreatmentPlan(),
                 entity.getDoctorInstructions(),
                 entity.getConclusion(),
+                entity.getRevisitDate(),
                 entity.getStatus(),
                 entity.getSignatureData(),
                 entity.getSignedAt(),
@@ -48,7 +49,7 @@ public class MedicalRecordPersistenceMapper {
                 .symptoms(domain.getSymptoms()).medicalHistory(domain.getMedicalHistory())
                 .physicalExamination(domain.getPhysicalExamination()).clinicalProgress(domain.getClinicalProgress())
                 .treatmentPlan(domain.getTreatmentPlan()).doctorInstructions(domain.getDoctorInstructions())
-                .conclusion(domain.getConclusion()).status(domain.getStatus()).signatureData(domain.getSignatureData())
+                .conclusion(domain.getConclusion()).revisitDate(domain.getRevisitDate()).status(domain.getStatus()).signatureData(domain.getSignatureData())
                 .signedAt(domain.getSignedAt()).signedBy(domain.getSignedBy()).lockedAt(domain.getLockedAt())
                 .lockedBy(domain.getLockedBy()).createdBy(domain.getCreatedBy()).createdAt(domain.getCreatedAt())
                 .updatedBy(domain.getUpdatedBy()).updatedAt(domain.getUpdatedAt())

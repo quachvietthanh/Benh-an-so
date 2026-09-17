@@ -175,12 +175,14 @@ export function getCallCountBadgeProps(callCount) {
 export function cleanQueueActionErrorMessage(error, defaultMsg = 'Thao tác không thành công.') {
   if (!error) return defaultMsg
   const responseMsg = error?.response?.data?.message || error?.message || ''
-  const errorKey = error?.response?.data?.error || ''
+  const errorCode = error?.response?.data?.code || error?.response?.data?.error || ''
 
-  if (responseMsg.includes('Only skipped items can be re-queued')) {
-    return 'Chỉ có thể đưa bệnh nhân đang ở trạng thái Tạm hoãn trở lại hàng đợi.'
-  }
-  if (errorKey === 'QUEUE_ITEM_INVALID_STATUS' || responseMsg.includes('Invalid status')) {
+  if (
+    errorCode === 'QUEUE_ITEM_INVALID_STATUS' ||
+    responseMsg.includes('does not allow this action') ||
+    responseMsg.includes('Invalid status') ||
+    responseMsg.includes('Only skipped items can be re-queued')
+  ) {
     return 'Lượt khám không ở trạng thái phù hợp để thực hiện thao tác này.'
   }
   if (responseMsg.includes('Medical queue is closed')) {
@@ -189,10 +191,17 @@ export function cleanQueueActionErrorMessage(error, defaultMsg = 'Thao tác khô
   if (responseMsg.includes('Cannot re-queue into a queue from a different date')) {
     return 'Không thể đưa lại vào hàng đợi của ngày khác.'
   }
-  if (error?.response?.status === 403) {
+  if (
+    errorCode === 'UNAUTHORIZED_QUEUE_OPERATION' ||
+    error?.response?.status === 403
+  ) {
     return 'Bạn không có quyền thực hiện thao tác này.'
   }
-  if (error?.response?.status === 404) {
+  if (
+    errorCode === 'QUEUE_ITEM_NOT_FOUND' ||
+    errorCode === 'QUEUE_NOT_FOUND' ||
+    error?.response?.status === 404
+  ) {
     return 'Không tìm thấy thông tin lượt khám trong hàng đợi.'
   }
 

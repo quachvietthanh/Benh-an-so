@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -135,6 +136,31 @@ class GetMedicalRecordVersionHistoryServiceTest {
         assertEquals("c", result.originalVersion().snapshot().chiefComplaint());
         assertEquals("s", result.originalVersion().snapshot().symptoms());
         assertEquals("co", result.originalVersion().snapshot().conclusion());
+    }
+
+    @Test
+    void originalVersionSnapshotIncludesRevisitDate() {
+        LocalDate revisitDate = LocalDate.of(2026, 9, 1);
+        MedicalRecord recordWithRevisit = MedicalRecord.restore(
+                RECORD_ID, VISIT_ID, "c", "s", "h", "p", "cp", "tp", "di", "co",
+                revisitDate, MedicalRecordStatus.LOCKED, null, null, null,
+                NOW, CREATOR_ID, CREATOR_ID, NOW, null, null, null, null, null
+        );
+        when(medicalRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(recordWithRevisit));
+        when(authorizationService.requireVersionHistoryReadAccess()).thenReturn(CREATOR_ID);
+        when(diagnosisRepository.findByMedicalRecordId(RECORD_ID)).thenReturn(List.of());
+        when(clockPort.now()).thenReturn(NOW);
+        Visit visit = Visit.restore(VISIT_ID, "V001", PATIENT_ID, CREATOR_ID, null, null, VisitType.WALK_IN,
+                VisitStatus.COMPLETED, NOW.minusSeconds(3600), NOW.minusSeconds(1800), NOW,
+                "Checkup", null, CREATOR_ID, NOW.minusSeconds(3600), NOW);
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(amendmentRepository.findByMedicalRecordId(RECORD_ID)).thenReturn(List.of());
+        when(userRepository.findAllById(any())).thenReturn(List.of(user(CREATOR_ID, "Dr. Creator")));
+
+        MedicalRecordVersionHistoryResult result = service().getVersionHistory(RECORD_ID);
+
+        assertNotNull(result.originalVersion().snapshot());
+        assertEquals(revisitDate, result.originalVersion().snapshot().revisitDate());
     }
 
     @Test

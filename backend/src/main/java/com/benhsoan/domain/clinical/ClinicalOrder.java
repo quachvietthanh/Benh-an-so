@@ -25,8 +25,11 @@ public class ClinicalOrder {
     private String orderCode, clinicalReason;
     private ClinicalOrderStatus status;
     private Instant orderedAt, completedAt, createdAt, updatedAt;
+    private String cancelReason;
+    private UUID cancelledBy;
+    private Instant cancelledAt;
 
-    private ClinicalOrder(UUID id, String code, UUID visit, UUID record, UUID patient, UUID by, String reason, ClinicalOrderStatus status, Instant ordered, Instant completed, Instant created, Instant updated) {
+    private ClinicalOrder(UUID id, String code, UUID visit, UUID record, UUID patient, UUID by, String reason, ClinicalOrderStatus status, Instant ordered, Instant completed, Instant created, Instant updated, String cancelReason, UUID cancelledBy, Instant cancelledAt) {
         this.id = Objects.requireNonNull(id);
         orderCode = Guard.require(code, "Order code");
         visitId = Objects.requireNonNull(visit);
@@ -39,14 +42,21 @@ public class ClinicalOrder {
         completedAt = completed;
         createdAt = Objects.requireNonNull(created);
         updatedAt = updated;
+        this.cancelReason = cancelReason;
+        this.cancelledBy = cancelledBy;
+        this.cancelledAt = cancelledAt;
     }
 
     public static ClinicalOrder create(String code, UUID visit, UUID record, UUID patient, UUID by, String reason, Instant at) {
-        return new ClinicalOrder(UUID.randomUUID(), code, visit, record, patient, by, reason, ClinicalOrderStatus.ORDERED, at, null, at, null);
+        return new ClinicalOrder(UUID.randomUUID(), code, visit, record, patient, by, reason, ClinicalOrderStatus.ORDERED, at, null, at, null, null, null, null);
     }
 
     public static ClinicalOrder restore(UUID id, String code, UUID visit, UUID record, UUID patient, UUID by, String reason, ClinicalOrderStatus status, Instant ordered, Instant completed, Instant created, Instant updated) {
-        return new ClinicalOrder(id, code, visit, record, patient, by, reason, status, ordered, completed, created, updated);
+        return restore(id, code, visit, record, patient, by, reason, status, ordered, completed, created, updated, null, null, null);
+    }
+
+    public static ClinicalOrder restore(UUID id, String code, UUID visit, UUID record, UUID patient, UUID by, String reason, ClinicalOrderStatus status, Instant ordered, Instant completed, Instant created, Instant updated, String cancelReason, UUID cancelledBy, Instant cancelledAt) {
+        return new ClinicalOrder(id, code, visit, record, patient, by, reason, status, ordered, completed, created, updated, cancelReason, cancelledBy, cancelledAt);
     }
 
     public void start(Instant at) {
@@ -64,24 +74,35 @@ public class ClinicalOrder {
     public void complete(Instant at) {
         if (status != ClinicalOrderStatus.IN_PROGRESS && status != ClinicalOrderStatus.PARTIALLY_COMPLETED) {
             conflict("Only active orders can be completed.");
-        
-        }if (at.isBefore(orderedAt)) {
+        }
+        if (at.isBefore(orderedAt)) {
             throw new ValidationException("Completion time is invalid.");
-        
-        }status = ClinicalOrderStatus.COMPLETED;
+        }
+        status = ClinicalOrderStatus.COMPLETED;
         completedAt = at;
         updatedAt = at;
     }
 
-    public void cancel(Instant at) {
+    public void cancel(String reason, UUID by, Instant at) {
         if (status == ClinicalOrderStatus.COMPLETED) {
             throw new ClinicalOrderAlreadyCompletedException();
-        
-        }if (status == ClinicalOrderStatus.CANCELLED) {
+        }
+        if (status == ClinicalOrderStatus.CANCELLED) {
             throw new ClinicalOrderAlreadyCancelledException();
-        
-        }status = ClinicalOrderStatus.CANCELLED;
-        updatedAt = Objects.requireNonNull(at);
+        }
+        String validatedReason = Guard.require(reason, "Cancellation reason");
+        if (validatedReason.length() > 500) {
+            throw new ValidationException("Cancellation reason must not exceed 500 characters.");
+        }
+        this.cancelReason = validatedReason;
+        this.cancelledBy = Objects.requireNonNull(by, "Cancelling user id is required.");
+        this.cancelledAt = Objects.requireNonNull(at, "Cancellation time is required.");
+        status = ClinicalOrderStatus.CANCELLED;
+        updatedAt = at;
+    }
+
+    public void cancel(Instant at) {
+        cancel("Cancelled without reason", orderedBy, at);
     }
 
     public boolean isCompleted() {

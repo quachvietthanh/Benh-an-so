@@ -5,9 +5,6 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Repository;
 
-import com.benhsoan.persistence.entity.appointment.AppointmentNotificationLogEntity;
-import com.benhsoan.persistence.entity.patient.PatientChronicDiseaseEntity;
-import com.benhsoan.persistence.entity.patient.PatientFamilyHistoryEntity;
 import com.benhsoan.port.outbound.repository.patient.PatientMergeDataPort;
 
 import jakarta.persistence.EntityManager;
@@ -88,7 +85,8 @@ public class PatientMergeDataPersistenceAdapter implements PatientMergeDataPort 
                                 .setParameter("sourceId", sourcePatientId)
                                 .executeUpdate();
 
-                // 11. Transfer Patient Chronic Diseases safely (deactivate duplicates to prevent unique constraint violation)
+                // 11. Transfer Patient Chronic Diseases safely (deactivate duplicates to
+                // prevent unique constraint violation)
                 transferChronicDiseasesSafely(sourcePatientId, targetPatientId);
 
                 // 12. Transfer Patient Family Histories
@@ -105,7 +103,8 @@ public class PatientMergeDataPersistenceAdapter implements PatientMergeDataPort 
                                 .setParameter("targetId", targetPatientId)
                                 .getResultList();
 
-                // Deactivate source patient's duplicate active chronic diseases to prevent unique
+                // Deactivate source patient's duplicate active chronic diseases to prevent
+                // unique
                 // constraint violation (uk_patient_active_chronic_disease)
                 if (!targetActiveCatalogs.isEmpty()) {
                         entityManager.createQuery(

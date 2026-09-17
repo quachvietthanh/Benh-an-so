@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -102,6 +103,66 @@ class MedicalRecordTest {
 
         assertThrows(ValidationException.class, () -> record.ensureRequiredTemplateSections(version));
         assertEquals(MedicalRecordStatus.DRAFT, record.getStatus());
+    }
+
+    @Test
+    @DisplayName("Cập nhật lời dặn, kế hoạch điều trị và mốc tái khám hợp lệ thành công")
+    void updatesInstructionsAndTreatmentPlanWithValidRevisitDate() {
+        MedicalRecord record = recordWithRequiredContent();
+        UUID doctorId = UUID.randomUUID();
+        LocalDate visitDate = LocalDate.of(2026, 8, 20);
+        LocalDate revisitDate = LocalDate.of(2026, 8, 27);
+        Instant updateTime = now.plusSeconds(60);
+
+        record.updateInstructionsAndTreatmentPlan(
+                "Kế hoạch điều trị 7 ngày",
+                "Uống thuốc đúng giờ, tránh vận động mạnh",
+                revisitDate,
+                visitDate,
+                doctorId,
+                updateTime
+        );
+
+        assertEquals("Kế hoạch điều trị 7 ngày", record.getTreatmentPlan());
+        assertEquals("Uống thuốc đúng giờ, tránh vận động mạnh", record.getDoctorInstructions());
+        assertEquals(revisitDate, record.getRevisitDate());
+        assertEquals(doctorId, record.getUpdatedBy());
+        assertEquals(updateTime, record.getUpdatedAt());
+    }
+
+    @Test
+    @DisplayName("Từ chối cập nhật khi mốc tái khám trước ngày khám")
+    void rejectsUpdateWhenRevisitDateIsBeforeVisitDate() {
+        MedicalRecord record = recordWithRequiredContent();
+        UUID doctorId = UUID.randomUUID();
+        LocalDate visitDate = LocalDate.of(2026, 8, 20);
+        LocalDate invalidRevisitDate = LocalDate.of(2026, 8, 19);
+
+        assertThrows(ValidationException.class, () -> record.updateInstructionsAndTreatmentPlan(
+                "Kế hoạch",
+                "Lời dặn",
+                invalidRevisitDate,
+                visitDate,
+                doctorId,
+                now
+        ));
+    }
+
+    @Test
+    @DisplayName("Từ chối cập nhật lời dặn và kế hoạch khi bệnh án đã bị khóa/ký")
+    void rejectsUpdateInstructionsWhenRecordIsLocked() {
+        MedicalRecord record = recordWithRequiredContent();
+        UUID doctorId = UUID.randomUUID();
+        record.sign("VALID_SIG", doctorId, now);
+
+        assertThrows(MedicalRecordAlreadyLockedException.class, () -> record.updateInstructionsAndTreatmentPlan(
+                "Kế hoạch",
+                "Lời dặn",
+                LocalDate.of(2026, 8, 25),
+                LocalDate.of(2026, 8, 20),
+                doctorId,
+                now.plusSeconds(60)
+        ));
     }
 
     private MedicalRecord recordWithRequiredContent() {

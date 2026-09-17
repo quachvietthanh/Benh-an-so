@@ -29,4 +29,23 @@ public class ClinicalOrderAuthorizationService {
         }
         return currentUserPort.getCurrentUserId();
     }
+
+    public UUID requireCancelAccess(UUID visitDoctorId, UUID orderedBy) {
+        if (!currentUserPort.hasRole("ADMIN") && !currentUserPort.hasRole("DOCTOR")) {
+            throw new MedicalRecordAccessDeniedException();
+        }
+        UUID currentUserId = currentUserPort.getCurrentUserId();
+        if (currentUserPort.hasRole("ADMIN")) {
+            return currentUserId;
+        }
+        if (!java.util.Objects.equals(currentUserId, visitDoctorId)
+                && !java.util.Objects.equals(currentUserId, orderedBy)) {
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return currentUserId;
+    }
+
+    public boolean isAdmin() {
+        return currentUserPort.hasRole("ADMIN");
+    }
 }

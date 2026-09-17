@@ -1,6 +1,10 @@
 package com.benhsoan.port.dto.command.medicalrecord;
 
 public record SignMedicalRecordCommand(
-        String signatureData
+        String signatureData,
+        Boolean acknowledgePendingOrders
 ) {
+    public SignMedicalRecordCommand(String signatureData) {
+        this(signatureData, false);
+    }
 }
