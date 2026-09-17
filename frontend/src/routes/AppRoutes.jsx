@@ -41,6 +41,7 @@ const MedicalRecordCopyPage = React.lazy(() => import('../pages/MedicalRecordCop
 const MedicalRecordVersionHistoryPage = React.lazy(() => import('../pages/MedicalRecordVersionHistoryPage'))
 const PrescriptionInterconnectionPage = React.lazy(() => import('../pages/PrescriptionInterconnectionPage'))
 const DoctorScheduleManagementPage = React.lazy(() => import('../pages/DoctorScheduleManagementPage'))
+const DoctorWeeklySchedulePage = React.lazy(() => import('../pages/DoctorWeeklySchedulePage'))
 const AnonymizationPage = React.lazy(() => import('../pages/AnonymizationPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
@@ -119,6 +120,8 @@ function AppRoutes() {
         <Route path="patients" element={<PrivateRoute allowedPermissions={['PATIENT_READ', 'PATIENT_CREATE', 'PATIENT_UPDATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientList /></LazyPage></PrivateRoute>} />
         <Route path="patients/:id" element={<PrivateRoute allowedPermissions={['PATIENT_READ', 'PATIENT_CREATE', 'PATIENT_UPDATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientDetail /></LazyPage></PrivateRoute>} />
         <Route path="appointments" element={<PrivateRoute allowedPermissions={['APPOINTMENT_READ', 'APPOINTMENT_CREATE', 'APPOINTMENT_UPDATE', 'QUEUE_VIEW', 'QUEUE_CREATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><AppointmentQueue /></LazyPage></PrivateRoute>} />
+        <Route path="appointments/weekly-schedule" element={<PrivateRoute allowedPermissions={['APPOINTMENT_READ', 'APPOINTMENT_CREATE']} allowedRoles={['admin', 'doctor', 'receptionist', 'manager', 'clinic_manager']}><LazyPage><DoctorWeeklySchedulePage /></LazyPage></PrivateRoute>} />
+        <Route path="doctor-weekly-schedule" element={<Navigate to="/appointments/weekly-schedule" replace />} />
         <Route path="doctor-schedules" element={<PrivateRoute allowedPermissions={['DOCTOR_SCHEDULE_UPDATE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><DoctorScheduleManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="system/doctor-schedules" element={<Navigate to="/doctor-schedules" replace />} />
         <Route path="after-care" element={<PrivateRoute allowedPermissions={['FOLLOW_UP_REMINDER_READ', 'FOLLOW_UP_REMINDER_CREATE', 'CARE_LOG_READ', 'CARE_LOG_CREATE']} allowedRoles={['receptionist', 'admin']}><LazyPage><AfterCarePage /></LazyPage></PrivateRoute>} />

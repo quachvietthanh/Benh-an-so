@@ -35,6 +35,8 @@ import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
+import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionDispenseHistoryUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
@@ -73,6 +75,8 @@ class PrescriptionSecurityIntegrationTest {
     @MockitoBean private GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
     @MockitoBean private SearchPrescriptionsUseCase searchPrescriptionsUseCase;
     @MockitoBean private DispensePrescriptionUseCase dispensePrescriptionUseCase;
+    @MockitoBean private DispensePrescriptionItemsUseCase dispensePrescriptionItemsUseCase;
+    @MockitoBean private GetPrescriptionDispenseHistoryUseCase getPrescriptionDispenseHistoryUseCase;
     @MockitoBean private CancelPrescriptionUseCase cancelPrescriptionUseCase;
     @MockitoBean private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     @MockitoBean private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
@@ -360,6 +364,32 @@ class PrescriptionSecurityIntegrationTest {
                                 new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /prescriptions/{id}/dispense-history requires PRESCRIPTION_DISPENSE_HISTORY_READ (NCL-06-CN-008, TC-05)")
+    void dispenseHistoryRequiresDispenseHistoryReadPermission() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(getPrescriptionDispenseHistoryUseCase.getHistory(prescriptionId))
+                .thenReturn(java.util.List.of());
+
+        // MANAGER with the dedicated permission is allowed (TC-05)
+        mockMvc.perform(get("/prescriptions/{id}/dispense-history", prescriptionId)
+                        .with(user("manager").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_DISPENSE_HISTORY_READ"))))
+                .andExpect(status().isOk());
+
+        // PHARMACIST with the dedicated permission is allowed
+        mockMvc.perform(get("/prescriptions/{id}/dispense-history", prescriptionId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_DISPENSE_HISTORY_READ"))))
+                .andExpect(status().isOk());
+
+        // RECEPTIONIST (no dispense-history permission) is rejected
+        mockMvc.perform(get("/prescriptions/{id}/dispense-history", prescriptionId)
+                        .with(user("receptionist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
                 .andExpect(status().isForbidden());
     }
 }

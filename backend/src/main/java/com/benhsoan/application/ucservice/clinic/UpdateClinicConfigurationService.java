@@ -46,8 +46,15 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 ? command.retentionYears()
                 : beforeRetentionYears;
 
+        int beforeSigningDeadlineHours = clinicConfigurationRepository.find()
+                .map(ClinicConfiguration::getSigningDeadlineHours)
+                .orElse(ClinicConfiguration.DEFAULT_SIGNING_DEADLINE_HOURS);
+        int afterSigningDeadlineHours = command.signingDeadlineHours() != null
+                ? command.signingDeadlineHours()
+                : beforeSigningDeadlineHours;
+
         ClinicConfiguration configuration = clinicConfigurationRepository.find()
-                .map(existing -> update(existing, command, afterRetentionYears, now))
+                .map(existing -> update(existing, command, afterRetentionYears, afterSigningDeadlineHours, now))
                 .orElseGet(() -> ClinicConfiguration.create(
                         command.clinicName(),
                         command.address(),
@@ -55,11 +62,13 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                         command.openingTime(),
                         command.closingTime(),
                         afterRetentionYears,
+                        afterSigningDeadlineHours,
                         now
                 ));
 
         ClinicConfiguration saved = clinicConfigurationRepository.save(configuration);
-        auditConfigurationUpdate(beforeRetentionYears, saved.getRetentionYears(), now);
+        auditConfigurationUpdate(beforeRetentionYears, saved.getRetentionYears(),
+                beforeSigningDeadlineHours, saved.getSigningDeadlineHours(), now);
 
         return resultMapper.toResult(saved);
     }
@@ -68,6 +77,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
             ClinicConfiguration configuration,
             UpdateClinicConfigurationCommand command,
             int retentionYears,
+            int signingDeadlineHours,
             Instant updatedAt
     ) {
         configuration.update(
@@ -76,13 +86,18 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 command.phone(),
                 command.openingTime(),
                 command.closingTime(),
+                retentionYears,
+                signingDeadlineHours,
                 updatedAt
         );
-        configuration.updateRetentionYears(retentionYears, updatedAt);
         return configuration;
     }
 
-    private void auditConfigurationUpdate(int beforeRetentionYears, int afterRetentionYears, Instant now) {
+    private void auditConfigurationUpdate(
+            int beforeRetentionYears, int afterRetentionYears,
+            int beforeSigningDeadlineHours, int afterSigningDeadlineHours,
+            Instant now
+    ) {
         UUID actorId = currentUserPort.getCurrentUserId();
         auditLogRepository.save(AuditLog.create(
                 actorId,
@@ -90,7 +105,9 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 ResourceType.CONFIGURATION,
                 null,
                 "Clinic configuration updated; retentionYears changed from "
-                        + beforeRetentionYears + " to " + afterRetentionYears,
+                        + beforeRetentionYears + " to " + afterRetentionYears
+                        + "; signingDeadlineHours changed from "
+                        + beforeSigningDeadlineHours + " to " + afterSigningDeadlineHours,
                 null,
                 now
         ));
