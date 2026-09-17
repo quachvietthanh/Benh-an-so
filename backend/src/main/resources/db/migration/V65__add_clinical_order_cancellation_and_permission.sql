@@ -1,5 +1,5 @@
 -- =====================================================
--- V60__add_clinical_order_cancellation_and_permission.sql
+-- V65__add_clinical_order_cancellation_and_permission.sql
 -- Add cancellation columns to clinical orders and order items
 -- and seed CLINICAL_ORDER_CANCEL permission (NCL-04-CN-008 / QTN-13, QTN-17).
 -- =====================================================
