@@ -26,6 +26,12 @@ const patientApi = {
   delete: (id) => {
     return axiosClient.delete(`/patients/${id}`)
   },
+  merge: (data) => {
+    return axiosClient.post('/patients/merge', data)
+  },
+  getDuplicates: () => {
+    return axiosClient.get('/patients/duplicates')
+  },
 }
 
 export default patientApi

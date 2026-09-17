@@ -14,6 +14,7 @@ export default function PersonalDataConsentModal({
   open,
   onClose,
   patientName = '',
+  guardianName = '',
   agreedAt = null,
   version = 'v1.0',
 }) {
@@ -79,6 +80,14 @@ export default function PersonalDataConsentModal({
             <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
               {patientName}
             </Text>
+            {guardianName && (
+              <div style={{ marginTop: 4 }}>
+                <Text type="secondary">Người ký đại diện / Giám hộ hợp pháp: </Text>
+                <Text strong style={{ color: '#ea580c' }}>
+                  {guardianName}
+                </Text>
+              </div>
+            )}
           </div>
           {agreedAt && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
