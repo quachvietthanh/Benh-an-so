@@ -18,6 +18,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
 import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.RevenueBreakdownReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
 import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -26,6 +27,7 @@ import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
+import com.benhsoan.port.inbound.reporting.GetRevenueBreakdownReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
 
@@ -45,6 +47,7 @@ public class ReportsController {
     private final GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     private final GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
     private final ExportOperationalReportUseCase exportOperationalReportUseCase;
+    private final GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
     private final ReportingRestMapper mapper;
 
     @GetMapping("/summary")
@@ -58,6 +61,19 @@ public class ReportsController {
         validateRange(fromDate, toDate);
 
         return mapper.toResponse(getOperationalSummaryUseCase.getSummary(fromDate, toDate));
+    }
+
+    @GetMapping("/revenue-breakdown")
+    @RequirePermission("REPORT_VIEW")
+    public RevenueBreakdownReportResponse getRevenueBreakdown(
+            @RequestParam String from,
+            @RequestParam String to
+    ) {
+        LocalDate fromDate = parseDate(from, "from");
+        LocalDate toDate = parseDate(to, "to");
+        validateRange(fromDate, toDate);
+
+        return mapper.toResponse(getRevenueBreakdownReportUseCase.getRevenueBreakdown(fromDate, toDate));
     }
 
     @GetMapping("/visits-timeline")

@@ -14,6 +14,12 @@ import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicineItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorRevenueResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.RevenueBreakdownReportResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.ServiceGroupRevenueResponse;
+import com.benhsoan.port.dto.result.DoctorRevenueResult;
+import com.benhsoan.port.dto.result.RevenueBreakdownReportResult;
+import com.benhsoan.port.dto.result.ServiceGroupRevenueResult;
 import com.benhsoan.port.dto.result.TopMedicineItemResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 
@@ -53,6 +59,44 @@ public class ReportingRestMapper {
                 result.to(),
                 result.generatedAt(),
                 result.items().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public RevenueBreakdownReportResponse toResponse(RevenueBreakdownReportResult result) {
+        return new RevenueBreakdownReportResponse(
+                result.from(),
+                result.to(),
+                result.totalNetRevenue(),
+                result.totalExamRevenue(),
+                result.totalClinicalServiceRevenue(),
+                result.totalMedicationRevenue(),
+                result.totalAdjustmentRevenue(),
+                result.currency(),
+                result.serviceGroups() == null ? java.util.List.of() : result.serviceGroups().stream().map(this::toResponse).toList(),
+                result.doctors() == null ? java.util.List.of() : result.doctors().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private ServiceGroupRevenueResponse toResponse(ServiceGroupRevenueResult result) {
+        return new ServiceGroupRevenueResponse(
+                result.groupCode(),
+                result.groupName(),
+                result.revenue(),
+                result.percentage()
+        );
+    }
+
+    private DoctorRevenueResponse toResponse(DoctorRevenueResult result) {
+        return new DoctorRevenueResponse(
+                result.doctorId(),
+                result.doctorCode(),
+                result.doctorName(),
+                result.examRevenue(),
+                result.clinicalServiceRevenue(),
+                result.medicationRevenue(),
+                result.adjustmentRevenue(),
+                result.totalRevenue(),
+                result.percentage()
         );
     }
 

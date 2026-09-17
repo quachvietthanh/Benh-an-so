@@ -21,4 +21,6 @@ public interface OperationalReportQueryRepository {
     List<TopMedicineSummary> findTopDispensedMedicines(Instant fromInclusive, Instant toExclusive);
 
     List<DoctorVisitSummary> findDoctorVisitSummaries(Instant fromInclusive, Instant toExclusive);
+
+    List<InvoiceLineReportDetail> findInvoiceLineReportDetails(Instant fromInclusive, Instant toExclusive);
 }
