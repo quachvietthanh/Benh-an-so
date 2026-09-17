@@ -35,6 +35,7 @@ public class UpdateInstructionsAndTreatmentPlanService implements UpdateInstruct
     private final MedicalRecordAuthorizationService authorizationService;
     private final MedicalRecordAccessAuditService accessAuditService;
     private final MedicalRecordResultMapper resultMapper;
+    private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final ClockPort clockPort;
 
     @Override
@@ -65,6 +66,6 @@ public class UpdateInstructionsAndTreatmentPlanService implements UpdateInstruct
         MedicalRecord saved = medicalRecordRepository.save(record);
         accessAuditService.recordRecordAccess(visit.getPatientId(), visit.getId(), saved.getId(), userId,
                 MedicalRecordAccessAction.UPDATE, "Doctor instructions and treatment plan updated", now);
-        return resultMapper.toResult(saved);
+        return resultMapper.toResult(saved, templateMapper.resolveApplied(saved, visit));
     }
 }

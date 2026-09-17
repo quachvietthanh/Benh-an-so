@@ -97,7 +97,7 @@ public class MedicalRecord {
         return create(
                 visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
                 clinicalProgress, treatmentPlan, doctorInstructions, conclusion,
-                null, createdBy, createdAt
+                null, null, createdBy, createdAt
         );
     }
 
@@ -115,6 +115,29 @@ public class MedicalRecord {
             UUID createdBy,
             Instant createdAt
     ) {
+        return create(
+                visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion,
+                revisitDate, null, createdBy, createdAt
+        );
+    }
+
+    public static MedicalRecord create(
+            UUID visitId,
+            String chiefComplaint,
+            String symptoms,
+            String medicalHistory,
+            String physicalExamination,
+            String clinicalProgress,
+            String treatmentPlan,
+            String doctorInstructions,
+            String conclusion,
+            LocalDate revisitDate,
+            LocalDate visitDate,
+            UUID createdBy,
+            Instant createdAt
+    ) {
+        validateRevisitDate(revisitDate, visitDate);
         return new MedicalRecord(
                 UUID.randomUUID(),
                 visitId,
@@ -401,7 +424,7 @@ public class MedicalRecord {
         this.updatedAt = Objects.requireNonNull(at);
     }
 
-    private void validateRevisitDate(LocalDate revisitDate, LocalDate visitDate) {
+    private static void validateRevisitDate(LocalDate revisitDate, LocalDate visitDate) {
         if (revisitDate != null && visitDate != null && revisitDate.isBefore(visitDate)) {
             throw new ValidationException("Ngày tái khám không được trước ngày khám.");
         }

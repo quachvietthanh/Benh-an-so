@@ -1,6 +1,8 @@
 package com.benhsoan.application.ucservice.medicalrecord;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,8 @@ import lombok.RequiredArgsConstructor;
 @Transactional
 public class CreateMedicalRecordService implements CreateMedicalRecordUseCase {
 
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final MedicalRecordRepository medicalRecordRepository;
     private final VisitRepository visitRepository;
     private final MedicalRecordAuthorizationService authorizationService;
@@ -43,11 +47,12 @@ public class CreateMedicalRecordService implements CreateMedicalRecordUseCase {
             throw new MedicalRecordAlreadyExistsForVisitException(visit.getId());
         }
 
+        LocalDate visitDate = visit.getVisitAt() != null ? visit.getVisitAt().atZone(CLINIC_ZONE).toLocalDate() : null;
         Instant now = clockPort.now();
         MedicalRecord saved = medicalRecordRepository.save(MedicalRecord.create(
                 visit.getId(), command.chiefComplaint(), command.symptoms(), command.medicalHistory(),
                 command.physicalExamination(), command.clinicalProgress(), command.treatmentPlan(),
-                command.doctorInstructions(), command.conclusion(), userId, now
+                command.doctorInstructions(), command.conclusion(), command.revisitDate(), visitDate, userId, now
         ));
         accessAuditService.recordRecordAccessInCurrentTransaction(visit.getPatientId(), visit.getId(), saved.getId(), userId,
                 MedicalRecordAccessAction.CREATE, "Medical record created", now);

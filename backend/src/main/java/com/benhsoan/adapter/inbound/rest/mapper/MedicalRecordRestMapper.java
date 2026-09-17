@@ -162,7 +162,7 @@ public class MedicalRecordRestMapper {
         return new MedicalRecordClinicalSnapshotResponse(
                 snapshot.chiefComplaint(), snapshot.symptoms(), snapshot.medicalHistory(),
                 snapshot.physicalExamination(), snapshot.clinicalProgress(), snapshot.treatmentPlan(),
-                snapshot.doctorInstructions(), snapshot.conclusion(), snapshot.diagnoses()
+                snapshot.doctorInstructions(), snapshot.conclusion(), snapshot.revisitDate(), snapshot.diagnoses()
         );
     }
 

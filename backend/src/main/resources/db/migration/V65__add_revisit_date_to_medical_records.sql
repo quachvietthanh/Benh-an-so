@@ -1,5 +1,5 @@
 -- =====================================================
--- V62__add_revisit_date_to_medical_records.sql
+-- V65__add_revisit_date_to_medical_records.sql
 -- Add revisit_date to medical_records (NCL-04-CN-010)
 -- =====================================================
 

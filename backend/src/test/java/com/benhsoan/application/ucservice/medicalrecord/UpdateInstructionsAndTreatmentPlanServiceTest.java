@@ -45,6 +45,7 @@ class UpdateInstructionsAndTreatmentPlanServiceTest {
     @Mock private VisitRepository visitRepository;
     @Mock private MedicalRecordAuthorizationService authorizationService;
     @Mock private MedicalRecordAccessAuditService accessAuditService;
+    @Mock private MedicalRecordTemplateApplicationMapper templateMapper;
     @Mock private ClockPort clockPort;
     @Spy private MedicalRecordResultMapper resultMapper = new MedicalRecordResultMapper();
 
@@ -87,6 +88,7 @@ class UpdateInstructionsAndTreatmentPlanServiceTest {
         verify(authorizationService).requireContentVisitWriteAccess(doctorId, visit.getDoctorId(), record.getId());
         verify(medicalRecordRepository).findByIdForUpdate(record.getId());
         verify(medicalRecordRepository).save(record);
+        verify(templateMapper).resolveApplied(record, visit);
         verify(accessAuditService).recordRecordAccess(patientId, visitId, record.getId(), doctorId,
                 MedicalRecordAccessAction.UPDATE, "Doctor instructions and treatment plan updated", now);
     }

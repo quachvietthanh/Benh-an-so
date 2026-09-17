@@ -113,7 +113,7 @@ public class GetMedicalRecordVersionHistoryService implements GetMedicalRecordVe
         return new MedicalRecordClinicalSnapshot(
                 record.getChiefComplaint(), record.getSymptoms(), record.getMedicalHistory(),
                 record.getPhysicalExamination(), record.getClinicalProgress(), record.getTreatmentPlan(),
-                record.getDoctorInstructions(), record.getConclusion(), diagnosisLabels
+                record.getDoctorInstructions(), record.getConclusion(), record.getRevisitDate(), diagnosisLabels
         );
     }
 
