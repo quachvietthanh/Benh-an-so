@@ -160,6 +160,18 @@ test('NCL-03-CN-009-TC-03: Từ chối tạm hoãn hoặc đưa lại hàng đ�
   const doctorReQueue = evaluateReQueueAction(skippedItem, doctorOnlyPerms)
   assert.equal(doctorReQueue.allowed, false)
   assert.match(doctorReQueue.message, /chỉ lễ tân hoặc quản trị viên/i)
+
+  // 5. Kiểm tra phân quyền RBAC: User không đủ quyền (không phải Bác sĩ/Lễ tân/Admin) khi thao tác Tạm hoãn
+  const unauthorizedPerms = {
+    isAdmin: false,
+    isReceptionist: false,
+    isDoctor: false,
+    canSkip: false,
+  }
+  const inProgressItem = { id: 'queue-item-07', status: 'IN_PROGRESS', callCount: 1 }
+  const deferUnauthorized = evaluateDeferAction(inProgressItem, unauthorizedPerms)
+  assert.equal(deferUnauthorized.allowed, false)
+  assert.match(deferUnauthorized.message, /bạn không có quyền thực hiện thao tác tạm hoãn/i)
 })
 
 test('NCL-03-CN-009-TC-04: Tra cứu và phân tích lịch sử luân chuyển hàng đợi (Queue History Audit)', () => {
@@ -227,14 +239,32 @@ test('NCL-03-CN-009-TC-04: Tra cứu và phân tích lịch sử luân chuyển 
   assert.equal(formatQueueActionVi(mockHistoryData[2].action), 'Tạm hoãn lượt khám')
   assert.equal(formatQueueActionVi(mockHistoryData[3].action), 'Đưa lại vào hàng đợi')
 
-  // 4. Kiểm tra xử lý thông điệp lỗi API
-  const simulatedError = {
+  // 4. Kiểm tra xử lý thông điệp lỗi API theo cấu trúc ApiErrorResponse chuẩn của Backend
+  const simulatedBackendError = {
     response: {
+      status: 400,
       data: {
-        message: 'Only skipped items can be re-queued',
+        timestamp: '2026-09-17T03:14:00Z',
+        status: 400,
+        error: 'Bad Request',
+        code: 'QUEUE_ITEM_INVALID_STATUS',
+        message: 'Queue item status WAITING does not allow this action. Expected IN_PROGRESS.',
+        path: '/api/v1/queue-items/item-100/skip',
       },
     },
   }
-  const cleanError = cleanQueueActionErrorMessage(simulatedError, 'Thao tác không thành công')
-  assert.equal(cleanError, 'Chỉ có thể đưa bệnh nhân đang ở trạng thái Tạm hoãn trở lại hàng đợi.')
+  const cleanError = cleanQueueActionErrorMessage(simulatedBackendError, 'Thao tác không thành công')
+  assert.equal(cleanError, 'Lượt khám không ở trạng thái phù hợp để thực hiện thao tác này.')
+
+  // Kiểm tra xử lý lỗi không có quyền (403 / UNAUTHORIZED_QUEUE_OPERATION)
+  const forbiddenError = {
+    response: {
+      status: 403,
+      data: {
+        code: 'UNAUTHORIZED_QUEUE_OPERATION',
+        message: 'Access denied.',
+      },
+    },
+  }
+  assert.equal(cleanQueueActionErrorMessage(forbiddenError), 'Bạn không có quyền thực hiện thao tác này.')
 })
