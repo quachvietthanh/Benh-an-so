@@ -20,6 +20,11 @@ Administrative scope is a whitelist of (resource type, action) combinations:
 | `SERVICE_CATALOG` | `CREATE`, `UPDATE`, `ACTIVATE`, `DEACTIVATE` |
 | `SERVICE_PRICE` | `CREATE` |
 
+> **SERVICE_PRICE is append-only.** Service prices are versioned by effective
+> date: introducing a new price version always appends a new `SERVICE_PRICE`
+> record rather than mutating an existing one. For that reason a price change is
+> audited as `CREATE` (a new version), never as `UPDATE`.
+
 Records that are **not** administrative configuration operations are excluded
 from this view even when they share a resource type, e.g. `ACCESS_DENIED`
 (`PERMISSION`), automatic login lockout (`LOCK` on `USER`), `CHANGE_PASSWORD`
@@ -47,6 +52,10 @@ and `RESET_PASSWORD` (`USER`). Login activity (`LOGIN`, `LOGOUT`,
 | `size` | int | no (default `20`) | Page size. |
 | `sort` | string | no (default `createdAt,desc`) | Spring Data sort expression. |
 
+> **Date-range semantics.** `from` is inclusive and `to` is exclusive. A request
+> with `from == to` therefore matches nothing (an empty interval); `from` must
+> not be after `to` (see §5).
+
 Example:
 
 ```
@@ -64,7 +73,7 @@ GET /admin-operation-logs?actorId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1&resourceT
       "id": "…",
       "actorId": "…",
       "actorName": "System Administrator",
-      "actionType": "UPDATE",
+      "actionType": "CREATE",
       "resourceType": "SERVICE_PRICE",
       "resourceId": "…",
       "detail": "{\"before\":{\"price\":95000.00,\"effectiveFrom\":\"2026-01-01\"},\"after\":{\"price\":120000.00,\"effectiveFrom\":\"2026-09-01\"}}",

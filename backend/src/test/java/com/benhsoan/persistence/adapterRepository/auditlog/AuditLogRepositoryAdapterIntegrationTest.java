@@ -154,6 +154,18 @@ class AuditLogRepositoryAdapterIntegrationTest {
     }
 
     @Test
+    void equalFromAndToYieldsEmptyInterval() {
+        Instant t = Instant.parse("2026-01-01T00:00:00Z");
+        repository.save(AuditLog.create(UUID.randomUUID(), ActionType.CREATE, ResourceType.MEDICINE,
+                UUID.randomUUID(), null, null, t));
+
+        var result = repository.findAdminOperationLogs(null, null, t, t, PageRequest.of(0, 20));
+
+        assertEquals(0, result.getTotalElements(),
+                "from == to must produce an empty interval because `to` is exclusive");
+    }
+
+    @Test
     void savedRecordIsReloadedUnchanged() {
         UUID actor = UUID.randomUUID();
         UUID resourceId = UUID.randomUUID();
