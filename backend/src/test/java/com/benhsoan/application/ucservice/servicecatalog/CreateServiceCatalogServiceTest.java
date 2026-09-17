@@ -19,12 +19,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
 import com.benhsoan.domain.servicecatalog.ServicePrice;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.servicecatalog.CreateServiceCatalogCommand;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -41,7 +40,7 @@ class CreateServiceCatalogServiceTest {
     @Mock
     private ServicePriceRepository servicePriceRepository;
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private AdminOperationAuditService adminOperationAuditService;
     @Mock
     private CurrentUserPort currentUserPort;
     @Mock
@@ -54,7 +53,7 @@ class CreateServiceCatalogServiceTest {
         service = new CreateServiceCatalogService(
                 serviceCatalogRepository,
                 servicePriceRepository,
-                auditLogRepository,
+                adminOperationAuditService,
                 currentUserPort,
                 clockPort,
                 new ServiceCatalogResultMapper()
@@ -69,8 +68,6 @@ class CreateServiceCatalogServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(servicePriceRepository.save(any(ServicePrice.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(auditLogRepository.save(any(AuditLog.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
         var result = service.create(command(new BigDecimal("95000.00")));
 
@@ -78,7 +75,8 @@ class CreateServiceCatalogServiceTest {
         assertEquals(0, result.price().compareTo(new BigDecimal("95000.00")));
         verify(serviceCatalogRepository).save(any(ServiceCatalog.class));
         verify(servicePriceRepository).save(any(ServicePrice.class));
-        verify(auditLogRepository, org.mockito.Mockito.times(2)).save(any(AuditLog.class));
+        verify(adminOperationAuditService, org.mockito.Mockito.times(2))
+                .record(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

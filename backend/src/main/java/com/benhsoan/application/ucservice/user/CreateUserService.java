@@ -3,7 +3,7 @@ package com.benhsoan.application.ucservice.user;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
@@ -18,7 +18,6 @@ import com.benhsoan.port.inbound.user.CreateUserUseCase;
 import com.benhsoan.port.outbound.authSecurity.PasswordEncoderPort;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
@@ -39,7 +38,7 @@ public class CreateUserService implements CreateUserUseCase {
 
     private final UserResultMapper userResultMapper;
 
-    private final AuditLogRepository auditLogRepository;
+    private final AdminOperationAuditService adminOperationAuditService;
     
     private final CurrentUserPort currentUserPort;
 
@@ -92,28 +91,22 @@ public class CreateUserService implements CreateUserUseCase {
 
         User saved = userRepository.save(user);
 
-        auditLogRepository.save(
-                AuditLog.create(
-                        currentUserPort.getCurrentUserId(),
-                        ActionType.CREATE,
-                        ResourceType.USER,
-                        saved.getId(),
-                        """
-                        {
-                        "username":"%s",
-                        "fullName":"%s",
-                        "email":"%s",
-                        "role":"%s"
-                        }
-                        """.formatted(
-                                saved.getUsername(),
-                                saved.getFullName(),
-                                saved.getEmail(),
-                                role.getName()),
-                        null
-                )
+        adminOperationAuditService.record(
+                currentUserPort.getCurrentUserId(),
+                ActionType.CREATE,
+                ResourceType.USER,
+                saved.getId(),
+                null,
+                AdminOperationAuditService.fields(
+                        "username", saved.getUsername(),
+                        "fullName", saved.getFullName(),
+                        "email", saved.getEmail(),
+                        "phone", saved.getPhone(),
+                        "role", role.getName(),
+                        "active", saved.isActive()),
+                clockPort.now()
         );
-        
+
         return userResultMapper.toResult(saved, role );
     }
 }

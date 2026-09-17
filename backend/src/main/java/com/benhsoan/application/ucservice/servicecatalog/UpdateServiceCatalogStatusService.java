@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
@@ -15,7 +15,6 @@ import com.benhsoan.domain.servicecatalog.ServicePrice;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.servicecatalog.ServiceCatalogResult;
 import com.benhsoan.port.inbound.servicecatalog.UpdateServiceCatalogStatusUseCase;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -30,7 +29,7 @@ public class UpdateServiceCatalogStatusService implements UpdateServiceCatalogSt
 
     private final ServiceCatalogRepository serviceCatalogRepository;
     private final ServicePriceRepository servicePriceRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AdminOperationAuditService adminOperationAuditService;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
     private final ServiceCatalogResultMapper resultMapper;
@@ -57,6 +56,7 @@ public class UpdateServiceCatalogStatusService implements UpdateServiceCatalogSt
 
         Instant now = clockPort.now();
         UUID actorId = currentUserPort.getCurrentUserId();
+        boolean beforeActive = serviceCatalog.isActive();
         if (active) {
             serviceCatalog.activate(now);
         } else {
@@ -64,15 +64,15 @@ public class UpdateServiceCatalogStatusService implements UpdateServiceCatalogSt
         }
 
         ServiceCatalog savedCatalog = serviceCatalogRepository.save(serviceCatalog);
-        auditLogRepository.save(AuditLog.create(
+        adminOperationAuditService.record(
                 actorId,
                 active ? ActionType.ACTIVATE : ActionType.DEACTIVATE,
                 ResourceType.SERVICE_CATALOG,
                 serviceCatalogId,
-                "Service status changed.",
-                null,
+                AdminOperationAuditService.fields("active", beforeActive),
+                AdminOperationAuditService.fields("active", savedCatalog.isActive()),
                 now
-        ));
+        );
 
         return resultMapper.toResult(
                 savedCatalog,

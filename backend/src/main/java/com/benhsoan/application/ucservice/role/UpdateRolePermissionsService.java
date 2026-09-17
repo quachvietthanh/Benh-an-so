@@ -7,7 +7,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Permission;
@@ -19,11 +19,11 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.role.UpdateRolePermissionsCommand;
 import com.benhsoan.port.dto.result.role.RolePermissionsResult;
 import com.benhsoan.port.inbound.role.UpdateRolePermissionsUseCase;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.PermissionRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,7 +37,8 @@ public class UpdateRolePermissionsService implements UpdateRolePermissionsUseCas
     private final PermissionRepository permissionRepository;
     private final UserRepository userRepository;
     private final CurrentUserPort currentUserPort;
-    private final AuditLogRepository auditLogRepository;
+    private final AdminOperationAuditService adminOperationAuditService;
+    private final ClockPort clockPort;
     private final RolePermissionsResultMapper mapper;
 
     @Override
@@ -63,12 +64,20 @@ public class UpdateRolePermissionsService implements UpdateRolePermissionsUseCas
                 .orElseThrow(() -> new IllegalStateException("Current user was not found."));
         ensureActorRetainsRoleManagement(actor, role, requestedCodes);
 
+        String roleName = role.getName();
         Set<String> before = role.getPermissions().stream().map(Permission::getCode).collect(java.util.stream.Collectors.toSet());
         role.replacePermissions(new HashSet<>(permissions));
         Role saved = roleRepository.save(role);
+        Set<String> after = saved.getPermissions().stream().map(Permission::getCode).collect(java.util.stream.Collectors.toSet());
 
-        auditLogRepository.save(AuditLog.create(actor.getId(), ActionType.UPDATE, ResourceType.ROLE, saved.getId(),
-                auditDetail(saved.getName(), before, requestedCodes), null));
+        adminOperationAuditService.record(
+                actor.getId(),
+                ActionType.UPDATE,
+                ResourceType.ROLE,
+                saved.getId(),
+                AdminOperationAuditService.fields("roleName", roleName, "permissions", sortedCodes(before)),
+                AdminOperationAuditService.fields("roleName", saved.getName(), "permissions", sortedCodes(after)),
+                clockPort.now());
         return mapper.role(saved);
     }
 
@@ -79,15 +88,7 @@ public class UpdateRolePermissionsService implements UpdateRolePermissionsUseCas
         }
     }
 
-    private String auditDetail(String roleName, Set<String> before, Set<String> after) {
-        Set<String> added = new HashSet<>(after); added.removeAll(before);
-        Set<String> removed = new HashSet<>(before); removed.removeAll(after);
-        return "{\"roleName\":\"%s\",\"before\":%s,\"after\":%s,\"added\":%s,\"removed\":%s}"
-                .formatted(roleName, jsonArray(before), jsonArray(after), jsonArray(added), jsonArray(removed));
-    }
-
-    private String jsonArray(Set<String> values) {
-        return values.stream().sorted().map(value -> "\"" + value + "\"")
-                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+    private static List<String> sortedCodes(Set<String> values) {
+        return values.stream().sorted().toList();
     }
 }

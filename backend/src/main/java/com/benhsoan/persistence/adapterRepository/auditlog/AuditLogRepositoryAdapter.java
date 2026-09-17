@@ -56,4 +56,15 @@ public class AuditLogRepositoryAdapter
                 .toList();
     }
 
+    @Override
+    public Page<AuditLog> findAdminOperationLogs(
+            UUID actorId,
+            com.benhsoan.domain.auditlog.enums.ResourceType resourceType,
+            java.time.Instant from,
+            java.time.Instant to,
+            Pageable pageable) {
+        return jpaRepository.findAdminOperationLogs(actorId, resourceType, from, to, pageable)
+                .map(mapper::toDomain);
+    }
+
 }

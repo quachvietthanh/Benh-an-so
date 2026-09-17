@@ -9,7 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
@@ -18,7 +18,6 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.servicecatalog.UpdateServiceCatalogCommand;
 import com.benhsoan.port.dto.result.servicecatalog.ServiceCatalogResult;
 import com.benhsoan.port.inbound.servicecatalog.UpdateServiceCatalogUseCase;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -33,7 +32,7 @@ public class UpdateServiceCatalogService implements UpdateServiceCatalogUseCase 
 
     private final ServiceCatalogRepository serviceCatalogRepository;
     private final ServicePriceRepository servicePriceRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AdminOperationAuditService adminOperationAuditService;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
     private final ServiceCatalogResultMapper resultMapper;
@@ -71,6 +70,10 @@ public class UpdateServiceCatalogService implements UpdateServiceCatalogUseCase 
         boolean statusChanged = serviceCatalog.isActive() != command.active();
         boolean priceCreated = shouldCreatePrice(candidatePrice, priceHistory);
 
+        String beforeName = serviceCatalog.getServiceName();
+        boolean beforeActive = serviceCatalog.isActive();
+        ServicePrice oldPrice = priceHistory.isEmpty() ? null : priceHistory.getFirst();
+
         if (nameChanged) {
             serviceCatalog.rename(command.serviceName(), now);
         }
@@ -82,19 +85,20 @@ public class UpdateServiceCatalogService implements UpdateServiceCatalogUseCase 
             }
         }
 
+        ServicePrice latestPrice = priceHistory.isEmpty() ? null : priceHistory.getFirst();
         try {
             if (nameChanged || statusChanged) {
                 serviceCatalog = serviceCatalogRepository.save(serviceCatalog);
             }
-            ServicePrice latestPrice = priceHistory.isEmpty() ? null : priceHistory.getFirst();
             if (priceCreated) {
                 latestPrice = servicePriceRepository.save(candidatePrice);
             }
-            auditChanges(serviceCatalog, candidatePrice, actorId, now, nameChanged, statusChanged, priceCreated);
-            return resultMapper.toResult(serviceCatalog, chooseLatest(latestPrice, priceHistory));
         } catch (DataIntegrityViolationException exception) {
             throw ServiceCatalogConflictTranslator.translate(exception);
         }
+        auditChanges(serviceCatalog, candidatePrice, oldPrice, beforeName, beforeActive,
+                actorId, now, nameChanged, statusChanged, priceCreated);
+        return resultMapper.toResult(serviceCatalog, chooseLatest(latestPrice, priceHistory));
     }
 
     private boolean shouldCreatePrice(ServicePrice candidate, List<ServicePrice> history) {
@@ -125,44 +129,55 @@ public class UpdateServiceCatalogService implements UpdateServiceCatalogUseCase 
     private void auditChanges(
             ServiceCatalog serviceCatalog,
             ServicePrice candidatePrice,
+            ServicePrice oldPrice,
+            String beforeName,
+            boolean beforeActive,
             UUID actorId,
             Instant now,
             boolean nameChanged,
             boolean statusChanged,
             boolean priceCreated
     ) {
-        if (nameChanged || priceCreated) {
-            auditLogRepository.save(AuditLog.create(
+        if (nameChanged) {
+            adminOperationAuditService.record(
                     actorId,
                     ActionType.UPDATE,
                     ResourceType.SERVICE_CATALOG,
                     serviceCatalog.getId(),
-                    "Service catalog information or price changed.",
-                    null,
+                    AdminOperationAuditService.fields(
+                            "serviceName", beforeName,
+                            "active", beforeActive),
+                    AdminOperationAuditService.fields(
+                            "serviceName", serviceCatalog.getServiceName(),
+                            "active", serviceCatalog.isActive()),
                     now
-            ));
+            );
         }
         if (statusChanged) {
-            auditLogRepository.save(AuditLog.create(
+            adminOperationAuditService.record(
                     actorId,
                     serviceCatalog.isActive() ? ActionType.ACTIVATE : ActionType.DEACTIVATE,
                     ResourceType.SERVICE_CATALOG,
                     serviceCatalog.getId(),
-                    "Service status changed.",
-                    null,
+                    AdminOperationAuditService.fields("active", beforeActive),
+                    AdminOperationAuditService.fields("active", serviceCatalog.isActive()),
                     now
-            ));
+            );
         }
         if (priceCreated) {
-            auditLogRepository.save(AuditLog.create(
+            adminOperationAuditService.record(
                     actorId,
                     ActionType.CREATE,
                     ResourceType.SERVICE_PRICE,
                     candidatePrice.getId(),
-                    "Service price version created.",
-                    null,
+                    AdminOperationAuditService.fields(
+                            "price", oldPrice == null ? null : oldPrice.getPrice(),
+                            "effectiveFrom", oldPrice == null ? null : oldPrice.getEffectiveFrom()),
+                    AdminOperationAuditService.fields(
+                            "price", candidatePrice.getPrice(),
+                            "effectiveFrom", candidatePrice.getEffectiveFrom()),
                     now
-            ));
+            );
         }
     }
 
