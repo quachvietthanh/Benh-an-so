@@ -1,6 +1,8 @@
 package com.benhsoan.application.ucservice.medicalrecord;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ public class UpdateMedicalRecordService implements UpdateMedicalRecordUseCase {
     private final MedicalRecordAccessAuditService accessAuditService;
     private final MedicalRecordTemplateApplicationMapper templateMapper;
     private final MedicalRecordResultMapper resultMapper;
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final ClockPort clockPort;
 
     @Override
@@ -47,9 +51,11 @@ public class UpdateMedicalRecordService implements UpdateMedicalRecordUseCase {
             throw new MedicalRecordInvalidVisitException(visit.getId());
         }
         Instant now = clockPort.now();
+        LocalDate visitDate = visit.getVisitAt() != null ? visit.getVisitAt().atZone(CLINIC_ZONE).toLocalDate() : null;
+        LocalDate revisitDate = command.revisitDate() != null ? command.revisitDate() : record.getRevisitDate();
         record.updateContent(command.chiefComplaint(), command.symptoms(), command.medicalHistory(),
                 command.physicalExamination(), command.clinicalProgress(), command.treatmentPlan(),
-                command.doctorInstructions(), command.conclusion(), userId, now);
+                command.doctorInstructions(), command.conclusion(), revisitDate, visitDate, userId, now);
         MedicalRecord saved = medicalRecordRepository.save(record);
         accessAuditService.recordRecordAccess(visit.getPatientId(), visit.getId(), saved.getId(), userId,
                 MedicalRecordAccessAction.UPDATE, "Medical record updated", now);

@@ -30,6 +30,7 @@ import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecor
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ApplyMedicalRecordTemplateRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.IssueMedicalRecordCopyRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateInstructionsAndTreatmentPlanRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ReplaceMedicalRecordDiagnosesRequest;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordAccessLogResponse;
@@ -53,6 +54,7 @@ import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.IssueMedicalRecordCopyUseCase;
 import com.benhsoan.port.inbound.medicalrecord.LockMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.SignMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.UpdateInstructionsAndTreatmentPlanUseCase;
 import com.benhsoan.port.inbound.medicalrecord.UpdateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ReplaceMedicalRecordDiagnosesUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetOverdueMedicalRecordsUseCase;
@@ -81,6 +83,7 @@ public class MedicalRecordController {
     private final GetMedicalRecordTemplateSelectionUseCase getMedicalRecordTemplateSelectionUseCase;
     private final ApplyMedicalRecordTemplateUseCase applyMedicalRecordTemplateUseCase;
     private final UpdateMedicalRecordUseCase updateMedicalRecordUseCase;
+    private final UpdateInstructionsAndTreatmentPlanUseCase updateInstructionsAndTreatmentPlanUseCase;
     private final LockMedicalRecordUseCase lockMedicalRecordUseCase;
     private final SignMedicalRecordUseCase signMedicalRecordUseCase;
     private final ArchiveMedicalRecordUseCase archiveMedicalRecordUseCase;
@@ -147,6 +150,15 @@ public class MedicalRecordController {
     public MedicalRecordResponse update(@PathVariable UUID medicalRecordId,
             @RequestBody UpdateMedicalRecordRequest request) {
         return mapper.toResponse(updateMedicalRecordUseCase.update(medicalRecordId, mapper.toCommand(request)));
+    }
+
+    @PutMapping("/{medicalRecordId}/instructions-and-treatment-plan")
+    @RequirePermission("MEDICAL_RECORD_UPDATE")
+    public MedicalRecordResponse updateInstructionsAndTreatmentPlan(
+            @PathVariable UUID medicalRecordId,
+            @Valid @RequestBody UpdateInstructionsAndTreatmentPlanRequest request) {
+        return mapper.toResponse(updateInstructionsAndTreatmentPlanUseCase.updateInstructionsAndTreatmentPlan(
+                medicalRecordId, mapper.toCommand(request)));
     }
 
     @PutMapping("/{medicalRecordId}/template")
