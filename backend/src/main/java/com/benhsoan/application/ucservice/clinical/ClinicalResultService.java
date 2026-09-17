@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.ClinicalReferenceRange;
 import com.benhsoan.domain.clinical.ClinicalResult;
 import com.benhsoan.domain.clinical.ClinicalResultHistory;
@@ -83,7 +84,7 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
     @Override
     public ClinicalResultResult enter(UUID clinicalOrderItemId, EnterClinicalResultCommand command) {
         UUID actorId = authorizationService.requireWriteAccess();
-        var item = clinicalOrderItemRepository.findById(clinicalOrderItemId)
+        var item = clinicalOrderItemRepository.findByIdForUpdate(clinicalOrderItemId)
                 .orElseThrow(() -> new ClinicalOrderItemNotFoundException(clinicalOrderItemId));
         if (item.getStatus() != ClinicalOrderItemStatus.PENDING
                 || clinicalResultRepository.findByClinicalOrderItemId(clinicalOrderItemId).isPresent()) {
@@ -210,10 +211,18 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         if (order.getStatus() == ClinicalOrderStatus.ORDERED) {
             order.start(now);
         }
-        boolean allCompleted = clinicalOrderItemRepository.findByClinicalOrderIdIn(List.of(order.getId())).stream()
-                .allMatch(item -> item.getStatus() == ClinicalOrderItemStatus.COMPLETED);
-        if (allCompleted) {
-            order.complete(now);
+        List<ClinicalOrderItem> items = clinicalOrderItemRepository.findByClinicalOrderIdIn(List.of(order.getId()));
+        boolean allFinished = items.stream().allMatch(item ->
+                item.getStatus() == ClinicalOrderItemStatus.COMPLETED || item.getStatus() == ClinicalOrderItemStatus.CANCELLED);
+        boolean anyCompleted = items.stream().anyMatch(item -> item.getStatus() == ClinicalOrderItemStatus.COMPLETED);
+        boolean allCancelled = items.stream().allMatch(item -> item.getStatus() == ClinicalOrderItemStatus.CANCELLED);
+
+        if (allFinished) {
+            if (anyCompleted) {
+                order.complete(now);
+            } else if (allCancelled) {
+                order.cancel("Tất cả chỉ định thành phần đã bị hủy", order.getOrderedBy(), now);
+            }
         } else if (order.getStatus() == ClinicalOrderStatus.IN_PROGRESS) {
             order.markPartiallyCompleted(now);
         }
