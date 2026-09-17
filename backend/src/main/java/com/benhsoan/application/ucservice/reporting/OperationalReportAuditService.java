@@ -26,15 +26,30 @@ public class OperationalReportAuditService {
     private final ClockPort clockPort;
 
     public void logExport(ReportType reportType, LocalDate from, LocalDate to) {
+        logExport(reportType, from, to, null);
+    }
+
+    public void logExport(ReportType reportType, LocalDate from, LocalDate to, UUID doctorId) {
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant exportedAt = clockPort.now();
 
-        auditLogRepository.save(AuditLog.create(
-                actorId,
-                ActionType.EXPORT,
-                ResourceType.OPERATIONAL_REPORT,
-                null,
-                """
+        String detailJson = doctorId != null ? """
+                {
+                "reportType":"%s",
+                "role":"%s",
+                "from":"%s",
+                "to":"%s",
+                "doctorId":"%s",
+                "exportedAt":"%s"
+                }
+                """.formatted(
+                        reportType.name(),
+                        resolvePrimaryRole(currentUserPort.getCurrentUserRoles()),
+                        from,
+                        to,
+                        doctorId,
+                        exportedAt
+                ) : """
                 {
                 "reportType":"%s",
                 "role":"%s",
@@ -48,7 +63,14 @@ public class OperationalReportAuditService {
                         from,
                         to,
                         exportedAt
-                ),
+                );
+
+        auditLogRepository.save(AuditLog.create(
+                actorId,
+                ActionType.EXPORT,
+                ResourceType.OPERATIONAL_REPORT,
+                null,
+                detailJson,
                 null,
                 exportedAt
         ));

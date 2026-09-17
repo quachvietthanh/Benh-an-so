@@ -12,8 +12,12 @@ import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DiseasePatternItemResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DiseasePatternReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicineItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportResponse;
+import com.benhsoan.port.dto.result.DiseasePatternItemResult;
+import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.dto.result.TopMedicineItemResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 
@@ -53,6 +57,33 @@ public class ReportingRestMapper {
                 result.to(),
                 result.generatedAt(),
                 result.items().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public DiseasePatternReportResponse toResponse(DiseasePatternReportResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new DiseasePatternReportResponse(
+                result.from(),
+                result.to(),
+                result.doctorId(),
+                result.doctorName(),
+                result.totalDiagnoses(),
+                result.generatedAt(),
+                result.items().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private DiseasePatternItemResponse toResponse(DiseasePatternItemResult result) {
+        return new DiseasePatternItemResponse(
+                result.rank(),
+                result.catalogId(),
+                result.diseaseCode(),
+                result.diseaseName(),
+                result.diseaseGroup(),
+                result.diagnosisCount(),
+                result.percentage()
         );
     }
 

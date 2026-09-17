@@ -14,9 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
+import com.benhsoan.port.outbound.repository.reporting.DiseasePatternSummary;
 import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
+
+import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -179,6 +182,81 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
                         ((Number) row[3]).longValue()
                 ))
                 .toList();
+    }
+
+    @Override
+    public List<DiseasePatternSummary> findDiseasePatternSummaries(
+            Instant fromInclusive,
+            Instant toExclusive,
+            UUID doctorId
+    ) {
+        String jpql = """
+                select d.diagnosisCatalogId,
+                       c.code,
+                       c.name,
+                       c.diseaseGroup,
+                       count(d.id)
+                from MedicalRecordDiagnosisEntity d
+                join DiagnosisCatalogEntity c on c.id = d.diagnosisCatalogId
+                join MedicalRecordEntity mr on mr.id = d.medicalRecordId
+                join VisitEntity v on v.id = mr.visitId
+                where d.diagnosedAt >= :fromInclusive
+                  and d.diagnosedAt < :toExclusive
+                  and d.diagnosisCatalogId is not null
+                  and v.status <> :cancelledStatus
+                """
+                + (doctorId != null ? " and d.diagnosedBy = :doctorId\n" : "\n")
+                + """
+                group by d.diagnosisCatalogId, c.code, c.name, c.diseaseGroup
+                order by count(d.id) desc, c.code asc
+                """;
+
+        var query = entityManager.createQuery(jpql, Object[].class)
+                .setParameter("fromInclusive", fromInclusive)
+                .setParameter("toExclusive", toExclusive)
+                .setParameter("cancelledStatus", VisitStatus.CANCELLED);
+
+        if (doctorId != null) {
+            query.setParameter("doctorId", doctorId);
+        }
+
+        return query.getResultList()
+                .stream()
+                .map(row -> new DiseasePatternSummary(
+                        (UUID) row[0],
+                        (String) row[1],
+                        (String) row[2],
+                        (String) row[3],
+                        ((Number) row[4]).longValue()
+                ))
+                .toList();
+    }
+
+    @Override
+    public boolean hasDiagnoses(Instant fromInclusive, Instant toExclusive, UUID doctorId) {
+        String jpql = """
+                select count(d.id)
+                from MedicalRecordDiagnosisEntity d
+                join MedicalRecordEntity mr on mr.id = d.medicalRecordId
+                join VisitEntity v on v.id = mr.visitId
+                where d.diagnosedAt >= :fromInclusive
+                  and d.diagnosedAt < :toExclusive
+                  and d.diagnosisCatalogId is not null
+                  and v.status <> :cancelledStatus
+                """
+                + (doctorId != null ? " and d.diagnosedBy = :doctorId" : "");
+
+        var query = entityManager.createQuery(jpql, Long.class)
+                .setParameter("fromInclusive", fromInclusive)
+                .setParameter("toExclusive", toExclusive)
+                .setParameter("cancelledStatus", VisitStatus.CANCELLED);
+
+        if (doctorId != null) {
+            query.setParameter("doctorId", doctorId);
+        }
+
+        Long count = query.getSingleResult();
+        return count != null && count > 0;
     }
 
     private LocalDate toLocalDate(Object value) {

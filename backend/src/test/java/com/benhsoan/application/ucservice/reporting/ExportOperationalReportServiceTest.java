@@ -181,6 +181,102 @@ class ExportOperationalReportServiceTest {
         verify(auditService).logExport(ReportType.REVENUE_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 2));
     }
 
+    @Test
+    void exportsDiseasePatternCsvWithoutDoctor() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(dataService.hasReportData(ReportType.DISEASE_PATTERN_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)))
+                .thenReturn(true);
+
+        java.util.UUID catalogId = java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
+        when(dataService.getDiseasePatterns(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null))
+                .thenReturn(new com.benhsoan.port.dto.result.DiseasePatternReportResult(
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31),
+                        null,
+                        null,
+                        50L,
+                        null,
+                        List.of(new com.benhsoan.port.dto.result.DiseasePatternItemResult(
+                                1,
+                                catalogId,
+                                "J00",
+                                "Viêm mũi họng cấp",
+                                "Bệnh hệ hô hấp",
+                                50L,
+                                100.0))
+                ));
+
+        ExportOperationalReportService service = new ExportOperationalReportService(dataService, auditService);
+        OperationalReportExportResult result = service.export(
+                ReportType.DISEASE_PATTERN_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals("disease-pattern-report-2026-08-01-to-2026-08-31.csv", result.fileName());
+        assertArrayEquals("""
+                \uFEFFDISEASE PATTERN REPORT
+                From,2026-08-01
+                To,2026-08-31
+                Doctor,All Doctors
+                Total Diagnoses,50
+
+                Rank,Disease Code,Disease Name,Disease Group,Diagnosis Count,Percentage
+                1,J00,Viêm mũi họng cấp,Bệnh hệ hô hấp,50,100.00%
+                """.getBytes(StandardCharsets.UTF_8), result.content());
+        verify(auditService).logExport(ReportType.DISEASE_PATTERN_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+    }
+
+    @Test
+    void exportsDiseasePatternCsvWithDoctor() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        com.benhsoan.port.outbound.repository.auth.UserRepository userRepository =
+                mock(com.benhsoan.port.outbound.repository.auth.UserRepository.class);
+
+        java.util.UUID doctorId = java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2");
+        com.benhsoan.domain.auth.User doctor = mock(com.benhsoan.domain.auth.User.class);
+        when(doctor.getFullName()).thenReturn("Dr. Nguyen Minh Anh");
+        when(userRepository.findById(doctorId)).thenReturn(java.util.Optional.of(doctor));
+
+        when(dataService.hasReportData(ReportType.DISEASE_PATTERN_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), doctorId))
+                .thenReturn(true);
+
+        java.util.UUID catalogId = java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
+        when(dataService.getDiseasePatterns(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), doctorId, "Dr. Nguyen Minh Anh"))
+                .thenReturn(new com.benhsoan.port.dto.result.DiseasePatternReportResult(
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31),
+                        doctorId,
+                        "Dr. Nguyen Minh Anh",
+                        20L,
+                        null,
+                        List.of(new com.benhsoan.port.dto.result.DiseasePatternItemResult(
+                                1,
+                                catalogId,
+                                "I10",
+                                "Tăng huyết áp",
+                                "Bệnh hệ tuần hoàn",
+                                20L,
+                                100.0))
+                ));
+
+        ExportOperationalReportService service = new ExportOperationalReportService(dataService, auditService, userRepository);
+        OperationalReportExportResult result = service.export(
+                ReportType.DISEASE_PATTERN_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), doctorId);
+
+        assertEquals("disease-pattern-report-2026-08-01-to-2026-08-31-doctor-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2.csv", result.fileName());
+        assertArrayEquals("""
+                \uFEFFDISEASE PATTERN REPORT
+                From,2026-08-01
+                To,2026-08-31
+                Doctor,Dr. Nguyen Minh Anh
+                Total Diagnoses,20
+
+                Rank,Disease Code,Disease Name,Disease Group,Diagnosis Count,Percentage
+                1,I10,Tăng huyết áp,Bệnh hệ tuần hoàn,20,100.00%
+                """.getBytes(StandardCharsets.UTF_8), result.content());
+        verify(auditService).logExport(ReportType.DISEASE_PATTERN_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), doctorId);
+    }
+
     private OperationalReportData sampleReportData() {
         return new OperationalReportData(
                 new OperationalSummaryResult(

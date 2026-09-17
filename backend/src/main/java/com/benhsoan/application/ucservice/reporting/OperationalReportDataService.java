@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.reporting.enums.ReportType;
+import com.benhsoan.port.dto.result.DiseasePatternItemResult;
+import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
@@ -20,8 +22,11 @@ import com.benhsoan.port.dto.result.TopMedicineItemResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
+import com.benhsoan.port.outbound.repository.reporting.DiseasePatternSummary;
 import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
+
+import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
 
@@ -64,6 +69,10 @@ public class OperationalReportDataService {
     }
 
     public boolean hasReportData(ReportType reportType, LocalDate from, LocalDate to) {
+        return hasReportData(reportType, from, to, null);
+    }
+
+    public boolean hasReportData(ReportType reportType, LocalDate from, LocalDate to, UUID doctorId) {
         ReportingTimeRange range = ReportingTimeRange.of(from, to);
         return switch (reportType) {
             case VISIT_REPORT -> operationalReportQueryRepository.hasCompletedVisits(
@@ -73,6 +82,8 @@ public class OperationalReportDataService {
             case OPERATIONAL_REPORT -> operationalReportQueryRepository.hasCompletedVisits(
                     range.fromInclusive(), range.toExclusive())
                     || operationalReportQueryRepository.hasInvoices(range.fromInclusive(), range.toExclusive());
+            case DISEASE_PATTERN_REPORT -> operationalReportQueryRepository.hasDiagnoses(
+                    range.fromInclusive(), range.toExclusive(), doctorId);
         };
     }
 
@@ -119,6 +130,50 @@ public class OperationalReportDataService {
         return new DoctorVisitsReportResult(
                 from,
                 to,
+                null,
+                items
+        );
+    }
+
+    public DiseasePatternReportResult getDiseasePatterns(
+            LocalDate from,
+            LocalDate to,
+            UUID doctorId,
+            String doctorName
+    ) {
+        ReportingTimeRange range = ReportingTimeRange.of(from, to);
+        List<DiseasePatternSummary> summaries =
+                operationalReportQueryRepository.findDiseasePatternSummaries(
+                        range.fromInclusive(), range.toExclusive(), doctorId);
+
+        long totalDiagnoses = 0L;
+        for (DiseasePatternSummary summary : summaries) {
+            totalDiagnoses += summary.diagnosisCount();
+        }
+
+        List<DiseasePatternItemResult> items = new ArrayList<>();
+        for (int index = 0; index < summaries.size(); index++) {
+            var item = summaries.get(index);
+            double percentage = totalDiagnoses > 0
+                    ? Math.round((double) item.diagnosisCount() * 10000.0 / totalDiagnoses) / 100.0
+                    : 0.0;
+            items.add(new DiseasePatternItemResult(
+                    index + 1,
+                    item.diagnosisCatalogId(),
+                    item.diseaseCode(),
+                    item.diseaseName(),
+                    item.diseaseGroup(),
+                    item.diagnosisCount(),
+                    percentage
+            ));
+        }
+
+        return new DiseasePatternReportResult(
+                from,
+                to,
+                doctorId,
+                doctorName,
+                totalDiagnoses,
                 null,
                 items
         );
