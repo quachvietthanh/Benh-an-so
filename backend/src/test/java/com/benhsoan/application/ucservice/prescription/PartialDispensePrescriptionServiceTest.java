@@ -332,7 +332,7 @@ class PartialDispensePrescriptionServiceTest {
     @SuppressWarnings("unchecked")
     private List<PrescriptionDispenseItem> capturedDispenseItems() {
         ArgumentCaptor<List<PrescriptionDispenseItem>> captor =
-                (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+                ArgumentCaptor.forClass(List.class);
         verify(dispenseItemRepository).saveAll(captor.capture());
         return captor.getValue();
     }
