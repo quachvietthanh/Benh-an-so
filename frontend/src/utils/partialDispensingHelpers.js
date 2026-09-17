@@ -1,12 +1,3 @@
-/**
- * Helpers & business validation logic for Partial Medication Dispensing (NCL-06-CN-008)
- */
-
-/**
- * Lấy số lượng còn lại cần cấp của một mục thuốc trong đơn.
- * @param {object} item
- * @returns {number}
- */
 export const getRemainingQuantity = (item) => {
   if (!item) return 0
   if (typeof item.remainingQuantity === 'number') {
@@ -17,13 +8,6 @@ export const getRemainingQuantity = (item) => {
   return Math.max(0, prescribed - dispensed)
 }
 
-/**
- * Kiểm tra tính hợp lệ của số lượng nhập vào cho 1 mục thuốc.
- * Quy tắc: 0 <= quantity <= remainingQuantity
- * @param {number|string} inputQty
- * @param {number} remainingQty
- * @returns {{ isValid: boolean, error: string | null }}
- */
 export const validateDispenseQuantity = (inputQty, remainingQty) => {
   if (inputQty === null || inputQty === undefined || inputQty === '') {
     return { isValid: false, error: 'Số lượng không được để trống.' }
@@ -44,31 +28,12 @@ export const validateDispenseQuantity = (inputQty, remainingQty) => {
   return { isValid: true, error: null }
 }
 
-/**
- * Tính số lượng thuốc còn thiếu sau lần cấp này.
- * @param {number} inputQty
- * @param {number} remainingQty
- * @returns {number}
- */
 export const calculateItemShortage = (inputQty, remainingQty) => {
   const validRemaining = Math.max(0, Number(remainingQty || 0))
   const validDispensed = Math.max(0, Number(inputQty || 0))
   return Math.max(0, validRemaining - validDispensed)
 }
 
-/**
- * Chuẩn bị payload gửi lên Backend cho API:
- * POST /prescriptions/{id}/partial-dispense
- * 
- * CONTRACT BẮT BUỘC:
- * - Backend validate @Min(1) trên từng item: "quantity must be greater than zero".
- * - CHỈ gửi các item có quantity > 0.
- * - Nếu 1 thuốc không cấp đợt này (quantity = 0), PHẢI LOẠI BỎ hoàn toàn khỏi mảng items.
- * 
- * @param {Record<string, number>} quantities Map itemId -> số lượng nhập
- * @param {Array<object>} items Danh sách các thuốc trong đơn
- * @returns {{ payloadItems: Array<{ prescriptionItemId: string, quantity: number }>, hasAnyItemToDispense: boolean }}
- */
 export const buildPartialDispensePayload = (quantities = {}, items = []) => {
   if (!Array.isArray(items) || items.length === 0) {
     return { payloadItems: [], hasAnyItemToDispense: false }
@@ -81,11 +46,9 @@ export const buildPartialDispensePayload = (quantities = {}, items = []) => {
     if (!itemId) return
 
     const remaining = getRemainingQuantity(item)
-    // Nếu không nhập, mặc định là remainingQuantity (cấp hết phần còn lại)
     const rawValue = quantities[itemId] !== undefined ? quantities[itemId] : remaining
     const qty = Math.floor(Number(rawValue || 0))
 
-    // LỌC BỎ triệt để các item có quantity <= 0 (theo đúng @Min(1) của Backend)
     if (qty > 0) {
       payloadItems.push({
         prescriptionItemId: itemId,
@@ -100,13 +63,6 @@ export const buildPartialDispensePayload = (quantities = {}, items = []) => {
   }
 }
 
-/**
- * Kiểm tra xem sau lần cấp phát này có thuốc nào còn thiếu hay không.
- * Phục vụ hiển thị Modal.confirm cảnh báo dược sĩ trước khi gửi.
- * @param {Record<string, number>} quantities
- * @param {Array<object>} items
- * @returns {boolean}
- */
 export const hasShortageAfterDispense = (quantities = {}, items = []) => {
   if (!Array.isArray(items) || items.length === 0) return false
 
@@ -121,22 +77,12 @@ export const hasShortageAfterDispense = (quantities = {}, items = []) => {
   })
 }
 
-/**
- * Map mã lỗi trả về từ Backend sang thông báo thân thiện và phân loại dữ liệu.
- * Phân loại và ánh xạ mã lỗi: 409 INSUFFICIENT_STOCK, 409 DATA_INTEGRITY_VIOLATION, 400, 403, và 500 fallback.
- * 
- * @param {object} error
- * @param {string} prescriptionId
- * @param {Array<object>} payloadItems
- * @returns {{ status: number, code: string, message: string, shortages: Array<object> }}
- */
 export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
   const status = error?.response?.status || error?.status || 0
   const responseData = error?.response?.data || error?.data || {}
   const code = responseData?.code || ''
   const details = responseData?.details || {}
 
-  // Case 1: 409 INSUFFICIENT_STOCK - Kèm danh sách thiếu hụt tồn kho
   if (status === 409 && (code === 'INSUFFICIENT_STOCK' || Array.isArray(details.shortages))) {
     const shortages = Array.isArray(details.shortages) ? details.shortages : []
     return {
@@ -147,7 +93,6 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
-  // Case 1b: 409 DATA_INTEGRITY_VIOLATION - Lỗi xung đột ràng buộc hệ thống
   if (code === 'DATA_INTEGRITY_VIOLATION' || (status === 409 && code === 'DATA_INTEGRITY_VIOLATION')) {
     return {
       status: 409,
@@ -158,7 +103,6 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
-  // Case 2: 409 khác - Đơn đã hủy hoặc đã cấp phát xong
   if (status === 409) {
     return {
       status: 409,
@@ -168,7 +112,6 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
-  // Case 3: 400 - Dữ liệu số lượng không hợp lệ
   if (status === 400) {
     return {
       status: 400,
@@ -178,7 +121,6 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
-  // Case 4: 403 - Không đủ quyền
   if (status === 403) {
     return {
       status: 403,
@@ -188,7 +130,6 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
-  // Case 5: 500 - Lớp phòng vệ lỗi hệ thống Backend
   if (status === 500) {
     console.error('[PartialDispense 500 Error]', {
       prescriptionId,
@@ -204,7 +145,6 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
     }
   }
 
-  // Fallback
   return {
     status,
     code: code || 'UNKNOWN_ERROR',
@@ -213,13 +153,6 @@ export const mapDispenseError = (error, prescriptionId, payloadItems = []) => {
   }
 }
 
-/**
- * Kiểm tra phân quyền thực hiện cấp phát thuốc.
- * Chỉ PHARMACIST và ADMIN có quyền cấp phát.
- * @param {Array<string>} roles
- * @param {Array<string>} permissions
- * @returns {boolean}
- */
 export const canUserDispense = (roles = [], permissions = []) => {
   const normalizedRoles = (roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const normalizedPermissions = (permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -232,13 +165,6 @@ export const canUserDispense = (roles = [], permissions = []) => {
   return (isPharmacist || isAdmin || hasPerm) && !isPureDoctor
 }
 
-/**
- * Kiểm tra phân quyền xem lịch sử cấp phát thuốc.
- * DOCTOR, PHARMACIST, ADMIN, MANAGER đều có thể xem.
- * @param {Array<string>} roles
- * @param {Array<string>} permissions
- * @returns {boolean}
- */
 export const canUserViewDispenseHistory = (roles = [], permissions = []) => {
   const normalizedRoles = (roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
   const normalizedPermissions = (permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -253,15 +179,6 @@ export const canUserViewDispenseHistory = (roles = [], permissions = []) => {
   )
 }
 
-/**
- * Tính toán tiền thuốc thu ngân cho BillingPage theo nghiệp vụ:
- * Đơn PARTIALLY_DISPENSED bắt buộc tính theo dispensedQuantity (số lượng thực cấp),
- * KHÔNG tính theo quantity kê ban đầu!
- * 
- * @param {object} item Mục thuốc trong đơn
- * @param {string} prescriptionStatus Trạng thái đơn thuốc
- * @returns {{ effectiveQty: number, unitPrice: number, amount: number }}
- */
 export const calculateBillingItemAmount = (item, prescriptionStatus) => {
   if (!item) return { effectiveQty: 0, unitPrice: 0, amount: 0 }
 
@@ -269,7 +186,6 @@ export const calculateBillingItemAmount = (item, prescriptionStatus) => {
   let effectiveQty = 0
 
   if (prescriptionStatus === 'PARTIALLY_DISPENSED') {
-    // Yêu cầu nghiệp vụ bắt buộc: Tính tiền theo dispensedQuantity (số lượng thực cấp)
     effectiveQty = Math.max(0, Number(item.dispensedQuantity || 0))
   } else if (prescriptionStatus === 'DISPENSED') {
     effectiveQty = Math.max(0, Number(item.dispensedQuantity != null ? item.dispensedQuantity : item.quantity || 0))

@@ -38,12 +38,6 @@ import {
 
 const { Text, Title } = Typography
 
-/**
- * PartialDispenseModal — Cấp phát một phần khi tồn kho không đủ (NCL-06-CN-008)
- *
- * Cho phép Dược sĩ điều chỉnh số lượng thực cấp cho từng mặt thuốc khi tồn kho không đủ,
- * hệ thống trừ đúng phần đã cấp và chuyển đơn sang trạng thái PARTIALLY_DISPENSED.
- */
 function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [prescriptionData, setPrescriptionData] = useState(null)
@@ -52,7 +46,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
   const [serverShortages, setServerShortages] = useState([])
   const [errorMessage, setErrorMessage] = useState('')
 
-  // Nạp chi tiết đơn thuốc nếu chưa có items đầy đủ
   useEffect(() => {
     if (!open || !prescription) {
       setPrescriptionData(null)
@@ -84,7 +77,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
     }
   }, [open, prescription])
 
-  // Khởi tạo số lượng mặc định: điền sẵn = remainingQuantity (giả định đủ kho)
   const initQuantities = (items) => {
     const initial = {}
     items.forEach((item) => {
@@ -102,9 +94,7 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
     return prescriptionData?.items || []
   }, [prescriptionData])
 
-  // Xử lý khi dược sĩ đổi số lượng thực cấp cho 1 thuốc
   const handleQuantityChange = (itemId, val, maxQuantity) => {
-    // Validate cứng tại UI: không cho nhập âm hoặc vượt quá remainingQuantity
     let nextVal = val
     if (nextVal === null || nextVal === undefined) {
       nextVal = 0
@@ -124,7 +114,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
     setErrorMessage('')
   }
 
-  // Thực thi submit lên Backend
   const executeSubmit = async (payloadItems) => {
     const rxId = prescriptionData?.id || prescription?.id
     if (!rxId) {
@@ -137,7 +126,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
     setErrorMessage('')
 
     try {
-      // Gọi API POST /prescriptions/{id}/partial-dispense
       const response = await prescriptionDispenseApi.partialDispense(rxId, payloadItems)
       const data = response?.data
 
@@ -171,10 +159,7 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
     }
   }
 
-  // Xử lý khi nhấn nút "Xác nhận cấp một phần"
   const handleConfirmDispense = () => {
-    // BƯỚC 1: LỌC BỎ mọi item có quantity = 0 khỏi payload
-    // BẮT BUỘC theo contract @Min(1) của Backend:
     const { payloadItems, hasAnyItemToDispense } = buildPartialDispensePayload(quantities, items)
 
     if (!hasAnyItemToDispense) {
@@ -182,11 +167,9 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
       return
     }
 
-    // BƯỚC 2: Kiểm tra xem có thuốc nào còn thiếu hay không
     const willHaveShortage = hasShortageAfterDispense(quantities, items)
 
     if (willHaveShortage) {
-      // Hiện Modal.confirm cảnh báo trước khi submit theo đúng đặc tả
       Modal.confirm({
         title: 'Cảnh báo cấp phát một phần',
         icon: <ExclamationCircleOutlined style={{ color: '#f59e0b', fontSize: 24 }} />,
@@ -209,7 +192,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
         onOk: () => executeSubmit(payloadItems),
       })
     } else {
-      // Đủ tất cả các thuốc còn lại
       executeSubmit(payloadItems)
     }
   }
@@ -370,7 +352,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
       ]}
     >
       <div style={{ marginTop: 12 }}>
-        {/* Thông tin vắn tắt đơn thuốc */}
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 16 }}>
           <Descriptions.Item label="Mã đơn thuốc">
             <Tag color="blue" style={{ fontWeight: 700, margin: 0 }}>
@@ -400,7 +381,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
           </Descriptions.Item>
         </Descriptions>
 
-        {/* Hướng dẫn thao tác cho Dược sĩ */}
         <Alert
           type="info"
           showIcon
@@ -409,7 +389,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
           style={{ marginBottom: 16 }}
         />
 
-        {/* Cảnh báo lỗi 500 hoặc lỗi chung */}
         {errorMessage && (
           <Alert
             type="error"
@@ -420,7 +399,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
           />
         )}
 
-        {/* Bảng chi tiết thuốc thiếu hụt nhận từ Backend 409 INSUFFICIENT_STOCK */}
         {serverShortages.length > 0 && (
           <Alert
             type="error"
@@ -440,7 +418,6 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
           />
         )}
 
-        {/* Bảng danh sách thuốc cần cấp */}
         <Table
           rowKey={(r) => r.id || r.prescriptionItemId}
           columns={columns}

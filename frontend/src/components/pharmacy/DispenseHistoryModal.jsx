@@ -30,12 +30,6 @@ import { getApiErrorMessage } from '../../utils/apiError.js'
 
 const { Text, Title } = Typography
 
-/**
- * DispenseHistoryModal — Hiển thị lịch sử tất cả các lần cấp phát của đơn thuốc (NCL-06-CN-008)
- *
- * Hiển thị đầy đủ nhiều lần cấp phát (không chỉ lần gần nhất),
- * mỗi dòng thể hiện thời điểm, người cấp, tên thuốc, số lượng thực cấp, số lô xuất kho.
- */
 function DispenseHistoryModal({ open, onClose, prescription }) {
   const [loading, setLoading] = useState(false)
   const [historyItems, setHistoryItems] = useState([])
@@ -54,7 +48,6 @@ function DispenseHistoryModal({ open, onClose, prescription }) {
       .then((res) => {
         const data = res?.data
         const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : []
-        // Sắp xếp giảm dần theo thời gian cấp phát (mới nhất lên đầu)
         list.sort((a, b) =>
           String(b.dispensedAt || '').localeCompare(String(a.dispensedAt || ''))
         )
@@ -77,11 +70,9 @@ function DispenseHistoryModal({ open, onClose, prescription }) {
     }
   }, [open, rxId])
 
-  // Gom nhóm các lần cấp phát theo thời điểm (round of dispensing)
   const groupedEvents = React.useMemo(() => {
     const groups = new Map()
     historyItems.forEach((item) => {
-      // Key theo thời điểm cấp phát và người cấp
       const timeKey = item.dispensedAt ? dayjs(item.dispensedAt).format('YYYY-MM-DD HH:mm:ss') : 'Không rõ'
       const key = `${timeKey}_${item.dispenserName || item.dispensedBy || ''}`
       if (!groups.has(key)) {
@@ -211,7 +202,6 @@ function DispenseHistoryModal({ open, onClose, prescription }) {
           />
         )}
 
-        {/* Tổng kết tiến trình cấp phát */}
         {groupedEvents.length > 0 && (
           <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc', borderRadius: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>

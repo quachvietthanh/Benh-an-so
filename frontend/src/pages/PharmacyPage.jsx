@@ -1055,7 +1055,6 @@ function PharmacyPage() {
         />
       </Modal>
 
-      {/* Modal Cấp phát một phần khi tồn kho không đủ (NCL-06-CN-008) */}
       <PartialDispenseModal
         open={partialModalOpen}
         onClose={() => setPartialModalOpen(false)}
@@ -1065,7 +1064,6 @@ function PharmacyPage() {
         }}
       />
 
-      {/* Modal Lịch sử các lần cấp phát của đơn */}
       <DispenseHistoryModal
         open={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
