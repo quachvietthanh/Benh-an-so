@@ -61,4 +61,80 @@ public class VisitRestMapper {
                 : new VisitEncounterResponse.MedicalRecordInfo(
                         medicalRecord.id(), medicalRecord.status(), medicalRecord.lockedAt());
     }
+
+    public com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse toResponse(
+            com.benhsoan.port.dto.result.VisitSummaryResult result) {
+        if (result == null) return null;
+
+        var clinic = result.clinic() != null
+                ? new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.ClinicInfo(
+                        result.clinic().name(), result.clinic().address(), result.clinic().phone())
+                : null;
+
+        var patient = result.patient() != null
+                ? new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.PatientInfo(
+                        result.patient().id(),
+                        result.patient().patientCode(),
+                        anonymizationModeState.isEnabled()
+                                ? PatientAnonymizer.maskFullName(result.patient().patientCode())
+                                : result.patient().fullName(),
+                        result.patient().dateOfBirth(),
+                        result.patient().gender(),
+                        anonymizationModeState.isEnabled()
+                                ? PatientAnonymizer.maskPhone(result.patient().phone())
+                                : result.patient().phone(),
+                        result.patient().identityNumber())
+                : null;
+
+        var doctor = result.doctor() != null
+                ? new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.DoctorInfo(
+                        result.doctor().id(), result.doctor().fullName())
+                : null;
+
+        var medicalRecord = result.medicalRecord() != null
+                ? new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.MedicalRecordInfo(
+                        result.medicalRecord().id(),
+                        result.medicalRecord().status(),
+                        result.medicalRecord().signedAt(),
+                        result.medicalRecord().signedBy(),
+                        result.medicalRecord().signedByName())
+                : null;
+
+        var diagnoses = result.diagnoses() != null
+                ? result.diagnoses().stream()
+                        .map(d -> new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.DiagnosisItem(
+                                d.code(), d.name(), d.isPrimary()))
+                        .toList()
+                : java.util.Collections.<com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.DiagnosisItem>emptyList();
+
+        var clinicalOrders = result.clinicalOrders() != null
+                ? result.clinicalOrders().stream()
+                        .map(o -> new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.ClinicalOrderItemInfo(
+                                o.orderCode(), o.serviceCode(), o.serviceName(), o.instruction(), o.status()))
+                        .toList()
+                : java.util.Collections.<com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.ClinicalOrderItemInfo>emptyList();
+
+        var printHistory = result.printHistory() != null
+                ? result.printHistory().stream()
+                        .map(p -> new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.PrintHistoryItem(
+                                p.printedBy(), p.printedByName(), p.printedAt(), p.detail()))
+                        .toList()
+                : java.util.Collections.<com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse.PrintHistoryItem>emptyList();
+
+        return new com.benhsoan.adapter.inbound.rest.response.visit.VisitSummaryResponse(
+                result.visitId(),
+                result.visitCode(),
+                result.visitAt(),
+                clinic,
+                patient,
+                doctor,
+                medicalRecord,
+                diagnoses,
+                clinicalOrders,
+                result.doctorInstructions(),
+                result.treatmentPlan(),
+                result.revisitDate(),
+                printHistory
+        );
+    }
 }

@@ -49,6 +49,9 @@
 | `/api/v1/medical-records/{id}/diagnoses` | GET | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/medical-records/{id}/sign` | POST | ❌ | ✅ (chỉ bác sĩ phụ trách lượt khám) | ❌ | ❌ |
 | `/api/v1/medical-records/{id}/status` | PATCH | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/visits/{id}/encounter` | GET | ✅ | ✅ | ❌ | ❌ |
+| `/api/v1/visits/{id}/summary` | GET | ✅ | ✅ (chỉ BS phụ trách lượt khám) | ✅ | ❌ |
+| `/api/v1/visits/{id}/summary/print` | GET | ✅ | ✅ (chỉ BS phụ trách lượt khám) | ✅ | ❌ |
 |  |  |  |  |  |  |
 | **Prescriptions** |  |  |  |  |  |
 | `/api/v1/prescriptions` | GET | ✅ | ✅ | ❌ | ✅ |
@@ -190,7 +193,7 @@ PATIENT_CREATE, PATIENT_READ, PATIENT_UPDATE, PATIENT_DELETE, PATIENT_CONSENT_UP
 PATIENT_CHRONIC_DISEASE_WRITE, PATIENT_CHRONIC_DISEASE_READ, PATIENT_FAMILY_HISTORY_WRITE, PATIENT_FAMILY_HISTORY_READ
 
 // Medical Record
-RECORD_CREATE, RECORD_READ, RECORD_UPDATE, RECORD_DELETE, RECORD_UPDATE_STATUS
+RECORD_CREATE, RECORD_READ, RECORD_UPDATE, RECORD_DELETE, RECORD_UPDATE_STATUS, VISIT_SUMMARY_PRINT
 
 // Prescription
 PRESCRIPTION_CREATE, PRESCRIPTION_READ, PRESCRIPTION_UPDATE, PRESCRIPTION_DELETE, PRESCRIPTION_UPDATE_STATUS, PRESCRIPTION_PRINT,
