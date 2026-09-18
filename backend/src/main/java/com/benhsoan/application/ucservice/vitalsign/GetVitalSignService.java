@@ -1,6 +1,5 @@
 package com.benhsoan.application.ucservice.vitalsign;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,72 +25,69 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class GetVitalSignService implements GetVitalSignUseCase {
 
-    private final VitalSignRepository vitalSignRepository;
-    private final VisitRepository visitRepository;
-    private final VitalSignAuthorizationService authorizationService;
-    private final MedicalRecordAccessAuditService accessAuditService;
-    private final VitalSignResultMapper resultMapper;
-    private final ClockPort clockPort;
+        private final VitalSignRepository vitalSignRepository;
+        private final VisitRepository visitRepository;
+        private final VitalSignAuthorizationService authorizationService;
+        private final MedicalRecordAccessAuditService accessAuditService;
+        private final VitalSignResultMapper resultMapper;
+        private final ClockPort clockPort;
 
-    @Override
-    public VitalSignResult getById(UUID id) {
-        VitalSign vitalSign = vitalSignRepository.findById(id)
-                .orElseThrow(() -> new VitalSignNotFoundException(id));
+        @Override
+        public VitalSignResult getById(UUID id) {
+                VitalSign vitalSign = vitalSignRepository.findById(id)
+                                .orElseThrow(() -> new VitalSignNotFoundException(id));
 
-        Visit visit = visitRepository.findById(vitalSign.getVisitId())
-                .orElseThrow(() -> new VisitNotFoundException(vitalSign.getVisitId()));
+                Visit visit = visitRepository.findById(vitalSign.getVisitId())
+                                .orElseThrow(() -> new VisitNotFoundException(vitalSign.getVisitId()));
 
-        UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
+                UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
 
-        accessAuditService.recordRecordView(
-                vitalSign.getPatientId(),
-                vitalSign.getVisitId(),
-                vitalSign.getMedicalRecordId(),
-                actorId,
-                clockPort.now()
-        );
+                accessAuditService.recordRecordView(
+                                vitalSign.getPatientId(),
+                                vitalSign.getVisitId(),
+                                vitalSign.getMedicalRecordId(),
+                                actorId,
+                                clockPort.now());
 
-        return resultMapper.toResult(vitalSign);
-    }
-
-    @Override
-    public Optional<VitalSignResult> getLatestByVisitId(UUID visitId) {
-        Visit visit = visitRepository.findById(visitId)
-                .orElseThrow(() -> new VisitNotFoundException(visitId));
-
-        UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
-
-        Optional<VitalSign> vitalSignOpt = vitalSignRepository.findLatestByVisitId(visitId);
-        vitalSignOpt.ifPresent(vs -> accessAuditService.recordRecordView(
-                vs.getPatientId(),
-                vs.getVisitId(),
-                vs.getMedicalRecordId(),
-                actorId,
-                clockPort.now()
-        ));
-
-        return vitalSignOpt.map(resultMapper::toResult);
-    }
-
-    @Override
-    public List<VitalSignResult> getByVisitId(UUID visitId) {
-        Visit visit = visitRepository.findById(visitId)
-                .orElseThrow(() -> new VisitNotFoundException(visitId));
-
-        UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
-
-        List<VitalSign> list = vitalSignRepository.findByVisitId(visitId);
-        if (!list.isEmpty()) {
-            VitalSign first = list.get(0);
-            accessAuditService.recordRecordView(
-                    first.getPatientId(),
-                    first.getVisitId(),
-                    first.getMedicalRecordId(),
-                    actorId,
-                    clockPort.now()
-            );
+                return resultMapper.toResult(vitalSign);
         }
 
-        return resultMapper.toResults(list);
-    }
+        @Override
+        public Optional<VitalSignResult> getLatestByVisitId(UUID visitId) {
+                Visit visit = visitRepository.findById(visitId)
+                                .orElseThrow(() -> new VisitNotFoundException(visitId));
+
+                UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
+
+                Optional<VitalSign> vitalSignOpt = vitalSignRepository.findLatestByVisitId(visitId);
+                vitalSignOpt.ifPresent(vs -> accessAuditService.recordRecordView(
+                                vs.getPatientId(),
+                                vs.getVisitId(),
+                                vs.getMedicalRecordId(),
+                                actorId,
+                                clockPort.now()));
+
+                return vitalSignOpt.map(resultMapper::toResult);
+        }
+
+        @Override
+        public List<VitalSignResult> getByVisitId(UUID visitId) {
+                Visit visit = visitRepository.findById(visitId)
+                                .orElseThrow(() -> new VisitNotFoundException(visitId));
+
+                UUID actorId = authorizationService.requireVisitReadAccess(visit.getDoctorId(), visit.getId());
+
+                List<VitalSign> list = vitalSignRepository.findByVisitId(visitId);
+                if (!list.isEmpty()) {
+                        VitalSign first = list.get(0);
+                        accessAuditService.recordRecordView(
+                                        first.getPatientId(),
+                                        first.getVisitId(),
+                                        first.getMedicalRecordId(),
+                                        actorId,
+                                        clockPort.now());
+                }
+
+                return resultMapper.toResults(list);
+        }
 }

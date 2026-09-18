@@ -1,14 +1,17 @@
 package com.benhsoan.application.ucservice.role;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.lenient;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -22,18 +25,20 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Permission;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.LastAdministratorPermissionException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.role.UpdateRolePermissionsCommand;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.PermissionRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)
 class UpdateRolePermissionsServiceTest {
@@ -42,8 +47,11 @@ class UpdateRolePermissionsServiceTest {
     private static final UUID USER_ID = UUID.randomUUID();
     @Mock RoleRepository roleRepository; @Mock PermissionRepository permissionRepository;
     @Mock UserRepository userRepository; @Mock CurrentUserPort currentUserPort;
-    @Mock AuditLogRepository auditLogRepository; @Mock RolePermissionsResultMapper mapper;
-    @Captor ArgumentCaptor<AuditLog> auditCaptor;
+    @Mock AdminOperationAuditService adminOperationAuditService; @Mock ClockPort clockPort;
+    @Mock RolePermissionsResultMapper mapper;
+    @Captor ArgumentCaptor<Map<String, Object>> beforeCaptor;
+    @Captor ArgumentCaptor<Map<String, Object>> afterCaptor;
+    @Captor ArgumentCaptor<Instant> atCaptor;
     @InjectMocks UpdateRolePermissionsService service;
     Role role; User actor;
 
@@ -53,25 +61,25 @@ class UpdateRolePermissionsServiceTest {
         lenient().when(roleRepository.findById(ROLE_ID)).thenReturn(Optional.of(role));
         lenient().when(userRepository.findById(USER_ID)).thenReturn(Optional.of(actor));
         lenient().when(currentUserPort.getCurrentUserId()).thenReturn(USER_ID);
+        lenient().when(clockPort.now()).thenReturn(NOW);
     }
 
-    @Test void updatesPermissionsAndWritesBeforeAfterAudit() {
+    @Test void updatesPermissionsAndWritesStandardizedBeforeAfterAudit() {
         List<String> codes = List.of("ROLE_READ", "ROLE_UPDATE", "PERMISSION_READ");
         when(permissionRepository.findAllByCodes(Set.copyOf(codes))).thenReturn(codes.stream().map(this::permission).toList());
         when(userRepository.countActiveByRoleId(ROLE_ID)).thenReturn(2L);
         when(roleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         service.updateRolePermissions(new UpdateRolePermissionsCommand(ROLE_ID, codes));
-        verify(auditLogRepository).save(auditCaptor.capture());
-        AuditLog audit = auditCaptor.getValue();
-        org.junit.jupiter.api.Assertions.assertEquals(USER_ID, audit.getUserId());
-        org.junit.jupiter.api.Assertions.assertEquals(com.benhsoan.domain.auditlog.enums.ActionType.UPDATE, audit.getActionType());
-        org.junit.jupiter.api.Assertions.assertEquals(com.benhsoan.domain.auditlog.enums.ResourceType.ROLE, audit.getResourceType());
-        org.junit.jupiter.api.Assertions.assertNotNull(audit.getCreatedAt());
-        String detail = audit.getDetail();
-        org.junit.jupiter.api.Assertions.assertTrue(detail.contains("\"before\""));
-        org.junit.jupiter.api.Assertions.assertTrue(detail.contains("\"after\""));
-        org.junit.jupiter.api.Assertions.assertTrue(detail.contains("\"added\""));
-        org.junit.jupiter.api.Assertions.assertTrue(detail.contains("\"removed\""));
+
+        verify(adminOperationAuditService).record(
+                eq(USER_ID), eq(ActionType.UPDATE), eq(ResourceType.ROLE), eq(ROLE_ID),
+                beforeCaptor.capture(), afterCaptor.capture(), atCaptor.capture());
+
+        assertEquals("ADMIN", beforeCaptor.getValue().get("roleName"));
+        assertEquals("ADMIN", afterCaptor.getValue().get("roleName"));
+        assertEquals(List.of("REPORT_EXPORT", "ROLE_READ"), beforeCaptor.getValue().get("permissions"));
+        assertEquals(List.of("PERMISSION_READ", "ROLE_READ", "ROLE_UPDATE"), afterCaptor.getValue().get("permissions"));
+        assertEquals(NOW, atCaptor.getValue());
     }
 
     @Test void rejectsDuplicateOrUnknownOrInactivePermissions() {
@@ -87,7 +95,7 @@ class UpdateRolePermissionsServiceTest {
         when(userRepository.countActiveByRoleId(ROLE_ID)).thenReturn(1L);
         assertThrows(LastAdministratorPermissionException.class, () -> service.updateRolePermissions(new UpdateRolePermissionsCommand(ROLE_ID, List.of("ROLE_READ", "PERMISSION_READ"))));
         verify(roleRepository, never()).save(any());
-        verify(auditLogRepository, never()).save(any());
+        verify(adminOperationAuditService, never()).record(any(), any(), any(), any(), any(), any(), any());
     }
 
     private Permission permission(String code) { return Permission.restore(UUID.randomUUID(), code, code, "TEST", null, true, NOW, NOW); }

@@ -34,6 +34,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.application.ucservice.auth.LoginService;
 import com.benhsoan.application.ucservice.auth.RefreshTokenService;
 import com.benhsoan.application.ucservice.role.RolePermissionsResultMapper;
@@ -317,7 +318,7 @@ class ReportsSecurityIntegrationTest {
         when(permissionRepository.findAllByCodes(Set.of("REPORT_VIEW")))
                 .thenReturn(List.of(Permission.fromCode("REPORT_VIEW")));
         new UpdateRolePermissionsService(roleRepository, permissionRepository, userRepository, currentUserPort,
-                auditLogRepository, new RolePermissionsResultMapper())
+                new AdminOperationAuditService(auditLogRepository), clockPort, new RolePermissionsResultMapper())
                 .updateRolePermissions(new UpdateRolePermissionsCommand(doctorRoleId, List.of("REPORT_VIEW")));
 
         mockMvc.perform(get("/reports/export").param("reportType", "OPERATIONAL_REPORT")
