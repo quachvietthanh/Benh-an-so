@@ -14,6 +14,7 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.domain.auth.exception.AccountDisabledException;
 import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
+import com.benhsoan.domain.auth.exception.TemporaryPasswordExpiredException;
 import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.result.LoginResult;
@@ -163,10 +164,15 @@ public class LoginService implements LoginUseCase {
 
         loginAttemptPort.loginSucceeded(username);
 
+        Instant now = clockPort.now();
+
+        if (user.getTempPasswordExpiresAt() != null && now.isAfter(user.getTempPasswordExpiresAt())) {
+            throw new TemporaryPasswordExpiredException(
+                    "Mật khẩu tạm thời đã hết hạn. Vui lòng liên hệ Quản trị viên để được cấp lại.");
+        }
+
         Role role = roleRepository.findById(user.getRoleId())
                 .orElseThrow(IllegalStateException::new);
-
-        Instant now = clockPort.now();
 
         userSessionRepository.revokeByUserId(user.getId(), now);
 

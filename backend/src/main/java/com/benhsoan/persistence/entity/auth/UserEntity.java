@@ -50,6 +50,9 @@ public class UserEntity {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword;
 
+    @Column(name = "temp_password_expires_at")
+    private Instant tempPasswordExpiresAt;
+
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
