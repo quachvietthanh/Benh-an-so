@@ -707,6 +707,15 @@ textarea {
   background-color: #f3e8ff !important;
 }
 
+/* Partial Dispensing Shortage Row Highlight */
+.ant-table-tbody > tr.partial-dispense-shortage-row > td {
+  background-color: #fffbeb !important;
+}
+
+.ant-table-tbody > tr.partial-dispense-shortage-row:hover > td {
+  background-color: #fef3c7 !important;
+}
+
 /* =======================================================
    UNIFIED BUTTON DESIGN SYSTEM (ĐỒNG BỘ NÚT TOÀN DỰ ÁN)
    ======================================================= */
@@ -758,4 +767,3 @@ textarea {
   border-radius: 8px !important;
   padding-inline: 20px !important;
 }
-
