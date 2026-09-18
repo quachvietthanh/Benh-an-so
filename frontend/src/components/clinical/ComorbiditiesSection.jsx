@@ -111,10 +111,10 @@ function ComorbiditiesSection({
     {
       title: 'STT',
       key: 'index',
-      width: 55,
+      width: 60,
       align: 'center',
       render: (_, __, index) => (
-        <span style={{ fontWeight: 600, color: '#64748B' }}>
+        <span style={{ fontWeight: 600, color: '#64748B', fontSize: 14 }}>
           {index + 1}
         </span>
       ),
@@ -123,15 +123,15 @@ function ComorbiditiesSection({
       title: 'Mã ICD-10',
       dataIndex: 'code',
       key: 'code',
-      width: 105,
+      width: 120,
       align: 'center',
       render: (code) =>
         code ? (
-          <Tag color="purple" style={{ fontWeight: 700, fontSize: 12.5, padding: '2px 8px', borderRadius: 6, margin: 0 }}>
+          <Tag color="purple" style={{ fontWeight: 700, fontSize: 13.5, padding: '3px 10px', borderRadius: 6, margin: 0 }}>
             {code}
           </Tag>
         ) : (
-          <Tag color="default" style={{ fontStyle: 'italic', fontSize: 11.5 }}>
+          <Tag color="default" style={{ fontStyle: 'italic', fontSize: 12.5, padding: '3px 8px' }}>
             Tự do
           </Tag>
         ),
@@ -142,11 +142,11 @@ function ComorbiditiesSection({
       key: 'name',
       render: (name, record) => (
         <div>
-          <Text strong style={{ fontSize: 13.5, color: '#1E293B', display: 'block' }}>
+          <Text strong style={{ fontSize: 14.5, color: '#0F172A', display: 'block', lineHeight: 1.4 }}>
             {fixMojibake(name || record.rawName || '')}
           </Text>
           {record.diseaseGroup && (
-            <span style={{ fontSize: 11.5, color: '#64748B' }}>
+            <span style={{ fontSize: 12.5, color: '#64748B', marginTop: 2, display: 'inline-block' }}>
               Nhóm: {record.diseaseGroup}
             </span>
           )}
@@ -157,13 +157,13 @@ function ComorbiditiesSection({
       title: 'Chuyên khoa',
       dataIndex: 'category',
       key: 'category',
-      width: 140,
+      width: 150,
       align: 'center',
       render: (_, record) => {
         const groupName = record.diseaseGroup || getDiseaseGroupName(record.code, record.diseaseGroup)
         const meta = categoryMeta[record.category] || categoryMeta.GENERAL
         return (
-          <Tag color={meta.color} style={{ margin: 0, fontSize: 11.5, borderRadius: 4 }}>
+          <Tag color={meta.color} style={{ margin: 0, fontSize: 12.5, padding: '3px 10px', borderRadius: 6 }}>
             {groupName || meta.label}
           </Tag>
         )
@@ -173,11 +173,11 @@ function ComorbiditiesSection({
       title: 'Ghi chú lâm sàng / Diễn giải',
       dataIndex: 'note',
       key: 'note',
-      width: 260,
+      width: 280,
       render: (note, record, index) => {
         if (!canEdit) {
           return (
-            <span style={{ color: note ? '#334155' : '#94A3B8', fontStyle: note ? 'normal' : 'italic' }}>
+            <span style={{ color: note ? '#334155' : '#94A3B8', fontStyle: note ? 'normal' : 'italic', fontSize: 13.5 }}>
               {note || 'Không có ghi chú'}
             </span>
           )
@@ -185,12 +185,12 @@ function ComorbiditiesSection({
 
         return (
           <Input
-            size="small"
-            placeholder="Ghi chú lâm sàng (mức độ, biến chứng...)"
+            size="middle"
+            placeholder="Ghi chú lâm sàng (mức độ, diễn tiến...)"
             defaultValue={note || ''}
             onBlur={(e) => onUpdateSecondaryNote(record.code || record.id || index, e.target.value)}
             onPressEnter={(e) => onUpdateSecondaryNote(record.code || record.id || index, e.target.value)}
-            style={{ borderRadius: 6, fontSize: 12.5 }}
+            style={{ borderRadius: 6, fontSize: 13.5, height: 36 }}
             maxLength={500}
             allowClear
           />
@@ -200,22 +200,33 @@ function ComorbiditiesSection({
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 155,
+      width: 180,
       align: 'center',
       render: (_, record) => {
         if (!canEdit) {
-          return <span style={{ color: '#94A3B8', fontSize: 12 }}>Chỉ xem</span>
+          return <span style={{ color: '#94A3B8', fontSize: 13 }}>Chỉ xem</span>
         }
 
         return (
-          <Space size={6}>
+          <Space size={8}>
             <Tooltip title="Đổi mã này thành chẩn đoán chính (hoán đổi)">
               <Button
-                size="small"
-                type="text"
-                icon={<SwapOutlined style={{ color: '#2563eb' }} />}
+                size="middle"
+                icon={<SwapOutlined style={{ fontSize: 14, color: '#1D4ED8' }} />}
                 onClick={() => onSwitchToPrimary(record)}
-                style={{ color: '#2563eb', fontWeight: 500, fontSize: 12 }}
+                style={{
+                  backgroundColor: '#EFF6FF',
+                  borderColor: '#BFDBFE',
+                  color: '#1D4ED8',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  height: 34,
+                  padding: '0 12px',
+                  borderRadius: 6,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
               >
                 CĐ chính
               </Button>
@@ -223,12 +234,22 @@ function ComorbiditiesSection({
 
             <Tooltip title="Xóa bệnh mắc kèm này">
               <Button
-                size="small"
-                type="text"
+                size="middle"
                 danger
-                icon={<DeleteOutlined />}
+                icon={<DeleteOutlined style={{ fontSize: 15 }} />}
                 onClick={() => onRemoveSecondary(record.code || record.id || record.name)}
-                style={{ fontWeight: 500 }}
+                style={{
+                  height: 34,
+                  width: 34,
+                  borderRadius: 6,
+                  backgroundColor: '#FEF2F2',
+                  borderColor: '#FECACA',
+                  color: '#DC2626',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
               />
             </Tooltip>
           </Space>
@@ -247,13 +268,13 @@ function ComorbiditiesSection({
         boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         marginBottom: 16,
       }}
-      bodyStyle={{ padding: '14px 16px' }}
+      bodyStyle={{ padding: '16px 18px' }}
     >
       {/* Header khu vực bệnh mắc kèm */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <MedicineBoxOutlined style={{ color: '#7C3AED', fontSize: 17 }} />
-          <Text strong style={{ fontSize: 14.5, color: '#0F172A' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <MedicineBoxOutlined style={{ color: '#7C3AED', fontSize: 20 }} />
+          <Text strong style={{ fontSize: 16, color: '#0F172A' }}>
             Bệnh mắc kèm (Chẩn đoán kèm theo)
           </Text>
           <Badge
@@ -262,19 +283,30 @@ function ComorbiditiesSection({
             style={{
               backgroundColor: secondaryIcds.length > 0 ? '#7C3AED' : '#94A3B8',
               fontWeight: 600,
+              fontSize: 13,
             }}
           />
-          <Tooltip title="Theo quy tắc QTN-22: Mỗi bệnh án bắt buộc phải có 1 chẩn đoán chính và có thể ghi thêm nhiều bệnh mắc kèm. Dữ liệu được lưu tách bạch để phục vụ phân tích mô hình bệnh tật.">
-            <InfoCircleOutlined style={{ color: '#64748B', cursor: 'pointer', fontSize: 13 }} />
+          <Tooltip title="Mỗi bệnh án bắt buộc phải có 1 chẩn đoán chính và có thể ghi thêm nhiều bệnh mắc kèm. Dữ liệu được lưu tách bạch để phục vụ phân tích mô hình bệnh tật.">
+            <InfoCircleOutlined style={{ color: '#64748B', cursor: 'pointer', fontSize: 15 }} />
           </Tooltip>
         </div>
 
         {canEdit && (
           <Button
-            size="small"
-            icon={<PlusCircleOutlined />}
+            size="middle"
+            icon={<PlusCircleOutlined style={{ fontSize: 15 }} />}
             onClick={() => setIsFreeTextModalOpen(true)}
-            style={{ fontSize: 12, borderRadius: 6, fontWeight: 500 }}
+            style={{
+              fontSize: 13.5,
+              height: 38,
+              padding: '0 16px',
+              borderRadius: 8,
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+            }}
           >
             Thêm chẩn đoán tự do
           </Button>
@@ -286,15 +318,16 @@ function ComorbiditiesSection({
         <Alert
           type="info"
           showIcon
-          message="Quy tắc QTN-22: Vui lòng chọn mã bệnh chẩn đoán chính trước khi thêm bệnh mắc kèm."
-          style={{ marginBottom: 12, fontSize: 12.5, borderRadius: 6 }}
+          message="Vui lòng chọn mã bệnh chẩn đoán chính trước khi thêm bệnh mắc kèm."
+          style={{ marginBottom: 14, fontSize: 13, borderRadius: 6 }}
         />
       )}
 
       {/* Thanh tìm kiếm & thêm bệnh kèm qua Autocomplete */}
       {canEdit && (
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 14 }}>
           <DiagnosisCatalogAutocomplete
+            size="large"
             placeholder={
               primaryIcd
                 ? '🔍 Tra cứu mã hoặc tên bệnh kèm theo (nhập mã ICD: I10, E11... hoặc tên bệnh có dấu/không dấu)'
@@ -308,8 +341,8 @@ function ComorbiditiesSection({
           />
 
           {/* Gợi ý các bệnh mắc kèm thường gặp */}
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <Text type="secondary" style={{ fontSize: 11.5, marginRight: 2 }}>
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text type="secondary" style={{ fontSize: 13, fontWeight: 600, marginRight: 2, color: '#475569' }}>
               Gợi ý bệnh kèm thường gặp:
             </Text>
             {COMMON_COMORBIDITIES_SUGGESTIONS.slice(0, 8).map((suggested) => {
@@ -323,12 +356,17 @@ function ComorbiditiesSection({
                   color={isAdded ? 'purple' : isPrimary ? 'blue' : 'default'}
                   style={{
                     cursor: isDisabled ? 'not-allowed' : 'pointer',
-                    fontSize: 11.5,
-                    padding: '2px 8px',
-                    borderRadius: 6,
+                    fontSize: 13,
+                    padding: '4px 12px',
+                    borderRadius: 8,
                     opacity: isDisabled ? 0.6 : 1,
-                    margin: '2px 0',
-                    border: isAdded ? '1px solid #C084FC' : '1px solid #E2E8F0',
+                    margin: '3px 0',
+                    fontWeight: 500,
+                    border: isAdded ? '1px solid #C084FC' : '1px solid #CBD5E1',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
                   }}
                   onClick={() => {
                     if (!isDisabled) {
@@ -336,8 +374,8 @@ function ComorbiditiesSection({
                     }
                   }}
                 >
-                  <b>{suggested.code}</b>: {suggested.name.split('(')[0].trim()}
-                  {isAdded && ' ✓'}
+                  <b style={{ fontWeight: 700 }}>{suggested.code}</b>: {suggested.name.split('(')[0].trim()}
+                  {isAdded && <span style={{ color: '#7C3AED', fontWeight: 700, marginLeft: 2 }}>✓</span>}
                   {isPrimary && ' (CĐ chính)'}
                 </Tag>
               )
@@ -349,22 +387,22 @@ function ComorbiditiesSection({
       {/* Bảng danh sách bệnh mắc kèm */}
       {secondaryIcds.length > 0 ? (
         <Table
-          size="small"
+          size="middle"
           rowKey={(record, idx) => record.code || record.id || `sec-${idx}`}
           dataSource={secondaryIcds}
           columns={columns}
           pagination={false}
-          style={{ border: '1px solid #F1F5F9', borderRadius: 6 }}
+          style={{ border: '1px solid #F1F5F9', borderRadius: 8 }}
         />
       ) : (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
-            <span style={{ color: '#94A3B8', fontSize: 12.5 }}>
+            <span style={{ color: '#94A3B8', fontSize: 13.5 }}>
               Chưa có bệnh mắc kèm nào. Hãy sử dụng thanh tìm kiếm hoặc gợi ý phía trên để thêm mã bệnh.
             </span>
           }
-          style={{ margin: '14px 0' }}
+          style={{ margin: '18px 0' }}
         />
       )}
 

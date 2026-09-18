@@ -155,6 +155,7 @@ function DiagnosisCatalogAutocomplete({
   disabled = false,
   allowClear = true,
   style = { width: '100%' },
+  size,
   className,
   id,
   'aria-label': ariaLabel,
@@ -332,6 +333,7 @@ function DiagnosisCatalogAutocomplete({
 
   return (
     <Select
+      size={size}
       showSearch
       allowClear={allowClear}
       disabled={disabled}

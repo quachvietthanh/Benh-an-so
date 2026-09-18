@@ -127,7 +127,7 @@ export const validateDiagnosesSubmission = ({ primaryIcd, secondaryIcds = [] }) 
   const hasPrimaryValid = Boolean(primaryIcd && (primaryIcd.id || primaryIcd.code))
 
   if (!hasPrimaryCode || !hasPrimaryValid) {
-    errors.push('Yêu cầu phải có đúng một chẩn đoán chính theo quy tắc QTN-22. Vui lòng chọn mã bệnh chẩn đoán chính trước khi lưu.')
+    errors.push('Yêu cầu phải có đúng một chẩn đoán chính. Vui lòng chọn mã bệnh chẩn đoán chính trước khi lưu.')
     return {
       valid: false,
       errors,

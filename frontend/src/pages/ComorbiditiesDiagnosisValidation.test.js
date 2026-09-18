@@ -179,10 +179,6 @@ test('NCL-13-CN-006-TC-03: Thiếu dữ liệu - Bác sĩ chỉ nhập bệnh m�
   assert.equal(submissionCheck.valid, false, 'Submission must be invalid when primary diagnosis is missing')
   assert.equal(submissionCheck.errorCode, 'QTN_22_PRIMARY_REQUIRED')
   assert.ok(
-    submissionCheck.errors[0].includes('QTN-22'),
-    'Error message must explicitly mention rule QTN-22'
-  )
-  assert.ok(
     submissionCheck.errors[0].includes('đúng một chẩn đoán chính'),
     'Error message must require exactly one primary diagnosis'
   )
