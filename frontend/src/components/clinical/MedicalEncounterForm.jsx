@@ -44,6 +44,7 @@ import PatientChronicDiseaseBanner from './PatientChronicDiseaseBanner'
 import EmergencyContactCard from '../patient/EmergencyContactCard'
 import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
 import VitalSignCard from './VitalSignCard'
+import InstructionsAndTreatmentPlanCard from './InstructionsAndTreatmentPlanCard'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
 
@@ -99,6 +100,7 @@ function MedicalEncounterForm({
   setPrintModalOpen,
   serviceCatalogError,
   onOpenSignModal,
+  onOpenAmendModal,
   visitSpecialty = null,
   availableTemplates = [],
   selectedTemplateId = '',
@@ -510,10 +512,11 @@ function MedicalEncounterForm({
                   </Tag>
                 </div>
                 <Button
-                  size="small"
-                  type="text"
+                  size="middle"
+                  type="primary"
+                  ghost
                   onClick={() => setShowIcdTable((prev) => !prev)}
-                  style={{ color: '#2563EB', fontWeight: 600 }}
+                  style={{ fontWeight: 600, height: 32, padding: '0 14px', borderRadius: 6 }}
                 >
                   {showIcdTable ? 'Thu gọn bảng' : 'Mở rộng bảng chọn'}
                 </Button>
@@ -757,8 +760,8 @@ function MedicalEncounterForm({
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    width: 36,
-                                    height: 30,
+                                    width: 34,
+                                    height: 32,
                                     borderRadius: 6,
                                   }}
                                   title="Chọn thao tác chẩn đoán..."
@@ -773,14 +776,15 @@ function MedicalEncounterForm({
                 </>
               )}
             </div>
-
-            <Form.Item name="treatmentPlan" label="Hướng điều trị & Lời dặn của bác sĩ">
-              <Input.TextArea
-                rows={2}
-                placeholder="Chỉ định nhập viện, kê đơn thuốc về nhà, hạn chế ăn mặn, tái khám sau 7 ngày..."
-              />
-            </Form.Item>
           </Card>
+
+          <InstructionsAndTreatmentPlanCard
+            form={form}
+            medicalRecordId={medicalRecord?.id || medicalRecord?.medicalRecordId || encounterContext?.medicalRecord?.id}
+            visitDate={encounterContext?.visit?.createdAt || encounterContext?.visit?.actualDate || encounterContext?.visitDate}
+            isSigned={isSigned}
+            onOpenAmendModal={onOpenAmendModal}
+          />
         </Col>
       </Row>
 
@@ -954,7 +958,11 @@ function MedicalEncounterForm({
                   />
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-                    <Button icon={<PrinterOutlined />} onClick={() => setPrintModalOpen(true)}>
+                    <Button
+                      icon={<PrinterOutlined />}
+                      onClick={() => setPrintModalOpen(true)}
+                      style={{ height: 36, fontWeight: 600, borderRadius: 6, padding: '0 16px' }}
+                    >
                       Xem trước và in phiếu
                     </Button>
                     <Text strong style={{ fontSize: 15 }}>

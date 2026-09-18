@@ -29,6 +29,7 @@ test('normalizes the operational dashboard response from the backend contract', 
     inProgress: 3,
     completed: 10,
     cancelled: 1,
+    earlyEnded: 0,
   })
   assert.equal(result.revenueSummary.totalRevenueToday, 12500000)
   assert.deepEqual(result.inventoryAlertSummary, {
@@ -50,6 +51,7 @@ test('uses safe zero values when dashboard fields are absent or invalid', () => 
     inProgress: 0,
     completed: 2,
     cancelled: 0,
+    earlyEnded: 0,
   })
   assert.equal(result.revenueSummary.totalRevenueToday, 0)
   assert.deepEqual(result.inventoryAlertSummary, {

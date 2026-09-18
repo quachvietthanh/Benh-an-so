@@ -706,3 +706,56 @@ textarea {
 .ant-table-tbody > tr.icd-row-secondary:hover > td {
   background-color: #f3e8ff !important;
 }
+
+/* =======================================================
+   UNIFIED BUTTON DESIGN SYSTEM (ĐỒNG BỘ NÚT TOÀN DỰ ÁN)
+   ======================================================= */
+/* 1. Base button standards */
+.ant-btn {
+  font-family: inherit !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 550 !important;
+  gap: 6px !important;
+}
+
+/* 2. Cấp 3: Small Buttons (Table actions, sub-cards, inline) */
+.ant-btn-sm {
+  height: 32px !important;
+  font-size: 13px !important;
+  padding-inline: 12px !important;
+  border-radius: 6px !important;
+}
+
+.ant-btn-sm.ant-btn-icon-only {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  padding: 0 !important;
+}
+
+/* 3. Cấp 1 & 2: Default / Middle Buttons (Toolbar, Cards, Forms, Modals) */
+.ant-btn:not(.ant-btn-sm):not(.ant-btn-lg) {
+  height: 38px;
+  font-size: 13.5px;
+  border-radius: 6px;
+  padding-inline: 16px;
+}
+
+.ant-btn-icon-only:not(.ant-btn-sm):not(.ant-btn-lg) {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  padding: 0 !important;
+}
+
+/* 4. Large Buttons (Main modal triggers, Hero buttons) */
+.ant-btn-lg {
+  height: 44px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  padding-inline: 20px !important;
+}
+

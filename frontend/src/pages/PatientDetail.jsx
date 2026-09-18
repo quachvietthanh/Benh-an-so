@@ -26,6 +26,7 @@ import {
   ExclamationCircleOutlined,
   FileTextOutlined,
   FolderOutlined,
+  HistoryOutlined,
   MedicineBoxOutlined,
   MergeCellsOutlined,
   PaperClipOutlined,
@@ -501,7 +502,14 @@ function PatientDetail() {
                 <a href={`tel:${patient.emergencyPhone}`} style={{ fontWeight: 700, color: '#0284c7' }}>
                   {patient.emergencyPhone}
                 </a>
-                <Button size="small" type="link" onClick={() => setEmergencyHistoryOpen(true)} style={{ padding: 0 }}>
+                <Button
+                  size="middle"
+                  type="primary"
+                  ghost
+                  icon={<HistoryOutlined />}
+                  onClick={() => setEmergencyHistoryOpen(true)}
+                  style={{ height: 30, fontSize: 12.5, borderRadius: 5, padding: '0 10px' }}
+                >
                   Xem lịch sử thay đổi
                 </Button>
               </Space>

@@ -52,6 +52,11 @@ export const buildMedicalRecordPayload = ({ visitId, values = {}, vitalSigns = {
     clinicalProgress: values.clinicalProgress || '',
     treatmentPlan: values.treatmentPlan || '',
     doctorInstructions: values.doctorInstructions || values.treatmentPlan || '',
+    revisitDate: values.revisitDate
+      ? (typeof values.revisitDate === 'string'
+          ? values.revisitDate
+          : (values.revisitDate.format ? values.revisitDate.format('YYYY-MM-DD') : String(values.revisitDate)))
+      : null,
     conclusion: values.conclusion || '',
   }
 }

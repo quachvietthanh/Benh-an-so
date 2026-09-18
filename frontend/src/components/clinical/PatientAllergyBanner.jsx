@@ -138,23 +138,37 @@ export default function PatientAllergyBanner({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              fontSize: 12,
-              color: '#64748b',
+              fontSize: 13,
+              color: '#475569',
               background: '#f8fafc',
-              padding: '4px 8px',
-              borderRadius: 4,
+              padding: '6px 12px',
+              borderRadius: 6,
+              border: '1px solid #e2e8f0',
             }}
           >
-            <span>
-              <b>Dị ứng thuốc:</b> <Text type="secondary">Chưa ghi nhận</Text>
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span style={{ display: 'inline-block', width: 120, fontWeight: 700, color: '#1e293b' }}>
+                Dị ứng thuốc:
+              </span>
+              <Text type="secondary" style={{ fontStyle: 'italic' }}>Chưa ghi nhận</Text>
+            </div>
             {canWrite && (
               <Button
-                size="small"
-                type="link"
+                size="middle"
+                type="primary"
+                ghost
                 icon={<PlusOutlined />}
                 onClick={() => setModalOpen(true)}
-                style={{ fontSize: 12, padding: 0 }}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  height: 32,
+                  padding: '0 14px',
+                  borderRadius: 6,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
               >
                 Ghi nhận
               </Button>

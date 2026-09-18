@@ -1349,21 +1349,25 @@ function AppointmentQueue() {
               </Card>
             ),
           },
-          {
-            key: 'doctor_weekly_table',
-            label: (
-              <span>
-                <TableOutlined /> Lịch tuần bác sĩ (bảng)
-              </span>
-            ),
-            children: (
-              <DoctorWeeklyScheduleTable
-                onAppointmentBooked={() => {
-                  refreshAllData()
-                }}
-              />
-            ),
-          },
+          ...(!permissions.isDoctorOnly
+            ? [
+                {
+                  key: 'doctor_weekly_table',
+                  label: (
+                    <span>
+                      <TableOutlined /> Lịch tuần bác sĩ (bảng)
+                    </span>
+                  ),
+                  children: (
+                    <DoctorWeeklyScheduleTable
+                      onAppointmentBooked={() => {
+                        refreshAllData()
+                      }}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             key: 'reception_queue',
             label: (
