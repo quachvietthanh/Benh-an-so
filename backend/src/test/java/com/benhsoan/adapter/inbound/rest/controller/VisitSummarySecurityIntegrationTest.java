@@ -67,6 +67,9 @@ class VisitSummarySecurityIntegrationTest {
     @MockitoBean private GetVisitEncounterUseCase getVisitEncounterUseCase;
     @MockitoBean private GetVisitSummaryUseCase getVisitSummaryUseCase;
     @MockitoBean private ExportVisitSummaryUseCase exportVisitSummaryUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.visit.HandoverPatientUseCase handoverPatientUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.visit.GetVisitHandoversUseCase getVisitHandoversUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.user.GetDoctorsUseCase getDoctorsUseCase;
 
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
