@@ -555,23 +555,9 @@ function DiseasePatternReportPage() {
             <BarChartOutlined style={{ fontSize: 24, color: '#2563eb' }} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Title level={4} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-                Báo cáo mô hình bệnh tật theo mã bệnh
-              </Title>
-              <Tag
-                color="blue"
-                style={{
-                  borderRadius: 12,
-                  fontSize: 11,
-                  padding: '1px 8px',
-                  fontWeight: 600,
-                  margin: 0,
-                }}
-              >
-                Quản lý phòng khám
-              </Tag>
-            </div>
+            <Title level={4} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
+              Báo cáo mô hình bệnh tật theo mã bệnh
+            </Title>
           </div>
         </div>
 
@@ -631,14 +617,19 @@ function DiseasePatternReportPage() {
       >
         <Row gutter={[16, 12]} align="middle">
           {/* Khoảng thời gian */}
-          <Col xs={24} sm={12} md={9} lg={8}>
+          <Col xs={24} sm={12} md={12}>
             <Text strong style={{ display: 'block', fontSize: 12.5, marginBottom: 4, color: '#475569' }}>
               <CalendarOutlined style={{ marginRight: 6, color: '#2563eb' }} />
               Khoảng thời gian (Tối đa 366 ngày):
             </Text>
             <RangePicker
               value={dateRange}
-              onChange={(val) => setDateRange(val)}
+              onChange={(val) => {
+                setDateRange(val)
+                if (val && val[0] && val[1]) {
+                  handleFetchReport(val, selectedDoctorId)
+                }
+              }}
               format="DD/MM/YYYY"
               allowClear={false}
               disabledDate={(current) => current && current > dayjs().endOf('day')}
@@ -647,11 +638,23 @@ function DiseasePatternReportPage() {
           </Col>
 
           {/* Bác sĩ chẩn đoán */}
-          <Col xs={24} sm={12} md={9} lg={8}>
-            <Text strong style={{ display: 'block', fontSize: 12.5, marginBottom: 4, color: '#475569' }}>
-              <UserOutlined style={{ marginRight: 6, color: '#2563eb' }} />
-              Bác sĩ chẩn đoán:
-            </Text>
+          <Col xs={24} sm={12} md={12}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text strong style={{ fontSize: 12.5, color: '#475569' }}>
+                <UserOutlined style={{ marginRight: 6, color: '#2563eb' }} />
+                Bác sĩ chẩn đoán:
+              </Text>
+              {selectedDoctorId && (
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={handleClearDoctorFilter}
+                  style={{ padding: 0, height: 'auto', fontSize: 12, color: '#2563eb' }}
+                >
+                  Xóa lọc bác sĩ
+                </Button>
+              )}
+            </div>
             <Select
               value={selectedDoctorId}
               onChange={handleDoctorChange}
@@ -665,41 +668,6 @@ function DiseasePatternReportPage() {
               }
               allowClear
             />
-          </Col>
-
-          {/* Nút Xem báo cáo */}
-          <Col xs={24} sm={24} md={6} lg={8} style={{ display: 'flex', alignItems: 'flex-end', paddingTop: { md: 20 } }}>
-            <div style={{ width: '100%', display: 'flex', gap: 10, alignItems: 'center' }}>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                onClick={() => handleFetchReport()}
-                loading={loading}
-                disabled={!dateRange || !dateRange[0] || !dateRange[1]}
-                style={{
-                  height: 38,
-                  borderRadius: 8,
-                  padding: '0 24px',
-                  fontWeight: 600,
-                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
-                  minWidth: 130,
-                }}
-              >
-                Xem báo cáo
-              </Button>
-
-              {selectedDoctorId && (
-                <Button
-                  size="small"
-                  type="text"
-                  onClick={handleClearDoctorFilter}
-                  style={{ color: '#64748b', fontSize: 12 }}
-                >
-                  Xóa lọc bác sĩ
-                </Button>
-              )}
-            </div>
           </Col>
         </Row>
 
@@ -752,170 +720,240 @@ function DiseasePatternReportPage() {
       ) : isDataAvailable ? (
         <Space direction="vertical" size={18} style={{ width: '100%' }}>
           {/* Thẻ tóm tắt thông tin tổng quan (Summary KPI Cards) */}
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={6}>
+          <Row gutter={[16, 16]} style={{ display: 'flex', alignItems: 'stretch' }}>
+            <Col xs={24} sm={12} md={6} style={{ display: 'flex' }}>
               <Card
                 bordered={false}
                 style={{
+                  width: '100%',
                   borderRadius: 10,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  border: '1px solid #e0e7ff',
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f8faff 100%)',
+                  border: '1px solid #f1f5f9',
+                  background: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
                 }}
-                styles={{ body: { padding: '16px 20px' } }}
+                styles={{
+                  body: {
+                    padding: '16px 20px',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  },
+                }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500 }}>
-                      Tổng số lượt chẩn đoán
-                    </Text>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: '#2563eb', marginTop: 4 }}>
-                      {Number(reportData.totalDiagnoses).toLocaleString('vi-VN')}
-                    </div>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500, display: 'block' }}>
+                    Tổng số lượt chẩn đoán
+                  </Text>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#2563eb', marginTop: 4, lineHeight: 1.3 }}>
+                    {Number(reportData.totalDiagnoses).toLocaleString('vi-VN')}
                   </div>
-                  <div
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 10,
-                      background: '#eff6ff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#2563eb',
-                      fontSize: 20,
-                    }}
-                  >
-                    <MedicineBoxOutlined />
-                  </div>
+                </div>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 10,
+                    background: '#eff6ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#2563eb',
+                    fontSize: 20,
+                    flexShrink: 0,
+                  }}
+                >
+                  <MedicineBoxOutlined />
                 </div>
               </Card>
             </Col>
 
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={6} style={{ display: 'flex' }}>
               <Card
                 bordered={false}
                 style={{
+                  width: '100%',
                   borderRadius: 10,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                   border: '1px solid #f1f5f9',
+                  background: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
                 }}
-                styles={{ body: { padding: '16px 20px' } }}
+                styles={{
+                  body: {
+                    padding: '16px 20px',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  },
+                }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500 }}>
-                      Kỳ báo cáo
-                    </Text>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginTop: 6 }}>
-                      {dayjs(reportData.from).format('DD/MM/YYYY')} - {dayjs(reportData.to).format('DD/MM/YYYY')}
-                    </div>
-                  </div>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500, display: 'block' }}>
+                    Kỳ báo cáo
+                  </Text>
                   <div
                     style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 10,
-                      background: '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#64748b',
-                      fontSize: 20,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      marginTop: 4,
+                      lineHeight: 1.3,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
+                    title={`${dayjs(reportData.from).format('DD/MM/YYYY')} - ${dayjs(reportData.to).format('DD/MM/YYYY')}`}
                   >
-                    <CalendarOutlined />
+                    {dayjs(reportData.from).format('DD/MM/YYYY')} - {dayjs(reportData.to).format('DD/MM/YYYY')}
                   </div>
+                </div>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 10,
+                    background: '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    fontSize: 20,
+                    flexShrink: 0,
+                  }}
+                >
+                  <CalendarOutlined />
                 </div>
               </Card>
             </Col>
 
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={6} style={{ display: 'flex' }}>
               <Card
                 bordered={false}
                 style={{
+                  width: '100%',
                   borderRadius: 10,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                   border: '1px solid #f1f5f9',
+                  background: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
                 }}
-                styles={{ body: { padding: '16px 20px' } }}
+                styles={{
+                  body: {
+                    padding: '16px 20px',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  },
+                }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500 }}>
-                      Bác sĩ chẩn đoán
-                    </Text>
-                    <div
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: '#0f172a',
-                        marginTop: 6,
-                        maxWidth: 160,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                      title={reportData.doctorName || 'Tất cả bác sĩ'}
-                    >
-                      {reportData.doctorName || 'Tất cả bác sĩ'}
-                    </div>
-                  </div>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500, display: 'block' }}>
+                    Bác sĩ chẩn đoán
+                  </Text>
                   <div
                     style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 10,
-                      background: '#ecfdf5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#059669',
-                      fontSize: 20,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      marginTop: 4,
+                      lineHeight: 1.3,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
+                    title={reportData.doctorName || 'Tất cả bác sĩ'}
                   >
-                    <UserOutlined />
+                    {reportData.doctorName || 'Tất cả bác sĩ'}
                   </div>
+                </div>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 10,
+                    background: '#ecfdf5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#059669',
+                    fontSize: 20,
+                    flexShrink: 0,
+                  }}
+                >
+                  <UserOutlined />
                 </div>
               </Card>
             </Col>
 
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={6} style={{ display: 'flex' }}>
               <Card
                 bordered={false}
                 style={{
+                  width: '100%',
                   borderRadius: 10,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                   border: '1px solid #f1f5f9',
+                  background: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
                 }}
-                styles={{ body: { padding: '16px 20px' } }}
+                styles={{
+                  body: {
+                    padding: '16px 20px',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  },
+                }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500 }}>
-                      Thời điểm kết xuất
-                    </Text>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#334155', marginTop: 6 }}>
-                      {reportData.generatedAt
-                        ? dayjs(reportData.generatedAt).format('DD/MM/YYYY HH:mm:ss')
-                        : '-'}
-                    </div>
-                  </div>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 500, display: 'block' }}>
+                    Thời điểm kết xuất
+                  </Text>
                   <div
                     style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 10,
-                      background: '#f8fafc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#64748b',
-                      fontSize: 20,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: '#334155',
+                      marginTop: 4,
+                      lineHeight: 1.3,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
                   >
-                    <ClockCircleOutlined />
+                    {reportData.generatedAt
+                      ? dayjs(reportData.generatedAt).format('DD/MM/YYYY HH:mm:ss')
+                      : '-'}
                   </div>
+                </div>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 10,
+                    background: '#f8fafc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    fontSize: 20,
+                    flexShrink: 0,
+                  }}
+                >
+                  <ClockCircleOutlined />
                 </div>
               </Card>
             </Col>
@@ -938,76 +976,99 @@ function DiseasePatternReportPage() {
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 border: '1px solid #f1f5f9',
               }}
-              styles={{ body: { padding: '18px 20px' } }}
+              styles={{ body: { padding: '16px 20px' } }}
             >
-              <Row gutter={[16, 14]}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {topDiseases.map((item, idx) => (
-                  <Col xs={24} sm={24} md={12} lg={12} key={item.catalogId || item.diseaseCode}>
-                    <div
-                      style={{
-                        padding: '14px 16px',
-                        background: '#f8fafc',
-                        borderRadius: 8,
-                        border: '1px solid #f1f5f9',
-                        borderLeft: `4px solid ${BAR_COLORS[idx % BAR_COLORS.length]}`,
-                      }}
-                    >
-                      <div
+                  <div
+                    key={item.catalogId || item.diseaseCode}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 12,
+                      padding: '10px 16px',
+                      background: '#f8fafc',
+                      borderRadius: 8,
+                      border: '1px solid #f1f5f9',
+                      borderLeft: `4px solid ${BAR_COLORS[idx % BAR_COLORS.length]}`,
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {/* Thông tin mã bệnh & tên bệnh */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 320px', minWidth: 260 }}>
+                      <Tag
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: 8,
+                          borderRadius: 12,
+                          fontWeight: 700,
+                          fontSize: 12,
+                          padding: '1px 8px',
+                          background: BAR_COLORS[idx % BAR_COLORS.length],
+                          color: '#fff',
+                          border: 'none',
+                          minWidth: 32,
+                          textAlign: 'center',
                         }}
                       >
-                        <Space size={8} wrap>
-                          <Tag
-                            style={{
-                              borderRadius: 12,
-                              fontWeight: 700,
-                              background: BAR_COLORS[idx % BAR_COLORS.length],
-                              color: '#fff',
-                              border: 'none',
-                            }}
-                          >
-                            #{item.rank}
-                          </Tag>
-                          <Tag color="blue" style={{ borderRadius: 6, fontWeight: 600 }}>
-                            {item.diseaseCode}
-                          </Tag>
-                          <Text strong style={{ fontSize: 13.5, color: '#0f172a' }}>
-                            {item.diseaseName}
-                          </Text>
-                        </Space>
-                        <Text strong style={{ color: BAR_COLORS[idx % BAR_COLORS.length], fontSize: 14 }}>
-                          {formatPercentage(item.percentage)}
+                        #{item.rank}
+                      </Tag>
+                      <Tag
+                        color="blue"
+                        style={{
+                          borderRadius: 6,
+                          fontWeight: 700,
+                          fontSize: 12.5,
+                          padding: '2px 8px',
+                          margin: 0,
+                        }}
+                      >
+                        {item.diseaseCode}
+                      </Tag>
+                      <div style={{ minWidth: 0 }}>
+                        <Text strong style={{ fontSize: 13.5, color: '#0f172a', display: 'block' }}>
+                          {item.diseaseName}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 11.5 }}>
+                          Nhóm: {item.diseaseGroup || 'Chưa phân nhóm'}
                         </Text>
                       </div>
+                    </div>
 
+                    {/* Thanh Progress bar ở giữa */}
+                    <div style={{ flex: '2 1 200px', minWidth: 160, display: 'flex', alignItems: 'center', gap: 12 }}>
                       <Progress
                         percent={item.percentage}
                         showInfo={false}
                         strokeColor={BAR_COLORS[idx % BAR_COLORS.length]}
                         size="small"
-                        style={{ margin: '4px 0' }}
+                        style={{ flex: 1, margin: 0 }}
                       />
+                    </div>
 
-                      <div
+                    {/* Số liệu lượt khám và % bên phải */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto', textAlign: 'right' }}>
+                      <Text strong style={{ fontSize: 13.5, color: '#0f172a' }}>
+                        {item.diagnosisCount} lượt
+                      </Text>
+                      <Tag
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          marginTop: 6,
-                          fontSize: 12,
-                          color: '#64748b',
+                          borderRadius: 6,
+                          fontWeight: 700,
+                          fontSize: 13,
+                          padding: '2px 8px',
+                          color: BAR_COLORS[idx % BAR_COLORS.length],
+                          background: '#ffffff',
+                          borderColor: BAR_COLORS[idx % BAR_COLORS.length],
+                          margin: 0,
                         }}
                       >
-                        <span>Nhóm: <b>{item.diseaseGroup || 'Chưa phân nhóm'}</b></span>
-                        <span><b>{item.diagnosisCount}</b> lượt chẩn đoán</span>
-                      </div>
+                        {formatPercentage(item.percentage)}
+                      </Tag>
                     </div>
-                  </Col>
+                  </div>
                 ))}
-              </Row>
+              </div>
             </Card>
           )}
 
@@ -1036,7 +1097,6 @@ function DiseasePatternReportPage() {
               pagination={{
                 pageSize: 10,
                 showSizeChanger: true,
-                showTotal: (total) => `Tổng cộng ${total} mã bệnh chẩn đoán`,
               }}
               bordered={false}
             />
