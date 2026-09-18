@@ -23,6 +23,7 @@ import com.benhsoan.domain.clinical.enums.ClinicalOrderStatus;
 import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordUnauthorizedSignerException;
 import com.benhsoan.domain.medicalrecord.exception.PendingClinicalOrdersWarningException;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
@@ -222,5 +223,28 @@ class SignMedicalRecordAuditIntegrationTest {
         );
 
         assertTrue(foundSignedAudit, "Audit log ký thành công với xác nhận chỉ định treo phải tồn tại trong CSDL!");
+    }
+
+    @Test
+    @DisplayName("P0-1 Verified: Bác sĩ không phụ trách ký bệnh án -> Ném ngoại lệ VÀ Audit log SIGN (Rejected) vẫn được commit độc lập vào CSDL")
+    void auditLogPersistedWhenSignatureRejectedForUnauthorizedDoctor() {
+        UUID otherDoctorId = UUID.randomUUID();
+        when(currentUserPort.getCurrentUserId()).thenReturn(otherDoctorId);
+
+        assertThrows(
+                MedicalRecordUnauthorizedSignerException.class,
+                () -> signMedicalRecordService.sign(recordId, new SignMedicalRecordCommand("SIG_DATA", false))
+        );
+
+        List<MedicalRecordAccessLogEntity> logs = accessLogRepository.findAll();
+        boolean foundRejectedAudit = logs.stream().anyMatch(log ->
+                recordId.equals(log.getMedicalRecordId())
+                        && log.getAction() == MedicalRecordAccessAction.SIGN
+                        && log.getDetail() != null
+                        && log.getDetail().contains("Signature rejected: User is not doctor in charge")
+                        && otherDoctorId.equals(log.getAccessedBy())
+        );
+
+        assertTrue(foundRejectedAudit, "Audit log từ chối ký phải tồn tại trong CSDL sau khi transaction chính bị rollback!");
     }
 }

@@ -14,7 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
+import com.benhsoan.adapter.inbound.rest.response.reporting.DiseasePatternReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalTimelineResponse;
@@ -25,6 +28,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
 import com.benhsoan.port.inbound.reporting.GetRevenueBreakdownReportUseCase;
@@ -46,6 +50,7 @@ public class ReportsController {
     private final GetOperationalTimelineUseCase getOperationalTimelineUseCase;
     private final GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     private final GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
+    private final GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     private final ExportOperationalReportUseCase exportOperationalReportUseCase;
     private final GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
     private final ReportingRestMapper mapper;
@@ -115,19 +120,36 @@ public class ReportsController {
         return mapper.toResponse(getDoctorVisitsReportUseCase.getDoctorVisits(fromDate, toDate));
     }
 
+    @GetMapping("/disease-patterns")
+    @RequirePermission("REPORT_VIEW")
+    public DiseasePatternReportResponse getDiseasePatterns(
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(required = false) UUID doctorId
+    ) {
+        LocalDate fromDate = parseDate(from, "from");
+        LocalDate toDate = parseDate(to, "to");
+        validateRange(fromDate, toDate);
+
+        return mapper.toResponse(getDiseasePatternReportUseCase.getDiseasePatternReport(fromDate, toDate, doctorId));
+    }
+
     @GetMapping("/export")
     @RequirePermission("REPORT_EXPORT")
     public ResponseEntity<ByteArrayResource> export(
             @RequestParam String reportType,
             @RequestParam String from,
-            @RequestParam String to
+            @RequestParam String to,
+            @RequestParam(required = false) UUID doctorId
     ) {
         ReportType selectedReportType = parseReportType(reportType);
         LocalDate fromDate = parseDate(from, "from");
         LocalDate toDate = parseDate(to, "to");
         validateRange(fromDate, toDate);
 
-        OperationalReportExportResult exportResult = exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate);
+        OperationalReportExportResult exportResult = doctorId == null
+                ? exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate)
+                : exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate, doctorId);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + exportResult.fileName() + "\"")
@@ -154,7 +176,7 @@ public class ReportsController {
         try {
             return ReportType.valueOf(value);
         } catch (IllegalArgumentException ex) {
-            throw new ValidationException("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT.");
+            throw new ValidationException("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT, DISEASE_PATTERN_REPORT.");
         }
     }
 

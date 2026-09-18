@@ -21,6 +21,8 @@ import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
+import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicine.enums.DosageForm;
 import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
@@ -31,11 +33,15 @@ import com.benhsoan.persistence.entity.billing.InvoiceEntity;
 import com.benhsoan.persistence.entity.billing.InvoiceLineEntity;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
 import com.benhsoan.persistence.entity.medicine.MedicineEntity;
+import com.benhsoan.persistence.entity.medicalrecord.DiagnosisCatalogEntity;
+import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordDiagnosisEntity;
+import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionDispenseItemEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
 import com.benhsoan.persistence.entity.visit.VisitEntity;
 import com.benhsoan.persistence.jpaRepository.billing.JpaInvoiceRepository;
 import com.benhsoan.persistence.jpaRepository.visit.JpaVisitRepository;
+import com.benhsoan.port.outbound.repository.reporting.DiseasePatternSummary;
 import com.benhsoan.port.outbound.repository.reporting.InvoiceLineReportDetail;
 
 import jakarta.persistence.EntityManager;
@@ -262,9 +268,10 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .build());
     }
 
-    private void createVisit(String code, VisitStatus status, Instant completedAt) {
+    private UUID createVisit(String code, VisitStatus status, Instant completedAt) {
+        UUID id = UUID.randomUUID();
         visitRepository.save(VisitEntity.builder()
-                .id(UUID.randomUUID())
+                .id(id)
                 .visitCode(code)
                 .patientId(UUID.randomUUID())
                 .doctorId(UUID.randomUUID())
@@ -277,6 +284,7 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .createdBy(UUID.randomUUID())
                 .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
                 .build());
+        return id;
     }
 
     private void createOriginalInvoice(String code, UUID visitId, BigDecimal amount, Instant createdAt) {
@@ -321,6 +329,75 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .minStockThreshold(10)
                 .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
                 .build());
+    }
+
+    @Test
+    void findsDiseasePatternSummariesOrderedByCountDescAndCodeAsc() {
+        UUID doc1 = UUID.randomUUID();
+        UUID cat1 = createDiagnosisCatalog("J00", "Viêm mũi họng cấp", "Bệnh hệ hô hấp");
+        UUID cat2 = createDiagnosisCatalog("I10", "Tăng huyết áp vô căn", "Bệnh hệ tuần hoàn");
+
+        UUID visit1 = createVisit("VIS100001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"));
+        UUID visit2 = createVisit("VIS100002", VisitStatus.COMPLETED, Instant.parse("2026-08-02T02:00:00Z"));
+        UUID visitCancelled = createVisit("VIS100003", VisitStatus.CANCELLED, null);
+
+        UUID mr1 = createMedicalRecord(visit1);
+        UUID mr2 = createMedicalRecord(visit2);
+        UUID mrCancelled = createMedicalRecord(visitCancelled);
+
+        // 2 counts for J00
+        createDiagnosis(mr1, cat1, "J00", "Viêm mũi họng cấp", doc1, Instant.parse("2026-08-01T03:00:00Z"));
+        createDiagnosis(mr2, cat1, "J00", "Viêm mũi họng cấp", doc1, Instant.parse("2026-08-02T03:00:00Z"));
+        // 1 count for I10
+        createDiagnosis(mr2, cat2, "I10", "Tăng huyết áp vô căn", doc1, Instant.parse("2026-08-02T03:30:00Z"));
+        // Cancelled visit diagnosis should be excluded
+        createDiagnosis(mrCancelled, cat2, "I10", "Tăng huyết áp vô căn", doc1, Instant.parse("2026-08-02T03:30:00Z"));
+
+        var summaries = repositoryAdapter.findDiseasePatternSummaries(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                null
+        );
+
+        assertEquals(2, summaries.size());
+        assertEquals("J00", summaries.get(0).diseaseCode());
+        assertEquals(2L, summaries.get(0).diagnosisCount());
+        assertEquals("I10", summaries.get(1).diseaseCode());
+        assertEquals(1L, summaries.get(1).diagnosisCount());
+    }
+
+    @Test
+    void filtersDiseasePatternSummariesByDoctorId() {
+        UUID doc1 = UUID.randomUUID();
+        UUID doc2 = UUID.randomUUID();
+        UUID cat1 = createDiagnosisCatalog("J01", "Viêm xoang cấp", "Bệnh hệ hô hấp");
+
+        UUID visit1 = createVisit("VIS200001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"));
+        UUID mr1 = createMedicalRecord(visit1);
+
+        createDiagnosis(mr1, cat1, "J01", "Viêm xoang cấp", doc1, Instant.parse("2026-08-01T03:00:00Z"));
+        createDiagnosis(mr1, cat1, "J01", "Viêm xoang cấp", doc2, Instant.parse("2026-08-01T04:00:00Z"));
+
+        var doc1Summaries = repositoryAdapter.findDiseasePatternSummaries(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                doc1
+        );
+
+        assertEquals(1, doc1Summaries.size());
+        assertEquals(1L, doc1Summaries.get(0).diagnosisCount());
+
+        assertTrue(repositoryAdapter.hasDiagnoses(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                doc1
+        ));
+
+        assertFalse(repositoryAdapter.hasDiagnoses(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                UUID.randomUUID()
+        ));
     }
 
     private void createDispenseItem(UUID id, UUID medicineId, int quantity, Instant dispensedAt) {
@@ -587,5 +664,46 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
 
         assertNull(adjLine.targetLineType(), "Unresolved adjustment must have null targetLineType");
         assertNull(adjLine.doctorId(), "Unresolved adjustment must not be attributed to visitDoctor, doctorId must be null");
+    }
+
+    private UUID createDiagnosisCatalog(String code, String name, String diseaseGroup) {
+        UUID id = UUID.randomUUID();
+        entityManager.persist(DiagnosisCatalogEntity.builder()
+                .id(id)
+                .code(code)
+                .name(name)
+                .nameNorm(name.toLowerCase())
+                .diseaseGroup(diseaseGroup)
+                .active(true)
+                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .build());
+        return id;
+    }
+
+    private UUID createMedicalRecord(UUID visitId) {
+        UUID id = UUID.randomUUID();
+        entityManager.persist(MedicalRecordEntity.builder()
+                .id(id)
+                .visitId(visitId)
+                .chiefComplaint("Trieu chung")
+                .status(MedicalRecordStatus.DRAFT)
+                .createdBy(UUID.randomUUID())
+                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .build());
+        return id;
+    }
+
+    private void createDiagnosis(UUID medicalRecordId, UUID catalogId, String code, String name, UUID doctorId, Instant diagnosedAt) {
+        entityManager.persist(MedicalRecordDiagnosisEntity.builder()
+                .id(UUID.randomUUID())
+                .medicalRecordId(medicalRecordId)
+                .diagnosisCatalogId(catalogId)
+                .diagnosisCode(code)
+                .diagnosisName(name)
+                .diagnosisType(DiagnosisType.PRIMARY)
+                .diagnosedBy(doctorId)
+                .diagnosedAt(diagnosedAt)
+                .createdAt(diagnosedAt)
+                .build());
     }
 }
