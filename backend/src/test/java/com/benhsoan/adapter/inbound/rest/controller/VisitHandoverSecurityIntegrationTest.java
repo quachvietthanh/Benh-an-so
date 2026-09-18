@@ -185,4 +185,33 @@ class VisitHandoverSecurityIntegrationTest {
                 .andExpect(jsonPath("$[0].phone").doesNotExist())
                 .andExpect(jsonPath("$[0].username").doesNotExist());
     }
+
+    @Test
+    @DisplayName("ST-07: Migration V69 tuân thủ Least Privilege, không cấp USER_READ cho DOCTOR và không trùng version")
+    void migrationV69_shouldFollowLeastPrivilegeAndProperVersioning() throws Exception {
+        java.nio.file.Path migrationDir = java.nio.file.Path.of("src/main/resources/db/migration");
+        org.junit.jupiter.api.Assertions.assertTrue(java.nio.file.Files.exists(migrationDir));
+
+        // 1. Khong duoc trung lap version 67
+        long v67Count = java.nio.file.Files.list(migrationDir)
+                .map(p -> p.getFileName().toString())
+                .filter(name -> name.startsWith("V67__"))
+                .count();
+        org.junit.jupiter.api.Assertions.assertEquals(1, v67Count, "Phải chỉ có đúng 1 migration V67 từ develop");
+
+        // 2. Migration ban giao phai la V69
+        java.nio.file.Path v69File = migrationDir.resolve("V69__create_visit_handover_tables.sql");
+        org.junit.jupiter.api.Assertions.assertTrue(java.nio.file.Files.exists(v69File), "Migration bàn giao phải được đặt tên là V69");
+
+        // 3. V69 khong duoc cap USER_READ
+        String content = java.nio.file.Files.readString(v69File);
+        org.junit.jupiter.api.Assertions.assertFalse(
+                content.contains("USER_READ"),
+                "Migration V69 vi phạm Least Privilege: không được cấp quyền USER_READ cho DOCTOR"
+        );
+        org.junit.jupiter.api.Assertions.assertTrue(
+                content.contains("MEDICAL_RECORD_HANDOVER"),
+                "Migration V69 phải cấp quyền MEDICAL_RECORD_HANDOVER"
+        );
+    }
 }

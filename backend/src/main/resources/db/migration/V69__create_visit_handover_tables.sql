@@ -1,8 +1,13 @@
 -- =====================================================
--- V67__create_visit_handover_tables.sql
+-- V69__create_visit_handover_tables.sql
 -- Add initial_doctor_id to visits table,
 -- create visit_handovers table for patient handover history,
 -- and seed MEDICAL_RECORD_HANDOVER permission (NCL-04-CN-014 / QTN-17, QTN-11).
+--
+-- Note on initial_doctor_id (P3-1):
+-- Cột initial_doctor_id là nullable. Với các visit cũ chưa từng bàn giao,
+-- giá trị là NULL và được application/domain model fallback về doctor_id.
+-- initial_doctor_id chỉ được gán cố định từ thời điểm phát sinh lần bàn giao đầu tiên.
 -- =====================================================
 
 -- 1. Add initial_doctor_id to visits
@@ -58,11 +63,11 @@ WHERE p.code = 'MEDICAL_RECORD_HANDOVER'
         AND rp.permission_id = p.id
   );
 
--- 5. Grant MEDICAL_RECORD_HANDOVER and USER_READ to DOCTOR (22222222-2222-2222-2222-222222222222)
+-- 5. Grant MEDICAL_RECORD_HANDOVER to DOCTOR (22222222-2222-2222-2222-222222222222)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT UUID_TO_BIN('22222222-2222-2222-2222-222222222222'), p.id
 FROM permissions p
-WHERE p.code IN ('MEDICAL_RECORD_HANDOVER', 'USER_READ')
+WHERE p.code = 'MEDICAL_RECORD_HANDOVER'
   AND NOT EXISTS (
       SELECT 1 FROM role_permissions rp
       WHERE rp.role_id = UUID_TO_BIN('22222222-2222-2222-2222-222222222222')
