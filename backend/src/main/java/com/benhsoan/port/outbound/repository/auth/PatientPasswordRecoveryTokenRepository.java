@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.auth;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +15,8 @@ public interface PatientPasswordRecoveryTokenRepository {
     Optional<PatientPasswordRecoveryToken> findLatestActiveByPhone(String phone);
 
     Optional<PatientPasswordRecoveryToken> findLatestActiveByUserId(UUID userId);
+
+    void invalidateActiveTokensByPhone(String phone, Instant invalidatedAt);
 
     int incrementAttempts(UUID tokenId);
 

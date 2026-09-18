@@ -122,4 +122,53 @@ class PatientPasswordRecoveryTokenRepositoryAdapterTest {
         assertEquals("active_code_hash", activeFound.get().getCodeHash());
         assertFalse(activeFound.get().isUsed());
     }
+
+    @Test
+    @DisplayName("Should find latest active token by userId")
+    void shouldFindLatestActiveByUserId() {
+        Instant now = Instant.now();
+        PatientPasswordRecoveryToken token = PatientPasswordRecoveryToken.create(
+                patientUser.getId(),
+                phone,
+                "user_code_hash",
+                now.plusSeconds(300),
+                now
+        );
+        tokenRepository.save(token);
+
+        Optional<PatientPasswordRecoveryToken> found = tokenRepository.findLatestActiveByUserId(patientUser.getId());
+        assertTrue(found.isPresent());
+        assertEquals("user_code_hash", found.get().getCodeHash());
+        assertEquals(patientUser.getId(), found.get().getUserId());
+    }
+
+    @Test
+    @DisplayName("Should invalidate all active tokens by phone")
+    void shouldInvalidateActiveTokensByPhone() {
+        Instant now = Instant.now();
+
+        PatientPasswordRecoveryToken token1 = PatientPasswordRecoveryToken.create(
+                patientUser.getId(),
+                phone,
+                "token_1_hash",
+                now.plusSeconds(300),
+                now.minusSeconds(30)
+        );
+        tokenRepository.save(token1);
+
+        PatientPasswordRecoveryToken token2 = PatientPasswordRecoveryToken.create(
+                patientUser.getId(),
+                phone,
+                "token_2_hash",
+                now.plusSeconds(300),
+                now
+        );
+        tokenRepository.save(token2);
+
+        // Invalidate active tokens for phone
+        tokenRepository.invalidateActiveTokensByPhone(phone, now);
+
+        Optional<PatientPasswordRecoveryToken> activeFound = tokenRepository.findLatestActiveByPhone(phone);
+        assertFalse(activeFound.isPresent());
+    }
 }

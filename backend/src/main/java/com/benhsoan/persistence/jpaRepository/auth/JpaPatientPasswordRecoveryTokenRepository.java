@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.auth;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +25,10 @@ public interface JpaPatientPasswordRecoveryTokenRepository
     @Modifying
     @Query("UPDATE PatientPasswordRecoveryTokenEntity t SET t.attempts = t.attempts + 1 WHERE t.id = :id")
     int incrementAttemptsById(@Param("id") UUID id);
+
+    @Modifying
+    @Query("UPDATE PatientPasswordRecoveryTokenEntity t SET t.usedAt = :invalidatedAt WHERE t.phone = :phone AND t.usedAt IS NULL")
+    int invalidateActiveTokensByPhone(@Param("phone") String phone, @Param("invalidatedAt") Instant invalidatedAt);
 
     @Query("SELECT t.attempts FROM PatientPasswordRecoveryTokenEntity t WHERE t.id = :id")
     Integer findAttemptsById(@Param("id") UUID id);

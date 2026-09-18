@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.auth;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +38,17 @@ public class PatientPasswordRecoveryTokenRepositoryAdapter implements PatientPas
     public Optional<PatientPasswordRecoveryToken> findLatestActiveByPhone(String phone) {
         return jpaRepository.findTopByPhoneAndUsedAtIsNullOrderByCreatedAtDesc(phone)
                 .map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<PatientPasswordRecoveryToken> findLatestActiveByUserId(UUID userId) {
+        return jpaRepository.findTopByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(userId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public void invalidateActiveTokensByPhone(String phone, Instant invalidatedAt) {
+        jpaRepository.invalidateActiveTokensByPhone(phone, invalidatedAt);
     }
 
     @Override

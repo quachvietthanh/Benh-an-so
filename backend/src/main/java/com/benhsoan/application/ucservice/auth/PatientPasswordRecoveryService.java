@@ -123,6 +123,9 @@ public class PatientPasswordRecoveryService
             return new PatientForgotPasswordResult(GENERIC_SUCCESS_MESSAGE, TTL_SECONDS);
         }
 
+        // Finding 4 (Replay Protection): Invalidate existing active tokens for this phone
+        tokenRepository.invalidateActiveTokensByPhone(phone, now);
+
         String plainCode = codeGeneratorPort.generate();
         String codeHash = passwordEncoderPort.encode(plainCode);
         Instant expiresAt = now.plusSeconds(TTL_SECONDS);
@@ -150,7 +153,8 @@ public class PatientPasswordRecoveryService
                 .orElseThrow(InvalidVerificationCodeException::new);
 
         if (token.isExpired(now)) {
-            throw new VerificationCodeExpiredException();
+            // Finding 5: Prevent enumeration by returning unified invalid code error
+            throw new InvalidVerificationCodeException("Mã xác thực không chính xác hoặc đã hết hạn.");
         }
 
         if (token.isAttemptsExceeded()) {
@@ -174,7 +178,8 @@ public class PatientPasswordRecoveryService
                 .orElseThrow(InvalidVerificationCodeException::new);
 
         if (token.isExpired(now)) {
-            throw new VerificationCodeExpiredException();
+            // Finding 5: Prevent enumeration by returning unified invalid code error
+            throw new InvalidVerificationCodeException("Mã xác thực không chính xác hoặc đã hết hạn.");
         }
 
         if (token.isAttemptsExceeded()) {
@@ -213,6 +218,9 @@ public class PatientPasswordRecoveryService
         // Mark token as used to prevent replay
         token.markUsed(now);
         tokenRepository.save(token);
+
+        // Finding 4: Invalidate all active tokens for this phone
+        tokenRepository.invalidateActiveTokensByPhone(phone, now);
 
         // Clear cooldown once successfully reset
         cooldownPort.clearCooldown(phone);

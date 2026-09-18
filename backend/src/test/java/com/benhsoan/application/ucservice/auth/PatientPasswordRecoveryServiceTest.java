@@ -129,6 +129,7 @@ class PatientPasswordRecoveryServiceTest {
         assertEquals(PatientPasswordRecoveryService.GENERIC_SUCCESS_MESSAGE, result.message());
         assertEquals(PatientPasswordRecoveryService.TTL_SECONDS, result.expiresInSeconds());
 
+        verify(tokenRepository).invalidateActiveTokensByPhone(PHONE, NOW);
         verify(tokenRepository).save(any(PatientPasswordRecoveryToken.class));
         verify(verificationCodePort).sendVerificationCode(PHONE, CODE, PatientPasswordRecoveryService.TTL_SECONDS);
     }
@@ -220,7 +221,7 @@ class PatientPasswordRecoveryServiceTest {
     // TC-02: Mã xác thực hết hạn (TTL Expired)
     // ==========================================
     @Test
-    void verifyCode_expiredCode_throwsVerificationCodeExpiredException() {
+    void verifyCode_expiredCode_throwsInvalidVerificationCodeException() {
         when(clockPort.now()).thenReturn(NOW);
 
         PatientPasswordRecoveryToken expiredToken = PatientPasswordRecoveryToken.restore(
@@ -229,12 +230,12 @@ class PatientPasswordRecoveryServiceTest {
                 0, null, NOW.minusSeconds(310));
         when(tokenRepository.findLatestActiveByPhone(PHONE)).thenReturn(Optional.of(expiredToken));
 
-        assertThrows(VerificationCodeExpiredException.class,
+        assertThrows(InvalidVerificationCodeException.class,
                 () -> service.verifyCode(new PatientVerifyRecoveryCodeCommand(PHONE, CODE)));
     }
 
     @Test
-    void resetPassword_expiredCode_throwsVerificationCodeExpiredException() {
+    void resetPassword_expiredCode_throwsInvalidVerificationCodeException() {
         when(clockPort.now()).thenReturn(NOW);
 
         PatientPasswordRecoveryToken expiredToken = PatientPasswordRecoveryToken.restore(
@@ -243,7 +244,7 @@ class PatientPasswordRecoveryServiceTest {
                 0, null, NOW.minusSeconds(310));
         when(tokenRepository.findLatestActiveByPhone(PHONE)).thenReturn(Optional.of(expiredToken));
 
-        assertThrows(VerificationCodeExpiredException.class,
+        assertThrows(InvalidVerificationCodeException.class,
                 () -> service.resetPassword(new PatientResetPasswordCommand(PHONE, CODE, NEW_PASSWORD, "127.0.0.1", "agent")));
     }
 
@@ -289,6 +290,7 @@ class PatientPasswordRecoveryServiceTest {
         // Token marked as used
         assertTrue(token.isUsed());
         verify(tokenRepository).save(token);
+        verify(tokenRepository).invalidateActiveTokensByPhone(PHONE, NOW);
 
         // Cooldown cleared
         verify(cooldownPort).clearCooldown(PHONE);

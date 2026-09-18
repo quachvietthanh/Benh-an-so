@@ -21,8 +21,15 @@ public class MockPatientVerificationCodeAdapter implements PatientVerificationCo
     @Override
     public void sendVerificationCode(String phone, String code, long ttlSeconds) {
         lastSentCodes.put(phone, code);
-        log.info("[MOCK SMS] Sending simulated verification code {} to phone {} (valid for {}s)",
-                code, phone, ttlSeconds);
+        log.info("[MOCK SMS] Simulated verification code sent to phone {} (valid for {}s)",
+                maskPhone(phone), ttlSeconds);
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) {
+            return "[REDACTED]";
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 3);
     }
 
     public String getLastSentCode(String phone) {

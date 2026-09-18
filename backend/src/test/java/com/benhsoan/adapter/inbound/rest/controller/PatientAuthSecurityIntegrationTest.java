@@ -136,14 +136,14 @@ class PatientAuthSecurityIntegrationTest {
 
     @Test
     void patientVerifyRecoveryCode_expiredReturns400() throws Exception {
-        org.mockito.Mockito.doThrow(new com.benhsoan.domain.auth.exception.VerificationCodeExpiredException())
+        org.mockito.Mockito.doThrow(new com.benhsoan.domain.auth.exception.InvalidVerificationCodeException("Mã xác thực không chính xác hoặc đã hết hạn."))
                 .when(patientVerifyRecoveryCodeUseCase).verifyCode(any(com.benhsoan.port.dto.command.auth.PatientVerifyRecoveryCodeCommand.class));
 
         mockMvc.perform(post("/auth/patient/verify-recovery-code")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"phone\":\"0901111222\",\"code\":\"123456\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VERIFICATION_CODE_EXPIRED"));
+                .andExpect(jsonPath("$.code").value("INVALID_VERIFICATION_CODE"));
     }
 
     @Test
