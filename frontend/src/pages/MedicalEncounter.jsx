@@ -65,6 +65,10 @@ import {
   mapVitalSignErrorMessage,
   validateVitalSignForm,
 } from '../utils/vitalSignHelpers'
+import {
+  validateCanAddComorbidity,
+  validateDiagnosesSubmission,
+} from '../utils/comorbiditiesHelpers'
 import { useAuthContext } from '../context/AuthContext'
 
 import { clinicalServiceCatalog } from '../utils/clinicalCatalogData'
@@ -819,40 +823,85 @@ function MedicalEncounter() {
 
   const addSecondaryDiagnosis = useCallback(
     (icd) => {
-      if (!icd?.code) return
-      if (primaryIcd?.code === icd.code) {
-        message.warning('Mã này đã được chọn làm chẩn đoán chính.')
+      if (!icd) return
+
+      const validation = validateCanAddComorbidity({
+        primaryIcd,
+        secondaryIcds,
+        candidateIcd: icd,
+      })
+
+      if (!validation.valid) {
+        if (validation.type === 'DUPLICATE_PRIMARY') {
+          message.warning(validation.error)
+        } else if (validation.type === 'DUPLICATE_SECONDARY') {
+          message.info(validation.error)
+        } else {
+          message.warning(validation.error)
+        }
         return
       }
+
       const backendItem =
         allBackendDiagnoses.find(
-          (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+          (item) =>
+            (icd.code && String(item.code).toUpperCase() === String(icd.code).toUpperCase()) ||
+            (icd.id && String(item.id) === String(icd.id)),
         ) ||
         backendIcdCatalog.find(
-          (item) => String(item.code).toUpperCase() === String(icd.code).toUpperCase() || (icd.id && String(item.id) === String(icd.id)),
+          (item) =>
+            (icd.code && String(item.code).toUpperCase() === String(icd.code).toUpperCase()) ||
+            (icd.id && String(item.id) === String(icd.id)),
         )
+
       const cleanIcd = {
-        id: icd.id || backendItem?.id,
-        code: backendItem?.code || icd.code,
-        rawName: backendItem?.rawName || backendItem?.name || icd.name,
-        name: fixMojibake(backendItem?.name || icd.name),
+        id: icd.id || backendItem?.id || null,
+        code: backendItem?.code || icd.code || '',
+        rawName: backendItem?.rawName || backendItem?.name || icd.rawName || icd.name || '',
+        name: fixMojibake(backendItem?.name || icd.name || icd.rawName || ''),
         diseaseGroup: backendItem?.diseaseGroup || icd.diseaseGroup || null,
-        category: backendItem?.category || icd.category || getCategoryFromIcdCode(backendItem?.code || icd.code),
-        note: icd.note,
+        category: backendItem?.category || icd.category || (backendItem?.code ? getCategoryFromIcdCode(backendItem.code) : 'GENERAL'),
+        note: icd.note || '',
       }
-      setSecondaryIcds((prev) => {
-        if (prev.some((item) => item.code === cleanIcd.code)) {
-          message.info('Mã chẩn đoán phụ này đã có trong danh sách.')
-          return prev
-        }
-        return [...prev, cleanIcd]
-      })
+
+      setSecondaryIcds((prev) => [...prev, cleanIcd])
       if (cleanIcd.id) {
         saveRecentDiagnosis(cleanIcd)
         setRecentIcds(loadRecentDiagnoses())
       }
+      message.success(`Đã thêm bệnh mắc kèm: ${cleanIcd.code ? `[${cleanIcd.code}] ` : ''}${cleanIcd.name}`)
     },
-    [allBackendDiagnoses, backendIcdCatalog, primaryIcd?.code],
+    [allBackendDiagnoses, backendIcdCatalog, primaryIcd, secondaryIcds],
+  )
+
+  const handleUpdateSecondaryNote = useCallback((key, newNote) => {
+    setSecondaryIcds((prev) =>
+      prev.map((item, idx) => {
+        if (item.code === key || item.id === key || idx === key || item.name === key || item.rawName === key) {
+          return { ...item, note: newNote }
+        }
+        return item
+      }),
+    )
+  }, [])
+
+  const handleSwitchToPrimary = useCallback(
+    (secondaryItem) => {
+      if (!secondaryItem) return
+      const currentPrimary = primaryIcd
+      selectPrimaryDiagnosis(secondaryItem)
+      setSecondaryIcds((prev) => {
+        const filtered = prev.filter((item) =>
+          item.code ? item.code !== secondaryItem.code : item.id !== secondaryItem.id && item.name !== secondaryItem.name,
+        )
+        if (currentPrimary && (currentPrimary.code ? currentPrimary.code !== secondaryItem.code : true)) {
+          return [currentPrimary, ...filtered]
+        }
+        return filtered
+      })
+      message.success(`Đã chuyển "${secondaryItem.code || secondaryItem.name}" thành chẩn đoán chính.`)
+    },
+    [primaryIcd, selectPrimaryDiagnosis],
   )
 
   const diagnosisSelectOptions = useMemo(() => {
@@ -1093,8 +1142,9 @@ function MedicalEncounter() {
       return null
     }
 
-    if (!primaryIcd) {
-      message.error('Vui lòng chọn chẩn đoán chính từ danh mục ICD-10.')
+    const diagValidation = validateDiagnosesSubmission({ primaryIcd, secondaryIcds })
+    if (!diagValidation.valid) {
+      message.error(diagValidation.errors[0])
       return null
     }
 
@@ -1850,6 +1900,8 @@ function MedicalEncounter() {
                 secondaryIcds={secondaryIcds}
                 setSecondaryIcds={setSecondaryIcds}
                 addSecondaryDiagnosis={addSecondaryDiagnosis}
+                onUpdateSecondaryNote={handleUpdateSecondaryNote}
+                onSwitchToPrimary={handleSwitchToPrimary}
                 diagnosisOptions={diagnosisSelectOptions}
                 setDiagnosisModalOpen={setDiagnosisModalOpen}
                 selectedOrders={selectedOrders}
