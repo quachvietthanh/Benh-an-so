@@ -64,7 +64,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('FOLLOW_UP_REMINDER_READ') || hasPerm('CARE_LOG_READ') || isReceptionist) },
     { key: '/doctor-schedules', label: 'Lịch làm việc bác sĩ', icon: CalendarOutlined, check: () => !isReceptionist && !isPharmacist && !isDoctor && (isAdmin || isManager || hasPerm('DOCTOR_SCHEDULE_UPDATE')) },
     { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, check: () => !isAdmin && !isManager && (hasPerm('MEDICAL_RECORD_READ') || hasPerm('MEDICAL_RECORD_CREATE') || isDoctor) },
-    { key: '/medical-records/overdue-signing', label: 'Nhắc ký bệnh án quá hạn', icon: BellOutlined, check: () => (isAdmin || isManager) && !isDoctor && !isReceptionist && !isPharmacist },
+    { key: '/medical-records/overdue-signing', label: isDoctor ? 'Bệnh án quá hạn ký' : 'Nhắc ký bệnh án quá hạn', icon: BellOutlined, check: () => (isAdmin || isManager || isDoctor || hasPerm('MEDICAL_RECORD_OVERDUE_READ')) && !isReceptionist && !isPharmacist },
     { key: '/medical-records/version-history', label: 'Lịch sử phiên bản bệnh án', icon: HistoryOutlined, check: () => isAdmin || isManager || hasPerm('MEDICAL_RECORD_VERSION_HISTORY_READ') || hasPerm('AUDIT_READ') },
     { key: '/medical-records/copy-issuance', label: 'Cấp bản sao hồ sơ', icon: CopyOutlined, check: () => isAdmin || isManager || hasPerm('REPORT_EXPORT') },
     { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, check: () => !isAdmin && !isManager && (hasPerm('PRESCRIPTION_READ') || hasPerm('PRESCRIPTION_CREATE') || isDoctor) },

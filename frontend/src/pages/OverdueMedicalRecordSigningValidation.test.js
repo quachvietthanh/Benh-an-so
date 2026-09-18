@@ -13,6 +13,7 @@ import {
   calculateOverdueKpis,
   filterOverdueRecords,
   getDoctorDisplayName,
+  formatMedicalRecordStatus,
   SYSTEM_DOCTORS,
 } from '../utils/overdueMedicalRecordHelpers.js'
 import { getNavigationItems } from '../components/layout/navigationConfig.js'
@@ -56,6 +57,11 @@ test('TC-01: calculateOverdueKpis accurately aggregates metrics from overdue rec
   assert.equal(kpis.criticalRecords, 2) // 30h and 80h are >= 24h
   assert.equal(kpis.uniqueDoctors, 2) // doc1 and doc2
   assert.equal(kpis.totalRemindersSent, 3) // 0 + 2 + 1
+
+  // With serverTotalElements from API metadata
+  const serverKpis = calculateOverdueKpis(mockRecords, 150)
+  assert.equal(serverKpis.totalRecords, 150, 'KPI totalRecords must use server totalElements when available')
+  assert.equal(serverKpis.criticalRecords, 2)
 })
 
 // ============================================================================
@@ -164,25 +170,31 @@ test('TC-04: Receptionist role is denied access to view and send signing reminde
   assert.equal(hasOverdueMenu, false, 'Navigation menu must hide overdue-signing for receptionist')
 })
 
-test('TC-04: Doctor role is turned off from overdue signing screen and navigation', () => {
+test('TC-04: Doctor role has read-only view access to overdue signing screen and navigation', () => {
   const doctorRoles = ['doctor']
-  const doctorPerms = ['MEDICAL_RECORD_READ', 'MEDICAL_RECORD_UPDATE']
+  const doctorPerms = ['MEDICAL_RECORD_OVERDUE_READ', 'MEDICAL_RECORD_READ', 'MEDICAL_RECORD_UPDATE']
 
   assert.equal(
     canViewOverdueSigning(doctorRoles, doctorPerms),
-    false,
-    'Doctor must NOT have access to overdue signing'
+    true,
+    'Doctor must have view access to overdue signing'
   )
   assert.equal(
     canSendSigningReminder(doctorRoles, doctorPerms),
     false,
-    'Doctor must NOT have remind access'
+    'Doctor must NOT have remind access (read-only)'
   )
 
   // Navigation menu check for doctor
   const docNavItems = getNavigationItems(doctorRoles, doctorPerms)
   const docHasOverdueMenu = docNavItems.some((item) => item.key === '/medical-records/overdue-signing')
-  assert.equal(docHasOverdueMenu, false, 'Navigation menu must hide overdue-signing for doctor')
+  assert.equal(docHasOverdueMenu, true, 'Navigation menu must show overdue-signing for doctor')
+
+  // Pharmacist is denied access
+  const pharmacistRoles = ['pharmacist']
+  const pharmacistPerms = ['PHARMACY_READ']
+  assert.equal(canViewOverdueSigning(pharmacistRoles, pharmacistPerms), false, 'Pharmacist must NOT have view access')
+  assert.equal(canSendSigningReminder(pharmacistRoles, pharmacistPerms), false, 'Pharmacist must NOT have remind access')
 })
 
 test('TC-04: Admin and Clinic Manager have appropriate permissions and navigation visible', () => {
@@ -218,6 +230,29 @@ test('OverdueMedicalRecordSigningPage complies with button standard and file str
   assert.ok(content.includes('minWidth: 96'), 'Modal buttons must adhere to min-width standard')
   assert.ok(!content.includes('font-size: 9px'), 'No tiny fonts (<10px)')
   assert.ok(!content.includes('font-size: 8px'), 'No tiny fonts (<10px)')
+
+  // Check .js extensions on internal imports (PR #232 Review fix)
+  assert.ok(content.includes("from '../api/medicalRecordApi.js'"), 'medicalRecordApi must have .js extension')
+  assert.ok(content.includes("from '../api/userApi.js'"), 'userApi must have .js extension')
+  assert.ok(content.includes("from '../utils/overdueMedicalRecordHelpers.js'"), 'overdueMedicalRecordHelpers must have .js extension')
+
+  // Check medical record status tag (Phát hiện 3 - No IN_PROGRESS label)
+  assert.ok(!content.includes('Chưa ký (IN_PROGRESS)'), 'Should not label record as IN_PROGRESS')
+  assert.ok(content.includes('formatMedicalRecordStatus'), 'Should format medical record status properly')
+})
+
+test('formatMedicalRecordStatus formats DRAFT and OPEN status tags accurately', () => {
+  const draft = formatMedicalRecordStatus('DRAFT')
+  assert.equal(draft.label, 'Chưa ký số (DRAFT)')
+  assert.equal(draft.color, 'orange')
+
+  const open = formatMedicalRecordStatus('OPEN')
+  assert.equal(open.label, 'Đang mở (OPEN)')
+  assert.equal(open.color, 'cyan')
+
+  const fallback = formatMedicalRecordStatus('')
+  assert.equal(fallback.label, 'Chưa ký số (DRAFT)')
+  assert.equal(fallback.color, 'orange')
 })
 
 // ============================================================================

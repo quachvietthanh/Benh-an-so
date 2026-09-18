@@ -59,7 +59,6 @@ export const canViewOverdueSigning = (roles = [], permissions = []) => {
     .filter(Boolean)
 
   if (
-    normalizedRoles.includes('doctor') ||
     normalizedRoles.includes('receptionist') ||
     normalizedRoles.includes('pharmacist')
   ) {
@@ -69,12 +68,16 @@ export const canViewOverdueSigning = (roles = [], permissions = []) => {
   if (
     normalizedRoles.includes('admin') ||
     normalizedRoles.includes('manager') ||
-    normalizedRoles.includes('clinic_manager')
+    normalizedRoles.includes('clinic_manager') ||
+    normalizedRoles.includes('doctor')
   ) {
     return true
   }
 
-  return normalizedPerms.includes('MEDICAL_RECORD_REMIND_SIGN')
+  return (
+    normalizedPerms.includes('MEDICAL_RECORD_OVERDUE_READ') ||
+    normalizedPerms.includes('MEDICAL_RECORD_REMIND_SIGN')
+  )
 }
 
 export const canSendSigningReminder = (roles = [], permissions = []) => {
@@ -179,9 +182,14 @@ export const validateSendReminderForm = ({ notes }) => {
   }
 }
 
-export const calculateOverdueKpis = (records = []) => {
+export const calculateOverdueKpis = (records = [], serverTotalElements = null) => {
   const safeRecords = Array.isArray(records) ? records : []
-  const total = safeRecords.length
+  const parsedServerTotal = serverTotalElements != null && Number.isFinite(Number(serverTotalElements))
+    ? Number(serverTotalElements)
+    : null
+  const total = parsedServerTotal != null
+    ? Math.max(parsedServerTotal, safeRecords.length)
+    : safeRecords.length
   let criticalCount = 0
   let totalRemindersSent = 0
   const doctorIdSet = new Set()
@@ -255,3 +263,15 @@ export const filterOverdueRecords = (
     return true
   })
 }
+
+export const formatMedicalRecordStatus = (status) => {
+  const upper = String(status || '').toUpperCase()
+  if (upper === 'OPEN') {
+    return { label: 'Đang mở (OPEN)', color: 'cyan' }
+  }
+  if (upper === 'DRAFT') {
+    return { label: 'Chưa ký số (DRAFT)', color: 'orange' }
+  }
+  return { label: `Chưa ký số (${upper || 'DRAFT'})`, color: 'orange' }
+}
+

@@ -29,6 +29,7 @@ import {
 import {
   BellOutlined,
   ClockCircleOutlined,
+  EditOutlined,
   ExclamationCircleOutlined,
   EyeOutlined,
   HistoryOutlined,
@@ -41,8 +42,8 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import medicalRecordApi from '../api/medicalRecordApi'
-import userApi from '../api/userApi'
+import medicalRecordApi from '../api/medicalRecordApi.js'
+import userApi from '../api/userApi.js'
 import { useAuthContext } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { formatDateTime } from '../utils/helpers'
@@ -51,6 +52,7 @@ import {
   canSendSigningReminder,
   canViewOverdueSigning,
   filterOverdueRecords,
+  formatMedicalRecordStatus,
   formatOverdueHours,
   formatReminderChannel,
   formatReminderStatus,
@@ -58,7 +60,7 @@ import {
   getOverdueSeverity,
   SYSTEM_DOCTORS,
   validateSendReminderForm,
-} from '../utils/overdueMedicalRecordHelpers'
+} from '../utils/overdueMedicalRecordHelpers.js'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -88,6 +90,7 @@ export default function OverdueMedicalRecordSigningPage() {
   // State
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState([])
+  const [totalElements, setTotalElements] = useState(0)
   const [doctors, setDoctors] = useState([])
   const [doctorsLoading, setDoctorsLoading] = useState(false)
 
@@ -129,7 +132,7 @@ export default function OverdueMedicalRecordSigningPage() {
     }
   }, [isDoctor, canSend])
 
-  // Load overdue records
+  // Load overdue records (fetches all pages up to 1000 items so KPIs and filters never truncate at 100)
   const fetchOverdueRecords = useCallback(async () => {
     if (!canView) return
     setLoading(true)
@@ -137,17 +140,36 @@ export default function OverdueMedicalRecordSigningPage() {
       const params = { page: 0, size: 100 }
       if (selectedDoctorId) {
         params.doctorId = selectedDoctorId
+      } else if (isDoctor && user?.id) {
+        params.doctorId = user.id
       }
       const res = await medicalRecordApi.getOverdueSigning(params)
-      const data = res?.data?.content || res?.data?.data || (Array.isArray(res?.data) ? res.data : [])
-      setRecords(data)
+      const firstPageData = res?.data?.content || res?.data?.data || (Array.isArray(res?.data) ? res.data : [])
+      const serverTotal = res?.data?.totalElements != null ? Number(res?.data?.totalElements) : null
+      const totalPages = res?.data?.totalPages ? Number(res?.data?.totalPages) : 1
+
+      let allData = [...firstPageData]
+      if (totalPages > 1) {
+        const remainingPromises = []
+        for (let p = 1; p < Math.min(totalPages, 10); p++) {
+          remainingPromises.push(medicalRecordApi.getOverdueSigning({ ...params, page: p, size: 100 }))
+        }
+        const responses = await Promise.all(remainingPromises)
+        responses.forEach((pageRes) => {
+          const pageItems = pageRes?.data?.content || pageRes?.data?.data || (Array.isArray(pageRes?.data) ? pageRes.data : [])
+          allData = allData.concat(pageItems)
+        })
+      }
+
+      setRecords(allData)
+      setTotalElements(serverTotal != null ? serverTotal : allData.length)
     } catch (err) {
       const errMsg = getApiErrorMessage(err, 'Không thể tải danh sách bệnh án quá hạn ký.')
       message.error(errMsg)
     } finally {
       setLoading(false)
     }
-  }, [canView, selectedDoctorId])
+  }, [canView, selectedDoctorId, isDoctor, user?.id])
 
   useEffect(() => {
     if (canView) {
@@ -227,10 +249,10 @@ export default function OverdueMedicalRecordSigningPage() {
     })
   }, [records, searchQuery, selectedDoctorId, selectedSeverity])
 
-  // KPI calculations
+  // KPI calculations (aggregates from all records & server total)
   const kpiData = useMemo(() => {
-    return calculateOverdueKpis(records)
-  }, [records])
+    return calculateOverdueKpis(records, totalElements)
+  }, [records, totalElements])
 
   // Open Send Reminder Modal
   const handleOpenReminderModal = (record) => {
@@ -323,19 +345,22 @@ export default function OverdueMedicalRecordSigningPage() {
       title: 'Mã khám & Bệnh án',
       key: 'visitInfo',
       width: 170,
-      render: (_, record) => (
-        <div>
-          <div style={{ fontWeight: 600, color: '#1677ff', fontSize: 13 }}>
-            {record.visitCode || 'N/A'}
+      render: (_, record) => {
+        const statusInfo = formatMedicalRecordStatus(record.status)
+        return (
+          <div>
+            <div style={{ fontWeight: 600, color: '#1677ff', fontSize: 13 }}>
+              {record.visitCode || 'N/A'}
+            </div>
+            <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+              ID: {record.medicalRecordId?.slice(0, 8)}...
+            </div>
+            <Tag color={statusInfo.color} style={{ marginTop: 4, fontSize: 11 }}>
+              {statusInfo.label}
+            </Tag>
           </div>
-          <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-            ID: {record.medicalRecordId?.slice(0, 8)}...
-          </div>
-          <Tag color="orange" style={{ marginTop: 4, fontSize: 11 }}>
-            Chưa ký (IN_PROGRESS)
-          </Tag>
-        </div>
-      ),
+        )
+      },
     },
     {
       title: 'Bệnh nhân',
@@ -450,6 +475,19 @@ export default function OverdueMedicalRecordSigningPage() {
       width: 220,
       render: (_, record) => (
         <Space size="small" wrap>
+          {isDoctor && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/medical-records/visits/${record.visitId}`)}
+              id={`btn-sign-${record.medicalRecordId}`}
+              style={{ borderRadius: 6 }}
+            >
+              Ký ngay
+            </Button>
+          )}
+
           {canSend && (
             <Button
               type="primary"
@@ -473,15 +511,17 @@ export default function OverdueMedicalRecordSigningPage() {
             Lịch sử
           </Button>
 
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => navigate(`/medical-records/visits/${record.visitId}`)}
-            id={`btn-view-${record.medicalRecordId}`}
-            style={{ borderRadius: 6 }}
-          >
-            Bệnh án
-          </Button>
+          {!isDoctor && (
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => navigate(`/medical-records/visits/${record.visitId}`)}
+              id={`btn-view-${record.medicalRecordId}`}
+              style={{ borderRadius: 6 }}
+            >
+              Bệnh án
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -501,7 +541,7 @@ export default function OverdueMedicalRecordSigningPage() {
         }}
       >
         <Title level={4} style={{ margin: 0 }}>
-          Theo dõi và nhắc ký bệnh án quá hạn
+          {isDoctor ? 'Bệnh án quá hạn ký cần hoàn thiện' : 'Theo dõi và nhắc ký bệnh án quá hạn'}
         </Title>
 
         <Space>
@@ -621,14 +661,15 @@ export default function OverdueMedicalRecordSigningPage() {
             <Select
               style={{ width: '100%', height: 38 }}
               placeholder="Lọc theo bác sĩ phụ trách"
-              value={selectedDoctorId || undefined}
+              value={isDoctor ? (user?.id || selectedDoctorId || undefined) : (selectedDoctorId || undefined)}
               onChange={(val) => setSelectedDoctorId(val || '')}
-              allowClear
+              allowClear={!isDoctor}
+              disabled={isDoctor && !canSend}
               loading={doctorsLoading}
               showSearch
               optionFilterProp="label"
               options={[
-                { value: '', label: 'Tất cả bác sĩ' },
+                ...(!isDoctor ? [{ value: '', label: 'Tất cả bác sĩ' }] : []),
                 ...doctorOptions.map((doc) => ({
                   value: doc.id,
                   label: doc.fullName || doc.name || doc.username,
