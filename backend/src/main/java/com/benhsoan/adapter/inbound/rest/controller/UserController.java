@@ -133,13 +133,14 @@ public class UserController {
     @RequirePermission("USER_RESET_PASSWORD")
     public com.benhsoan.adapter.inbound.rest.response.user.ResetPasswordResponse resetPassword(
             @PathVariable UUID id,
-            @RequestBody(required = false) com.benhsoan.adapter.inbound.rest.request.user.ResetPasswordRequest request
+            @Valid @RequestBody(required = false) com.benhsoan.adapter.inbound.rest.request.user.ResetPasswordRequest request
     ) {
 
         String customTempPassword = request != null ? request.temporaryPassword() : null;
+        Integer expiresInHours = request != null ? request.expiresInHours() : null;
         com.benhsoan.port.dto.result.ResetPasswordResult result =
                 resetPasswordUseCase.resetPassword(
-                        new com.benhsoan.port.dto.command.user.ResetPasswordCommand(id, customTempPassword));
+                        new com.benhsoan.port.dto.command.user.ResetPasswordCommand(id, customTempPassword, expiresInHours));
 
         return userRestMapper.toResponse(result);
     }

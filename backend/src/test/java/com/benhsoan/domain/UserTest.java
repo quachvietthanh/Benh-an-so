@@ -78,24 +78,39 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("changePassword should update password hash and clear mustChangePassword")
+    @DisplayName("changePassword should update password hash and clear mustChangePassword and tempPasswordExpiresAt")
     void changePassword() {
         User user = createDefaultUser();
-        user.resetPassword("tempHash123");
+        Instant expiresAt = Instant.now().plusSeconds(3600);
+        user.resetPassword("tempHash123", expiresAt);
         assertTrue(user.isMustChangePassword());
+        assertEquals(expiresAt, user.getTempPasswordExpiresAt());
 
         user.changePassword("newHash456");
         assertFalse(user.isMustChangePassword());
+        assertNull(user.getTempPasswordExpiresAt());
     }
 
     @Test
-    @DisplayName("resetPassword should set mustChangePassword to true")
+    @DisplayName("resetPassword should set mustChangePassword to true and set tempPasswordExpiresAt")
     void resetPassword() {
         User user = createDefaultUser();
         assertFalse(user.isMustChangePassword());
+        assertNull(user.getTempPasswordExpiresAt());
 
-        user.resetPassword("temporaryHash789");
+        Instant expiresAt = Instant.now().plusSeconds(86400);
+        user.resetPassword("temporaryHash789", expiresAt);
         assertTrue(user.isMustChangePassword());
+        assertEquals(expiresAt, user.getTempPasswordExpiresAt());
+    }
+
+    @Test
+    @DisplayName("resetPassword legacy overload without expiresAt defaults expiresAt to null")
+    void resetPasswordLegacyOverload() {
+        User user = createDefaultUser();
+        user.resetPassword("temporaryHashLegacy");
+        assertTrue(user.isMustChangePassword());
+        assertNull(user.getTempPasswordExpiresAt());
     }
 
     @Test

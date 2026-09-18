@@ -63,6 +63,14 @@ function Login() {
           const seconds = result.retryAfterSeconds || 60
           setLockoutSeconds(seconds)
           setErrorMessage(`Tài khoản tạm khóa. Vui lòng thử lại sau ${seconds} giây.`)
+        } else if (
+          result.isTempPasswordExpired ||
+          result.errorCode === 'TEMP_PASSWORD_EXPIRED' ||
+          result.data?.code === 'TEMP_PASSWORD_EXPIRED'
+        ) {
+          const msg = result.message || 'Mật khẩu tạm thời đã hết hạn. Vui lòng liên hệ Quản trị viên để được cấp lại.'
+          setErrorMessage(msg)
+          message.error(msg)
         } else {
           const msg = result.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.'
           setErrorMessage(msg)

@@ -11,7 +11,13 @@ public record ResetPasswordResponse(
 
         String temporaryPassword,
 
-        Instant resetAt
+        Instant resetAt,
+
+        Instant tempPasswordExpiresAt
 
 ) {
+    public ResetPasswordResponse(UUID userId, String username, String temporaryPassword, Instant resetAt) {
+        this(userId, username, temporaryPassword, resetAt, null);
+    }
 }
+

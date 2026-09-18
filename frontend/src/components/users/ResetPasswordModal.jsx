@@ -3,6 +3,8 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
+  Select,
   Button,
   Radio,
   Alert,
@@ -18,7 +20,10 @@ import {
   ExclamationCircleOutlined,
   WarningOutlined,
   CheckCircleOutlined,
+  ClockCircleOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import userApi from '../../api/userApi'
 import { validatePasswordStrength } from '../../utils/passwordPolicy'
 
@@ -29,6 +34,11 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [resetMode, setResetMode] = useState('auto') // 'auto' | 'custom'
 
+  // Expiration states
+  const [expiryPreset, setExpiryPreset] = useState('24') // '1' | '24' | '72' | '168' | 'custom'
+  const [customExpiryValue, setCustomExpiryValue] = useState(24)
+  const [customExpiryUnit, setCustomExpiryUnit] = useState('hours') // 'hours' | 'days'
+
   // Error states
   const [tempPasswordError, setTempPasswordError] = useState(null)
   const [violations, setViolations] = useState([])
@@ -38,9 +48,32 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
   const [resetResult, setResetResult] = useState(null)
   const [copied, setCopied] = useState(false)
 
+  const getCalculatedExpiresInHours = () => {
+    if (expiryPreset !== 'custom') {
+      return Number(expiryPreset)
+    }
+    const val = Number(customExpiryValue)
+    if (!val || isNaN(val) || val < 1) return null
+    return customExpiryUnit === 'days' ? val * 24 : val
+  }
+
+  const calculatedExpiresInHours = getCalculatedExpiresInHours()
+  const isCustomInvalid =
+    expiryPreset === 'custom' &&
+    (!calculatedExpiresInHours || calculatedExpiresInHours < 1 || calculatedExpiresInHours > 720)
+
+  const formatExpiryDateTime = (dateStr) => {
+    if (!dateStr) return null
+    const d = dayjs(dateStr)
+    return d.isValid() ? d.format('DD/MM/YYYY HH:mm') : String(dateStr)
+  }
+
   const handleClose = () => {
     form.resetFields()
     setResetMode('auto')
+    setExpiryPreset('24')
+    setCustomExpiryValue(24)
+    setCustomExpiryUnit('hours')
     setTempPasswordError(null)
     setViolations([])
     setGeneralError(null)
@@ -76,12 +109,15 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
 
   const handleSubmit = async (values) => {
     if (!targetUser?.id) return
+    if (isCustomInvalid) return
 
     setTempPasswordError(null)
     setViolations([])
     setGeneralError(null)
 
-    let payload = {}
+    const payload = {
+      expiresInHours: calculatedExpiresInHours || 24,
+    }
 
     if (resetMode === 'custom') {
       const customPassword = values.temporaryPassword?.trim() || ''
@@ -97,7 +133,7 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
         return
       }
 
-      payload = { temporaryPassword: customPassword }
+      payload.temporaryPassword = customPassword
     }
 
     setLoading(true)
@@ -112,6 +148,7 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
         username: data.username || targetUser.username,
         temporaryPassword: data.temporaryPassword,
         resetAt: data.resetAt,
+        tempPasswordExpiresAt: data.tempPasswordExpiresAt,
       })
 
       if (onSuccess) onSuccess()
@@ -144,7 +181,7 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
       onCancel={handleClose}
       footer={null}
       centered
-      width={500}
+      width={520}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <KeyOutlined style={{ color: '#D97706', fontSize: 20 }} />
@@ -153,7 +190,7 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
       }
     >
       {resetResult ? (
-        // RESULT SCREEN: displays one-time temporary password
+        // RESULT SCREEN: displays one-time temporary password and expiration time
         <div style={{ paddingTop: 8 }}>
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
             <div
@@ -218,12 +255,40 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
             </Button>
           </div>
 
+          {resetResult.tempPasswordExpiresAt && (
+            <div
+              style={{
+                backgroundColor: '#FEF3C7',
+                border: '1px solid #FCD34D',
+                borderRadius: 8,
+                padding: '12px 16px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <ClockCircleOutlined style={{ color: '#D97706', fontSize: 20, flexShrink: 0 }} />
+              <div style={{ fontSize: 13, color: '#92400E', lineHeight: 1.5 }}>
+                <span>Mật khẩu tạm thời có hiệu lực đến: </span>
+                <strong style={{ color: '#78350F' }}>
+                  {formatExpiryDateTime(resetResult.tempPasswordExpiresAt)}
+                </strong>
+                {calculatedExpiresInHours && (
+                  <span style={{ color: '#B45309', marginLeft: 4 }}>
+                    ({calculatedExpiresInHours} giờ kể từ lúc đặt lại)
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <Alert
             type="warning"
             showIcon
             icon={<WarningOutlined />}
             message="Lưu ý quan trọng"
-            description="Mật khẩu tạm này chỉ hiển thị DUY NHẤT 1 LẦN. Vui lòng sao chép và gửi ngay cho nhân viên. Sau khi đóng cửa sổ này, bạn sẽ không thể xem lại. Nhân viên sẽ bị bắt buộc đổi mật khẩu mới trong lần đăng nhập kế tiếp."
+            description="Mật khẩu tạm này chỉ hiển thị DUY NHẤT 1 LẦN. Vui lòng sao chép và gửi ngay cho nhân viên kèm thông tin thời hạn hiệu lực. Sau khi hết hạn, nhân viên sẽ không thể đăng nhập. Nhân viên sẽ bị bắt buộc đổi mật khẩu mới trong lần đăng nhập đầu tiên."
             style={{ marginBottom: 20 }}
           />
 
@@ -234,7 +299,7 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
           </div>
         </div>
       ) : (
-        // FORM SCREEN: selects auto-generate or custom temporary password
+        // FORM SCREEN: selects auto-generate or custom temporary password and expiration period
         <div style={{ paddingTop: 8 }}>
           <Paragraph style={{ color: '#475569', marginBottom: 16, fontSize: 13 }}>
             Đặt lại mật khẩu cho nhân viên <strong>{targetUser?.fullName}</strong> (@{targetUser?.username}).
@@ -257,7 +322,7 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
             onFinish={handleSubmit}
             initialValues={{ temporaryPassword: '' }}
           >
-            <Form.Item label={<span style={{ fontWeight: 600 }}>Phương thức tạo mật khẩu</span>}>
+            <Form.Item label={<span style={{ fontWeight: 600 }}>Phương thức tạo mật khẩu</span>} style={{ marginBottom: 16 }}>
               <Radio.Group
                 value={resetMode}
                 onChange={(e) => {
@@ -305,7 +370,7 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
                     </div>
                   )
                 }
-                style={{ marginBottom: 20 }}
+                style={{ marginBottom: 16 }}
               >
                 <Input.Password
                   prefix={<KeyOutlined style={{ color: '#94A3B8' }} />}
@@ -319,6 +384,91 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
               </Form.Item>
             )}
 
+            {/* SECTION: Thời gian hiệu lực (áp dụng cho cả 2 phương thức) */}
+            <Form.Item
+              label={<span style={{ fontWeight: 600 }}>Thời gian hiệu lực</span>}
+              style={{ marginBottom: 14 }}
+            >
+              <Radio.Group
+                value={expiryPreset}
+                onChange={(e) => setExpiryPreset(e.target.value)}
+                style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+              >
+                <Radio value="1">1 giờ</Radio>
+                <Radio value="24">
+                  <span>
+                    <strong>24 giờ (1 ngày)</strong> (Mặc định)
+                  </span>
+                </Radio>
+                <Radio value="72">3 ngày (72 giờ)</Radio>
+                <Radio value="168">7 ngày (168 giờ)</Radio>
+                <Radio value="custom">
+                  <span>Tùy chỉnh</span>
+                </Radio>
+              </Radio.Group>
+
+              {expiryPreset === 'custom' && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    marginLeft: 24,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <Space.Compact style={{ width: '100%', maxWidth: 260 }}>
+                    <InputNumber
+                      min={1}
+                      max={customExpiryUnit === 'days' ? 30 : 720}
+                      value={customExpiryValue}
+                      onChange={(val) => setCustomExpiryValue(val)}
+                      placeholder={customExpiryUnit === 'days' ? 'Số ngày' : 'Số giờ'}
+                      style={{ width: 160 }}
+                    />
+                    <Select
+                      value={customExpiryUnit}
+                      onChange={(u) => {
+                        setCustomExpiryUnit(u)
+                        if (u === 'days' && customExpiryValue > 30) {
+                          setCustomExpiryValue(30)
+                        }
+                      }}
+                      style={{ width: 100 }}
+                      options={[
+                        { value: 'hours', label: 'Giờ' },
+                        { value: 'days', label: 'Ngày' },
+                      ]}
+                    />
+                  </Space.Compact>
+
+                  {customExpiryUnit === 'days' && customExpiryValue && (
+                    <div style={{ fontSize: 12, color: '#64748B' }}>
+                      Quy đổi: <strong>{customExpiryValue * 24} giờ</strong> (Tối đa 30 ngày / 720 giờ)
+                    </div>
+                  )}
+
+                  {isCustomInvalid && (
+                    <div style={{ color: '#DC2626', fontSize: 12 }}>
+                      Thời gian hiệu lực tùy chỉnh phải từ 1 đến 720 giờ (1 giờ đến tối đa 30 ngày).
+                    </div>
+                  )}
+                </div>
+              )}
+            </Form.Item>
+
+            <Alert
+              type="info"
+              showIcon
+              icon={<InfoCircleOutlined />}
+              message="Sau khi hết hạn, nhân viên sẽ không thể đăng nhập bằng mật khẩu tạm thời này và cần được cấp lại."
+              style={{
+                marginBottom: 20,
+                backgroundColor: '#EFF6FF',
+                borderColor: '#BFDBFE',
+              }}
+            />
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
               <Button onClick={handleClose} disabled={loading}>
                 Hủy
@@ -327,8 +477,13 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
                 type="primary"
                 htmlType="submit"
                 loading={loading}
+                disabled={loading || isCustomInvalid}
                 icon={<KeyOutlined />}
-                style={{ fontWeight: 600, backgroundColor: '#D97706', borderColor: '#D97706' }}
+                style={{
+                  fontWeight: 600,
+                  backgroundColor: isCustomInvalid ? undefined : '#D97706',
+                  borderColor: isCustomInvalid ? undefined : '#D97706',
+                }}
               >
                 Xác nhận đặt lại
               </Button>
@@ -341,3 +496,4 @@ function ResetPasswordModal({ open, targetUser, onClose, onSuccess }) {
 }
 
 export default ResetPasswordModal
+
