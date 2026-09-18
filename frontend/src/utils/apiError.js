@@ -6,6 +6,7 @@ export const DOMAIN_ERROR_MESSAGES = {
   INVALID_CREDENTIALS: 'Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.',
   TOKEN_INVALID: 'Phiên làm việc hoặc mã xác thực không hợp lệ. Vui lòng đăng nhập lại.',
   SESSION_EXPIRED: 'Phiên làm việc của bạn đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.',
+  TEMP_PASSWORD_EXPIRED: 'Mật khẩu tạm thời đã hết hạn. Vui lòng liên hệ Quản trị viên để được cấp lại.',
   TOO_MANY_LOGIN_ATTEMPTS: 'Bạn đã thử đăng nhập thất bại quá số lần quy định. Vui lòng thử lại sau ít phút.',
   LAST_ADMINISTRATOR_PERMISSION: 'Không thể xóa hoặc tước quyền của Quản trị viên hệ thống cuối cùng.',
   USER_ALREADY_EXISTS: 'Tên tài khoản người dùng đã tồn tại trên hệ thống.',

@@ -40,8 +40,12 @@ import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
+import com.benhsoan.port.inbound.reporting.GetRevenueBreakdownReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
+import com.benhsoan.port.dto.result.DoctorRevenueResult;
+import com.benhsoan.port.dto.result.RevenueBreakdownReportResult;
+import com.benhsoan.port.dto.result.ServiceGroupRevenueResult;
 import com.benhsoan.port.dto.result.TopMedicineItemResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -63,6 +67,7 @@ class ReportsControllerTest {
     @MockitoBean private GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
     @MockitoBean private GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
+    @MockitoBean private GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -590,5 +595,72 @@ class ReportsControllerTest {
                         .value("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT, DISEASE_PATTERN_REPORT."));
 
         verifyNoInteractions(exportOperationalReportUseCase);
+    }
+
+    @Test
+    void returnsRevenueBreakdown() throws Exception {
+        when(getRevenueBreakdownReportUseCase.getRevenueBreakdown(any(), any()))
+                .thenReturn(new RevenueBreakdownReportResult(
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31),
+                        new BigDecimal("700000"),
+                        new BigDecimal("100000"),
+                        new BigDecimal("400000"),
+                        new BigDecimal("200000"),
+                        BigDecimal.ZERO,
+                        "VND",
+                        List.of(
+                                new ServiceGroupRevenueResult("EXAMINATION", "Khám bệnh", new BigDecimal("100000"), new BigDecimal("14.29")),
+                                new ServiceGroupRevenueResult("LAB_TEST", "Xét nghiệm", new BigDecimal("150000"), new BigDecimal("21.43")),
+                                new ServiceGroupRevenueResult("MEDICATION", "Thuốc / Dược phẩm", new BigDecimal("200000"), new BigDecimal("28.57"))
+                        ),
+                        List.of(
+                                new DoctorRevenueResult(
+                                        java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
+                                        "doctor1",
+                                        "Dr. Nguyen Minh Anh",
+                                        new BigDecimal("100000"),
+                                        new BigDecimal("250000"),
+                                        new BigDecimal("200000"),
+                                        BigDecimal.ZERO,
+                                        new BigDecimal("550000"),
+                                        new BigDecimal("78.57")
+                                )
+                        )
+                ));
+
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalNetRevenue").value(700000))
+                .andExpect(jsonPath("$.totalExamRevenue").value(100000))
+                .andExpect(jsonPath("$.totalClinicalServiceRevenue").value(400000))
+                .andExpect(jsonPath("$.totalMedicationRevenue").value(200000))
+                .andExpect(jsonPath("$.currency").value("VND"))
+                .andExpect(jsonPath("$.serviceGroups[0].groupCode").value("EXAMINATION"))
+                .andExpect(jsonPath("$.serviceGroups[0].revenue").value(100000))
+                .andExpect(jsonPath("$.serviceGroups[2].groupCode").value("MEDICATION"))
+                .andExpect(jsonPath("$.serviceGroups[2].revenue").value(200000))
+                .andExpect(jsonPath("$.doctors[0].doctorCode").value("doctor1"))
+                .andExpect(jsonPath("$.doctors[0].totalRevenue").value(550000));
+    }
+
+    @Test
+    void rejectsInvalidRangeForRevenueBreakdown() throws Exception {
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2026-08-31")
+                        .param("to", "2026-08-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+    }
+
+    @Test
+    void rejectsRangeExceedingMaxDaysForRevenueBreakdown() throws Exception {
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2025-01-01")
+                        .param("to", "2026-02-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
     }
 }

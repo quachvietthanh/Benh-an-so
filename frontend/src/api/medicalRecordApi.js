@@ -118,6 +118,15 @@ const medicalRecordApi = {
   updateInstructionsAndTreatmentPlan: (medicalRecordId, data) => {
     return axiosClient.put(`/medical-records/${medicalRecordId}/instructions-and-treatment-plan`, data)
   },
+  getOverdueSigning: (params = {}) => {
+    return axiosClient.get('/medical-records/overdue-signing', { params })
+  },
+  sendSigningReminder: (medicalRecordId, data = {}) => {
+    return axiosClient.post(`/medical-records/${medicalRecordId}/signing-reminders`, data)
+  },
+  getSigningReminders: (medicalRecordId) => {
+    return axiosClient.get(`/medical-records/${medicalRecordId}/signing-reminders`)
+  },
 }
 
 export default medicalRecordApi

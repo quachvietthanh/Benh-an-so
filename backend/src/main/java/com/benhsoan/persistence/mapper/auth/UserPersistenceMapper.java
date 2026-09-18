@@ -23,6 +23,7 @@ public class UserPersistenceMapper {
                 entity.getRoleId(),
                 entity.isActive(),
                 entity.isMustChangePassword(),
+                entity.getTempPasswordExpiresAt(),
                 entity.getLastLoginAt(),
                 entity.getCreatedAt()
         );
@@ -43,6 +44,7 @@ public class UserPersistenceMapper {
                 .roleId(domain.getRoleId())
                 .active(domain.isActive())
                 .mustChangePassword(domain.isMustChangePassword())
+                .tempPasswordExpiresAt(domain.getTempPasswordExpiresAt())
                 .lastLoginAt(domain.getLastLoginAt())
                 .createdAt(domain.getCreatedAt())
                 .build();

@@ -173,6 +173,29 @@ class UserControllerTest {
     }
 
     @Test
+    void deniesResetPasswordWhenExpiresInHoursIsInvalid() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mvc.perform(post("/users/{id}/reset-password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expiresInHours": 0}
+                                """)
+                        .with(withPermission("PERMISSION_USER_RESET_PASSWORD")))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(post("/users/{id}/reset-password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expiresInHours": 721}
+                                """)
+                        .with(withPermission("PERMISSION_USER_RESET_PASSWORD")))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(resetPasswordUseCase);
+    }
+
+    @Test
     void deniesResetPasswordWhenActorOnlyHasUserUpdatePermission() throws Exception {
         UUID userId = UUID.randomUUID();
 

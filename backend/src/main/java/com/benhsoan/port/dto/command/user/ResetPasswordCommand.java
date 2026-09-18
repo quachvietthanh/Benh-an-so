@@ -4,6 +4,11 @@ import java.util.UUID;
 
 public record ResetPasswordCommand(
         UUID targetUserId,
-        String temporaryPassword
+        String temporaryPassword,
+        Integer expiresInHours
 ) {
+    public ResetPasswordCommand(UUID targetUserId, String temporaryPassword) {
+        this(targetUserId, temporaryPassword, null);
+    }
 }
+

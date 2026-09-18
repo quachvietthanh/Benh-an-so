@@ -1,5 +1,6 @@
 package com.benhsoan.application.ucservice.user;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -58,11 +59,14 @@ public class ResetPasswordService implements ResetPasswordUseCase {
             temporaryPassword = TemporaryPasswordGenerator.generate();
         }
 
+        Instant now = clockPort.now();
+        int hours = (command.expiresInHours() != null) ? command.expiresInHours() : 24;
+        Instant expiresAt = now.plus(Duration.ofHours(hours));
+
         String tempHash = passwordEncoderPort.encode(temporaryPassword);
-        targetUser.resetPassword(tempHash);
+        targetUser.resetPassword(tempHash, expiresAt);
         userRepository.save(targetUser);
 
-        Instant now = clockPort.now();
         userSessionRepository.revokeByUserId(targetUser.getId(), now);
 
         UUID actorId = currentUserPort.getCurrentUserId();
@@ -72,9 +76,10 @@ public class ResetPasswordService implements ResetPasswordUseCase {
                     "targetUserId": "%s",
                     "targetUsername": "%s",
                     "resetBy": "%s",
-                    "action": "RESET_PASSWORD"
+                    "action": "RESET_PASSWORD",
+                    "tempPasswordExpiresAt": "%s"
                 }
-                """.formatted(targetUser.getId(), targetUser.getUsername(), actorId != null ? actorId : "SYSTEM").trim();
+                """.formatted(targetUser.getId(), targetUser.getUsername(), actorId != null ? actorId : "SYSTEM", expiresAt).trim();
 
         auditLogRepository.save(
                 AuditLog.create(
@@ -92,7 +97,8 @@ public class ResetPasswordService implements ResetPasswordUseCase {
                 targetUser.getId(),
                 targetUser.getUsername(),
                 temporaryPassword,
-                now
+                now,
+                expiresAt
         );
     }
 }

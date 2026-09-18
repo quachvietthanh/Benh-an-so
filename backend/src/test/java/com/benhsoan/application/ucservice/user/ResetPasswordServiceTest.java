@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -113,11 +114,30 @@ class ResetPasswordServiceTest {
         assertEquals("receptionist1", result.username());
         assertNotNull(result.temporaryPassword());
         assertTrue(result.temporaryPassword().length() >= 8);
+        assertEquals(now.plus(Duration.ofHours(24)), result.tempPasswordExpiresAt());
+        assertEquals(now.plus(Duration.ofHours(24)), targetUser.getTempPasswordExpiresAt());
 
         assertTrue(targetUser.isMustChangePassword());
         verify(userRepository).save(targetUser);
         verify(userSessionRepository).revokeByUserId(targetUserId, now);
         verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("resets password with custom expiration hours")
+    void resetPasswordWithCustomExpirationHours() {
+        User targetUser = createTargetUser();
+        when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(passwordEncoderPort.encode(any())).thenReturn("$2a$10$tempHashedPassword");
+        when(clockPort.now()).thenReturn(now);
+        when(currentUserPort.getCurrentUserId()).thenReturn(adminId);
+
+        ResetPasswordCommand command = new ResetPasswordCommand(targetUserId, null, 72);
+        ResetPasswordResult result = resetPasswordService.resetPassword(command);
+
+        assertNotNull(result);
+        assertEquals(now.plus(Duration.ofHours(72)), result.tempPasswordExpiresAt());
+        assertEquals(now.plus(Duration.ofHours(72)), targetUser.getTempPasswordExpiresAt());
     }
 
     @Test
@@ -134,6 +154,7 @@ class ResetPasswordServiceTest {
 
         assertNotNull(result);
         assertEquals("CustomTempPass123", result.temporaryPassword());
+        assertEquals(now.plus(Duration.ofHours(24)), result.tempPasswordExpiresAt());
         assertTrue(targetUser.isMustChangePassword());
         verify(userRepository).save(targetUser);
     }
