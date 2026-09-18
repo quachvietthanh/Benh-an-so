@@ -2,11 +2,13 @@ package com.benhsoan.persistence.adapterRepository.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -15,18 +17,32 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.enums.InvoiceType;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
+import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicine.enums.DosageForm;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.persistence.entity.auth.UserEntity;
 import com.benhsoan.persistence.entity.billing.InvoiceEntity;
+import com.benhsoan.persistence.entity.billing.InvoiceLineEntity;
+import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
 import com.benhsoan.persistence.entity.medicine.MedicineEntity;
+import com.benhsoan.persistence.entity.medicalrecord.DiagnosisCatalogEntity;
+import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordDiagnosisEntity;
+import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionDispenseItemEntity;
+import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
 import com.benhsoan.persistence.entity.visit.VisitEntity;
 import com.benhsoan.persistence.jpaRepository.billing.JpaInvoiceRepository;
 import com.benhsoan.persistence.jpaRepository.visit.JpaVisitRepository;
+import com.benhsoan.port.outbound.repository.reporting.DiseasePatternSummary;
+import com.benhsoan.port.outbound.repository.reporting.InvoiceLineReportDetail;
 
 import jakarta.persistence.EntityManager;
 
@@ -252,9 +268,10 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .build());
     }
 
-    private void createVisit(String code, VisitStatus status, Instant completedAt) {
+    private UUID createVisit(String code, VisitStatus status, Instant completedAt) {
+        UUID id = UUID.randomUUID();
         visitRepository.save(VisitEntity.builder()
-                .id(UUID.randomUUID())
+                .id(id)
                 .visitCode(code)
                 .patientId(UUID.randomUUID())
                 .doctorId(UUID.randomUUID())
@@ -267,6 +284,7 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .createdBy(UUID.randomUUID())
                 .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
                 .build());
+        return id;
     }
 
     private void createOriginalInvoice(String code, UUID visitId, BigDecimal amount, Instant createdAt) {
@@ -313,6 +331,75 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .build());
     }
 
+    @Test
+    void findsDiseasePatternSummariesOrderedByCountDescAndCodeAsc() {
+        UUID doc1 = UUID.randomUUID();
+        UUID cat1 = createDiagnosisCatalog("J00", "Viêm mũi họng cấp", "Bệnh hệ hô hấp");
+        UUID cat2 = createDiagnosisCatalog("I10", "Tăng huyết áp vô căn", "Bệnh hệ tuần hoàn");
+
+        UUID visit1 = createVisit("VIS100001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"));
+        UUID visit2 = createVisit("VIS100002", VisitStatus.COMPLETED, Instant.parse("2026-08-02T02:00:00Z"));
+        UUID visitCancelled = createVisit("VIS100003", VisitStatus.CANCELLED, null);
+
+        UUID mr1 = createMedicalRecord(visit1);
+        UUID mr2 = createMedicalRecord(visit2);
+        UUID mrCancelled = createMedicalRecord(visitCancelled);
+
+        // 2 counts for J00
+        createDiagnosis(mr1, cat1, "J00", "Viêm mũi họng cấp", doc1, Instant.parse("2026-08-01T03:00:00Z"));
+        createDiagnosis(mr2, cat1, "J00", "Viêm mũi họng cấp", doc1, Instant.parse("2026-08-02T03:00:00Z"));
+        // 1 count for I10
+        createDiagnosis(mr2, cat2, "I10", "Tăng huyết áp vô căn", doc1, Instant.parse("2026-08-02T03:30:00Z"));
+        // Cancelled visit diagnosis should be excluded
+        createDiagnosis(mrCancelled, cat2, "I10", "Tăng huyết áp vô căn", doc1, Instant.parse("2026-08-02T03:30:00Z"));
+
+        var summaries = repositoryAdapter.findDiseasePatternSummaries(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                null
+        );
+
+        assertEquals(2, summaries.size());
+        assertEquals("J00", summaries.get(0).diseaseCode());
+        assertEquals(2L, summaries.get(0).diagnosisCount());
+        assertEquals("I10", summaries.get(1).diseaseCode());
+        assertEquals(1L, summaries.get(1).diagnosisCount());
+    }
+
+    @Test
+    void filtersDiseasePatternSummariesByDoctorId() {
+        UUID doc1 = UUID.randomUUID();
+        UUID doc2 = UUID.randomUUID();
+        UUID cat1 = createDiagnosisCatalog("J01", "Viêm xoang cấp", "Bệnh hệ hô hấp");
+
+        UUID visit1 = createVisit("VIS200001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"));
+        UUID mr1 = createMedicalRecord(visit1);
+
+        createDiagnosis(mr1, cat1, "J01", "Viêm xoang cấp", doc1, Instant.parse("2026-08-01T03:00:00Z"));
+        createDiagnosis(mr1, cat1, "J01", "Viêm xoang cấp", doc2, Instant.parse("2026-08-01T04:00:00Z"));
+
+        var doc1Summaries = repositoryAdapter.findDiseasePatternSummaries(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                doc1
+        );
+
+        assertEquals(1, doc1Summaries.size());
+        assertEquals(1L, doc1Summaries.get(0).diagnosisCount());
+
+        assertTrue(repositoryAdapter.hasDiagnoses(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                doc1
+        ));
+
+        assertFalse(repositoryAdapter.hasDiagnoses(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-03T00:00:00Z"),
+                UUID.randomUUID()
+        ));
+    }
+
     private void createDispenseItem(UUID id, UUID medicineId, int quantity, Instant dispensedAt) {
         entityManager.persist(PrescriptionDispenseItemEntity.builder()
                 .id(id)
@@ -324,6 +411,299 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 .dispensedBy(UUID.randomUUID())
                 .dispensedAt(dispensedAt)
                 .createdAt(dispensedAt)
+                .build());
+    }
+
+    @Test
+    void findsInvoiceLineReportDetailsCorrectly() {
+        UUID docId = UUID.randomUUID();
+        createDoctor(docId, "doctor1", "Dr. Nguyen Minh Anh");
+
+        UUID visitId = UUID.randomUUID();
+        createVisitWithDoctor("VIS000010", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"), visitId, docId);
+
+        UUID invoiceId = UUID.randomUUID();
+        createOriginalInvoiceWithId(invoiceId, "HD000010", visitId, new BigDecimal("250000"), Instant.parse("2026-08-01T03:00:00Z"));
+
+        createInvoiceLine(invoiceId, InvoiceLineType.EXAM_FEE, "Phi kham", new BigDecimal("100000"), visitId);
+        createInvoiceLine(invoiceId, InvoiceLineType.MEDICINE_FEE, "Tien thuoc", new BigDecimal("150000"), UUID.randomUUID());
+
+        List<InvoiceLineReportDetail> details = repositoryAdapter.findInvoiceLineReportDetails(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        );
+
+        assertEquals(2, details.size());
+        InvoiceLineReportDetail examLine = details.stream().filter(l -> l.lineType() == InvoiceLineType.EXAM_FEE).findFirst().orElseThrow();
+        assertEquals(docId, examLine.doctorId());
+        assertEquals("Dr. Nguyen Minh Anh", examLine.doctorName());
+        assertEquals(new BigDecimal("100000.00"), examLine.amount());
+
+        InvoiceLineReportDetail medLine = details.stream().filter(l -> l.lineType() == InvoiceLineType.MEDICINE_FEE).findFirst().orElseThrow();
+        assertEquals(docId, medLine.doctorId());
+        assertEquals(new BigDecimal("150000.00"), medLine.amount());
+    }
+
+    private void createVisitWithDoctor(String code, VisitStatus status, Instant completedAt, UUID visitId, UUID docId) {
+        entityManager.persist(VisitEntity.builder()
+                .id(visitId)
+                .visitCode(code)
+                .patientId(UUID.randomUUID())
+                .doctorId(docId)
+                .visitType(VisitType.WALK_IN)
+                .status(status)
+                .visitAt(completedAt != null ? completedAt : Instant.parse("2026-08-01T01:00:00Z"))
+                .completedAt(completedAt)
+                .reason("Reason")
+                .createdBy(docId)
+                .createdAt(Instant.parse("2026-08-01T01:00:00Z"))
+                .build());
+    }
+
+    private void createOriginalInvoiceWithId(UUID invoiceId, String code, UUID visitId, BigDecimal amount, Instant createdAt) {
+        entityManager.persist(InvoiceEntity.builder()
+                .id(invoiceId)
+                .invoiceCode(code)
+                .visitId(visitId)
+                .paymentId(UUID.randomUUID())
+                .type(InvoiceType.ORIGINAL)
+                .totalAmount(amount)
+                .createdBy(UUID.randomUUID())
+                .createdAt(createdAt)
+                .build());
+    }
+
+    private void createInvoiceLine(UUID invoiceId, InvoiceLineType lineType, String itemName, BigDecimal amount, UUID refId) {
+        entityManager.persist(InvoiceLineEntity.builder()
+                .id(UUID.randomUUID())
+                .invoiceId(invoiceId)
+                .lineType(lineType)
+                .itemName(itemName)
+                .referenceId(refId)
+                .quantity(1)
+                .unitPrice(amount)
+                .amount(amount)
+                .createdAt(Instant.parse("2026-08-01T03:00:00Z"))
+                .build());
+    }
+
+    private void createMedicalRecord(UUID id, UUID visitId, UUID createdBy) {
+        entityManager.persist(MedicalRecordEntity.builder()
+                .id(id)
+                .visitId(visitId)
+                .status(MedicalRecordStatus.OPEN)
+                .createdBy(createdBy)
+                .createdAt(Instant.parse("2026-08-01T01:30:00Z"))
+                .build());
+    }
+
+    private void createPrescription(UUID id, String code, UUID medicalRecordId, UUID prescribedBy, PrescriptionStatus status, Instant prescribedAt) {
+        entityManager.persist(PrescriptionEntity.builder()
+                .id(id)
+                .prescriptionCode(code)
+                .medicalRecordId(medicalRecordId)
+                .prescribedBy(prescribedBy)
+                .status(status)
+                .interconnectionStatus(InterconnectionStatus.NOT_SENT)
+                .prescribedAt(prescribedAt)
+                .build());
+    }
+
+    private void createAdjustmentInvoice(UUID invoiceId, String code, UUID visitId, UUID origInvoiceId, BigDecimal amount, Instant createdAt) {
+        entityManager.persist(InvoiceEntity.builder()
+                .id(invoiceId)
+                .invoiceCode(code)
+                .visitId(visitId)
+                .originalInvoiceId(origInvoiceId)
+                .type(InvoiceType.ADJUSTMENT)
+                .totalAmount(amount)
+                .createdBy(UUID.randomUUID())
+                .createdAt(createdAt)
+                .build());
+    }
+
+    @Test
+    void deductsRefundedMedicineAgainstPrescribingDoctorNotExamDoctor() {
+        // Finding P1-01 / TC-REP-01:
+        // Exam Doctor = docA, Prescribing Doctor = docB
+        UUID docA = UUID.randomUUID();
+        UUID docB = UUID.randomUUID();
+        createDoctor(docA, "doctorA", "Dr. Exam Doctor");
+        createDoctor(docB, "doctorB", "Dr. Prescribing Doctor");
+
+        UUID visitId = UUID.randomUUID();
+        createVisitWithDoctor("VIS000099", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"), visitId, docA);
+
+        UUID medicalRecordId = UUID.randomUUID();
+        createMedicalRecord(medicalRecordId, visitId, docA);
+
+        UUID prescriptionId = UUID.randomUUID();
+        createPrescription(prescriptionId, "RX000099", medicalRecordId, docB, PrescriptionStatus.DISPENSED, Instant.parse("2026-08-01T02:15:00Z"));
+
+        UUID originalInvoiceId = UUID.randomUUID();
+        UUID paymentId = UUID.randomUUID();
+        createOriginalInvoiceWithId(originalInvoiceId, "HD000099", visitId, new BigDecimal("150000"), Instant.parse("2026-08-01T03:00:00Z"));
+        createInvoiceLine(originalInvoiceId, InvoiceLineType.MEDICINE_FEE, "Tien thuoc", new BigDecimal("150000"), paymentId);
+
+        // Refund invoice: ADJUSTMENT line with amount -150,000 and refId = paymentId
+        UUID refundInvoiceId = UUID.randomUUID();
+        createAdjustmentInvoice(refundInvoiceId, "HDDC000099", visitId, originalInvoiceId, new BigDecimal("-150000"), Instant.parse("2026-08-01T04:00:00Z"));
+        createInvoiceLine(refundInvoiceId, InvoiceLineType.ADJUSTMENT, "Tien thuoc", new BigDecimal("-150000"), paymentId);
+
+        List<InvoiceLineReportDetail> details = repositoryAdapter.findInvoiceLineReportDetails(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        );
+
+        assertEquals(2, details.size());
+
+        InvoiceLineReportDetail originalMedLine = details.stream()
+                .filter(d -> d.lineType() == InvoiceLineType.MEDICINE_FEE)
+                .findFirst().orElseThrow();
+        assertEquals(docB, originalMedLine.doctorId(), "Original medicine line must be attributed to prescribing doctor B");
+
+        InvoiceLineReportDetail refundLine = details.stream()
+                .filter(d -> d.lineType() == InvoiceLineType.ADJUSTMENT)
+                .findFirst().orElseThrow();
+        assertEquals(docB, refundLine.doctorId(), "Refund line must be deducted from prescribing doctor B, NOT exam doctor A");
+        assertEquals(InvoiceLineType.MEDICINE_FEE, refundLine.targetLineType(), "Adjustment targetLineType must be MEDICINE_FEE");
+    }
+
+    @Test
+    void ignoresCancelledPrescriptionsWhenAttributingMedicineDoctor() {
+        // Finding P2-02 / TC-REP-04:
+        // docCancelled creates RX 1 (CANCELLED). docActive creates RX 2 (DISPENSED).
+        UUID docExam = UUID.randomUUID();
+        UUID docCancelled = UUID.randomUUID();
+        UUID docActive = UUID.randomUUID();
+        createDoctor(docExam, "docExam", "Dr. Exam");
+        createDoctor(docCancelled, "docCancelled", "Dr. Cancelled");
+        createDoctor(docActive, "docActive", "Dr. Active");
+
+        UUID visitId = UUID.randomUUID();
+        createVisitWithDoctor("VIS000088", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"), visitId, docExam);
+
+        UUID medicalRecordId = UUID.randomUUID();
+        createMedicalRecord(medicalRecordId, visitId, docExam);
+
+        // Cancelled prescription created at 02:00
+        createPrescription(UUID.randomUUID(), "RX000081", medicalRecordId, docCancelled, PrescriptionStatus.CANCELLED, Instant.parse("2026-08-01T02:00:00Z"));
+        // Active replacement prescription created at 02:30
+        createPrescription(UUID.randomUUID(), "RX000082", medicalRecordId, docActive, PrescriptionStatus.DISPENSED, Instant.parse("2026-08-01T02:30:00Z"));
+
+        UUID originalInvoiceId = UUID.randomUUID();
+        createOriginalInvoiceWithId(originalInvoiceId, "HD000088", visitId, new BigDecimal("120000"), Instant.parse("2026-08-01T03:00:00Z"));
+        createInvoiceLine(originalInvoiceId, InvoiceLineType.MEDICINE_FEE, "Tien thuoc", new BigDecimal("120000"), UUID.randomUUID());
+
+        List<InvoiceLineReportDetail> details = repositoryAdapter.findInvoiceLineReportDetails(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        );
+
+        assertEquals(1, details.size());
+        InvoiceLineReportDetail line = details.get(0);
+        assertEquals(docActive, line.doctorId(), "Medicine fee must be attributed to docActive, NOT docCancelled");
+    }
+
+    @Test
+    void reconcilesInvoiceLineDetailsWithSumNetRevenueOnSameDataset() {
+        // Finding P3-2: Reconcile sum(invoice_lines.amount) with sumNetRevenue
+        UUID doc = UUID.randomUUID();
+        createDoctor(doc, "docReconcile", "Dr. Reconcile");
+
+        UUID visitId = UUID.randomUUID();
+        createVisitWithDoctor("VIS-REC-001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"), visitId, doc);
+
+        UUID invoice1 = UUID.randomUUID();
+        createOriginalInvoiceWithId(invoice1, "HD-REC-001", visitId, new BigDecimal("450000"), Instant.parse("2026-08-01T03:00:00Z"));
+        createInvoiceLine(invoice1, InvoiceLineType.EXAM_FEE, "Phi kham", new BigDecimal("100000"), visitId);
+        createInvoiceLine(invoice1, InvoiceLineType.MEDICINE_FEE, "Tien thuoc", new BigDecimal("150000"), UUID.randomUUID());
+        createInvoiceLine(invoice1, InvoiceLineType.SERVICE_FEE, "Sieu am", new BigDecimal("200000"), UUID.randomUUID());
+
+        UUID adjInvoice = UUID.randomUUID();
+        createAdjustmentInvoice(adjInvoice, "HD-REC-002", visitId, invoice1, new BigDecimal("-50000"), Instant.parse("2026-08-01T04:00:00Z"));
+        createInvoiceLine(adjInvoice, InvoiceLineType.ADJUSTMENT, "Giam gia", new BigDecimal("-50000"), UUID.randomUUID());
+
+        Instant from = Instant.parse("2026-08-01T00:00:00Z");
+        Instant to = Instant.parse("2026-08-02T00:00:00Z");
+
+        BigDecimal netRevenue = repositoryAdapter.sumNetRevenue(from, to);
+        List<InvoiceLineReportDetail> lines = repositoryAdapter.findInvoiceLineReportDetails(from, to);
+
+        BigDecimal sumLineAmounts = lines.stream()
+                .map(InvoiceLineReportDetail::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        assertEquals(new BigDecimal("400000.00"), netRevenue);
+        assertEquals(0, netRevenue.compareTo(sumLineAmounts), "Sum of invoice line details must match sumNetRevenue");
+    }
+
+    @Test
+    void attributesUnresolvedAdjustmentToNullDoctorAndNullTargetLineType() {
+        // Finding P2-2: Unresolved adjustment must have doctorId == null and targetLineType == null
+        UUID doc = UUID.randomUUID();
+        createDoctor(doc, "docUnresolved", "Dr. Unresolved");
+
+        UUID visitId = UUID.randomUUID();
+        createVisitWithDoctor("VIS-UNRES-001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"), visitId, doc);
+
+        // Adjustment with non-existent original invoice and random refId
+        UUID orphanAdjInvoice = UUID.randomUUID();
+        UUID nonExistentOrigInvoiceId = UUID.randomUUID();
+        createAdjustmentInvoice(orphanAdjInvoice, "HD-UNRES-001", visitId, nonExistentOrigInvoiceId, new BigDecimal("-25000"), Instant.parse("2026-08-01T05:00:00Z"));
+        createInvoiceLine(orphanAdjInvoice, InvoiceLineType.ADJUSTMENT, "Khoan dieu chinh vo danh", new BigDecimal("-25000"), UUID.randomUUID());
+
+        List<InvoiceLineReportDetail> details = repositoryAdapter.findInvoiceLineReportDetails(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        );
+
+        InvoiceLineReportDetail adjLine = details.stream()
+                .filter(d -> d.lineType() == InvoiceLineType.ADJUSTMENT)
+                .findFirst().orElseThrow();
+
+        assertNull(adjLine.targetLineType(), "Unresolved adjustment must have null targetLineType");
+        assertNull(adjLine.doctorId(), "Unresolved adjustment must not be attributed to visitDoctor, doctorId must be null");
+    }
+
+    private UUID createDiagnosisCatalog(String code, String name, String diseaseGroup) {
+        UUID id = UUID.randomUUID();
+        entityManager.persist(DiagnosisCatalogEntity.builder()
+                .id(id)
+                .code(code)
+                .name(name)
+                .nameNorm(name.toLowerCase())
+                .diseaseGroup(diseaseGroup)
+                .active(true)
+                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .build());
+        return id;
+    }
+
+    private UUID createMedicalRecord(UUID visitId) {
+        UUID id = UUID.randomUUID();
+        entityManager.persist(MedicalRecordEntity.builder()
+                .id(id)
+                .visitId(visitId)
+                .chiefComplaint("Trieu chung")
+                .status(MedicalRecordStatus.DRAFT)
+                .createdBy(UUID.randomUUID())
+                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                .build());
+        return id;
+    }
+
+    private void createDiagnosis(UUID medicalRecordId, UUID catalogId, String code, String name, UUID doctorId, Instant diagnosedAt) {
+        entityManager.persist(MedicalRecordDiagnosisEntity.builder()
+                .id(UUID.randomUUID())
+                .medicalRecordId(medicalRecordId)
+                .diagnosisCatalogId(catalogId)
+                .diagnosisCode(code)
+                .diagnosisName(name)
+                .diagnosisType(DiagnosisType.PRIMARY)
+                .diagnosedBy(doctorId)
+                .diagnosedAt(diagnosedAt)
+                .createdAt(diagnosedAt)
                 .build());
     }
 }

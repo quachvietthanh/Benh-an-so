@@ -126,20 +126,35 @@ export const AuthProvider = ({ children }) => {
       const isLockout = isLockoutError(error)
       const retryAfterSeconds = parseRetryAfterSeconds(error)
       const errorData = error.response?.data
-      const message = isLockout
-        ? (retryAfterSeconds > 0
+      const errorCode = errorData?.code || error.apiError?.code
+      const isTempPasswordExpired = errorCode === 'TEMP_PASSWORD_EXPIRED'
+
+      let message = ''
+      if (isLockout) {
+        message =
+          retryAfterSeconds > 0
             ? `Tài khoản tạm khóa. Vui lòng thử lại sau ${retryAfterSeconds} giây.`
-            : 'Tài khoản tạm khóa. Vui lòng thử lại sau.')
-        : (status === 403
-            ? 'Tài khoản đã bị vô hiệu hóa / khóa. Vui lòng liên hệ quản trị viên.'
-            : (errorData?.message ||
-              (status === 500
-                ? 'Máy chủ Backend đang bị lỗi hoặc chưa sẵn sàng kết nối (Lỗi 500)'
-                : (status === 401 ? 'Tên đăng nhập hoặc mật khẩu không chính xác.' : error.message || 'Tên đăng nhập hoặc mật khẩu không đúng'))))
+            : 'Tài khoản tạm khóa. Vui lòng thử lại sau.'
+      } else if (isTempPasswordExpired) {
+        message = 'Mật khẩu tạm thời đã hết hạn. Vui lòng liên hệ Quản trị viên để được cấp lại.'
+      } else if (status === 403) {
+        message = 'Tài khoản đã bị vô hiệu hóa / khóa. Vui lòng liên hệ quản trị viên.'
+      } else if (errorData?.message) {
+        message = errorData.message
+      } else if (status === 500) {
+        message = 'Máy chủ Backend đang bị lỗi hoặc chưa sẵn sàng kết nối (Lỗi 500)'
+      } else if (status === 401) {
+        message = 'Tên đăng nhập hoặc mật khẩu không chính xác.'
+      } else {
+        message = error.message || 'Tên đăng nhập hoặc mật khẩu không đúng'
+      }
+
       return {
         success: false,
         status,
+        errorCode,
         isLockout,
+        isTempPasswordExpired,
         retryAfterSeconds,
         data: errorData,
         error,

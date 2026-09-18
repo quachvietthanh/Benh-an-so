@@ -305,21 +305,58 @@ function MedicalHistoryDetailModal({
             )}
           </div>
 
-          <div>
+          <div style={{ marginBottom: 20 }}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-                fontSize: 15,
-                fontWeight: 700,
-                color: '#1e3a8a',
+                justifyContent: 'space-between',
                 marginBottom: 10,
+                flexWrap: 'wrap',
+                gap: 8,
               }}
             >
-              <InfoCircleOutlined style={{ color: '#d97706' }} />
-              <span>3. Lời dặn của Bác sĩ</span>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: '#1e3a8a',
+                }}
+              >
+                <InfoCircleOutlined style={{ color: '#d97706' }} />
+                <span>3. Kế hoạch điều trị & Lời dặn của Bác sĩ</span>
+              </div>
+              {(detail.revisitDate || detail.revisitDateFormatted) && (
+                <Tag color="geekblue" style={{ fontSize: 13, padding: '3px 10px', borderRadius: 6, fontWeight: 600 }}>
+                  <CalendarOutlined style={{ marginRight: 6 }} />
+                  Hẹn tái khám: <b>{detail.revisitDateFormatted || dayjs(detail.revisitDate).format('DD/MM/YYYY')}</b>
+                </Tag>
+              )}
             </div>
+
+            {detail.treatmentPlan && (
+              <div
+                style={{
+                  background: '#f0f9ff',
+                  border: '1px solid #bae6fd',
+                  borderRadius: 10,
+                  padding: '12px 16px',
+                  marginBottom: 12,
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                }}
+              >
+                <div style={{ fontWeight: 600, color: '#0284c7', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <FileDoneOutlined /> Kế hoạch điều trị:
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap', color: '#0f172a' }}>
+                  {detail.treatmentPlan}
+                </div>
+              </div>
+            )}
 
             <div
               style={{
@@ -332,8 +369,11 @@ function MedicalHistoryDetailModal({
                 lineHeight: 1.6,
               }}
             >
+              <div style={{ fontWeight: 600, color: '#b45309', marginBottom: 4 }}>
+                Lời dặn dò & Chế độ sinh hoạt:
+              </div>
               {detail.doctorAdvice ? (
-                <div style={{ whiteSpace: 'pre-wrap' }}>
+                <div style={{ whiteSpace: 'pre-wrap', color: '#78350f' }}>
                   {detail.doctorAdvice}
                 </div>
               ) : (

@@ -31,7 +31,8 @@ test('AppointmentQueue.jsx computes doctorQueueGroups.completed correctly', () =
 
 test('AppointmentQueue.jsx displays completed patients block in doctor queue tab', () => {
   const apptPath = path.join(frontendDir, 'src/pages/AppointmentQueue.jsx')
-  const content = fs.readFileSync(apptPath, 'utf-8')
+  const completedListPath = path.join(frontendDir, 'src/components/appointment-queue/CompletedTodayList.jsx')
+  const content = fs.readFileSync(apptPath, 'utf-8') + (fs.existsSync(completedListPath) ? fs.readFileSync(completedListPath, 'utf-8') : '')
 
   assert.ok(
     content.includes('🟢 BỆNH NHÂN ĐÃ KHÁM XONG TRONG NGÀY'),
@@ -42,7 +43,7 @@ test('AppointmentQueue.jsx displays completed patients block in doctor queue tab
     'Must provide button to view medical record of completed patient'
   )
   assert.ok(
-    content.includes('FileTextOutlined,'),
+    content.includes('FileTextOutlined'),
     'Must import FileTextOutlined from @ant-design/icons'
   )
 })

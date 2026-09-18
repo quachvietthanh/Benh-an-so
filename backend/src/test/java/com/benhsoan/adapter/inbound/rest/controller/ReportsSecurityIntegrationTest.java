@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,14 +48,18 @@ import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
+import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
+import com.benhsoan.port.dto.result.RevenueBreakdownReportResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
 import com.benhsoan.port.dto.command.role.UpdateRolePermissionsCommand;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
+import com.benhsoan.port.inbound.reporting.GetRevenueBreakdownReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -98,7 +103,9 @@ class ReportsSecurityIntegrationTest {
     @MockitoBean private GetOperationalTimelineUseCase getOperationalTimelineUseCase;
     @MockitoBean private GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     @MockitoBean private GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
+    @MockitoBean private GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
+    @MockitoBean private GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -249,6 +256,86 @@ class ReportsSecurityIntegrationTest {
     }
 
     @Test
+    void allowsManagerToReadDiseasePatternsReport() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(any(), any(), any())).thenReturn(new DiseasePatternReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31),
+                null,
+                null,
+                0L,
+                Instant.parse("2026-08-31T08:00:00Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("MANAGER", "REPORT_VIEW")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forbidsDoctorFromReadingDiseasePatternsReport() throws Exception {
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+    }
+
+    @Test
+    void forbidsAdminFromReadingDiseasePatternsReport() throws Exception {
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("ADMIN", "USER_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+    }
+
+    @Test
+    void forbidsReceptionistFromReadingDiseasePatternsReportAndAuditsAccessDenied() throws Exception {
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("RECEPTIONIST", "PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+        verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    void returnsForbiddenWhenDiseasePatternsUseCaseDeniesAccess() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(any(), any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Only managers can view the disease pattern report."));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "REPORT_VIEW")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenWhenExportDiseasePatternUseCaseDeniesAccess() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Only managers can export the disease pattern report."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "DISEASE_PATTERN_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "REPORT_EXPORT")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void keepsOldTokenPermissionAndAppliesRevocationAfterRefresh() throws Exception {
         Instant now = Instant.parse("2026-08-19T08:00:00Z");
         UUID doctorRoleId = UUID.randomUUID();
@@ -335,6 +422,56 @@ class ReportsSecurityIntegrationTest {
                         .param("from", "2026-08-01").param("to", "2026-08-03")
                         .header("Authorization", "Bearer " + refreshedAccessToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void allowsManagerWithReportViewToAccessRevenueBreakdown() throws Exception {
+        when(getRevenueBreakdownReportUseCase.getRevenueBreakdown(any(), any())).thenReturn(new RevenueBreakdownReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                new BigDecimal("500000"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                "VND",
+                List.of(),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .with(permission("MANAGER", "REPORT_VIEW")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forbidsAdminWithoutReportViewToAccessRevenueBreakdownAndAuditsDeniedAttempt() throws Exception {
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .with(permission("ADMIN", "USER_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getRevenueBreakdownReportUseCase);
+        org.mockito.Mockito.verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    void forbidsReceptionistWithoutReportViewToAccessRevenueBreakdownAndAuditsDeniedAttempt() throws Exception {
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .with(permission("RECEPTIONIST", "PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getRevenueBreakdownReportUseCase);
+        org.mockito.Mockito.verify(auditLogRepository).save(any());
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor permission(String role, String code) {

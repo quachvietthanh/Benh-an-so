@@ -39,10 +39,13 @@ const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
 const MedicalRecordAccessLogsPage = React.lazy(() => import('../pages/MedicalRecordAccessLogsPage'))
 const MedicalRecordCopyPage = React.lazy(() => import('../pages/MedicalRecordCopyPage'))
 const MedicalRecordVersionHistoryPage = React.lazy(() => import('../pages/MedicalRecordVersionHistoryPage'))
+const OverdueMedicalRecordSigningPage = React.lazy(() => import('../pages/OverdueMedicalRecordSigningPage'))
 const PrescriptionInterconnectionPage = React.lazy(() => import('../pages/PrescriptionInterconnectionPage'))
 const DoctorScheduleManagementPage = React.lazy(() => import('../pages/DoctorScheduleManagementPage'))
 const DoctorWeeklySchedulePage = React.lazy(() => import('../pages/DoctorWeeklySchedulePage'))
 const AnonymizationPage = React.lazy(() => import('../pages/AnonymizationPage'))
+const PendingClinicalOrdersPage = React.lazy(() => import('../pages/PendingClinicalOrdersPage'))
+const AdminOperationLogPage = React.lazy(() => import('../pages/AdminOperationLogPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -120,7 +123,7 @@ function AppRoutes() {
         <Route path="patients" element={<PrivateRoute allowedPermissions={['PATIENT_READ', 'PATIENT_CREATE', 'PATIENT_UPDATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientList /></LazyPage></PrivateRoute>} />
         <Route path="patients/:id" element={<PrivateRoute allowedPermissions={['PATIENT_READ', 'PATIENT_CREATE', 'PATIENT_UPDATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientDetail /></LazyPage></PrivateRoute>} />
         <Route path="appointments" element={<PrivateRoute allowedPermissions={['APPOINTMENT_READ', 'APPOINTMENT_CREATE', 'APPOINTMENT_UPDATE', 'QUEUE_VIEW', 'QUEUE_CREATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><AppointmentQueue /></LazyPage></PrivateRoute>} />
-        <Route path="appointments/weekly-schedule" element={<PrivateRoute allowedPermissions={['APPOINTMENT_READ', 'APPOINTMENT_CREATE']} allowedRoles={['admin', 'doctor', 'receptionist', 'manager', 'clinic_manager']}><LazyPage><DoctorWeeklySchedulePage /></LazyPage></PrivateRoute>} />
+        <Route path="appointments/weekly-schedule" element={<PrivateRoute allowedRoles={['admin', 'receptionist', 'manager', 'clinic_manager']}><LazyPage><DoctorWeeklySchedulePage /></LazyPage></PrivateRoute>} />
         <Route path="doctor-weekly-schedule" element={<Navigate to="/appointments/weekly-schedule" replace />} />
         <Route path="doctor-schedules" element={<PrivateRoute allowedPermissions={['DOCTOR_SCHEDULE_UPDATE']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><DoctorScheduleManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="system/doctor-schedules" element={<Navigate to="/doctor-schedules" replace />} />
@@ -133,9 +136,12 @@ function AppRoutes() {
         <Route path="medical-records/copies" element={<Navigate to="/medical-records/copy-issuance" replace />} />
         <Route path="medical-records/version-history" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_VERSION_HISTORY_READ', 'AUDIT_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><MedicalRecordVersionHistoryPage /></LazyPage></PrivateRoute>} />
         <Route path="medical-records/versions" element={<Navigate to="/medical-records/version-history" replace />} />
+        <Route path="medical-records/overdue-signing" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_OVERDUE_READ', 'MEDICAL_RECORD_REMIND_SIGN']} allowedRoles={['admin', 'manager', 'clinic_manager', 'doctor']}><LazyPage><OverdueMedicalRecordSigningPage /></LazyPage></PrivateRoute>} />
+        <Route path="overdue-signing" element={<Navigate to="/medical-records/overdue-signing" replace />} />
         <Route path="prescriptions" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_READ', 'PRESCRIPTION_CREATE', 'PRESCRIPTION_UPDATE', 'PRESCRIPTION_PRINT']} allowedRoles={['admin', 'doctor']}><LazyPage><PrescriptionPage /></LazyPage></PrivateRoute>} />
         <Route path="prescriptions/:medicalRecordId" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_READ', 'PRESCRIPTION_CREATE', 'PRESCRIPTION_UPDATE', 'PRESCRIPTION_PRINT']} allowedRoles={['admin', 'doctor']}><LazyPage><PrescriptionPage /></LazyPage></PrivateRoute>} />
-        <Route path="clinical-orders" element={<PrivateRoute allowedPermissions={['CLINICAL_RESULT_READ', 'CLINICAL_RESULT_CREATE']} allowedRoles={['admin', 'doctor']}><Navigate to="/appointments" replace /></PrivateRoute>} />
+        <Route path="clinical-orders" element={<PrivateRoute allowedPermissions={['CLINICAL_ORDER_READ', 'CLINICAL_ORDER_CANCEL']} allowedRoles={['admin', 'doctor']}><LazyPage><PendingClinicalOrdersPage /></LazyPage></PrivateRoute>} />
+        <Route path="clinical-orders/pending" element={<Navigate to="/clinical-orders" replace />} />
         <Route path="clinical-results" element={<PrivateRoute allowedPermissions={['CLINICAL_RESULT_READ', 'CLINICAL_RESULT_CREATE', 'CLINICAL_RESULT_UPDATE']} allowedRoles={['admin', 'doctor']}><LazyPage><ResultPage /></LazyPage></PrivateRoute>} />
         <Route path="results" element={<Navigate to="/clinical-results" replace />} />
         <Route path="pharmacy" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PRESCRIPTION_READ']} allowedRoles={['admin', 'pharmacist']}><LazyPage><PharmacyPage /></LazyPage></PrivateRoute>} />
@@ -159,6 +165,8 @@ function AppRoutes() {
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
         <Route path="system/anonymization" element={<PrivateRoute allowedPermissions={['SYSTEM_CONFIG_READ']} allowedRoles={['admin']}><LazyPage><AnonymizationPage /></LazyPage></PrivateRoute>} />
         <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
+        <Route path="admin/operation-logs" element={<PrivateRoute allowedPermissions={['ADMIN_OPERATION_LOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><AdminOperationLogPage /></LazyPage></PrivateRoute>} />
+        <Route path="admin-operation-logs" element={<Navigate to="/admin/operation-logs" replace />} />
 
 
       </Route>

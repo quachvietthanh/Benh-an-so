@@ -65,7 +65,8 @@ public class UserRestMapper {
                 result.userId(),
                 result.username(),
                 result.temporaryPassword(),
-                result.resetAt()
+                result.resetAt(),
+                result.tempPasswordExpiresAt()
         );
     }
 

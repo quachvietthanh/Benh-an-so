@@ -36,6 +36,8 @@ public class VisitEntity {
     private UUID patientId;
     @Column(name = "doctor_id", nullable = false, columnDefinition = "BINARY(16)")
     private UUID doctorId;
+    @Column(name = "initial_doctor_id", columnDefinition = "BINARY(16)")
+    private UUID initialDoctorId;
     @Column(name = "appointment_id", columnDefinition = "BINARY(16)")
     private UUID appointmentId;
     @Column(name = "queue_item_id", columnDefinition = "BINARY(16)")

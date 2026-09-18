@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -16,19 +17,23 @@ import org.junit.jupiter.api.Test;
 
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
+import com.benhsoan.port.outbound.repository.reporting.DiseasePatternSummary;
 import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
+import com.benhsoan.port.outbound.time.ClockPort;
 import com.benhsoan.domain.reporting.enums.ReportType;
 
 class OperationalReportDataServiceTest {
+
+    private final ClockPort clockPort = mock(ClockPort.class);
 
     @Test
     void checksSourceDataAccordingToReportType() {
         OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
         when(repository.hasCompletedVisits(any(), any())).thenReturn(true);
         when(repository.hasInvoices(any(), any())).thenReturn(false);
-        OperationalReportDataService service = new OperationalReportDataService(repository);
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 3);
 
@@ -42,7 +47,7 @@ class OperationalReportDataServiceTest {
         OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
         when(repository.hasCompletedVisits(any(), any())).thenReturn(false);
         when(repository.hasInvoices(any(), any())).thenReturn(true);
-        OperationalReportDataService service = new OperationalReportDataService(repository);
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
 
         assertTrue(service.hasReportData(
                 ReportType.OPERATIONAL_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3)));
@@ -62,7 +67,7 @@ class OperationalReportDataServiceTest {
                 new DailyRevenueSummary(LocalDate.of(2026, 8, 3), new BigDecimal("-20000"))
         ));
 
-        OperationalReportDataService service = new OperationalReportDataService(repository);
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
         OperationalReportData reportData = service.getReportData(
                 LocalDate.of(2026, 8, 1),
                 LocalDate.of(2026, 8, 3)
@@ -95,7 +100,7 @@ class OperationalReportDataServiceTest {
                 )
         ));
 
-        OperationalReportDataService service = new OperationalReportDataService(repository);
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
         var result = service.getTopMedicines(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
 
         assertEquals(LocalDate.of(2026, 8, 1), result.from());
@@ -127,7 +132,7 @@ class OperationalReportDataServiceTest {
                 )
         ));
 
-        OperationalReportDataService service = new OperationalReportDataService(repository);
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
         var result = service.getDoctorVisits(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 14));
 
         assertEquals(LocalDate.of(2026, 8, 1), result.from());
@@ -147,9 +152,33 @@ class OperationalReportDataServiceTest {
         OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
         when(repository.findDoctorVisitSummaries(any(), any())).thenReturn(List.of());
 
-        OperationalReportDataService service = new OperationalReportDataService(repository);
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
         var result = service.getDoctorVisits(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 14));
 
         assertEquals(0, result.items().size());
+    }
+
+    @Test
+    void returnsDiseasePatternsWithGeneratedAtSetFromClockPort() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        Instant fixedNow = Instant.parse("2026-08-31T08:00:00Z");
+        when(clockPort.now()).thenReturn(fixedNow);
+        when(repository.findDiseasePatternSummaries(any(), any(), any())).thenReturn(List.of(
+                new DiseasePatternSummary(
+                        java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"),
+                        "J00",
+                        "Viêm mũi họng cấp",
+                        "Bệnh hệ hô hấp",
+                        10L
+                )
+        ));
+
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
+        var result = service.getDiseasePatterns(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null);
+
+        assertEquals(fixedNow, result.generatedAt());
+        assertEquals(10L, result.totalDiagnoses());
+        assertEquals(1, result.items().size());
+        assertEquals("J00", result.items().get(0).diseaseCode());
     }
 }

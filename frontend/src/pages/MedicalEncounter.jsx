@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import dayjs from 'dayjs'
 import {
   Alert,
   Button,
@@ -364,6 +365,7 @@ function MedicalEncounter() {
                 clinicalProgress: '',
                 treatmentPlan: '',
                 doctorInstructions: '',
+                revisitDate: null,
                 conclusion: '',
               })
               await medicalRecordApi.update(currentRecordId, {
@@ -449,8 +451,9 @@ function MedicalEncounter() {
       physicalExamination: fixMojibake(detail.physicalExamination || ''),
       examinationNote: fixMojibake(detail.physicalExamination || ''),
       clinicalProgress: fixMojibake(detail.clinicalProgress || ''),
-      treatmentPlan: fixMojibake(detail.treatmentPlan || detail.doctorInstructions || ''),
-      doctorInstructions: fixMojibake(detail.doctorInstructions || detail.treatmentPlan || ''),
+      treatmentPlan: fixMojibake(detail.treatmentPlan || ''),
+      doctorInstructions: fixMojibake(detail.doctorInstructions || ''),
+      revisitDate: detail.revisitDate ? dayjs(detail.revisitDate) : null,
       conclusion: cleanConclusion || '',
       diagnosisText:
         detail.primaryIcdCode && cleanPrimaryName
@@ -1760,31 +1763,29 @@ function MedicalEncounter() {
                 Nội dung khám ban đầu được lưu giữ nguyên vẹn để đảm bảo tính toàn vẹn và pháp lý.
                 Nếu có phát hiện sai sót chuyên môn hoặc bổ sung phác đồ, bác sĩ hãy sử dụng chức năng <b>Lập bản đính chính</b> để tạo phiên bản gắn kèm.
               </div>
-              <Space>
+              <Space size={8} wrap>
                 {encounter?.queueItem?.status !== 'COMPLETED' && encounter?.queueItem?.id && (
                   <Button
                     type="primary"
-                    size="small"
                     icon={<CheckCircleOutlined />}
                     onClick={handleCompleteVisit}
-                    style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 600 }}
+                    style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 600, height: 36 }}
                   >
                     Hoàn tất ca khám
                   </Button>
                 )}
                 <Button
                   type="primary"
-                  size="small"
                   icon={<EditOutlined />}
                   onClick={() => setAmendModalOpen(true)}
-                  style={{ background: '#d97706', borderColor: '#d97706', fontWeight: 600 }}
+                  style={{ background: '#d97706', borderColor: '#d97706', fontWeight: 600, height: 36 }}
                 >
                   + Lập bản đính chính
                 </Button>
                 <Button
-                  size="small"
                   icon={<HistoryOutlined />}
                   onClick={() => setVersionHistoryModalOpen(true)}
+                  style={{ height: 36 }}
                 >
                   Xem lịch sử phiên bản
                 </Button>
@@ -1831,6 +1832,7 @@ function MedicalEncounter() {
                 currentUser={user}
                 medicalRecord={medicalRecord || encounter?.medicalRecord}
                 onOpenSignModal={handleOpenSignFlow}
+                onOpenAmendModal={() => setAmendModalOpen(true)}
                 encounterContext={encounter}
                 selectedPatientObj={selectedPatientObj}
                 vitalSigns={vitalSigns}

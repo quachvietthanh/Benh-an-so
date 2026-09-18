@@ -1,5 +1,6 @@
 import {
   AppstoreOutlined,
+  AuditOutlined,
   CalendarOutlined,
   CloudServerOutlined,
   CopyOutlined,
@@ -18,6 +19,7 @@ import {
   UserOutlined,
   EyeInvisibleOutlined,
   TeamOutlined,
+  BellOutlined,
 } from '@ant-design/icons'
 
 export const roleNames = {
@@ -32,11 +34,11 @@ export const roleNames = {
 export const navigationSections = [
   { key: 'overview', paths: ['/'] },
   { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/appointments', '/appointments/weekly-schedule', '/after-care', '/doctor-schedules'] },
-  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/version-history', '/medical-records/copy-issuance', '/prescriptions', '/clinical-results', '/results'] },
+  { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/overdue-signing', '/medical-records/version-history', '/medical-records/copy-issuance', '/prescriptions', '/clinical-orders', '/clinical-results', '/results'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/prescription-interconnections', '/system/anonymization'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization'] },
 ]
 
 export const getNavigationItems = (roles = [], permissions = []) => {
@@ -59,13 +61,15 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/', label: 'Tổng quan', icon: DashboardOutlined, check: () => hasPerm('DASHBOARD_OPERATIONAL_READ') || isAdmin || isManager },
     { key: '/patients', label: 'Quản lý hồ sơ bệnh nhân', icon: UserOutlined, check: () => !isAdmin && (hasPerm('PATIENT_READ') || hasPerm('PATIENT_CREATE') || isDoctor || isReceptionist || isManager) },
     { key: '/appointments', label: 'Lịch hẹn và hàng đợi khám', icon: CalendarOutlined, check: () => !isAdmin && !isManager && (hasPerm('APPOINTMENT_READ') || hasPerm('APPOINTMENT_CREATE') || isDoctor || isReceptionist) },
-    { key: '/appointments/weekly-schedule', label: 'Lịch tuần theo bác sĩ', icon: TableOutlined, check: () => !isAdmin && !isManager && (hasPerm('APPOINTMENT_READ') || isReceptionist || isDoctor) },
+    { key: '/appointments/weekly-schedule', label: 'Lịch tuần theo bác sĩ', icon: TableOutlined, check: () => !isAdmin && !isDoctor && (isReceptionist || isManager || hasPerm('APPOINTMENT_READ')) },
     { key: '/after-care', label: 'Chăm sóc sau khám', icon: HeartOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('FOLLOW_UP_REMINDER_READ') || hasPerm('CARE_LOG_READ') || isReceptionist) },
     { key: '/doctor-schedules', label: 'Lịch làm việc bác sĩ', icon: CalendarOutlined, check: () => !isReceptionist && !isPharmacist && !isDoctor && (isAdmin || isManager || hasPerm('DOCTOR_SCHEDULE_UPDATE')) },
     { key: '/medical-records', label: 'Khám bệnh & Bệnh án', icon: SolutionOutlined, check: () => !isAdmin && !isManager && (hasPerm('MEDICAL_RECORD_READ') || hasPerm('MEDICAL_RECORD_CREATE') || isDoctor) },
+    { key: '/medical-records/overdue-signing', label: isDoctor ? 'Bệnh án quá hạn ký' : 'Nhắc ký bệnh án quá hạn', icon: BellOutlined, check: () => (isAdmin || isManager || isDoctor || hasPerm('MEDICAL_RECORD_OVERDUE_READ')) && !isReceptionist && !isPharmacist },
     { key: '/medical-records/version-history', label: 'Lịch sử phiên bản bệnh án', icon: HistoryOutlined, check: () => isAdmin || isManager || hasPerm('MEDICAL_RECORD_VERSION_HISTORY_READ') || hasPerm('AUDIT_READ') },
     { key: '/medical-records/copy-issuance', label: 'Cấp bản sao hồ sơ', icon: CopyOutlined, check: () => isAdmin || isManager || hasPerm('REPORT_EXPORT') },
     { key: '/prescriptions', label: 'Kê đơn thuốc', icon: FormOutlined, check: () => !isAdmin && !isManager && (hasPerm('PRESCRIPTION_READ') || hasPerm('PRESCRIPTION_CREATE') || isDoctor) },
+    { key: '/clinical-orders', label: 'Theo dõi chỉ định CĐLS', icon: ExperimentOutlined, check: () => !isAdmin && !isManager && (hasPerm('CLINICAL_ORDER_READ') || isDoctor) },
     { key: '/clinical-results', label: 'Nhập kết quả CĐLS', icon: FileTextOutlined, check: () => !isAdmin && !isManager && (hasPerm('CLINICAL_RESULT_READ') || hasPerm('CLINICAL_RESULT_CREATE') || isDoctor) },
     { key: '/pharmacy', label: 'Cấp phát thuốc', icon: MedicineBoxOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('PHARMACY_READ') || isPharmacist) },
     { key: '/medicines', label: 'Danh mục & Ngưỡng tồn', icon: ShopOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('PHARMACY_READ') || isPharmacist) },
@@ -78,6 +82,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/system/diagnosis-catalog', label: 'Danh mục mã bệnh (ICD-10)', icon: ExperimentOutlined, check: () => hasPerm('DIAGNOSIS_CATALOG_MANAGE') || isAdmin },
     { key: '/system/medical-record-templates', label: 'Mẫu bệnh án chuyên khoa', icon: FileTextOutlined, check: () => hasPerm('MEDICAL_RECORD_TEMPLATE_MANAGE') || isAdmin },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => isAdmin },
+    { key: '/admin/operation-logs', label: 'Nhật ký thao tác', icon: AuditOutlined, check: () => !isDoctor && !isReceptionist && !isPharmacist && (isAdmin || isManager || hasPerm('ADMIN_OPERATION_LOG_READ')) },
     { key: '/prescription-interconnections', label: 'Liên thông đơn thuốc', icon: CloudServerOutlined, check: () => hasPerm('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin },
     { key: '/system/anonymization', label: 'Chế độ ẩn danh dữ liệu', icon: EyeInvisibleOutlined, check: () => hasPerm('SYSTEM_CONFIG_READ') || isAdmin },
   ]

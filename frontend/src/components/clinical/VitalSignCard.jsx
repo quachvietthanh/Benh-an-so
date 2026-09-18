@@ -101,26 +101,44 @@ export function VitalSignCard({
               </Tag>
             )}
           </Space>
-          <Space>
+          <Space size={10}>
             {patientId && onOpenHistory && (
               <Button
-                size="small"
-                icon={<HistoryOutlined />}
+                size="middle"
+                icon={<HistoryOutlined style={{ fontSize: 15 }} />}
                 onClick={onOpenHistory}
-                style={{ fontSize: 12 }}
+                style={{
+                  height: 36,
+                  padding: '0 16px',
+                  fontSize: 13.5,
+                  fontWeight: 500,
+                  borderRadius: 6,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
               >
                 Diễn tiến lịch sử
               </Button>
             )}
             {!readOnly && onSave && (
               <Button
-                size="small"
+                size="middle"
                 type="primary"
                 ghost
-                icon={<SaveOutlined />}
+                icon={<SaveOutlined style={{ fontSize: 15 }} />}
                 loading={saving}
                 onClick={() => onSave && onSave(vitalSigns)}
-                style={{ fontSize: 12 }}
+                style={{
+                  height: 36,
+                  padding: '0 18px',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
               >
                 Lưu chỉ số
               </Button>

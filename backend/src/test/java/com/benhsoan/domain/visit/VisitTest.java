@@ -184,4 +184,69 @@ class VisitTest {
         earlyEnded.earlyEnd("reason", now.plusSeconds(1));
         assertThrows(VisitInvalidStatusException.class, () -> earlyEnded.cancel("reason", now.plusSeconds(2)));
     }
+
+    @Test
+    void handoverTransfersDoctorAndPreservesInitialDoctor() {
+        Visit v = inProgress();
+        UUID initialDoc = v.getDoctorId();
+        UUID targetDoc = UUID.randomUUID();
+
+        v.handover(targetDoc, "Bác sĩ có việc đột xuất", now.plusSeconds(10));
+
+        assertEquals(targetDoc, v.getDoctorId());
+        assertEquals(initialDoc, v.getInitialDoctorId());
+        assertEquals(initialDoc, v.getRawInitialDoctorId());
+    }
+
+    @Test
+    void handoverRejectsSameDoctor() {
+        Visit v = inProgress();
+        assertThrows(ValidationException.class, () -> v.handover(v.getDoctorId(), "Reason", now));
+    }
+
+    @Test
+    void handoverRejectsBlankReason() {
+        Visit v = inProgress();
+        UUID targetDoc = UUID.randomUUID();
+        assertThrows(ValidationException.class, () -> v.handover(targetDoc, "   ", now));
+    }
+
+    @Test
+    void handoverRejectsReasonOver500Chars() {
+        Visit v = inProgress();
+        UUID targetDoc = UUID.randomUUID();
+        assertThrows(ValidationException.class, () -> v.handover(targetDoc, "a".repeat(501), now));
+    }
+
+    @Test
+    void handoverRejectsNonActiveStates() {
+        Visit waiting = visit();
+        UUID targetDoc = UUID.randomUUID();
+        assertThrows(VisitInvalidStatusException.class, () -> waiting.handover(targetDoc, "Reason", now));
+
+        Visit completed = inProgress();
+        completed.complete(now.plusSeconds(10));
+        assertThrows(VisitAlreadyCompletedException.class, () -> completed.handover(targetDoc, "Reason", now.plusSeconds(20)));
+
+        Visit cancelled = visit();
+        cancelled.cancel(now);
+        assertThrows(VisitAlreadyCancelledException.class, () -> cancelled.handover(targetDoc, "Reason", now.plusSeconds(10)));
+    }
+
+    @Test
+    void multipleHandoversPreservesFirstDoctorAsInitial() {
+        Visit v = inProgress();
+        UUID firstDoc = v.getDoctorId();
+        UUID secondDoc = UUID.randomUUID();
+        UUID thirdDoc = UUID.randomUUID();
+
+        v.handover(secondDoc, "Lý do bàn giao 1", now.plusSeconds(10));
+        assertEquals(secondDoc, v.getDoctorId());
+        assertEquals(firstDoc, v.getInitialDoctorId());
+
+        v.handover(thirdDoc, "Lý do bàn giao 2", now.plusSeconds(20));
+        assertEquals(thirdDoc, v.getDoctorId());
+        assertEquals(firstDoc, v.getInitialDoctorId());
+    }
 }
+

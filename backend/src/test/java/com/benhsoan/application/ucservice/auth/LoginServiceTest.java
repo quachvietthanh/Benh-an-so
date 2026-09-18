@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.auth;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
+import com.benhsoan.domain.auth.exception.TemporaryPasswordExpiredException;
 import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.result.LoginAttemptResult;
@@ -239,5 +241,69 @@ class LoginServiceTest {
                 assertEquals(900L, exception.getRetryAfterSeconds());
                 verify(loginAttemptPort).recordLoginFailed(USERNAME);
                 verify(auditLogRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Mật khẩu tạm thời đã hết hạn -> Ném TemporaryPasswordExpiredException và không tạo session")
+        void loginWithExpiredTemporaryPassword_throwsTemporaryPasswordExpiredException() {
+                UUID userId = UUID.randomUUID();
+                User user = mock(User.class);
+                when(user.getId()).thenReturn(userId);
+                when(user.getUsername()).thenReturn(USERNAME);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+                when(user.getTempPasswordExpiresAt()).thenReturn(NOW.minusSeconds(1)); // Expired 1 second ago
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(CORRECT_PASSWORD, "hashed_secret")).thenReturn(true);
+                when(clockPort.now()).thenReturn(NOW);
+
+                assertThrows(
+                                TemporaryPasswordExpiredException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD)));
+
+                // Session và token không được tạo khi mật khẩu tạm hết hạn
+                verify(userSessionRepository, never()).save(any());
+                verify(jwtTokenPort, never()).generateToken(any(), any(), any(), any(), any());
+                verify(user, never()).updateLastLogin(any());
+                verify(userRepository, never()).save(user);
+        }
+
+        @Test
+        @DisplayName("Mật khẩu tạm thời còn hạn -> Đăng nhập thành công, giữ mustChangePassword = true")
+        void loginWithValidTemporaryPassword_succeedsAndPreservesMustChangePassword() {
+                UUID userId = UUID.randomUUID();
+                UUID roleId = UUID.randomUUID();
+                User user = mock(User.class);
+                when(user.getId()).thenReturn(userId);
+                when(user.getUsername()).thenReturn(USERNAME);
+                when(user.getRoleId()).thenReturn(roleId);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+                when(user.getTempPasswordExpiresAt()).thenReturn(NOW.plusSeconds(3600)); // Valid for 1 more hour
+                when(user.isMustChangePassword()).thenReturn(true);
+
+                Role role = mock(Role.class);
+                when(role.getName()).thenReturn("DOCTOR");
+                when(role.getPermissions()).thenReturn(Set.of());
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(CORRECT_PASSWORD, "hashed_secret")).thenReturn(true);
+                when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+                when(clockPort.now()).thenReturn(NOW);
+                when(refreshTokenGeneratorPort.generate()).thenReturn("refresh_token_value");
+                when(tokenHashPort.hash(any())).thenReturn("hashed_token");
+                when(jwtTokenPort.generateToken(any(), any(), any(), any(), any())).thenReturn("jwt_access_token");
+                when(jwtTokenPort.getExpiredAt(any())).thenReturn(NOW.plusSeconds(3600));
+
+                LoginResult result = loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD));
+
+                assertNotNull(result);
+                assertEquals(USERNAME, result.username());
+                assertTrue(result.mustChangePassword());
+                verify(loginAttemptPort).loginSucceeded(USERNAME);
+                verify(userSessionRepository).save(any());
         }
 }

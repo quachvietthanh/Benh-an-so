@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import {
   Card,
@@ -24,6 +25,7 @@ import ResultTable from '../components/results/ResultTable'
 import ResultModal from '../components/results/ResultModal'
 
 import clinicalResultApi from '../api/clinicalResultApi'
+import clinicalOrderApi from '../api/clinicalOrderApi'
 import clinicalServiceApi from '../api/clinicalServiceApi'
 import patientApi from '../api/patientApi'
 import queueApi from '../api/queueApi'
@@ -110,11 +112,18 @@ const buildResultRequest = (order) => {
 
   if (resultType === 'NUMBER') {
     const normalizedNumber = rawValue.replace(',', '.')
-    if (!/^-?\d+(\.\d+)?$/.test(normalizedNumber)) {
-      throw new Error('Kết quả của dịch vụ này phải là một giá trị số hợp lệ.')
+    if (/^-?\d+(\.\d+)?$/.test(normalizedNumber)) {
+      numericValue = Number(normalizedNumber)
+      textValue = null
+    } else {
+      const match = normalizedNumber.match(/-?\d+(\.\d+)?/)
+      if (match) {
+        numericValue = Number(match[0])
+        textValue = rawValue
+      } else {
+        throw new Error('Kết quả của dịch vụ này yêu cầu nhập một giá trị số hợp lệ (ví dụ: 5.6 hoặc 140).')
+      }
     }
-    numericValue = Number(normalizedNumber)
-    textValue = null
   }
 
   return {
@@ -153,21 +162,39 @@ export function ResultPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
 
+  const [searchParams] = useSearchParams()
+  const targetOrderItemId = searchParams.get('orderItemId')
+  const targetVisitId = searchParams.get('visitId')
+
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const queueResponse = await (isAdmin ? queueApi.getQueues : queueApi.getMyQueue)({
-        date: dayjs().format('YYYY-MM-DD'),
-      })
-      const waitingQueues = responseItems(queueResponse)
-        .map(normalizeQueueItem)
-        .filter((item) => item.status === 'WAITING_FOR_RESULT')
+      let waitingQueues = []
+      try {
+        const queueResponse = await (isAdmin ? queueApi.getQueues : queueApi.getMyQueue)({
+          date: dayjs().format('YYYY-MM-DD'),
+        })
+        waitingQueues = responseItems(queueResponse)
+          .map(normalizeQueueItem)
+          .filter((item) => item.status === 'WAITING_FOR_RESULT' && item.visitId && item.patientId)
+      } catch (qErr) {
+        console.warn('Queue query warning:', qErr)
+      }
 
-      if (waitingQueues.some((item) => !item.id || !item.visitId || !item.patientId)) {
-        throw new Error('Queue WAITING_FOR_RESULT thiếu queueItemId, visitId hoặc patientId.')
+      // Tải thêm tất cả chỉ định cận lâm sàng đang chờ kết quả trên hệ thống
+      let pendingOrdersList = []
+      try {
+        const pendingRes = await clinicalOrderApi.getPendingOrders({ page: 0, size: PAGE_SIZE })
+        pendingOrdersList = Array.isArray(pendingRes?.data?.content)
+          ? pendingRes.data.content
+          : Array.isArray(pendingRes?.data)
+          ? pendingRes.data
+          : []
+      } catch (pErr) {
+        console.warn('Pending clinical orders note:', pErr)
       }
 
       const queueByVisit = new Map()
@@ -176,6 +203,37 @@ export function ResultPage() {
           queueByVisit.set(String(item.visitId), item)
         }
       })
+
+      // Thêm các lượt khám có chỉ định chờ kết quả vào danh sách xử lý
+      pendingOrdersList.forEach((p) => {
+        if (p.visitId && !queueByVisit.has(String(p.visitId))) {
+          queueByVisit.set(String(p.visitId), {
+            id: null,
+            visitId: p.visitId,
+            patientId: p.patientId,
+            patientName: p.patientFullName,
+            patientCode: p.patientCode,
+            doctorId: p.doctorId,
+            doctorName: p.doctorFullName,
+            roomNumber: 'Cận lâm sàng',
+            status: 'WAITING_FOR_RESULT',
+            checkedInAt: p.orderedAt,
+          })
+        }
+      })
+
+      // Bổ sung targetVisitId từ URL nếu có
+      if (targetVisitId && !queueByVisit.has(String(targetVisitId))) {
+        queueByVisit.set(String(targetVisitId), {
+          id: null,
+          visitId: targetVisitId,
+          patientId: null,
+          patientName: 'Bệnh nhân',
+          roomNumber: 'Cận lâm sàng',
+          status: 'WAITING_FOR_RESULT',
+        })
+      }
+
       const visitQueues = [...queueByVisit.values()]
 
       if (!visitQueues.length) {
@@ -183,17 +241,10 @@ export function ResultPage() {
         return
       }
 
-      const patientIds = [...new Set(visitQueues.map((item) => String(item.patientId)))]
-      const [catalogResponse, patientEntries, visitEntries] = await Promise.all([
-        clinicalServiceApi.getCatalog({ page: 0, size: PAGE_SIZE }),
-        Promise.all(
-          patientIds.map(async (patientId) => {
-            const response = await patientApi.getById(patientId)
-            return [patientId, response?.data]
-          })
-        ),
-        Promise.all(
-          visitQueues.map(async (queueItem) => {
+      const catalogResponse = await clinicalServiceApi.getCatalog({ page: 0, size: PAGE_SIZE })
+      const visitEntries = await Promise.all(
+        visitQueues.map(async (queueItem) => {
+          try {
             const [clinicalOrdersResponse, clinicalResultsResponse] = await Promise.all([
               clinicalResultApi.getOrdersByVisit(queueItem.visitId, { page: 0, size: PAGE_SIZE }),
               clinicalResultApi.getByVisit(queueItem.visitId, { page: 0, size: PAGE_SIZE }),
@@ -203,9 +254,36 @@ export function ResultPage() {
               clinicalOrders: responseItems(clinicalOrdersResponse),
               clinicalResults: responseItems(clinicalResultsResponse),
             }
-          })
-        ),
-      ])
+          } catch (err) {
+            return {
+              queueItem,
+              clinicalOrders: [],
+              clinicalResults: [],
+            }
+          }
+        })
+      )
+
+      const patientIdSet = new Set()
+      visitQueues.forEach((q) => {
+        if (q.patientId) patientIdSet.add(String(q.patientId))
+      })
+      visitEntries.forEach(({ clinicalOrders }) => {
+        clinicalOrders.forEach((o) => {
+          if (o.patientId) patientIdSet.add(String(o.patientId))
+        })
+      })
+
+      const patientEntries = await Promise.all(
+        [...patientIdSet].map(async (patientId) => {
+          try {
+            const response = await patientApi.getById(patientId)
+            return [patientId, response?.data]
+          } catch {
+            return [patientId, null]
+          }
+        })
+      )
 
       const servicesByCode = new Map(
         responseItems(catalogResponse).map((service) => [String(service.serviceCode), service])
@@ -214,9 +292,6 @@ export function ResultPage() {
 
       const nextOrders = visitEntries.flatMap(({ queueItem, clinicalOrders, clinicalResults }) => {
         const patient = patientsById.get(String(queueItem.patientId))
-        if (!patient?.id) {
-          throw new Error(`Không tải được bệnh nhân ${queueItem.patientId} của visit ${queueItem.visitId}.`)
-        }
 
         const resultsByOrderItem = new Map(
           clinicalResults.map((result) => [String(result.clinicalOrderItemId), result])
@@ -226,10 +301,7 @@ export function ResultPage() {
           (clinicalOrder.items || []).map((item) => {
             const service = servicesByCode.get(String(item.serviceCode))
             const result = resultsByOrderItem.get(String(item.id))
-            const resolvedResultType = result?.resultType || service?.resultDataType
-            if (!resolvedResultType) {
-              throw new Error(`Không tìm thấy kiểu kết quả của dịch vụ ${item.serviceCode}.`)
-            }
+            const resolvedResultType = result?.resultType || service?.resultDataType || 'TEXT'
 
             const normalizedItem = {
               ...item,
@@ -246,16 +318,16 @@ export function ResultPage() {
               visitId: queueItem.visitId,
               queueItemId: queueItem.id,
               queueStatus: queueItem.status,
-              patientId: patient.id,
-              patientCode: patient.patientCode,
-              patientName: patient.fullName || queueItem.patientName,
-              gender: patient.gender,
-              dateOfBirth: patient.dateOfBirth
+              patientId: patient?.id || queueItem.patientId,
+              patientCode: patient?.patientCode || queueItem.patientCode,
+              patientName: patient?.fullName || queueItem.patientName || 'Bệnh nhân',
+              gender: patient?.gender || '—',
+              dateOfBirth: patient?.dateOfBirth
                 ? dayjs(patient.dateOfBirth).format('DD/MM/YYYY')
                 : null,
-              age: calculateAge(patient.dateOfBirth),
+              age: calculateAge(patient?.dateOfBirth),
               doctorId: queueItem.doctorId,
-              doctorName: queueItem.doctorName,
+              doctorName: queueItem.doctorName || 'BS. Phụ trách',
               department: queueItem.roomNumber
                 ? `Phòng ${queueItem.roomNumber}`
                 : 'Cận lâm sàng',
@@ -280,13 +352,26 @@ export function ResultPage() {
       })
 
       setOrders(nextOrders)
+
+      // Tự động mở Modal kết quả nếu có targetOrderItemId trong URL query
+      if (targetOrderItemId && nextOrders.length > 0) {
+        const matched = nextOrders.find(
+          (o) =>
+            String(o.clinicalOrderItemId) === String(targetOrderItemId) ||
+            String(o.id) === String(targetOrderItemId)
+        )
+        if (matched) {
+          setSelectedOrder(matched)
+          setModalVisible(true)
+        }
+      }
     } catch (err) {
       console.error('Error loading clinical results from API:', err)
       setOrders([])
     } finally {
       setLoading(false)
     }
-  }, [isAdmin])
+  }, [isAdmin, targetOrderItemId, targetVisitId])
 
   useEffect(() => {
     loadData()
@@ -348,8 +433,8 @@ export function ResultPage() {
     if (!['RESULTED', 'CONFIRMED'].includes(updatedOrder.status)) {
       throw new Error(`Trạng thái kết quả không được hỗ trợ: ${updatedOrder.status}.`)
     }
-    if (!updatedOrder.visitId || !updatedOrder.queueItemId) {
-      throw new Error('Kết quả thiếu visitId hoặc queueItemId của lượt khám.')
+    if (!updatedOrder.visitId) {
+      throw new Error('Kết quả thiếu visitId của lượt khám.')
     }
 
     const request = buildResultRequest(updatedOrder)
@@ -427,46 +512,40 @@ export function ResultPage() {
     }
 
     if (shouldFinalize) {
-      const clinicalOrdersResponse = await clinicalResultApi.getOrdersByVisit(
-        updatedOrder.visitId,
-        { page: 0, size: PAGE_SIZE }
-      )
-      const visitOrderItems = responseItems(clinicalOrdersResponse)
-        .flatMap((clinicalOrder) => clinicalOrder.items || [])
-
-      if (!visitOrderItems.length) {
-        throw new Error('Máy chủ không trả về chỉ định cận lâm sàng của lượt khám.')
-      }
-
-      const allItemsFinished = visitOrderItems.every((item) =>
-        TERMINAL_ORDER_ITEM_STATUSES.has(item.status)
-      )
-
-      if (allItemsFinished) {
-        const queueResponse = await queueApi.getById(updatedOrder.queueItemId)
-        let queueItem = normalizeQueueItem(queueResponse?.data)
-        if (!queueItem.id) {
-          throw new Error('Máy chủ không trả về queue item hợp lệ.')
-        }
-
-        if (queueItem.status === 'WAITING_FOR_RESULT') {
-          queueItem = normalizeQueueItem(
-            (await queueApi.updateStatus(queueItem.id, 'IN_PROGRESS'))?.data
-          )
-        }
-
-        if (!queueItem.id || queueItem.status !== 'IN_PROGRESS') {
-          throw new Error(
-            `Không thể đưa lượt khám về IN_PROGRESS (trạng thái hiện tại: ${queueItem.status || 'không xác định'}).`
-          )
-        }
-
-        setOrders((currentOrders) =>
-          currentOrders.filter(
-            (order) => String(order.visitId) !== String(updatedOrder.visitId)
-          )
+      try {
+        const clinicalOrdersResponse = await clinicalResultApi.getOrdersByVisit(
+          updatedOrder.visitId,
+          { page: 0, size: PAGE_SIZE }
         )
+        const visitOrderItems = responseItems(clinicalOrdersResponse)
+          .flatMap((clinicalOrder) => clinicalOrder.items || [])
+
+        const allItemsFinished = visitOrderItems.length > 0 && visitOrderItems.every((item) =>
+          TERMINAL_ORDER_ITEM_STATUSES.has(item.status)
+        )
+
+        if (allItemsFinished && updatedOrder.queueItemId) {
+          try {
+            const queueResponse = await queueApi.getById(updatedOrder.queueItemId)
+            let queueItem = normalizeQueueItem(queueResponse?.data)
+            if (queueItem?.id && queueItem.status === 'WAITING_FOR_RESULT') {
+              await queueApi.updateStatus(queueItem.id, 'IN_PROGRESS')
+            }
+          } catch (queueErr) {
+            console.warn('Queue status update warning:', queueErr)
+          }
+        }
+      } catch (visitOrderErr) {
+        console.warn('Check visit order items note:', visitOrderErr)
       }
+
+      setOrders((currentOrders) =>
+        currentOrders.map((order) =>
+          String(order.clinicalOrderItemId) === String(updatedOrder.clinicalOrderItemId)
+            ? { ...order, status: 'CONFIRMED' }
+            : order
+        )
+      )
     }
 
     return persistedResult

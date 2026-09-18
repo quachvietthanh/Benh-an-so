@@ -30,15 +30,22 @@ import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyExcepti
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.DoctorVisitSummaryResult;
+import com.benhsoan.port.dto.result.DiseasePatternItemResult;
+import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
+import com.benhsoan.port.inbound.reporting.GetRevenueBreakdownReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
+import com.benhsoan.port.dto.result.DoctorRevenueResult;
+import com.benhsoan.port.dto.result.RevenueBreakdownReportResult;
+import com.benhsoan.port.dto.result.ServiceGroupRevenueResult;
 import com.benhsoan.port.dto.result.TopMedicineItemResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -58,7 +65,9 @@ class ReportsControllerTest {
     @MockitoBean private GetOperationalTimelineUseCase getOperationalTimelineUseCase;
     @MockitoBean private GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     @MockitoBean private GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
+    @MockitoBean private GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
+    @MockitoBean private GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -340,6 +349,162 @@ class ReportsControllerTest {
     }
 
     @Test
+    void returnsDiseasePatterns() throws Exception {
+        java.util.UUID catalogId = java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(any(), any(), any())).thenReturn(new DiseasePatternReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31),
+                null,
+                null,
+                50L,
+                Instant.parse("2026-08-31T08:00:00Z"),
+                List.of(
+                        new DiseasePatternItemResult(
+                                1,
+                                catalogId,
+                                "J00",
+                                "Viêm mũi họng cấp",
+                                "Bệnh hệ hô hấp",
+                                50L,
+                                100.0
+                        )
+                )
+        ));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("2026-08-01"))
+                .andExpect(jsonPath("$.to").value("2026-08-31"))
+                .andExpect(jsonPath("$.doctorId").doesNotExist())
+                .andExpect(jsonPath("$.doctorName").doesNotExist())
+                .andExpect(jsonPath("$.totalDiagnoses").value(50))
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-31T08:00:00Z"))
+                .andExpect(jsonPath("$.items[0].rank").value(1))
+                .andExpect(jsonPath("$.items[0].catalogId").value("11111111-2222-3333-4444-555555555555"))
+                .andExpect(jsonPath("$.items[0].diseaseCode").value("J00"))
+                .andExpect(jsonPath("$.items[0].diseaseName").value("Viêm mũi họng cấp"))
+                .andExpect(jsonPath("$.items[0].diseaseGroup").value("Bệnh hệ hô hấp"))
+                .andExpect(jsonPath("$.items[0].diagnosisCount").value(50))
+                .andExpect(jsonPath("$.items[0].percentage").value(100.0));
+    }
+
+    @Test
+    void returnsDiseasePatternsFilteredByDoctor() throws Exception {
+        java.util.UUID doctorId = java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2");
+        java.util.UUID catalogId = java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), doctorId)).thenReturn(new DiseasePatternReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31),
+                doctorId,
+                "Dr. Nguyen Minh Anh",
+                20L,
+                Instant.parse("2026-08-31T08:00:00Z"),
+                List.of(
+                        new DiseasePatternItemResult(
+                                1,
+                                catalogId,
+                                "I10",
+                                "Tăng huyết áp",
+                                "Bệnh hệ tuần hoàn",
+                                20L,
+                                100.0
+                        )
+                )
+        ));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .param("doctorId", doctorId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("2026-08-01"))
+                .andExpect(jsonPath("$.to").value("2026-08-31"))
+                .andExpect(jsonPath("$.doctorId").value("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"))
+                .andExpect(jsonPath("$.doctorName").value("Dr. Nguyen Minh Anh"))
+                .andExpect(jsonPath("$.totalDiagnoses").value(20))
+                .andExpect(jsonPath("$.items[0].rank").value(1))
+                .andExpect(jsonPath("$.items[0].diseaseCode").value("I10"));
+    }
+
+    @Test
+    void returnsEmptyDiseasePatternsWhenNoDataExists() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(any(), any(), any())).thenReturn(new DiseasePatternReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31),
+                null,
+                null,
+                0L,
+                Instant.parse("2026-08-31T08:00:00Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.totalDiagnoses").value(0));
+    }
+
+    @Test
+    void rejectsInvalidDateFormatForDiseasePatterns() throws Exception {
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "01-08-2026")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be in yyyy-MM-dd format."));
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+    }
+
+    @Test
+    void rejectsWhenFromIsAfterToForDiseasePatterns() throws Exception {
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-09-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+    }
+
+    @Test
+    void rejectsWhenDiseasePatternsDateRangeExceeds366Days() throws Exception {
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2025-01-01")
+                        .param("to", "2026-01-02"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+    }
+
+    @Test
+    void allowsDiseasePatternsDateRangeOf366DaysInLeapYear() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31), null)).thenReturn(new DiseasePatternReportResult(
+                LocalDate.of(2024, 1, 1),
+                LocalDate.of(2024, 12, 31),
+                null,
+                null,
+                0L,
+                Instant.parse("2024-12-31T23:59:59Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2024-01-01")
+                        .param("to", "2024-12-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("2024-01-01"))
+                .andExpect(jsonPath("$.to").value("2024-12-31"));
+    }
+
+    @Test
     void exportsCsv() throws Exception {
         when(exportOperationalReportUseCase.export(any(), any(), any())).thenReturn(new OperationalReportExportResult(
                 ReportType.OPERATIONAL_REPORT,
@@ -427,8 +592,75 @@ class ReportsControllerTest {
                         .param("to", "2026-08-03"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
-                        .value("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT."));
+                        .value("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT, DISEASE_PATTERN_REPORT."));
 
         verifyNoInteractions(exportOperationalReportUseCase);
+    }
+
+    @Test
+    void returnsRevenueBreakdown() throws Exception {
+        when(getRevenueBreakdownReportUseCase.getRevenueBreakdown(any(), any()))
+                .thenReturn(new RevenueBreakdownReportResult(
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31),
+                        new BigDecimal("700000"),
+                        new BigDecimal("100000"),
+                        new BigDecimal("400000"),
+                        new BigDecimal("200000"),
+                        BigDecimal.ZERO,
+                        "VND",
+                        List.of(
+                                new ServiceGroupRevenueResult("EXAMINATION", "Khám bệnh", new BigDecimal("100000"), new BigDecimal("14.29")),
+                                new ServiceGroupRevenueResult("LAB_TEST", "Xét nghiệm", new BigDecimal("150000"), new BigDecimal("21.43")),
+                                new ServiceGroupRevenueResult("MEDICATION", "Thuốc / Dược phẩm", new BigDecimal("200000"), new BigDecimal("28.57"))
+                        ),
+                        List.of(
+                                new DoctorRevenueResult(
+                                        java.util.UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
+                                        "doctor1",
+                                        "Dr. Nguyen Minh Anh",
+                                        new BigDecimal("100000"),
+                                        new BigDecimal("250000"),
+                                        new BigDecimal("200000"),
+                                        BigDecimal.ZERO,
+                                        new BigDecimal("550000"),
+                                        new BigDecimal("78.57")
+                                )
+                        )
+                ));
+
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalNetRevenue").value(700000))
+                .andExpect(jsonPath("$.totalExamRevenue").value(100000))
+                .andExpect(jsonPath("$.totalClinicalServiceRevenue").value(400000))
+                .andExpect(jsonPath("$.totalMedicationRevenue").value(200000))
+                .andExpect(jsonPath("$.currency").value("VND"))
+                .andExpect(jsonPath("$.serviceGroups[0].groupCode").value("EXAMINATION"))
+                .andExpect(jsonPath("$.serviceGroups[0].revenue").value(100000))
+                .andExpect(jsonPath("$.serviceGroups[2].groupCode").value("MEDICATION"))
+                .andExpect(jsonPath("$.serviceGroups[2].revenue").value(200000))
+                .andExpect(jsonPath("$.doctors[0].doctorCode").value("doctor1"))
+                .andExpect(jsonPath("$.doctors[0].totalRevenue").value(550000));
+    }
+
+    @Test
+    void rejectsInvalidRangeForRevenueBreakdown() throws Exception {
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2026-08-31")
+                        .param("to", "2026-08-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+    }
+
+    @Test
+    void rejectsRangeExceedingMaxDaysForRevenueBreakdown() throws Exception {
+        mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2025-01-01")
+                        .param("to", "2026-02-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
     }
 }
