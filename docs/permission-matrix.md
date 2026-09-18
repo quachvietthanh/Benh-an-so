@@ -50,8 +50,8 @@
 | `/api/v1/medical-records/{id}/sign` | POST | ❌ | ✅ (chỉ bác sĩ phụ trách lượt khám) | ❌ | ❌ |
 | `/api/v1/medical-records/{id}/status` | PATCH | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/visits/{id}/encounter` | GET | ✅ | ✅ | ❌ | ❌ |
-| `/api/v1/visits/{id}/summary` | GET | ✅ | ✅ | ✅ | ❌ |
-| `/api/v1/visits/{id}/summary/print` | GET | ✅ | ✅ | ✅ | ❌ |
+| `/api/v1/visits/{id}/summary` | GET | ✅ | ✅ (chỉ BS phụ trách lượt khám) | ✅ | ❌ |
+| `/api/v1/visits/{id}/summary/print` | GET | ✅ | ✅ (chỉ BS phụ trách lượt khám) | ✅ | ❌ |
 |  |  |  |  |  |  |
 | **Prescriptions** |  |  |  |  |  |
 | `/api/v1/prescriptions` | GET | ✅ | ✅ | ❌ | ✅ |

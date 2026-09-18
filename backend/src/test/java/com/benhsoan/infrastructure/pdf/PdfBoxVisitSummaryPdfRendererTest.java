@@ -97,4 +97,53 @@ class PdfBoxVisitSummaryPdfRendererTest {
             assertThat(loaded.getNumberOfPages()).isEqualTo(1);
         }
     }
+
+    @Test
+    void rendersVisitSummary_withComplexVietnameseDiacritics_inHeadlessMode() throws Exception {
+        System.setProperty("java.awt.headless", "true");
+
+        VisitSummaryPrintDocument document = new VisitSummaryPrintDocument(
+                "Phòng khám Đa khoa Quốc tế Hoàn Mỹ Sài Gòn",
+                "Số 123 Đường Hoàng Văn Thụ, Phường 8, Quận Phú Nhuận, Thành phố Hồ Chí Minh",
+                "02838445566",
+                "BN-2026-9999",
+                "Nguyễn Trần Khánh Đan",
+                "1985-12-30",
+                "FEMALE",
+                "0909888777",
+                "KB-20260820-9999",
+                Instant.parse("2026-08-20T08:30:00Z"),
+                "BS.CKII. Vũ Hoàng Điệp",
+                List.of(
+                        new VisitSummaryPrintDocument.Diagnosis("J00", "Viêm mũi họng cấp tính (cảm cúm thông thường)", true),
+                        new VisitSummaryPrintDocument.Diagnosis("K29.0", "Viêm dạ dày xuất huyết cấp do dùng thuốc chống viêm", false)
+                ),
+                List.of(
+                        new VisitSummaryPrintDocument.ClinicalOrder("ORD-99", "NS01", "Nội soi thực quản - dạ dày - tá tràng có gây mê", "Nhịn ăn uống trước 6 tiếng", "COMPLETED")
+                ),
+                "Nghỉ ngơi tĩnh dưỡng, uống thuốc theo toa, tái khám ngay nếu có dấu hiệu nôn ra máu hoặc đau quặn bụng.",
+                "Điều trị nội khoa kết hợp theo dõi chức năng tiêu hóa.",
+                LocalDate.of(2026, 9, 5),
+                "BS.CKII. Vũ Hoàng Điệp",
+                Instant.parse("2026-08-20T09:15:00Z"),
+                "Lễ tân Nguyễn Hoàng Yến",
+                Instant.parse("2026-08-20T09:30:00Z")
+        );
+
+        PdfBoxVisitSummaryPdfRenderer renderer = new PdfBoxVisitSummaryPdfRenderer();
+        byte[] pdf = renderer.render(document);
+
+        assertThat(pdf).isNotNull();
+        assertThat(pdf.length).isGreaterThan(1000);
+        assertThat(pdf.length).isLessThan(1_500_000);
+
+        try (PDDocument loaded = Loader.loadPDF(pdf)) {
+            assertThat(loaded.getNumberOfPages()).isGreaterThanOrEqualTo(1);
+        }
+
+        List<String> lines = renderer.buildLines(document, renderer.createFontMetrics());
+        assertThat(lines).anyMatch(l -> l.contains("PHIẾU TÓM TẮT LƯỢT KHÁM"));
+        assertThat(lines).anyMatch(l -> l.contains("3. CHẨN ĐOÁN"));
+        assertThat(lines).anyMatch(l -> l.contains("Viêm mũi họng cấp tính"));
+    }
 }

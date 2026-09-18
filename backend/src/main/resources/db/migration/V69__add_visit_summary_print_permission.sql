@@ -1,5 +1,5 @@
 -- =====================================================
--- V67 - Add visit summary print permission (NCL-04-CN-011).
+-- V69 - Add visit summary print permission (NCL-04-CN-011).
 -- Allows DOCTOR, RECEPTIONIST, ADMIN, and MANAGER to print/export visit summary.
 -- =====================================================
 

@@ -27,12 +27,12 @@ Tài liệu này đặc tả API contract cho tính năng dựng và in phiếu 
 
 ## 2. Roles & Permissions
 
-| Role | Quyền hạn | Ghi chú |
+| Role | Quyền hạn | Ghi chú & Phạm vi dữ liệu (Data Scope) |
 | :--- | :--- | :--- |
-| **DOCTOR** | `VISIT_SUMMARY_PRINT` | Bác sĩ in phiếu tóm tắt trực tiếp tại phòng khám cho người bệnh. |
-| **RECEPTIONIST** | `VISIT_SUMMARY_PRINT` | Lễ tân in phiếu tóm tắt tại quầy tiếp đón/thu ngân khi hoàn tất lượt khám đã ký. |
-| **ADMIN** | `VISIT_SUMMARY_PRINT` | Toàn quyền xem và xuất tệp tóm tắt. |
-| **MANAGER** | `VISIT_SUMMARY_PRINT` | Quản lý phòng khám xem và xuất tệp tóm tắt. |
+| **DOCTOR** | `VISIT_SUMMARY_PRINT` | Bác sĩ chỉ được xem/in phiếu tóm tắt cho lượt khám **do chính mình phụ trách** (`visit.doctorId == currentUserId`). Bác sĩ khác truy cập sẽ bị chặn với HTTP 403. |
+| **RECEPTIONIST** | `VISIT_SUMMARY_PRINT` | Lễ tân in phiếu tóm tắt tại quầy tiếp đón/thu ngân toàn phòng khám khi lượt khám đã ký. |
+| **ADMIN** | `VISIT_SUMMARY_PRINT` | Toàn quyền xem và xuất tệp tóm tắt toàn phòng khám. |
+| **MANAGER** | `VISIT_SUMMARY_PRINT` | Quản lý phòng khám xem và xuất tệp tóm tắt toàn phòng khám. |
 | **PHARMACIST** | *Không có quyền* | Trả về HTTP 403 Forbidden. |
 | **PATIENT** | *Không có quyền* | Trả về HTTP 403 Forbidden (bệnh nhân dùng cổng tra cứu riêng). |
 
@@ -111,7 +111,7 @@ Tài liệu này đặc tả API contract cho tính năng dựng và in phiếu 
 - **Error Responses**:
   - `400 BAD_REQUEST`: Nếu bệnh án chưa được ký (`DomainErrorCode: MEDICAL_RECORD_NOT_SIGNED`).
   - `404 NOT_FOUND`: Nếu `visitId` không tồn tại hoặc chưa có bệnh án.
-  - `403 FORBIDDEN`: Không có quyền `VISIT_SUMMARY_PRINT`.
+  - `403 FORBIDDEN`: Không có quyền `VISIT_SUMMARY_PRINT` hoặc bác sĩ truy cập lượt khám của bác sĩ khác (`DomainErrorCode: MEDICAL_RECORD_ACCESS_DENIED`).
 
 ---
 
@@ -131,6 +131,6 @@ Tài liệu này đặc tả API contract cho tính năng dựng và in phiếu 
   - Tự động ghi 1 bản ghi vào `medical_record_access_logs` (`MedicalRecordAccessAction.PRINT`, `detail: "In phiếu tóm tắt lượt khám"`).
 
 - **Error Responses**:
-  - `400 BAD_REQUEST`: Nếu bệnh án chưa được ký (`MEDICAL_RECORD_NOT_SIGNED`).
+  - `400 BAD_REQUEST`: Nếu bệnh án chưa được ký (`DomainErrorCode: MEDICAL_RECORD_NOT_SIGNED`).
   - `404 NOT_FOUND`: Nếu không tìm thấy lượt khám hoặc bệnh án.
-  - `403 FORBIDDEN`: Không có quyền `VISIT_SUMMARY_PRINT`.
+  - `403 FORBIDDEN`: Không có quyền `VISIT_SUMMARY_PRINT` hoặc bác sĩ truy cập lượt khám của bác sĩ khác (`DomainErrorCode: MEDICAL_RECORD_ACCESS_DENIED`).

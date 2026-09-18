@@ -82,6 +82,7 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
     private final ClockPort clockPort;
     private final AnonymizationModeState anonymizationModeState;
     private final ObjectMapper objectMapper;
+    private final VisitSummaryAuthorization visitSummaryAuthorization;
 
     @Override
     @Transactional(readOnly = true)
@@ -110,6 +111,8 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
     private VisitEncounterData loadAndValidateVisitData(UUID visitId) {
         Visit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new VisitNotFoundException(visitId));
+
+        visitSummaryAuthorization.requireSummaryAccess(visit.getDoctorId());
 
         MedicalRecord record = medicalRecordRepository.findByVisitId(visitId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(visitId));
@@ -211,13 +214,17 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
                 ? PatientAnonymizer.maskFullName(d.patient().getPatientCode())
                 : d.patient().getFullName();
 
+        String displayPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(d.patient().getPhone())
+                : d.patient().getPhone();
+
         var patientInfo = new VisitSummaryResult.PatientInfo(
                 d.patient().getId(),
                 d.patient().getPatientCode(),
                 displayName,
                 d.patient().getDateOfBirth(),
                 d.patient().getGender(),
-                d.patient().getPhone(),
+                displayPhone,
                 d.patient().getIdentityNumber()
         );
 
@@ -279,6 +286,10 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
                 ? PatientAnonymizer.maskFullName(d.patient().getPatientCode())
                 : d.patient().getFullName();
 
+        String displayPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(d.patient().getPhone())
+                : d.patient().getPhone();
+
         String dobStr = d.patient().getDateOfBirth() != null ? d.patient().getDateOfBirth().toString() : "";
         String genderStr = d.patient().getGender() != null ? d.patient().getGender().name() : "";
 
@@ -309,7 +320,7 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
                 displayName,
                 dobStr,
                 genderStr,
-                d.patient().getPhone(),
+                displayPhone,
                 d.visit().getVisitCode(),
                 d.visit().getVisitAt(),
                 d.doctor().getFullName(),
@@ -349,8 +360,8 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
                 now
         ));
 
-        // 2. Ghi nhận MedicalRecordAccessLog chuyên biệt (MedicalRecordAccessAction.PRINT) trong transaction độc lập
-        accessAuditService.recordRecordAccessInNewTransaction(
+        // 2. Ghi nhận MedicalRecordAccessLog chuyên biệt (MedicalRecordAccessAction.PRINT) cùng transaction
+        accessAuditService.recordRecordAccessInCurrentTransaction(
                 patient.getId(),
                 visit.getId(),
                 record.getId(),

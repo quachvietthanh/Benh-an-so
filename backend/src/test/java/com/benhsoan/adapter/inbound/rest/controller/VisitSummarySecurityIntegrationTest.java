@@ -138,6 +138,23 @@ class VisitSummarySecurityIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void whenDoctorAccessesUnauthorizedVisit_returnsForbidden() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        when(getVisitSummaryUseCase.getSummary(visitId))
+                .thenThrow(new com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException("Bác sĩ chỉ có quyền xem và in phiếu tóm tắt của lượt khám do mình phụ trách."));
+        when(exportVisitSummaryUseCase.export(visitId))
+                .thenThrow(new com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException("Bác sĩ chỉ có quyền xem và in phiếu tóm tắt của lượt khám do mình phụ trách."));
+
+        mockMvc.perform(get("/visits/{visitId}/summary", visitId)
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_VISIT_SUMMARY_PRINT"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/visits/{visitId}/summary/print", visitId)
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_VISIT_SUMMARY_PRINT"))))
+                .andExpect(status().isForbidden());
+    }
+
     private VisitSummaryResult emptySummary(UUID visitId) {
         return new VisitSummaryResult(
                 visitId, "VIS01", java.time.Instant.now(),

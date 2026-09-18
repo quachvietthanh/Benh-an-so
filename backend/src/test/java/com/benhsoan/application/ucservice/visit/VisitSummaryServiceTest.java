@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +44,7 @@ import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotSignedException;
 import com.benhsoan.domain.patient.Patient;
@@ -95,6 +97,7 @@ class VisitSummaryServiceTest {
     @Mock private VisitSummaryPdfRenderer pdfRenderer;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private ClockPort clockPort;
+    @Mock private VisitSummaryAuthorization visitSummaryAuthorization;
 
     private AnonymizationModeState anonymizationModeState;
     private ObjectMapper objectMapper;
@@ -115,7 +118,7 @@ class VisitSummaryServiceTest {
                 clinicConfigurationRepository, medicalRecordDiagnosisRepository, clinicalOrderRepository,
                 clinicalOrderItemRepository, accessLogRepository, auditLogRepository,
                 accessAuditService, pdfRenderer, currentUserPort, clockPort,
-                anonymizationModeState, objectMapper
+                anonymizationModeState, objectMapper, visitSummaryAuthorization
         );
 
         visit = Visit.restore(
@@ -289,8 +292,8 @@ class VisitSummaryServiceTest {
         assertEquals(ResourceType.VISIT, savedAudit.getResourceType());
         assertEquals(VISIT_ID, savedAudit.getResourceId());
 
-        // Kiểm tra TC-03: Ghi nhận MedicalRecordAccessLog chuyên biệt với PRINT qua transaction độc lập
-        verify(accessAuditService).recordRecordAccessInNewTransaction(
+        // Kiểm tra TC-03: Ghi nhận MedicalRecordAccessLog chuyên biệt với PRINT trong cùng transaction
+        verify(accessAuditService).recordRecordAccessInCurrentTransaction(
                 eq(PATIENT_ID), eq(VISIT_ID), eq(RECORD_ID), eq(CURRENT_USER_ID),
                 eq(MedicalRecordAccessAction.PRINT), eq("In phiếu tóm tắt lượt khám"), eq(NOW)
         );
@@ -312,6 +315,57 @@ class VisitSummaryServiceTest {
         VisitSummaryResult result = service.getSummary(VISIT_ID);
 
         assertEquals("BỆNH NHÂN #BN-2026-0001", result.patient().fullName());
+        assertEquals("09******67", result.patient().phone());
+    }
+
+    @Test
+    void export_whenAnonymizationModeEnabled_masksPatientNameAndPhoneInPdfDocument() {
+        anonymizationModeState.setEnabled(true);
+
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        when(medicalRecordRepository.findByVisitId(VISIT_ID)).thenReturn(Optional.of(signedRecord));
+        when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+        when(userRepository.findById(DOCTOR_ID)).thenReturn(Optional.of(doctor));
+        when(userRepository.findById(CURRENT_USER_ID)).thenReturn(Optional.of(doctor));
+        when(clinicConfigurationRepository.find()).thenReturn(Optional.of(clinic));
+        when(medicalRecordDiagnosisRepository.findByMedicalRecordId(RECORD_ID)).thenReturn(List.of());
+        when(clinicalOrderRepository.findByVisitId(eq(VISIT_ID), any())).thenReturn(new PageImpl<>(List.of()));
+        when(accessLogRepository.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(CURRENT_USER_ID);
+        when(clockPort.now()).thenReturn(NOW);
+
+        byte[] fakePdf = new byte[]{1, 2, 3};
+        ArgumentCaptor<VisitSummaryPrintDocument> docCaptor = ArgumentCaptor.forClass(VisitSummaryPrintDocument.class);
+        when(pdfRenderer.render(docCaptor.capture())).thenReturn(fakePdf);
+
+        service.export(VISIT_ID);
+
+        VisitSummaryPrintDocument capturedDoc = docCaptor.getValue();
+        assertEquals("BỆNH NHÂN #BN-2026-0001", capturedDoc.patientName());
+        assertEquals("09******67", capturedDoc.patientPhone());
+    }
+
+    @Test
+    void getSummary_whenDoctorNotAuthorized_throwsMedicalRecordAccessDeniedException() {
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        doThrow(new MedicalRecordAccessDeniedException("Bác sĩ chỉ có quyền xem và in phiếu tóm tắt của lượt khám do mình phụ trách."))
+                .when(visitSummaryAuthorization).requireSummaryAccess(DOCTOR_ID);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, () -> service.getSummary(VISIT_ID));
+        verify(medicalRecordRepository, never()).findByVisitId(any());
+    }
+
+    @Test
+    void export_whenDoctorNotAuthorized_throwsMedicalRecordAccessDeniedException() {
+        when(visitRepository.findById(VISIT_ID)).thenReturn(Optional.of(visit));
+        doThrow(new MedicalRecordAccessDeniedException("Bác sĩ chỉ có quyền xem và in phiếu tóm tắt của lượt khám do mình phụ trách."))
+                .when(visitSummaryAuthorization).requireSummaryAccess(DOCTOR_ID);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, () -> service.export(VISIT_ID));
+        verify(pdfRenderer, never()).render(any());
+        verify(auditLogRepository, never()).save(any());
+        verify(accessAuditService, never()).recordRecordAccessInCurrentTransaction(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
