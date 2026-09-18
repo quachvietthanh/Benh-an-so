@@ -20,12 +20,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.servicecatalog.ServiceCatalog;
 import com.benhsoan.domain.servicecatalog.ServicePrice;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServiceCatalogRepository;
 import com.benhsoan.port.outbound.repository.servicecatalog.ServicePriceRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -41,7 +40,7 @@ class UpdateServiceCatalogStatusServiceTest {
 
     @Mock private ServiceCatalogRepository serviceCatalogRepository;
     @Mock private ServicePriceRepository servicePriceRepository;
-    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private AdminOperationAuditService adminOperationAuditService;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private ClockPort clockPort;
 
@@ -54,7 +53,7 @@ class UpdateServiceCatalogStatusServiceTest {
         service = new UpdateServiceCatalogStatusService(
                 serviceCatalogRepository,
                 servicePriceRepository,
-                auditLogRepository,
+                adminOperationAuditService,
                 currentUserPort,
                 clockPort,
                 new ServiceCatalogResultMapper()
@@ -78,18 +77,17 @@ class UpdateServiceCatalogStatusServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
         when(serviceCatalogRepository.save(any(ServiceCatalog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(auditLogRepository.save(any(AuditLog.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
         var result = service.updateStatus(SERVICE_ID, false);
 
         assertEquals(false, result.active());
         assertEquals(new BigDecimal("95000.00"), result.price());
         verify(servicePriceRepository, never()).save(any());
-        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(auditCaptor.capture());
-        assertEquals(ActionType.DEACTIVATE, auditCaptor.getValue().getActionType());
-        assertEquals(ResourceType.SERVICE_CATALOG, auditCaptor.getValue().getResourceType());
+        ArgumentCaptor<ActionType> actionCaptor = ArgumentCaptor.forClass(ActionType.class);
+        ArgumentCaptor<ResourceType> resourceCaptor = ArgumentCaptor.forClass(ResourceType.class);
+        verify(adminOperationAuditService).record(any(), actionCaptor.capture(), resourceCaptor.capture(), any(), any(), any(), any());
+        assertEquals(ActionType.DEACTIVATE, actionCaptor.getValue());
+        assertEquals(ResourceType.SERVICE_CATALOG, resourceCaptor.getValue());
     }
 
     @Test
@@ -98,7 +96,7 @@ class UpdateServiceCatalogStatusServiceTest {
 
         assertEquals(true, result.active());
         verify(serviceCatalogRepository, never()).save(any());
-        verify(auditLogRepository, never()).save(any());
+        verify(adminOperationAuditService, never()).record(any(), any(), any(), any(), any(), any(), any());
         verify(clockPort, never()).now();
         verify(currentUserPort, never()).getCurrentUserId();
     }

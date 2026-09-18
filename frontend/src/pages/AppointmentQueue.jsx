@@ -45,6 +45,7 @@ import {
   MedicineBoxOutlined,
   MoreOutlined,
   PlusOutlined,
+  RedoOutlined,
   ReloadOutlined,
   RightCircleOutlined,
   SearchOutlined,
@@ -89,7 +90,6 @@ import BookAppointmentModal from '../components/appointment-queue/BookAppointmen
 import WalkInModal from '../components/appointment-queue/WalkInModal'
 import CancelAppointmentModal from '../components/appointment-queue/CancelAppointmentModal'
 import QuickPatientModal from '../components/appointment-queue/QuickPatientModal'
-import SkipQueueModal from '../components/appointment-queue/SkipQueueModal'
 import AppointmentLogsDrawer from '../components/appointment-queue/AppointmentLogsDrawer'
 import AppointmentDetailModal from '../components/appointment-queue/AppointmentDetailModal'
 import InProgressPatientList from '../components/appointment-queue/InProgressPatientList'
@@ -106,6 +106,13 @@ import {
   canConfirmAppointment,
   formatConfirmationInfo,
 } from '../utils/appointmentConfirmValidation'
+import DeferPatientModal from '../components/queue/DeferPatientModal'
+import QueueItemHistoryModal from '../components/queue/QueueItemHistoryModal'
+import {
+  evaluateDeferAction,
+  evaluateReQueueAction,
+  cleanQueueActionErrorMessage,
+} from '../utils/queueDeferRecallHelpers'
 
 import {
   getInitials,
@@ -168,6 +175,8 @@ function AppointmentQueue() {
   const [bookModalOpen, setBookModalOpen] = useState(false)
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
   const [skipModalItem, setSkipModalItem] = useState(null)
+  const [historyQueueItem, setHistoryQueueItem] = useState(null)
+  const [reQueuingId, setReQueuingId] = useState(null)
   const [closeVisitModalItem, setCloseVisitModalItem] = useState(null)
   const [cancelModalItem, setCancelModalItem] = useState(null)
   const [rescheduleModalItem, setRescheduleModalItem] = useState(null)
@@ -441,6 +450,7 @@ function AppointmentQueue() {
       inProgress: sortByNumber(items.filter((q) => q.status === 'IN_PROGRESS')),
       waiting: sortByNumber(items.filter((q) => q.status === 'WAITING')),
       waitingForResult: sortByNumber(items.filter((q) => q.status === 'WAITING_FOR_RESULT')),
+      skipped: sortByNumber(items.filter((q) => q.status === 'SKIPPED')),
       completed: [...items.filter((q) => q.status === 'COMPLETED')].sort((a, b) => {
         if (a.completedAt && b.completedAt) {
           return new Date(b.completedAt) - new Date(a.completedAt)
@@ -957,15 +967,17 @@ function AppointmentQueue() {
     }
   }
 
-  const handleSkipSubmit = async (values) => {
+  const handleDeferSubmit = async (values) => {
     if (!skipModalItem) return
-    setActionLoading(true)
-    const reason = values.reason || 'Vắng mặt khi gọi'
-    try {
-      if (skipModalItem.status !== 'IN_PROGRESS') {
-        throw new Error('Chỉ có thể bỏ qua queue item đang IN_PROGRESS.')
-      }
+    const evalRes = evaluateDeferAction(skipModalItem, permissions)
+    if (!evalRes.allowed) {
+      message.error(evalRes.message)
+      return
+    }
 
+    setActionLoading(true)
+    const reason = values.reason || 'Vắng mặt khi gọi lượt khám'
+    try {
       const response = await queueApi.skip(skipModalItem.id, reason)
       const updatedItem = normalizeQueueItem(response?.data)
       if (!updatedItem.id) {
@@ -975,14 +987,63 @@ function AppointmentQueue() {
       setQueues((prev) => replaceQueueItem(prev, updatedItem))
       setMyQueueData((prev) => replaceQueueItem(prev, updatedItem))
       saveStoredQueueItem(updatedItem)
-      message.success('Đã chuyển bệnh nhân vào danh sách bỏ qua.')
+
+      const pInfo = getPatientInfo(skipModalItem.patientId, skipModalItem.patientName)
+      saveAppointmentLog({
+        appointmentId: updatedItem.appointmentId || updatedItem.id,
+        appointmentCode: updatedItem.visitCode || 'VIS-QUEUE',
+        action: 'QUEUE_DEFER',
+        operatorName: user?.fullName || user?.username || 'Lễ tân',
+        details: `Tạm hoãn bệnh nhân ${pInfo.name} (STT #${skipModalItem.queueNumber || 1}). Lý do: ${reason}. Số lần gọi: ${updatedItem.callCount || 1}`,
+      })
+
+      message.success(`Đã tạm hoãn bệnh nhân ${pInfo.name}. Hàng đợi sẵn sàng gọi lượt tiếp theo.`)
       setSkipModalItem(null)
-      skipForm.resetFields()
       await refreshAllData()
     } catch (err) {
-      handleQueueApiError(err, 'Không thể thực hiện bỏ qua lượt khám')
+      const errorMsg = cleanQueueActionErrorMessage(err, 'Không thể thực hiện tạm hoãn lượt khám.')
+      message.error(errorMsg)
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleReQueue = async (item) => {
+    if (!item) return
+    const evalRes = evaluateReQueueAction(item, permissions)
+    if (!evalRes.allowed) {
+      message.error(evalRes.message)
+      return
+    }
+
+    const pInfo = getPatientInfo(item.patientId, item.patientName)
+    setReQueuingId(item.id)
+    try {
+      const response = await queueApi.reQueue(item.id)
+      const updatedItem = normalizeQueueItem(response?.data)
+      if (!updatedItem.id) {
+        throw new Error('Backend did not return the re-queued queue item.')
+      }
+
+      setQueues((prev) => replaceQueueItem(prev, updatedItem))
+      setMyQueueData((prev) => replaceQueueItem(prev, updatedItem))
+      saveStoredQueueItem(updatedItem)
+
+      saveAppointmentLog({
+        appointmentId: updatedItem.appointmentId || updatedItem.id,
+        appointmentCode: updatedItem.visitCode || 'VIS-QUEUE',
+        action: 'QUEUE_RE_QUEUE',
+        operatorName: user?.fullName || user?.username || 'Lễ tân',
+        details: `Đưa bệnh nhân ${pInfo.name} (STT #${item.queueNumber || 1}) trở lại hàng đợi khám (Đang chờ). Số lần gọi bảo toàn: ${updatedItem.callCount || 0}`,
+      })
+
+      message.success(`Đã đưa bệnh nhân ${pInfo.name} trở lại hàng đợi khám thành công.`)
+      await refreshAllData()
+    } catch (err) {
+      const errorMsg = cleanQueueActionErrorMessage(err, 'Không thể đưa bệnh nhân trở lại hàng đợi.')
+      message.error(errorMsg)
+    } finally {
+      setReQueuingId(null)
     }
   }
 
@@ -1123,13 +1184,13 @@ function AppointmentQueue() {
         getDoctorInfo,
         permissions,
         user,
+        reQueuingId,
         onOpenDetail: handleOpenQueueDetail,
-        onCallNext: handleCallNext,
+        onCallNext: (queueId) => handleCallNext(queueId),
         onUpdateStatus: handleUpdateItemStatus,
-        onSkip: (record) => {
-          skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-          setSkipModalItem(record)
-        },
+        onSkip: (record) => setSkipModalItem(record),
+        onReQueue: (record) => handleReQueue(record),
+        onOpenHistory: (record) => setHistoryQueueItem(record),
         onCloseVisit: (record) => {
           const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
           setCloseVisitModalItem({
@@ -1144,11 +1205,11 @@ function AppointmentQueue() {
       getDoctorInfo,
       permissions,
       user,
+      reQueuingId,
       handleOpenQueueDetail,
       handleCallNext,
       handleUpdateItemStatus,
-      skipForm,
-      getPatientInfo,
+      handleReQueue,
     ],
   )
 
@@ -1450,10 +1511,16 @@ function AppointmentQueue() {
                   onOpenHistory={openPatientHistory}
                   onUpdateStatus={handleUpdateItemStatus}
                   onComplete={handleCompleteItem}
-                  onSkip={(item) => {
-                    skipForm.setFieldsValue({ reason: 'Vắng mặt khi gọi' })
-                    setSkipModalItem(item)
+                  onSkip={(item) => setSkipModalItem(item)}
+                  onCloseVisit={(item) => {
+                    const pInfo = getPatientInfo(item.patientId, item.patientName, item.patientCode, item.phone)
+                    setCloseVisitModalItem({
+                      ...item,
+                      patientName: pInfo.name,
+                      patientCode: pInfo.code,
+                    })
                   }}
+                  onOpenQueueHistory={(item) => setHistoryQueueItem(item)}
                 />
 
                 <WaitingPatientList
@@ -1472,6 +1539,156 @@ function AppointmentQueue() {
                   onOpenEncounter={openEncounter}
                   onOpenHistory={openPatientHistory}
                 />
+
+                {/* Khối Bệnh nhân tạm hoãn (vắng mặt khi gọi) */}
+                <Card
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                      <Text strong style={{ color: '#d97706' }}>
+                        🟠 BỆNH NHÂN TẠM HOÃN ({doctorQueueGroups.skipped.length})
+                      </Text>
+                      <Tag color="warning" style={{ margin: 0, fontWeight: 600 }}>
+                        Vắng mặt khi gọi
+                      </Tag>
+                    </div>
+                  }
+                  style={{ borderRadius: 12, borderColor: '#fed7aa', backgroundColor: '#fffdfa' }}
+                >
+                  {doctorQueueGroups.skipped.length === 0 ? (
+                    <div style={{ padding: '16px 0', textAlign: 'center' }}>
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description={
+                          <span style={{ color: '#64748b' }}>
+                            Không có bệnh nhân nào đang tạm hoãn trong phòng khám này.
+                          </span>
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <List
+                      dataSource={doctorQueueGroups.skipped}
+                      pagination={{ pageSize: 5 }}
+                      renderItem={(item) => {
+                        const pInfo = getPatientInfo(item.patientId, item.patientName)
+                        return (
+                          <List.Item
+                            actions={[
+                              (permissions.isAdmin || permissions.isReceptionist) && (
+                                <Button
+                                  key="requeue"
+                                  type="primary"
+                                  icon={<RedoOutlined />}
+                                  style={{ backgroundColor: '#0284c7' }}
+                                  loading={reQueuingId === item.id}
+                                  onClick={() => handleReQueue(item)}
+                                >
+                                  Đưa lại vào hàng đợi
+                                </Button>
+                              ),
+                              <Button
+                                key="history-queue"
+                                icon={<HistoryOutlined />}
+                                onClick={() => setHistoryQueueItem(item)}
+                              >
+                                Lịch sử luân chuyển
+                              </Button>,
+                              <Button
+                                key="history-patient"
+                                icon={<HistoryOutlined />}
+                                onClick={() => openPatientHistory(item.patientId, pInfo.name, pInfo.code)}
+                              >
+                                Lịch sử khám
+                              </Button>,
+                            ].filter(Boolean)}
+                          >
+                            <List.Item.Meta
+                              avatar={
+                                <Avatar
+                                  size={44}
+                                  style={{
+                                    backgroundColor: '#f97316',
+                                    fontWeight: 700,
+                                    fontSize: 15,
+                                    boxShadow: '0 2px 5px rgba(249, 115, 22, 0.2)',
+                                  }}
+                                >
+                                  {getInitials(pInfo.name)}
+                                </Avatar>
+                              }
+                              title={
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                  <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
+                                    {pInfo.name}
+                                  </Text>
+                                  {item.queueNumber && (
+                                    <Tag
+                                      color="orange"
+                                      style={{
+                                        fontWeight: 700,
+                                        fontSize: 12,
+                                        padding: '1px 8px',
+                                        borderRadius: 4,
+                                        margin: 0,
+                                      }}
+                                    >
+                                      STT #{String(item.queueNumber).padStart(2, '0')}
+                                    </Tag>
+                                  )}
+                                  <Tag color="orange" style={{ margin: 0, fontSize: 11, borderRadius: 4, fontWeight: 600 }}>
+                                    Tạm hoãn
+                                  </Tag>
+                                  {Number(item.callCount) > 0 && (
+                                    <Tag color="volcano" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
+                                      Đã gọi: {item.callCount} lần
+                                    </Tag>
+                                  )}
+                                </div>
+                              }
+                              description={
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap', fontSize: 12 }}>
+                                  <span style={{ color: '#64748b' }}>
+                                    Mã lượt:{' '}
+                                    <Tag
+                                      style={{
+                                        fontFamily: 'monospace',
+                                        fontWeight: 600,
+                                        fontSize: 11.5,
+                                        color: '#1d4ed8',
+                                        backgroundColor: '#eff6ff',
+                                        borderColor: '#bfdbfe',
+                                        borderRadius: 4,
+                                        margin: 0,
+                                        padding: '0 6px',
+                                      }}
+                                    >
+                                      {formatVisitCode(item.visitCode, item.visitId)}
+                                    </Tag>
+                                  </span>
+                                  {pInfo.code && pInfo.code !== '—' && (
+                                    <span style={{ color: '#64748b' }}>
+                                      Mã BN: <Text strong style={{ color: '#334155' }}>{pInfo.code}</Text>
+                                    </span>
+                                  )}
+                                  {pInfo.phone && (
+                                    <span style={{ color: '#64748b' }}>
+                                      SĐT: <Text style={{ color: '#334155' }}>{pInfo.phone}</Text>
+                                    </span>
+                                  )}
+                                  {item.skipReason && (
+                                    <span style={{ color: '#c2410c' }}>
+                                      Lý do hoãn: <strong>{item.skipReason}</strong>
+                                    </span>
+                                  )}
+                                </div>
+                              }
+                            />
+                          </List.Item>
+                        )
+                      }}
+                    />
+                  )}
+                </Card>
 
                 <CompletedTodayList
                   items={doctorQueueGroups.completed}
@@ -1721,14 +1938,18 @@ function AppointmentQueue() {
         loading={quickPatientSaving}
       />
 
-      <SkipQueueModal
-        open={!!skipModalItem}
-        onCancel={() => setSkipModalItem(null)}
-        form={skipForm}
-        onFinish={handleSkipSubmit}
-        skipModalItem={skipModalItem}
-        getPatientInfo={getPatientInfo}
-        actionLoading={actionLoading}
+      <DeferPatientModal
+        open={Boolean(skipModalItem)}
+        item={skipModalItem}
+        onClose={() => setSkipModalItem(null)}
+        onSubmit={handleDeferSubmit}
+        loading={actionLoading}
+      />
+
+      <QueueItemHistoryModal
+        open={Boolean(historyQueueItem)}
+        item={historyQueueItem}
+        onClose={() => setHistoryQueueItem(null)}
       />
 
       <AppointmentLogsDrawer

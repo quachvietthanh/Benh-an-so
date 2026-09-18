@@ -31,6 +31,8 @@ import {
   UserAddOutlined,
   UsergroupAddOutlined,
   UserOutlined,
+  UsergroupDeleteOutlined,
+  MergeCellsOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
@@ -40,6 +42,11 @@ import PersonalDataConsentField from '../components/patient/PersonalDataConsentF
 import { getPatientConsentStatus } from '../constants/patientConsentConstants'
 import EmergencyContactFields from '../components/patient/EmergencyContactFields'
 import { validateEmergencyContactTriplet } from '../utils/emergencyContactValidation'
+import GuardianFields from '../components/patient/GuardianFields'
+import MergePatientModal from '../components/patient/MergePatientModal'
+import DuplicatePatientsDrawer from '../components/patient/DuplicatePatientsDrawer'
+import { isMinorPatient, validateGuardianFields } from '../utils/patientGuardianValidation'
+import { canUserMergePatients } from '../utils/patientMergeValidation'
 
 const { RangePicker } = DatePicker
 
@@ -58,11 +65,14 @@ const getInitials = (name = '') => name
   .join('')
   .toUpperCase()
 
-const getPatientStatus = (patient) => (
-  patient.active === false
+const getPatientStatus = (patient) => {
+  if (patient.isMerged || patient.status === 'MERGED' || patient.mergedIntoPatientId) {
+    return { label: 'Đã gộp', tone: 'purple' }
+  }
+  return patient.active === false
     ? { label: 'Đã lưu trữ', tone: 'gray' }
     : { label: 'Đang điều trị', tone: 'green' }
-)
+}
 
 function PatientList() {
   const navigate = useNavigate()
@@ -77,6 +87,8 @@ function PatientList() {
   const canReadPatient = userPermissions.includes('PATIENT_READ')
   const canBookAppointment = userPermissions.includes('APPOINTMENT_CREATE') || userPermissions.includes('APPOINTMENT_READ')
   const canManage = canCreatePatient || canUpdatePatient
+  const canMerge = canUserMergePatients(user?.roles, userPermissions)
+
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [searchText, setSearchText] = useState('')
@@ -98,6 +110,18 @@ function PatientList() {
   const [registerOpen, setRegisterOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [registerForm] = Form.useForm()
+
+  // Merge modal and duplicate drawer states
+  const [mergeModalOpen, setMergeModalOpen] = useState(false)
+  const [mergeTargetPatient, setMergeTargetPatient] = useState(null)
+  const [mergeSourcePatient, setMergeSourcePatient] = useState(null)
+  const [duplicatesDrawerOpen, setDuplicatesDrawerOpen] = useState(false)
+
+  // Form watches for minor & consent
+  const registeredFullName = Form.useWatch('fullName', registerForm)
+  const registeredDob = Form.useWatch('dateOfBirth', registerForm)
+  const registeredGuardianName = Form.useWatch('guardianName', registerForm)
+  const isRegisteredMinor = isMinorPatient(registeredDob)
 
   const loadPatients = useCallback(async () => {
     setLoading(true)
@@ -128,8 +152,11 @@ function PatientList() {
       ].some((val) => String(val || '').toLowerCase().includes(kw))
 
       const matchesGender = genderFilter === 'ALL' || patient.gender === genderFilter
+      const isMerged = Boolean(patient.isMerged || patient.status === 'MERGED' || patient.mergedIntoPatientId)
       const matchesStatus = statusFilter === 'ALL'
-        || (statusFilter === 'ACTIVE' ? patient.active !== false : patient.active === false)
+        || (statusFilter === 'ACTIVE' ? (patient.active !== false && !isMerged) : false)
+        || (statusFilter === 'ARCHIVED' ? (patient.active === false && !isMerged) : false)
+        || (statusFilter === 'MERGED' ? isMerged : false)
 
       const createdAt = patient.createdAt ? dayjs(patient.createdAt) : null
       const matchesDate = !dateRange?.length || (createdAt
@@ -145,8 +172,9 @@ function PatientList() {
     return filteredPatients.slice(start, start + pageSize)
   }, [filteredPatients, page, pageSize])
 
-  const activeCount = useMemo(() => allPatients.filter((patient) => patient.active !== false).length, [allPatients])
-  const archivedCount = useMemo(() => allPatients.filter((patient) => patient.active === false).length, [allPatients])
+  const activeCount = useMemo(() => allPatients.filter((patient) => patient.active !== false && !patient.isMerged && patient.status !== 'MERGED').length, [allPatients])
+  const archivedCount = useMemo(() => allPatients.filter((patient) => patient.active === false && !patient.isMerged && patient.status !== 'MERGED').length, [allPatients])
+  const mergedCount = useMemo(() => allPatients.filter((patient) => patient.isMerged || patient.status === 'MERGED' || patient.mergedIntoPatientId).length, [allPatients])
   const newCount = useMemo(() => allPatients.filter((patient) => patient.createdAt && dayjs().diff(dayjs(patient.createdAt), 'day') <= 30).length, [allPatients])
 
   const patientStats = [
@@ -159,6 +187,7 @@ function PatientList() {
   const handleRegister = async (values) => {
     setSaving(true)
     try {
+      // 1. Kiểm tra Người liên hệ khẩn cấp (nếu có nhập)
       const tripletValidation = validateEmergencyContactTriplet({
         emergencyContact: values.emergencyContact,
         emergencyRelationship: values.emergencyRelationship,
@@ -171,15 +200,32 @@ function PatientList() {
         return
       }
 
+      // 2. Kiểm tra Người giám hộ nếu là bệnh nhân dưới 18 tuổi (NCL-02-CN-008 / QTN-44)
+      const formattedDob = values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null
+      const guardianValidation = validateGuardianFields({
+        ...values,
+        dateOfBirth: formattedDob,
+      })
+      if (!guardianValidation.valid) {
+        const firstError = Object.values(guardianValidation.errors)[0]
+        message.error(firstError)
+        setSaving(false)
+        return
+      }
+
       const payload = {
         ...values,
-        dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null,
+        dateOfBirth: formattedDob,
         gender: values.gender ? values.gender.toUpperCase() : 'OTHER',
         phone: values.phone || null,
         insuranceNumber: values.insuranceNumber || null,
         emergencyContact: values.emergencyContact?.trim() || null,
         emergencyRelationship: values.emergencyRelationship?.trim() || null,
         emergencyPhone: values.emergencyPhone?.trim() || null,
+        guardianName: values.guardianName?.trim() || null,
+        guardianPhone: values.guardianPhone?.trim() || null,
+        guardianRelationship: values.guardianRelationship?.trim() || null,
+        guardianIdentityNumber: values.guardianIdentityNumber?.trim() || null,
         consentAgreed: values.consentAgreed ?? true,
         consentVersion: 'v1.0',
       }
@@ -423,6 +469,20 @@ ${rowsXml}
                       },
                     ]
                   : []),
+                ...(canMerge && !patient.isMerged && patient.status !== 'MERGED'
+                  ? [
+                      {
+                        key: 'merge',
+                        icon: <MergeCellsOutlined style={{ color: '#ea580c' }} />,
+                        label: 'Gộp hồ sơ trùng...',
+                        onClick: () => {
+                          setMergeTargetPatient(patient)
+                          setMergeSourcePatient(null)
+                          setMergeModalOpen(true)
+                        },
+                      },
+                    ]
+                  : []),
                 { type: 'divider' },
                 {
                   key: 'copy',
@@ -467,6 +527,14 @@ ${rowsXml}
         <header className="patient-list-header">
           <h1>Danh sách bệnh nhân</h1>
           <Space size={10}>
+            {canMerge && (
+              <Button
+                icon={<UsergroupDeleteOutlined style={{ color: '#ea580c' }} />}
+                onClick={() => setDuplicatesDrawerOpen(true)}
+              >
+                Rà soát hồ sơ trùng
+              </Button>
+            )}
             <Button icon={<DownloadOutlined />} onClick={exportPatients}>Xuất Excel</Button>
             {canCreatePatient && <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>Thêm bệnh nhân</Button>}
           </Space>
@@ -503,11 +571,54 @@ ${rowsXml}
               { value: 'ALL', label: 'Tất cả trạng thái' },
               { value: 'ACTIVE', label: 'Đang điều trị' },
               { value: 'ARCHIVED', label: 'Đã lưu trữ' },
+              { value: 'MERGED', label: 'Đã gộp' },
             ]}
             onChange={setStatusFilter}
           />
           <Button icon={<FilterOutlined />} onClick={resetFilters}>Bộ lọc</Button>
         </div>
+
+        {canMerge && selectedRowKeys.length === 2 && (
+          <div
+            style={{
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: 8,
+              padding: '10px 16px',
+              marginBottom: 12,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            <Space>
+              <MergeCellsOutlined style={{ color: '#2563eb', fontSize: 18 }} />
+              <span style={{ fontWeight: 600, color: '#1e40af' }}>
+                Đã chọn 2 hồ sơ bệnh nhân để đối chiếu
+              </span>
+              <span style={{ fontSize: 13, color: '#4b5563' }}>
+                (Bạn có thể thực hiện kiểm tra và hợp nhất 2 hồ sơ này)
+              </span>
+            </Space>
+            <Button
+              type="primary"
+              size="small"
+              icon={<MergeCellsOutlined />}
+              style={{ background: '#2563eb' }}
+              onClick={() => {
+                const p1 = allPatients.find((p) => p.id === selectedRowKeys[0])
+                const p2 = allPatients.find((p) => p.id === selectedRowKeys[1])
+                setMergeTargetPatient(p1)
+                setMergeSourcePatient(p2)
+                setMergeModalOpen(true)
+              }}
+            >
+              Tiến hành gộp 2 hồ sơ này
+            </Button>
+          </div>
+        )}
 
         <Table
           className="patient-record-table"
@@ -547,7 +658,7 @@ ${rowsXml}
         onOk={() => registerForm.submit()}
         okText="Lưu hồ sơ"
         cancelText="Hủy"
-        width={700}
+        width={720}
         centered
         className="patient-register-modal"
       >
@@ -564,10 +675,45 @@ ${rowsXml}
             <div className="patient-register-full">
               <EmergencyContactFields form={registerForm} layoutGrid />
             </div>
+            <div className="patient-register-full">
+              <GuardianFields form={registerForm} layoutGrid />
+            </div>
           </div>
-          <PersonalDataConsentField patientName={Form.useWatch('fullName', registerForm)} />
+          <PersonalDataConsentField
+            patientName={registeredFullName}
+            isMinor={isRegisteredMinor}
+            guardianName={registeredGuardianName}
+          />
         </Form>
       </Modal>
+
+      <MergePatientModal
+        open={mergeModalOpen}
+        onClose={() => {
+          setMergeModalOpen(false)
+          setMergeTargetPatient(null)
+          setMergeSourcePatient(null)
+        }}
+        initialTargetPatient={mergeTargetPatient}
+        initialSourcePatient={mergeSourcePatient}
+        allPatients={allPatients}
+        onSuccess={() => {
+          loadPatients()
+          setSelectedRowKeys([])
+        }}
+      />
+
+      <DuplicatePatientsDrawer
+        open={duplicatesDrawerOpen}
+        onClose={() => setDuplicatesDrawerOpen(false)}
+        canMerge={canMerge}
+        onSelectMerge={(target, source) => {
+          setDuplicatesDrawerOpen(false)
+          setMergeTargetPatient(target)
+          setMergeSourcePatient(source)
+          setMergeModalOpen(true)
+        }}
+      />
     </div>
   )
 }

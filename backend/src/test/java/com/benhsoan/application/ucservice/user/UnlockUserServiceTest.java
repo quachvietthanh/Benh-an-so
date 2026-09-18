@@ -3,10 +3,12 @@ package com.benhsoan.application.ucservice.user;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,7 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
@@ -26,10 +28,10 @@ import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.UserNotFoundException;
 import com.benhsoan.port.dto.result.UserResult;
 import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
-import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)
 class UnlockUserServiceTest {
@@ -43,9 +45,11 @@ class UnlockUserServiceTest {
     @Mock
     private LoginAttemptPort loginAttemptPort;
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private AdminOperationAuditService adminOperationAuditService;
     @Mock
     private CurrentUserPort currentUserPort;
+    @Mock
+    private ClockPort clockPort;
 
     private UnlockUserService unlockUserService;
 
@@ -56,8 +60,9 @@ class UnlockUserServiceTest {
                 roleRepository,
                 userResultMapper,
                 loginAttemptPort,
-                auditLogRepository,
-                currentUserPort);
+                adminOperationAuditService,
+                currentUserPort,
+                clockPort);
     }
 
     @Test
@@ -81,6 +86,8 @@ class UnlockUserServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(adminId);
         when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
         when(userResultMapper.toResult(user, role)).thenReturn(expectedResult);
+        when(loginAttemptPort.isBlocked("bacsi_an")).thenReturn(false);
+        when(loginAttemptPort.isBlocked("0901234567")).thenReturn(true);
 
         UserResult result = unlockUserService.unlockUser(userId);
 
@@ -91,15 +98,55 @@ class UnlockUserServiceTest {
         verify(loginAttemptPort).unlock("bacsi_an");
         verify(loginAttemptPort).unlock("0901234567");
 
-        // Xác nhận ghi Audit Log với ActionType UNLOCK
-        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(captor.capture());
-        AuditLog savedLog = captor.getValue();
+        // Xác nhận ghi Audit Log với ActionType UNLOCK và trạng thái before/after thực tế
+        ArgumentCaptor<UUID> actorCaptor = ArgumentCaptor.forClass(UUID.class);
+        ArgumentCaptor<ActionType> actionCaptor = ArgumentCaptor.forClass(ActionType.class);
+        ArgumentCaptor<ResourceType> resourceCaptor = ArgumentCaptor.forClass(ResourceType.class);
+        ArgumentCaptor<UUID> resourceIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> beforeCaptor = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> afterCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(adminOperationAuditService).record(
+                actorCaptor.capture(), actionCaptor.capture(), resourceCaptor.capture(),
+                resourceIdCaptor.capture(), beforeCaptor.capture(), afterCaptor.capture(), any());
 
-        assertEquals(adminId, savedLog.getUserId());
-        assertEquals(ActionType.UNLOCK, savedLog.getActionType());
-        assertEquals(ResourceType.USER, savedLog.getResourceType());
-        assertEquals(userId, savedLog.getResourceId());
+        assertEquals(adminId, actorCaptor.getValue());
+        assertEquals(ActionType.UNLOCK, actionCaptor.getValue());
+        assertEquals(ResourceType.USER, resourceCaptor.getValue());
+        assertEquals(userId, resourceIdCaptor.getValue());
+        assertEquals(Boolean.TRUE, beforeCaptor.getValue().get("locked"));
+        assertEquals(Boolean.FALSE, afterCaptor.getValue().get("locked"));
+    }
+
+    @Test
+    @DisplayName("Admin mở khóa tài khoản chưa bị khóa: before.locked phản ánh trạng thái thực tế (false)")
+    void unlockUser_notBlocked_recordsActualBeforeStateAsFalse() {
+        UUID userId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(userId);
+        when(user.getUsername()).thenReturn("bacsi_an");
+        when(user.getPhone()).thenReturn(null);
+        when(user.getRoleId()).thenReturn(roleId);
+
+        Role role = mock(Role.class);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(currentUserPort.getCurrentUserId()).thenReturn(adminId);
+        when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+        when(userResultMapper.toResult(user, role)).thenReturn(new UserResult(
+                userId, "bacsi_an", "Bác sĩ An", "an@hospital.vn", null, "DOCTOR", true));
+        when(loginAttemptPort.isBlocked("bacsi_an")).thenReturn(false);
+
+        unlockUserService.unlockUser(userId);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> beforeCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(adminOperationAuditService).record(
+                any(), any(), any(), any(), beforeCaptor.capture(), any(), any());
+        assertEquals(Boolean.FALSE, beforeCaptor.getValue().get("locked"));
     }
 
     @Test
