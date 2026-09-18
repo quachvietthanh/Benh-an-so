@@ -25,9 +25,10 @@ Tài liệu này quy định API contract cho chức năng **Báo cáo doanh thu
 
 ## 2. Roles And Permissions
 
-- **Allowed Roles:** `MANAGER`, `ADMIN`.
+- **Allowed Roles:** `MANAGER` (hoặc các tài khoản được cấp quyền `REPORT_VIEW`).
+  > *Lưu ý:* Vai trò `ADMIN` trong hệ thống không được cấp quyền `REPORT_VIEW` theo mặc định (nguyên tắc Tách biệt trách nhiệm - Separation of Duties).
 - **Required Permission:** `@RequirePermission("REPORT_VIEW")`.
-- **Unauthorized Roles:** `RECEPTIONIST`, `DOCTOR`, `PHARMACIST`, `PATIENT` (trả về `403 Forbidden` và tự động ghi `AuditLog` với `actionType = ACCESS_DENIED`, `resourceType = PERMISSION`).
+- **Unauthorized Roles:** `ADMIN` (mặc định), `RECEPTIONIST`, `DOCTOR`, `PHARMACIST`, `PATIENT` (trả về `403 Forbidden` và tự động ghi `AuditLog` với `actionType = ACCESS_DENIED`, `resourceType = PERMISSION`).
 
 ---
 
@@ -54,8 +55,8 @@ GET /reports/revenue-breakdown?from=YYYY-MM-DD&to=YYYY-MM-DD
 - Doanh thu từng mục tính theo từng dòng hóa đơn (`invoice_lines`):
   - `EXAM_FEE`: Tiền khám bệnh -> Nhóm dịch vụ `EXAMINATION`, gán cho Bác sĩ phụ trách lượt khám (`visit.doctorId`).
   - `SERVICE_FEE`: Dịch vụ cận lâm sàng -> Tra cứu nhóm dịch vụ từ `clinical_service_catalog.service_type` (`LAB_TEST`, `IMAGING`, `OTHER`), gán cho Bác sĩ chỉ định (`clinical_orders.orderedBy`).
-  - `MEDICINE_FEE`: Tiền thuốc -> Nhóm `MEDICATION`, gán cho Bác sĩ kê đơn (`prescriptions.prescribedBy`, hoặc fallback `visit.doctorId`).
-  - `ADJUSTMENT`: Hóa đơn điều chỉnh và hoàn tiền -> Khấu trừ vào nhóm dịch vụ/thuốc và bác sĩ tương ứng theo dòng gốc (`originalInvoiceId` / `referenceId`).
+  - `MEDICINE_FEE`: Tiền thuốc -> Nhóm `MEDICATION`, gán cho Bác sĩ kê đơn (`prescriptions.prescribedBy`, hoặc fallback `visit.doctorId`). Đối với lượt khám có nhiều đơn thuốc từ nhiều bác sĩ khác nhau, doanh thu thuốc tạm thời được gán cho bác sĩ có đơn thuốc kê mới nhất trong lượt khám.
+  - `ADJUSTMENT`: Hóa đơn điều chỉnh và hoàn tiền -> Khấu trừ vào nhóm dịch vụ/thuốc và bác sĩ tương ứng theo dòng gốc (`originalInvoiceId` / `referenceId`). Trong trường hợp khoản điều chỉnh/hoàn tiền không thể liên kết được dòng gốc (`targetLineType == null`), khoản tiền sẽ được phân loại an toàn vào nhóm dịch vụ `OTHER` ("Dịch vụ khác") và gán cho nhóm bác sĩ `UNASSIGNED` ("Chưa phân bổ bác sĩ"), bảo đảm không làm sai lệch số liệu khám bệnh của bác sĩ phụ trách.
 
 ### 4.2 Tính Bảo Toàn Khớp Số Liệu (Postcondition)
 - Tổng doanh thu thuần:
@@ -65,8 +66,7 @@ GET /reports/revenue-breakdown?from=YYYY-MM-DD&to=YYYY-MM-DD
   $$\text{totalNetRevenue} = \sum (\text{serviceGroup.revenue}) = \sum (\text{doctor.totalRevenue})$$
 - **Quy tắc tính tỷ lệ phần trăm (%):**
   - Khi $\text{totalNetRevenue} \le 0$: Mọi tỷ lệ phần trăm trả về `0.00`.
-  - Khi một mục có doanh thu $\le 0$: Tỷ lệ phần trăm trả về `0.00`.
-  - Ngược lại: $\text{percentage} = \text{revenue} \times 100 / \text{totalNetRevenue}$, làm tròn 2 chữ số thập phân (`HALF_UP`).
+  - Khi $\text{totalNetRevenue} > 0$: $\text{percentage} = \text{revenue} \times 100 / \text{totalNetRevenue}$, làm tròn 2 chữ số thập phân (`HALF_UP`). Cho phép tỷ lệ phần trăm mang giá trị âm khi một mục có doanh thu âm do khấu trừ hoàn tiền/điều chỉnh vượt quá phát sinh, bảo đảm tổng tỷ trọng đóng góp của các bác sĩ luôn bảo toàn đạt đúng 100%.
 
 ---
 

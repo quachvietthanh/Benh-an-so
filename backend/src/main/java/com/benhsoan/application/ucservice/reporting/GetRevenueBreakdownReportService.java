@@ -90,7 +90,7 @@ public class GetRevenueBreakdownReportService implements GetRevenueBreakdownRepo
                 } else if (line.targetLineType() == InvoiceLineType.EXAM_FEE) {
                     totalExamRevenue = totalExamRevenue.add(amount);
                 } else {
-                    totalExamRevenue = totalExamRevenue.add(amount);
+                    totalClinicalServiceRevenue = totalClinicalServiceRevenue.add(amount);
                 }
             }
         }
@@ -177,7 +177,7 @@ public class GetRevenueBreakdownReportService implements GetRevenueBreakdownRepo
             } else if (line.targetLineType() == InvoiceLineType.EXAM_FEE) {
                 groupMap.get("EXAMINATION").revenue = groupMap.get("EXAMINATION").revenue.add(amount);
             } else {
-                groupMap.get("EXAMINATION").revenue = groupMap.get("EXAMINATION").revenue.add(amount);
+                groupMap.get("OTHER").revenue = groupMap.get("OTHER").revenue.add(amount);
             }
         }
     }
@@ -222,7 +222,7 @@ public class GetRevenueBreakdownReportService implements GetRevenueBreakdownRepo
     }
 
     private BigDecimal calculatePercentage(BigDecimal part, BigDecimal total) {
-        if (total == null || total.compareTo(BigDecimal.ZERO) <= 0 || part == null || part.compareTo(BigDecimal.ZERO) <= 0) {
+        if (total == null || total.compareTo(BigDecimal.ZERO) <= 0 || part == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
         return part.multiply(BigDecimal.valueOf(100))

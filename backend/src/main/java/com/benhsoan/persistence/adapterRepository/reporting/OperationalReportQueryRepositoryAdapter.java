@@ -464,6 +464,9 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
                 return item.orderedBy();
             }
         }
+        if (lineType == InvoiceLineType.ADJUSTMENT && targetLineType == null) {
+            return null;
+        }
         return visitDoctorId;
     }
 

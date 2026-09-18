@@ -2,6 +2,7 @@ package com.benhsoan.persistence.adapterRepository.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
@@ -525,5 +526,66 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
         assertEquals(1, details.size());
         InvoiceLineReportDetail line = details.get(0);
         assertEquals(docActive, line.doctorId(), "Medicine fee must be attributed to docActive, NOT docCancelled");
+    }
+
+    @Test
+    void reconcilesInvoiceLineDetailsWithSumNetRevenueOnSameDataset() {
+        // Finding P3-2: Reconcile sum(invoice_lines.amount) with sumNetRevenue
+        UUID doc = UUID.randomUUID();
+        createDoctor(doc, "docReconcile", "Dr. Reconcile");
+
+        UUID visitId = UUID.randomUUID();
+        createVisitWithDoctor("VIS-REC-001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"), visitId, doc);
+
+        UUID invoice1 = UUID.randomUUID();
+        createOriginalInvoiceWithId(invoice1, "HD-REC-001", visitId, new BigDecimal("450000"), Instant.parse("2026-08-01T03:00:00Z"));
+        createInvoiceLine(invoice1, InvoiceLineType.EXAM_FEE, "Phi kham", new BigDecimal("100000"), visitId);
+        createInvoiceLine(invoice1, InvoiceLineType.MEDICINE_FEE, "Tien thuoc", new BigDecimal("150000"), UUID.randomUUID());
+        createInvoiceLine(invoice1, InvoiceLineType.SERVICE_FEE, "Sieu am", new BigDecimal("200000"), UUID.randomUUID());
+
+        UUID adjInvoice = UUID.randomUUID();
+        createAdjustmentInvoice(adjInvoice, "HD-REC-002", visitId, invoice1, new BigDecimal("-50000"), Instant.parse("2026-08-01T04:00:00Z"));
+        createInvoiceLine(adjInvoice, InvoiceLineType.ADJUSTMENT, "Giam gia", new BigDecimal("-50000"), UUID.randomUUID());
+
+        Instant from = Instant.parse("2026-08-01T00:00:00Z");
+        Instant to = Instant.parse("2026-08-02T00:00:00Z");
+
+        BigDecimal netRevenue = repositoryAdapter.sumNetRevenue(from, to);
+        List<InvoiceLineReportDetail> lines = repositoryAdapter.findInvoiceLineReportDetails(from, to);
+
+        BigDecimal sumLineAmounts = lines.stream()
+                .map(InvoiceLineReportDetail::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        assertEquals(new BigDecimal("400000.00"), netRevenue);
+        assertEquals(0, netRevenue.compareTo(sumLineAmounts), "Sum of invoice line details must match sumNetRevenue");
+    }
+
+    @Test
+    void attributesUnresolvedAdjustmentToNullDoctorAndNullTargetLineType() {
+        // Finding P2-2: Unresolved adjustment must have doctorId == null and targetLineType == null
+        UUID doc = UUID.randomUUID();
+        createDoctor(doc, "docUnresolved", "Dr. Unresolved");
+
+        UUID visitId = UUID.randomUUID();
+        createVisitWithDoctor("VIS-UNRES-001", VisitStatus.COMPLETED, Instant.parse("2026-08-01T02:00:00Z"), visitId, doc);
+
+        // Adjustment with non-existent original invoice and random refId
+        UUID orphanAdjInvoice = UUID.randomUUID();
+        UUID nonExistentOrigInvoiceId = UUID.randomUUID();
+        createAdjustmentInvoice(orphanAdjInvoice, "HD-UNRES-001", visitId, nonExistentOrigInvoiceId, new BigDecimal("-25000"), Instant.parse("2026-08-01T05:00:00Z"));
+        createInvoiceLine(orphanAdjInvoice, InvoiceLineType.ADJUSTMENT, "Khoan dieu chinh vo danh", new BigDecimal("-25000"), UUID.randomUUID());
+
+        List<InvoiceLineReportDetail> details = repositoryAdapter.findInvoiceLineReportDetails(
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-02T00:00:00Z")
+        );
+
+        InvoiceLineReportDetail adjLine = details.stream()
+                .filter(d -> d.lineType() == InvoiceLineType.ADJUSTMENT)
+                .findFirst().orElseThrow();
+
+        assertNull(adjLine.targetLineType(), "Unresolved adjustment must have null targetLineType");
+        assertNull(adjLine.doctorId(), "Unresolved adjustment must not be attributed to visitDoctor, doctorId must be null");
     }
 }

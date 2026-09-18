@@ -297,4 +297,118 @@ class GetRevenueBreakdownReportServiceTest {
         assertEquals("Chưa phân bổ bác sĩ", unassigned.doctorName());
         assertEquals(new BigDecimal("50000"), unassigned.totalRevenue());
     }
+
+    @Test
+    void routesUnresolvedAdjustmentToOtherServiceGroupAndUnassignedDoctor() {
+        // Finding P2-2: Unresolved adjustment must route to OTHER and UNASSIGNED doctor
+        UUID invoice1 = UUID.randomUUID();
+        UUID adjInvoice = UUID.randomUUID();
+        UUID visit1 = UUID.randomUUID();
+
+        List<InvoiceLineReportDetail> lines = List.of(
+                new InvoiceLineReportDetail(
+                        UUID.randomUUID(), invoice1, InvoiceType.ORIGINAL, InvoiceLineType.EXAM_FEE,
+                        InvoiceLineType.EXAM_FEE, "Phi kham", new BigDecimal("100000"),
+                        visit1, visit1, DOC_1, "doctor1", "Dr. Nguyen Minh Anh", null
+                ),
+                new InvoiceLineReportDetail(
+                        UUID.randomUUID(), adjInvoice, InvoiceType.ADJUSTMENT, InvoiceLineType.ADJUSTMENT,
+                        null, "Dieu chinh khong ro nguon goc", new BigDecimal("-30000"),
+                        null, visit1, null, null, null, null
+                )
+        );
+
+        when(queryRepository.findInvoiceLineReportDetails(any(), any())).thenReturn(lines);
+
+        RevenueBreakdownReportResult result = service.getRevenueBreakdown(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31)
+        );
+
+        assertEquals(new BigDecimal("70000"), result.totalNetRevenue());
+        assertEquals(new BigDecimal("100000"), result.totalExamRevenue()); // Must NOT be docked!
+        assertEquals(new BigDecimal("-30000"), result.totalClinicalServiceRevenue());
+        assertEquals(new BigDecimal("-30000"), result.totalAdjustmentRevenue());
+
+        ServiceGroupRevenueResult examGroup = result.serviceGroups().stream()
+                .filter(g -> "EXAMINATION".equals(g.groupCode())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("100000"), examGroup.revenue());
+
+        ServiceGroupRevenueResult otherGroup = result.serviceGroups().stream()
+                .filter(g -> "OTHER".equals(g.groupCode())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("-30000"), otherGroup.revenue());
+
+        // Doctors: DOC_1 = 100k, UNASSIGNED = -30k
+        DoctorRevenueResult doc1 = result.doctors().stream()
+                .filter(d -> DOC_1.equals(d.doctorId())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("100000"), doc1.totalRevenue());
+
+        DoctorRevenueResult unassigned = result.doctors().stream()
+                .filter(d -> "UNASSIGNED".equals(d.doctorCode())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("-30000"), unassigned.totalRevenue());
+        assertEquals(new BigDecimal("-30000"), unassigned.adjustmentRevenue());
+
+        // Conservation check
+        BigDecimal sumServiceGroupRevenue = result.serviceGroups().stream()
+                .map(ServiceGroupRevenueResult::revenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(result.totalNetRevenue(), sumServiceGroupRevenue);
+
+        BigDecimal sumDoctorRevenue = result.doctors().stream()
+                .map(DoctorRevenueResult::totalRevenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(result.totalNetRevenue(), sumDoctorRevenue);
+    }
+
+    @Test
+    void calculatesNegativePercentageWhenTotalNetRevenueIsPositive() {
+        // Finding P2-3: Doc 1 = 1M, Doc 2 = -200k, Total = 800k (> 0)
+        UUID invoice1 = UUID.randomUUID();
+        UUID adjInvoice = UUID.randomUUID();
+        UUID visit1 = UUID.randomUUID();
+
+        List<InvoiceLineReportDetail> lines = List.of(
+                new InvoiceLineReportDetail(
+                        UUID.randomUUID(), invoice1, InvoiceType.ORIGINAL, InvoiceLineType.EXAM_FEE,
+                        InvoiceLineType.EXAM_FEE, "Phi kham", new BigDecimal("1000000"),
+                        visit1, visit1, DOC_1, "doctor1", "Dr. Nguyen Minh Anh", null
+                ),
+                new InvoiceLineReportDetail(
+                        UUID.randomUUID(), adjInvoice, InvoiceType.ADJUSTMENT, InvoiceLineType.ADJUSTMENT,
+                        InvoiceLineType.MEDICINE_FEE, "Hoan tra thuoc", new BigDecimal("-200000"),
+                        UUID.randomUUID(), visit1, DOC_2, "doctor2", "Dr. Tran Quang Huy", null
+                )
+        );
+
+        when(queryRepository.findInvoiceLineReportDetails(any(), any())).thenReturn(lines);
+
+        RevenueBreakdownReportResult result = service.getRevenueBreakdown(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31)
+        );
+
+        assertEquals(new BigDecimal("800000"), result.totalNetRevenue());
+
+        DoctorRevenueResult doc1 = result.doctors().stream()
+                .filter(d -> DOC_1.equals(d.doctorId())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("125.00"), doc1.percentage()); // 1,000,000 / 800,000 * 100 = 125.00%
+
+        DoctorRevenueResult doc2 = result.doctors().stream()
+                .filter(d -> DOC_2.equals(d.doctorId())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("-25.00"), doc2.percentage()); // -200,000 / 800,000 * 100 = -25.00%
+
+        ServiceGroupRevenueResult examGroup = result.serviceGroups().stream()
+                .filter(g -> "EXAMINATION".equals(g.groupCode())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("125.00"), examGroup.percentage());
+
+        ServiceGroupRevenueResult medGroup = result.serviceGroups().stream()
+                .filter(g -> "MEDICATION".equals(g.groupCode())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("-25.00"), medGroup.percentage());
+
+        // Sum of percentages equals 100.00%
+        BigDecimal sumDoctorPercentages = result.doctors().stream()
+                .map(DoctorRevenueResult::percentage)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(new BigDecimal("100.00"), sumDoctorPercentages);
+    }
 }

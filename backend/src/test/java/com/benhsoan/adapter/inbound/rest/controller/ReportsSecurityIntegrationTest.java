@@ -363,25 +363,17 @@ class ReportsSecurityIntegrationTest {
     }
 
     @Test
-    void allowsAdminWithReportViewToAccessRevenueBreakdown() throws Exception {
-        when(getRevenueBreakdownReportUseCase.getRevenueBreakdown(any(), any())).thenReturn(new RevenueBreakdownReportResult(
-                LocalDate.of(2026, 8, 1),
-                LocalDate.of(2026, 8, 3),
-                new BigDecimal("500000"),
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                "VND",
-                List.of(),
-                List.of()
-        ));
+    void forbidsAdminWithoutReportViewToAccessRevenueBreakdownAndAuditsDeniedAttempt() throws Exception {
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
 
         mockMvc.perform(get("/reports/revenue-breakdown")
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-03")
-                        .with(permission("ADMIN", "REPORT_VIEW")))
-                .andExpect(status().isOk());
+                        .with(permission("ADMIN", "USER_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getRevenueBreakdownReportUseCase);
+        org.mockito.Mockito.verify(auditLogRepository).save(any());
     }
 
     @Test
