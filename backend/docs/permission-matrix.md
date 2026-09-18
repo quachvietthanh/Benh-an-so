@@ -14,8 +14,8 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `GET /roles` → `RoleController.getSystemRoles` | `ROLE_READ` | Không có | Dynamic hoàn tất |
 | `GET /permissions` → `RoleController.getPermissionCatalog` | `PERMISSION_READ` | Chỉ catalog active | Dynamic hoàn tất |
 | `PUT /roles/{roleId}/permissions` → `RoleController.updateRolePermissions` | `ROLE_UPDATE` | AC-02: admin active duy nhất không tự mất quyền quản trị | Dynamic hoàn tất |
-| `GET /reports/summary` → `getSummary`; `/visits-timeline` → `getVisitsTimeline`; `/top-medicines` → `getTopMedicines`; `/doctor-visits` → `getDoctorVisits` | `REPORT_VIEW` | Khoảng ngày hợp lệ, tối đa 366 ngày | Dynamic hoàn tất |
-| `GET /reports/export` → `ReportsController.export` | `REPORT_EXPORT` | Khoảng ngày hợp lệ | Dynamic hoàn tất |
+| `GET /reports/summary` → `getSummary`; `/visits-timeline` → `getVisitsTimeline`; `/top-medicines` → `getTopMedicines`; `/doctor-visits` → `getDoctorVisits`; `/disease-patterns` → `getDiseasePatterns` | `REPORT_VIEW` | Khoảng ngày hợp lệ, tối đa 366 ngày; `getDoctorVisits` và `getDiseasePatterns` chỉ `MANAGER` | Dynamic hoàn tất |
+| `GET /reports/export` → `ReportsController.export` | `REPORT_EXPORT` | Khoảng ngày hợp lệ; `DISEASE_PATTERN_REPORT` chỉ `MANAGER` | Dynamic hoàn tất |
 | `POST /users` → `UserController.create` | `USER_CREATE` | Username/email/role hợp lệ | Chuyển từ role |
 | `GET /users`, `GET /users/{id}` → `getAll`, `getById` | `USER_READ` | Không có | Chuyển từ role |
 | `GET /users/doctors` → `getDoctors` | `USER_READ` | Chỉ trả user role doctor/active theo use case | Chuyển từ role |
@@ -50,11 +50,10 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `PATCH /queue-items/{itemId}/status`; `POST /queue-items/{itemId}/complete`; `POST /queue-items/{itemId}/skip`; `POST /queue-items/{itemId}/re-queue` | `QUEUE_UPDATE_STATUS` | Chỉ transition hợp lệ; bác sĩ phụ trách/role workflow theo `QueueOperationAuthorization` (re-queue cho ADMIN, RECEPTIONIST) | Permission + service context |
 | `POST /clinical-orders/visits/{visitId}` → `ClinicalOrderController.create` | `NEW: CLINICAL_ORDER_CREATE` | Giữ `ClinicalOrderAuthorizationService.requireWriteAccess`, visit/record state | New catalog + service context |
 | `GET /clinical-orders/visits/{visitId}` → `getByVisitId`; `GET /clinical-orders/pending` → `getPendingOrders` | `NEW: CLINICAL_ORDER_READ` | Giữ `requireReadAccess` | New catalog + service context |
-<<<<<<< HEAD
 | `POST /clinical-orders/{orderId}/cancel`; `POST /clinical-orders/items/{itemId}/cancel` | `NEW: CLINICAL_ORDER_CANCEL` | Bác sĩ phụ trách / người chỉ định / ADMIN; visit active, medical record open/draft, không có kết quả (QTN-13) | V65; seeded to `DOCTOR`, `ADMIN` |
-=======
-| `POST /clinical-orders/{orderId}/cancel`; `POST /clinical-orders/items/{itemId}/cancel` | `NEW: CLINICAL_ORDER_CANCEL` | Bác sĩ phụ trách / người chỉ định / ADMIN; visit active, medical record open/draft, không có kết quả (QTN-13) | V62; seeded to `DOCTOR`, `ADMIN` |
->>>>>>> a64e8cbd2fa1ba05ba93930d211339739c416f21
+| `POST /visits/{visitId}/handover` → `VisitController.handover` | `MEDICAL_RECORD_HANDOVER` | NCL-04-CN-014: Bác sĩ phụ trách lượt khám hoặc ADMIN; visit chưa hoàn thành/hủy; bệnh án chưa ký/khóa (TC-02); bác sĩ nhận phải là DOCTOR active khác bác sĩ hiện tại | V71; seeded to `DOCTOR`, `ADMIN` |
+| `GET /visits/{visitId}/handovers` → `VisitController.getHandovers` | `MEDICAL_RECORD_READ` | Bác sĩ phụ trách, bác sĩ ban đầu, các bác sĩ tham gia bàn giao trong lượt khám hoặc ADMIN | V71 |
+| `GET /visits/handover/doctors` → `VisitController.getHandoverDoctors` | `MEDICAL_RECORD_READ` | Lấy danh sách các bác sĩ đang hoạt động để phục vụ bàn giao | V71 |
 | `POST /clinical-order-items/{itemId}/results`; `PUT /clinical-results/{id}`; `POST /clinical-results/{id}/finalize` | `NEW: CLINICAL_RESULT_CREATE` / `NEW: CLINICAL_RESULT_UPDATE` / `NEW: CLINICAL_RESULT_FINALIZE` | Giữ write access, actor, finalize-state rule | New catalog + service context |
 | `GET /clinical-results/{id}`, `/visits/{visitId}`, `/{id}/history` | `NEW: CLINICAL_RESULT_READ` | Giữ clinical read access | New catalog + service context |
 | `POST /clinical-results/{resultId}/attachments`; `GET /clinical-result-attachments/{attachmentId}/download` | `NEW: CLINICAL_RESULT_ATTACHMENT_CREATE` / `NEW: CLINICAL_RESULT_ATTACHMENT_READ` | Giữ clinical read/write access, file validation | New catalog + service context |
@@ -80,6 +79,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `POST /backups`; `GET /backups`, `/{id}`, `/{id}/download`; `POST /backups/{id}/restore` | `NEW: BACKUP_CREATE` / `NEW: BACKUP_READ` / `NEW: BACKUP_RESTORE` | Giữ backup integrity/restore lock và audit; `BackupAuthorizer` phải thay role policy riêng | New catalog + service context |
 | `GET /security-alerts` → `SecurityAlertController.getSecurityAlerts` | `SECURITY_ALERT_VIEW` | ADMIN-only (seeded); paginated response enriched with username/fullName | Implemented — NCL-15 / QTN-25 (V37) |
 | `GET /reports/access-log/export` → `AccessLogReportController.export` | `ACCESS_LOG_REPORT_EXPORT` | ADMIN-only (seeded); khoảng ngày hợp lệ, tối đa 366 ngày; tổng hợp lượt truy cập bệnh án theo tài khoản | Implemented — NCL-15-CN-004 (V43) |
+| `GET /admin-operation-logs` → `AdminOperationLogController.getLogs` | `ADMIN_OPERATION_LOG_READ` | ADMIN, MANAGER (seeded); read-only view over `audit_logs` whitelist (USER/ROLE/MEDICINE/SERVICE_CATALOG/SERVICE_PRICE); filter by actor/resource/date, paginated | Implemented — NCL-09-CN-006 (V67) |
 | `POST /vital-signs` → `VitalSignController.record` | `VITAL_SIGN_CREATE` | Chỉ `DOCTOR` phụ trách lượt khám; lượt khám đang diễn ra (`IN_PROGRESS` hoặc `WAITING_FOR_RESULT`); bệnh án của lượt khám đã mở và chưa bị khóa (`ensureEditable`); audit QTN-02 | Implemented — NCL-04-CN-007 (V59) |
 | `PUT /vital-signs/{id}` → `VitalSignController.update` | `VITAL_SIGN_UPDATE` | Chỉ `DOCTOR` phụ trách lượt khám; lượt khám đang diễn ra; bệnh án liên kết chưa bị khóa (`ensureEditable`); tự động gắn kết lại `medicalRecordId` nếu đang null; audit QTN-02 | Implemented — NCL-04-CN-007 (V59) |
 | `GET /vital-signs`, `/{id}`, `/visits/{visitId}`, `/patients/{patientId}/history` → read methods | `VITAL_SIGN_READ` | Đọc dữ liệu sinh tồn; kiểm tra tồn tại bệnh nhân khi xem lịch sử để đảm bảo audit log toàn vẹn dữ liệu; audit view QTN-02 | Implemented — NCL-04-CN-007 (V59) |

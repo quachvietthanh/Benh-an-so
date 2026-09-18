@@ -44,6 +44,7 @@ const DoctorScheduleManagementPage = React.lazy(() => import('../pages/DoctorSch
 const DoctorWeeklySchedulePage = React.lazy(() => import('../pages/DoctorWeeklySchedulePage'))
 const AnonymizationPage = React.lazy(() => import('../pages/AnonymizationPage'))
 const PendingClinicalOrdersPage = React.lazy(() => import('../pages/PendingClinicalOrdersPage'))
+const AdminOperationLogPage = React.lazy(() => import('../pages/AdminOperationLogPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -161,6 +162,8 @@ function AppRoutes() {
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
         <Route path="system/anonymization" element={<PrivateRoute allowedPermissions={['SYSTEM_CONFIG_READ']} allowedRoles={['admin']}><LazyPage><AnonymizationPage /></LazyPage></PrivateRoute>} />
         <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
+        <Route path="admin/operation-logs" element={<PrivateRoute allowedPermissions={['ADMIN_OPERATION_LOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><AdminOperationLogPage /></LazyPage></PrivateRoute>} />
+        <Route path="admin-operation-logs" element={<Navigate to="/admin/operation-logs" replace />} />
 
 
       </Route>

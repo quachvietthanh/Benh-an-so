@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
@@ -42,6 +43,8 @@ class MedicineApplicationServiceTest {
     private final MedicineManagementAuthorizer authorizer =
             new MedicineManagementAuthorizer(currentUserPort);
     private final MedicineResultMapper resultMapper = new MedicineResultMapper();
+    private final AdminOperationAuditService adminOperationAuditService =
+            mock(AdminOperationAuditService.class);
 
     @BeforeEach
     void setUp() {
@@ -57,7 +60,9 @@ class MedicineApplicationServiceTest {
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
 
         var result = service.create(new CreateMedicineCommand(
@@ -90,7 +95,9 @@ class MedicineApplicationServiceTest {
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
 
         assertThrows(ValidationException.class, () -> service.create(
@@ -115,7 +122,9 @@ class MedicineApplicationServiceTest {
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
 
         assertThrows(ValidationException.class, () -> service.create(
@@ -203,7 +212,9 @@ class MedicineApplicationServiceTest {
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
 
         assertThrows(ValidationException.class, () -> service.update(
@@ -232,13 +243,17 @@ class MedicineApplicationServiceTest {
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
         var deactivateService = new DeactivateMedicineService(
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
 
         var activated = activateService.activate(medicineId);
@@ -254,7 +269,9 @@ class MedicineApplicationServiceTest {
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
 
         assertThrows(AccessDeniedException.class, () -> service.create(
@@ -279,7 +296,9 @@ class MedicineApplicationServiceTest {
                 medicineRepository,
                 authorizer,
                 resultMapper,
-                clockPort
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
         );
 
         assertThrows(AccessDeniedException.class, () -> service.create(

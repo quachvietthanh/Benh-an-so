@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +35,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.application.ucservice.auth.LoginService;
 import com.benhsoan.application.ucservice.auth.RefreshTokenService;
 import com.benhsoan.application.ucservice.role.RolePermissionsResultMapper;
@@ -46,12 +48,14 @@ import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
+import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
 import com.benhsoan.port.dto.command.role.UpdateRolePermissionsCommand;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
@@ -97,6 +101,7 @@ class ReportsSecurityIntegrationTest {
     @MockitoBean private GetOperationalTimelineUseCase getOperationalTimelineUseCase;
     @MockitoBean private GetTopMedicinesReportUseCase getTopMedicinesReportUseCase;
     @MockitoBean private GetDoctorVisitsReportUseCase getDoctorVisitsReportUseCase;
+    @MockitoBean private GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
@@ -248,6 +253,86 @@ class ReportsSecurityIntegrationTest {
     }
 
     @Test
+    void allowsManagerToReadDiseasePatternsReport() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(any(), any(), any())).thenReturn(new DiseasePatternReportResult(
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31),
+                null,
+                null,
+                0L,
+                Instant.parse("2026-08-31T08:00:00Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("MANAGER", "REPORT_VIEW")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forbidsDoctorFromReadingDiseasePatternsReport() throws Exception {
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+    }
+
+    @Test
+    void forbidsAdminFromReadingDiseasePatternsReport() throws Exception {
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("ADMIN", "USER_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+    }
+
+    @Test
+    void forbidsReceptionistFromReadingDiseasePatternsReportAndAuditsAccessDenied() throws Exception {
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("RECEPTIONIST", "PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getDiseasePatternReportUseCase);
+        verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    void returnsForbiddenWhenDiseasePatternsUseCaseDeniesAccess() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(any(), any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Only managers can view the disease pattern report."));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "REPORT_VIEW")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenWhenExportDiseasePatternUseCaseDeniesAccess() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Only managers can export the disease pattern report."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "DISEASE_PATTERN_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "REPORT_EXPORT")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void keepsOldTokenPermissionAndAppliesRevocationAfterRefresh() throws Exception {
         Instant now = Instant.parse("2026-08-19T08:00:00Z");
         UUID doctorRoleId = UUID.randomUUID();
@@ -317,7 +402,7 @@ class ReportsSecurityIntegrationTest {
         when(permissionRepository.findAllByCodes(Set.of("REPORT_VIEW")))
                 .thenReturn(List.of(Permission.fromCode("REPORT_VIEW")));
         new UpdateRolePermissionsService(roleRepository, permissionRepository, userRepository, currentUserPort,
-                auditLogRepository, new RolePermissionsResultMapper())
+                new AdminOperationAuditService(auditLogRepository), clockPort, new RolePermissionsResultMapper())
                 .updateRolePermissions(new UpdateRolePermissionsCommand(doctorRoleId, List.of("REPORT_VIEW")));
 
         mockMvc.perform(get("/reports/export").param("reportType", "OPERATIONAL_REPORT")

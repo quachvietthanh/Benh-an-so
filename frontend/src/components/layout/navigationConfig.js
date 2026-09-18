@@ -1,5 +1,6 @@
 import {
   AppstoreOutlined,
+  AuditOutlined,
   CalendarOutlined,
   CloudServerOutlined,
   CopyOutlined,
@@ -36,7 +37,7 @@ export const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/prescription-interconnections', '/system/anonymization'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization'] },
 ]
 
 export const getNavigationItems = (roles = [], permissions = []) => {
@@ -79,6 +80,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/system/diagnosis-catalog', label: 'Danh mục mã bệnh (ICD-10)', icon: ExperimentOutlined, check: () => hasPerm('DIAGNOSIS_CATALOG_MANAGE') || isAdmin },
     { key: '/system/medical-record-templates', label: 'Mẫu bệnh án chuyên khoa', icon: FileTextOutlined, check: () => hasPerm('MEDICAL_RECORD_TEMPLATE_MANAGE') || isAdmin },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => isAdmin },
+    { key: '/admin/operation-logs', label: 'Nhật ký thao tác', icon: AuditOutlined, check: () => !isDoctor && !isReceptionist && !isPharmacist && (isAdmin || isManager || hasPerm('ADMIN_OPERATION_LOG_READ')) },
     { key: '/prescription-interconnections', label: 'Liên thông đơn thuốc', icon: CloudServerOutlined, check: () => hasPerm('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin },
     { key: '/system/anonymization', label: 'Chế độ ẩn danh dữ liệu', icon: EyeInvisibleOutlined, check: () => hasPerm('SYSTEM_CONFIG_READ') || isAdmin },
   ]

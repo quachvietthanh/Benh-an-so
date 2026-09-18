@@ -5,11 +5,15 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.MedicineResult;
 import com.benhsoan.port.inbound.medicine.ActivateMedicineUseCase;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +31,10 @@ public class ActivateMedicineService implements ActivateMedicineUseCase {
 
     private final ClockPort clockPort;
 
+    private final AdminOperationAuditService adminOperationAuditService;
+
+    private final CurrentUserPort currentUserPort;
+
     @Override
     public MedicineResult activate(UUID medicineId) {
         requireMedicineId(medicineId);
@@ -40,6 +48,16 @@ public class ActivateMedicineService implements ActivateMedicineUseCase {
         if (!medicine.isActive()) {
             medicine.activate(clockPort.now());
             medicine = medicineRepository.save(medicine);
+
+            adminOperationAuditService.record(
+                    currentUserPort.getCurrentUserId(),
+                    ActionType.ACTIVATE,
+                    ResourceType.MEDICINE,
+                    medicine.getId(),
+                    AdminOperationAuditService.fields("medicineCode", medicine.getMedicineCode(), "active", false),
+                    AdminOperationAuditService.fields("medicineCode", medicine.getMedicineCode(), "active", true),
+                    clockPort.now()
+            );
         }
 
         return resultMapper.toResult(medicine);

@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -429,6 +430,37 @@ public class GlobalExceptionHandler {
                 "Dữ liệu không hợp lệ hoặc bị xung đột ràng buộc hệ thống.",
                 request.getRequestURI()
         );
+    }
+
+    @ExceptionHandler(TransactionSystemException.class)
+    public ResponseEntity<ApiErrorResponse> handleTransactionSystemException(
+            TransactionSystemException ex,
+            HttpServletRequest request
+    ) {
+        org.springframework.dao.DataIntegrityViolationException integrityViolation =
+                findCause(ex, org.springframework.dao.DataIntegrityViolationException.class);
+        if (integrityViolation != null) {
+            return handleDataIntegrityViolation(integrityViolation, request);
+        }
+
+        log.error("Transaction system failure for {}", request.getRequestURI(), ex);
+        return build(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "INTERNAL_SERVER_ERROR",
+                "Internal server error.",
+                request.getRequestURI()
+        );
+    }
+
+    private static <T extends Throwable> T findCause(Throwable throwable, Class<T> type) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return type.cast(current);
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private String extractIntegrityViolationMessage(Throwable throwable) {

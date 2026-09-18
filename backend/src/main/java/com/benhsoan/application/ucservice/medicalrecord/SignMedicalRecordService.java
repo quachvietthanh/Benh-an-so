@@ -68,7 +68,7 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
         Instant now = clockPort.now();
 
         if (!visit.getDoctorId().equals(userId)) {
-            accessAuditService.recordRecordAccess(
+            accessAuditService.recordRecordAccessInNewTransaction(
                     visit.getPatientId(),
                     visit.getId(),
                     record.getId(),
@@ -121,6 +121,9 @@ public class SignMedicalRecordService implements SignMedicalRecordUseCase {
         String auditDetail = pendingOrdersCount > 0
                 ? "Medical record signed (acknowledged pending paraclinical orders)"
                 : "Medical record signed";
+        if (visit.getInitialDoctorId() != null && !visit.getInitialDoctorId().equals(userId)) {
+            auditDetail += " (handed over from initial doctor: " + visit.getInitialDoctorId() + ")";
+        }
 
         accessAuditService.recordRecordAccess(
                 visit.getPatientId(),

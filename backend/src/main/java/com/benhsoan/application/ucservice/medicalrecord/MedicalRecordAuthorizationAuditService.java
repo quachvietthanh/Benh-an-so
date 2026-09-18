@@ -81,4 +81,21 @@ public class MedicalRecordAuthorizationAuditService {
                     actorId, resourceId, exception.getMessage());
         }
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordHandoverAccessDenied(UUID actorId, UUID visitId, String detail) {
+        try {
+            auditLogRepository.save(AuditLog.create(
+                    actorId,
+                    ActionType.ACCESS_DENIED,
+                    ResourceType.VISIT,
+                    visitId,
+                    detail,
+                    null
+            ));
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record handover access denied audit log for actor {} on visit {}: {}",
+                    actorId, visitId, exception.getMessage());
+        }
+    }
 }
