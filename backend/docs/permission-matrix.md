@@ -14,8 +14,8 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `GET /roles` → `RoleController.getSystemRoles` | `ROLE_READ` | Không có | Dynamic hoàn tất |
 | `GET /permissions` → `RoleController.getPermissionCatalog` | `PERMISSION_READ` | Chỉ catalog active | Dynamic hoàn tất |
 | `PUT /roles/{roleId}/permissions` → `RoleController.updateRolePermissions` | `ROLE_UPDATE` | AC-02: admin active duy nhất không tự mất quyền quản trị | Dynamic hoàn tất |
-| `GET /reports/summary` → `getSummary`; `/visits-timeline` → `getVisitsTimeline`; `/top-medicines` → `getTopMedicines`; `/doctor-visits` → `getDoctorVisits` | `REPORT_VIEW` | Khoảng ngày hợp lệ, tối đa 366 ngày | Dynamic hoàn tất |
-| `GET /reports/export` → `ReportsController.export` | `REPORT_EXPORT` | Khoảng ngày hợp lệ | Dynamic hoàn tất |
+| `GET /reports/summary` → `getSummary`; `/visits-timeline` → `getVisitsTimeline`; `/top-medicines` → `getTopMedicines`; `/doctor-visits` → `getDoctorVisits`; `/disease-patterns` → `getDiseasePatterns` | `REPORT_VIEW` | Khoảng ngày hợp lệ, tối đa 366 ngày; `getDoctorVisits` và `getDiseasePatterns` chỉ `MANAGER` | Dynamic hoàn tất |
+| `GET /reports/export` → `ReportsController.export` | `REPORT_EXPORT` | Khoảng ngày hợp lệ; `DISEASE_PATTERN_REPORT` chỉ `MANAGER` | Dynamic hoàn tất |
 | `POST /users` → `UserController.create` | `USER_CREATE` | Username/email/role hợp lệ | Chuyển từ role |
 | `GET /users`, `GET /users/{id}` → `getAll`, `getById` | `USER_READ` | Không có | Chuyển từ role |
 | `GET /users/doctors` → `getDoctors` | `USER_READ` | Chỉ trả user role doctor/active theo use case | Chuyển từ role |
