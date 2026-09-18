@@ -8,12 +8,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
-import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,7 +27,7 @@ public class GetDiseasePatternReportService implements GetDiseasePatternReportUs
     private final OperationalReportDataService operationalReportDataService;
     private final UserRepository userRepository;
     private final CurrentUserPort currentUserPort;
-    private final ClockPort clockPort;
+    private final OperationalReportAuditService operationalReportAuditService;
 
     @Override
     public DiseasePatternReportResult getDiseasePatternReport(LocalDate from, LocalDate to, UUID doctorId) {
@@ -40,22 +40,15 @@ public class GetDiseasePatternReportService implements GetDiseasePatternReportUs
             doctorName = doctor.getFullName();
         }
 
-        DiseasePatternReportResult result = operationalReportDataService.getDiseasePatterns(
-                from, to, doctorId, doctorName);
-
-        return new DiseasePatternReportResult(
-                result.from(),
-                result.to(),
-                result.doctorId(),
-                result.doctorName(),
-                result.totalDiagnoses(),
-                clockPort.now(),
-                result.items()
-        );
+        return operationalReportDataService.getDiseasePatterns(from, to, doctorId, doctorName);
     }
 
     private void ensureAuthorized() {
         if (!currentUserPort.hasRole(MANAGER_ROLE)) {
+            operationalReportAuditService.logAccessDenied(
+                    ReportType.DISEASE_PATTERN_REPORT,
+                    "Only managers can view the disease pattern report."
+            );
             throw new AccessDeniedException(
                     "Only managers can view the disease pattern report."
             );

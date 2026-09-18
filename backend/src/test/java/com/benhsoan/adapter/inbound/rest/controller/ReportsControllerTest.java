@@ -479,6 +479,27 @@ class ReportsControllerTest {
     }
 
     @Test
+    void allowsDiseasePatternsDateRangeOf366DaysInLeapYear() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31), null)).thenReturn(new DiseasePatternReportResult(
+                LocalDate.of(2024, 1, 1),
+                LocalDate.of(2024, 12, 31),
+                null,
+                null,
+                0L,
+                Instant.parse("2024-12-31T23:59:59Z"),
+                List.of()
+        ));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2024-01-01")
+                        .param("to", "2024-12-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("2024-01-01"))
+                .andExpect(jsonPath("$.to").value("2024-12-31"));
+    }
+
+    @Test
     void exportsCsv() throws Exception {
         when(exportOperationalReportUseCase.export(any(), any(), any())).thenReturn(new OperationalReportExportResult(
                 ReportType.OPERATIONAL_REPORT,

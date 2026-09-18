@@ -308,6 +308,31 @@ class ReportsSecurityIntegrationTest {
     }
 
     @Test
+    void returnsForbiddenWhenDiseasePatternsUseCaseDeniesAccess() throws Exception {
+        when(getDiseasePatternReportUseCase.getDiseasePatternReport(any(), any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Only managers can view the disease pattern report."));
+
+        mockMvc.perform(get("/reports/disease-patterns")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "REPORT_VIEW")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returnsForbiddenWhenExportDiseasePatternUseCaseDeniesAccess() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Only managers can export the disease pattern report."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "DISEASE_PATTERN_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("DOCTOR", "REPORT_EXPORT")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void keepsOldTokenPermissionAndAppliesRevocationAfterRefresh() throws Exception {
         Instant now = Instant.parse("2026-08-19T08:00:00Z");
         UUID doctorRoleId = UUID.randomUUID();

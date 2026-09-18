@@ -54,7 +54,7 @@ class GetOperationalTimelineServiceTest {
                 new DailyRevenueSummary(LocalDate.of(2026, 8, 3), new BigDecimal("-20000"))
         ));
 
-        var result = new GetOperationalTimelineService(new OperationalReportDataService(repository))
+        var result = new GetOperationalTimelineService(new OperationalReportDataService(repository, mock(com.benhsoan.port.outbound.time.ClockPort.class)))
                 .getTimeline(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
 
         assertEquals(3, result.items().size());

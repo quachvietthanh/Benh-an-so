@@ -5,11 +5,14 @@ import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.DiseasePatternItemResult;
 import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
@@ -18,10 +21,12 @@ import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class ExportOperationalReportService implements ExportOperationalReportUseCase {
 
@@ -30,23 +35,7 @@ public class ExportOperationalReportService implements ExportOperationalReportUs
     private final OperationalReportDataService operationalReportDataService;
     private final OperationalReportAuditService operationalReportAuditService;
     private final UserRepository userRepository;
-
-    public ExportOperationalReportService(
-            OperationalReportDataService operationalReportDataService,
-            OperationalReportAuditService operationalReportAuditService
-    ) {
-        this(operationalReportDataService, operationalReportAuditService, null);
-    }
-
-    public ExportOperationalReportService(
-            OperationalReportDataService operationalReportDataService,
-            OperationalReportAuditService operationalReportAuditService,
-            UserRepository userRepository
-    ) {
-        this.operationalReportDataService = operationalReportDataService;
-        this.operationalReportAuditService = operationalReportAuditService;
-        this.userRepository = userRepository;
-    }
+    private final CurrentUserPort currentUserPort;
 
     @Override
     public OperationalReportExportResult export(ReportType reportType, LocalDate from, LocalDate to) {
@@ -55,6 +44,22 @@ public class ExportOperationalReportService implements ExportOperationalReportUs
 
     @Override
     public OperationalReportExportResult export(ReportType reportType, LocalDate from, LocalDate to, UUID doctorId) {
+        String doctorName = null;
+        if (reportType == ReportType.DISEASE_PATTERN_REPORT) {
+            if (!currentUserPort.hasRole("MANAGER")) {
+                operationalReportAuditService.logAccessDenied(
+                        ReportType.DISEASE_PATTERN_REPORT,
+                        "Only managers can export the disease pattern report."
+                );
+                throw new AccessDeniedException("Only managers can export the disease pattern report.");
+            }
+            if (doctorId != null) {
+                User doctor = userRepository.findById(doctorId)
+                        .orElseThrow(() -> new ValidationException("Doctor not found."));
+                doctorName = doctor.getFullName();
+            }
+        }
+
         boolean hasData = doctorId == null
                 ? operationalReportDataService.hasReportData(reportType, from, to)
                 : operationalReportDataService.hasReportData(reportType, from, to, doctorId);
@@ -66,13 +71,6 @@ public class ExportOperationalReportService implements ExportOperationalReportUs
         byte[] content;
 
         if (reportType == ReportType.DISEASE_PATTERN_REPORT) {
-            String doctorName = null;
-            if (doctorId != null && userRepository != null) {
-                var doctor = userRepository.findById(doctorId).orElse(null);
-                if (doctor != null) {
-                    doctorName = doctor.getFullName();
-                }
-            }
             DiseasePatternReportResult reportResult = operationalReportDataService.getDiseasePatterns(from, to, doctorId, doctorName);
             fileName = buildDiseasePatternFileName(from, to, doctorId);
             content = buildDiseasePatternCsv(reportResult).getBytes(StandardCharsets.UTF_8);

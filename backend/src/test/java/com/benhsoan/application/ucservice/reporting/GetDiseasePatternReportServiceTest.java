@@ -18,12 +18,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.DiseasePatternItemResult;
 import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
-import com.benhsoan.port.outbound.time.ClockPort;
 
 class GetDiseasePatternReportServiceTest {
 
@@ -31,17 +31,17 @@ class GetDiseasePatternReportServiceTest {
             mock(OperationalReportDataService.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
-    private final ClockPort clockPort = mock(ClockPort.class);
+    private final OperationalReportAuditService operationalReportAuditService =
+            mock(OperationalReportAuditService.class);
 
     private final GetDiseasePatternReportService service =
             new GetDiseasePatternReportService(
-                    operationalReportDataService, userRepository, currentUserPort, clockPort);
+                    operationalReportDataService, userRepository, currentUserPort, operationalReportAuditService);
 
     @Test
     void delegatesAndStampsGeneratedAtWhenAuthorizedWithoutDoctor() {
         when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
         Instant generatedAt = Instant.parse("2026-08-31T08:00:00Z");
-        when(clockPort.now()).thenReturn(generatedAt);
 
         UUID catalogId = UUID.fromString("11111111-2222-3333-4444-555555555555");
         when(operationalReportDataService.getDiseasePatterns(any(), any(), any(), any()))
@@ -51,7 +51,7 @@ class GetDiseasePatternReportServiceTest {
                         null,
                         null,
                         50L,
-                        null,
+                        generatedAt,
                         List.of(new DiseasePatternItemResult(
                                 1,
                                 catalogId,
@@ -80,7 +80,6 @@ class GetDiseasePatternReportServiceTest {
     void delegatesAndResolvesDoctorNameWhenDoctorIdProvided() {
         when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
         Instant generatedAt = Instant.parse("2026-08-31T08:00:00Z");
-        when(clockPort.now()).thenReturn(generatedAt);
 
         UUID doctorId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2");
         User doctor = mock(User.class);
@@ -95,7 +94,7 @@ class GetDiseasePatternReportServiceTest {
                         doctorId,
                         "Dr. Nguyen Minh Anh",
                         20L,
-                        null,
+                        generatedAt,
                         List.of(new DiseasePatternItemResult(
                                 1,
                                 catalogId,
@@ -123,6 +122,11 @@ class GetDiseasePatternReportServiceTest {
 
         assertThrows(AccessDeniedException.class,
                 () -> service.getDiseasePatternReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null));
+
+        verify(operationalReportAuditService).logAccessDenied(
+                ReportType.DISEASE_PATTERN_REPORT,
+                "Only managers can view the disease pattern report."
+        );
     }
 
     @Test

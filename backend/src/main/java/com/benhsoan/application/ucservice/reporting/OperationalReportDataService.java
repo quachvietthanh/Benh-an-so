@@ -25,6 +25,7 @@ import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.DiseasePatternSummary;
 import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import java.util.UUID;
 
@@ -38,6 +39,7 @@ public class OperationalReportDataService {
     private static final String DEFAULT_CURRENCY = "VND";
 
     private final OperationalReportQueryRepository operationalReportQueryRepository;
+    private final ClockPort clockPort;
 
     public OperationalSummaryResult getSummary(LocalDate from, LocalDate to) {
         ReportingTimeRange range = ReportingTimeRange.of(from, to);
@@ -174,7 +176,7 @@ public class OperationalReportDataService {
                 doctorId,
                 doctorName,
                 totalDiagnoses,
-                null,
+                clockPort.now(),
                 items
         );
     }
