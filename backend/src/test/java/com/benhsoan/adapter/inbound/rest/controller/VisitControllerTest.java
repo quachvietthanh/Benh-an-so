@@ -52,6 +52,9 @@ class VisitControllerTest {
     @MockitoBean private HandoverPatientUseCase handoverPatientUseCase;
     @MockitoBean private GetVisitHandoversUseCase getVisitHandoversUseCase;
     @MockitoBean private GetDoctorsUseCase getDoctorsUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.visit.GetVisitSummaryUseCase getVisitSummaryUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.visit.ExportVisitSummaryUseCase exportVisitSummaryUseCase;
+
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -143,6 +146,57 @@ class VisitControllerTest {
                 .andExpect(jsonPath("$[0].username").doesNotExist())
                 .andExpect(jsonPath("$[0].email").doesNotExist())
                 .andExpect(jsonPath("$[0].phone").doesNotExist());
+    }
+
+    @Test
+    void returnsVisitSummary() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        var summaryResult = new com.benhsoan.port.dto.result.VisitSummaryResult(
+                visitId, "KB-2026-0001", Instant.parse("2026-08-20T08:00:00Z"),
+                new com.benhsoan.port.dto.result.VisitSummaryResult.ClinicInfo("Phòng khám A", "Địa chỉ A", "0900000000"),
+                new com.benhsoan.port.dto.result.VisitSummaryResult.PatientInfo(
+                        UUID.randomUUID(), "BN-01", "Nguyễn Văn A", LocalDate.of(1990, 1, 1),
+                        Gender.MALE, "0900000000", "012345678901"),
+                new com.benhsoan.port.dto.result.VisitSummaryResult.DoctorInfo(UUID.randomUUID(), "BS. B"),
+                new com.benhsoan.port.dto.result.VisitSummaryResult.MedicalRecordInfo(
+                        UUID.randomUUID(), com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus.SIGNED,
+                        Instant.parse("2026-08-20T08:30:00Z"), UUID.randomUUID(), "BS. B"),
+                java.util.List.of(new com.benhsoan.port.dto.result.VisitSummaryResult.DiagnosisItem("J00", "Viêm mũi họng", true)),
+                java.util.List.of(new com.benhsoan.port.dto.result.VisitSummaryResult.ClinicalOrderItemInfo(
+                        "ORD-01", "XQ01", "X-quang ngực", "Thẳng", "COMPLETED")),
+                "Nghỉ ngơi", "Uống thuốc", LocalDate.of(2026, 8, 27),
+                java.util.List.of()
+        );
+
+        when(getVisitSummaryUseCase.getSummary(visitId)).thenReturn(summaryResult);
+
+        mockMvc.perform(get("/visits/{visitId}/summary", visitId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visitId").value(visitId.toString()))
+                .andExpect(jsonPath("$.visitCode").value("KB-2026-0001"))
+                .andExpect(jsonPath("$.patient.fullName").value("Nguyễn Văn A"))
+                .andExpect(jsonPath("$.clinicalOrders[0].orderCode").value("ORD-01"))
+                .andExpect(jsonPath("$.clinicalOrders[0].serviceCode").value("XQ01"))
+                .andExpect(jsonPath("$.doctorInstructions").value("Nghỉ ngơi"))
+                .andExpect(jsonPath("$.revisitDate").value("2026-08-27"));
+    }
+
+    @Test
+    void printsVisitSummaryPdf() throws Exception {
+        UUID visitId = UUID.randomUUID();
+        byte[] fakePdf = new byte[]{1, 2, 3};
+        var printResult = new com.benhsoan.port.dto.result.VisitSummaryPrintResult(
+                "phieu-tom-tat-KB-001.pdf", "application/pdf", fakePdf
+        );
+
+        when(exportVisitSummaryUseCase.export(visitId)).thenReturn(printResult);
+
+        mockMvc.perform(get("/visits/{visitId}/summary/print", visitId))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string(
+                        "Content-Disposition", "attachment; filename=\"phieu-tom-tat-KB-001.pdf\""))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentTypeCompatibleWith(org.springframework.http.MediaType.APPLICATION_PDF))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(fakePdf));
     }
 
     private VisitEncounterResult encounter(UUID visitId) {

@@ -1,5 +1,5 @@
 -- =====================================================
--- V69__create_visit_handover_tables.sql
+-- V71__create_visit_handover_tables.sql
 -- Add initial_doctor_id to visits table,
 -- create visit_handovers table for patient handover history,
 -- and seed MEDICAL_RECORD_HANDOVER permission (NCL-04-CN-014 / QTN-17, QTN-11).
