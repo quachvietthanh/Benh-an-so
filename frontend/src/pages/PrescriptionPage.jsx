@@ -898,20 +898,17 @@ function PrescriptionPage() {
       const liveStockValidation = validatePrescriptionStock(items, normalizedFreshMeds)
       if (!liveStockValidation.isValid) {
         Modal.error({
-          title: 'Không thể tạo/lưu đơn thuốc do tồn kho thay đổi',
+          title: 'Không thể tạo/lưu đơn thuốc',
           content: (
             <div>
               <Paragraph style={{ color: '#dc2626', marginBottom: 8 }}>
-                Dữ liệu tồn kho khả dụng mới nhất của hệ thống không đủ cho đơn thuốc này:
+                Có lỗi về thông tin thuốc trong đơn:
               </Paragraph>
               <ul style={{ paddingLeft: 20, color: '#b91c1c', marginBottom: 8 }}>
                 {liveStockValidation.errors.map((err, idx) => (
                   <li key={idx}><strong>{err}</strong></li>
                 ))}
               </ul>
-              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                Vui lòng chọn lại thuốc khác hoặc giảm số lượng kê phù hợp với tồn khả dụng hiện tại.
-              </Paragraph>
             </div>
           ),
         })
@@ -2412,15 +2409,35 @@ function PrescriptionPage() {
                               const avail = getAvailableStock(selectedMed)
                               if (avail <= 0) {
                                 return (
-                                  <Tag color="red" icon={<CloseCircleOutlined />} style={{ borderRadius: 12, margin: 0 }}>
-                                    HẾT HÀNG (Tồn khả dụng: 0 {unit})
+                                  <Tag
+                                    color="warning"
+                                    icon={<WarningOutlined />}
+                                    style={{
+                                      borderRadius: 12,
+                                      margin: 0,
+                                      backgroundColor: '#FEF3C7',
+                                      color: '#92400E',
+                                      borderColor: '#FCD34D',
+                                    }}
+                                  >
+                                    Hết hàng — Dược sĩ sẽ cấp bù sau (Tồn: 0 {unit})
                                   </Tag>
                                 )
                               }
                               if (item.quantity > avail) {
                                 return (
-                                  <Tag color="volcano" icon={<WarningOutlined />} style={{ borderRadius: 12, margin: 0 }}>
-                                    Vượt quá tồn kho (Còn {avail} {unit})
+                                  <Tag
+                                    color="orange"
+                                    icon={<WarningOutlined />}
+                                    style={{
+                                      borderRadius: 12,
+                                      margin: 0,
+                                      backgroundColor: '#FFF7ED',
+                                      color: '#C2410C',
+                                      borderColor: '#FDBA74',
+                                    }}
+                                  >
+                                    Tồn kho không đủ ({avail}/{item.quantity} {unit}) — Sẽ cấp phát một phần
                                   </Tag>
                                 )
                               }
@@ -2479,9 +2496,9 @@ function PrescriptionPage() {
                                     : ''
                                   return {
                                     value: medicine.id,
-                                    disabled: isOut,
+                                    disabled: false,
                                     label: isOut
-                                      ? `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Hết hàng`
+                                      ? `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— [Hết hàng — cấp bù sau]`
                                       : `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
                                   }
                                 })}
@@ -2728,10 +2745,17 @@ function PrescriptionPage() {
                             </div>
                             {selectedMed && (() => {
                               const avail = getAvailableStock(selectedMed)
-                              if (avail > 0 && item.quantity > avail) {
+                              if (avail <= 0) {
                                 return (
-                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-                                    Không đủ tồn kho. Tối đa có thể kê: {avail} {unit}.
+                                  <div style={{ color: '#d97706', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                    Thuốc hiện hết hàng (tồn 0 {unit}) — dược sĩ sẽ cấp bù sau khi có hàng.
+                                  </div>
+                                )
+                              }
+                              if (item.quantity > avail) {
+                                return (
+                                  <div style={{ color: '#d97706', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                    Tồn kho hiện tại chỉ còn {avail} {unit} — dược sĩ có thể cần cấp phát một phần.
                                   </div>
                                 )
                               }
@@ -2787,22 +2811,32 @@ function PrescriptionPage() {
                           if (avail <= 0) {
                             return (
                               <Alert
-                                type="error"
+                                type="warning"
                                 showIcon
-                                icon={<StopOutlined />}
-                                message={`Thuốc "${selectedMed.medicineName}" hiện đã HẾT HÀNG (tồn khả dụng = 0). Vui lòng đổi sang thuốc khác.`}
-                                style={{ marginTop: 12, borderRadius: 6 }}
+                                icon={<WarningOutlined />}
+                                message={`Thuốc "${selectedMed.medicineName}" hiện đã hết hàng (tồn khả dụng = 0). Dược sĩ sẽ cấp bù sau khi có hàng.`}
+                                style={{
+                                  marginTop: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: '#FEF3C7',
+                                  borderColor: '#FCD34D',
+                                }}
                               />
                             )
                           }
                           if (item.quantity > avail) {
                             return (
                               <Alert
-                                type="error"
+                                type="warning"
                                 showIcon
                                 icon={<WarningOutlined />}
-                                message={`Số lượng kê (${item.quantity} ${unit}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${unit}).`}
-                                style={{ marginTop: 12, borderRadius: 6 }}
+                                message={`Số lượng kê (${item.quantity} ${unit}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${unit}). Dược sĩ có thể thực hiện cấp phát một phần.`}
+                                style={{
+                                  marginTop: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: '#FFF7ED',
+                                  borderColor: '#FDBA74',
+                                }}
                               />
                             )
                           }
@@ -2816,16 +2850,7 @@ function PrescriptionPage() {
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
-                      disabled={checkingInteractions || saving || items.some((i) => {
-                        if (!i.medicineId) return false
-                        const med = selectedMedicineMap.get(String(i.medicineId))
-                        if (!med) return false
-                        const avail = getAvailableStock(med)
-                        const totalQty = items
-                          .filter((x) => String(x.medicineId) === String(i.medicineId))
-                          .reduce((sum, x) => sum + Number(x.quantity || 0), 0)
-                        return avail <= 0 || Number(i.quantity || 0) > avail || totalQty > avail
-                      })}
+                      disabled={checkingInteractions || saving}
                       onClick={() => {
                         setConfirmedOverrides([])
                         setItems((current) => [...current, createEmptyItem(false)])
