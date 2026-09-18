@@ -45,6 +45,7 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
   const [submitting, setSubmitting] = useState(false)
   const [serverShortages, setServerShortages] = useState([])
   const [errorMessage, setErrorMessage] = useState('')
+  const [stocks, setStocks] = useState([])
 
   useEffect(() => {
     if (!open || !prescription) {
@@ -52,8 +53,19 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
       setQuantities({})
       setServerShortages([])
       setErrorMessage('')
+      setStocks([])
       return
     }
+
+    pharmacyApi
+      .stocks({ active: true })
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : (res?.data?.content || [])
+        setStocks(list)
+      })
+      .catch((err) => {
+        console.warn('[PartialDispenseModal] Không tải được dữ liệu tồn kho:', err)
+      })
 
     const rawItems = prescription.items || []
     if (rawItems.length > 0) {
@@ -93,6 +105,17 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
   const items = useMemo(() => {
     return prescriptionData?.items || []
   }, [prescriptionData])
+
+  const stockByMedicineId = useMemo(() => {
+    const map = new Map()
+    stocks.forEach((s) => {
+      const id = s?.medicineId || s?.id
+      if (id) {
+        map.set(String(id), s)
+      }
+    })
+    return map
+  }, [stocks])
 
   const handleQuantityChange = (itemId, val, maxQuantity) => {
     let nextVal = val
@@ -254,15 +277,23 @@ function PartialDispenseModal({ open, onClose, prescription, onSuccess }) {
       },
     },
     {
-      title: 'Còn cấp',
-      key: 'remainingQuantity',
-      width: 95,
+      title: 'Số lượng tồn trong kho',
+      key: 'stockQuantity',
+      width: 125,
       align: 'center',
       render: (_, item) => {
-        const remaining = getRemainingQuantity(item)
+        const medId = item.medicineId || item.medicine?.id || item.id
+        const stock = stockByMedicineId.get(String(medId))
+        const stockQty =
+          stock?.eligibleStockQuantity ??
+          stock?.stockQuantity ??
+          item.stockQuantity ??
+          item.availableStock ??
+          item.availableQuantity ??
+          0
         return (
-          <Tag color={remaining > 0 ? 'orange' : 'green'} style={{ fontWeight: 600 }}>
-            {remaining} {item.unit || ''}
+          <Tag color={stockQty > 0 ? 'green' : 'orange'} style={{ fontWeight: 600 }}>
+            {stockQty} {item.unit || ''}
           </Tag>
         )
       },
