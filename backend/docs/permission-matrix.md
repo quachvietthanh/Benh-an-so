@@ -50,11 +50,10 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `PATCH /queue-items/{itemId}/status`; `POST /queue-items/{itemId}/complete`; `POST /queue-items/{itemId}/skip`; `POST /queue-items/{itemId}/re-queue` | `QUEUE_UPDATE_STATUS` | Chỉ transition hợp lệ; bác sĩ phụ trách/role workflow theo `QueueOperationAuthorization` (re-queue cho ADMIN, RECEPTIONIST) | Permission + service context |
 | `POST /clinical-orders/visits/{visitId}` → `ClinicalOrderController.create` | `NEW: CLINICAL_ORDER_CREATE` | Giữ `ClinicalOrderAuthorizationService.requireWriteAccess`, visit/record state | New catalog + service context |
 | `GET /clinical-orders/visits/{visitId}` → `getByVisitId`; `GET /clinical-orders/pending` → `getPendingOrders` | `NEW: CLINICAL_ORDER_READ` | Giữ `requireReadAccess` | New catalog + service context |
-<<<<<<< HEAD
 | `POST /clinical-orders/{orderId}/cancel`; `POST /clinical-orders/items/{itemId}/cancel` | `NEW: CLINICAL_ORDER_CANCEL` | Bác sĩ phụ trách / người chỉ định / ADMIN; visit active, medical record open/draft, không có kết quả (QTN-13) | V65; seeded to `DOCTOR`, `ADMIN` |
-=======
-| `POST /clinical-orders/{orderId}/cancel`; `POST /clinical-orders/items/{itemId}/cancel` | `NEW: CLINICAL_ORDER_CANCEL` | Bác sĩ phụ trách / người chỉ định / ADMIN; visit active, medical record open/draft, không có kết quả (QTN-13) | V62; seeded to `DOCTOR`, `ADMIN` |
->>>>>>> a64e8cbd2fa1ba05ba93930d211339739c416f21
+| `POST /visits/{visitId}/handover` → `VisitController.handover` | `MEDICAL_RECORD_HANDOVER` | NCL-04-CN-014: Bác sĩ phụ trách lượt khám hoặc ADMIN; visit chưa hoàn thành/hủy; bệnh án chưa ký/khóa (TC-02); bác sĩ nhận phải là DOCTOR active khác bác sĩ hiện tại | V71; seeded to `DOCTOR`, `ADMIN` |
+| `GET /visits/{visitId}/handovers` → `VisitController.getHandovers` | `MEDICAL_RECORD_READ` | Bác sĩ phụ trách, bác sĩ ban đầu, các bác sĩ tham gia bàn giao trong lượt khám hoặc ADMIN | V71 |
+| `GET /visits/handover/doctors` → `VisitController.getHandoverDoctors` | `MEDICAL_RECORD_READ` | Lấy danh sách các bác sĩ đang hoạt động để phục vụ bàn giao | V71 |
 | `POST /clinical-order-items/{itemId}/results`; `PUT /clinical-results/{id}`; `POST /clinical-results/{id}/finalize` | `NEW: CLINICAL_RESULT_CREATE` / `NEW: CLINICAL_RESULT_UPDATE` / `NEW: CLINICAL_RESULT_FINALIZE` | Giữ write access, actor, finalize-state rule | New catalog + service context |
 | `GET /clinical-results/{id}`, `/visits/{visitId}`, `/{id}/history` | `NEW: CLINICAL_RESULT_READ` | Giữ clinical read access | New catalog + service context |
 | `POST /clinical-results/{resultId}/attachments`; `GET /clinical-result-attachments/{attachmentId}/download` | `NEW: CLINICAL_RESULT_ATTACHMENT_CREATE` / `NEW: CLINICAL_RESULT_ATTACHMENT_READ` | Giữ clinical read/write access, file validation | New catalog + service context |

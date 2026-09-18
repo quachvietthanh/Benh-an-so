@@ -73,6 +73,7 @@ final class DomainExceptionHttpStatusMapper {
                     INVALID_BACKUP_STATUS,
                     INVALID_DOCTOR_ROLE,
                     INVALID_OLD_PASSWORD,
+                    INVALID_VERIFICATION_CODE,
                     MEDICAL_RECORD_MISSING_AUTHORIZATION,
                     MEDICAL_RECORD_MISSING_DIAGNOSIS,
                     MEDICAL_RECORD_NOT_LOCKED,
@@ -85,6 +86,7 @@ final class DomainExceptionHttpStatusMapper {
                     SAME_PASSWORD_NOT_ALLOWED,
                     SELF_DRUG_INTERACTION,
                     VALIDATION_FAILED,
+                    VERIFICATION_CODE_EXPIRED,
                     WEAK_PASSWORD -> HttpStatus.BAD_REQUEST;
             case ALLERGY_CONFIRMATION_REQUIRED,
                     APPOINTMENT_ALREADY_CANCELLED,
@@ -157,7 +159,8 @@ final class DomainExceptionHttpStatusMapper {
                     VISIT_INVALID_STATUS -> HttpStatus.CONFLICT;
             case BACKUP_EXECUTION_FAILED -> HttpStatus.INTERNAL_SERVER_ERROR;
             case REPORT_DATA_EMPTY -> HttpStatus.UNPROCESSABLE_ENTITY;
-            case TOO_MANY_LOGIN_ATTEMPTS -> HttpStatus.TOO_MANY_REQUESTS;
+            case TOO_MANY_LOGIN_ATTEMPTS,
+                    VERIFICATION_CODE_COOLDOWN -> HttpStatus.TOO_MANY_REQUESTS;
             default -> HttpStatus.BAD_REQUEST;
         };
     }
