@@ -23,9 +23,11 @@ import com.benhsoan.port.outbound.time.ClockPort;
 /**
  * Persistent login-attempt tracking with atomic {@code blocked_until} expiry
  * (NCL-14-CN-002 TC-02).
- * Writes run in a REQUIRES_NEW transaction so failed-attempt increments survive
- * the rollback of the
- * login use-case when credentials are rejected.
+ * Failed-attempt increments and login-success cleanup run in a REQUIRES_NEW
+ * transaction so they survive the rollback of the login use-case when
+ * credentials are rejected. {@link #unlock(String)} intentionally runs in the
+ * caller's transaction (default propagation) so an administrative unlock and
+ * its audit record commit or roll back atomically (QTN-31).
  */
 @Component
 public class LoginAttemptAdapter implements LoginAttemptPort {
@@ -75,7 +77,7 @@ public class LoginAttemptAdapter implements LoginAttemptPort {
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void unlock(String identifier) {
         repository.deleteById(identifier);
     }
