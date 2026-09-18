@@ -73,7 +73,7 @@ public class MedicalRecordDetailRestMapper {
 
     private MedicalRecordDiagnosisResponse toDiagnosisResponse(MedicalRecordDiagnosisResult d) {
         return new MedicalRecordDiagnosisResponse(
-                d.id(), d.medicalRecordId(), d.diagnosisCode(), d.diagnosisName(),
+                d.id(), d.medicalRecordId(), d.diagnosisCatalogId(), d.diagnosisCode(), d.diagnosisName(),
                 d.diagnosisType(), d.note(), d.diagnosedBy(), d.diagnosedAt());
     }
 

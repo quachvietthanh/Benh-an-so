@@ -78,8 +78,10 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
 
         assertEquals(2, result.size());
         assertEquals(DiagnosisType.PRIMARY, result.getFirst().diagnosisType());
+        assertEquals(primaryCatalogId, result.getFirst().diagnosisCatalogId());
         assertEquals("J06.9", result.getFirst().diagnosisCode());
         assertEquals("Upper respiratory infection", result.getFirst().diagnosisName());
+        assertEquals(secondaryCatalogId, result.get(1).diagnosisCatalogId());
         assertEquals("R50.9", result.get(1).diagnosisCode());
         assertEquals("Fever", result.get(1).diagnosisName());
         assertEquals(actorId, result.getFirst().diagnosedBy());
@@ -107,6 +109,79 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
         assertThrows(ValidationException.class, () -> service.replace(record.getId(),
                 command(catalogId, catalogId)));
 
+        verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
+    }
+
+    @Test
+    void rejectsDuplicateFreeTextSecondaryDiagnoses() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID primaryCatalogId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
+        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
+                VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
+        when(authorizationService.requireDiagnosisWriteAccess(any())).thenReturn(actorId);
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+
+        var command = new ReplaceMedicalRecordDiagnosesCommand(
+                new ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand(primaryCatalogId, null),
+                List.of(
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(null, "Asthma allergy", null),
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(null, "  asthma allergy  ", null)
+                )
+        );
+
+        assertThrows(ValidationException.class, () -> service.replace(record.getId(), command));
+        verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
+    }
+
+    @Test
+    void rejectsSecondaryFreeTextMatchingPrimaryDiagnosisName() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID primaryCatalogId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
+        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
+                VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
+        DiagnosisCatalog primary = DiagnosisCatalog.restore(primaryCatalogId, "J06.9", "Upper respiratory infection", "Respiratory", null, true, now, null);
+        when(authorizationService.requireDiagnosisWriteAccess(any())).thenReturn(actorId);
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(clockPort.now()).thenReturn(now);
+        when(diagnosisCatalogRepository.findById(primaryCatalogId)).thenReturn(Optional.of(primary));
+
+        var command = new ReplaceMedicalRecordDiagnosesCommand(
+                new ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand(primaryCatalogId, null),
+                List.of(
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(null, "Upper respiratory infection", null)
+                )
+        );
+
+        assertThrows(ValidationException.class, () -> service.replace(record.getId(), command));
+        verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
+    }
+
+    @Test
+    void rejectsMissingPrimaryDiagnosisAccordingToQtn22() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
+        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
+                VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
+        when(authorizationService.requireDiagnosisWriteAccess(any())).thenReturn(actorId);
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+
+        var command = new ReplaceMedicalRecordDiagnosesCommand(
+                null,
+                List.of(new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(UUID.randomUUID(), null, null))
+        );
+
+        assertThrows(ValidationException.class, () -> service.replace(record.getId(), command));
         verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
     }
 
@@ -284,6 +359,102 @@ class ReplaceMedicalRecordDiagnosesServiceTest {
         MedicalRecordDiagnosis freeTextDiagnosis = diagnosesCaptor.getValue().get(1);
         assertNull(freeTextDiagnosis.getDiagnosisCatalogId());
         assertNull(freeTextDiagnosis.getDiagnosisCode());
+    }
+
+    @Test
+    void rejectsSecondaryFreeTextMatchingSecondaryCatalogNameAccordingToNcl13Cn006Tc02() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID primaryCatalogId = UUID.randomUUID();
+        UUID secondaryCatalogId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
+        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
+                VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
+        DiagnosisCatalog primary = DiagnosisCatalog.restore(primaryCatalogId, "I10", "Essential hypertension", "Circulatory", null, true, now, null);
+        DiagnosisCatalog secondary = DiagnosisCatalog.restore(secondaryCatalogId, "E11", "Type 2 diabetes mellitus", "Endocrine", null, true, now, null);
+
+        when(authorizationService.requireDiagnosisWriteAccess(any())).thenReturn(actorId);
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(clockPort.now()).thenReturn(now);
+        when(diagnosisCatalogRepository.findById(primaryCatalogId)).thenReturn(Optional.of(primary));
+        when(diagnosisCatalogRepository.findById(secondaryCatalogId)).thenReturn(Optional.of(secondary));
+
+        var command = new ReplaceMedicalRecordDiagnosesCommand(
+                new ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand(primaryCatalogId, null),
+                List.of(
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(secondaryCatalogId, null, null),
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(null, "Type 2 diabetes mellitus", null)
+                )
+        );
+
+        assertThrows(ValidationException.class, () -> service.replace(record.getId(), command));
+        verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
+    }
+
+    @Test
+    void rejectsSecondaryFreeTextMatchingSecondaryCatalogCodeAccordingToNcl13Cn006Tc02() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID primaryCatalogId = UUID.randomUUID();
+        UUID secondaryCatalogId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
+        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
+                VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
+        DiagnosisCatalog primary = DiagnosisCatalog.restore(primaryCatalogId, "I10", "Essential hypertension", "Circulatory", null, true, now, null);
+        DiagnosisCatalog secondary = DiagnosisCatalog.restore(secondaryCatalogId, "E11", "Type 2 diabetes mellitus", "Endocrine", null, true, now, null);
+
+        when(authorizationService.requireDiagnosisWriteAccess(any())).thenReturn(actorId);
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(clockPort.now()).thenReturn(now);
+        when(diagnosisCatalogRepository.findById(primaryCatalogId)).thenReturn(Optional.of(primary));
+        when(diagnosisCatalogRepository.findById(secondaryCatalogId)).thenReturn(Optional.of(secondary));
+
+        var command = new ReplaceMedicalRecordDiagnosesCommand(
+                new ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand(primaryCatalogId, null),
+                List.of(
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(secondaryCatalogId, null, null),
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(null, "e11", null)
+                )
+        );
+
+        assertThrows(ValidationException.class, () -> service.replace(record.getId(), command));
+        verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
+    }
+
+    @Test
+    void rejectsSecondaryFreeTextMatchingSecondaryCatalogRegardlessOfOrder() {
+        UUID actorId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID primaryCatalogId = UUID.randomUUID();
+        UUID secondaryCatalogId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-20T02:00:00Z");
+        MedicalRecord record = MedicalRecord.create(visitId, null, null, null, null, null, null, null, null, actorId, now);
+        Visit visit = Visit.restore(visitId, "VIS-001", UUID.randomUUID(), UUID.randomUUID(), null, null, VisitType.WALK_IN,
+                VisitStatus.IN_PROGRESS, now, now, null, "Exam", null, actorId, now, null);
+        DiagnosisCatalog primary = DiagnosisCatalog.restore(primaryCatalogId, "I10", "Essential hypertension", "Circulatory", null, true, now, null);
+        DiagnosisCatalog secondary = DiagnosisCatalog.restore(secondaryCatalogId, "E11", "Type 2 diabetes mellitus", "Endocrine", null, true, now, null);
+
+        when(authorizationService.requireDiagnosisWriteAccess(any())).thenReturn(actorId);
+        when(medicalRecordRepository.findById(record.getId())).thenReturn(Optional.of(record));
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+        when(clockPort.now()).thenReturn(now);
+        when(diagnosisCatalogRepository.findById(primaryCatalogId)).thenReturn(Optional.of(primary));
+        when(diagnosisCatalogRepository.findById(secondaryCatalogId)).thenReturn(Optional.of(secondary));
+
+        var command = new ReplaceMedicalRecordDiagnosesCommand(
+                new ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand(primaryCatalogId, null),
+                List.of(
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(null, "Type 2 diabetes mellitus", null),
+                        new ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand(secondaryCatalogId, null, null)
+                )
+        );
+
+        assertThrows(ValidationException.class, () -> service.replace(record.getId(), command));
+        verify(medicalRecordDiagnosisRepository, never()).replaceForMedicalRecord(any(), any());
     }
 
     private ReplaceMedicalRecordDiagnosesCommand command(UUID primaryCatalogId, UUID secondaryCatalogId) {

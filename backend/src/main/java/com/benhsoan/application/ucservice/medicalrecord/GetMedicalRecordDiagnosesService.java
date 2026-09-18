@@ -33,13 +33,23 @@ public class GetMedicalRecordDiagnosesService implements GetMedicalRecordDiagnos
 
     @Override
     public List<MedicalRecordDiagnosisResult> getByMedicalRecordId(UUID medicalRecordId) {
+        return getByMedicalRecordId(medicalRecordId, null);
+    }
+
+    @Override
+    public List<MedicalRecordDiagnosisResult> getByMedicalRecordId(UUID medicalRecordId, com.benhsoan.domain.medicalrecord.enums.DiagnosisType type) {
         UUID actorId = authorizationService.requireReadAccess();
         MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
         var visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
         accessAuditService.recordRecordView(visit.getPatientId(), visit.getId(), record.getId(), actorId, clockPort.now());
-        return medicalRecordDiagnosisRepository.findByMedicalRecordId(record.getId()).stream()
+
+        List<com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis> diagnoses = (type != null)
+                ? medicalRecordDiagnosisRepository.findByMedicalRecordIdAndDiagnosisType(record.getId(), type)
+                : medicalRecordDiagnosisRepository.findByMedicalRecordId(record.getId());
+
+        return diagnoses.stream()
                 .map(resultMapper::toResult)
                 .toList();
     }

@@ -64,7 +64,7 @@ public class MedicalRecordResultMapper {
             User doctor, List<MedicalRecordDiagnosis> diagnoses, AppliedMedicalRecordTemplateResult appliedTemplate) {
         List<MedicalRecordDiagnosisResult> diagnosisResults = diagnoses.stream()
                 .map(d -> new MedicalRecordDiagnosisResult(
-                        d.getId(), d.getMedicalRecordId(), d.getDiagnosisCode(), d.getDiagnosisName(),
+                        d.getId(), d.getMedicalRecordId(), d.getDiagnosisCatalogId(), d.getDiagnosisCode(), d.getDiagnosisName(),
                         d.getDiagnosisType(), d.getNote(), d.getDiagnosedBy(), d.getDiagnosedAt()))
                 .toList();
 

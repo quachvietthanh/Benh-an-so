@@ -40,6 +40,7 @@ import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDia
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordTemplateSelectionResponse;
 import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordVersionHistoryResponse;
+import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.inbound.medicalrecord.AmendMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.ApplyMedicalRecordTemplateUseCase;
@@ -129,8 +130,10 @@ public class MedicalRecordController {
 
     @GetMapping("/{medicalRecordId}/diagnoses")
     @RequirePermission("MEDICAL_RECORD_READ")
-    public List<MedicalRecordDiagnosisResponse> getDiagnoses(@PathVariable UUID medicalRecordId) {
-        return diagnosisMapper.toResponses(getMedicalRecordDiagnosesUseCase.getByMedicalRecordId(medicalRecordId));
+    public List<MedicalRecordDiagnosisResponse> getDiagnoses(
+            @PathVariable UUID medicalRecordId,
+            @RequestParam(required = false) DiagnosisType type) {
+        return diagnosisMapper.toResponses(getMedicalRecordDiagnosesUseCase.getByMedicalRecordId(medicalRecordId, type));
     }
 
     @GetMapping("/visits/{visitId}")

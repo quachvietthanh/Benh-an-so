@@ -38,7 +38,9 @@ public class MedicalRecordDiagnosisRestMapper {
     }
 
     private MedicalRecordDiagnosisResponse toResponse(MedicalRecordDiagnosisResult result) {
-        return new MedicalRecordDiagnosisResponse(result.id(), result.medicalRecordId(), result.diagnosisCode(),
+        return new MedicalRecordDiagnosisResponse(result.id(), result.medicalRecordId(),
+                result.diagnosisCatalogId(),
+                result.diagnosisCode(),
                 result.diagnosisName(), result.diagnosisType(), result.note(), result.diagnosedBy(), result.diagnosedAt());
     }
 }
