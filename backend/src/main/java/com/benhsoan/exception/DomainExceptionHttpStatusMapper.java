@@ -88,6 +88,7 @@ final class DomainExceptionHttpStatusMapper {
                     SELF_DRUG_INTERACTION,
                     VALIDATION_FAILED,
                     VERIFICATION_CODE_EXPIRED,
+                    CANNOT_DEACTIVATE_DEFAULT_SPECIALTY,
                     WEAK_PASSWORD -> HttpStatus.BAD_REQUEST;
             case ALLERGY_CONFIRMATION_REQUIRED,
                     APPOINTMENT_ALREADY_CANCELLED,
@@ -136,6 +137,9 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_TEMPLATE_LAST_ACTIVE,
                     MEDICAL_RECORD_TEMPLATE_NAME_DUPLICATE,
                     MEDICAL_RECORD_TEMPLATE_SPECIALTY_MISMATCH,
+                    SPECIALTY_CODE_ALREADY_EXISTS,
+                    SPECIALTY_IN_USE,
+                    SPECIALTY_NAME_ALREADY_EXISTS,
                     MEDICINE_CODE_ALREADY_EXISTS,
                     MEDICINE_INACTIVE,
                     PATIENT_ALREADY_EXISTS,
