@@ -19,8 +19,11 @@ public class ClinicalServiceAuditService {
     private final AuditLogRepository auditLogRepository;
 
     public void record(UUID actorId, ActionType action, UUID serviceId, String detail, Instant at) {
+        String safeDetail = (detail != null && detail.trim().startsWith("{"))
+                ? detail
+                : "{\"before\":null,\"after\":null,\"summary\":\"" + (detail != null ? detail.replace("\"", "\\\"") : "") + "\"}";
         auditLogRepository.save(AuditLog.create(
-                actorId, action, ResourceType.CLINICAL_SERVICE, serviceId, detail, null, at
+                actorId, action, ResourceType.CLINICAL_SERVICE, serviceId, safeDetail, null, at
         ));
     }
 }

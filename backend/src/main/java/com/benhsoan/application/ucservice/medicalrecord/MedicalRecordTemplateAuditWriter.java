@@ -42,8 +42,17 @@ public class MedicalRecordTemplateAuditWriter {
     }
 
     private void write(UUID actorId, ActionType action, MedicalRecordTemplate template, String event, Instant now) {
+        String detail = """
+                {"before":null,"after":{"templateName":"%s","version":%d,"active":%b},"event":"%s; templateId=%s; version=%d."}
+                """.formatted(
+                template.getName(),
+                template.getCurrentVersionNo(),
+                template.isActive(),
+                event,
+                template.getId(),
+                template.getCurrentVersionNo()
+        ).trim();
         auditLogRepository.save(AuditLog.create(actorId, action, ResourceType.MEDICAL_RECORD_TEMPLATE, template.getId(),
-                event + "; templateId=" + template.getId() + "; version=" + template.getCurrentVersionNo() + ".",
-                null, now));
+                detail, null, now));
     }
 }
