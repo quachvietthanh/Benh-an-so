@@ -22,6 +22,8 @@ public interface OperationalReportQueryRepository {
 
     List<DoctorVisitSummary> findDoctorVisitSummaries(Instant fromInclusive, Instant toExclusive);
 
+    List<InvoiceLineReportDetail> findInvoiceLineReportDetails(Instant fromInclusive, Instant toExclusive);
+
     List<DiseasePatternSummary> findDiseasePatternSummaries(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
 
     boolean hasDiagnoses(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
