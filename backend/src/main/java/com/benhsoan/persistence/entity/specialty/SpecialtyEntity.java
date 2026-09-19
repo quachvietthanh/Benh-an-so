@@ -27,10 +27,22 @@ public class SpecialtyEntity {
     private String code;
     @Column(nullable = false, length = 100)
     private String name;
+    @Column(name = "name_key", nullable = false, length = 100)
+    private String nameKey;
+    @Column(length = 500)
+    private String description;
     @Column(nullable = false)
     private boolean active;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @jakarta.persistence.PrePersist
+    @jakarta.persistence.PreUpdate
+    public void syncNameKey() {
+        if (this.name != null && (this.nameKey == null || this.nameKey.isBlank())) {
+            this.nameKey = this.name.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+    }
 }

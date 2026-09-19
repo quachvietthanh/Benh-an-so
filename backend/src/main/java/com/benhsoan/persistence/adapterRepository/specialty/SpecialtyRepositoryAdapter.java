@@ -22,8 +22,20 @@ public class SpecialtyRepositoryAdapter implements SpecialtyRepository {
     private final SpecialtyPersistenceMapper mapper;
 
     @Override
+    public Specialty save(Specialty specialty) {
+        var entity = mapper.toEntity(specialty);
+        var saved = jpaRepository.save(entity);
+        return mapper.toDomain(saved);
+    }
+
+    @Override
     public Optional<Specialty> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<Specialty> findByCode(String code) {
+        return jpaRepository.findByCode(code).map(mapper::toDomain);
     }
 
     @Override
@@ -38,6 +50,37 @@ public class SpecialtyRepositoryAdapter implements SpecialtyRepository {
 
     @Override
     public List<Specialty> findByActive(boolean active) {
-        return jpaRepository.findByActiveOrderByCodeAsc(active).stream().map(mapper::toDomain).toList();
+        return jpaRepository.findByActiveOrderByCodeAsc(active).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Specialty> findAll() {
+        return jpaRepository.findAllByOrderByCodeAsc().stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Specialty> search(String keyword, Boolean active) {
+        return jpaRepository.search(keyword, active).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public boolean existsByCode(String code) {
+        return jpaRepository.existsByCode(code);
+    }
+
+    @Override
+    public boolean existsByNameKey(String nameKey) {
+        return jpaRepository.existsByNameKey(nameKey);
+    }
+
+    @Override
+    public boolean existsByNameKeyAndIdNot(String nameKey, UUID id) {
+        return jpaRepository.existsByNameKeyAndIdNot(nameKey, id);
     }
 }
