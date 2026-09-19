@@ -77,28 +77,36 @@ test('1. KIỂM THỬ safeParseDetail (Parse an toàn chuỗi JSON detail)', () 
   assert.equal(resObj.after.status, 'ACTIVE')
 })
 
-test('2. KIỂM THỬ formatResourceType (Map 5 loại đối tượng quản trị sang tiếng Việt)', () => {
-  // Khớp chính xác đặc tả yêu cầu:
-  // USER -> 'Tài khoản nhân viên'
-  // ROLE -> 'Vai trò & Phân quyền'
-  // MEDICINE -> 'Danh mục thuốc'
-  // SERVICE_CATALOG -> 'Danh mục dịch vụ'
-  // SERVICE_PRICE -> 'Bảng giá dịch vụ'
+test('2. KIỂM THỬ formatResourceType (Map đầy đủ các loại đối tượng quản trị sang tiếng Việt)', () => {
+  // Khớp chính xác các nhóm đối tượng quản trị hệ thống:
   assert.equal(formatResourceType('USER'), 'Tài khoản nhân viên')
   assert.equal(formatResourceType('ROLE'), 'Vai trò & Phân quyền')
   assert.equal(formatResourceType('MEDICINE'), 'Danh mục thuốc')
   assert.equal(formatResourceType('SERVICE_CATALOG'), 'Danh mục dịch vụ')
   assert.equal(formatResourceType('SERVICE_PRICE'), 'Bảng giá dịch vụ')
+  assert.equal(formatResourceType('DIAGNOSIS_CATALOG'), 'Danh mục mã bệnh (ICD-10)')
+  assert.equal(formatResourceType('SECURITY_ALERT'), 'Cảnh báo an toàn bảo mật')
+  assert.equal(formatResourceType('CONFIGURATION'), 'Cấu hình hệ thống & phòng khám')
+  assert.equal(formatResourceType('SYSTEM_BACKUP'), 'Sao lưu & Phục hồi dữ liệu')
+  assert.equal(formatResourceType('MEDICAL_RECORD_TEMPLATE'), 'Mẫu bệnh án chuyên khoa')
+  assert.equal(formatResourceType('CLINICAL_SERVICE'), 'Danh mục cận lâm sàng & ngưỡng')
+  assert.equal(formatResourceType('ROOM'), 'Quản lý phòng & phân phòng')
+  assert.equal(formatResourceType('DOCTOR_SCHEDULE'), 'Lịch làm việc bác sĩ')
+  assert.equal(formatResourceType('DOCTOR_TIMEOFF'), 'Lịch nghỉ của bác sĩ')
 
   // Trường hợp type không xác định
   assert.equal(formatResourceType('UNKNOWN_TYPE'), 'UNKNOWN_TYPE')
   assert.equal(formatResourceType(null), '—')
 
-  // Kiểm tra đủ 5 options trong RESOURCE_TYPE_OPTIONS
-  assert.equal(RESOURCE_TYPE_OPTIONS.length, 5)
+  // Kiểm tra đủ 14 options trong RESOURCE_TYPE_OPTIONS
+  assert.equal(RESOURCE_TYPE_OPTIONS.length, 14)
   assert.deepEqual(
     RESOURCE_TYPE_OPTIONS.map((o) => o.value),
-    ['USER', 'ROLE', 'MEDICINE', 'SERVICE_CATALOG', 'SERVICE_PRICE']
+    [
+      'USER', 'ROLE', 'MEDICINE', 'SERVICE_CATALOG', 'SERVICE_PRICE',
+      'DIAGNOSIS_CATALOG', 'SECURITY_ALERT', 'CONFIGURATION', 'SYSTEM_BACKUP',
+      'MEDICAL_RECORD_TEMPLATE', 'CLINICAL_SERVICE', 'ROOM', 'DOCTOR_SCHEDULE', 'DOCTOR_TIMEOFF'
+    ]
   )
 
   // Kiểm tra option "Tất cả" trong RESOURCE_TYPE_FILTER_OPTIONS
@@ -106,12 +114,7 @@ test('2. KIỂM THỬ formatResourceType (Map 5 loại đối tượng quản tr
   assert.equal(RESOURCE_TYPE_FILTER_OPTIONS[0].label, 'Tất cả đối tượng')
 })
 
-test('3. KIỂM THỬ formatActionType (Map 5 loại hành động sang tiếng Việt & màu Tag)', () => {
-  // CREATE -> { label: 'Tạo mới', color: 'green' }
-  // UPDATE -> { label: 'Cập nhật', color: 'blue' }
-  // ACTIVATE -> { label: 'Kích hoạt', color: 'cyan' }
-  // DEACTIVATE -> { label: 'Vô hiệu hóa', color: 'orange' }
-  // UNLOCK -> { label: 'Mở khóa', color: 'purple' }
+test('3. KIỂM THỬ formatActionType (Map các loại hành động sang tiếng Việt & màu Tag)', () => {
   const create = formatActionType('CREATE')
   assert.equal(create.label, 'Tạo mới')
   assert.equal(create.color, 'green')
@@ -131,6 +134,18 @@ test('3. KIỂM THỬ formatActionType (Map 5 loại hành động sang tiếng 
   const unlock = formatActionType('UNLOCK')
   assert.equal(unlock.label, 'Mở khóa')
   assert.equal(unlock.color, 'purple')
+
+  const backup = formatActionType('BACKUP')
+  assert.equal(backup.label, 'Sao lưu')
+  assert.equal(backup.color, 'cyan')
+
+  const restore = formatActionType('RESTORE')
+  assert.equal(restore.label, 'Phục hồi')
+  assert.equal(restore.color, 'magenta')
+
+  const exp = formatActionType('EXPORT')
+  assert.equal(exp.label, 'Tải về / Xuất')
+  assert.equal(exp.color, 'geekblue')
 
   // Hành động lạ fallback
   const other = formatActionType('OTHER')

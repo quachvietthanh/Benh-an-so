@@ -416,14 +416,20 @@ function BillingPage() {
 
       if (prescriptions.length === 0) {
         try {
-          const [pendingRes, dispensedRes] = await Promise.allSettled([
+          const [pendingRes, partialRes, dispensedRes] = await Promise.allSettled([
             pharmacyApi.prescriptions({ status: 'PENDING_DISPENSE', size: 100 }),
+            pharmacyApi.prescriptions({ status: 'PARTIALLY_DISPENSED', size: 100 }),
             pharmacyApi.prescriptions({ status: 'DISPENSED', size: 100 }),
           ])
 
           const pList = []
           if (pendingRes.status === 'fulfilled') {
             const raw = pendingRes.value?.data
+            const items = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
+            pList.push(...items)
+          }
+          if (partialRes.status === 'fulfilled') {
+            const raw = partialRes.value?.data
             const items = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : []
             pList.push(...items)
           }
@@ -483,7 +489,22 @@ function BillingPage() {
           const unitPrice = Number(
             item.unitPrice || item.price || matchedMed?.price || matchedMed?.unitPrice || 5000
           )
-          const qty = Number(item.quantity || 1)
+          const isPartial = prescriptionStatus === 'PARTIALLY_DISPENSED'
+          const prescribedQty = Number(item.quantity || 1)
+          const dispensedQty = Number(
+            item.dispensedQuantity != null
+              ? item.dispensedQuantity
+              : isPartial
+              ? 0
+              : prescribedQty
+          )
+          // Yêu cầu nghiệp vụ bắt buộc: Đơn PARTIALLY_DISPENSED tính tiền theo dispensedQuantity (thực cấp), KHÔNG phải quantity (kê)
+          const qty = isPartial ? dispensedQty : prescribedQty
+          const remainingQty = Number(
+            item.remainingQuantity != null
+              ? item.remainingQuantity
+              : Math.max(0, prescribedQty - dispensedQty)
+          )
           const amount = qty * unitPrice
           const name = item.medicineName || matchedMed?.medicineName || matchedMed?.name || `Thuốc ${idx + 1}`
           const freqStr = item.frequency != null && item.frequency !== ''
@@ -503,13 +524,16 @@ function BillingPage() {
             unitPrice,
             price: unitPrice,
             quantity: qty,
+            prescribedQuantity: prescribedQty,
+            dispensedQuantity: dispensedQty,
+            remainingQuantity: remainingQty,
             amount,
             dosageInfo,
           }
         })
       }
 
-      const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED'
+      const isDispensingCompleted = !prescriptionStatus || prescriptionStatus === 'DISPENSED' || prescriptionStatus === 'PARTIALLY_DISPENSED'
       const hasPendingDispense = prescriptionStatus === 'PENDING_DISPENSE' || prescriptionStatus === 'CREATED'
       const isCancelled = visitStatus === 'CANCELLED'
 
@@ -968,7 +992,25 @@ function BillingPage() {
 
   const feeColumns = [
     { title: 'Khoản thu / Dịch vụ', key: 'name', width: 220, render: (_, r) => <Text strong style={{ color: '#0f172a', whiteSpace: 'nowrap' }}>{r.name}</Text> },
-    { title: 'Số lượng', dataIndex: 'quantity', key: 'quantity', width: 100, align: 'center', render: (v) => <Tag color="blue" style={{ minWidth: 28, textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>{v}</Tag> },
+    {
+      title: 'Số lượng',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      width: 120,
+      align: 'center',
+      render: (v, r) => {
+        if (r.prescribedQuantity != null && r.prescribedQuantity !== v) {
+          return (
+            <Tooltip title={`Số lượng kê đơn: ${r.prescribedQuantity}, Thực cấp: ${v}`}>
+              <Tag color="gold" style={{ minWidth: 32, textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {v} / {r.prescribedQuantity}
+              </Tag>
+            </Tooltip>
+          )
+        }
+        return <Tag color="blue" style={{ minWidth: 28, textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>{v}</Tag>
+      },
+    },
     { title: 'Đơn giá', dataIndex: 'price', key: 'price', width: 150, align: 'right', render: (v) => <Text style={{ color: '#475569', whiteSpace: 'nowrap' }}>{money(v)}</Text> },
     { title: 'Thành tiền', dataIndex: 'amount', key: 'amount', width: 160, align: 'right', render: (v) => <Text strong style={{ color: '#2563eb', fontSize: 14, whiteSpace: 'nowrap' }}>{money(v)}</Text> },
   ]
@@ -986,6 +1028,8 @@ function BillingPage() {
           key: `med-${idx}`,
           name: `Thuốc: ${item.medicineName}${item.dosageInfo ? ` (${item.dosageInfo})` : ''}`,
           quantity: item.quantity,
+          prescribedQuantity: item.prescribedQuantity,
+          remainingQuantity: item.remainingQuantity,
           price: item.unitPrice || item.price,
           amount: item.amount,
         })
@@ -1386,6 +1430,15 @@ function BillingPage() {
                                     ({selectedVisitData.prescriptionItems.length} loại thuốc)
                                   </Text>
                                 </Space>
+                              ) : selectedVisitData.prescriptionStatus === 'PARTIALLY_DISPENSED' ? (
+                                <Space wrap style={{ margin: 0 }}>
+                                  <Tag color="gold" icon={<CheckCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
+                                    Cấp phát một phần ({selectedVisitData.prescriptionCode || 'PARTIALLY_DISPENSED'})
+                                  </Tag>
+                                  <Text type="secondary" style={{ fontSize: 12, color: '#d97706', fontWeight: 500 }}>
+                                    (Tính tiền theo SL thực cấp: {selectedVisitData.prescriptionItems.length} loại)
+                                  </Text>
+                                </Space>
                               ) : selectedVisitData.prescriptionStatus === 'PENDING_DISPENSE' ? (
                                 <Space wrap style={{ margin: 0 }}>
                                   <Tag color="orange" icon={<ClockCircleOutlined />} style={{ margin: 0, fontWeight: 600 }}>
@@ -1547,6 +1600,15 @@ function BillingPage() {
                                     showIcon
                                     message="Đơn thuốc đang chờ cấp phát tại Quầy Dược (PENDING_DISPENSE)"
                                     description="Theo quy trình nghiệp vụ hệ thống, Dược sĩ cần hoàn tất cấp phát thuốc trước khi Lễ tân ghi nhận thu phí."
+                                  />
+                                )}
+
+                                {selectedVisitData.prescriptionStatus === 'PARTIALLY_DISPENSED' && (
+                                  <Alert
+                                    type="warning"
+                                    showIcon
+                                    message="Đơn thuốc được cấp phát một phần (PARTIALLY_DISPENSED)"
+                                    description="Hệ thống đã tự động tính viện phí dựa trên số lượng thuốc thực cấp (dispensedQuantity). Bệnh nhân không phải thanh toán phần thuốc chưa cấp."
                                   />
                                 )}
 

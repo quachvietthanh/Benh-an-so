@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.security.SecurityAlert;
 import com.benhsoan.domain.security.enums.AlertSeverity;
 import com.benhsoan.domain.security.enums.AlertStatus;
@@ -24,6 +25,7 @@ import com.benhsoan.domain.security.enums.AlertType;
 import com.benhsoan.domain.security.exception.SecurityAlertNotFoundException;
 import com.benhsoan.port.dto.result.security.SecurityAlertResult;
 import com.benhsoan.port.outbound.repository.security.SecurityAlertRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +34,12 @@ class UpdateSecurityAlertStatusServiceTest {
     @Mock
     private SecurityAlertRepository securityAlertRepository;
 
+    @Mock
+    private AdminOperationAuditService adminOperationAuditService;
+
+    @Mock
+    private CurrentUserPort currentUserPort;
+
     private static final Instant NOW = Instant.parse("2026-08-11T10:05:00Z");
 
     private UpdateSecurityAlertStatusService service;
@@ -39,7 +47,7 @@ class UpdateSecurityAlertStatusServiceTest {
     @BeforeEach
     void setUp() {
         ClockPort clockPort = () -> NOW;
-        service = new UpdateSecurityAlertStatusService(securityAlertRepository, clockPort);
+        service = new UpdateSecurityAlertStatusService(securityAlertRepository, clockPort, adminOperationAuditService, currentUserPort);
     }
 
     @Test

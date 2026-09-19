@@ -22,6 +22,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogCodeAlreadyExistsException;
 import com.benhsoan.domain.medicalrecord.exception.DiagnosisCatalogDeletionNotAllowedException;
@@ -30,6 +31,7 @@ import com.benhsoan.port.dto.command.medicalrecord.CreateDiagnosisCatalogCommand
 import com.benhsoan.port.dto.command.medicalrecord.UpdateDiagnosisCatalogCommand;
 import com.benhsoan.port.outbound.repository.medicalrecord.DiagnosisCatalogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,6 +42,8 @@ class DiagnosisCatalogManagementServicesTest {
     @Mock private DiagnosisCatalogRepository diagnosisCatalogRepository;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private ClockPort clockPort;
+    @Mock private AdminOperationAuditService adminOperationAuditService;
+    @Mock private CurrentUserPort currentUserPort;
     @Spy private DiagnosisCatalogResultMapper resultMapper = new DiagnosisCatalogResultMapper();
     @InjectMocks private CreateDiagnosisCatalogService createService;
     @InjectMocks private UpdateDiagnosisCatalogService updateService;
@@ -49,6 +53,7 @@ class DiagnosisCatalogManagementServicesTest {
     @BeforeEach
     void setUp() {
         lenient().when(clockPort.now()).thenReturn(NOW);
+        lenient().when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
     }
 
     @Test

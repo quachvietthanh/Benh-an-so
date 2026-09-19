@@ -71,6 +71,8 @@ import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModa
 import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import PatientChronicDiseaseBanner from '../components/clinical/PatientChronicDiseaseBanner'
 import CancelPrescriptionModal from '../components/pharmacy/CancelPrescriptionModal.jsx'
+import PartialDispenseModal from '../components/pharmacy/PartialDispenseModal.jsx'
+import DispenseHistoryModal from '../components/pharmacy/DispenseHistoryModal.jsx'
 import {
   canCancelPrescription,
   getCancelRestrictionMessage,
@@ -206,6 +208,10 @@ function PrescriptionPage() {
   const [signModalOpen, setSignModalOpen] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [prescriptionToCancel, setPrescriptionToCancel] = useState(null)
+  const [partialModalOpen, setPartialModalOpen] = useState(false)
+  const [selectedPrescriptionForPartial, setSelectedPrescriptionForPartial] = useState(null)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [selectedPrescriptionForHistory, setSelectedPrescriptionForHistory] = useState(null)
 
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -892,20 +898,17 @@ function PrescriptionPage() {
       const liveStockValidation = validatePrescriptionStock(items, normalizedFreshMeds)
       if (!liveStockValidation.isValid) {
         Modal.error({
-          title: 'Không thể tạo/lưu đơn thuốc do tồn kho thay đổi',
+          title: 'Không thể tạo/lưu đơn thuốc',
           content: (
             <div>
               <Paragraph style={{ color: '#dc2626', marginBottom: 8 }}>
-                Dữ liệu tồn kho khả dụng mới nhất của hệ thống không đủ cho đơn thuốc này:
+                Có lỗi về thông tin thuốc trong đơn:
               </Paragraph>
               <ul style={{ paddingLeft: 20, color: '#b91c1c', marginBottom: 8 }}>
                 {liveStockValidation.errors.map((err, idx) => (
                   <li key={idx}><strong>{err}</strong></li>
                 ))}
               </ul>
-              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                Vui lòng chọn lại thuốc khác hoặc giảm số lượng kê phù hợp với tồn khả dụng hiện tại.
-              </Paragraph>
             </div>
           ),
         })
@@ -1503,6 +1506,13 @@ function PrescriptionPage() {
             </Tag>
           )
         }
+        if (value === 'PARTIALLY_DISPENSED') {
+          return (
+            <Tag color="gold" icon={<ClockCircleOutlined />} style={{ fontWeight: 600 }}>
+              Cấp phát một phần
+            </Tag>
+          )
+        }
         if (value === 'DISPENSED') {
           return (
             <Tag color="green" icon={<CheckCircleOutlined />}>
@@ -1616,11 +1626,12 @@ function PrescriptionPage() {
       align: 'center',
       render: (_, prescription) => {
         const isPending = prescription.status === 'PENDING_DISPENSE'
+        const isPartiallyDispensed = prescription.status === 'PARTIALLY_DISPENSED'
         const isPrintable = Boolean(
           canPrintPrescription &&
           prescription.id &&
           prescription.prescriptionCode &&
-          (prescription.status === 'PENDING_DISPENSE' || prescription.status === 'DISPENSED')
+          (isPending || isPartiallyDispensed || prescription.status === 'DISPENSED')
         )
         const canEditThis = canPrescribe && isPending
         const isInterconnected = prescription.interconnectionStatus === 'SUCCESS'
@@ -1631,12 +1642,43 @@ function PrescriptionPage() {
           currentUserId: currentUser?.id,
         })
 
+        const isPharmacistOrAdmin =
+          (roles.includes('pharmacist') || roles.includes('admin') || userPermissions.includes('PRESCRIPTION_UPDATE_STATUS')) &&
+          !roles.includes('doctor')
+        const canViewHistory =
+          roles.includes('doctor') ||
+          roles.includes('pharmacist') ||
+          roles.includes('admin') ||
+          roles.includes('manager') ||
+          userPermissions.includes('PRESCRIPTION_DISPENSE_HISTORY_READ')
+
+        const canPartialDispense = isPharmacistOrAdmin && (isPending || isPartiallyDispensed)
+        const canSeeHistory = canViewHistory && (isPartiallyDispensed || prescription.status === 'DISPENSED')
+
         const menuItems = [
           {
             key: 'detail',
             icon: <EyeOutlined />,
             label: 'Xem chi tiết đơn thuốc',
             onClick: () => openDetailModal(prescription),
+          },
+          canPartialDispense && {
+            key: 'partial-dispense',
+            icon: <MedicineBoxOutlined style={{ color: '#d97706' }} />,
+            label: 'Cấp phát một phần',
+            onClick: () => {
+              setSelectedPrescriptionForPartial(prescription)
+              setPartialModalOpen(true)
+            },
+          },
+          canSeeHistory && {
+            key: 'dispense-history',
+            icon: <HistoryOutlined style={{ color: '#1677ff' }} />,
+            label: 'Xem lịch sử cấp phát',
+            onClick: () => {
+              setSelectedPrescriptionForHistory(prescription)
+              setHistoryModalOpen(true)
+            },
           },
           canPrescribe && prescription.status !== 'CANCELLED' && {
             key: 'interconnection',
@@ -1673,13 +1715,13 @@ function PrescriptionPage() {
             label: 'Hủy đơn thuốc này',
             onClick: () => handleOpenCancelModal(prescription),
           },
-          roles.includes('doctor') && prescription.status === 'DISPENSED' && (prescription.prescribedBy ? String(prescription.prescribedBy).toLowerCase().replace(/-/g, '') === String(user?.id).toLowerCase().replace(/-/g, '') : true) && {
+          roles.includes('doctor') && (prescription.status === 'DISPENSED' || isPartiallyDispensed) && (prescription.prescribedBy ? String(prescription.prescribedBy).toLowerCase().replace(/-/g, '') === String(user?.id).toLowerCase().replace(/-/g, '') : true) && {
             key: 'cancel-dispensed',
             icon: <StopOutlined style={{ color: '#94a3b8' }} />,
             disabled: true,
             label: (
-              <Tooltip title="Đơn thuốc đã được cấp phát. Vui lòng sử dụng chức năng trả lại thuốc nếu muốn thu hồi thuốc.">
-                <span>Hủy đơn (Đã cấp phát)</span>
+              <Tooltip title="Đơn thuốc đã được xuất cấp phát tại quầy dược. Không thể hủy đơn trực tiếp.">
+                <span>Hủy đơn (Đã cấp thuốc)</span>
               </Tooltip>
             ),
           },
@@ -2367,15 +2409,35 @@ function PrescriptionPage() {
                               const avail = getAvailableStock(selectedMed)
                               if (avail <= 0) {
                                 return (
-                                  <Tag color="red" icon={<CloseCircleOutlined />} style={{ borderRadius: 12, margin: 0 }}>
-                                    HẾT HÀNG (Tồn khả dụng: 0 {unit})
+                                  <Tag
+                                    color="warning"
+                                    icon={<WarningOutlined />}
+                                    style={{
+                                      borderRadius: 12,
+                                      margin: 0,
+                                      backgroundColor: '#FEF3C7',
+                                      color: '#92400E',
+                                      borderColor: '#FCD34D',
+                                    }}
+                                  >
+                                    Hết hàng — Dược sĩ sẽ cấp bù sau (Tồn: 0 {unit})
                                   </Tag>
                                 )
                               }
                               if (item.quantity > avail) {
                                 return (
-                                  <Tag color="volcano" icon={<WarningOutlined />} style={{ borderRadius: 12, margin: 0 }}>
-                                    Vượt quá tồn kho (Còn {avail} {unit})
+                                  <Tag
+                                    color="orange"
+                                    icon={<WarningOutlined />}
+                                    style={{
+                                      borderRadius: 12,
+                                      margin: 0,
+                                      backgroundColor: '#FFF7ED',
+                                      color: '#C2410C',
+                                      borderColor: '#FDBA74',
+                                    }}
+                                  >
+                                    Tồn kho không đủ ({avail}/{item.quantity} {unit}) — Sẽ cấp phát một phần
                                   </Tag>
                                 )
                               }
@@ -2434,9 +2496,9 @@ function PrescriptionPage() {
                                     : ''
                                   return {
                                     value: medicine.id,
-                                    disabled: isOut,
+                                    disabled: false,
                                     label: isOut
-                                      ? `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Hết hàng`
+                                      ? `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— [Hết hàng — cấp bù sau]`
                                       : `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
                                   }
                                 })}
@@ -2683,10 +2745,17 @@ function PrescriptionPage() {
                             </div>
                             {selectedMed && (() => {
                               const avail = getAvailableStock(selectedMed)
-                              if (avail > 0 && item.quantity > avail) {
+                              if (avail <= 0) {
                                 return (
-                                  <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-                                    Không đủ tồn kho. Tối đa có thể kê: {avail} {unit}.
+                                  <div style={{ color: '#d97706', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                    Thuốc hiện hết hàng (tồn 0 {unit}) — dược sĩ sẽ cấp bù sau khi có hàng.
+                                  </div>
+                                )
+                              }
+                              if (item.quantity > avail) {
+                                return (
+                                  <div style={{ color: '#d97706', fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                                    Tồn kho hiện tại chỉ còn {avail} {unit} — dược sĩ có thể cần cấp phát một phần.
                                   </div>
                                 )
                               }
@@ -2742,22 +2811,32 @@ function PrescriptionPage() {
                           if (avail <= 0) {
                             return (
                               <Alert
-                                type="error"
+                                type="warning"
                                 showIcon
-                                icon={<StopOutlined />}
-                                message={`Thuốc "${selectedMed.medicineName}" hiện đã HẾT HÀNG (tồn khả dụng = 0). Vui lòng đổi sang thuốc khác.`}
-                                style={{ marginTop: 12, borderRadius: 6 }}
+                                icon={<WarningOutlined />}
+                                message={`Thuốc "${selectedMed.medicineName}" hiện đã hết hàng (tồn khả dụng = 0). Dược sĩ sẽ cấp bù sau khi có hàng.`}
+                                style={{
+                                  marginTop: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: '#FEF3C7',
+                                  borderColor: '#FCD34D',
+                                }}
                               />
                             )
                           }
                           if (item.quantity > avail) {
                             return (
                               <Alert
-                                type="error"
+                                type="warning"
                                 showIcon
                                 icon={<WarningOutlined />}
-                                message={`Số lượng kê (${item.quantity} ${unit}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${unit}).`}
-                                style={{ marginTop: 12, borderRadius: 6 }}
+                                message={`Số lượng kê (${item.quantity} ${unit}) vượt quá tồn kho khả dụng (hiện còn ${avail} ${unit}). Dược sĩ có thể thực hiện cấp phát một phần.`}
+                                style={{
+                                  marginTop: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: '#FFF7ED',
+                                  borderColor: '#FDBA74',
+                                }}
                               />
                             )
                           }
@@ -2771,16 +2850,7 @@ function PrescriptionPage() {
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
-                      disabled={checkingInteractions || saving || items.some((i) => {
-                        if (!i.medicineId) return false
-                        const med = selectedMedicineMap.get(String(i.medicineId))
-                        if (!med) return false
-                        const avail = getAvailableStock(med)
-                        const totalQty = items
-                          .filter((x) => String(x.medicineId) === String(i.medicineId))
-                          .reduce((sum, x) => sum + Number(x.quantity || 0), 0)
-                        return avail <= 0 || Number(i.quantity || 0) > avail || totalQty > avail
-                      })}
+                      disabled={checkingInteractions || saving}
                       onClick={() => {
                         setConfirmedOverrides([])
                         setItems((current) => [...current, createEmptyItem(false)])
@@ -3373,6 +3443,27 @@ function PrescriptionPage() {
         prescription={prescriptionToCancel}
         onConfirm={handleConfirmCancelPrescription}
         loading={cancelling}
+      />
+
+      <PartialDispenseModal
+        open={partialModalOpen}
+        onClose={() => {
+          setPartialModalOpen(false)
+          setSelectedPrescriptionForPartial(null)
+        }}
+        prescription={selectedPrescriptionForPartial}
+        onSuccess={() => {
+          loadData()
+        }}
+      />
+
+      <DispenseHistoryModal
+        open={historyModalOpen}
+        onClose={() => {
+          setHistoryModalOpen(false)
+          setSelectedPrescriptionForHistory(null)
+        }}
+        prescription={selectedPrescriptionForHistory}
       />
 
       <PrescriptionPrintTemplateModal
