@@ -17,7 +17,19 @@ public record AppointmentResponse(
 
         UUID patientId,
 
+        String patientName,
+
+        String patientCode,
+
+        String patientPhone,
+
+        String phone,
+
         UUID doctorId,
+
+        String doctorName,
+
+        String department,
 
         Instant startTime,
 
@@ -48,6 +60,11 @@ public record AppointmentResponse(
         if (rescheduleHistories == null) {
             rescheduleHistories = List.of();
         }
+        if (phone == null && patientPhone != null) {
+            phone = patientPhone;
+        } else if (patientPhone == null && phone != null) {
+            patientPhone = phone;
+        }
     }
 
     public AppointmentResponse(
@@ -65,8 +82,32 @@ public record AppointmentResponse(
             Instant createdAt,
             List<AppointmentRescheduleHistoryResponse> rescheduleHistories
     ) {
-        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
-                reason, cancelReason, checkedInAt, completedAt, createdAt, null, null, null,
+        this(id, appointmentCode, patientId, null, null, null, null, doctorId, null, null,
+                startTime, endTime, status, reason, cancelReason, checkedInAt, completedAt, createdAt,
+                null, null, null, rescheduleHistories != null ? rescheduleHistories : List.of());
+    }
+
+    public AppointmentResponse(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            Instant createdAt,
+            Instant confirmedAt,
+            UUID confirmedBy,
+            String confirmedByName,
+            List<AppointmentRescheduleHistoryResponse> rescheduleHistories
+    ) {
+        this(id, appointmentCode, patientId, null, null, null, null, doctorId, null, null,
+                startTime, endTime, status, reason, cancelReason, checkedInAt, completedAt, createdAt,
+                confirmedAt, confirmedBy, confirmedByName,
                 rescheduleHistories != null ? rescheduleHistories : List.of());
     }
 }

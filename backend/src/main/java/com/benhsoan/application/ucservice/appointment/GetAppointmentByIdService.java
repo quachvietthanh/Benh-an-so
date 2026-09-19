@@ -12,10 +12,7 @@ import com.benhsoan.port.inbound.appointment.GetAppointmentByIdUseCase;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 
-import lombok.RequiredArgsConstructor;
-
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class GetAppointmentByIdService implements GetAppointmentByIdUseCase {
 
@@ -23,11 +20,38 @@ public class GetAppointmentByIdService implements GetAppointmentByIdUseCase {
     private final AppointmentResultMapper appointmentResultMapper;
     private final AppointmentRescheduleHistoryAssembler historyAssembler;
     private final UserRepository userRepository;
+    private final AppointmentResultAssembler appointmentResultAssembler;
+
+    public GetAppointmentByIdService(
+            AppointmentRepository appointmentRepository,
+            AppointmentResultMapper appointmentResultMapper,
+            AppointmentRescheduleHistoryAssembler historyAssembler,
+            UserRepository userRepository,
+            AppointmentResultAssembler appointmentResultAssembler
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.appointmentResultMapper = appointmentResultMapper;
+        this.historyAssembler = historyAssembler;
+        this.userRepository = userRepository;
+        this.appointmentResultAssembler = appointmentResultAssembler;
+    }
+
+    public GetAppointmentByIdService(
+            AppointmentRepository appointmentRepository,
+            AppointmentResultMapper appointmentResultMapper,
+            AppointmentRescheduleHistoryAssembler historyAssembler,
+            UserRepository userRepository
+    ) {
+        this(appointmentRepository, appointmentResultMapper, historyAssembler, userRepository, null);
+    }
 
     @Override
     public AppointmentResult getById(UUID appointmentId) {
         return appointmentRepository.findById(appointmentId)
                 .map(appointment -> {
+                    if (appointmentResultAssembler != null) {
+                        return appointmentResultAssembler.toResult(appointment);
+                    }
                     var histories = historyAssembler.getHistoriesForAppointment(appointmentId);
                     String confirmedByName = null;
                     if (appointment.getConfirmedBy() != null) {

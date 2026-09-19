@@ -30,7 +30,6 @@ import com.benhsoan.port.outbound.time.ClockPort;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class CreateAppointmentService
                 implements CreateAppointmentUseCase {
@@ -52,6 +51,46 @@ public class CreateAppointmentService
         private final DoctorScheduleValidator doctorScheduleValidator;
 
         private final ClockPort clockPort;
+
+        private final AppointmentResultAssembler assembler;
+
+        public CreateAppointmentService(
+                        AppointmentRepository appointmentRepository,
+                        PatientRepository patientRepository,
+                        UserRepository userRepository,
+                        AppointmentCodeGenerator appointmentCodeGenerator,
+                        CurrentUserPort currentUserPort,
+                        AppointmentResultMapper appointmentResultMapper,
+                        AuditLogRepository auditLogRepository,
+                        DoctorScheduleValidator doctorScheduleValidator,
+                        ClockPort clockPort,
+                        AppointmentResultAssembler assembler) {
+                this.appointmentRepository = appointmentRepository;
+                this.patientRepository = patientRepository;
+                this.userRepository = userRepository;
+                this.appointmentCodeGenerator = appointmentCodeGenerator;
+                this.currentUserPort = currentUserPort;
+                this.appointmentResultMapper = appointmentResultMapper;
+                this.auditLogRepository = auditLogRepository;
+                this.doctorScheduleValidator = doctorScheduleValidator;
+                this.clockPort = clockPort;
+                this.assembler = assembler;
+        }
+
+        public CreateAppointmentService(
+                        AppointmentRepository appointmentRepository,
+                        PatientRepository patientRepository,
+                        UserRepository userRepository,
+                        AppointmentCodeGenerator appointmentCodeGenerator,
+                        CurrentUserPort currentUserPort,
+                        AppointmentResultMapper appointmentResultMapper,
+                        AuditLogRepository auditLogRepository,
+                        DoctorScheduleValidator doctorScheduleValidator,
+                        ClockPort clockPort) {
+                this(appointmentRepository, patientRepository, userRepository, appointmentCodeGenerator,
+                                currentUserPort, appointmentResultMapper, auditLogRepository,
+                                doctorScheduleValidator, clockPort, null);
+        }
 
         @Override
         public AppointmentResult create(
@@ -96,7 +135,9 @@ public class CreateAppointmentService
                                                                 saved.getEndTime()),
                                                 null));
 
-                return appointmentResultMapper.toResult(saved);
+                return assembler != null
+                                ? assembler.toResult(saved)
+                                : appointmentResultMapper.toResult(saved);
         }
 
         private void validate(

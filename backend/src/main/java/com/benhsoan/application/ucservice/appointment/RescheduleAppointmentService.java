@@ -45,7 +45,6 @@ import lombok.RequiredArgsConstructor;
  * and writes audit logs.
  */
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class RescheduleAppointmentService implements RescheduleAppointmentUseCase {
 
@@ -62,6 +61,53 @@ public class RescheduleAppointmentService implements RescheduleAppointmentUseCas
     private final AppointmentRescheduleHistoryAssembler historyAssembler;
     private final AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter;
     private final ObjectMapper objectMapper;
+    private final AppointmentResultAssembler assembler;
+
+    public RescheduleAppointmentService(
+            AppointmentRepository appointmentRepository,
+            AppointmentRescheduleLogRepository rescheduleLogRepository,
+            UserRepository userRepository,
+            DoctorScheduleValidator doctorScheduleValidator,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            AppointmentResultMapper resultMapper,
+            AppointmentRescheduleHistoryAssembler historyAssembler,
+            AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter,
+            ObjectMapper objectMapper,
+            AppointmentResultAssembler assembler
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.rescheduleLogRepository = rescheduleLogRepository;
+        this.userRepository = userRepository;
+        this.doctorScheduleValidator = doctorScheduleValidator;
+        this.currentUserPort = currentUserPort;
+        this.auditLogRepository = auditLogRepository;
+        this.clockPort = clockPort;
+        this.resultMapper = resultMapper;
+        this.historyAssembler = historyAssembler;
+        this.accessDeniedAuditWriter = accessDeniedAuditWriter;
+        this.objectMapper = objectMapper;
+        this.assembler = assembler;
+    }
+
+    public RescheduleAppointmentService(
+            AppointmentRepository appointmentRepository,
+            AppointmentRescheduleLogRepository rescheduleLogRepository,
+            UserRepository userRepository,
+            DoctorScheduleValidator doctorScheduleValidator,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            AppointmentResultMapper resultMapper,
+            AppointmentRescheduleHistoryAssembler historyAssembler,
+            AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter,
+            ObjectMapper objectMapper
+    ) {
+        this(appointmentRepository, rescheduleLogRepository, userRepository, doctorScheduleValidator,
+                currentUserPort, auditLogRepository, clockPort, resultMapper, historyAssembler,
+                accessDeniedAuditWriter, objectMapper, null);
+    }
 
     @Override
     public AppointmentResult reschedule(UUID appointmentId, RescheduleAppointmentCommand command) {
@@ -152,7 +198,9 @@ public class RescheduleAppointmentService implements RescheduleAppointmentUseCas
         ));
 
         List<AppointmentRescheduleHistoryResult> histories = historyAssembler.getHistoriesForAppointment(saved.getId());
-        return resultMapper.toResult(saved, histories);
+        return assembler != null
+                ? assembler.toResult(saved)
+                : resultMapper.toResult(saved, histories);
     }
 
     private void validateCommand(RescheduleAppointmentCommand command) {
