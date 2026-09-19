@@ -39,10 +39,14 @@ export const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports', '/reports/disease-patterns'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/specialties', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization'] },
 ]
 
-export const getNavigationItems = (roles = [], permissions = []) => {
+export const getNavigationItems = (rolesOrUser = [], permissionsArg = []) => {
+  const isObjectArg = rolesOrUser && typeof rolesOrUser === 'object' && !Array.isArray(rolesOrUser)
+  const roles = isObjectArg ? (rolesOrUser.roles || []) : rolesOrUser
+  const permissions = isObjectArg ? (rolesOrUser.permissions || permissionsArg) : permissionsArg
+
   const normalizedRoles = (Array.isArray(roles) ? roles : [roles])
     .map((role) => String(role || '').toLowerCase().replace(/^role_/, ''))
     .filter(Boolean)
@@ -83,6 +87,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/system/clinical-services', label: 'Danh mục cận lâm sàng & ngưỡng', icon: ExperimentOutlined, check: () => hasPerm('CLINICAL_SERVICE_MANAGE') || isAdmin },
     { key: '/system/diagnosis-catalog', label: 'Danh mục mã bệnh (ICD-10)', icon: ExperimentOutlined, check: () => hasPerm('DIAGNOSIS_CATALOG_MANAGE') || isAdmin },
     { key: '/system/medical-record-templates', label: 'Mẫu bệnh án chuyên khoa', icon: FileTextOutlined, check: () => hasPerm('MEDICAL_RECORD_TEMPLATE_MANAGE') || isAdmin },
+    { key: '/system/specialties', label: 'Danh mục chuyên khoa & phòng khám', icon: MedicineBoxOutlined, check: () => hasPerm('SPECIALTY_MANAGE') || isAdmin },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => isAdmin },
     { key: '/admin/operation-logs', label: 'Nhật ký thao tác', icon: AuditOutlined, check: () => !isDoctor && !isReceptionist && !isPharmacist && (isAdmin || isManager || hasPerm('ADMIN_OPERATION_LOG_READ')) },
     { key: '/prescription-interconnections', label: 'Liên thông đơn thuốc', icon: CloudServerOutlined, check: () => hasPerm('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin },

@@ -34,6 +34,7 @@ const SystemManagementPage = React.lazy(() => import('../pages/SystemManagementP
 const DiagnosisCatalogPage = React.lazy(() => import('../pages/DiagnosisCatalogPage'))
 const ClinicalServiceManagementPage = React.lazy(() => import('../pages/ClinicalServiceManagementPage'))
 const MedicalRecordTemplateManagementPage = React.lazy(() => import('../pages/MedicalRecordTemplateManagementPage'))
+const SpecialtyManagementPage = React.lazy(() => import('../pages/SpecialtyManagementPage'))
 const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
 
 const MedicalRecordAccessLogsPage = React.lazy(() => import('../pages/MedicalRecordAccessLogsPage'))
@@ -169,6 +170,8 @@ function AppRoutes() {
         <Route path="diagnosis-catalog" element={<Navigate to="/system/diagnosis-catalog" replace />} />
         <Route path="system/medical-record-templates" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_TEMPLATE_MANAGE']} allowedRoles={['admin']}><LazyPage><MedicalRecordTemplateManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="medical-record-templates" element={<Navigate to="/system/medical-record-templates" replace />} />
+        <Route path="system/specialties" element={<PrivateRoute allowedPermissions={['SPECIALTY_MANAGE']} allowedRoles={['admin']}><LazyPage><SpecialtyManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="specialties" element={<Navigate to="/system/specialties" replace />} />
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
         <Route path="system/anonymization" element={<PrivateRoute allowedPermissions={['SYSTEM_CONFIG_READ']} allowedRoles={['admin']}><LazyPage><AnonymizationPage /></LazyPage></PrivateRoute>} />
         <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
