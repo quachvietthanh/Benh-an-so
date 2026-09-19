@@ -68,6 +68,52 @@ public interface JpaAuditLogRepository
                         ))
                     OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.SERVICE_PRICE
                         AND a.actionType = com.benhsoan.domain.auditlog.enums.ActionType.CREATE)
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.DIAGNOSIS_CATALOG
+                        AND a.actionType IN (
+                            com.benhsoan.domain.auditlog.enums.ActionType.CREATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.UPDATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.ACTIVATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.DEACTIVATE
+                        ))
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.SECURITY_ALERT
+                        AND a.actionType = com.benhsoan.domain.auditlog.enums.ActionType.UPDATE)
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.CONFIGURATION
+                        AND a.actionType = com.benhsoan.domain.auditlog.enums.ActionType.UPDATE)
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.SYSTEM_BACKUP
+                        AND a.actionType IN (
+                            com.benhsoan.domain.auditlog.enums.ActionType.BACKUP,
+                            com.benhsoan.domain.auditlog.enums.ActionType.RESTORE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.EXPORT
+                        ))
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.MEDICAL_RECORD_TEMPLATE
+                        AND a.actionType IN (
+                            com.benhsoan.domain.auditlog.enums.ActionType.CREATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.UPDATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.ACTIVATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.DEACTIVATE
+                        ))
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.CLINICAL_SERVICE
+                        AND a.actionType IN (
+                            com.benhsoan.domain.auditlog.enums.ActionType.CREATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.UPDATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.ACTIVATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.DEACTIVATE
+                        ))
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.ROOM
+                        AND a.actionType IN (
+                            com.benhsoan.domain.auditlog.enums.ActionType.CREATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.UPDATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.ACTIVATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.DEACTIVATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.DELETE
+                        ))
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.DOCTOR_SCHEDULE
+                        AND a.actionType = com.benhsoan.domain.auditlog.enums.ActionType.UPDATE)
+                    OR (a.resourceType = com.benhsoan.domain.auditlog.enums.ResourceType.DOCTOR_TIMEOFF
+                        AND a.actionType IN (
+                            com.benhsoan.domain.auditlog.enums.ActionType.CREATE,
+                            com.benhsoan.domain.auditlog.enums.ActionType.CANCEL
+                        ))
                 )
                 AND (:actorId IS NULL OR a.userId = :actorId)
                 AND (:resourceType IS NULL OR a.resourceType = :resourceType)
