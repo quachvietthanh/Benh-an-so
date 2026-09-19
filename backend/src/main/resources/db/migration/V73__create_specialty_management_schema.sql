@@ -1,5 +1,5 @@
 -- =====================================================
--- V72 - NCL-09-CN-007: Specialty and Room/Doctor Management Schema.
+-- V73 - NCL-09-CN-007: Specialty and Room/Doctor Management Schema.
 -- Allows Admin to manage specialties, prevent duplicates,
 -- and associate doctors and rooms with specialties.
 -- =====================================================
