@@ -1,7 +1,7 @@
 # Specialty and Room/Doctor Management API
 
 > User Story: **NCL-09-CN-007 — Quản lý danh mục chuyên khoa và phòng khám bệnh**  
-> Status: **Implemented in backend migration V72**  
+> Status: **Implemented in backend migration V73**  
 > Base URL: `/api/v1` (hoặc `/` tùy cấu hình servlet path)  
 > Auth: Bearer JWT  
 
