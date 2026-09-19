@@ -21,7 +21,7 @@ public record ReplaceMedicalRecordDiagnosesRequest(
 
     public record SecondaryDiagnosisRequest(
             UUID diagnosisCatalogId,
-            @Size(max = 255) String name,
+            @Size(max = 150) String name,
             @Size(max = 5000) String note
     ) {
 

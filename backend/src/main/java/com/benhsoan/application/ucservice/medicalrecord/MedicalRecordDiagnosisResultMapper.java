@@ -10,6 +10,7 @@ public class MedicalRecordDiagnosisResultMapper {
 
     public MedicalRecordDiagnosisResult toResult(MedicalRecordDiagnosis diagnosis) {
         return new MedicalRecordDiagnosisResult(diagnosis.getId(), diagnosis.getMedicalRecordId(),
+                diagnosis.getDiagnosisCatalogId(),
                 diagnosis.getDiagnosisCode(), diagnosis.getDiagnosisName(), diagnosis.getDiagnosisType(),
                 diagnosis.getNote(), diagnosis.getDiagnosedBy(), diagnosis.getDiagnosedAt());
     }
