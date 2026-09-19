@@ -20,6 +20,7 @@ import {
   EyeInvisibleOutlined,
   TeamOutlined,
   BellOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 
 export const roleNames = {
@@ -37,7 +38,7 @@ export const navigationSections = [
   { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/overdue-signing', '/medical-records/version-history', '/medical-records/copy-issuance', '/prescriptions', '/clinical-orders', '/clinical-results', '/results'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing'] },
-  { key: 'reports', label: 'Báo cáo', paths: ['/reports'] },
+  { key: 'reports', label: 'Báo cáo', paths: ['/reports', '/reports/disease-patterns'] },
   { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization'] },
 ]
 
@@ -76,6 +77,7 @@ export const getNavigationItems = (roles = [], permissions = []) => {
     { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('PHARMACY_CREATE') || isPharmacist) },
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, check: () => !isAdmin && !isDoctor && (hasPerm('INVOICE_READ') || hasPerm('INVOICE_CREATE') || isManager || isReceptionist) },
     { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, check: () => hasPerm('REPORT_VIEW') || isAdmin || isManager },
+    { key: '/reports/disease-patterns', label: 'Mô hình bệnh tật', icon: BarChartOutlined, check: () => isManager && !isAdmin },
     { key: '/users', label: 'Quản trị tài khoản', icon: TeamOutlined, check: () => isAdmin },
     { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || isAdmin || isManager },
     { key: '/system/clinical-services', label: 'Danh mục cận lâm sàng & ngưỡng', icon: ExperimentOutlined, check: () => hasPerm('CLINICAL_SERVICE_MANAGE') || isAdmin },
