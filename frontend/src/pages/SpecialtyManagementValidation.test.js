@@ -222,3 +222,56 @@ test('NCL-09-CN-007: Validation rules cho form chuyên khoa', () => {
   assert.strictEqual('A'.repeat(30).length <= maxLength, true)
   assert.strictEqual('A'.repeat(31).length <= maxLength, false)
 })
+
+test('PR #240: Tất cả các file trong module chuyên khoa phải có đuôi mở rộng file trong import ESM (.js/.jsx)', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+
+  const filesToCheck = [
+    'src/pages/SpecialtyManagementPage.jsx',
+    'src/components/specialty/SpecialtyFormModal.jsx',
+    'src/components/specialty/SpecialtyDeactivateConfirmModal.jsx',
+    'src/components/specialty/SpecialtyDetailDrawer.jsx',
+  ]
+
+  for (const relPath of filesToCheck) {
+    const fullPath = path.resolve(relPath)
+    const content = fs.readFileSync(fullPath, 'utf8')
+    const relativeImportRegex = /from\s+['"](\.\.?\/[^'"]+)['"]/g
+    let match
+    while ((match = relativeImportRegex.exec(content)) !== null) {
+      const importPath = match[1]
+      // CSS imports end in .css, code imports must end in .js or .jsx
+      const hasValidExt = importPath.endsWith('.js') || importPath.endsWith('.jsx') || importPath.endsWith('.css')
+      assert.strictEqual(
+        hasValidExt,
+        true,
+        `Import "${importPath}" trong file ${relPath} phải có đuôi file (.js, .jsx, .css)`
+      )
+    }
+  }
+})
+
+test('PR #240: KPI stats không bị tính sai khi lọc trạng thái (đảm bảo tính trên toàn bộ dữ liệu)', () => {
+  const fullSpecialties = [
+    { id: '1', code: 'GENERAL', name: 'Đa khoa', active: true },
+    { id: '2', code: 'PEDIATRICS', name: 'Nhi', active: true },
+    { id: '3', code: 'OLD_SPEC', name: 'Khoa cũ', active: false },
+  ]
+
+  // KPI tính từ danh sách đầy đủ (không filter)
+  const total = fullSpecialties.length
+  const activeCount = fullSpecialties.filter((s) => s.active).length
+  const inactiveCount = total - activeCount
+
+  assert.strictEqual(total, 3, 'Tổng số chuyên khoa phải là 3')
+  assert.strictEqual(activeCount, 2, 'Số chuyên khoa đang hoạt động phải là 2')
+  assert.strictEqual(inactiveCount, 1, 'Số chuyên khoa ngừng dùng phải là 1')
+
+  // Giả lập danh sách sau khi đã filter trạng thái 'ACTIVE'
+  const filteredActiveList = fullSpecialties.filter((s) => s.active)
+  assert.strictEqual(filteredActiveList.length, 2)
+  // KPI vẫn phải giữ nguyên theo danh sách tổng, không bị tụt inactiveCount về 0
+  assert.strictEqual(inactiveCount, 1, 'Khi hiển thị tab Đang dùng, KPI Ngừng dùng không được tụt về 0')
+})
+

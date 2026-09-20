@@ -11,7 +11,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import specialtyApi from '../../api/specialtyApi'
+import specialtyApi from '../../api/specialtyApi.js'
 
 const { Text, Title, Paragraph } = Typography
 

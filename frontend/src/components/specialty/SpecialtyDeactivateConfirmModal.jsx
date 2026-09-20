@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button, Modal, Spin, Typography, message } from 'antd'
 import { ExclamationCircleOutlined, StopOutlined, WarningOutlined } from '@ant-design/icons'
-import specialtyApi from '../../api/specialtyApi'
-import { getApiErrorMessage } from '../../utils/apiError'
+import specialtyApi from '../../api/specialtyApi.js'
+import { getApiErrorMessage } from '../../utils/apiError.js'
 
 const { Text, Paragraph } = Typography
 

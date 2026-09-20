@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Form, Input, Modal, Select, message } from 'antd'
 import { ApartmentOutlined, MedicineBoxOutlined, UserOutlined } from '@ant-design/icons'
-import specialtyApi from '../../api/specialtyApi'
-import userApi from '../../api/userApi'
-import systemApi from '../../api/systemApi'
-import { getApiErrorMessage } from '../../utils/apiError'
+import specialtyApi from '../../api/specialtyApi.js'
+import userApi from '../../api/userApi.js'
+import systemApi from '../../api/systemApi.js'
+import { getApiErrorMessage } from '../../utils/apiError.js'
 
 const { TextArea } = Input
 

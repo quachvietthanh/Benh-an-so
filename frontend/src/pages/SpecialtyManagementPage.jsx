@@ -32,12 +32,12 @@ import {
   StopOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import specialtyApi from '../api/specialtyApi'
-import SpecialtyFormModal from '../components/specialty/SpecialtyFormModal'
-import SpecialtyDeactivateConfirmModal from '../components/specialty/SpecialtyDeactivateConfirmModal'
-import SpecialtyDetailDrawer from '../components/specialty/SpecialtyDetailDrawer'
-import { useAuthContext } from '../context/AuthContext'
-import { getApiErrorMessage } from '../utils/apiError'
+import specialtyApi from '../api/specialtyApi.js'
+import SpecialtyFormModal from '../components/specialty/SpecialtyFormModal.jsx'
+import SpecialtyDeactivateConfirmModal from '../components/specialty/SpecialtyDeactivateConfirmModal.jsx'
+import SpecialtyDetailDrawer from '../components/specialty/SpecialtyDetailDrawer.jsx'
+import { useAuthContext } from '../context/AuthContext.jsx'
+import { getApiErrorMessage } from '../utils/apiError.js'
 import '../styles/specialtyManagement.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -60,6 +60,9 @@ export default function SpecialtyManagementPage() {
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [stats, setStats] = useState({ total: 0, activeCount: 0, inactiveCount: 0 })
 
   // Modals & Drawer states
   const [formModalOpen, setFormModalOpen] = useState(false)
@@ -69,6 +72,19 @@ export default function SpecialtyManagementPage() {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [detailSpecialtyId, setDetailSpecialtyId] = useState(null)
   const [actionLoadingId, setActionLoadingId] = useState(null)
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await specialtyApi.search({})
+      const list = Array.isArray(res.data) ? res.data : []
+      const total = list.length
+      const activeCount = list.filter((s) => s.active).length
+      const inactiveCount = total - activeCount
+      setStats({ total, activeCount, inactiveCount })
+    } catch {
+      // Giữ nguyên thống kê nếu có lỗi mạng tạm thời
+    }
+  }, [])
 
   const fetchSpecialties = useCallback(async () => {
     setLoading(true)
@@ -86,6 +102,13 @@ export default function SpecialtyManagementPage() {
       const res = await specialtyApi.search(params)
       const list = Array.isArray(res.data) ? res.data : []
       setSpecialties(list)
+
+      if (!keyword.trim() && statusFilter === 'ALL') {
+        const total = list.length
+        const activeCount = list.filter((s) => s.active).length
+        const inactiveCount = total - activeCount
+        setStats({ total, activeCount, inactiveCount })
+      }
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Không thể nạp danh sách chuyên khoa.')
       message.error(msg)
@@ -98,12 +121,24 @@ export default function SpecialtyManagementPage() {
     fetchSpecialties()
   }, [fetchSpecialties])
 
-  const stats = useMemo(() => {
-    const total = specialties.length
-    const activeCount = specialties.filter((s) => s.active).length
-    const inactiveCount = total - activeCount
-    return { total, activeCount, inactiveCount }
-  }, [specialties])
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
+
+  const handleKeywordChange = (e) => {
+    setKeyword(e.target.value)
+    setCurrentPage(1)
+  }
+
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value)
+    setCurrentPage(1)
+  }
+
+  const handleReload = () => {
+    fetchSpecialties()
+    fetchStats()
+  }
 
   const handleOpenCreate = () => {
     setEditingSpecialty(null)
@@ -135,6 +170,7 @@ export default function SpecialtyManagementPage() {
       await specialtyApi.activate(specialty.id)
       message.success(`Kích hoạt lại chuyên khoa "${specialty.name}" thành công!`)
       fetchSpecialties()
+      fetchStats()
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Không thể kích hoạt lại chuyên khoa.')
       message.error(msg)
@@ -434,14 +470,14 @@ export default function SpecialtyManagementPage() {
                 prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
                 allowClear
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
+                onChange={handleKeywordChange}
                 onPressEnter={fetchSpecialties}
                 style={{ width: 280, borderRadius: 8 }}
               />
 
               <Radio.Group
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={handleStatusFilterChange}
                 buttonStyle="solid"
               >
                 <Radio.Button value="ALL">Tất cả ({stats.total})</Radio.Button>
@@ -454,7 +490,7 @@ export default function SpecialtyManagementPage() {
           <Col xs={24} md={10} style={{ textAlign: 'right' }}>
             <Button
               icon={<ReloadOutlined />}
-              onClick={fetchSpecialties}
+              onClick={handleReload}
               loading={loading}
               style={{ borderRadius: 8 }}
             >
@@ -472,10 +508,15 @@ export default function SpecialtyManagementPage() {
           rowKey="id"
           loading={loading}
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
             showTotal: (total, range) => `${range[0]}-${range[1]} trong số ${total} chuyên khoa`,
+            onChange: (page, size) => {
+              setCurrentPage(page)
+              setPageSize(size)
+            },
           }}
           locale={{
             emptyText: (
@@ -495,6 +536,7 @@ export default function SpecialtyManagementPage() {
         onSuccess={() => {
           setFormModalOpen(false)
           fetchSpecialties()
+          fetchStats()
         }}
         editingSpecialty={editingSpecialty}
       />
@@ -507,6 +549,7 @@ export default function SpecialtyManagementPage() {
         onSuccess={() => {
           setDeactivateModalOpen(false)
           fetchSpecialties()
+          fetchStats()
         }}
       />
 
