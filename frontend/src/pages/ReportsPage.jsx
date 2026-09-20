@@ -58,11 +58,12 @@ import {
 } from '../utils/storageHelpers'
 
 import DiseasePatternReportPage from './DiseasePatternReportPage.jsx'
+import RevenueBreakdownReportPage from './RevenueBreakdownReportPage.jsx'
 
 const { RangePicker } = DatePicker
 const { Title, Text } = Typography
 
-const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit', 'disease-patterns']
+const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit', 'disease-patterns', 'revenue-breakdown']
 
 function ReportsPage() {
   const { user } = useAuthContext()
@@ -575,6 +576,14 @@ function ReportsPage() {
                       </span>
                     ),
                   },
+                  {
+                    key: 'revenue-breakdown',
+                    label: (
+                      <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                        <DollarCircleOutlined /> Doanh thu bóc tách
+                      </span>
+                    ),
+                  },
                 ]
               : []),
           ]}
@@ -628,6 +637,10 @@ function ReportsPage() {
 
         {activeTab === 'disease-patterns' && isManager && !isAdmin && (
           <DiseasePatternReportPage />
+        )}
+
+        {activeTab === 'revenue-breakdown' && isManager && !isAdmin && (
+          <RevenueBreakdownReportPage />
         )}
       </div>
 
