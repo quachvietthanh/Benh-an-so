@@ -78,10 +78,14 @@ public class UserController {
 
     @GetMapping("/doctors")
     @RequirePermission("USER_READ")
-    public List<UserResponse> getDoctors() {
+    public List<UserResponse> getDoctors(
+            @RequestParam(required = false) UUID specialtyId
+    ) {
 
         return userRestMapper.toResponse(
-                getDoctorsUseCase.getAllActiveDoctors());
+                specialtyId != null
+                        ? getDoctorsUseCase.getActiveDoctorsBySpecialty(specialtyId)
+                        : getDoctorsUseCase.getAllActiveDoctors());
     }
 
     @GetMapping("/{id}")
