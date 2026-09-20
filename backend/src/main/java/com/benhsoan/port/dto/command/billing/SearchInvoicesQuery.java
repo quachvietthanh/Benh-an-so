@@ -11,6 +11,7 @@ public record SearchInvoicesQuery(
         String invoiceCode,
         InvoiceType invoiceType,
         UUID visitId,
+        String patientName,
         Instant createdFrom,
         Instant createdTo,
         Pageable pageable

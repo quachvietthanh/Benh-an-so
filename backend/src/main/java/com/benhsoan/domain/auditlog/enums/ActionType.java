@@ -34,11 +34,15 @@ public enum ActionType {
 
     RETURN,
 
+    REPRINT,
+
     EXPORT,
 
     SEND,
 
     OVERRIDE_DRUG_INTERACTION_WARNING,
+
+    OVERRIDE_BATCH_SELECTION,
 
     BACKUP,
 

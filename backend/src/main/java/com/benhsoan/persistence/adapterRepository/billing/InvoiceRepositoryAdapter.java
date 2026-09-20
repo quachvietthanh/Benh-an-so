@@ -113,6 +113,7 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
                         criteria.invoiceCode(),
                         criteria.invoiceType(),
                         criteria.visitId(),
+                        criteria.patientName(),
                         criteria.createdFrom(),
                         criteria.createdTo(),
                         pageable

@@ -6,12 +6,17 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.billing.Invoice;
 import com.benhsoan.domain.billing.exception.InvoiceNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.inbound.billing.RecordInvoiceReprintUseCase;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.InvoiceRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
@@ -24,6 +29,8 @@ public class RecordInvoiceReprintService implements RecordInvoiceReprintUseCase 
     private final InvoiceRepository invoiceRepository;
     private final InvoiceResultMapper resultMapper;
     private final ClockPort clockPort;
+    private final CurrentUserPort currentUserPort;
+    private final AuditLogRepository auditLogRepository;
 
     @Override
     public InvoiceResult recordReprint(UUID invoiceId) {
@@ -32,10 +39,23 @@ public class RecordInvoiceReprintService implements RecordInvoiceReprintUseCase 
         }
 
         Instant now = clockPort.now();
+        UUID actorId = currentUserPort.getCurrentUserId();
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new InvoiceNotFoundException(invoiceId));
 
         invoice.recordReprint(now);
-        return resultMapper.toResult(invoiceRepository.save(invoice));
+        Invoice saved = invoiceRepository.save(invoice);
+
+        auditLogRepository.save(AuditLog.create(
+                actorId,
+                ActionType.REPRINT,
+                ResourceType.INVOICE,
+                saved.getId(),
+                "{\"invoiceCode\":\"%s\",\"reprintCount\":%d}".formatted(
+                        saved.getInvoiceCode(), saved.getReprintCount()),
+                null,
+                now));
+
+        return resultMapper.toResult(saved);
     }
 }

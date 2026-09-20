@@ -83,31 +83,12 @@ CREATE TABLE prescription_contraindication_warning_logs (
 CREATE INDEX idx_presc_contra_warning_prescription
     ON prescription_contraindication_warning_logs(prescription_id);
 
--- Seed illustrative, configurable contraindication rules.
-INSERT INTO contraindication_rules (
-    id, medicine_id, active_ingredient, contraindication_type, min_age_years, max_age_years,
-    diagnosis_catalog_id, severity, message, recommendation, active, created_at, updated_at
-) SELECT UUID_TO_BIN(UUID()), NULL, 'Aspirin', 'AGE', NULL, 15, NULL, 'CONTRAINDICATED',
-     'Aspirin is contraindicated in children under 16 due to the risk of Reye syndrome.',
-     'Use Paracetamol as a safer alternative for fever and pain.',
-     TRUE, CURRENT_TIMESTAMP, NULL
-  WHERE NOT EXISTS (SELECT 1 FROM contraindication_rules WHERE active_ingredient = 'Aspirin' AND contraindication_type = 'AGE');
-
-INSERT INTO contraindication_rules (
-    id, medicine_id, active_ingredient, contraindication_type, min_age_years, max_age_years,
-    diagnosis_catalog_id, severity, message, recommendation, active, created_at, updated_at
-) SELECT UUID_TO_BIN(UUID()), NULL, 'Ibuprofen', 'PREGNANCY', NULL, NULL, NULL, 'CONTRAINDICATED',
-     'Ibuprofen is contraindicated in the third trimester of pregnancy.',
-     'Use Paracetamol and consult the prescribing physician.',
-     TRUE, CURRENT_TIMESTAMP, NULL
-  WHERE NOT EXISTS (SELECT 1 FROM contraindication_rules WHERE active_ingredient = 'Ibuprofen' AND contraindication_type = 'PREGNANCY');
-
-INSERT INTO contraindication_rules (
-    id, medicine_id, active_ingredient, contraindication_type, min_age_years, max_age_years,
-    diagnosis_catalog_id, severity, message, recommendation, active, created_at, updated_at
-) SELECT UUID_TO_BIN(UUID()), NULL, 'Ibuprofen', 'DISEASE', NULL, NULL,
-     UUID_TO_BIN('a1000000-0000-0000-0000-000000000014'), 'MODERATE',
-     'NSAIDs may raise blood pressure and reduce the effect of antihypertensive therapy.',
-     'Consider Paracetamol or a non-NSAID alternative and monitor blood pressure.',
-     TRUE, CURRENT_TIMESTAMP, NULL
-  WHERE NOT EXISTS (SELECT 1 FROM contraindication_rules WHERE active_ingredient = 'Ibuprofen' AND contraindication_type = 'DISEASE');
+-- =====================================================
+-- Contraindication rule catalog
+-- =====================================================
+-- The `contraindication_rules` table is intentionally seeded with NO rows.
+-- Clinical rules (age / pregnancy / disease thresholds, severity, message and
+-- recommendation) MUST come from an authoritative clinical source and be
+-- configured by an authorized business/clinical process. No clinical
+-- thresholds or medication/disease pairings are invented by this migration.
+-- =====================================================

@@ -78,10 +78,14 @@ public interface JpaInvoiceRepository
             value = """
                     select invoice
                     from InvoiceEntity invoice
+                    join VisitEntity visit on visit.id = invoice.visitId
+                    join PatientEntity patient on patient.id = visit.patientId
                     where (:invoiceCode is null
                         or lower(invoice.invoiceCode) like lower(concat('%', :invoiceCode, '%')))
                       and (:invoiceType is null or invoice.type = :invoiceType)
                       and (:visitId is null or invoice.visitId = :visitId)
+                      and (:patientName is null
+                        or lower(patient.fullName) like lower(concat('%', :patientName, '%')))
                       and (:createdFrom is null or invoice.createdAt >= :createdFrom)
                       and (:createdTo is null or invoice.createdAt <= :createdTo)
                     order by invoice.createdAt desc
@@ -89,10 +93,14 @@ public interface JpaInvoiceRepository
             countQuery = """
                     select count(invoice)
                     from InvoiceEntity invoice
+                    join VisitEntity visit on visit.id = invoice.visitId
+                    join PatientEntity patient on patient.id = visit.patientId
                     where (:invoiceCode is null
                         or lower(invoice.invoiceCode) like lower(concat('%', :invoiceCode, '%')))
                       and (:invoiceType is null or invoice.type = :invoiceType)
                       and (:visitId is null or invoice.visitId = :visitId)
+                      and (:patientName is null
+                        or lower(patient.fullName) like lower(concat('%', :patientName, '%')))
                       and (:createdFrom is null or invoice.createdAt >= :createdFrom)
                       and (:createdTo is null or invoice.createdAt <= :createdTo)
                     """
@@ -101,6 +109,7 @@ public interface JpaInvoiceRepository
             @Param("invoiceCode") String invoiceCode,
             @Param("invoiceType") InvoiceType invoiceType,
             @Param("visitId") UUID visitId,
+            @Param("patientName") String patientName,
             @Param("createdFrom") Instant createdFrom,
             @Param("createdTo") Instant createdTo,
             Pageable pageable

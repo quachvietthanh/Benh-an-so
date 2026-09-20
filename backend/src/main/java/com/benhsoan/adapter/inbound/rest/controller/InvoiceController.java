@@ -119,6 +119,7 @@ public class InvoiceController {
             @RequestParam(required = false) String invoiceCode,
             @RequestParam(required = false) InvoiceType invoiceType,
             @RequestParam(required = false) UUID visitId,
+            @RequestParam(required = false) String patientName,
             @RequestParam(required = false) Instant createdFrom,
             @RequestParam(required = false) Instant createdTo,
             @RequestParam(defaultValue = "0") int page,
@@ -140,6 +141,7 @@ public class InvoiceController {
                         invoiceCode,
                         invoiceType,
                         visitId,
+                        patientName,
                         createdFrom,
                         createdTo,
                         pageable

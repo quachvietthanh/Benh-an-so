@@ -26,6 +26,7 @@ public class SearchInvoicesService implements SearchInvoicesUseCase {
                 query.invoiceCode(),
                 query.invoiceType(),
                 query.visitId(),
+                query.patientName(),
                 query.createdFrom(),
                 query.createdTo()
         );

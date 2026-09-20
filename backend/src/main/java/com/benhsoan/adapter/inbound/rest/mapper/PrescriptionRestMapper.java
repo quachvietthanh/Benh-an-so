@@ -238,7 +238,11 @@ public class PrescriptionRestMapper {
     }
 
     private DispenseItemCommand toCommand(DispenseItemRequest request) {
-        return new DispenseItemCommand(request.prescriptionItemId(), request.quantity());
+        return new DispenseItemCommand(
+                request.prescriptionItemId(),
+                request.quantity(),
+                request.batchId(),
+                request.batchChangeReason());
     }
 
     public PartialDispensePrescriptionResponse toResponse(

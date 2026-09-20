@@ -90,9 +90,12 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
         List<PrescriptionItem> items = prescription.getItems();
         Map<UUID, Integer> requestedByItem = resolveRequestedQuantities(command, items);
         Map<UUID, Medicine> medicines = loadMedicines(items);
+        Map<UUID, DispenseItemCommand> commandByItemId = command.items().stream()
+                .collect(Collectors.toMap(DispenseItemCommand::prescriptionItemId, Function.identity()));
 
         List<PrescriptionInsufficientStockException.StockShortageDetail> shortages = new ArrayList<>();
         List<AllocationPlan> plans = new ArrayList<>();
+        List<BatchOverride> overrides = new ArrayList<>();
         Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>(
                 eligibleStockSnapshotService.snapshotEligibleStockQuantities(
                         items.stream().map(PrescriptionItem::getMedicineId).distinct().toList(), today));
@@ -119,10 +122,56 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
                 continue;
             }
 
+            DispenseItemCommand commandItem = commandByItemId.get(item.getId());
+            UUID overrideBatchId = commandItem == null ? null : commandItem.batchId();
+            String overrideReason = commandItem == null ? null : commandItem.batchChangeReason();
+
+            if (overrideBatchId == null) {
+                int remaining = requested;
+                for (MedicineBatch batch : batches) {
+                    if (remaining == 0) {
+                        break;
+                    }
+                    int allocated = Math.min(remaining, batch.getQuantity());
+                    plans.add(new AllocationPlan(item, batch, medicine.getMedicineCode(), allocated));
+                    remaining -= allocated;
+                }
+                continue;
+            }
+
+            MedicineBatch selected = null;
+            for (MedicineBatch batch : batches) {
+                if (batch.getId().equals(overrideBatchId)) {
+                    selected = batch;
+                    break;
+                }
+            }
+            if (selected == null) {
+                throw new ValidationException(
+                        "Selected batch is not eligible for dispensing: " + overrideBatchId);
+            }
+
+            MedicineBatch fefoFirst = batches.getFirst();
+            if (!selected.getId().equals(fefoFirst.getId())) {
+                if (overrideReason == null || overrideReason.isBlank()) {
+                    throw new ValidationException(
+                            "Batch change reason is required when overriding the FEFO-selected batch.");
+                }
+                overrides.add(new BatchOverride(
+                        item.getId(), fefoFirst.getId(), selected.getId(), overrideReason.trim()));
+            }
+
             int remaining = requested;
+            int allocatedFromSelected = Math.min(remaining, selected.getQuantity());
+            plans.add(new AllocationPlan(item, selected, medicine.getMedicineCode(), allocatedFromSelected));
+            remaining -= allocatedFromSelected;
+
             for (MedicineBatch batch : batches) {
                 if (remaining == 0) {
                     break;
+                }
+                if (batch.getId().equals(selected.getId())) {
+                    continue;
                 }
                 int allocated = Math.min(remaining, batch.getQuantity());
                 plans.add(new AllocationPlan(item, batch, medicine.getMedicineCode(), allocated));
@@ -154,6 +203,19 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
                         .formatted(saved.getPrescriptionCode(), saved.getStatus()),
                 null,
                 now));
+
+        for (BatchOverride override : overrides) {
+            auditLogRepository.save(AuditLog.create(
+                    actorId,
+                    ActionType.OVERRIDE_BATCH_SELECTION,
+                    ResourceType.PRESCRIPTION,
+                    saved.getId(),
+                    "{\"prescriptionItemId\":\"%s\",\"fefoBatchId\":\"%s\",\"selectedBatchId\":\"%s\",\"reason\":\"%s\"}"
+                            .formatted(override.prescriptionItemId(), override.fefoBatchId(),
+                                    override.selectedBatchId(), override.reason()),
+                    null,
+                    now));
+        }
 
         return resultMapper.toResult(
                 saved,
@@ -336,6 +398,14 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
             MedicineBatch batch,
             String medicineCode,
             int allocatedQuantity
+    ) {
+    }
+
+    private record BatchOverride(
+            UUID prescriptionItemId,
+            UUID fefoBatchId,
+            UUID selectedBatchId,
+            String reason
     ) {
     }
 }

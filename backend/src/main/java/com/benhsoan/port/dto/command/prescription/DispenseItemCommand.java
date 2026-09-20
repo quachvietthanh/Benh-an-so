@@ -8,6 +8,11 @@ import java.util.UUID;
  */
 public record DispenseItemCommand(
         UUID prescriptionItemId,
-        int quantity
+        int quantity,
+        UUID batchId,
+        String batchChangeReason
 ) {
+    public DispenseItemCommand(UUID prescriptionItemId, int quantity) {
+        this(prescriptionItemId, quantity, null, null);
+    }
 }
