@@ -85,7 +85,7 @@ class GetPrescriptionDispenseHistoryServiceTest {
 
         PrescriptionDispenseItem event = PrescriptionDispenseItem.restore(
                 UUID.randomUUID(), prescriptionId, itemId, medicineId, batchId,
-                12, dispenserId, NOW, NOW);
+                12, 0, dispenserId, NOW, NOW);
         when(dispenseItemRepository.findByPrescriptionId(prescriptionId)).thenReturn(List.of(event));
 
         Medicine medicine = mock(Medicine.class);

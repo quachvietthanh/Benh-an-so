@@ -14,6 +14,7 @@ import com.benhsoan.adapter.inbound.rest.request.billing.GetPaymentQuoteRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RecordPaymentRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RefundPaymentRequest;
 import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceLineResponse;
+import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceAdjustmentsResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PayableEncounterResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentResponse;
@@ -27,6 +28,7 @@ import com.benhsoan.port.dto.command.billing.CreateInvoiceCommand;
 import com.benhsoan.port.dto.command.billing.GetPaymentQuoteCommand;
 import com.benhsoan.port.dto.command.billing.RecordPaymentCommand;
 import com.benhsoan.port.dto.command.billing.RefundPaymentCommand;
+import com.benhsoan.port.dto.result.InvoiceAdjustmentsResult;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
@@ -126,6 +128,8 @@ public class BillingRestMapper {
                 result.totalAmount(),
                 result.createdBy(),
                 result.createdAt(),
+                result.reprintCount(),
+                result.lastReprintedAt(),
                 lines
         );
     }
@@ -145,6 +149,17 @@ public class BillingRestMapper {
 
     public Page<InvoiceResponse> toInvoiceResponse(Page<InvoiceResult> results) {
         return results.map(this::toResponse);
+    }
+
+    public InvoiceAdjustmentsResponse toResponse(InvoiceAdjustmentsResult result) {
+        return new InvoiceAdjustmentsResponse(
+                result.originalInvoiceId(),
+                result.originalAmount(),
+                result.finalAmount(),
+                result.adjustments().stream()
+                        .map(this::toResponse)
+                        .toList()
+        );
     }
 
     public PayableEncounterResponse toResponse(PayableEncounterResult result) {

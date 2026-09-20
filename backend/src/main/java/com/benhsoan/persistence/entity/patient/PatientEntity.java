@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.enums.PatientStatus;
+import com.benhsoan.domain.patient.enums.PregnancyStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -145,6 +146,10 @@ public class PatientEntity {
 
     @Column(name = "merge_reason", length = 500)
     private String mergeReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pregnancy_status", length = 30)
+    private PregnancyStatus pregnancyStatus;
 
     @PrePersist
     void prePersist() {

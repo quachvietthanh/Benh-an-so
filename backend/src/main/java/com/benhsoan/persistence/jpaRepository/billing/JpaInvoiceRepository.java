@@ -29,6 +29,16 @@ public interface JpaInvoiceRepository
     @Query("""
             select invoice
             from InvoiceEntity invoice
+            where invoice.originalInvoiceId = :originalInvoiceId
+            order by invoice.createdAt asc
+            """)
+    List<InvoiceEntity> findAdjustmentsByOriginalInvoiceId(
+            @Param("originalInvoiceId") UUID originalInvoiceId
+    );
+
+    @Query("""
+            select invoice
+            from InvoiceEntity invoice
             where invoice.createdAt >= :fromInclusive
               and invoice.createdAt < :toExclusive
             order by invoice.createdAt asc

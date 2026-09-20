@@ -14,16 +14,26 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescription
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.DispenseItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PartialDispensePrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.ReturnMedicationItemRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.ReturnMedicationRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionInteractionOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.ContraindicationCheckResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.ContraindicationMissingDataResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.ContraindicationWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseAllocationResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseItemSummaryResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseSuggestionBatchResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseSuggestionItemResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseSuggestionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PartialDispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionWarningResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.ReturnMedicationResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.ReturnedMedicationItemResponse;
 import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
@@ -34,20 +44,32 @@ import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispensePrescriptionItemsCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.ReturnMedicationCommand;
+import com.benhsoan.port.dto.command.prescription.ReturnMedicationItemCommand;
+import com.benhsoan.port.dto.result.ContraindicationCheckResult;
+import com.benhsoan.port.dto.result.ContraindicationMissingDataResult;
+import com.benhsoan.port.dto.result.ContraindicationWarningResult;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.DispenseAllocationResult;
 import com.benhsoan.port.dto.result.DispenseItemSummaryResult;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
+import com.benhsoan.port.dto.result.DispenseSuggestionBatchResult;
+import com.benhsoan.port.dto.result.DispenseSuggestionItemResult;
+import com.benhsoan.port.dto.result.DispenseSuggestionResult;
 import com.benhsoan.port.dto.result.PartialDispensePrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionDispenseHistoryResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
+import com.benhsoan.port.dto.result.ReturnMedicationResult;
+import com.benhsoan.port.dto.result.ReturnedMedicationItemResult;
 
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionAllergyOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionContraindicationOverrideRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PatientAllergyWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionAllergyWarningLogResponse;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
 
@@ -113,6 +135,14 @@ public class PrescriptionRestMapper {
                                 .map(this::toCommand)
                                 .toList();
 
+        List<PrescriptionContraindicationOverrideCommand> contraindicationOverrides
+                = request.contraindicationOverrides() == null
+                        ? List.of()
+                        : request.contraindicationOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
         return CreatePrescriptionCommand.builder()
                 .medicalRecordId(request.medicalRecordId())
                 .note(request.note())
@@ -122,6 +152,7 @@ public class PrescriptionRestMapper {
                         .toList())
                 .interactionOverrides(interactionOverrides)
                 .allergyOverrides(allergyOverrides)
+                .contraindicationOverrides(contraindicationOverrides)
                 .build();
     }
 
@@ -379,6 +410,19 @@ public class PrescriptionRestMapper {
         );
     }
 
+    public PrescriptionContraindicationOverrideCommand toCommand(
+            PrescriptionContraindicationOverrideRequest request
+    ) {
+        if (request == null) {
+            return null;
+        }
+        return new PrescriptionContraindicationOverrideCommand(
+                request.ruleId(),
+                request.medicineId(),
+                request.overrideReason()
+        );
+    }
+
     public PatientAllergyWarningResponse toAllergyResponse(
             PatientAllergyWarningResult result
     ) {
@@ -432,6 +476,98 @@ public class PrescriptionRestMapper {
                 result.reaction(),
                 result.overrideReason(),
                 result.handledAt()
+        );
+    }
+
+    public ReturnMedicationCommand toCommand(UUID prescriptionId, ReturnMedicationRequest request) {
+        return new ReturnMedicationCommand(
+                prescriptionId,
+                request.reason(),
+                request.items().stream().map(this::toCommand).toList()
+        );
+    }
+
+    public ReturnMedicationResponse toResponse(ReturnMedicationResult result) {
+        return new ReturnMedicationResponse(
+                result.prescriptionId(),
+                result.status(),
+                result.returnedBy(),
+                result.returnedAt(),
+                result.returns().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private ReturnMedicationItemCommand toCommand(ReturnMedicationItemRequest request) {
+        return new ReturnMedicationItemCommand(request.dispenseItemId(), request.quantity());
+    }
+
+    private ReturnedMedicationItemResponse toResponse(ReturnedMedicationItemResult result) {
+        return new ReturnedMedicationItemResponse(
+                result.returnId(),
+                result.dispenseItemId(),
+                result.prescriptionItemId(),
+                result.medicineId(),
+                result.medicineName(),
+                result.medicineBatchId(),
+                result.batchNumber(),
+                result.returnedQuantity(),
+                result.remainingReturnableQuantity()
+        );
+    }
+
+    public ContraindicationCheckResponse toResponse(ContraindicationCheckResult result) {
+        return new ContraindicationCheckResponse(
+                result.warnings().stream().map(this::toResponse).toList(),
+                result.missingData().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private ContraindicationWarningResponse toResponse(ContraindicationWarningResult result) {
+        return new ContraindicationWarningResponse(
+                result.ruleId(),
+                result.medicineId(),
+                result.medicineName(),
+                result.type(),
+                result.severity(),
+                result.message(),
+                result.recommendation()
+        );
+    }
+
+    private ContraindicationMissingDataResponse toResponse(ContraindicationMissingDataResult result) {
+        return new ContraindicationMissingDataResponse(
+                result.medicineId(),
+                result.medicineName(),
+                result.type(),
+                result.message()
+        );
+    }
+
+    public DispenseSuggestionResponse toResponse(DispenseSuggestionResult result) {
+        return new DispenseSuggestionResponse(
+                result.prescriptionId(),
+                result.items().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private DispenseSuggestionItemResponse toResponse(DispenseSuggestionItemResult result) {
+        return new DispenseSuggestionItemResponse(
+                result.prescriptionItemId(),
+                result.medicineId(),
+                result.medicineName(),
+                result.prescribedQuantity(),
+                result.remainingQuantity(),
+                result.batches().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private DispenseSuggestionBatchResponse toResponse(DispenseSuggestionBatchResult result) {
+        return new DispenseSuggestionBatchResponse(
+                result.batchId(),
+                result.batchNumber(),
+                result.expiryDate(),
+                result.availableQuantity(),
+                result.suggestedQuantity()
         );
     }
 }

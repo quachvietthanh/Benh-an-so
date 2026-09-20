@@ -209,6 +209,16 @@ public class PrescriptionItem {
         this.dispensedQuantity = newDispensedQuantity;
     }
 
+    public void recordReturn(int returnedQuantity) {
+        if (returnedQuantity <= 0) {
+            throw new ValidationException("Returned quantity must be greater than zero.");
+        }
+        if (returnedQuantity > this.dispensedQuantity) {
+            throw new ValidationException("Returned quantity cannot exceed the dispensed quantity.");
+        }
+        this.dispensedQuantity -= returnedQuantity;
+    }
+
     public int getRemainingQuantity() {
         return this.quantity - this.dispensedQuantity;
     }

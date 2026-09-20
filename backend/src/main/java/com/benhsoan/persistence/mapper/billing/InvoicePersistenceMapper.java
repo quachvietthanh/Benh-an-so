@@ -44,6 +44,8 @@ public class InvoicePersistenceMapper {
                 entity.getTotalAmount(),
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
+                entity.getReprintCount(),
+                entity.getLastReprintedAt(),
                 lines
         );
     }
@@ -64,6 +66,8 @@ public class InvoicePersistenceMapper {
                 .totalAmount(domain.getTotalAmount())
                 .createdBy(domain.getCreatedBy())
                 .createdAt(domain.getCreatedAt())
+                .reprintCount(domain.getReprintCount())
+                .lastReprintedAt(domain.getLastReprintedAt())
                 .build();
     }
 }

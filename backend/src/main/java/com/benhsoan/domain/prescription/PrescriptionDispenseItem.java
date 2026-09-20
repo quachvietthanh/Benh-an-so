@@ -24,6 +24,7 @@ public class PrescriptionDispenseItem {
     private UUID medicineId;
     private UUID medicineBatchId;
     private int dispensedQuantity;
+    private int returnedQuantity;
     private UUID dispensedBy;
     private Instant dispensedAt;
     private Instant createdAt;
@@ -35,6 +36,7 @@ public class PrescriptionDispenseItem {
             UUID medicineId,
             UUID medicineBatchId,
             int dispensedQuantity,
+            int returnedQuantity,
             UUID dispensedBy,
             Instant dispensedAt,
             Instant createdAt
@@ -45,6 +47,7 @@ public class PrescriptionDispenseItem {
         this.medicineId = requireNonNull(medicineId, "Medicine id is required.");
         this.medicineBatchId = requireNonNull(medicineBatchId, "Medicine batch id is required.");
         this.dispensedQuantity = requirePositive(dispensedQuantity, "Dispensed quantity must be greater than 0.");
+        this.returnedQuantity = validateReturnedQuantity(returnedQuantity, this.dispensedQuantity);
         this.dispensedBy = requireNonNull(dispensedBy, "Dispensed by is required.");
         this.dispensedAt = requireNonNull(dispensedAt, "Dispensed at is required.");
         this.createdAt = requireNonNull(createdAt, "Created at is required.");
@@ -67,6 +70,7 @@ public class PrescriptionDispenseItem {
                 medicineId,
                 medicineBatchId,
                 dispensedQuantity,
+                0,
                 dispensedBy,
                 dispensedAt,
                 dispensedAt
@@ -80,6 +84,7 @@ public class PrescriptionDispenseItem {
             UUID medicineId,
             UUID medicineBatchId,
             int dispensedQuantity,
+            int returnedQuantity,
             UUID dispensedBy,
             Instant dispensedAt,
             Instant createdAt
@@ -91,10 +96,36 @@ public class PrescriptionDispenseItem {
                 medicineId,
                 medicineBatchId,
                 dispensedQuantity,
+                returnedQuantity,
                 dispensedBy,
                 dispensedAt,
                 createdAt
         );
+    }
+
+    public void recordReturn(int quantity) {
+        if (quantity <= 0) {
+            throw new ValidationException("Returned quantity must be greater than zero.");
+        }
+        int returnable = this.dispensedQuantity - this.returnedQuantity;
+        if (quantity > returnable) {
+            throw new ValidationException("Returned quantity exceeds the remaining returnable quantity.");
+        }
+        this.returnedQuantity += quantity;
+    }
+
+    public int getRemainingReturnableQuantity() {
+        return this.dispensedQuantity - this.returnedQuantity;
+    }
+
+    private static int validateReturnedQuantity(int returnedQuantity, int dispensedQuantity) {
+        if (returnedQuantity < 0) {
+            throw new ValidationException("Returned quantity must not be negative.");
+        }
+        if (returnedQuantity > dispensedQuantity) {
+            throw new ValidationException("Returned quantity cannot exceed the dispensed quantity.");
+        }
+        return returnedQuantity;
     }
 
     private static int requirePositive(int value, String message) {

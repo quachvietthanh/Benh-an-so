@@ -99,6 +99,22 @@ public class MedicineBatchRepositoryAdapter implements MedicineBatchRepository {
     }
 
     @Override
+    public void restoreStockQuantity(UUID batchId, int delta, BatchStatus status, Instant updatedAt) {
+        Objects.requireNonNull(batchId, "Batch id must not be null.");
+        Objects.requireNonNull(status, "Batch status must not be null.");
+        Objects.requireNonNull(updatedAt, "Updated at must not be null.");
+        if (delta <= 0) {
+            throw new ValidationException("Restore delta must be greater than 0.");
+        }
+
+        int updated = jpaRepository.restoreStockQuantity(batchId, delta, status, updatedAt);
+        if (updated == 0) {
+            throw new ValidationException(
+                    "Medicine batch not found with id: " + batchId);
+        }
+    }
+
+    @Override
     public void deductStockQuantity(UUID batchId, int delta, BatchStatus status, Instant updatedAt) {
         Objects.requireNonNull(batchId, "Batch id must not be null.");
         Objects.requireNonNull(status, "Batch status must not be null.");

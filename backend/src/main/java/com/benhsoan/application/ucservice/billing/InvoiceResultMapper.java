@@ -38,6 +38,8 @@ public class InvoiceResultMapper {
                 invoice.getTotalAmount(),
                 invoice.getCreatedBy(),
                 invoice.getCreatedAt(),
+                invoice.getReprintCount(),
+                invoice.getLastReprintedAt(),
                 lines
         );
     }

@@ -22,6 +22,8 @@ public interface InvoiceRepository {
 
     boolean existsByOriginalInvoiceId(UUID originalInvoiceId);
 
+    List<Invoice> findAdjustmentsByOriginalInvoiceId(UUID originalInvoiceId);
+
     List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive);
 
     Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable);

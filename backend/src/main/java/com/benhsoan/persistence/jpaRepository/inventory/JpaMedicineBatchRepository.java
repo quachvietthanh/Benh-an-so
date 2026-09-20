@@ -60,6 +60,20 @@ public interface JpaMedicineBatchRepository
     @Modifying
     @Query("""
             UPDATE MedicineBatchEntity b
+            SET b.quantity = b.quantity + :delta,
+                b.status = :status,
+                b.updatedAt = :updatedAt
+            WHERE b.id = :id
+            """)
+    int restoreStockQuantity(
+            @Param("id") UUID id,
+            @Param("delta") int delta,
+            @Param("status") com.benhsoan.domain.inventory.enums.BatchStatus status,
+            @Param("updatedAt") Instant updatedAt);
+
+    @Modifying
+    @Query("""
+            UPDATE MedicineBatchEntity b
             SET b.quantity = b.quantity - :delta,
                 b.status = :status,
                 b.updatedAt = :updatedAt

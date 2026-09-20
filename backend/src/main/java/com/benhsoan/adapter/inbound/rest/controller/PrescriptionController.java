@@ -24,13 +24,18 @@ import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CheckContraindicationRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PartialDispensePrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.ReturnMedicationRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.ContraindicationCheckResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseSuggestionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DrugInteractionWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PartialDispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.ReturnMedicationResponse;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.prescription.SearchPrescriptionsQuery;
@@ -38,16 +43,19 @@ import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
+import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionDispenseHistoryUseCase;
+import com.benhsoan.port.inbound.prescription.GetDispenseSuggestionUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
 import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
 import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.inbound.prescription.ReturnMedicationUseCase;
 import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -77,13 +85,16 @@ public class PrescriptionController {
         private final DispensePrescriptionUseCase dispensePrescriptionUseCase;
         private final DispensePrescriptionItemsUseCase dispensePrescriptionItemsUseCase;
         private final GetPrescriptionDispenseHistoryUseCase getPrescriptionDispenseHistoryUseCase;
+        private final GetDispenseSuggestionUseCase getDispenseSuggestionUseCase;
         private final CancelPrescriptionUseCase cancelPrescriptionUseCase;
         private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
         private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+        private final CheckContraindicationUseCase checkContraindicationUseCase;
         private final GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
         private final ExportPrescriptionUseCase exportPrescriptionUseCase;
         private final SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
         private final RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
+        private final ReturnMedicationUseCase returnMedicationUseCase;
 
         private final PrescriptionRestMapper mapper;
 
@@ -162,11 +173,32 @@ public class PrescriptionController {
                                 dispensePrescriptionItemsUseCase.dispense(mapper.toCommand(id, request)));
         }
 
+        @PostMapping("/{id}/return")
+        @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
+        @Operation(summary = "Trả lại thuốc và hủy phiếu cấp phát kèm lý do")
+        @ApiResponse(responseCode = "200", description = "Thuốc đã được trả lại và tồn kho được hoàn về đúng lô")
+        @ApiResponse(responseCode = "403", description = "Không có quyền trả thuốc hoặc không phải dược sĩ")
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy đơn thuốc")
+        @ApiResponse(responseCode = "409", description = "Lượt khám đã thu phí và chưa hoàn tiền")
+        public ReturnMedicationResponse returnMedication(
+                        @PathVariable UUID id,
+                        @Valid @RequestBody ReturnMedicationRequest request) {
+                return mapper.toResponse(
+                                returnMedicationUseCase.returnMedication(mapper.toCommand(id, request)));
+        }
+
         @GetMapping("/{id}/dispense-history")
         @RequirePermission("PRESCRIPTION_DISPENSE_HISTORY_READ")
         public java.util.List<DispenseHistoryResponse> getDispenseHistory(@PathVariable UUID id) {
                 return mapper.toDispenseHistoryResponse(
                                 getPrescriptionDispenseHistoryUseCase.getHistory(id));
+        }
+
+        @GetMapping("/{id}/dispense-suggestion")
+        @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
+        @Operation(summary = "Gợi ý lô cấp phát theo nguyên tắc hạn dùng gần trước (FEFO)")
+        public DispenseSuggestionResponse getDispenseSuggestion(@PathVariable UUID id) {
+                return mapper.toResponse(getDispenseSuggestionUseCase.getSuggestion(id));
         }
 
         @PostMapping("/{id}/cancel")
@@ -215,6 +247,15 @@ public class PrescriptionController {
                         @Valid @RequestBody CheckPatientDrugAllergyRequest request) {
                 return mapper.toAllergyResponses(
                                 checkPatientDrugAllergyUseCase.check(request.medicalRecordId(), request.medicineIds()));
+        }
+
+        @PostMapping("/check-contraindications")
+        @RequirePermission({ "PRESCRIPTION_CREATE", "PRESCRIPTION_UPDATE" })
+        @Operation(summary = "Check contraindication warnings by age, pregnancy and chronic disease")
+        public ContraindicationCheckResponse checkContraindications(
+                        @Valid @RequestBody CheckContraindicationRequest request) {
+                return mapper.toResponse(
+                                checkContraindicationUseCase.check(request.medicalRecordId(), request.medicineIds()));
         }
 
         @GetMapping("/allergy-warning-logs")

@@ -81,6 +81,15 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public List<Invoice> findAdjustmentsByOriginalInvoiceId(UUID originalInvoiceId) {
+        return jpaRepository.findAdjustmentsByOriginalInvoiceId(originalInvoiceId)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive) {
         return jpaRepository.findCreatedBetween(fromInclusive, toExclusive).stream()
                 .map(this::toDomain)

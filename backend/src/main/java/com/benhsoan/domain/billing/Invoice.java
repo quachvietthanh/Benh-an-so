@@ -44,6 +44,10 @@ public class Invoice {
 
     private Instant createdAt;
 
+    private int reprintCount;
+
+    private Instant lastReprintedAt;
+
     private List<InvoiceLine> lines;
 
     private Invoice(
@@ -57,6 +61,8 @@ public class Invoice {
             BigDecimal totalAmount,
             UUID createdBy,
             Instant createdAt,
+            int reprintCount,
+            Instant lastReprintedAt,
             List<InvoiceLine> lines
     ) {
         this.id = requireNonNull(id, "Invoice id is required.");
@@ -68,9 +74,12 @@ public class Invoice {
         this.adjustmentReason = normalizeOptionalText(adjustmentReason);
         this.createdBy = requireNonNull(createdBy, "Invoice creator id is required.");
         this.createdAt = requireNonNull(createdAt, "Invoice creation time is required.");
+        this.reprintCount = validateReprintCount(reprintCount);
+        this.lastReprintedAt = lastReprintedAt;
         this.lines = validateAndCopyLines(lines, id);
         this.totalAmount = validateTotalAmount(totalAmount, this.lines);
         validateInvoiceTypeConsistency();
+        validateReprintState();
     }
 
     public static Invoice createOriginal(
@@ -107,6 +116,8 @@ public class Invoice {
                 totalAmount,
                 createdBy,
                 createdAt,
+                0,
+                null,
                 lines
         );
     }
@@ -145,6 +156,8 @@ public class Invoice {
                 totalAmount,
                 createdBy,
                 createdAt,
+                0,
+                null,
                 lines
         );
     }
@@ -162,6 +175,38 @@ public class Invoice {
             Instant createdAt,
             List<InvoiceLine> lines
     ) {
+        return restore(
+                id,
+                invoiceCode,
+                visitId,
+                paymentId,
+                type,
+                originalInvoiceId,
+                adjustmentReason,
+                totalAmount,
+                createdBy,
+                createdAt,
+                0,
+                null,
+                lines
+        );
+    }
+
+    public static Invoice restore(
+            UUID id,
+            String invoiceCode,
+            UUID visitId,
+            UUID paymentId,
+            InvoiceType type,
+            UUID originalInvoiceId,
+            String adjustmentReason,
+            BigDecimal totalAmount,
+            UUID createdBy,
+            Instant createdAt,
+            int reprintCount,
+            Instant lastReprintedAt,
+            List<InvoiceLine> lines
+    ) {
         return new Invoice(
                 id,
                 invoiceCode,
@@ -173,8 +218,16 @@ public class Invoice {
                 totalAmount,
                 createdBy,
                 createdAt,
+                reprintCount,
+                lastReprintedAt,
                 lines
         );
+    }
+
+    public void recordReprint(Instant reprintedAt) {
+        Instant validatedReprintedAt = requireNonNull(reprintedAt, "Reprint time is required.");
+        this.reprintCount += 1;
+        this.lastReprintedAt = validatedReprintedAt;
     }
 
     public boolean isOriginal() {
@@ -210,6 +263,22 @@ public class Invoice {
         }
         if (totalAmount.compareTo(BigDecimal.ZERO) == 0) {
             throw new ValidationException("Adjustment invoice total amount must not be zero.");
+        }
+    }
+
+    private static int validateReprintCount(int reprintCount) {
+        if (reprintCount < 0) {
+            throw new ValidationException("Invoice reprint count must not be negative.");
+        }
+        return reprintCount;
+    }
+
+    private void validateReprintState() {
+        if (reprintCount == 0 && lastReprintedAt != null) {
+            throw new ValidationException("Invoice cannot have a reprint time without a reprint.");
+        }
+        if (reprintCount > 0 && lastReprintedAt == null) {
+            throw new ValidationException("Reprinted invoice must have a reprint time.");
         }
     }
 

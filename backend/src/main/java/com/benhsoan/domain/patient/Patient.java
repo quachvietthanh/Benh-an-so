@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.enums.PatientStatus;
+import com.benhsoan.domain.patient.enums.PregnancyStatus;
 import com.benhsoan.domain.patient.exception.PatientAlreadyMergedException;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
 import com.benhsoan.domain.shared.Guard.Guard;
@@ -101,6 +102,9 @@ public class Patient {
 
     private String mergeReason;
 
+    // Pregnancy status (NCL-05-CN-006 / QTN-34). Null means "not recorded".
+    private PregnancyStatus pregnancyStatus;
+
     private Patient(
             UUID id,
             String patientCode,
@@ -192,6 +196,10 @@ public class Patient {
         this.mergedAt = mergedAt;
         this.mergedBy = mergedBy;
         this.mergeReason = mergeReason;
+    }
+
+    public void changePregnancyStatus(PregnancyStatus pregnancyStatus) {
+        this.pregnancyStatus = pregnancyStatus;
     }
 
     public static Patient create(

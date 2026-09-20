@@ -51,7 +51,10 @@ import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmatio
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
+import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionContraindicationWarningLogRepository;
+import com.benhsoan.port.dto.result.ContraindicationCheckResult;
 
 @ExtendWith(MockitoExtension.class)
 class CreatePrescriptionServiceTest {
@@ -62,9 +65,11 @@ class CreatePrescriptionServiceTest {
     @Mock private MedicineRepository medicineRepository;
     @Mock private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     @Mock private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+    @Mock private CheckContraindicationUseCase checkContraindicationUseCase;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
+    @Mock private PrescriptionContraindicationWarningLogRepository contraindicationWarningLogRepository;
     @Mock private PrescriptionCodeGenerator prescriptionCodeGenerator;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
@@ -89,14 +94,18 @@ class CreatePrescriptionServiceTest {
                 ));
         lenient().when(checkPatientDrugAllergyUseCase.check(any(), any()))
                 .thenReturn(List.of());
+        lenient().when(checkContraindicationUseCase.check(any(), any()))
+                .thenReturn(new ContraindicationCheckResult(List.of(), List.of()));
         service = new CreatePrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
                 checkDrugInteractionUseCase,
                 checkPatientDrugAllergyUseCase,
+                checkContraindicationUseCase,
                 medicalRecordDiagnosisRepository,
                 warningLogRepository,
                 allergyWarningLogRepository,
+                contraindicationWarningLogRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
                 new PrescriptionResultMapper(displayContextResolver),

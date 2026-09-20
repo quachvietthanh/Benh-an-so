@@ -32,6 +32,8 @@ public enum ActionType {
 
     DISPENSE,
 
+    RETURN,
+
     EXPORT,
 
     SEND,
