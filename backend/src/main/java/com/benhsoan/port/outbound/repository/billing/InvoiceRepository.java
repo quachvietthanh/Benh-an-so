@@ -14,6 +14,8 @@ public interface InvoiceRepository {
 
     Invoice save(Invoice invoice);
 
+    void updateReprintMetadata(UUID invoiceId, int reprintCount, Instant lastReprintedAt);
+
     Optional<Invoice> findById(UUID id);
 
     Optional<Invoice> findOriginalByVisitId(UUID visitId);
@@ -21,6 +23,8 @@ public interface InvoiceRepository {
     Optional<Invoice> findByPaymentId(UUID paymentId);
 
     boolean existsByOriginalInvoiceId(UUID originalInvoiceId);
+
+    List<Invoice> findAdjustmentsByOriginalInvoiceId(UUID originalInvoiceId);
 
     List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive);
 

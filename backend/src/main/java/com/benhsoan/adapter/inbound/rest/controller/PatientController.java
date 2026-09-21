@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,6 +20,7 @@ import com.benhsoan.adapter.inbound.rest.request.patient.MergePatientsRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.RegisterPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.SearchPatientRequest;
 import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientRequest;
+import com.benhsoan.adapter.inbound.rest.request.patient.UpdatePatientPregnancyStatusRequest;
 import com.benhsoan.adapter.inbound.rest.response.patient.DuplicatePatientGroupResponse;
 import com.benhsoan.adapter.inbound.rest.response.patient.MergePatientsResponse;
 import com.benhsoan.adapter.inbound.rest.response.patient.PatientResponse;
@@ -32,6 +34,7 @@ import com.benhsoan.port.inbound.patient.MergePatientsUseCase;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
 import com.benhsoan.port.inbound.patient.SearchPatientUseCase;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
+import com.benhsoan.port.inbound.patient.UpdatePatientPregnancyStatusUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +58,8 @@ public class PatientController {
     private final MergePatientsUseCase mergePatientsUseCase;
 
     private final FindDuplicatePatientsUseCase findDuplicatePatientsUseCase;
+
+    private final UpdatePatientPregnancyStatusUseCase updatePatientPregnancyStatusUseCase;
 
     private final PatientRestMapper patientRestMapper;
 
@@ -135,6 +140,18 @@ public class PatientController {
                         patientRestMapper.toConsentCommand(request));
 
         return patientRestMapper.toResponse(result);
+    }
+
+    @PatchMapping("/{patientId}/pregnancy-status")
+    @RequirePermission("PATIENT_UPDATE")
+    public PatientResponse updatePregnancyStatus(
+            @PathVariable UUID patientId,
+            @Valid @RequestBody UpdatePatientPregnancyStatusRequest request
+    ) {
+        return patientRestMapper.toResponse(
+                updatePatientPregnancyStatusUseCase.update(
+                        patientId,
+                        request.pregnancyStatus()));
     }
 
     @PostMapping("/merge")

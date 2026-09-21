@@ -49,6 +49,7 @@ import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
+import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
@@ -57,12 +58,14 @@ import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionDispenseHistoryUseCase;
+import com.benhsoan.port.inbound.prescription.GetDispenseSuggestionUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
 import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
 import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.inbound.prescription.ReturnMedicationUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -108,6 +111,9 @@ class PrescriptionControllerTest {
     private GetPrescriptionDispenseHistoryUseCase getPrescriptionDispenseHistoryUseCase;
 
     @MockitoBean
+    private GetDispenseSuggestionUseCase getDispenseSuggestionUseCase;
+
+    @MockitoBean
     private CancelPrescriptionUseCase cancelPrescriptionUseCase;
 
     @MockitoBean
@@ -115,6 +121,9 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+
+    @MockitoBean
+    private CheckContraindicationUseCase checkContraindicationUseCase;
 
     @MockitoBean
     private GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
@@ -127,6 +136,9 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
+
+    @MockitoBean
+    private ReturnMedicationUseCase returnMedicationUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;

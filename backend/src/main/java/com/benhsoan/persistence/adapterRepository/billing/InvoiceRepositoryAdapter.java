@@ -1,9 +1,11 @@
 package com.benhsoan.persistence.adapterRepository.billing;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.Instant;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -61,6 +63,15 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     }
 
     @Override
+    @Transactional
+    public void updateReprintMetadata(UUID invoiceId, int reprintCount, Instant lastReprintedAt) {
+        int updated = jpaRepository.updateReprintMetadata(invoiceId, reprintCount, lastReprintedAt);
+        if (updated == 0) {
+            throw new com.benhsoan.domain.billing.exception.InvoiceNotFoundException(invoiceId);
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<Invoice> findOriginalByVisitId(UUID visitId) {
         return jpaRepository.findByVisitIdAndType(visitId, InvoiceType.ORIGINAL)
@@ -77,6 +88,15 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     @Transactional(readOnly = true)
     public boolean existsByOriginalInvoiceId(UUID originalInvoiceId) {
         return jpaRepository.existsByOriginalInvoiceId(originalInvoiceId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Invoice> findAdjustmentsByOriginalInvoiceId(UUID originalInvoiceId) {
+        return jpaRepository.findAdjustmentsByOriginalInvoiceId(originalInvoiceId)
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
@@ -100,21 +120,36 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
             InvoiceSearchCriteria criteria,
             Pageable pageable
     ) {
-        return jpaRepository.search(
-                        criteria.invoiceCode(),
-                        criteria.invoiceType(),
-                        criteria.visitId(),
-                        criteria.createdFrom(),
-                        criteria.createdTo(),
-                        pageable
-                )
-                .map(this::toDomain);
+        Page<InvoiceEntity> page = jpaRepository.search(
+                criteria.invoiceCode(),
+                criteria.invoiceType(),
+                criteria.visitId(),
+                criteria.patientName(),
+                criteria.createdFrom(),
+                criteria.createdTo(),
+                pageable
+        );
+
+        List<UUID> invoiceIds = page.getContent().stream()
+                .map(InvoiceEntity::getId)
+                .toList();
+        Map<UUID, List<InvoiceLineEntity>> linesByInvoiceId = invoiceIds.isEmpty()
+                ? Map.of()
+                : lineJpaRepository.findByInvoiceIdInOrderByCreatedAtAsc(invoiceIds).stream()
+                        .collect(Collectors.groupingBy(InvoiceLineEntity::getInvoiceId));
+
+        return page.map(entity ->
+                toDomain(entity, linesByInvoiceId.getOrDefault(entity.getId(), List.of())));
     }
 
     private Invoice toDomain(InvoiceEntity entity) {
         List<InvoiceLineEntity> lineEntities = lineJpaRepository
                 .findByInvoiceIdOrderByCreatedAtAsc(entity.getId());
 
+        return mapper.toDomain(entity, lineEntities);
+    }
+
+    private Invoice toDomain(InvoiceEntity entity, List<InvoiceLineEntity> lineEntities) {
         return mapper.toDomain(entity, lineEntities);
     }
 

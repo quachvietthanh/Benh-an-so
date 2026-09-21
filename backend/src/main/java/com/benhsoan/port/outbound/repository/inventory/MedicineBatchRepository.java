@@ -28,5 +28,7 @@ public interface MedicineBatchRepository {
 
     void addStockQuantity(UUID batchId, int delta);
 
+    void restoreStockQuantity(UUID batchId, int delta, BatchStatus status, Instant updatedAt);
+
     void deductStockQuantity(UUID batchId, int delta, BatchStatus status, Instant updatedAt);
 }

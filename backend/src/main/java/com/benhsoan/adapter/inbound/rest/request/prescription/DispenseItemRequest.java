@@ -8,5 +8,9 @@ import jakarta.validation.constraints.NotNull;
 public record DispenseItemRequest(
                 @NotNull(message = "prescriptionItemId is required") UUID prescriptionItemId,
 
-                @Min(value = 1, message = "quantity must be greater than zero") int quantity) {
+                @Min(value = 1, message = "quantity must be greater than zero") int quantity,
+
+                UUID batchId,
+
+                String batchChangeReason) {
 }

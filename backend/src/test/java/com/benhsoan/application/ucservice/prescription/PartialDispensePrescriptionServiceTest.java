@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,8 @@ import org.springframework.security.access.AccessDeniedException;
 import com.benhsoan.application.ucservice.inventory.EligibleStockSnapshotService;
 import com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService;
 import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.inventory.MedicineBatch;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.domain.medicine.Medicine;
@@ -335,5 +338,115 @@ class PartialDispensePrescriptionServiceTest {
                 ArgumentCaptor.forClass(List.class);
         verify(dispenseItemRepository).saveAll(captor.capture());
         return captor.getValue();
+    }
+
+    @Test
+    void acceptsManualBatchOverrideAndRecordsAudit() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        stubMedicine();
+
+        UUID fefoBatchId = UUID.randomUUID();
+        UUID selectedBatchId = UUID.randomUUID();
+        stubBatches(List.of(
+                batchOf(fefoBatchId, "BATCH-A", LocalDate.of(2026, 12, 1), 8),
+                batchOf(selectedBatchId, "BATCH-B", LocalDate.of(2027, 6, 1), 100)));
+
+        service.dispense(new DispensePrescriptionItemsCommand(prescriptionId,
+                List.of(new DispenseItemCommand(itemId, 20, selectedBatchId, "Patient prefers newer batch"))));
+
+        assertEquals(PrescriptionStatus.DISPENSED, prescription.getStatus());
+        assertTrue(capturedAuditLogs().stream()
+                .anyMatch(log -> log.getActionType() == ActionType.OVERRIDE_BATCH_SELECTION));
+    }
+
+    @Test
+    void rejectsManualOverrideWithoutReason() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        stubMedicine();
+
+        UUID fefoBatchId = UUID.randomUUID();
+        UUID selectedBatchId = UUID.randomUUID();
+        stubBatches(List.of(
+                batchOf(fefoBatchId, "BATCH-A", LocalDate.of(2026, 12, 1), 8),
+                batchOf(selectedBatchId, "BATCH-B", LocalDate.of(2027, 6, 1), 100)));
+
+        assertThrows(ValidationException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(new DispenseItemCommand(itemId, 20, selectedBatchId, null)))));
+
+        verify(medicineBatchRepository, never())
+                .deductStockQuantity(any(), org.mockito.ArgumentMatchers.anyInt(), any(), any());
+    }
+
+    @Test
+    void rejectsManualOverrideWithBlankReason() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        stubMedicine();
+
+        UUID fefoBatchId = UUID.randomUUID();
+        UUID selectedBatchId = UUID.randomUUID();
+        stubBatches(List.of(
+                batchOf(fefoBatchId, "BATCH-A", LocalDate.of(2026, 12, 1), 8),
+                batchOf(selectedBatchId, "BATCH-B", LocalDate.of(2027, 6, 1), 100)));
+
+        assertThrows(ValidationException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(new DispenseItemCommand(itemId, 20, selectedBatchId, "   ")))));
+
+        verify(medicineBatchRepository, never())
+                .deductStockQuantity(any(), org.mockito.ArgumentMatchers.anyInt(), any(), any());
+    }
+
+    @Test
+    void rejectsManualOverrideBatchNotInEligibleSet() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        stubMedicine();
+
+        UUID fefoBatchId = UUID.randomUUID();
+        stubBatches(List.of(
+                batchOf(fefoBatchId, "BATCH-A", LocalDate.of(2026, 12, 1), 8)));
+
+        assertThrows(ValidationException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(new DispenseItemCommand(itemId, 8, UUID.randomUUID(), "Override")))));
+
+        verify(medicineBatchRepository, never())
+                .deductStockQuantity(any(), org.mockito.ArgumentMatchers.anyInt(), any(), any());
+    }
+
+    private List<AuditLog> capturedAuditLogs() {
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues();
+    }
+
+    private void stubBatches(List<MedicineBatch> batches) {
+        int total = batches.stream().mapToInt(MedicineBatch::getQuantity).sum();
+        when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(MEDICINE_ID), any()))
+                .thenReturn(batches);
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(any(), any()))
+                .thenReturn(Map.of(MEDICINE_ID, total));
+    }
+
+    private MedicineBatch batchOf(UUID id, String batchNumber, LocalDate expiryDate, int quantity) {
+        return MedicineBatch.restore(
+                id, MEDICINE_ID, batchNumber, expiryDate, quantity,
+                BatchStatus.ACTIVE, NOW.minusSeconds(3600), null);
     }
 }

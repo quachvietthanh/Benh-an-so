@@ -24,6 +24,8 @@ import org.springframework.security.access.AccessDeniedException;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.contraindication.enums.ContraindicationSeverity;
+import com.benhsoan.domain.contraindication.enums.ContraindicationType;
 import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
@@ -48,10 +50,18 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 import com.benhsoan.domain.patient.enums.AllergySeverity;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationMissingDataException;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
+import com.benhsoan.port.dto.result.ContraindicationWarningResult;
+import com.benhsoan.port.dto.result.ContraindicationMissingDataResult;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
+import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionContraindicationWarningLogRepository;
+import com.benhsoan.port.dto.result.ContraindicationCheckResult;
 
 @ExtendWith(MockitoExtension.class)
 class CreatePrescriptionServiceTest {
@@ -62,9 +72,11 @@ class CreatePrescriptionServiceTest {
     @Mock private MedicineRepository medicineRepository;
     @Mock private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     @Mock private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+    @Mock private CheckContraindicationUseCase checkContraindicationUseCase;
     @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
+    @Mock private PrescriptionContraindicationWarningLogRepository contraindicationWarningLogRepository;
     @Mock private PrescriptionCodeGenerator prescriptionCodeGenerator;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
@@ -89,14 +101,18 @@ class CreatePrescriptionServiceTest {
                 ));
         lenient().when(checkPatientDrugAllergyUseCase.check(any(), any()))
                 .thenReturn(List.of());
+        lenient().when(checkContraindicationUseCase.check(any(), any()))
+                .thenReturn(new ContraindicationCheckResult(List.of(), List.of()));
         service = new CreatePrescriptionService(
                 prescriptionRepository,
                 medicineRepository,
                 checkDrugInteractionUseCase,
                 checkPatientDrugAllergyUseCase,
+                checkContraindicationUseCase,
                 medicalRecordDiagnosisRepository,
                 warningLogRepository,
                 allergyWarningLogRepository,
+                contraindicationWarningLogRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
                 new PrescriptionResultMapper(displayContextResolver),
@@ -358,5 +374,137 @@ class CreatePrescriptionServiceTest {
         assertEquals("RX000001", result.prescriptionCode());
         verify(prescriptionRepository).save(any());
         verify(allergyWarningLogRepository).save(any());
+    }
+
+    @Test
+    void rejectsWhenContraindicationDetectedWithoutOverride() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID ruleId = UUID.randomUUID();
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(contraindicationWarning(ruleId, medicineId)), List.of()));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .build();
+
+        assertThrows(PrescriptionContraindicationConfirmationRequiredException.class,
+                () -> service.create(command));
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsWhenContraindicationDataMissing() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(), List.of(new ContraindicationMissingDataResult(
+                        medicineId, "Paracetamol", ContraindicationType.PREGNANCY,
+                        "Patient pregnancy status is missing."))));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .build();
+
+        assertThrows(PrescriptionContraindicationMissingDataException.class,
+                () -> service.create(command));
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsMissingDataEvenWithAttemptedOverride() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(), List.of(new ContraindicationMissingDataResult(
+                        medicineId, "Paracetamol", ContraindicationType.PREGNANCY,
+                        "Patient pregnancy status is missing."))));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .contraindicationOverrides(List.of(new PrescriptionContraindicationOverrideCommand(
+                        UUID.randomUUID(), medicineId, "Clinical necessity")))
+                .build();
+
+        assertThrows(PrescriptionContraindicationMissingDataException.class,
+                () -> service.create(command));
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsBlankContraindicationOverrideReason() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID ruleId = UUID.randomUUID();
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(contraindicationWarning(ruleId, medicineId)), List.of()));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .contraindicationOverrides(List.of(new PrescriptionContraindicationOverrideCommand(
+                        ruleId, medicineId, "   ")))
+                .build();
+
+        assertThrows(ValidationException.class, () -> service.create(command));
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsOverrideForUndetectedContraindication() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID ruleId = UUID.randomUUID();
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(contraindicationWarning(ruleId, medicineId)), List.of()));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .contraindicationOverrides(List.of(new PrescriptionContraindicationOverrideCommand(
+                        UUID.randomUUID(), medicineId, "Clinical necessity")))
+                .build();
+
+        assertThrows(ValidationException.class, () -> service.create(command));
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void allowsCreateWhenContraindicationOverrideProvidedAndSavesLog() {
+        prepareValidCreate();
+        preparePersistence();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID ruleId = UUID.randomUUID();
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(contraindicationWarning(ruleId, medicineId)), List.of()));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .contraindicationOverrides(List.of(new PrescriptionContraindicationOverrideCommand(
+                        ruleId, medicineId, "Clinical necessity, monitored closely")))
+                .build();
+
+        var result = service.create(command);
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
+        verify(contraindicationWarningLogRepository).save(any());
+    }
+
+    private ContraindicationWarningResult contraindicationWarning(UUID ruleId, UUID medicineId) {
+        return new ContraindicationWarningResult(
+                UUID.randomUUID(), ruleId, medicineId, "Paracetamol",
+                ContraindicationType.AGE, ContraindicationSeverity.CONTRAINDICATED,
+                "Contraindicated", "Use alternative");
     }
 }

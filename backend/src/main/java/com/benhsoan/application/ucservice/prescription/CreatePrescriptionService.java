@@ -23,7 +23,10 @@ import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
 import com.benhsoan.domain.prescription.enums.WarningAction;
 import com.benhsoan.domain.prescription.PrescriptionAllergyWarningLog;
+import com.benhsoan.domain.prescription.PrescriptionContraindicationWarningLog;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationMissingDataException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -31,16 +34,21 @@ import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
+import com.benhsoan.port.dto.result.ContraindicationCheckResult;
+import com.benhsoan.port.dto.result.ContraindicationWarningResult;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
+import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.outbound.generator.PrescriptionCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionContraindicationWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
@@ -64,11 +72,15 @@ public class CreatePrescriptionService
 
     private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
 
+    private final CheckContraindicationUseCase checkContraindicationUseCase;
+
     private final MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
 
     private final PrescriptionWarningLogRepository warningLogRepository;
 
     private final PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
+
+    private final PrescriptionContraindicationWarningLogRepository contraindicationWarningLogRepository;
 
     private final PrescriptionCodeGenerator prescriptionCodeGenerator;
 
@@ -125,6 +137,20 @@ public class CreatePrescriptionService
                 command.allergyOverrides()
         );
 
+        // Detect contraindication warnings by age, pregnancy and chronic disease
+        // (QTN-34, NCL-05-CN-006). Block completion unless every warning is overridden,
+        // and reject creation when required patient data is missing (TC-05).
+        ContraindicationCheckResult contraindicationCheck = checkContraindicationUseCase
+                .check(command.medicalRecordId(), List.copyOf(medicines.keySet()));
+        List<ContraindicationWarningResult> contraindicationWarnings = contraindicationCheck.warnings();
+        if (!contraindicationCheck.missingData().isEmpty()) {
+            throw new PrescriptionContraindicationMissingDataException();
+        }
+        Map<ContraKey, String> contraindicationOverrideReasons = validateContraindicationOverrides(
+                contraindicationWarnings,
+                command.contraindicationOverrides()
+        );
+
         Prescription prescription = Prescription.create(
                 prescriptionId,
                 prescriptionCodeGenerator.generate(),
@@ -151,7 +177,15 @@ public class CreatePrescriptionService
                 now
         );
 
-        saveAuditLog(saved, warningLogs.size() + allergyLogs.size(), currentUserId, now);
+        saveContraindicationWarningLogs(
+                saved.getId(),
+                contraindicationWarnings,
+                contraindicationOverrideReasons,
+                currentUserId,
+                now
+        );
+
+        saveAuditLog(saved, warningLogs.size() + allergyLogs.size() + contraindicationWarnings.size(), currentUserId, now);
 
         return resultMapper.toResult(saved, warningLogs);
     }
@@ -499,6 +533,78 @@ public class CreatePrescriptionService
     }
 
     private record AllergyKey(UUID allergyId, UUID medicineId) {
+    }
+
+    private Map<ContraKey, String> validateContraindicationOverrides(
+            List<ContraindicationWarningResult> warnings,
+            List<PrescriptionContraindicationOverrideCommand> overrides
+    ) {
+        List<PrescriptionContraindicationOverrideCommand> cleanOverrides =
+                overrides == null ? List.of() : overrides;
+
+        Map<ContraKey, String> reasonsByKey = new LinkedHashMap<>();
+        for (PrescriptionContraindicationOverrideCommand override : cleanOverrides) {
+            if (override == null || override.ruleId() == null || override.medicineId() == null) {
+                throw new ValidationException(
+                        "Contraindication override must reference a rule and a medicine.");
+            }
+            if (override.overrideReason() == null || override.overrideReason().isBlank()) {
+                throw new ValidationException("Contraindication override reason is required.");
+            }
+            ContraKey key = new ContraKey(override.ruleId(), override.medicineId());
+            if (reasonsByKey.put(key, override.overrideReason().trim()) != null) {
+                throw new ValidationException("Duplicate contraindication override.");
+            }
+        }
+
+        Set<ContraKey> detectedKeys = warnings.stream()
+                .map(w -> new ContraKey(w.ruleId(), w.medicineId()))
+                .collect(Collectors.toSet());
+
+        for (ContraKey suppliedKey : reasonsByKey.keySet()) {
+            if (!detectedKeys.contains(suppliedKey)) {
+                throw new ValidationException(
+                        "Override does not belong to a detected contraindication: " + suppliedKey.ruleId());
+            }
+        }
+
+        List<ContraindicationWarningResult> unconfirmed = warnings.stream()
+                .filter(w -> !reasonsByKey.containsKey(new ContraKey(w.ruleId(), w.medicineId())))
+                .toList();
+
+        if (!unconfirmed.isEmpty()) {
+            throw new PrescriptionContraindicationConfirmationRequiredException();
+        }
+
+        return Map.copyOf(reasonsByKey);
+    }
+
+    private void saveContraindicationWarningLogs(
+            UUID prescriptionId,
+            List<ContraindicationWarningResult> warnings,
+            Map<ContraKey, String> overrideReasons,
+            UUID handledBy,
+            Instant handledAt
+    ) {
+        for (ContraindicationWarningResult warning : warnings) {
+            contraindicationWarningLogRepository.save(PrescriptionContraindicationWarningLog.create(
+                    UUID.randomUUID(),
+                    prescriptionId,
+                    warning.patientId(),
+                    warning.ruleId(),
+                    warning.medicineId(),
+                    warning.type(),
+                    warning.severity(),
+                    warning.message(),
+                    warning.recommendation(),
+                    overrideReasons.get(new ContraKey(warning.ruleId(), warning.medicineId())),
+                    handledBy,
+                    handledAt
+            ));
+        }
+    }
+
+    private record ContraKey(UUID ruleId, UUID medicineId) {
     }
 
     private void requireCommand(CreatePrescriptionCommand command) {

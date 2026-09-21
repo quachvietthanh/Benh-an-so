@@ -20,6 +20,7 @@ public class PrescriptionDispenseItemPersistenceMapper {
                 entity.getMedicineId(),
                 entity.getMedicineBatchId(),
                 entity.getDispensedQuantity(),
+                entity.getReturnedQuantity(),
                 entity.getDispensedBy(),
                 entity.getDispensedAt(),
                 entity.getCreatedAt()
@@ -38,6 +39,7 @@ public class PrescriptionDispenseItemPersistenceMapper {
                 .medicineId(domain.getMedicineId())
                 .medicineBatchId(domain.getMedicineBatchId())
                 .dispensedQuantity(domain.getDispensedQuantity())
+                .returnedQuantity(domain.getReturnedQuantity())
                 .dispensedBy(domain.getDispensedBy())
                 .dispensedAt(domain.getDispensedAt())
                 .createdAt(domain.getCreatedAt())

@@ -36,6 +36,7 @@ import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
+import com.benhsoan.port.dto.result.InvoiceAdjustmentsResult;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
@@ -44,9 +45,11 @@ import com.benhsoan.port.dto.result.PaymentQuoteResult;
 import com.benhsoan.port.dto.result.RefundPaymentResult;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
+import com.benhsoan.port.inbound.billing.GetInvoiceAdjustmentsUseCase;
 import com.benhsoan.port.inbound.billing.GetInvoiceByIdUseCase;
 import com.benhsoan.port.inbound.billing.GetPayableEncountersUseCase;
 import com.benhsoan.port.inbound.billing.GetPaymentQuoteUseCase;
+import com.benhsoan.port.inbound.billing.RecordInvoiceReprintUseCase;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.inbound.billing.RefundPaymentUseCase;
 import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
@@ -78,6 +81,8 @@ class InvoiceSecurityIntegrationTest {
     @MockitoBean private GetPaymentQuoteUseCase getPaymentQuoteUseCase;
     @MockitoBean private SearchInvoicesUseCase searchInvoicesUseCase;
     @MockitoBean private GetInvoiceByIdUseCase getInvoiceByIdUseCase;
+    @MockitoBean private GetInvoiceAdjustmentsUseCase getInvoiceAdjustmentsUseCase;
+    @MockitoBean private RecordInvoiceReprintUseCase recordInvoiceReprintUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -113,6 +118,8 @@ class InvoiceSecurityIntegrationTest {
                 new BigDecimal("100000"),
                 UUID.randomUUID(),
                 Instant.parse("2026-08-12T02:00:00Z"),
+                0,
+                null,
                 List.of()
         ));
 
@@ -171,6 +178,8 @@ class InvoiceSecurityIntegrationTest {
                 new BigDecimal("250000"),
                 UUID.randomUUID(),
                 now,
+                0,
+                null,
                 List.of(new InvoiceLineResult(
                         UUID.randomUUID(),
                         invoiceId,
@@ -276,6 +285,8 @@ class InvoiceSecurityIntegrationTest {
                 new BigDecimal("-20000"),
                 UUID.randomUUID(),
                 now,
+                0,
+                null,
                 List.of(new InvoiceLineResult(
                         UUID.randomUUID(),
                         adjustmentInvoiceId,
@@ -331,6 +342,8 @@ class InvoiceSecurityIntegrationTest {
                 new BigDecimal("-250000"),
                 UUID.randomUUID(),
                 now,
+                0,
+                null,
                 List.of()
         );
         when(refundPaymentUseCase.refund(any())).thenReturn(new RefundPaymentResult(
@@ -361,5 +374,41 @@ class InvoiceSecurityIntegrationTest {
                             .content(body))
                     .andExpect(status().isForbidden());
         }
+    }
+
+    @Test
+    void reprintRequiresInvoiceReadPermission() throws Exception {
+        UUID invoiceId = UUID.fromString("23100000-0000-0000-0000-000000000001");
+        when(recordInvoiceReprintUseCase.recordReprint(invoiceId)).thenReturn(new InvoiceResult(
+                invoiceId, "HD000001", UUID.randomUUID(), UUID.randomUUID(), InvoiceType.ORIGINAL,
+                null, null, new BigDecimal("100000"), UUID.randomUUID(),
+                Instant.parse("2026-08-12T02:00:00Z"), 1, Instant.parse("2026-08-12T03:00:00Z"), List.of()));
+
+        mockMvc.perform(post("/invoices/{invoiceId}/reprint", invoiceId)
+                        .with(user("receptionist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/invoices/{invoiceId}/reprint", invoiceId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE_STATUS"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getAdjustmentsRequiresInvoiceReadPermission() throws Exception {
+        UUID invoiceId = UUID.fromString("23100000-0000-0000-0000-000000000001");
+        when(getInvoiceAdjustmentsUseCase.getAdjustments(invoiceId)).thenReturn(new InvoiceAdjustmentsResult(
+                invoiceId, new BigDecimal("250000"), new BigDecimal("230000"), List.of()));
+
+        mockMvc.perform(get("/invoices/{invoiceId}/adjustments", invoiceId)
+                        .with(user("manager").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/invoices/{invoiceId}/adjustments", invoiceId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE_STATUS"))))
+                .andExpect(status().isForbidden());
     }
 }

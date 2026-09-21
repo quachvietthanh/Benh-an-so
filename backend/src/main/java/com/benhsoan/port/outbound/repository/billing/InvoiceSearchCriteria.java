@@ -9,6 +9,7 @@ public record InvoiceSearchCriteria(
         String invoiceCode,
         InvoiceType invoiceType,
         UUID visitId,
+        String patientName,
         Instant createdFrom,
         Instant createdTo
 ) {
