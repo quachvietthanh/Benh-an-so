@@ -62,9 +62,13 @@ import pharmacyApi from '../api/pharmacyApi'
 import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import patientAllergyApi from '../api/patientAllergyApi'
+import contraindicationApi from '../api/contraindicationApi'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionAllergyWarningModal from '../components/pharmacy/PrescriptionAllergyWarningModal.jsx'
 import PrescriptionAllergyWarningLogsModal from '../components/pharmacy/PrescriptionAllergyWarningLogsModal.jsx'
+import ContraindicationWarningPanel from '../components/prescription/ContraindicationWarningPanel'
+import ContraindicationOverrideModal from '../components/prescription/ContraindicationOverrideModal'
+import QuickUpdatePregnancyModal from '../components/prescription/QuickUpdatePregnancyModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
 import SignMedicalRecordModal from '../components/clinical/SignMedicalRecordModal'
@@ -77,6 +81,10 @@ import {
   canCancelPrescription,
   getCancelRestrictionMessage,
 } from '../utils/prescriptionCancelValidation.js'
+import {
+  areAllContraindicationsHandled,
+  sanitizeContraindicationOverrides,
+} from '../utils/contraindicationValidation'
 import { useAuthContext } from '../context/AuthContext'
 
 import { getApiErrorMessage as getApiMessage, isAccessDeniedApiError, normalizeApiError } from '../utils/apiError'
@@ -196,6 +204,15 @@ function PrescriptionPage() {
   const [allergyLogsModalOpen, setAllergyLogsModalOpen] = useState(false)
   const [confirmedAllergyOverrides, setConfirmedAllergyOverrides] = useState([])
   const [allergyApiError, setAllergyApiError] = useState(null)
+
+  const [detectedContraindicationWarnings, setDetectedContraindicationWarnings] = useState([])
+  const [detectedContraindicationMissingData, setDetectedContraindicationMissingData] = useState([])
+  const [checkingContraindications, setCheckingContraindications] = useState(false)
+  const [contraindicationModalOpen, setContraindicationModalOpen] = useState(false)
+  const [confirmedContraindicationOverrides, setConfirmedContraindicationOverrides] = useState([])
+  const [contraindicationApiError, setContraindicationApiError] = useState(null)
+  const [quickPregnancyModalOpen, setQuickPregnancyModalOpen] = useState(false)
+  const contraindicationRequestIdRef = useRef(0)
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
@@ -321,6 +338,19 @@ function PrescriptionPage() {
     return Array.from(map.values())
   }, [detectedAllergyConflicts, detectedAllergyWarnings])
 
+  const currentPatient = useMemo(() => {
+    return (
+      encounter?.patient || {
+        id: encounter?.patientId || record?.patientId || routeState.patient?.id || routeState.encounter?.patient?.id,
+        fullName: encounter?.patientName || record?.patientName || routeState.patient?.fullName || routeState.encounter?.patient?.fullName || 'Bệnh nhân',
+        patientCode: encounter?.patientCode || record?.patientCode || routeState.patient?.patientCode || '',
+        gender: encounter?.patient?.gender || record?.gender,
+        dateOfBirth: encounter?.patient?.dateOfBirth || record?.dateOfBirth,
+        pregnancyStatus: encounter?.patient?.pregnancyStatus,
+      }
+    )
+  }, [encounter, record, routeState])
+
   const submitStatus = useMemo(
     () => {
       const baseStatus = canSubmitPrescription({
@@ -348,6 +378,28 @@ function PrescriptionPage() {
       })
       if (!allergyStatus.allowed) return allergyStatus
 
+      if (checkingContraindications) {
+        return {
+          allowed: false,
+          reason: 'Đang đối chiếu cảnh báo chống chỉ định từ máy chủ...',
+        }
+      }
+      if (detectedContraindicationMissingData && detectedContraindicationMissingData.length > 0) {
+        return {
+          allowed: false,
+          reason: `Thiếu dữ liệu bệnh nhân (${detectedContraindicationMissingData.length} trường hợp) để kiểm tra chống chỉ định an toàn.`,
+        }
+      }
+      if (
+        detectedContraindicationWarnings.length > 0 &&
+        !areAllContraindicationsHandled(detectedContraindicationWarnings, confirmedContraindicationOverrides)
+      ) {
+        return {
+          allowed: false,
+          reason: `Phát hiện ${detectedContraindicationWarnings.length} cảnh báo chống chỉ định cần xác nhận lý do trước khi kê đơn.`,
+        }
+      }
+
       return { allowed: true, reason: '' }
     },
     [
@@ -362,6 +414,10 @@ function PrescriptionPage() {
       allergyApiError,
       activeAllergyWarnings,
       confirmedAllergyOverrides,
+      checkingContraindications,
+      detectedContraindicationMissingData,
+      detectedContraindicationWarnings,
+      confirmedContraindicationOverrides,
     ],
   )
   const canSubmit = submitStatus.allowed
@@ -719,6 +775,47 @@ function PrescriptionPage() {
     }
   }, [medicalRecordId])
 
+  const performContraindicationCheck = useCallback(async (currentItems) => {
+    const validItems = (currentItems || []).filter((item) => Boolean(item.medicineId))
+    const medicineIds = [...new Set(validItems.map((item) => item.medicineId))]
+
+    const currentRequestId = ++contraindicationRequestIdRef.current
+
+    if (!medicalRecordId || medicineIds.length === 0) {
+      setDetectedContraindicationWarnings([])
+      setDetectedContraindicationMissingData([])
+      setContraindicationApiError(null)
+      return { warnings: [], missingData: [] }
+    }
+
+    setCheckingContraindications(true)
+    setContraindicationApiError(null)
+    try {
+      const response = await contraindicationApi.checkContraindications(medicalRecordId, medicineIds)
+      if (currentRequestId !== contraindicationRequestIdRef.current) {
+        return { warnings: [], missingData: [] }
+      }
+      const data = response?.data || {}
+      const warnings = data.warnings || []
+      const missingData = data.missingData || []
+      setDetectedContraindicationWarnings(warnings)
+      setDetectedContraindicationMissingData(missingData)
+      setContraindicationApiError(null)
+      return { warnings, missingData }
+    } catch (error) {
+      if (currentRequestId !== contraindicationRequestIdRef.current) {
+        return { warnings: [], missingData: [] }
+      }
+      console.warn('Lỗi kiểm tra chống chỉ định từ máy chủ:', error)
+      setContraindicationApiError('Không thể kiểm tra chống chỉ định từ máy chủ. Vui lòng thử lại.')
+      return { warnings: [], missingData: [] }
+    } finally {
+      if (currentRequestId === contraindicationRequestIdRef.current) {
+        setCheckingContraindications(false)
+      }
+    }
+  }, [medicalRecordId])
+
   const handleItemChange = (clientId, field, value) => {
     const nextItems = items.map((item) => {
       if (item.clientId !== clientId) return item
@@ -748,8 +845,10 @@ function PrescriptionPage() {
     if (field === 'medicineId') {
       setConfirmedOverrides([])
       setConfirmedAllergyOverrides([])
+      setConfirmedContraindicationOverrides([])
       performInteractionCheck(nextItems).catch(() => {})
       performAllergyCheck(nextItems).catch(() => {})
+      performContraindicationCheck(nextItems).catch(() => {})
     }
   }
 
@@ -762,8 +861,10 @@ function PrescriptionPage() {
     setItems(nextItems)
     setConfirmedOverrides([])
     setConfirmedAllergyOverrides([])
+    setConfirmedContraindicationOverrides([])
     performInteractionCheck(nextItems).catch(() => {})
     performAllergyCheck(nextItems).catch(() => {})
+    performContraindicationCheck(nextItems).catch(() => {})
   }
 
   const validateForm = () => {
@@ -849,7 +950,11 @@ function PrescriptionPage() {
       instructions: (item.instructions || '').trim(),
     }))
 
-  const executeSavePrescription = async (overrides = [], allergyOverrides = confirmedAllergyOverrides) => {
+  const executeSavePrescription = async (
+    overrides = [],
+    allergyOverrides = confirmedAllergyOverrides,
+    contraOverrides = confirmedContraindicationOverrides,
+  ) => {
     setSaving(true)
     try {
       const activeQueueItem = await requireLiveInProgressQueue(
@@ -932,6 +1037,9 @@ function PrescriptionPage() {
           overrideReason: o.overrideReason.trim(),
         }))
 
+      // Chuẩn bị danh sách overrides chống chỉ định hợp lệ
+      const validContraOverrides = sanitizeContraindicationOverrides(contraOverrides)
+
       const payload = {
         note: note.trim(),
         items: formatItems(),
@@ -946,6 +1054,11 @@ function PrescriptionPage() {
         ...(validAllergyOverrides.length > 0
           ? {
               allergyOverrides: validAllergyOverrides,
+            }
+          : {}),
+        ...(!editingPrescription && validContraOverrides.length > 0
+          ? {
+              contraindicationOverrides: validContraOverrides,
             }
           : {}),
       }
@@ -1039,6 +1152,9 @@ function PrescriptionPage() {
       setConfirmedOverrides([])
       setDetectedAllergyWarnings([])
       setConfirmedAllergyOverrides([])
+      setDetectedContraindicationWarnings([])
+      setDetectedContraindicationMissingData([])
+      setConfirmedContraindicationOverrides([])
       await loadData()
       setActiveTab('history')
     } catch (error) {
@@ -1052,6 +1168,29 @@ function PrescriptionPage() {
         message.error(
           'Phát hiện thuốc trùng tiền sử dị ứng của bệnh nhân. Vui lòng kiểm tra và nhập lý do lâm sàng để tiếp tục.',
         )
+        return
+      }
+      if (
+        responseData?.code === 'CONTRAINDICATION_CONFIRMATION_REQUIRED' ||
+        error?.response?.status === 409
+      ) {
+        setContraindicationModalOpen(true)
+        message.error(
+          'Phát hiện thuốc có chống chỉ định lâm sàng. Vui lòng kiểm tra và nhập lý do chuyên môn để tiếp tục.',
+        )
+        return
+      }
+      if (
+        responseData?.code === 'CONTRAINDICATION_DATA_MISSING' ||
+        error?.response?.status === 422
+      ) {
+        message.error(
+          responseData?.message ||
+            'Hồ sơ bệnh nhân thiếu dữ liệu (ngày sinh hoặc tình trạng thai kỳ) để đối chiếu an toàn.',
+        )
+        if (detectedContraindicationMissingData.some((m) => m.type === 'PREGNANCY')) {
+          setQuickPregnancyModalOpen(true)
+        }
         return
       }
       message.error(getApiMessage(error, 'Không thể lưu đơn thuốc.'))
@@ -1087,6 +1226,29 @@ function PrescriptionPage() {
         return
       }
 
+      // 3. Kiểm tra chống chỉ định theo tuổi, thai kỳ và bệnh nền (NCL-05-CN-006)
+      const contraindicationRes = await performContraindicationCheck(items)
+      const contraWarnings = contraindicationRes?.warnings || detectedContraindicationWarnings
+      const contraMissing = contraindicationRes?.missingData || detectedContraindicationMissingData
+
+      if (contraMissing.length > 0) {
+        message.warning(
+          `Cần bổ sung dữ liệu bệnh nhân (${contraMissing.length} trường hợp) để kiểm tra chống chỉ định an toàn trước khi kê đơn.`,
+        )
+        if (contraMissing.some((m) => m.type === 'PREGNANCY')) {
+          setQuickPregnancyModalOpen(true)
+        }
+        return
+      }
+
+      if (
+        contraWarnings.length > 0 &&
+        !areAllContraindicationsHandled(contraWarnings, confirmedContraindicationOverrides)
+      ) {
+        setContraindicationModalOpen(true)
+        return
+      }
+
       const checkStatus = canSubmitPrescription({
         canPrescribe,
         saving,
@@ -1115,7 +1277,11 @@ function PrescriptionPage() {
         return
       }
 
-      await executeSavePrescription(confirmedOverrides, confirmedAllergyOverrides)
+      await executeSavePrescription(
+        confirmedOverrides,
+        confirmedAllergyOverrides,
+        confirmedContraindicationOverrides,
+      )
     } catch (error) {
       message.error(getApiMessage(error, 'Không thể tạo đơn thuốc.'))
     }
@@ -1131,13 +1297,51 @@ function PrescriptionPage() {
       setAllergyModalOpen(true)
       return
     }
-    await executeSavePrescription(overrides, confirmedAllergyOverrides)
+    if (
+      detectedContraindicationWarnings.length > 0 &&
+      !areAllContraindicationsHandled(
+        detectedContraindicationWarnings,
+        confirmedContraindicationOverrides,
+      )
+    ) {
+      setContraindicationModalOpen(true)
+      return
+    }
+    await executeSavePrescription(
+      overrides,
+      confirmedAllergyOverrides,
+      confirmedContraindicationOverrides,
+    )
   }
 
   const handleConfirmAllergyOverrides = async (allergyOverrides) => {
     setConfirmedAllergyOverrides(allergyOverrides)
     setAllergyModalOpen(false)
-    await executeSavePrescription(confirmedOverrides, allergyOverrides)
+    if (
+      detectedContraindicationWarnings.length > 0 &&
+      !areAllContraindicationsHandled(
+        detectedContraindicationWarnings,
+        confirmedContraindicationOverrides,
+      )
+    ) {
+      setContraindicationModalOpen(true)
+      return
+    }
+    await executeSavePrescription(
+      confirmedOverrides,
+      allergyOverrides,
+      confirmedContraindicationOverrides,
+    )
+  }
+
+  const handleConfirmContraindicationOverrides = async (contraOverrides) => {
+    setConfirmedContraindicationOverrides(contraOverrides)
+    setContraindicationModalOpen(false)
+    await executeSavePrescription(
+      confirmedOverrides,
+      confirmedAllergyOverrides,
+      contraOverrides,
+    )
   }
 
   const startEditPrescription = (prescription) => {
@@ -1175,8 +1379,10 @@ function PrescriptionPage() {
     setItems(nextItems.length > 0 ? nextItems : [createEmptyItem()])
     setConfirmedOverrides([])
     setConfirmedAllergyOverrides([])
+    setConfirmedContraindicationOverrides([])
     performInteractionCheck(nextItems).catch(() => {})
     performAllergyCheck(nextItems).catch(() => {})
+    performContraindicationCheck(nextItems).catch(() => {})
     setActiveTab('prescribe')
     message.info(`Đang mở chế độ điều chỉnh đơn thuốc ${prescription.prescriptionCode}.`)
   }
@@ -1190,6 +1396,9 @@ function PrescriptionPage() {
     setConfirmedOverrides([])
     setDetectedAllergyWarnings([])
     setConfirmedAllergyOverrides([])
+    setDetectedContraindicationWarnings([])
+    setDetectedContraindicationMissingData([])
+    setConfirmedContraindicationOverrides([])
   }
 
   const handleOpenCancelModal = (prescription) => {
@@ -3108,15 +3317,66 @@ function PrescriptionPage() {
                     </div>
                   )}
 
+                  {checkingContraindications && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        type="info"
+                        showIcon
+                        icon={<Spin size="small" />}
+                        message="Đang đối chiếu chống chỉ định theo tuổi, thai kỳ và bệnh nền của bệnh nhân..."
+                      />
+                    </div>
+                  )}
+
+                  {!checkingContraindications && contraindicationApiError && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        type="error"
+                        showIcon
+                        icon={<WarningOutlined />}
+                        message="Lỗi kiểm tra chống chỉ định thuốc"
+                        description={
+                          <div>
+                            <Paragraph style={{ marginBottom: 8, color: '#991b1b' }}>
+                              {contraindicationApiError}
+                            </Paragraph>
+                            <Button
+                              size="small"
+                              type="primary"
+                              danger
+                              onClick={() => performContraindicationCheck(items).catch(() => {})}
+                            >
+                              Thử lại kiểm tra chống chỉ định
+                            </Button>
+                          </div>
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {!checkingContraindications &&
+                    !contraindicationApiError &&
+                    (detectedContraindicationWarnings.length > 0 ||
+                      detectedContraindicationMissingData.length > 0) && (
+                      <ContraindicationWarningPanel
+                        warnings={detectedContraindicationWarnings}
+                        missingData={detectedContraindicationMissingData}
+                        overrides={confirmedContraindicationOverrides}
+                        onOpenOverrideModal={() => setContraindicationModalOpen(true)}
+                        onOpenQuickUpdatePregnancy={() => setQuickPregnancyModalOpen(true)}
+                        editingPrescription={Boolean(editingPrescription)}
+                      />
+                    )}
+
                   <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     {editingPrescription && (
-                      <Button disabled={checkingInteractions || checkingAllergies || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
+                      <Button disabled={checkingInteractions || checkingAllergies || checkingContraindications || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                     )}
                     {canPrescribe && (
                       <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
                         <Button
                           type="primary"
-                          loading={saving || checkingInteractions || checkingAllergies}
+                          loading={saving || checkingInteractions || checkingAllergies || checkingContraindications}
                           disabled={!canSubmit}
                           icon={<CheckCircleOutlined />}
                           onClick={handleSaveClick}
@@ -3407,6 +3667,34 @@ function PrescriptionPage() {
         patientName={encounter?.patient?.fullName || record?.patientName || ''}
         onCancel={() => setAllergyModalOpen(false)}
         onConfirmOverride={handleConfirmAllergyOverrides}
+      />
+
+      <ContraindicationOverrideModal
+        open={contraindicationModalOpen}
+        warnings={detectedContraindicationWarnings}
+        initialOverrides={confirmedContraindicationOverrides}
+        patientName={currentPatient?.fullName || ''}
+        onCancel={() => setContraindicationModalOpen(false)}
+        onConfirmOverride={handleConfirmContraindicationOverrides}
+      />
+
+      <QuickUpdatePregnancyModal
+        open={quickPregnancyModalOpen}
+        patient={currentPatient}
+        onClose={() => setQuickPregnancyModalOpen(false)}
+        onSuccess={(status) => {
+          setEncounter((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              patient: {
+                ...(prev.patient || {}),
+                pregnancyStatus: status,
+              },
+            }
+          })
+          performContraindicationCheck(items).catch(() => {})
+        }}
       />
 
       <PrescriptionAllergyWarningLogsModal

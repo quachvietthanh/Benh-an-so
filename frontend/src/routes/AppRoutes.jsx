@@ -49,6 +49,7 @@ const PendingClinicalOrdersPage = React.lazy(() => import('../pages/PendingClini
 const AdminOperationLogPage = React.lazy(() => import('../pages/AdminOperationLogPage'))
 const DiseasePatternReportPage = React.lazy(() => import('../pages/DiseasePatternReportPage'))
 const RevenueBreakdownReportPage = React.lazy(() => import('../pages/RevenueBreakdownReportPage'))
+const ContraindicationRuleManagementPage = React.lazy(() => import('../pages/ContraindicationRuleManagementPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -178,7 +179,8 @@ function AppRoutes() {
         <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
         <Route path="admin/operation-logs" element={<PrivateRoute allowedPermissions={['ADMIN_OPERATION_LOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><AdminOperationLogPage /></LazyPage></PrivateRoute>} />
         <Route path="admin-operation-logs" element={<Navigate to="/admin/operation-logs" replace />} />
-
+        <Route path="contraindication-rules" element={<PrivateRoute allowedPermissions={['CONTRAINDICATION_RULE_MANAGE']}><LazyPage><ContraindicationRuleManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="system/contraindication-rules" element={<Navigate to="/contraindication-rules" replace />} />
 
       </Route>
 

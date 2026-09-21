@@ -65,6 +65,35 @@ public class ContraindicationRule {
         validate();
     }
 
+    public static ContraindicationRule create(
+            UUID medicineId,
+            String activeIngredient,
+            ContraindicationType type,
+            Integer minAgeYears,
+            Integer maxAgeYears,
+            UUID diagnosisCatalogId,
+            ContraindicationSeverity severity,
+            String message,
+            String recommendation,
+            Instant now
+    ) {
+        return new ContraindicationRule(
+                UUID.randomUUID(),
+                medicineId,
+                activeIngredient,
+                type,
+                minAgeYears,
+                maxAgeYears,
+                diagnosisCatalogId,
+                severity,
+                message,
+                recommendation,
+                true,
+                now,
+                null
+        );
+    }
+
     public static ContraindicationRule restore(
             UUID id,
             UUID medicineId,
@@ -86,6 +115,41 @@ public class ContraindicationRule {
         );
     }
 
+    public void update(
+            UUID medicineId,
+            String activeIngredient,
+            ContraindicationType type,
+            Integer minAgeYears,
+            Integer maxAgeYears,
+            UUID diagnosisCatalogId,
+            ContraindicationSeverity severity,
+            String message,
+            String recommendation,
+            Instant now
+    ) {
+        this.medicineId = medicineId;
+        this.activeIngredient = normalizeOptionalText(activeIngredient);
+        this.type = requireNonNull(type, "Contraindication type is required.");
+        this.minAgeYears = minAgeYears;
+        this.maxAgeYears = maxAgeYears;
+        this.diagnosisCatalogId = diagnosisCatalogId;
+        this.severity = requireNonNull(severity, "Contraindication severity is required.");
+        this.message = requireText(message, "Contraindication message is required.");
+        this.recommendation = normalizeOptionalText(recommendation);
+        this.updatedAt = requireNonNull(now, "Contraindication rule update time is required.");
+        validate();
+    }
+
+    public void deactivate(Instant now) {
+        this.active = false;
+        this.updatedAt = requireNonNull(now, "Contraindication rule update time is required.");
+    }
+
+    public void activate(Instant now) {
+        this.active = true;
+        this.updatedAt = requireNonNull(now, "Contraindication rule update time is required.");
+    }
+
     private void validate() {
         if (medicineId == null && activeIngredient == null) {
             throw new ValidationException(
@@ -103,10 +167,10 @@ public class ContraindicationRule {
                             "Age contraindication min age must not exceed max age.");
                 }
             }
-            case PREGNANCY -> {
+            case PREGNANCY, BREASTFEEDING -> {
                 if (diagnosisCatalogId != null) {
                     throw new ValidationException(
-                            "A pregnancy contraindication rule must not reference a diagnosis.");
+                            "A pregnancy or breastfeeding contraindication rule must not reference a diagnosis.");
                 }
             }
             case DISEASE -> {
