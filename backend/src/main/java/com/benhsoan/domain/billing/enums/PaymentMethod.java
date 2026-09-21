@@ -10,5 +10,7 @@ public enum PaymentMethod {
 
     QR_CODE,
 
-    E_WALLET
+    E_WALLET,
+
+    MULTIPLE
 }

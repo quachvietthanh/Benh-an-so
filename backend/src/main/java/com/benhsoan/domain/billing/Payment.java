@@ -2,8 +2,11 @@ package com.benhsoan.domain.billing;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
@@ -54,6 +57,8 @@ public class Payment {
 
     private Instant createdAt;
 
+    private List<PaymentMethodItem> paymentMethodItems;
+
     private Payment(
             UUID id,
             UUID visitId,
@@ -69,7 +74,8 @@ public class Payment {
             String refundReason,
             UUID refundedBy,
             Instant refundedAt,
-            Instant createdAt
+            Instant createdAt,
+            List<PaymentMethodItem> paymentMethodItems
     ) {
         this.id = requireNonNull(id, "Payment id is required.");
         this.visitId = requireNonNull(visitId, "Visit id is required.");
@@ -91,6 +97,70 @@ public class Payment {
         this.refundedBy = refundedBy;
         this.refundedAt = refundedAt;
         this.createdAt = requireNonNull(createdAt, "Payment creation time is required.");
+        this.paymentMethodItems = validatePaymentMethodItems(
+                paymentMethodItems,
+                this.amountPaid,
+                this.paymentMethod,
+                this.id,
+                this.paidAt
+        );
+    }
+
+    public static Payment record(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal amountPaid,
+            List<PaymentMethodItem> paymentMethodItems,
+            UUID collectedBy,
+            Instant paidAt,
+            VisitStatus visitStatus,
+            boolean dispensingCompleted
+    ) {
+        validatePaymentEligibility(visitStatus, dispensingCompleted);
+        BigDecimal validatedExamFee = validateNonNegative(examFee, "Exam fee is required.");
+        BigDecimal validatedMedicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
+        BigDecimal validatedServiceFee = validateNonNegative(serviceFee, "Service fee is required.");
+        BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee).add(validatedServiceFee);
+        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidationException("Payment total amount must be greater than zero.");
+        }
+
+        if (paymentMethodItems == null || paymentMethodItems.isEmpty()) {
+            throw new ValidationException("At least one payment method item is required.");
+        }
+
+        BigDecimal sumItems = paymentMethodItems.stream()
+                .map(PaymentMethodItem::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (sumItems.compareTo(totalAmount) != 0) {
+            throw new PaymentAmountMismatchException(totalAmount, sumItems);
+        }
+
+        PaymentMethod resolvedMethod = resolvePaymentMethod(paymentMethodItems);
+
+        return new Payment(
+                id,
+                visitId,
+                validatedExamFee,
+                validatedMedicineFee,
+                validatedServiceFee,
+                totalAmount,
+                amountPaid,
+                resolvedMethod,
+                PaymentStatus.RECORDED,
+                collectedBy,
+                paidAt,
+                null,
+                null,
+                null,
+                paidAt,
+                paymentMethodItems
+        );
     }
 
     public static Payment record(
@@ -106,31 +176,26 @@ public class Payment {
             VisitStatus visitStatus,
             boolean dispensingCompleted
     ) {
-        validatePaymentEligibility(visitStatus, dispensingCompleted);
-        BigDecimal validatedExamFee = validateNonNegative(examFee, "Exam fee is required.");
-        BigDecimal validatedMedicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
-        BigDecimal validatedServiceFee = validateNonNegative(serviceFee, "Service fee is required.");
-        BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee).add(validatedServiceFee);
-        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ValidationException("Payment total amount must be greater than zero.");
-        }
-
-        return new Payment(
+        PaymentMethodItem singleItem = PaymentMethodItem.create(
+                UUID.randomUUID(),
                 id,
-                visitId,
-                validatedExamFee,
-                validatedMedicineFee,
-                validatedServiceFee,
-                totalAmount,
-                amountPaid,
                 paymentMethod,
-                PaymentStatus.RECORDED,
-                collectedBy,
-                paidAt,
-                null,
-                null,
+                amountPaid,
                 null,
                 paidAt
+        );
+        return record(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                amountPaid,
+                List.of(singleItem),
+                collectedBy,
+                paidAt,
+                visitStatus,
+                dispensingCompleted
         );
     }
 
@@ -189,7 +254,8 @@ public class Payment {
                 null,
                 null,
                 null,
-                createdAt
+                createdAt,
+                null
         );
     }
 
@@ -222,7 +288,8 @@ public class Payment {
                 null,
                 null,
                 null,
-                createdAt
+                createdAt,
+                null
         );
     }
 
@@ -242,7 +309,7 @@ public class Payment {
             Instant refundedAt,
             Instant createdAt
     ) {
-        return new Payment(
+        return restore(
                 id,
                 visitId,
                 examFee,
@@ -257,7 +324,8 @@ public class Payment {
                 refundReason,
                 refundedBy,
                 refundedAt,
-                createdAt
+                createdAt,
+                null
         );
     }
 
@@ -278,6 +346,44 @@ public class Payment {
             Instant refundedAt,
             Instant createdAt
     ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt,
+                null
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt,
+            List<PaymentMethodItem> paymentMethodItems
+    ) {
         return new Payment(
                 id,
                 visitId,
@@ -293,7 +399,8 @@ public class Payment {
                 refundReason,
                 refundedBy,
                 refundedAt,
-                createdAt
+                createdAt,
+                paymentMethodItems
         );
     }
 
@@ -386,6 +493,49 @@ public class Payment {
             throw new ValidationException(message);
         }
         return value.trim();
+    }
+
+    private static List<PaymentMethodItem> validatePaymentMethodItems(
+            List<PaymentMethodItem> items,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            UUID paymentId,
+            Instant paidAt
+    ) {
+        if (items == null || items.isEmpty()) {
+            if (paymentMethod != null && paymentMethod != PaymentMethod.MULTIPLE) {
+                return List.of(PaymentMethodItem.create(
+                        UUID.randomUUID(),
+                        paymentId,
+                        paymentMethod,
+                        amountPaid,
+                        null,
+                        paidAt
+                ));
+            }
+            throw new ValidationException("At least one payment method item is required.");
+        }
+
+        BigDecimal sumItems = items.stream()
+                .map(PaymentMethodItem::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (sumItems.compareTo(amountPaid) != 0) {
+            throw new PaymentAmountMismatchException(amountPaid, sumItems);
+        }
+
+        return List.copyOf(items);
+    }
+
+    private static PaymentMethod resolvePaymentMethod(List<PaymentMethodItem> items) {
+        Set<PaymentMethod> distinctMethods = items.stream()
+                .map(PaymentMethodItem::getPaymentMethod)
+                .collect(Collectors.toSet());
+        if (distinctMethods.size() == 1) {
+            return distinctMethods.iterator().next();
+        }
+        return PaymentMethod.MULTIPLE;
     }
 
     private static <T> T requireNonNull(T value, String message) {
