@@ -25,6 +25,7 @@ const PharmacyPage = React.lazy(() => import('../pages/PharmacyPage'))
 const InventoryReceiptPage = React.lazy(() => import('../pages/InventoryReceiptPage'))
 const MedicineCatalogPage = React.lazy(() => import('../pages/MedicineCatalogPage'))
 const BillingPage = React.lazy(() => import('../pages/BillingPage'))
+const InvoiceLookupPage = React.lazy(() => import('../pages/InvoiceLookupPage'))
 const ReportsPage = React.lazy(() => import('../pages/ReportsPage'))
 const UsersPage = React.lazy(() => import('../pages/UsersPage'))
 const ServicesPage = React.lazy(() => import('../pages/ServicesPage'))
@@ -156,6 +157,7 @@ function AppRoutes() {
         <Route path="medicines" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />
+        <Route path="invoices/lookup" element={<PrivateRoute allowedPermissions={['INVOICE_READ']} allowedRoles={['admin', 'manager', 'clinic_manager', 'receptionist']}><LazyPage><InvoiceLookupPage /></LazyPage></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedPermissions={['REPORT_VIEW', 'REPORT_EXPORT']} allowedRoles={['admin', 'manager']}><LazyPage><ReportsPage /></LazyPage></PrivateRoute>} />
         <Route path="reports/disease-patterns" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><DiseasePatternReportPage /></LazyPage></PrivateRoute>} />
         <Route path="reports/revenue-breakdown" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><RevenueBreakdownReportPage /></LazyPage></PrivateRoute>} />
