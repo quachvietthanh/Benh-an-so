@@ -41,6 +41,7 @@ const { Text, Title, Paragraph } = Typography
 export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrinted }) {
   const [loading, setLoading] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [printing, setPrinting] = useState(false)
   const [summaryData, setSummaryData] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
 
@@ -78,16 +79,37 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
     fetchSummary()
   }, [open, visitId])
 
-  const handlePrint = () => {
-    if (!summaryData) return
-    window.print()
-    if (onPrinted) {
-      onPrinted()
+  const handlePrint = async () => {
+    if (!summaryData || printing || downloading) return
+    setPrinting(true)
+    try {
+      // Ghi nhận nhật ký in vào Backend thông qua API GET /visits/{visitId}/summary/print (Blocker 3)
+      await visitSummaryApi.recordPrintAudit(summaryData.visitId)
+
+      // Cập nhật lại thông tin tóm tắt để hiển thị lịch sử in mới nhất
+      try {
+        const updatedRes = await visitSummaryApi.getSummary(summaryData.visitId)
+        if (updatedRes?.data) {
+          setSummaryData(updatedRes.data)
+        }
+      } catch {
+        // Bỏ qua lỗi làm tươi dữ liệu phụ nếu có
+      }
+
+      // Kích hoạt in trên trình duyệt
+      window.print()
+      if (onPrinted) {
+        onPrinted()
+      }
+    } catch (err) {
+      message.error(getApiErrorMessage(err, 'Không thể ghi nhận nhật ký in phiếu tóm tắt.'))
+    } finally {
+      setPrinting(false)
     }
   }
 
   const handleDownloadPdf = async () => {
-    if (!summaryData) return
+    if (!summaryData || downloading || printing) return
     setDownloading(true)
     try {
       await visitSummaryApi.downloadPdf(
@@ -95,6 +117,17 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
         `phieu-tom-tat-${summaryData.visitCode || 'kham-benh'}.pdf`
       )
       message.success('Đã tải xuống tệp PDF phiếu tóm tắt thành công!')
+
+      // Cập nhật lại thông tin tóm tắt để hiển thị lịch sử in mới nhất
+      try {
+        const updatedRes = await visitSummaryApi.getSummary(summaryData.visitId)
+        if (updatedRes?.data) {
+          setSummaryData(updatedRes.data)
+        }
+      } catch {
+        // Bỏ qua lỗi làm tươi dữ liệu phụ
+      }
+
       if (onPrinted) {
         onPrinted()
       }
@@ -105,10 +138,15 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
     }
   }
 
+  const isBusy = downloading || printing
+
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={isBusy ? undefined : onClose}
+      maskClosable={!isBusy}
+      closable={!isBusy}
+      keyboard={!isBusy}
       width={900}
       style={{ top: 20 }}
       className="visit-summary-modal"
@@ -132,6 +170,7 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
         >
           <Button
             key="close"
+            disabled={isBusy}
             onClick={onClose}
             style={{
               height: 46,
@@ -147,7 +186,7 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
             key="download"
             icon={<DownloadOutlined style={{ fontSize: 18 }} />}
             loading={downloading}
-            disabled={!summaryData || Boolean(errorMsg)}
+            disabled={!summaryData || Boolean(errorMsg) || isBusy}
             onClick={handleDownloadPdf}
             style={{
               height: 46,
@@ -165,7 +204,8 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
             key="print"
             type="primary"
             icon={<PrinterOutlined style={{ fontSize: 18 }} />}
-            disabled={!summaryData || Boolean(errorMsg)}
+            loading={printing}
+            disabled={!summaryData || Boolean(errorMsg) || isBusy}
             onClick={handlePrint}
             style={{
               height: 46,

@@ -11,6 +11,18 @@ const visitSummaryApi = {
   },
 
   /**
+   * Ghi nhận nhật ký in phiếu tóm tắt lượt khám vào Backend (NCL-04-CN-011)
+   * Kích hoạt ghi log vào bảng audit print trước khi in giấy
+   * @param {string} visitId - Mã định danh duy nhất của lượt khám
+   * @returns {Promise<Blob>}
+   */
+  recordPrintAudit: async (visitId) => {
+    return axiosClient.get(`/visits/${visitId}/summary/print`, {
+      responseType: 'blob',
+    })
+  },
+
+  /**
    * Tải tệp PDF phiếu tóm tắt lượt khám (NCL-04-CN-011)
    * @param {string} visitId - Mã định danh duy nhất của lượt khám
    * @returns {Promise<Blob>}

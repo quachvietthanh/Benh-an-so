@@ -146,7 +146,7 @@ function AppRoutes() {
         <Route path="medical-records/version-history" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_VERSION_HISTORY_READ', 'AUDIT_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><MedicalRecordVersionHistoryPage /></LazyPage></PrivateRoute>} />
         <Route path="medical-records/versions" element={<Navigate to="/medical-records/version-history" replace />} />
         <Route path="medical-records/visit-summaries" element={<PrivateRoute allowedPermissions={['VISIT_SUMMARY_PRINT']} allowedRoles={['admin', 'doctor', 'receptionist', 'manager', 'clinic_manager']}><LazyPage><VisitSummaryManagementPage /></LazyPage></PrivateRoute>} />
-        <Route path="visit-summaries" element={<Navigate to="/medical-records/visit-summaries" replace />} />
+        <Route path="visit-summaries" element={<PrivateRoute allowedPermissions={['VISIT_SUMMARY_PRINT']} allowedRoles={['admin', 'doctor', 'receptionist', 'manager', 'clinic_manager']}><LazyPage><VisitSummaryManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="visits/summary" element={<Navigate to="/medical-records/visit-summaries" replace />} />
         <Route path="medical-records/overdue-signing" element={<PrivateRoute allowedPermissions={['MEDICAL_RECORD_OVERDUE_READ', 'MEDICAL_RECORD_REMIND_SIGN']} allowedRoles={['admin', 'manager', 'clinic_manager', 'doctor']}><LazyPage><OverdueMedicalRecordSigningPage /></LazyPage></PrivateRoute>} />
         <Route path="overdue-signing" element={<Navigate to="/medical-records/overdue-signing" replace />} />

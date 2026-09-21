@@ -1,19 +1,15 @@
 import dayjs from 'dayjs'
+import { isMedicalRecordSigned } from './medicalRecordSignHelpers.js'
 
 /**
  * Kiểm tra xem bệnh án của lượt khám đã được ký hợp lệ để in phiếu tóm tắt chưa (NCL-04-CN-011-TC-02)
- * Bắt buộc trạng thái phải là SIGNED, LOCKED, hoặc ARCHIVED
+ * Tái sử dụng isMedicalRecordSigned từ medicalRecordSignHelpers.js (SIGNED, LOCKED, ARCHIVED)
  */
 export const isMedicalRecordSignedForSummary = (medicalRecord) => {
-  if (!medicalRecord) return false
-  const status = typeof medicalRecord === 'string' ? medicalRecord : medicalRecord.status
-  const normalizedStatus = String(status || '').toUpperCase()
-  return (
-    normalizedStatus === 'SIGNED' ||
-    normalizedStatus === 'LOCKED' ||
-    normalizedStatus === 'ARCHIVED'
-  )
+  return isMedicalRecordSigned(medicalRecord)
 }
+
+export { isMedicalRecordSigned }
 
 /**
  * Định dạng nhãn giới tính thuần tiếng Việt
