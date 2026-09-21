@@ -36,6 +36,24 @@ public class MedicineBatchRepositoryAdapter implements MedicineBatchRepository {
     }
 
     @Override
+    public Optional<MedicineBatch> findById(UUID id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return jpaRepository.findById(id)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<MedicineBatch> findByIdForUpdate(UUID id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return jpaRepository.findByIdForUpdate(id)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public List<MedicineBatch> findAllById(Collection<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();

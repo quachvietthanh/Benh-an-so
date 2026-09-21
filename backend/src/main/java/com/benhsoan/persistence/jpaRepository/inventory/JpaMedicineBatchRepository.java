@@ -53,6 +53,10 @@ public interface JpaMedicineBatchRepository
             @Param("medicineId") UUID medicineId,
             @Param("today") LocalDate today);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select batch from MedicineBatchEntity batch where batch.id = :id")
+    Optional<MedicineBatchEntity> findByIdForUpdate(@Param("id") UUID id);
+
     @Modifying
     @Query("UPDATE MedicineBatchEntity b SET b.quantity = b.quantity + :delta WHERE b.id = :id")
     int addStockQuantity(@Param("id") UUID id, @Param("delta") int delta);

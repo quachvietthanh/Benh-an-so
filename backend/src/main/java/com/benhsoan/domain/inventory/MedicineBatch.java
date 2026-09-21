@@ -5,6 +5,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import com.benhsoan.domain.inventory.enums.BatchStatus;
+import com.benhsoan.domain.inventory.exception.BatchAlreadyDiscardedException;
+import com.benhsoan.domain.inventory.exception.BatchNotExpiredException;
+import com.benhsoan.domain.inventory.exception.BatchStateConflictException;
 import com.benhsoan.domain.shared.Guard.Guard;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
@@ -123,5 +126,43 @@ public class MedicineBatch {
                 && quantity > 0
                 && !expiryDate.isBefore(validatedToday)
                 && !expiryDate.isAfter(validatedToday.plusDays(alertDays));
+    }
+
+    public void adjustStock(int actualQuantity, LocalDate today, Instant updatedAt) {
+        LocalDate validatedToday = Guard.require(today, "Today");
+        if (actualQuantity < 0) {
+            throw new ValidationException("Số lượng tồn kho thực tế không được âm.");
+        }
+        if (this.status == BatchStatus.EXPIRED) {
+            throw new BatchStateConflictException(this.id, "Không thể điều chỉnh tồn kho cho lô thuốc đã bị hủy hoặc hết hạn.");
+        }
+        if (this.expiryDate.isBefore(validatedToday)) {
+            throw new BatchStateConflictException(
+                    this.id,
+                    "Không thể điều chỉnh tồn kho cho lô thuốc đã hết hạn sử dụng. Vui lòng thực hiện quy trình hủy lô."
+            );
+        }
+        if (actualQuantity == this.quantity) {
+            throw new ValidationException(
+                    "Số lượng kiểm kê thực tế trùng khớp với tồn kho hiện tại, không có chênh lệch để điều chỉnh."
+            );
+        }
+        this.quantity = actualQuantity;
+        this.status = this.quantity == 0 ? BatchStatus.DEPLETED : BatchStatus.ACTIVE;
+        this.updatedAt = Guard.require(updatedAt, "Update time");
+    }
+
+
+    public void discardExpired(LocalDate today, Instant updatedAt) {
+        LocalDate validatedToday = Guard.require(today, "Today");
+        if (this.status == BatchStatus.EXPIRED || this.quantity <= 0) {
+            throw new BatchAlreadyDiscardedException(this.id);
+        }
+        if (!this.expiryDate.isBefore(validatedToday)) {
+            throw new BatchNotExpiredException(this.id, this.expiryDate);
+        }
+        this.quantity = 0;
+        this.status = BatchStatus.EXPIRED;
+        this.updatedAt = Guard.require(updatedAt, "Update time");
     }
 }

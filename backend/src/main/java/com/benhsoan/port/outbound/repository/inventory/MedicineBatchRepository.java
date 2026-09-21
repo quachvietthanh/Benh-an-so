@@ -14,6 +14,10 @@ public interface MedicineBatchRepository {
 
     List<MedicineBatch> findAll();
 
+    Optional<MedicineBatch> findById(UUID id);
+
+    Optional<MedicineBatch> findByIdForUpdate(UUID id);
+
     List<MedicineBatch> findAllById(Collection<UUID> ids);
 
     List<MedicineBatch> findByMedicineId(UUID medicineId);
