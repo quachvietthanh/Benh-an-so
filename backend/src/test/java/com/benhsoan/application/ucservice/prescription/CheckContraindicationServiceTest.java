@@ -256,6 +256,38 @@ class CheckContraindicationServiceTest {
         assertTrue(result.missingData().isEmpty());
     }
 
+    @Test
+    void skipsPregnancyCheckWhenFemalePatientIsOlderThanReproductiveAge() {
+        Patient patient = patient(LocalDate.of(1960, 1, 1), null); // 66 years old in 2026
+        Medicine medicine = medicine("Ibuprofen");
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(patientChronicDiseaseRepository.findByPatientIdAndActiveTrue(patientId)).thenReturn(List.of());
+        when(medicineRepository.findAllById(List.of(medicineId))).thenReturn(List.of(medicine));
+        when(ruleRepository.findActiveByMedicineIdsAndIngredients(
+                List.of(medicineId), List.of("Ibuprofen"))).thenReturn(List.of(pregnancyRule()));
+
+        ContraindicationCheckResult result = service.checkByPatientId(patientId, List.of(medicineId));
+
+        assertTrue(result.warnings().isEmpty());
+        assertTrue(result.missingData().isEmpty());
+    }
+
+    @Test
+    void skipsPregnancyCheckWhenFemalePatientIsYoungerThanReproductiveAge() {
+        Patient patient = patient(LocalDate.of(2018, 1, 1), null); // 8 years old in 2026
+        Medicine medicine = medicine("Ibuprofen");
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(patientChronicDiseaseRepository.findByPatientIdAndActiveTrue(patientId)).thenReturn(List.of());
+        when(medicineRepository.findAllById(List.of(medicineId))).thenReturn(List.of(medicine));
+        when(ruleRepository.findActiveByMedicineIdsAndIngredients(
+                List.of(medicineId), List.of("Ibuprofen"))).thenReturn(List.of(pregnancyRule()));
+
+        ContraindicationCheckResult result = service.checkByPatientId(patientId, List.of(medicineId));
+
+        assertTrue(result.warnings().isEmpty());
+        assertTrue(result.missingData().isEmpty());
+    }
+
     private Patient patient(LocalDate dateOfBirth, PregnancyStatus pregnancyStatus) {
         return patient(dateOfBirth, pregnancyStatus, Gender.FEMALE);
     }
