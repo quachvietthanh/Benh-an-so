@@ -63,6 +63,8 @@ class RecordPaymentServiceTest {
         ClockPort clockPort = mock(ClockPort.class);
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
         ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
+        com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository =
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class);
         RecordPaymentService service = new RecordPaymentService(
                 visitRepository,
                 medicalRecordRepository,
@@ -73,7 +75,8 @@ class RecordPaymentServiceTest {
                 auditLogRepository,
                 new PaymentResultMapper(),
                 feeCalculator,
-                paymentServiceFeeRepository
+                paymentServiceFeeRepository,
+                discountRequestRepository
         );
 
         UUID visitId = UUID.randomUUID();
@@ -436,6 +439,94 @@ class RecordPaymentServiceTest {
         );
     }
 
+    @Test
+    void rejectsPaymentWhenDiscountApprovalIsPending() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository =
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class);
+        UUID visitId = UUID.randomUUID();
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(completedVisit(visitId)));
+        when(discountRequestRepository.existsByVisitIdAndStatus(visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING))
+                .thenReturn(true);
+
+        RecordPaymentService service = new RecordPaymentService(
+                visitRepository,
+                mock(MedicalRecordRepository.class),
+                mock(PrescriptionRepository.class),
+                mock(PaymentRepository.class),
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new PaymentResultMapper(),
+                noServiceFees(),
+                mock(PaymentServiceFeeRepository.class),
+                discountRequestRepository
+        );
+
+        assertThrows(
+                com.benhsoan.domain.billing.exception.PendingDiscountApprovalException.class,
+                () -> service.record(command(visitId, "100000", "150000", "250000"))
+        );
+    }
+
+    @Test
+    void recordsPaymentWithApprovedDiscount() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository =
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class);
+        UUID visitId = UUID.randomUUID();
+        UUID discountRequestId = UUID.randomUUID();
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(completedVisit(visitId)));
+        when(discountRequestRepository.existsByVisitIdAndStatus(visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING))
+                .thenReturn(false);
+
+        com.benhsoan.domain.billing.DiscountRequest approvedRequest = com.benhsoan.domain.billing.DiscountRequest.restore(
+                discountRequestId,
+                visitId,
+                com.benhsoan.domain.billing.enums.DiscountType.PERCENTAGE,
+                new BigDecimal("20"),
+                new BigDecimal("250000"),
+                new BigDecimal("50000"),
+                new BigDecimal("200000"),
+                "Uu dai",
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus.APPROVED,
+                UUID.randomUUID(),
+                Instant.now(),
+                UUID.randomUUID(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null
+        );
+        when(discountRequestRepository.findByVisitIdAndStatus(visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus.APPROVED))
+                .thenReturn(Optional.of(approvedRequest));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RecordPaymentService service = new RecordPaymentService(
+                visitRepository,
+                mock(MedicalRecordRepository.class),
+                mock(PrescriptionRepository.class),
+                paymentRepository,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new PaymentResultMapper(),
+                noServiceFees(),
+                mock(PaymentServiceFeeRepository.class),
+                discountRequestRepository
+        );
+
+        PaymentResult result = service.record(command(visitId, "100000", "150000", "200000"));
+
+        assertEquals(new BigDecimal("250000"), result.totalAmount());
+        assertEquals(new BigDecimal("50000"), result.discountAmount());
+        assertEquals(new BigDecimal("200000"), result.amountPaid());
+        assertEquals(discountRequestId, result.discountRequestId());
+    }
+
     private static RecordPaymentService service(
             VisitRepository visitRepository,
             MedicalRecordRepository medicalRecordRepository,
@@ -455,7 +546,8 @@ class RecordPaymentServiceTest {
                 auditLogRepository,
                 new PaymentResultMapper(),
                 noServiceFees(),
-                mock(PaymentServiceFeeRepository.class)
+                mock(PaymentServiceFeeRepository.class),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
     }
 

@@ -47,6 +47,65 @@ class InvoiceTest {
     }
 
     @Test
+    @DisplayName("createOriginal should create invoice with discount line and discount metadata")
+    void createOriginalShouldSucceedWithDiscount() {
+        UUID invoiceId = UUID.randomUUID();
+        UUID discountRequestId = UUID.randomUUID();
+        Invoice invoice = Invoice.createOriginal(
+                invoiceId,
+                "HD-0001-DISC",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:30:00Z"),
+                List.of(
+                        line(invoiceId, InvoiceLineType.EXAM_FEE, "Exam fee", 1, "100000"),
+                        line(invoiceId, InvoiceLineType.MEDICINE_FEE, "Medicine fee", 1, "150000"),
+                        line(invoiceId, InvoiceLineType.DISCOUNT, "Giảm giá 20%", 1, "-50000")
+                ),
+                true,
+                false,
+                new BigDecimal("50000"),
+                discountRequestId
+        );
+
+        assertEquals(InvoiceType.ORIGINAL, invoice.getType());
+        assertEquals(new BigDecimal("200000"), invoice.getTotalAmount());
+        assertEquals(new BigDecimal("50000"), invoice.getDiscountAmount());
+        assertEquals(discountRequestId, invoice.getDiscountRequestId());
+        assertTrue(invoice.isOriginal());
+    }
+
+    @Test
+    @DisplayName("createOriginal should succeed with zero total amount for full free exemption")
+    void createOriginalShouldSucceedWithZeroTotalForFullFreeExemption() {
+        UUID invoiceId = UUID.randomUUID();
+        UUID discountRequestId = UUID.randomUUID();
+        Invoice invoice = Invoice.createOriginal(
+                invoiceId,
+                "HD-0001-FREE",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:30:00Z"),
+                List.of(
+                        line(invoiceId, InvoiceLineType.EXAM_FEE, "Exam fee", 1, "100000"),
+                        line(invoiceId, InvoiceLineType.DISCOUNT, "Miễn phí 100%", 1, "-100000")
+                ),
+                true,
+                false,
+                new BigDecimal("100000"),
+                discountRequestId
+        );
+
+        assertEquals(InvoiceType.ORIGINAL, invoice.getType());
+        assertEquals(BigDecimal.ZERO, invoice.getTotalAmount());
+        assertEquals(new BigDecimal("100000"), invoice.getDiscountAmount());
+        assertEquals(discountRequestId, invoice.getDiscountRequestId());
+        assertTrue(invoice.isOriginal());
+    }
+
+    @Test
     @DisplayName("createOriginal should reject duplicate invoice for same visit")
     void createOriginalShouldRejectDuplicateInvoice() {
         UUID invoiceId = UUID.randomUUID();

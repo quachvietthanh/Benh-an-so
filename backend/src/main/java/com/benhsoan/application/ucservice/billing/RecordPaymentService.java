@@ -58,6 +58,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
     private final PaymentResultMapper resultMapper;
     private final ClinicalServiceFeeCalculator clinicalServiceFeeCalculator;
     private final PaymentServiceFeeRepository paymentServiceFeeRepository;
+    private final com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository;
     private final ObjectMapper objectMapper;
     private final BillingAccessDeniedAuditWriter accessDeniedAuditWriter;
 
@@ -73,6 +74,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             PaymentResultMapper resultMapper,
             ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
             PaymentServiceFeeRepository paymentServiceFeeRepository,
+            com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository,
             ObjectMapper objectMapper,
             BillingAccessDeniedAuditWriter accessDeniedAuditWriter
     ) {
@@ -86,6 +88,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         this.resultMapper = resultMapper;
         this.clinicalServiceFeeCalculator = clinicalServiceFeeCalculator;
         this.paymentServiceFeeRepository = paymentServiceFeeRepository;
+        this.discountRequestRepository = discountRequestRepository;
         this.objectMapper = objectMapper;
         this.accessDeniedAuditWriter = accessDeniedAuditWriter;
     }
@@ -100,7 +103,8 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             AuditLogRepository auditLogRepository,
             PaymentResultMapper resultMapper,
             ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
-            PaymentServiceFeeRepository paymentServiceFeeRepository
+            PaymentServiceFeeRepository paymentServiceFeeRepository,
+            com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository
     ) {
         this(
                 visitRepository,
@@ -113,6 +117,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 resultMapper,
                 clinicalServiceFeeCalculator,
                 paymentServiceFeeRepository,
+                discountRequestRepository,
                 new ObjectMapper(),
                 new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper())
         );
@@ -131,6 +136,10 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             );
         }
 
+        if (discountRequestRepository.existsByVisitIdAndStatus(visit.getId(), com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING)) {
+            throw new com.benhsoan.domain.billing.exception.PendingDiscountApprovalException(visit.getId());
+        }
+
         if (paymentRepository.findByVisitId(visit.getId()).isPresent()) {
             throw new PaymentAlreadyExistsException(visit.getId());
         }
@@ -141,6 +150,19 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         Instant now = clockPort.now();
         List<ClinicalServiceCharge> serviceCharges = clinicalServiceFeeCalculator
                 .calculate(visit.getId(), now);
+
+        var approvedDiscountOpt = discountRequestRepository.findByVisitIdAndStatus(
+                visit.getId(),
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus.APPROVED
+        );
+
+        java.math.BigDecimal discountAmount = java.math.BigDecimal.ZERO;
+        UUID discountRequestId = null;
+        if (approvedDiscountOpt.isPresent()) {
+            var approvedDiscount = approvedDiscountOpt.get();
+            discountAmount = approvedDiscount.getDiscountAmount();
+            discountRequestId = approvedDiscount.getId();
+        }
 
         UUID paymentId = UUID.randomUUID();
         List<PaymentMethodItem> methodItems;
@@ -174,6 +196,8 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 command.examFee(),
                 command.medicineFee(),
                 clinicalServiceFeeCalculator.total(serviceCharges),
+                discountAmount,
+                discountRequestId,
                 command.amountPaid(),
                 methodItems,
                 actorId,

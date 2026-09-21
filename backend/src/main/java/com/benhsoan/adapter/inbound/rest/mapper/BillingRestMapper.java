@@ -262,4 +262,59 @@ public class BillingRestMapper {
                 result.amount(),
                 result.createdAt());
     }
+
+    public com.benhsoan.port.dto.command.billing.CreateDiscountRequestCommand toCommand(
+            com.benhsoan.adapter.inbound.rest.request.billing.CreateDiscountRequest request
+    ) {
+        return com.benhsoan.port.dto.command.billing.CreateDiscountRequestCommand.builder()
+                .visitId(request.getVisitId())
+                .discountType(request.getDiscountType())
+                .discountValue(request.getDiscountValue())
+                .originalAmount(request.getOriginalAmount())
+                .reason(request.getReason())
+                .build();
+    }
+
+    public com.benhsoan.port.dto.command.billing.RejectDiscountRequestCommand toCommand(
+            UUID discountRequestId,
+            com.benhsoan.adapter.inbound.rest.request.billing.RejectDiscountRequest request
+    ) {
+        return com.benhsoan.port.dto.command.billing.RejectDiscountRequestCommand.builder()
+                .discountRequestId(discountRequestId)
+                .rejectionReason(request.getRejectionReason())
+                .build();
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.billing.DiscountRequestResponse toResponse(
+            com.benhsoan.port.dto.result.DiscountRequestResult result
+    ) {
+        if (result == null) {
+            return null;
+        }
+        return com.benhsoan.adapter.inbound.rest.response.billing.DiscountRequestResponse.builder()
+                .id(result.id())
+                .visitId(result.visitId())
+                .discountType(result.discountType())
+                .discountValue(result.discountValue())
+                .originalAmount(result.originalAmount())
+                .discountAmount(result.discountAmount())
+                .finalAmount(result.finalAmount())
+                .reason(result.reason())
+                .status(result.status())
+                .requestedBy(result.requestedBy())
+                .requestedAt(result.requestedAt())
+                .approvedBy(result.approvedBy())
+                .approvedAt(result.approvedAt())
+                .rejectedBy(result.rejectedBy())
+                .rejectionReason(result.rejectionReason())
+                .rejectedAt(result.rejectedAt())
+                .invoiceId(result.invoiceId())
+                .build();
+    }
+
+    public Page<com.benhsoan.adapter.inbound.rest.response.billing.DiscountRequestResponse> toDiscountResponse(
+            Page<com.benhsoan.port.dto.result.DiscountRequestResult> results
+    ) {
+        return results.map(this::toResponse);
+    }
 }

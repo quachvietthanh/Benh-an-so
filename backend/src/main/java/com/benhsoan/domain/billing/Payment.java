@@ -37,6 +37,10 @@ public class Payment {
 
     private BigDecimal serviceFee;
 
+    private BigDecimal discountAmount;
+
+    private UUID discountRequestId;
+
     private BigDecimal totalAmount;
 
     private BigDecimal amountPaid;
@@ -65,6 +69,8 @@ public class Payment {
             BigDecimal examFee,
             BigDecimal medicineFee,
             BigDecimal serviceFee,
+            BigDecimal discountAmount,
+            UUID discountRequestId,
             BigDecimal totalAmount,
             BigDecimal amountPaid,
             PaymentMethod paymentMethod,
@@ -82,13 +88,15 @@ public class Payment {
         this.examFee = validateNonNegative(examFee, "Exam fee is required.");
         this.medicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
         this.serviceFee = validateNonNegative(serviceFee, "Service fee is required.");
+        this.discountAmount = discountAmount != null ? validateNonNegative(discountAmount, "Discount amount is required.") : BigDecimal.ZERO;
+        this.discountRequestId = discountRequestId;
         this.totalAmount = validateTotalAmount(
                 totalAmount,
                 this.examFee,
                 this.medicineFee,
                 this.serviceFee
         );
-        this.amountPaid = validateAmountPaid(amountPaid, this.totalAmount);
+        this.amountPaid = validateAmountPaid(amountPaid, this.totalAmount, this.discountAmount);
         this.paymentMethod = requireNonNull(paymentMethod, "Payment method is required.");
         this.status = requireNonNull(status, "Payment status is required.");
         this.collectedBy = requireNonNull(collectedBy, "Collector id is required.");
@@ -112,6 +120,8 @@ public class Payment {
             BigDecimal examFee,
             BigDecimal medicineFee,
             BigDecimal serviceFee,
+            BigDecimal discountAmount,
+            UUID discountRequestId,
             BigDecimal amountPaid,
             List<PaymentMethodItem> paymentMethodItems,
             UUID collectedBy,
@@ -123,9 +133,15 @@ public class Payment {
         BigDecimal validatedExamFee = validateNonNegative(examFee, "Exam fee is required.");
         BigDecimal validatedMedicineFee = validateNonNegative(medicineFee, "Medicine fee is required.");
         BigDecimal validatedServiceFee = validateNonNegative(serviceFee, "Service fee is required.");
+        BigDecimal validatedDiscount = discountAmount != null ? validateNonNegative(discountAmount, "Discount amount is required.") : BigDecimal.ZERO;
         BigDecimal totalAmount = validatedExamFee.add(validatedMedicineFee).add(validatedServiceFee);
         if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ValidationException("Payment total amount must be greater than zero.");
+        }
+
+        BigDecimal expectedAmountPaid = totalAmount.subtract(validatedDiscount);
+        if (expectedAmountPaid.compareTo(BigDecimal.ZERO) < 0) {
+            expectedAmountPaid = BigDecimal.ZERO;
         }
 
         if (paymentMethodItems == null || paymentMethodItems.isEmpty()) {
@@ -137,8 +153,8 @@ public class Payment {
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (sumItems.compareTo(totalAmount) != 0) {
-            throw new PaymentAmountMismatchException(totalAmount, sumItems);
+        if (sumItems.compareTo(expectedAmountPaid) != 0) {
+            throw new PaymentAmountMismatchException(expectedAmountPaid, sumItems);
         }
 
         PaymentMethod resolvedMethod = resolvePaymentMethod(paymentMethodItems);
@@ -149,6 +165,8 @@ public class Payment {
                 validatedExamFee,
                 validatedMedicineFee,
                 validatedServiceFee,
+                validatedDiscount,
+                discountRequestId,
                 totalAmount,
                 amountPaid,
                 resolvedMethod,
@@ -170,6 +188,38 @@ public class Payment {
             BigDecimal medicineFee,
             BigDecimal serviceFee,
             BigDecimal amountPaid,
+            List<PaymentMethodItem> paymentMethodItems,
+            UUID collectedBy,
+            Instant paidAt,
+            VisitStatus visitStatus,
+            boolean dispensingCompleted
+    ) {
+        return record(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                BigDecimal.ZERO,
+                null,
+                amountPaid,
+                paymentMethodItems,
+                collectedBy,
+                paidAt,
+                visitStatus,
+                dispensingCompleted
+        );
+    }
+
+    public static Payment record(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal discountAmount,
+            UUID discountRequestId,
+            BigDecimal amountPaid,
             PaymentMethod paymentMethod,
             UUID collectedBy,
             Instant paidAt,
@@ -190,8 +240,40 @@ public class Payment {
                 examFee,
                 medicineFee,
                 serviceFee,
+                discountAmount,
+                discountRequestId,
                 amountPaid,
                 List.of(singleItem),
+                collectedBy,
+                paidAt,
+                visitStatus,
+                dispensingCompleted
+        );
+    }
+
+    public static Payment record(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            UUID collectedBy,
+            Instant paidAt,
+            VisitStatus visitStatus,
+            boolean dispensingCompleted
+    ) {
+        return record(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                BigDecimal.ZERO,
+                null,
+                amountPaid,
+                paymentMethod,
                 collectedBy,
                 paidAt,
                 visitStatus,
@@ -315,6 +397,8 @@ public class Payment {
                 examFee,
                 medicineFee,
                 BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                null,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -352,6 +436,8 @@ public class Payment {
                 examFee,
                 medicineFee,
                 serviceFee,
+                BigDecimal.ZERO,
+                null,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -372,6 +458,49 @@ public class Payment {
             BigDecimal examFee,
             BigDecimal medicineFee,
             BigDecimal serviceFee,
+            BigDecimal discountAmount,
+            UUID discountRequestId,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt
+    ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                discountAmount,
+                discountRequestId,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt,
+                null
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal discountAmount,
+            UUID discountRequestId,
             BigDecimal totalAmount,
             BigDecimal amountPaid,
             PaymentMethod paymentMethod,
@@ -390,6 +519,8 @@ public class Payment {
                 examFee,
                 medicineFee,
                 serviceFee,
+                discountAmount,
+                discountRequestId,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -469,11 +600,16 @@ public class Payment {
 
     private static BigDecimal validateAmountPaid(
             BigDecimal amountPaid,
-            BigDecimal totalAmount
+            BigDecimal totalAmount,
+            BigDecimal discountAmount
     ) {
         BigDecimal validatedAmountPaid = validateNonNegative(amountPaid, "Amount paid is required.");
-        if (validatedAmountPaid.compareTo(totalAmount) != 0) {
-            throw new PaymentAmountMismatchException(totalAmount, validatedAmountPaid);
+        BigDecimal expectedAmountPaid = totalAmount.subtract(discountAmount != null ? discountAmount : BigDecimal.ZERO);
+        if (expectedAmountPaid.compareTo(BigDecimal.ZERO) < 0) {
+            expectedAmountPaid = BigDecimal.ZERO;
+        }
+        if (validatedAmountPaid.compareTo(expectedAmountPaid) != 0) {
+            throw new PaymentAmountMismatchException(expectedAmountPaid, validatedAmountPaid);
         }
         return validatedAmountPaid;
     }
