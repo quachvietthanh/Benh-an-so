@@ -33,6 +33,7 @@ final class DomainExceptionHttpStatusMapper {
                     PATIENT_CHRONIC_DISEASE_NOT_FOUND,
                     PATIENT_FAMILY_HISTORY_NOT_FOUND,
                     PATIENT_NOT_FOUND,
+                    PATIENT_IMPORT_LOG_NOT_FOUND,
                     PAYMENT_NOT_FOUND,
                     PORTAL_LOOKUP_NOT_FOUND,
                     PRESCRIPTION_ITEM_NOT_FOUND,
