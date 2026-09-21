@@ -644,7 +644,18 @@ function PharmacyPage() {
           <Card
             title={(
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <span>Đơn cần cấp ({prescriptionTotal})</span>
+                <span>
+                  {prescriptionStatusFilter === 'DISPENSED'
+                    ? 'Đơn đã cấp phát'
+                    : prescriptionStatusFilter === 'PARTIALLY_DISPENSED'
+                    ? 'Đơn cấp một phần'
+                    : prescriptionStatusFilter === 'PENDING_DISPENSE'
+                    ? 'Đơn chờ cấp phát'
+                    : prescriptionStatusFilter === 'CANCELLED'
+                    ? 'Đơn đã hủy cấp phát'
+                    : 'Đơn cần cấp'}{' '}
+                  ({prescriptionTotal})
+                </span>
                 <Select
                   size="small"
                   value={prescriptionStatusFilter}
@@ -653,12 +664,13 @@ function PharmacyPage() {
                     setPrescriptionPage(0)
                     loadPrescriptionPage(0, val)
                   }}
-                  style={{ width: 145 }}
+                  style={{ width: 160 }}
                   options={[
                     { value: 'ALL', label: 'Tất cả cần cấp' },
                     { value: 'PENDING_DISPENSE', label: 'Chờ cấp phát' },
                     { value: 'PARTIALLY_DISPENSED', label: 'Cấp một phần' },
                     { value: 'DISPENSED', label: 'Đã cấp phát' },
+                    { value: 'CANCELLED', label: 'Đã hủy cấp phát' },
                   ]}
                 />
               </div>
@@ -733,6 +745,10 @@ function PharmacyPage() {
                           </Tooltip>
                           {item.status === 'PARTIALLY_DISPENSED' ? (
                             <Tag color="gold" style={{ fontWeight: 600, margin: 0 }}>Cấp một phần</Tag>
+                          ) : item.status === 'DISPENSED' ? (
+                            <Tag color="green" style={{ fontWeight: 600, margin: 0 }}>Đã cấp phát</Tag>
+                          ) : item.status === 'CANCELLED' ? (
+                            <Tag color="red" style={{ fontWeight: 600, margin: 0 }}>Đã hủy cấp phát</Tag>
                           ) : (
                             <Tag color="orange" style={{ margin: 0 }}>Chờ cấp phát</Tag>
                           )}
@@ -819,6 +835,10 @@ function PharmacyPage() {
                   <Descriptions.Item label="Trạng thái">
                     {selectedPrescription.status === 'PARTIALLY_DISPENSED' ? (
                       <Tag color="gold" style={{ fontWeight: 600 }}>Cấp phát một phần</Tag>
+                    ) : selectedPrescription.status === 'DISPENSED' ? (
+                      <Tag color="green" style={{ fontWeight: 600 }}>Đã cấp phát</Tag>
+                    ) : selectedPrescription.status === 'CANCELLED' ? (
+                      <Tag color="red" style={{ fontWeight: 600 }}>Đã hủy cấp phát</Tag>
                     ) : (
                       <Tag color="orange">Chờ cấp phát</Tag>
                     )}
@@ -826,7 +846,7 @@ function PharmacyPage() {
                   <Descriptions.Item label="Ghi chú">{selectedPrescription.note || 'Không có'}</Descriptions.Item>
                 </Descriptions>
 
-                {hasPreviewShortage && (
+                {hasPreviewShortage && selectedPrescription.status !== 'DISPENSED' && (
                   <Alert
                     type="warning"
                     showIcon
@@ -881,25 +901,29 @@ function PharmacyPage() {
                     borderTop: '1px solid #f1f5f9',
                   }}
                 >
-                  {(selectedPrescription.status === 'PARTIALLY_DISPENSED' || selectedPrescription.status === 'DISPENSED') && (
-                    <>
-                      <Button
-                        icon={<HistoryOutlined />}
-                        size="large"
-                        onClick={() => setHistoryModalOpen(true)}
-                      >
-                        Xem lịch sử cấp phát
-                      </Button>
-                      <Button
-                        danger
-                        icon={<RollbackOutlined />}
-                        size="large"
-                        disabled={!canDispense}
-                        onClick={() => setReturnModalOpen(true)}
-                      >
-                        Trả lại thuốc / Hủy cấp phát
-                      </Button>
-                    </>
+                  {(selectedPrescription.status === 'PARTIALLY_DISPENSED' ||
+                    selectedPrescription.status === 'DISPENSED' ||
+                    selectedPrescription.status === 'CANCELLED') && (
+                    <Button
+                      icon={<HistoryOutlined />}
+                      size="large"
+                      onClick={() => setHistoryModalOpen(true)}
+                    >
+                      Xem lịch sử cấp phát
+                    </Button>
+                  )}
+
+                  {(selectedPrescription.status === 'PARTIALLY_DISPENSED' ||
+                    selectedPrescription.status === 'DISPENSED') && (
+                    <Button
+                      danger
+                      icon={<RollbackOutlined />}
+                      size="large"
+                      disabled={!canDispense}
+                      onClick={() => setReturnModalOpen(true)}
+                    >
+                      Trả lại thuốc / Hủy cấp phát
+                    </Button>
                   )}
 
                   {selectedPrescription.status === 'PARTIALLY_DISPENSED' && (
@@ -1114,8 +1138,16 @@ function PharmacyPage() {
         open={returnModalOpen}
         onClose={() => setReturnModalOpen(false)}
         prescription={selectedPrescription}
-        onSuccess={() => {
-          loadData()
+        onSuccess={(result) => {
+          const targetStatus = result?.status
+          if (targetStatus === 'CANCELLED') {
+            setPrescriptionStatusFilter('CANCELLED')
+            setPrescriptionPage(0)
+            loadPrescriptionPage(0, 'CANCELLED')
+            loadInventoryData()
+          } else {
+            loadData()
+          }
         }}
       />
     </div>

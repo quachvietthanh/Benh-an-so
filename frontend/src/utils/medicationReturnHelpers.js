@@ -196,11 +196,22 @@ export const mapReturnErrorMessage = (error) => {
       return 'Vui lòng nhập lý do trả thuốc.'
     }
     if (
-      lowerMsg.includes('greater than zero') ||
-      lowerMsg.includes('exceed') ||
-      lowerMsg.includes('quantity')
+      lowerMsg.includes('only dispensed or partially dispensed') ||
+      lowerMsg.includes('prescriptioninvalidstatusexception')
     ) {
+      return 'Chỉ đơn thuốc ở trạng thái [Đã cấp phát] hoặc [Cấp phát một phần] mới có thể hoàn trả thuốc. Đơn thuốc này có thể đã được hủy thành công trước đó, vui lòng làm mới danh sách.'
+    }
+    if (lowerMsg.includes('cannot exceed the dispensed quantity')) {
+      return 'Tổng số lượng trả lại vượt quá tổng số lượng thuốc đã cấp thực tế của đơn thuốc. Vui lòng kiểm tra lại số lượng nhận lại.'
+    }
+    if (lowerMsg.includes('exceeds the remaining returnable quantity')) {
       return 'Số lượng trả lại không hợp lệ hoặc vượt quá số lượng còn lại có thể trả.'
+    }
+    if (lowerMsg.includes('greater than zero') || lowerMsg.includes('must be greater than zero')) {
+      return 'Số lượng nhận lại của thuốc phải lớn hơn 0.'
+    }
+    if (lowerMsg.includes('exceed') || lowerMsg.includes('quantity')) {
+      return serverMsg || 'Số lượng trả lại không hợp lệ hoặc vượt quá số lượng còn lại có thể trả.'
     }
     if (lowerMsg.includes('at least one') || lowerMsg.includes('items is required')) {
       return 'Vui lòng chọn ít nhất một loại thuốc có số lượng trả lớn hơn 0.'
@@ -228,7 +239,11 @@ export const mapReturnErrorMessage = (error) => {
  * @param {Record<string, number>} returnQuantities - Map of dispenseItemId -> returning quantity
  * @returns {{ projectedStatus: 'CANCELLED' | 'PARTIALLY_DISPENSED' | 'UNCHANGED', label: string, color: string, isFullCancellation: boolean, description: string }}
  */
-export const calculateProjectedStatus = (historyItems = [], returnQuantities = {}) => {
+export const calculateProjectedStatus = (
+  historyItems = [],
+  returnQuantities = {},
+  prescriptionItems = []
+) => {
   if (!Array.isArray(historyItems) || historyItems.length === 0) {
     return {
       projectedStatus: 'UNCHANGED',
@@ -239,18 +254,10 @@ export const calculateProjectedStatus = (historyItems = [], returnQuantities = {
     }
   }
 
-  let totalDispensed = 0
-  let totalPreviouslyReturned = 0
   let totalReturningNow = 0
-
-  historyItems.forEach((item) => {
-    const dispensed = Number(item.dispensedQuantity || 0)
-    const returned = Number(item.returnedQuantity || 0)
-    const returningNow = Number(returnQuantities[item.id] || 0)
-
-    totalDispensed += dispensed
-    totalPreviouslyReturned += returned
-    totalReturningNow += Math.max(0, returningNow)
+  Object.values(returnQuantities).forEach((qty) => {
+    const num = Number(qty) || 0
+    if (num > 0) totalReturningNow += num
   })
 
   if (totalReturningNow <= 0) {
@@ -262,6 +269,56 @@ export const calculateProjectedStatus = (historyItems = [], returnQuantities = {
       description: 'Chưa có loại thuốc nào được nhập số lượng nhận lại.',
     }
   }
+
+  // Nếu có danh sách các thuốc thực tế trong đơn thuốc (PrescriptionItem):
+  // Tính theo đúng contract Backend: Đơn thuốc thành CANCELLED khi tất cả các thuốc đều không còn số lượng đã cấp (> 0)
+  if (Array.isArray(prescriptionItems) && prescriptionItems.length > 0) {
+    const returningByRxItem = {}
+    historyItems.forEach((hist) => {
+      const qty = Number(returnQuantities[hist.id]) || 0
+      if (qty > 0 && hist.prescriptionItemId) {
+        returningByRxItem[hist.prescriptionItemId] =
+          (returningByRxItem[hist.prescriptionItemId] || 0) + qty
+      }
+    })
+
+    const allPrescriptionItemsCleared = prescriptionItems.every((rxItem) => {
+      const currentlyDispensed = Number(rxItem.dispensedQuantity || 0)
+      const returningForThisItem = Number(returningByRxItem[rxItem.id] || 0)
+      return currentlyDispensed - returningForThisItem <= 0
+    })
+
+    if (allPrescriptionItemsCleared) {
+      return {
+        projectedStatus: 'CANCELLED',
+        label: 'Đã hủy',
+        color: 'red',
+        isFullCancellation: true,
+        description:
+          'Toàn bộ thuốc đã cấp phát sẽ được nhận lại hoàn toàn. Đơn thuốc sẽ tự động chuyển sang trạng thái ĐÃ HỦY.',
+      }
+    }
+
+    return {
+      projectedStatus: 'PARTIALLY_DISPENSED',
+      label: 'Cấp phát một phần',
+      color: 'gold',
+      isFullCancellation: false,
+      description:
+        'Chỉ một phần thuốc được nhận lại. Đơn thuốc sẽ giữ trạng thái CẤP PHÁT MỘT PHẦN với số lượng đã cấp được điều chỉnh giảm.',
+    }
+  }
+
+  let totalDispensed = 0
+  let totalPreviouslyReturned = 0
+
+  historyItems.forEach((item) => {
+    const dispensed = Number(item.dispensedQuantity || 0)
+    const returned = Number(item.returnedQuantity || 0)
+
+    totalDispensed += dispensed
+    totalPreviouslyReturned += returned
+  })
 
   const remainingAfter = totalDispensed - (totalPreviouslyReturned + totalReturningNow)
 

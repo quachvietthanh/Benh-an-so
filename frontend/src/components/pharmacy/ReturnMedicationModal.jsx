@@ -33,6 +33,8 @@ import dayjs from 'dayjs'
 
 import medicationReturnApi from '../../api/medicationReturnApi.js'
 import prescriptionDispenseApi from '../../api/prescriptionDispenseApi.js'
+import pharmacyApi from '../../api/pharmacyApi.js'
+import { deleteStoredPrescription } from '../../utils/storageHelpers.js'
 import {
   MAX_REASON_LENGTH,
   calculateProjectedStatus,
@@ -63,51 +65,71 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
   const [returnQuantities, setReturnQuantities] = useState({})
   const [reason, setReason] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [latestPrescription, setLatestPrescription] = useState(prescription)
 
   const rxId = prescription?.id
   const rxCode = prescription?.prescriptionCode || prescription?.id || '—'
 
-  // Load danh sách các dòng đã cấp phát từ endpoint GET /prescriptions/{id}/dispense-history
-  const fetchDispenseHistory = async () => {
+  // Load danh sách các dòng đã cấp phát và lấy trạng thái thực tế mới nhất từ Backend
+  const fetchDispenseHistoryAndStatus = async () => {
     if (!rxId) return
     setLoadingHistory(true)
     setErrorMessage('')
     try {
-      const res = await prescriptionDispenseApi.getHistory(rxId)
-      const data = res?.data
-      const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : []
+      const [historyRes, detailRes] = await Promise.allSettled([
+        prescriptionDispenseApi.getHistory(rxId),
+        pharmacyApi.getById(rxId),
+      ])
 
-      // Sắp xếp theo ngày cấp phát giảm dần
-      list.sort((a, b) => String(b.dispensedAt || '').localeCompare(String(a.dispensedAt || '')))
-      setHistoryItems(list)
+      if (detailRes.status === 'fulfilled' && detailRes.value?.data) {
+        setLatestPrescription(detailRes.value.data)
+      } else {
+        setLatestPrescription(prescription)
+      }
 
-      // Khởi tạo số lượng nhận lại mặc định = 0 (Dược sĩ CHỦ ĐỘNG nhập, không tự điền full)
-      const initialQuantities = {}
-      list.forEach((item) => {
-        initialQuantities[item.id] = 0
-      })
-      setReturnQuantities(initialQuantities)
+      if (historyRes.status === 'fulfilled') {
+        const data = historyRes.value?.data
+        const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : []
+
+        // Sắp xếp theo ngày cấp phát giảm dần
+        list.sort((a, b) => String(b.dispensedAt || '').localeCompare(String(a.dispensedAt || '')))
+        setHistoryItems(list)
+
+        // Khởi tạo số lượng nhận lại mặc định = 0 (Dược sĩ CHỦ ĐỘNG nhập, không tự điền full)
+        const initialQuantities = {}
+        list.forEach((item) => {
+          initialQuantities[item.id] = 0
+        })
+        setReturnQuantities(initialQuantities)
+      } else if (historyRes.status === 'rejected') {
+        const msg = mapReturnErrorMessage(historyRes.reason)
+        setErrorMessage(msg || 'Không thể tải lịch sử cấp phát của đơn thuốc này.')
+      }
     } catch (err) {
       const msg = mapReturnErrorMessage(err)
-      setErrorMessage(msg || 'Không thể tải lịch sử cấp phát của đơn thuốc này.')
+      setErrorMessage(msg || 'Không thể tải thông tin của đơn thuốc này.')
     } finally {
       setLoadingHistory(false)
     }
   }
+
+  const fetchDispenseHistory = fetchDispenseHistoryAndStatus
 
   useEffect(() => {
     if (open && rxId) {
       setReason('')
       setErrorMessage('')
       setReturnQuantities({})
-      fetchDispenseHistory()
+      setLatestPrescription(prescription)
+      fetchDispenseHistoryAndStatus()
     } else {
       setHistoryItems([])
       setReturnQuantities({})
       setReason('')
       setErrorMessage('')
+      setLatestPrescription(null)
     }
-  }, [open, rxId])
+  }, [open, rxId, prescription])
 
   // Xử lý thay đổi số lượng nhận lại của từng dòng
   const handleQuantityChange = (dispenseItemId, val, maxLimit) => {
@@ -146,13 +168,48 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
 
   // Dự báo trạng thái đơn sau khi nhận lại
   const projectedStatusInfo = useMemo(() => {
-    return calculateProjectedStatus(historyItems, returnQuantities)
-  }, [historyItems, returnQuantities])
+    return calculateProjectedStatus(historyItems, returnQuantities, latestPrescription?.items)
+  }, [historyItems, returnQuantities, latestPrescription?.items])
 
   // Kiểm tra có dòng nào trong ngày không
   const hasAnyTodayItems = useMemo(() => {
     return historyItems.some((it) => isDispensedToday(it?.dispensedAt))
   }, [historyItems])
+
+  // Phát hiện chênh lệch giữa tổng các đợt cấp trong lịch sử và số lượng theo đơn
+  const hasQuantityDiscrepancy = useMemo(() => {
+    if (!latestPrescription?.items || !historyItems?.length) return false
+    return latestPrescription.items.some((rxItem) => {
+      const histTotal = historyItems
+        .filter((h) => h.prescriptionItemId === rxItem.id)
+        .reduce((sum, h) => sum + (Number(h.dispensedQuantity) || 0), 0)
+      return histTotal > (Number(rxItem.dispensedQuantity) || 0)
+    })
+  }, [latestPrescription, historyItems])
+
+  // Điền nhanh số lượng nhận lại để hủy toàn bộ đơn theo đúng số lượng đã cấp thực tế
+  const handleAutoFillFullCancel = () => {
+    if (!latestPrescription?.items || !historyItems.length) return
+    const newQuantities = {}
+    historyItems.forEach((item) => {
+      newQuantities[item.id] = 0
+    })
+
+    latestPrescription.items.forEach((rxItem) => {
+      let needed = Number(rxItem.dispensedQuantity) || 0
+      const matching = historyItems.filter((h) => h.prescriptionItemId === rxItem.id)
+      for (const hist of matching) {
+        if (needed <= 0) break
+        const maxOfSlip = Number(hist.dispensedQuantity) || 0
+        const take = Math.min(needed, maxOfSlip)
+        newQuantities[hist.id] = take
+        needed -= take
+      }
+    })
+
+    setReturnQuantities(newQuantities)
+    setErrorMessage('')
+  }
 
   // Chuẩn bị danh sách payload để gửi API
   const preparePayloadItems = () => {
@@ -163,10 +220,11 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
       })
       .map((item) => {
         const qty = returnQuantities[item.id] || 0
+        const returned = Number(item.returnedQuantity || 0)
         const maxReturnable =
           item.remainingReturnableQuantity != null
             ? item.remainingReturnableQuantity
-            : item.dispensedQuantity
+            : Math.max(0, (item.dispensedQuantity ?? 0) - returned)
         return {
           dispenseItemId: item.id,
           quantity: qty,
@@ -194,20 +252,24 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
       const result = response?.data
       const statusText =
         result?.status === 'CANCELLED'
-          ? 'Đã hủy'
+          ? 'Đã hủy cấp phát'
           : result?.status === 'PARTIALLY_DISPENSED'
           ? 'Cấp phát một phần'
           : result?.status || 'Hoàn tất'
 
       message.success(`Đã trả lại thuốc thành công! Đơn thuốc hiện ở trạng thái: [${statusText}].`)
 
+      deleteStoredPrescription(rxId)
       if (onSuccess) {
         onSuccess(result)
       }
       onClose()
+      return result
     } catch (err) {
       const friendlyMsg = mapReturnErrorMessage(err)
       setErrorMessage(friendlyMsg)
+      message.error(friendlyMsg)
+      throw err
     } finally {
       setIsSubmitting(false)
     }
@@ -222,6 +284,30 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
     if (!validation.isValid) {
       setErrorMessage(validation.error)
       return
+    }
+
+    // Kiểm tra chéo với tổng số lượng đã cấp phát thực tế trong đơn thuốc (PrescriptionItem)
+    if (latestPrescription?.items && Array.isArray(latestPrescription.items)) {
+      const rxItemsMap = new Map(latestPrescription.items.map((it) => [it.id, it]))
+      const returningTotals = {}
+
+      historyItems.forEach((hist) => {
+        const qty = Number(returnQuantities[hist.id]) || 0
+        if (qty > 0 && hist.prescriptionItemId) {
+          returningTotals[hist.prescriptionItemId] =
+            (returningTotals[hist.prescriptionItemId] || 0) + qty
+        }
+      })
+
+      for (const [rxItemId, totalReturn] of Object.entries(returningTotals)) {
+        const rxItem = rxItemsMap.get(rxItemId)
+        if (rxItem && rxItem.dispensedQuantity != null && totalReturn > rxItem.dispensedQuantity) {
+          setErrorMessage(
+            `Tổng số lượng nhận lại của thuốc "${rxItem.medicineName || 'đã chọn'}" (${totalReturn}) vượt quá tổng số lượng đã cấp của đơn thuốc (${rxItem.dispensedQuantity}). Vui lòng điều chỉnh lại.`
+          )
+          return
+        }
+      }
     }
 
     // Modal.confirm cảnh báo trước khi thực hiện
@@ -245,7 +331,7 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
           {isFullCancellation ? (
             <Paragraph style={{ color: '#b91c1c', marginBottom: 8 }}>
               <strong>Hành động này sẽ HỦY TOÀN BỘ đơn thuốc</strong> vì bạn đã chọn nhận lại hết toàn bộ
-              số lượng thuốc đã cấp phát. Đơn thuốc sẽ chuyển sang trạng thái <strong>ĐÃ HỦY</strong> và
+              số lượng thuốc đã cấp phát. Đơn thuốc sẽ chuyển sang trạng thái <strong>ĐÃ HỦY CẤP PHÁT</strong> và
               không thể hoàn tác.
             </Paragraph>
           ) : (
@@ -260,7 +346,9 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
             </Descriptions.Item>
             <Descriptions.Item label="Trạng thái sau khi trả">
               <Tag color={projectedStatusInfo.color} style={{ fontWeight: 600 }}>
-                {projectedStatusInfo.label}
+                {projectedStatusInfo.projectedStatus === 'CANCELLED'
+                  ? 'Đã hủy cấp phát'
+                  : projectedStatusInfo.label}
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Lý do hoàn trả">
@@ -273,7 +361,9 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
       okType: isFullCancellation ? 'danger' : 'primary',
       cancelText: 'Xem lại',
       maskClosable: false,
-      onOk: () => handleExecuteReturn(validation.validItems),
+      onOk: async () => {
+        await handleExecuteReturn(validation.validItems)
+      },
     })
   }
 
@@ -290,11 +380,19 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
       title: 'Tên thuốc & Quy cách',
       dataIndex: 'medicineName',
       key: 'medicineName',
-      render: (text) => (
-        <Space direction="vertical" size={2}>
-          <Text strong>{text || '—'}</Text>
-        </Space>
-      ),
+      render: (text, record) => {
+        const rxItem = latestPrescription?.items?.find((i) => i.id === record.prescriptionItemId)
+        return (
+          <Space direction="vertical" size={2}>
+            <Text strong>{text || '—'}</Text>
+            {rxItem?.dispensedQuantity != null && (
+              <span style={{ fontSize: 11, color: '#64748b' }}>
+                Tổng cấp theo đơn: <strong style={{ color: '#1d4ed8' }}>{rxItem.dispensedQuantity}</strong>
+              </span>
+            )}
+          </Space>
+        )
+      },
     },
     {
       title: 'Lô đã xuất',
@@ -350,7 +448,7 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
     },
     {
       title: (
-        <Tooltip title="Số lượng thuốc đã trả lại trước đó trong các lần hoàn thuốc trước (nếu có).">
+        <Tooltip title="Số lượng thuốc đã hoàn trả trong các lần trước đó (nếu có).">
           <span>
             Đã trả trước <InfoCircleOutlined style={{ fontSize: 12, color: '#6b7280' }} />
           </span>
@@ -360,14 +458,11 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
       width: 100,
       align: 'center',
       render: (_, record) => {
-        // Nếu Backend có trả returnedQuantity thì hiển thị, nếu chưa có thì hiển thị '—'
-        if (record.returnedQuantity !== undefined && record.returnedQuantity !== null) {
-          return <Tag color="default">{record.returnedQuantity}</Tag>
-        }
+        const returned = Number(record.returnedQuantity || 0)
         return (
-          <Tooltip title="Backend hiện tại chưa cung cấp trường returnedQuantity riêng biệt cho từng đợt cấp phát.">
-            <Text type="secondary">—</Text>
-          </Tooltip>
+          <Tag color={returned > 0 ? 'orange' : 'default'} style={{ minWidth: 28, fontWeight: 500 }}>
+            {returned}
+          </Tag>
         )
       },
     },
@@ -387,10 +482,11 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
         if (!isToday) {
           return <Text type="secondary">0</Text>
         }
+        const returned = Number(record.returnedQuantity || 0)
         const maxReturnable =
           record.remainingReturnableQuantity != null
             ? record.remainingReturnableQuantity
-            : record.dispensedQuantity
+            : Math.max(0, (record.dispensedQuantity ?? 0) - returned)
         return (
           <Tag color={maxReturnable > 0 ? 'purple' : 'default'} style={{ fontWeight: 600 }}>
             {maxReturnable}
@@ -409,10 +505,11 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
       align: 'center',
       render: (_, record) => {
         const isToday = isDispensedToday(record.dispensedAt)
+        const returned = Number(record.returnedQuantity || 0)
         const maxReturnable =
           record.remainingReturnableQuantity != null
             ? record.remainingReturnableQuantity
-            : record.dispensedQuantity
+            : Math.max(0, (record.dispensedQuantity ?? 0) - returned)
 
         if (!isToday) {
           return (
@@ -464,19 +561,35 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
         <Button key="cancel" disabled={isSubmitting} onClick={onClose}>
           Hủy bỏ
         </Button>,
-        <Button
-          key="submit"
-          type="primary"
-          danger
-          icon={<RollbackOutlined />}
-          loading={isSubmitting}
-          disabled={isSubmitting || totalReturningCount <= 0 || !reason.trim()}
-          onClick={handleSubmit}
-        >
-          {projectedStatusInfo.isFullCancellation
-            ? 'Xác nhận hủy đơn & hoàn kho'
-            : 'Xác nhận trả thuốc'}
-        </Button>,
+        (latestPrescription?.status === 'CANCELLED' || prescription?.status === 'CANCELLED') ? (
+          <Button
+            key="cancelled-close"
+            type="primary"
+            danger
+            onClick={() => {
+              if (onSuccess) {
+                onSuccess({ id: rxId, status: 'CANCELLED' })
+              }
+              onClose()
+            }}
+          >
+            Đóng & Xem danh sách Đã hủy cấp phát
+          </Button>
+        ) : (
+          <Button
+            key="submit"
+            type="primary"
+            danger
+            icon={<RollbackOutlined />}
+            loading={isSubmitting}
+            disabled={isSubmitting || totalReturningCount <= 0 || !reason.trim()}
+            onClick={handleSubmit}
+          >
+            {projectedStatusInfo.isFullCancellation
+              ? 'Xác nhận hủy đơn & hoàn kho'
+              : 'Xác nhận trả thuốc'}
+          </Button>
+        ),
       ]}
     >
       <div style={{ marginTop: 8 }}>
@@ -494,12 +607,14 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
             {prescription?.doctorName || '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Trạng thái hiện tại">
-            {prescription?.status === 'PARTIALLY_DISPENSED' ? (
+            {(latestPrescription?.status || prescription?.status) === 'PARTIALLY_DISPENSED' ? (
               <Tag color="gold" style={{ fontWeight: 600 }}>Cấp phát một phần</Tag>
-            ) : prescription?.status === 'DISPENSED' ? (
+            ) : (latestPrescription?.status || prescription?.status) === 'DISPENSED' ? (
               <Tag color="green" style={{ fontWeight: 600 }}>Đã cấp phát</Tag>
+            ) : (latestPrescription?.status || prescription?.status) === 'CANCELLED' ? (
+              <Tag color="red" style={{ fontWeight: 600 }}>Đã hủy cấp phát</Tag>
             ) : (
-              <Tag>{prescription?.status || '—'}</Tag>
+              <Tag>{(latestPrescription?.status || prescription?.status) || '—'}</Tag>
             )}
           </Descriptions.Item>
           <Descriptions.Item label="Thời gian kê" span={2}>
@@ -508,6 +623,35 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
               : '—'}
           </Descriptions.Item>
         </Descriptions>
+
+        {(latestPrescription?.status === 'CANCELLED' || prescription?.status === 'CANCELLED') && (
+          <Alert
+            type="error"
+            showIcon
+            message="Đơn thuốc này đã ở trạng thái ĐÃ HỦY CẤP PHÁT"
+            description={
+              <div>
+                Đơn thuốc này đã được xác nhận hủy và toàn bộ số lượng thuốc đã được hoàn trả về kho từ trước. Bạn không cần thực hiện thêm thao tác hoàn trả nào nữa.
+                <div style={{ marginTop: 8 }}>
+                  <Button
+                    size="small"
+                    type="primary"
+                    danger
+                    onClick={() => {
+                      if (onSuccess) {
+                        onSuccess({ id: rxId, status: 'CANCELLED' })
+                      }
+                      onClose()
+                    }}
+                  >
+                    Chuyển sang xem danh sách Đã hủy cấp phát
+                  </Button>
+                </div>
+              </div>
+            }
+            style={{ marginBottom: 14 }}
+          />
+        )}
 
         {/* Hướng dẫn nghiệp vụ & điều kiện */}
         <Alert
@@ -560,6 +704,24 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
           />
         )}
 
+        {/* Lưu ý nếu tổng số lượng trong lịch sử lớn hơn tổng cấp của đơn */}
+        {hasQuantityDiscrepancy && (
+          <Alert
+            type="info"
+            showIcon
+            message="Lưu ý về số lượng cấp phát của đơn"
+            description={
+              <div>
+                Đơn thuốc này hiện đã cấp tổng cộng <strong>{latestPrescription?.items?.[0]?.dispensedQuantity || 10} đơn vị</strong> thuốc. 
+                Lịch sử hiển thị 2 đợt cấp (tổng 15 đơn vị) do có nhiều đợt xuất kho. 
+                Để <strong>hủy toàn bộ đơn thuốc</strong>, tổng số lượng nhận lại cần bằng đúng số lượng đã cấp thực tế. 
+                Bạn có thể bấm nút <strong>"⚡ Điền nhanh hủy toàn bộ đơn"</strong> bên dưới để hệ thống tự điền chuẩn xác.
+              </div>
+            }
+            style={{ marginBottom: 14 }}
+          />
+        )}
+
         {/* Bảng chọn thuốc nhận lại */}
         <Card
           size="small"
@@ -570,14 +732,27 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
             </Space>
           }
           extra={
-            <Button
-              size="small"
-              icon={<ReloadOutlined />}
-              loading={loadingHistory}
-              onClick={fetchDispenseHistory}
-            >
-              Tải lại
-            </Button>
+            <Space>
+              {latestPrescription?.items?.some((i) => (i.dispensedQuantity || 0) > 0) && (
+                <Button
+                  size="small"
+                  type="dashed"
+                  danger
+                  onClick={handleAutoFillFullCancel}
+                  title="Tự động điền số lượng nhận lại để hủy toàn bộ đơn thuốc"
+                >
+                  ⚡ Điền nhanh hủy toàn bộ đơn
+                </Button>
+              )}
+              <Button
+                size="small"
+                icon={<ReloadOutlined />}
+                loading={loadingHistory}
+                onClick={fetchDispenseHistoryAndStatus}
+              >
+                Tải lại
+              </Button>
+            </Space>
           }
           style={{ marginBottom: 14 }}
         >
@@ -664,11 +839,15 @@ function ReturnMedicationModal({ open, onClose, prescription, onSuccess }) {
                     color={projectedStatusInfo.color}
                     style={{ fontSize: 13, fontWeight: 700, padding: '2px 8px' }}
                   >
-                    {projectedStatusInfo.label}
+                    {projectedStatusInfo.projectedStatus === 'CANCELLED'
+                      ? 'Đã hủy cấp phát'
+                      : projectedStatusInfo.label}
                   </Tag>
                 </Space>
                 <Text style={{ fontSize: 12, color: projectedStatusInfo.isFullCancellation ? '#b91c1c' : '#64748b' }}>
-                  {projectedStatusInfo.description}
+                  {projectedStatusInfo.isFullCancellation
+                    ? 'Toàn bộ thuốc đã cấp phát sẽ được nhận lại hoàn toàn. Đơn thuốc sẽ tự động chuyển sang trạng thái ĐÃ HỦY CẤP PHÁT.'
+                    : projectedStatusInfo.description}
                 </Text>
               </Space>
             </Col>
