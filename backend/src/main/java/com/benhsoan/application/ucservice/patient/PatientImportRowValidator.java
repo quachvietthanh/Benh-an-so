@@ -11,7 +11,7 @@ import com.benhsoan.domain.patient.PatientImportRowError;
 import com.benhsoan.domain.patient.PatientMinorPolicy;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
-import com.benhsoan.infrastructure.spreadsheet.RawPatientRowDto;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
 
 @Component
 public class PatientImportRowValidator {
@@ -23,7 +23,9 @@ public class PatientImportRowValidator {
     private static final DateTimeFormatter[] DATE_FORMATTERS = new DateTimeFormatter[] {
             DateTimeFormatter.ofPattern("dd/MM/yyyy"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
             DateTimeFormatter.ofPattern("d/M/yyyy"),
+            DateTimeFormatter.ofPattern("d-M-yyyy"),
             DateTimeFormatter.ofPattern("d/MM/yyyy"),
             DateTimeFormatter.ofPattern("dd/M/yyyy")
     };
@@ -61,7 +63,7 @@ public class PatientImportRowValidator {
             return new RowValidationResult(null, PatientImportRowError.create(
                     rowNum, "Ngày sinh", "Ngày sinh không đúng định dạng (hợp lệ: dd/MM/yyyy hoặc yyyy-MM-dd).", rawSummary));
         }
-        if (dateOfBirth.isAfter(LocalDate.now())) {
+        if (dateOfBirth.isAfter(PatientMinorPolicy.currentDate())) {
             return new RowValidationResult(null, PatientImportRowError.create(
                     rowNum, "Ngày sinh", "Ngày sinh không thể ở tương lai.", rawSummary));
         }
@@ -193,7 +195,11 @@ public class PatientImportRowValidator {
     private LocalDate parseDate(String val) {
         for (DateTimeFormatter formatter : DATE_FORMATTERS) {
             try {
-                return LocalDate.parse(val, formatter);
+                LocalDate parsed = LocalDate.parse(val, formatter);
+                String roundTrip = parsed.format(formatter);
+                if (roundTrip.equals(val) || roundTrip.replaceFirst("^0", "").equals(val.replaceFirst("^0", ""))) {
+                    return parsed;
+                }
             } catch (DateTimeParseException ignored) {
             }
         }

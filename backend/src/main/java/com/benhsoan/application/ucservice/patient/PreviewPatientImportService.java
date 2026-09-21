@@ -9,12 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.patient.PatientImportRowError;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.infrastructure.spreadsheet.ExcelPatientSheetParser;
-import com.benhsoan.infrastructure.spreadsheet.RawPatientRowDto;
 import com.benhsoan.port.dto.command.patient.PreviewPatientImportCommand;
 import com.benhsoan.port.dto.result.patient.PatientImportPreviewResult;
 import com.benhsoan.port.dto.result.patient.PatientImportRowErrorResult;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
 import com.benhsoan.port.inbound.patient.PreviewPatientImportUseCase;
+import com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class PreviewPatientImportService implements PreviewPatientImportUseCase {
 
-    private final ExcelPatientSheetParser sheetParser;
+    private final PatientSpreadsheetParserPort sheetParser;
     private final PatientImportRowValidator rowValidator;
     private final PatientImportDuplicateDetector duplicateDetector;
 

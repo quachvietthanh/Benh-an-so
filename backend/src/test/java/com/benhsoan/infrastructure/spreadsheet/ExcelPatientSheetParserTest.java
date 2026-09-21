@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
 
 class ExcelPatientSheetParserTest {
 

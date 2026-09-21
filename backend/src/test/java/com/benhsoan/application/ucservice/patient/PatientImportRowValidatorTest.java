@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
-import com.benhsoan.infrastructure.spreadsheet.RawPatientRowDto;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
 
 class PatientImportRowValidatorTest {
 

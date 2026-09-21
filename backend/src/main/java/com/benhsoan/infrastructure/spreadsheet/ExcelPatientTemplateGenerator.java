@@ -14,8 +14,10 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
 
+import com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetTemplatePort;
+
 @Component
-public class ExcelPatientTemplateGenerator {
+public class ExcelPatientTemplateGenerator implements PatientSpreadsheetTemplatePort {
 
     private static final String[] HEADERS = {
             "Họ và tên (*)",

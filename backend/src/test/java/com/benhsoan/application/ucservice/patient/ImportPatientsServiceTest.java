@@ -23,7 +23,7 @@ import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.enums.ImportStatus;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.spreadsheet.ExcelPatientSheetParser;
-import com.benhsoan.infrastructure.spreadsheet.RawPatientRowDto;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
 import com.benhsoan.port.dto.command.patient.ImportPatientsCommand;
 import com.benhsoan.port.dto.result.patient.PatientImportResult;
 import com.benhsoan.port.outbound.generator.PatientCodeGenerator;
@@ -35,7 +35,7 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 
 class ImportPatientsServiceTest {
 
-    private ExcelPatientSheetParser sheetParser;
+    private com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort sheetParser;
     private PatientImportRowValidator rowValidator;
     private PatientImportDuplicateDetector duplicateDetector;
     private PatientRepository patientRepository;
@@ -52,7 +52,7 @@ class ImportPatientsServiceTest {
 
     @BeforeEach
     void setUp() {
-        sheetParser = mock(ExcelPatientSheetParser.class);
+        sheetParser = mock(com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort.class);
         rowValidator = mock(PatientImportRowValidator.class);
         duplicateDetector = mock(PatientImportDuplicateDetector.class);
         patientRepository = mock(PatientRepository.class);
@@ -75,7 +75,8 @@ class ImportPatientsServiceTest {
                 patientCodeGenerator,
                 currentUserPort,
                 auditLogRepository,
-                changeDetailBuilder
+                changeDetailBuilder,
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
     }
 

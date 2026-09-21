@@ -3,10 +3,13 @@ package com.benhsoan.application.ucservice.patient;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
@@ -17,12 +20,11 @@ import com.benhsoan.domain.patient.PatientImportLog;
 import com.benhsoan.domain.patient.PatientImportRowError;
 import com.benhsoan.domain.patient.enums.PatientChangeAction;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.infrastructure.spreadsheet.ExcelPatientSheetParser;
-import com.benhsoan.infrastructure.spreadsheet.RawPatientRowDto;
 import com.benhsoan.port.dto.command.patient.ImportPatientsCommand;
 import com.benhsoan.port.dto.result.patient.PatientImportResult;
 import com.benhsoan.port.dto.result.patient.PatientImportRowErrorResult;
 import com.benhsoan.port.dto.result.patient.SuspectedDuplicateResult;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
 import com.benhsoan.port.inbound.patient.ImportPatientsUseCase;
 import com.benhsoan.port.outbound.generator.PatientCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -30,6 +32,7 @@ import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientImportLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,7 +40,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ImportPatientsService implements ImportPatientsUseCase {
 
-    private final ExcelPatientSheetParser sheetParser;
+    private final PatientSpreadsheetParserPort sheetParser;
     private final PatientImportRowValidator rowValidator;
     private final PatientImportDuplicateDetector duplicateDetector;
     private final PatientRepository patientRepository;
@@ -47,6 +50,7 @@ public class ImportPatientsService implements ImportPatientsUseCase {
     private final CurrentUserPort currentUserPort;
     private final AuditLogRepository auditLogRepository;
     private final PatientChangeDetailBuilder changeDetailBuilder;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -163,21 +167,27 @@ public class ImportPatientsService implements ImportPatientsUseCase {
         );
         PatientImportLog savedLog = patientImportLogRepository.save(importLog);
 
-        // 5. Save Admin Audit Log (QTN-31)
+        // 5. Save Admin Audit Log (QTN-31) with safe JSON serialization
+        String auditDetail;
+        try {
+            auditDetail = objectMapper.writeValueAsString(Map.of(
+                    "fileName", command.fileName() != null ? command.fileName() : "",
+                    "totalRows", totalRows,
+                    "successRows", successCount,
+                    "errorRows", errorCount,
+                    "duplicateRows", duplicateCount
+            ));
+        } catch (Exception ignored) {
+            auditDetail = "{\"fileName\":\"import\",\"totalRows\":%d,\"successRows\":%d,\"errorRows\":%d,\"duplicateRows\":%d}"
+                    .formatted(totalRows, successCount, errorCount, duplicateCount);
+        }
+
         auditLogRepository.save(AuditLog.create(
                 currentUserId,
                 ActionType.IMPORT,
                 ResourceType.PATIENT_IMPORT,
                 savedLog.getId(),
-                """
-                {
-                  "fileName": "%s",
-                  "totalRows": %d,
-                  "successRows": %d,
-                  "errorRows": %d,
-                  "duplicateRows": %d
-                }
-                """.formatted(command.fileName(), totalRows, successCount, errorCount, duplicateCount),
+                auditDetail,
                 null
         ));
 
