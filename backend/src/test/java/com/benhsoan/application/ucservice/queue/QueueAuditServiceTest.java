@@ -182,5 +182,59 @@ class QueueAuditServiceTest {
         assertTrue(captor.getValue().getDetail().contains("\"status\":\"WAITING\""));
         assertTrue(captor.getValue().getDetail().contains("\"callCount\":1"));
     }
+
+    @Test
+    void recordsPrioritizedQueueItem() {
+        Instant now = Instant.parse("2026-08-02T02:00:00Z");
+        QueueItem item = QueueItem.create(UUID.randomUUID(), UUID.randomUUID(), null, UUID.randomUUID(),
+                QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 8, 2), UUID.randomUUID(), now);
+        UUID actorId = UUID.randomUUID();
+        item.prioritize(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, "Ca cap cuu - Sot cao co giat", actorId, now.plusSeconds(15));
+
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(auditLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        new QueueAuditService(auditLogRepository, currentUserPort)
+                .recordPrioritized(item, com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, "Ca cap cuu - Sot cao co giat");
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals(ActionType.UPDATE, captor.getValue().getActionType());
+        assertTrue(captor.getValue().getDetail().contains("\"action\":\"PRIORITIZED\""));
+        assertTrue(captor.getValue().getDetail().contains("\"priority\":\"EMERGENCY\""));
+        assertTrue(captor.getValue().getDetail().contains("\"reason\":\"Ca cap cuu - Sot cao co giat\""));
+        assertTrue(captor.getValue().getDetail().contains("\"queueItemId\":\"" + item.getId() + "\""));
+    }
+
+    @Test
+    void recordsAuditWithSpecialCharactersSafely() {
+        UUID actorId = UUID.randomUUID();
+        QueueItem item = QueueItem.create(UUID.randomUUID(), UUID.randomUUID(), null, UUID.randomUUID(),
+                QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 8, 2), actorId, Instant.parse("2026-08-02T02:00:00Z"));
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(auditLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        String specialReason = "Bệnh nhân \"sốt cao co giật\"\nCần cấp cứu ngay!";
+        new QueueAuditService(auditLogRepository, currentUserPort)
+                .recordPrioritized(item, com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, specialReason);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        String detail = captor.getValue().getDetail();
+
+        // Must be parseable valid JSON
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+            var node = mapper.readTree(detail);
+            assertEquals("PRIORITIZED", node.get("action").asText());
+            assertEquals("EMERGENCY", node.get("priority").asText());
+            assertEquals(specialReason, node.get("reason").asText());
+        });
+    }
 }
+
 
