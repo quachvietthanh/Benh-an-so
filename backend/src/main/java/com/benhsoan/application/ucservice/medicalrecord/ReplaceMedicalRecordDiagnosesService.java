@@ -80,12 +80,50 @@ public class ReplaceMedicalRecordDiagnosesService implements ReplaceMedicalRecor
         List<ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand> secondaryDiagnoses = command.secondaryDiagnoses() == null
                 ? List.of()
                 : command.secondaryDiagnoses();
-        validateNoDuplicateCatalogIds(command.primaryDiagnosis(), secondaryDiagnoses);
+        validateNoDuplicates(command.primaryDiagnosis(), secondaryDiagnoses);
 
         List<MedicalRecordDiagnosis> diagnoses = new ArrayList<>();
-        diagnoses.add(toPrimaryDiagnosis(medicalRecordId, command.primaryDiagnosis(), actorId, diagnosedAt));
+        MedicalRecordDiagnosis primary = toPrimaryDiagnosis(medicalRecordId, command.primaryDiagnosis(), actorId, diagnosedAt);
+        diagnoses.add(primary);
+
+        Set<String> catalogIdentifiers = new HashSet<>();
+        if (hasText(primary.getDiagnosisName())) {
+            catalogIdentifiers.add(primary.getDiagnosisName().trim().toLowerCase());
+        }
+        if (hasText(primary.getDiagnosisCode())) {
+            catalogIdentifiers.add(primary.getDiagnosisCode().trim().toLowerCase());
+        }
+
+        List<MedicalRecordDiagnosis> resolvedSecondaryList = new ArrayList<>(secondaryDiagnoses.size());
         for (ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand secondary : secondaryDiagnoses) {
-            diagnoses.add(toSecondaryDiagnosis(medicalRecordId, secondary, actorId, diagnosedAt));
+            if (secondary != null && secondary.diagnosisCatalogId() != null) {
+                MedicalRecordDiagnosis catalogDiag = toSecondaryDiagnosis(medicalRecordId, secondary, actorId, diagnosedAt);
+                resolvedSecondaryList.add(catalogDiag);
+                if (hasText(catalogDiag.getDiagnosisName())) {
+                    catalogIdentifiers.add(catalogDiag.getDiagnosisName().trim().toLowerCase());
+                }
+                if (hasText(catalogDiag.getDiagnosisCode())) {
+                    catalogIdentifiers.add(catalogDiag.getDiagnosisCode().trim().toLowerCase());
+                }
+            } else {
+                resolvedSecondaryList.add(null);
+            }
+        }
+
+        for (int i = 0; i < secondaryDiagnoses.size(); i++) {
+            ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand secondary = secondaryDiagnoses.get(i);
+            MedicalRecordDiagnosis preResolved = resolvedSecondaryList.get(i);
+            if (preResolved != null) {
+                diagnoses.add(preResolved);
+            } else if (secondary != null) {
+                if (hasText(secondary.name())) {
+                    String normalized = secondary.name().trim().toLowerCase();
+                    if (catalogIdentifiers.contains(normalized)) {
+                        throw new ValidationException("A diagnosis cannot be repeated in the same medical record.");
+                    }
+                }
+                diagnoses.add(toSecondaryDiagnosis(medicalRecordId, secondary, actorId, diagnosedAt));
+            }
         }
         return diagnoses;
     }
@@ -140,7 +178,7 @@ public class ReplaceMedicalRecordDiagnosesService implements ReplaceMedicalRecor
                 type, note, actorId, diagnosedAt);
     }
 
-    private void validateNoDuplicateCatalogIds(
+    private void validateNoDuplicates(
             ReplaceMedicalRecordDiagnosesCommand.PrimaryDiagnosisCommand primary,
             List<ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand> secondaryDiagnoses
     ) {
@@ -149,9 +187,18 @@ public class ReplaceMedicalRecordDiagnosesService implements ReplaceMedicalRecor
         }
         Set<UUID> catalogIds = new HashSet<>();
         catalogIds.add(primary.diagnosisCatalogId());
+        Set<String> freeTextNames = new HashSet<>();
         for (ReplaceMedicalRecordDiagnosesCommand.SecondaryDiagnosisCommand secondary : secondaryDiagnoses) {
-            if (secondary != null && secondary.diagnosisCatalogId() != null && !catalogIds.add(secondary.diagnosisCatalogId())) {
-                throw new ValidationException("A diagnosis cannot be repeated in the same medical record.");
+            if (secondary != null) {
+                if (secondary.diagnosisCatalogId() != null && !catalogIds.add(secondary.diagnosisCatalogId())) {
+                    throw new ValidationException("A diagnosis cannot be repeated in the same medical record.");
+                }
+                if (hasText(secondary.name())) {
+                    String normalized = secondary.name().trim().toLowerCase();
+                    if (!freeTextNames.add(normalized)) {
+                        throw new ValidationException("A diagnosis cannot be repeated in the same medical record.");
+                    }
+                }
             }
         }
     }

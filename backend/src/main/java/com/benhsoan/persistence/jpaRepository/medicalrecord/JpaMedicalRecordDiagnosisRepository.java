@@ -10,11 +10,33 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.benhsoan.domain.medicalrecord.enums.DiagnosisType;
 import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordDiagnosisEntity;
 
 public interface JpaMedicalRecordDiagnosisRepository extends JpaRepository<MedicalRecordDiagnosisEntity, UUID> {
 
     List<MedicalRecordDiagnosisEntity> findByMedicalRecordId(UUID medicalRecordId);
+
+    @Query("""
+            SELECT d FROM MedicalRecordDiagnosisEntity d
+            WHERE d.medicalRecordId = :medicalRecordId
+            ORDER BY CASE WHEN d.diagnosisType = com.benhsoan.domain.medicalrecord.enums.DiagnosisType.PRIMARY THEN 0 ELSE 1 END,
+                     d.diagnosedAt ASC, d.createdAt ASC, d.id ASC
+            """)
+    List<MedicalRecordDiagnosisEntity> findByMedicalRecordIdOrdered(@Param("medicalRecordId") UUID medicalRecordId);
+
+    @Query("""
+            SELECT d FROM MedicalRecordDiagnosisEntity d
+            WHERE d.medicalRecordId = :medicalRecordId
+              AND d.diagnosisType = :diagnosisType
+            ORDER BY d.diagnosedAt ASC, d.createdAt ASC, d.id ASC
+            """)
+    List<MedicalRecordDiagnosisEntity> findByMedicalRecordIdAndDiagnosisTypeOrdered(
+            @Param("medicalRecordId") UUID medicalRecordId,
+            @Param("diagnosisType") DiagnosisType diagnosisType);
+
+    List<MedicalRecordDiagnosisEntity> findByMedicalRecordIdAndDiagnosisTypeOrderByDiagnosedAtAsc(
+            UUID medicalRecordId, DiagnosisType diagnosisType);
 
     List<MedicalRecordDiagnosisEntity> findByMedicalRecordIdIn(Collection<UUID> medicalRecordIds);
 
