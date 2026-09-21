@@ -1,13 +1,22 @@
 package com.benhsoan.adapter.inbound.rest.mapper;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
+import com.benhsoan.adapter.inbound.rest.request.inventory.AdjustBatchStockRequest;
+import com.benhsoan.adapter.inbound.rest.request.inventory.DiscardExpiredBatchRequest;
+import com.benhsoan.adapter.inbound.rest.response.inventory.BatchAdjustmentResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.DiscardBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryExpiryAlertResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.LowStockMedicineResponse;
+import com.benhsoan.port.dto.command.inventory.AdjustBatchStockCommand;
+import com.benhsoan.port.dto.command.inventory.DiscardExpiredBatchCommand;
+import com.benhsoan.port.dto.result.BatchAdjustmentResult;
+import com.benhsoan.port.dto.result.DiscardBatchResult;
 import com.benhsoan.port.dto.result.InventoryBatchResult;
 import com.benhsoan.port.dto.result.InventoryExpiryAlertResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
@@ -99,6 +108,48 @@ public class InventoryRestMapper {
                 result.alertStatus(),
                 result.createdAt(),
                 result.updatedAt()
+        );
+    }
+
+    public AdjustBatchStockCommand toAdjustCommand(UUID batchId, AdjustBatchStockRequest request) {
+        return new AdjustBatchStockCommand(batchId, request.actualQuantity(), request.reason());
+    }
+
+    public BatchAdjustmentResponse toAdjustResponse(BatchAdjustmentResult result) {
+        return new BatchAdjustmentResponse(
+                result.batchId(),
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.batchNumber(),
+                result.expiryDate(),
+                result.quantityBefore(),
+                result.quantityAfter(),
+                result.quantityChange(),
+                result.status(),
+                result.reason(),
+                result.performedBy(),
+                result.performedAt()
+        );
+    }
+
+    public DiscardExpiredBatchCommand toDiscardCommand(UUID batchId, DiscardExpiredBatchRequest request) {
+        return new DiscardExpiredBatchCommand(batchId, request.reason());
+    }
+
+    public DiscardBatchResponse toDiscardResponse(DiscardBatchResult result) {
+        return new DiscardBatchResponse(
+                result.batchId(),
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.batchNumber(),
+                result.expiryDate(),
+                result.discardedQuantity(),
+                result.status(),
+                result.reason(),
+                result.performedBy(),
+                result.performedAt()
         );
     }
 }
