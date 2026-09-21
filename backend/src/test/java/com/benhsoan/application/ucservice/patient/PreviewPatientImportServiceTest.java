@@ -18,14 +18,14 @@ import com.benhsoan.domain.patient.PatientImportRowError;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.spreadsheet.ExcelPatientSheetParser;
-import com.benhsoan.infrastructure.spreadsheet.RawPatientRowDto;
 import com.benhsoan.port.dto.command.patient.PreviewPatientImportCommand;
 import com.benhsoan.port.dto.result.patient.PatientImportPreviewResult;
 import com.benhsoan.port.dto.result.patient.SuspectedDuplicateResult;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
 
 class PreviewPatientImportServiceTest {
 
-    private ExcelPatientSheetParser sheetParser;
+    private com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort sheetParser;
     private PatientImportRowValidator rowValidator;
     private PatientImportDuplicateDetector duplicateDetector;
 
@@ -33,7 +33,7 @@ class PreviewPatientImportServiceTest {
 
     @BeforeEach
     void setUp() {
-        sheetParser = mock(ExcelPatientSheetParser.class);
+        sheetParser = mock(com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort.class);
         rowValidator = mock(PatientImportRowValidator.class);
         duplicateDetector = mock(PatientImportDuplicateDetector.class);
 

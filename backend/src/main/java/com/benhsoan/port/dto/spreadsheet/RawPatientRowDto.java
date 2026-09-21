@@ -1,4 +1,4 @@
-package com.benhsoan.infrastructure.spreadsheet;
+package com.benhsoan.port.dto.spreadsheet;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

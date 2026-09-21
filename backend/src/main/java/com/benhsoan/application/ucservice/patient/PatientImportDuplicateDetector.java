@@ -38,6 +38,7 @@ public class PatientImportDuplicateDetector {
         Set<GroupKey> seenGroupKeys = new HashSet<>();
         Map<String, Boolean> identityExistsCache = new HashMap<>();
         Map<String, List<Patient>> phonePatientsCache = new HashMap<>();
+        Map<String, List<Patient>> nameDobPatientsCache = new HashMap<>();
 
         for (ValidatedPatientRowDto row : validRows) {
             String normName = row.getFullName() == null ? "" : VietnameseTextNormalizer.normalize(row.getFullName());
@@ -99,7 +100,7 @@ public class PatientImportDuplicateDetector {
                 }
             }
 
-            // 3. Check Database Duplicates by (Name + DOB + Phone)
+            // 3. Check Database Duplicates by (Name + DOB + Phone) or (Name + DOB) for patients without phone
             boolean matchedDb = false;
             if (!phone.isEmpty()) {
                 List<Patient> existingByPhone = phonePatientsCache.computeIfAbsent(
@@ -128,6 +129,78 @@ public class PatientImportDuplicateDetector {
                         ));
                         matchedDb = true;
                         break;
+                    }
+                }
+            } else {
+                // For minors or patients without personal phone: check via guardianPhone or Name+DOB search
+                String guardianPhone = row.getGuardianPhone() != null ? row.getGuardianPhone().trim() : "";
+                if (!guardianPhone.isEmpty()) {
+                    List<Patient> existingByGPhone = phonePatientsCache.computeIfAbsent(
+                            guardianPhone,
+                            patientRepository::findAllByPhone
+                    );
+                    for (Patient p : existingByGPhone) {
+                        if (p.isMerged()) {
+                            continue;
+                        }
+                        boolean dobMatch = p.getDateOfBirth() != null && p.getDateOfBirth().equals(row.getDateOfBirth());
+                        String existingNormName = p.getFullName() == null ? "" : VietnameseTextNormalizer.normalize(p.getFullName());
+                        boolean nameMatch = normName.equalsIgnoreCase(existingNormName);
+
+                        if (dobMatch && nameMatch) {
+                            suspectedDuplicates.add(new SuspectedDuplicateResult(
+                                    row.getRowNumber(),
+                                    row.getFullName(),
+                                    row.getDateOfBirth(),
+                                    row.getPhone(),
+                                    row.getIdentityNumber(),
+                                    p.getId(),
+                                    p.getPatientCode(),
+                                    p.getFullName(),
+                                    "Hồ sơ trùng khớp Họ tên, Ngày sinh và Số điện thoại người giám hộ với bệnh nhân " + p.getPatientCode() + " đã có trong hệ thống."
+                            ));
+                            matchedDb = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!matchedDb && !normName.isEmpty() && row.getDateOfBirth() != null) {
+                    String nameDobKey = normName + "_" + row.getDateOfBirth();
+                    List<Patient> byNameDob = nameDobPatientsCache.computeIfAbsent(
+                            nameDobKey,
+                            k -> {
+                                var searchCmd = com.benhsoan.port.dto.command.patient.SearchPatientCommand.builder()
+                                        .fullName(row.getFullName())
+                                        .dateOfBirth(row.getDateOfBirth())
+                                        .build();
+                                var searchPage = patientRepository.search(searchCmd);
+                                return searchPage != null && searchPage.getContent() != null ? searchPage.getContent() : List.of();
+                            }
+                    );
+                    for (Patient p : byNameDob) {
+                        if (p.isMerged()) {
+                            continue;
+                        }
+                        boolean dobMatch = p.getDateOfBirth() != null && p.getDateOfBirth().equals(row.getDateOfBirth());
+                        String existingNormName = p.getFullName() == null ? "" : VietnameseTextNormalizer.normalize(p.getFullName());
+                        boolean nameMatch = normName.equalsIgnoreCase(existingNormName);
+
+                        if (dobMatch && nameMatch) {
+                            suspectedDuplicates.add(new SuspectedDuplicateResult(
+                                    row.getRowNumber(),
+                                    row.getFullName(),
+                                    row.getDateOfBirth(),
+                                    row.getPhone(),
+                                    row.getIdentityNumber(),
+                                    p.getId(),
+                                    p.getPatientCode(),
+                                    p.getFullName(),
+                                    "Hồ sơ trùng khớp Họ tên và Ngày sinh với bệnh nhân " + p.getPatientCode() + " đã có trong hệ thống."
+                            ));
+                            matchedDb = true;
+                            break;
+                        }
                     }
                 }
             }

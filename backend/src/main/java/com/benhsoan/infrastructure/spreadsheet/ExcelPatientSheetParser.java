@@ -18,9 +18,11 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
+import com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort;
 
 @Component
-public class ExcelPatientSheetParser {
+public class ExcelPatientSheetParser implements PatientSpreadsheetParserPort {
 
     private static final int MAX_ALLOWED_ROWS = 5000;
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
