@@ -69,4 +69,44 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
         BigDecimal sum = jpaRepository.sumRefundedAmountBetween(fromInclusive, toExclusive);
         return sum == null ? BigDecimal.ZERO : sum;
     }
+
+    @Override
+    @Transactional
+    public java.util.List<Payment> saveAll(java.util.List<Payment> payments) {
+        var entities = payments.stream().map(mapper::toEntity).toList();
+        return jpaRepository.saveAll(entities).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<Payment> findUnsettledByCashier(
+            UUID cashierId,
+            Collection<PaymentStatus> statuses
+    ) {
+        return jpaRepository.findUnsettledByCashier(cashierId, statuses)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public java.util.List<Payment> findUnsettledByCashierForUpdate(
+            UUID cashierId,
+            Collection<PaymentStatus> statuses
+    ) {
+        return jpaRepository.findUnsettledByCashierForUpdate(cashierId, statuses)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<Payment> findByCashierShiftId(UUID cashierShiftId) {
+        return jpaRepository.findByCashierShiftId(cashierShiftId)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
 }

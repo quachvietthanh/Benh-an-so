@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.domain.billing.exception.PaymentAmountMismatchException;
+import com.benhsoan.domain.billing.exception.PaymentAlreadySettledException;
 import com.benhsoan.domain.billing.exception.PaymentNotAllowedException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.enums.VisitStatus;
@@ -54,6 +55,8 @@ public class Payment {
 
     private Instant createdAt;
 
+    private UUID cashierShiftId;
+
     private Payment(
             UUID id,
             UUID visitId,
@@ -69,7 +72,8 @@ public class Payment {
             String refundReason,
             UUID refundedBy,
             Instant refundedAt,
-            Instant createdAt
+            Instant createdAt,
+            UUID cashierShiftId
     ) {
         this.id = requireNonNull(id, "Payment id is required.");
         this.visitId = requireNonNull(visitId, "Visit id is required.");
@@ -91,6 +95,7 @@ public class Payment {
         this.refundedBy = refundedBy;
         this.refundedAt = refundedAt;
         this.createdAt = requireNonNull(createdAt, "Payment creation time is required.");
+        this.cashierShiftId = cashierShiftId;
     }
 
     public static Payment record(
@@ -130,7 +135,8 @@ public class Payment {
                 null,
                 null,
                 null,
-                paidAt
+                paidAt,
+                null
         );
     }
 
@@ -257,7 +263,8 @@ public class Payment {
                 refundReason,
                 refundedBy,
                 refundedAt,
-                createdAt
+                createdAt,
+                null
         );
     }
 
@@ -278,6 +285,44 @@ public class Payment {
             Instant refundedAt,
             Instant createdAt
     ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt,
+                null
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt,
+            UUID cashierShiftId
+    ) {
         return new Payment(
                 id,
                 visitId,
@@ -293,7 +338,8 @@ public class Payment {
                 refundReason,
                 refundedBy,
                 refundedAt,
-                createdAt
+                createdAt,
+                cashierShiftId
         );
     }
 
@@ -305,7 +351,22 @@ public class Payment {
         return status == PaymentStatus.REFUNDED;
     }
 
+    public boolean isSettled() {
+        return cashierShiftId != null;
+    }
+
+    public void assignToShift(UUID shiftId) {
+        if (this.cashierShiftId != null && !this.cashierShiftId.equals(shiftId)) {
+            throw new ValidationException("Khoản thu đã được gán cho một ca chốt khác.");
+        }
+        this.cashierShiftId = requireNonNull(shiftId, "Mã ca chốt không được để trống.");
+    }
+
     public void refund(String reason, UUID refundedBy, Instant refundedAt) {
+        if (isSettled()) {
+            throw new PaymentAlreadySettledException(this.id);
+        }
+
         String validatedReason = requireText(reason, "Refund reason is required.");
         UUID validatedRefundedBy = requireNonNull(
                 refundedBy,

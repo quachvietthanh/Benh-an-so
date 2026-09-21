@@ -28,7 +28,8 @@ public class PaymentPersistenceMapper {
                 entity.getRefundReason(),
                 entity.getRefundedBy(),
                 entity.getRefundedAt(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getCashierShiftId()
         );
     }
 
@@ -53,6 +54,7 @@ public class PaymentPersistenceMapper {
                 .refundedBy(domain.getRefundedBy())
                 .refundedAt(domain.getRefundedAt())
                 .createdAt(domain.getCreatedAt())
+                .cashierShiftId(domain.getCashierShiftId())
                 .build();
     }
 }

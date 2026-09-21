@@ -61,5 +61,6 @@ public enum ResourceType {
     VITAL_SIGN,
     SPECIALTY,
     DIAGNOSIS_CATALOG,
-    SECURITY_ALERT
+    SECURITY_ALERT,
+    CASHIER_SHIFT
 }
