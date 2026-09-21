@@ -64,6 +64,61 @@ class PaymentTest {
     }
 
     @Test
+    @DisplayName("record should succeed with discount amount and discounted amountPaid")
+    void recordShouldSucceedWithDiscountAmount() {
+        UUID discountRequestId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        Payment payment = Payment.record(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("50000"),
+                discountRequestId,
+                new BigDecimal("200000"),
+                PaymentMethod.CASH,
+                UUID.randomUUID(),
+                paidAt,
+                VisitStatus.WAITING,
+                true
+        );
+
+        assertEquals(new BigDecimal("250000"), payment.getTotalAmount());
+        assertEquals(new BigDecimal("50000"), payment.getDiscountAmount());
+        assertEquals(discountRequestId, payment.getDiscountRequestId());
+        assertEquals(new BigDecimal("200000"), payment.getAmountPaid());
+    }
+
+    @Test
+    @DisplayName("record should succeed with full free exemption (amountPaid = 0)")
+    void recordShouldSucceedWithFullFreeExemption() {
+        UUID discountRequestId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        Payment payment = Payment.record(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("250000"),
+                discountRequestId,
+                BigDecimal.ZERO,
+                PaymentMethod.CASH,
+                UUID.randomUUID(),
+                paidAt,
+                VisitStatus.WAITING,
+                true
+        );
+
+        assertEquals(new BigDecimal("250000"), payment.getTotalAmount());
+        assertEquals(new BigDecimal("250000"), payment.getDiscountAmount());
+        assertEquals(BigDecimal.ZERO, payment.getAmountPaid());
+    }
+
+    @Test
     @DisplayName("record should reject payment amount different from amount due")
     void recordShouldRejectDifferentPaymentAmount() {
         assertThrows(

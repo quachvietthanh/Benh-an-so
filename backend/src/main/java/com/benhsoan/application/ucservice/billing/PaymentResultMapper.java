@@ -15,6 +15,8 @@ public class PaymentResultMapper {
                 payment.getExamFee(),
                 payment.getMedicineFee(),
                 payment.getServiceFee(),
+                payment.getDiscountAmount(),
+                payment.getDiscountRequestId(),
                 payment.getTotalAmount(),
                 payment.getAmountPaid(),
                 payment.getPaymentMethod(),

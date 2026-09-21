@@ -51,6 +51,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
     private final PaymentResultMapper resultMapper;
     private final ClinicalServiceFeeCalculator clinicalServiceFeeCalculator;
     private final PaymentServiceFeeRepository paymentServiceFeeRepository;
+    private final com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository;
 
     @Override
     public PaymentResult record(RecordPaymentCommand command) {
@@ -65,6 +66,10 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             );
         }
 
+        if (discountRequestRepository.existsByVisitIdAndStatus(visit.getId(), com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING)) {
+            throw new com.benhsoan.domain.billing.exception.PendingDiscountApprovalException(visit.getId());
+        }
+
         if (paymentRepository.findByVisitId(visit.getId()).isPresent()) {
             throw new PaymentAlreadyExistsException(visit.getId());
         }
@@ -76,12 +81,27 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         List<ClinicalServiceCharge> serviceCharges = clinicalServiceFeeCalculator
                 .calculate(visit.getId(), now);
 
+        var approvedDiscountOpt = discountRequestRepository.findByVisitIdAndStatus(
+                visit.getId(),
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus.APPROVED
+        );
+
+        java.math.BigDecimal discountAmount = java.math.BigDecimal.ZERO;
+        UUID discountRequestId = null;
+        if (approvedDiscountOpt.isPresent()) {
+            var approvedDiscount = approvedDiscountOpt.get();
+            discountAmount = approvedDiscount.getDiscountAmount();
+            discountRequestId = approvedDiscount.getId();
+        }
+
         Payment payment = Payment.record(
                 UUID.randomUUID(),
                 visit.getId(),
                 command.examFee(),
                 command.medicineFee(),
                 clinicalServiceFeeCalculator.total(serviceCharges),
+                discountAmount,
+                discountRequestId,
                 command.amountPaid(),
                 command.paymentMethod(),
                 actorId,

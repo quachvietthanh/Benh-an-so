@@ -15,6 +15,8 @@ public record InvoiceResult(
         InvoiceType type,
         UUID originalInvoiceId,
         String adjustmentReason,
+        BigDecimal discountAmount,
+        UUID discountRequestId,
         BigDecimal totalAmount,
         UUID createdBy,
         Instant createdAt,
@@ -22,4 +24,37 @@ public record InvoiceResult(
         Instant lastReprintedAt,
         List<InvoiceLineResult> lines
 ) {
+    public InvoiceResult(
+            UUID id,
+            String invoiceCode,
+            UUID visitId,
+            UUID paymentId,
+            InvoiceType type,
+            UUID originalInvoiceId,
+            String adjustmentReason,
+            BigDecimal totalAmount,
+            UUID createdBy,
+            Instant createdAt,
+            int reprintCount,
+            Instant lastReprintedAt,
+            List<InvoiceLineResult> lines
+    ) {
+        this(
+                id,
+                invoiceCode,
+                visitId,
+                paymentId,
+                type,
+                originalInvoiceId,
+                adjustmentReason,
+                BigDecimal.ZERO,
+                null,
+                totalAmount,
+                createdBy,
+                createdAt,
+                reprintCount,
+                lastReprintedAt,
+                lines
+        );
+    }
 }
