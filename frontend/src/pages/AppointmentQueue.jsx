@@ -63,6 +63,11 @@ import dayjs from 'dayjs'
 import appointmentApi from '../api/appointmentApi'
 import patientApi from '../api/patientApi'
 import queueApi from '../api/queueApi'
+import visitApi from '../api/visitApi.js'
+import {
+  getStoredHandovers,
+  saveStoredHandover,
+} from '../utils/handoverValidation.js'
 import PatientMedicalHistoryModal from '../components/clinical/PatientMedicalHistoryModal'
 import CloseVisitModal from '../components/clinical/CloseVisitModal'
 import DoctorWeeklyScheduleTable from '../components/appointment/DoctorWeeklyScheduleTable'
@@ -304,7 +309,39 @@ function AppointmentQueue() {
         roomId: queueRoomFilter !== 'ALL' ? queueRoomFilter : undefined,
       }
       const res = await queueApi.getQueues(params)
-      setQueues(normalizeQueueList(res.data))
+      const list = normalizeQueueList(res.data)
+      setQueues(list)
+
+      // Đồng bộ lịch sử bàn giao cho các lượt khám trong ngày
+      const activeItems = list.filter(
+        (item) => item.visitId && ['IN_PROGRESS', 'WAITING', 'WAITING_FOR_RESULT'].includes(item.status)
+      )
+      if (activeItems.length > 0) {
+        Promise.allSettled(
+          activeItems.map((item) =>
+            visitApi
+              .getVisitHandovers(item.visitId)
+              .then((hRes) => {
+                if (Array.isArray(hRes.data) && hRes.data.length > 0) {
+                  const lastH = hRes.data[hRes.data.length - 1]
+                  saveStoredHandover({
+                    visitId: item.visitId,
+                    patientId: item.patientId,
+                    patientName: item.patientName,
+                    patientCode: item.patientCode,
+                    fromDoctorId: lastH.fromDoctorId,
+                    fromDoctorName: lastH.fromDoctorName,
+                    toDoctorId: lastH.toDoctorId,
+                    toDoctorName: lastH.toDoctorName,
+                    reason: lastH.reason,
+                    handedOverAt: lastH.handedOverAt,
+                  })
+                }
+              })
+              .catch(() => {})
+          )
+        )
+      }
     } catch (err) {
       setQueues([])
       console.error('Error loading queue board:', err)
@@ -333,10 +370,7 @@ function AppointmentQueue() {
   const refreshAllData = useCallback(async () => {
     setLoading(true)
     try {
-      const tasks = [loadAppointments()]
-      if (!permissions.isDoctorOnly) {
-        tasks.push(loadQueues())
-      }
+      const tasks = [loadAppointments(), loadQueues()]
       if (permissions.canViewMyQueue) {
         tasks.push(loadMyQueue())
       }
@@ -347,7 +381,7 @@ function AppointmentQueue() {
     } finally {
       setLoading(false)
     }
-  }, [loadAppointments, loadQueues, loadMyQueue, loadLogs, permissions.canViewMyQueue, permissions.isDoctorOnly])
+  }, [loadAppointments, loadQueues, loadMyQueue, loadLogs, permissions.canViewMyQueue])
 
   useEffect(() => {
     loadDirectories()
@@ -437,16 +471,73 @@ function AppointmentQueue() {
   }, [queues, queueKeyword, queueStatusFilter, queueSourceFilter, getPatientInfo, getDoctorInfo, permissions.isDoctorOnly, user?.id])
 
   const doctorQueueGroups = useMemo(() => {
-    let items = []
+    const handovers = getStoredHandovers()
+    const handoverMap = new Map()
+    handovers.forEach((h) => {
+      if (h.visitId) handoverMap.set(String(h.visitId), h)
+    })
+
+    const currentUserId = user?.id || user?.userId
+    let baseItems = []
     if (permissions.isDoctorOnly) {
-      items = (Array.isArray(myQueueData) ? myQueueData : myQueueData?.items || myQueueData?.content) || queues.filter((q) => String(q.doctorId) === String(user?.id))
+      baseItems = (Array.isArray(myQueueData) ? myQueueData : myQueueData?.items || myQueueData?.content) || []
     } else {
-      items = queueDoctorFilter === 'ALL'
+      baseItems = queueDoctorFilter === 'ALL'
         ? queues
         : queues.filter((q) => String(q.doctorId) === String(queueDoctorFilter) || String(q.doctorName) === String(queueDoctorFilter))
     }
+
+    // 1. Loại bỏ các ca khám mà bác sĩ hiện tại đã bàn giao sang bác sĩ khác
+    const filteredBaseItems = baseItems.filter((item) => {
+      const h = handoverMap.get(String(item.visitId))
+      if (h && currentUserId && String(h.fromDoctorId) === String(currentUserId) && String(h.toDoctorId) !== String(currentUserId)) {
+        return false
+      }
+      return true
+    })
+
+    // 2. Bổ sung các ca khám đã được bàn giao cho bác sĩ hiện tại từ các phòng khám khác
+    const handedOverToMe = []
+    const extraHandoverItems = []
+    if (currentUserId) {
+      queues.forEach((qItem) => {
+        const h = handoverMap.get(String(qItem.visitId))
+        const isTargetDoctor = h && (
+          String(h.toDoctorId) === String(currentUserId) ||
+          (user.fullName && h.toDoctorName && h.toDoctorName.toLowerCase() === user.fullName.toLowerCase()) ||
+          (user.username && h.toDoctorName && h.toDoctorName.toLowerCase().includes(user.username.toLowerCase()))
+        )
+
+        if (isTargetDoctor) {
+          const alreadyExists = filteredBaseItems.some(
+            (m) => String(m.id) === String(qItem.id) || String(m.visitId) === String(qItem.visitId)
+          )
+          if (!alreadyExists) {
+            const isItemCompleted = Boolean(h.completed) || qItem.status === 'COMPLETED'
+            const handoverItemObj = {
+              ...qItem,
+              status: isItemCompleted ? 'COMPLETED' : qItem.status,
+              doctorId: currentUserId,
+              doctorName: user.fullName || user.username,
+              isHandoverToMe: true,
+              fromDoctorName: h.fromDoctorName || 'Đồng nghiệp',
+              handoverReason: h.reason || '',
+              handedOverAt: h.handedOverAt,
+            }
+            if (!isItemCompleted) {
+              handedOverToMe.push(handoverItemObj)
+            }
+            extraHandoverItems.push(handoverItemObj)
+          }
+        }
+      })
+    }
+
+    const items = [...filteredBaseItems, ...extraHandoverItems]
     const sortByNumber = (list) => [...list].sort((a, b) => Number(a.queueNumber || 999999) - Number(b.queueNumber || 999999))
+
     return {
+      handedOverToMe,
       inProgress: sortByNumber(items.filter((q) => q.status === 'IN_PROGRESS')),
       waiting: sortByNumber(items.filter((q) => q.status === 'WAITING')),
       waitingForResult: sortByNumber(items.filter((q) => q.status === 'WAITING_FOR_RESULT')),
@@ -466,7 +557,7 @@ function AppointmentQueue() {
         return Number(b.queueNumber || 0) - Number(a.queueNumber || 0)
       }),
     }
-  }, [permissions.isDoctorOnly, myQueueData, queues, user?.id, queueDoctorFilter])
+  }, [permissions.isDoctorOnly, myQueueData, queues, user?.id, user?.userId, user?.fullName, user?.username, queueDoctorFilter])
 
   const handleCreateAppointmentSubmit = async (values) => {
     setActionLoading(true)
@@ -1506,6 +1597,69 @@ function AppointmentQueue() {
                       </Col>
                     </Row>
                   </Card>
+                )}
+                {doctorQueueGroups.handedOverToMe?.length > 0 && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    icon={<SwapOutlined style={{ fontSize: 20, color: '#0284c7' }} />}
+                    message={
+                      <b style={{ fontSize: 14 }}>
+                        Bạn có {doctorQueueGroups.handedOverToMe.length} ca khám được bàn giao từ bác sĩ khác
+                      </b>
+                    }
+                    description={
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                        {doctorQueueGroups.handedOverToMe.map((item) => (
+                          <div
+                            key={item.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              background: '#ffffff',
+                              padding: '10px 14px',
+                              borderRadius: 8,
+                              border: '1px solid #bae6fd',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                            }}
+                          >
+                            <div>
+                              <Text strong style={{ fontSize: 15, color: '#0369a1' }}>
+                                {item.patientName}
+                              </Text>
+                              {item.patientCode && (
+                                <Tag color="geekblue" style={{ marginLeft: 8, fontFamily: 'monospace' }}>
+                                  {item.patientCode}
+                                </Tag>
+                              )}
+                              <span style={{ color: '#475569', fontSize: 13, marginLeft: 12 }}>
+                                Bàn giao từ BS: <b>{item.fromDoctorName || 'Đồng nghiệp'}</b>
+                                {item.handoverReason && <i> (Lý do: "{item.handoverReason}")</i>}
+                              </span>
+                            </div>
+                            <Button
+                              type="primary"
+                              icon={<MedicineBoxOutlined />}
+                              onClick={() => openEncounter(item)}
+                              style={{
+                                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                                borderColor: '#0284c7',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Vào khám ngay
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    }
+                    style={{
+                      borderRadius: 10,
+                      borderColor: '#bae6fd',
+                      background: '#f0f9ff',
+                    }}
+                  />
                 )}
                 <InProgressPatientList
                   items={doctorQueueGroups.inProgress}

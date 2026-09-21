@@ -54,6 +54,10 @@ export const DOMAIN_ERROR_MESSAGES = {
   ROOM_CODE_ALREADY_EXISTS: 'Mã phòng khám đã tồn tại trong danh mục cơ sở vật chất.',
   ROOM_NOT_FOUND: 'Không tìm thấy thông tin phòng khám trong hệ thống.',
   SPECIALTY_NOT_FOUND: 'Không tìm thấy thông tin chuyên khoa trong hệ thống.',
+  SPECIALTY_NAME_ALREADY_EXISTS: 'Tên chuyên khoa đã tồn tại trong danh mục hệ thống.',
+  SPECIALTY_CODE_ALREADY_EXISTS: 'Mã chuyên khoa đã tồn tại trong danh mục hệ thống.',
+  SPECIALTY_IN_USE: 'Chuyên khoa đang được gán cho bác sĩ hoặc mẫu bệnh án đang hoạt động. Cần xác nhận trước khi ngừng dùng.',
+  CANNOT_DEACTIVATE_DEFAULT_SPECIALTY: 'Không thể ngừng dùng chuyên khoa mặc định hệ thống (GENERAL).',
 
   MEDICAL_RECORD_ALREADY_EXISTS_FOR_VISIT:
     'Lượt khám này đã có hồ sơ bệnh án được tạo trong hệ thống. Hệ thống sẽ tự động cập nhật vào hồ sơ hiện có thay vì tạo mới.',
