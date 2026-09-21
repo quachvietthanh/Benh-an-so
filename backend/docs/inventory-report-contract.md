@@ -15,6 +15,7 @@ Tài liệu này xác định toàn bộ hợp đồng API, cấu trúc dữ li�
     - Xem báo cáo: `@RequirePermission(value = {"PHARMACY_READ", "REPORT_VIEW"}, operator = ANY)`
     - Xuất file: `@RequirePermission(value = {"PHARMACY_READ", "REPORT_EXPORT"}, operator = ANY)`
   - Tầng Application Service áp dụng `InventoryReportAuthorizer` để kiểm tra vai trò ngữ cảnh dữ liệu nhằm ngăn chặn hoàn toàn việc Bác sĩ (vốn sở hữu quyền `PHARMACY_READ` khi kê đơn) xem báo cáo kho.
+  - Việc ghi nhận nhật ký kiểm toán từ chối truy cập (`ACCESS_DENIED`) được thực thi độc lập qua `InventoryReportAccessDeniedAuditWriter` với `@Transactional(propagation = Propagation.REQUIRES_NEW)`, bảo đảm bản ghi audit log tồn tại nguyên vẹn ngay cả khi giao dịch nghiệp vụ cha bị rollback do ngoại lệ bảo mật.
 
 - **Quy tắc cân đối số liệu kho (NCL-06-CN-013-TC-01 / QTN-32 / QTN-06)**:
   - Công thức kế toán bất biến:

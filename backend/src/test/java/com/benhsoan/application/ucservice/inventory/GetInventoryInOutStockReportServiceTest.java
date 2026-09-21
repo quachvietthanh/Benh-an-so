@@ -9,23 +9,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.inventory.enums.StockMovementType;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
+import com.benhsoan.domain.medicine.exception.MedicineNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.query.inventory.GetInventoryInOutStockReportQuery;
 import com.benhsoan.port.dto.result.inventory.InventoryInOutStockItemResult;
@@ -176,8 +181,53 @@ class GetInventoryInOutStockReportServiceTest {
                 null
         );
 
-        ValidationException ex = assertThrows(ValidationException.class, () -> service.getReport(query));
+        MedicineNotFoundException ex = assertThrows(MedicineNotFoundException.class, () -> service.getReport(query));
         assertTrue(ex.getMessage().contains("Medicine not found"));
+    }
+
+    @Test
+    void successfullyFiltersByKeyword_usingBatchQueries() {
+        LocalDate from = LocalDate.of(2026, 8, 1);
+        LocalDate to = LocalDate.of(2026, 8, 31);
+        UUID medId = UUID.randomUUID();
+        Medicine medicine = createMedicine(medId, "MED-001", "Paracetamol 500mg", "Viên");
+
+        when(medicineRepository.search(any(), any())).thenReturn(new PageImpl<>(List.of(medicine)));
+        when(stockMovementRepository.sumQuantitiesBeforeForMedicineIds(eq(List.of(medId)), any(Instant.class)))
+                .thenReturn(List.of(new MedicineStockQuantityResult(medId, 50L)));
+        when(stockMovementRepository.sumMovementsBetweenForMedicineIds(eq(List.of(medId)), any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of(new MedicineMovementSummaryResult(medId, StockMovementType.RECEIPT, 20L)));
+
+        GetInventoryInOutStockReportQuery query = new GetInventoryInOutStockReportQuery(from, to, null, "Para");
+        InventoryInOutStockReportResult result = service.getReport(query);
+
+        assertNotNull(result);
+        assertEquals(1, result.items().size());
+        assertEquals(medId, result.items().getFirst().medicineId());
+        assertEquals(50, result.items().getFirst().openingStock());
+        assertEquals(20, result.items().getFirst().importQuantity());
+        assertEquals(70, result.items().getFirst().closingStock());
+
+        verify(stockMovementRepository, never()).sumQuantitiesBefore(any());
+        verify(stockMovementRepository, never()).sumMovementsBetween(any(), any());
+    }
+
+    @Test
+    void shortCircuitsWhenKeywordMatchesNoMedicines() {
+        LocalDate from = LocalDate.of(2026, 8, 1);
+        LocalDate to = LocalDate.of(2026, 8, 31);
+
+        when(medicineRepository.search(any(), any())).thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        GetInventoryInOutStockReportQuery query = new GetInventoryInOutStockReportQuery(from, to, null, "NonExistent");
+        InventoryInOutStockReportResult result = service.getReport(query);
+
+        assertNotNull(result);
+        assertEquals(0, result.summary().totalMedicines());
+        assertTrue(result.items().isEmpty());
+        assertFalse(result.hasTransactions());
+
+        verifyNoInteractions(stockMovementRepository);
     }
 
     @Test

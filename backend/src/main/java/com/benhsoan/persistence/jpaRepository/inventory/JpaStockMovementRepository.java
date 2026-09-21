@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.jpaRepository.inventory;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,6 +39,15 @@ public interface JpaStockMovementRepository
             @Param("beforeInstant") Instant beforeInstant
     );
 
+    @Query("select sm.medicineId as medicineId, sum(sm.quantityChange) as totalQuantity "
+            + "from StockMovementEntity sm "
+            + "where sm.medicineId in :medicineIds and sm.performedAt < :beforeInstant "
+            + "group by sm.medicineId")
+    List<MedicineStockQuantityProjection> sumQuantitiesBeforeForMedicineIds(
+            @Param("medicineIds") Collection<UUID> medicineIds,
+            @Param("beforeInstant") Instant beforeInstant
+    );
+
     @Query("select sm.medicineId as medicineId, sm.movementType as movementType, sum(sm.quantityChange) as totalQuantityChange "
             + "from StockMovementEntity sm "
             + "where sm.performedAt >= :fromInstant and sm.performedAt < :toInstant "
@@ -53,6 +63,16 @@ public interface JpaStockMovementRepository
             + "group by sm.medicineId, sm.movementType")
     List<MedicinePeriodMovementProjection> sumMovementsBetweenForMedicine(
             @Param("medicineId") UUID medicineId,
+            @Param("fromInstant") Instant fromInstant,
+            @Param("toInstant") Instant toInstant
+    );
+
+    @Query("select sm.medicineId as medicineId, sm.movementType as movementType, sum(sm.quantityChange) as totalQuantityChange "
+            + "from StockMovementEntity sm "
+            + "where sm.medicineId in :medicineIds and sm.performedAt >= :fromInstant and sm.performedAt < :toInstant "
+            + "group by sm.medicineId, sm.movementType")
+    List<MedicinePeriodMovementProjection> sumMovementsBetweenForMedicineIds(
+            @Param("medicineIds") Collection<UUID> medicineIds,
             @Param("fromInstant") Instant fromInstant,
             @Param("toInstant") Instant toInstant
     );

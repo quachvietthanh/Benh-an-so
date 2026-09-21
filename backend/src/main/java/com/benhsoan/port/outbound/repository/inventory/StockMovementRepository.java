@@ -1,6 +1,7 @@
 package com.benhsoan.port.outbound.repository.inventory;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,8 +27,12 @@ public interface StockMovementRepository {
 
     List<MedicineStockQuantityResult> sumQuantitiesBeforeForMedicine(UUID medicineId, Instant beforeInstant);
 
+    List<MedicineStockQuantityResult> sumQuantitiesBeforeForMedicineIds(Collection<UUID> medicineIds, Instant beforeInstant);
+
     List<MedicineMovementSummaryResult> sumMovementsBetween(Instant from, Instant to);
 
     List<MedicineMovementSummaryResult> sumMovementsBetweenForMedicine(UUID medicineId, Instant from, Instant to);
+
+    List<MedicineMovementSummaryResult> sumMovementsBetweenForMedicineIds(Collection<UUID> medicineIds, Instant from, Instant to);
 }
 

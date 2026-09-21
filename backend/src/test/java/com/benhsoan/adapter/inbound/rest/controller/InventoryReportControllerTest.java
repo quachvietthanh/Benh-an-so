@@ -178,4 +178,18 @@ class InventoryReportControllerTest {
 
         verify(exportInventoryInOutStockReportUseCase).export(any(GetInventoryInOutStockReportQuery.class));
     }
+
+    @Test
+    void getReport_returns404WhenMedicineNotFound() throws Exception {
+        UUID medicineId = UUID.randomUUID();
+        when(getInventoryInOutStockReportUseCase.getReport(any(GetInventoryInOutStockReportQuery.class)))
+                .thenThrow(new com.benhsoan.domain.medicine.exception.MedicineNotFoundException(medicineId));
+
+        mockMvc.perform(get("/inventory/reports/in-out-stock")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .param("medicineId", medicineId.toString()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEDICINE_NOT_FOUND"));
+    }
 }

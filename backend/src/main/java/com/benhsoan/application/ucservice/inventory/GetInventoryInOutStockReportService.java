@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.inventory.enums.StockMovementType;
 import com.benhsoan.domain.medicine.Medicine;
+import com.benhsoan.domain.medicine.exception.MedicineNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.query.inventory.GetInventoryInOutStockReportQuery;
 import com.benhsoan.port.dto.result.inventory.InventoryInOutStockItemResult;
@@ -58,14 +59,34 @@ public class GetInventoryInOutStockReportService implements GetInventoryInOutSto
         Instant now = clockPort.now();
 
         List<Medicine> medicines = resolveMedicines(query);
+        if (medicines.isEmpty()) {
+            InventoryInOutStockSummaryResult emptySummary = new InventoryInOutStockSummaryResult(
+                    0, 0, 0, 0, 0, 0, 0
+            );
+            return new InventoryInOutStockReportResult(
+                    query.from(),
+                    query.to(),
+                    now,
+                    false,
+                    Collections.emptyList(),
+                    emptySummary
+            );
+        }
 
-        List<MedicineStockQuantityResult> openingStockResults = query.medicineId() != null
-                ? stockMovementRepository.sumQuantitiesBeforeForMedicine(query.medicineId(), startInstant)
-                : stockMovementRepository.sumQuantitiesBefore(startInstant);
+        List<MedicineStockQuantityResult> openingStockResults;
+        List<MedicineMovementSummaryResult> periodMovementResults;
 
-        List<MedicineMovementSummaryResult> periodMovementResults = query.medicineId() != null
-                ? stockMovementRepository.sumMovementsBetweenForMedicine(query.medicineId(), startInstant, endInstant)
-                : stockMovementRepository.sumMovementsBetween(startInstant, endInstant);
+        if (query.medicineId() != null) {
+            openingStockResults = stockMovementRepository.sumQuantitiesBeforeForMedicine(query.medicineId(), startInstant);
+            periodMovementResults = stockMovementRepository.sumMovementsBetweenForMedicine(query.medicineId(), startInstant, endInstant);
+        } else if (query.keyword() != null && !query.keyword().isBlank()) {
+            List<UUID> medicineIds = medicines.stream().map(Medicine::getId).toList();
+            openingStockResults = stockMovementRepository.sumQuantitiesBeforeForMedicineIds(medicineIds, startInstant);
+            periodMovementResults = stockMovementRepository.sumMovementsBetweenForMedicineIds(medicineIds, startInstant, endInstant);
+        } else {
+            openingStockResults = stockMovementRepository.sumQuantitiesBefore(startInstant);
+            periodMovementResults = stockMovementRepository.sumMovementsBetween(startInstant, endInstant);
+        }
 
         Map<UUID, Integer> openingStockByMedicine = openingStockResults.stream()
                 .collect(Collectors.toMap(
@@ -172,7 +193,7 @@ public class GetInventoryInOutStockReportService implements GetInventoryInOutSto
     private List<Medicine> resolveMedicines(GetInventoryInOutStockReportQuery query) {
         if (query.medicineId() != null) {
             Medicine medicine = medicineRepository.findById(query.medicineId())
-                    .orElseThrow(() -> new ValidationException("Medicine not found with id: " + query.medicineId()));
+                    .orElseThrow(() -> new MedicineNotFoundException(query.medicineId()));
             return List.of(medicine);
         }
 
