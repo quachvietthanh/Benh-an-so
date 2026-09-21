@@ -34,6 +34,7 @@ import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
@@ -250,6 +251,30 @@ class CreatePrescriptionServiceTest {
         verify(prescriptionRepository, never()).save(any(Prescription.class));
     }
 
+    @Test
+    void rejectsControlledMedicineWithoutConfirmation() {
+        prepareValidCreate();
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(controlledMedicine(medicineId)));
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class,
+                () -> service.create(command(List.of(item(medicineId)), List.of())));
+
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
+    }
+
+    @Test
+    void acceptsControlledMedicineWithConfirmation() {
+        prepareValidCreate();
+        preparePersistence();
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(controlledMedicine(medicineId)));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        var result = service.create(commandWithConfirmation(List.of(item(medicineId)), List.of(), true));
+
+        assertEquals(PrescriptionStatus.PENDING_DISPENSE, result.status());
+        verify(prescriptionRepository).save(any(Prescription.class));
+    }
+
     private void prepareValidCreate() {
         when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
@@ -294,6 +319,25 @@ class CreatePrescriptionServiceTest {
     private Medicine inactiveMedicine(UUID id) {
         return Medicine.restore(id, "MED001", "Paracetamol", "Paracetamol", "500 mg", DosageForm.TABLET,
                 "tablet", AdministrationRoute.ORAL, false, NOW, null, 0, 20);
+    }
+
+    private Medicine controlledMedicine(UUID id) {
+        return Medicine.restore(id, "MED001", "Paracetamol", "Paracetamol", "500 mg", DosageForm.TABLET,
+                "tablet", AdministrationRoute.ORAL, true, NOW, null, 0, 20, true);
+    }
+
+    private CreatePrescriptionCommand commandWithConfirmation(
+            List<CreatePrescriptionItemCommand> items,
+            List<PrescriptionInteractionOverrideCommand> overrides,
+            boolean controlledMedicineConfirmed
+    ) {
+        return CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(items)
+                .interactionOverrides(overrides)
+                .controlledMedicineConfirmed(controlledMedicineConfirmed)
+                .build();
     }
 
     private DrugInteractionWarningResult warning(UUID firstMedicineId, UUID secondMedicineId) {

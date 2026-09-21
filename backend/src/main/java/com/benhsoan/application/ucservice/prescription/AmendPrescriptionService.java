@@ -31,6 +31,7 @@ import com.benhsoan.domain.prescription.PrescriptionAllergyWarningLog;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
@@ -120,6 +121,7 @@ public class AmendPrescriptionService
         List<PrescriptionItem> replacementItems = buildReplacementItems(
                 prescription,
                 itemCommands,
+                command.controlledMedicineConfirmed(),
                 now
         );
 
@@ -218,6 +220,17 @@ public class AmendPrescriptionService
         }
     }
 
+    private void requireControlledMedicineConfirmation(
+            Map<UUID, Medicine> medicines,
+            boolean confirmed
+    ) {
+        boolean hasControlled = medicines.values().stream()
+                .anyMatch(Medicine::isControlled);
+        if (hasControlled && !confirmed) {
+            throw new ControlledMedicineConfirmationRequiredException();
+        }
+    }
+
     private Prescription loadForUpdate(UUID prescriptionId) {
         return prescriptionRepository.findByIdForUpdate(prescriptionId)
                 .orElseThrow(() ->
@@ -266,6 +279,7 @@ public class AmendPrescriptionService
     private List<PrescriptionItem> buildReplacementItems(
             Prescription prescription,
             List<AmendPrescriptionItemCommand> itemCommands,
+            boolean controlledMedicineConfirmed,
             Instant updatedAt
     ) {
         Map<UUID, PrescriptionItem> existingByMedicineId
@@ -275,6 +289,7 @@ public class AmendPrescriptionService
         }
 
         Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
+        requireControlledMedicineConfirmation(medicines, controlledMedicineConfirmed);
 
         return itemCommands.stream()
                 .map(command -> {

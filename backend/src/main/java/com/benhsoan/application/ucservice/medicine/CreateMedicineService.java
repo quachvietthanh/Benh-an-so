@@ -57,6 +57,7 @@ public class CreateMedicineService implements CreateMedicineUseCase {
                 now
         );
         validateUniqueness(medicine);
+        medicine.markControlled(command.controlled(), now);
 
         Medicine saved = medicineRepository.save(medicine);
         adminOperationAuditService.record(
@@ -73,7 +74,8 @@ public class CreateMedicineService implements CreateMedicineUseCase {
                         "dosageForm", saved.getDosageForm(),
                         "unit", saved.getUnit(),
                         "defaultRoute", saved.getDefaultRoute(),
-                        "minStockThreshold", saved.getMinStockThreshold()),
+                        "minStockThreshold", saved.getMinStockThreshold(),
+                        "controlled", saved.isControlled()),
                 now
         );
 

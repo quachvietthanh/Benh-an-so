@@ -18,7 +18,9 @@ public record AmendPrescriptionCommand(
 
         List<PrescriptionInteractionOverrideCommand> interactionOverrides,
 
-        List<PrescriptionAllergyOverrideCommand> allergyOverrides
+        List<PrescriptionAllergyOverrideCommand> allergyOverrides,
+
+        boolean controlledMedicineConfirmed
 
 ) {
 }

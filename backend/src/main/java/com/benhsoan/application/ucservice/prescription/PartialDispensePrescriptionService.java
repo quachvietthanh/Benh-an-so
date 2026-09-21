@@ -31,11 +31,13 @@ import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.application.ucservice.controlledmedicine.ControlledMedicineRegisterRecorder;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllocationInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispensePrescriptionItemsCommand;
@@ -71,6 +73,8 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final PartialDispensePrescriptionResultMapper resultMapper;
+    private final ControlledMedicineRegisterRecorder controlledMedicineRegisterRecorder;
+    private final PrescriptionDisplayContextResolver displayContextResolver;
 
     @Override
     public PartialDispensePrescriptionResult dispense(DispensePrescriptionItemsCommand command) {
@@ -90,6 +94,7 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
         List<PrescriptionItem> items = prescription.getItems();
         Map<UUID, Integer> requestedByItem = resolveRequestedQuantities(command, items);
         Map<UUID, Medicine> medicines = loadMedicines(items);
+        requireControlledMedicineConfirmation(medicines, command.controlledMedicineConfirmed());
         Map<UUID, DispenseItemCommand> commandByItemId = command.items().stream()
                 .collect(Collectors.toMap(DispenseItemCommand::prescriptionItemId, Function.identity()));
 
@@ -194,6 +199,15 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
         }
         Prescription saved = prescriptionRepository.save(prescription);
 
+        recordControlledRegisterEntries(
+                saved,
+                items,
+                requestedByItem,
+                medicines,
+                actorId,
+                now
+        );
+
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.DISPENSE,
@@ -232,6 +246,61 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
                 && !currentUserPort.hasRole("ADMIN")) {
             throw new AccessDeniedException("Only pharmacists can dispense prescriptions.");
         }
+    }
+
+    private void requireControlledMedicineConfirmation(
+            Map<UUID, Medicine> medicines,
+            boolean confirmed
+    ) {
+        boolean hasControlled = medicines.values().stream()
+                .anyMatch(Medicine::isControlled);
+        if (hasControlled && !confirmed) {
+            throw new ControlledMedicineConfirmationRequiredException();
+        }
+    }
+
+    private void recordControlledRegisterEntries(
+            Prescription prescription,
+            List<PrescriptionItem> items,
+            Map<UUID, Integer> requestedByItem,
+            Map<UUID, Medicine> medicines,
+            UUID dispensedBy,
+            Instant dispensedAt
+    ) {
+        List<ControlledMedicineRegisterRecorder.Entry> entries = items.stream()
+                .filter(item -> {
+                    Medicine medicine = medicines.get(item.getMedicineId());
+                    Integer requested = requestedByItem.get(item.getId());
+                    return medicine != null
+                            && medicine.isControlled()
+                            && requested != null
+                            && requested > 0;
+                })
+                .map(item -> new ControlledMedicineRegisterRecorder.Entry(
+                        item.getId(),
+                        item.getMedicineId(),
+                        item.getMedicineName(),
+                        requestedByItem.get(item.getId())
+                ))
+                .toList();
+
+        if (entries.isEmpty()) {
+            return;
+        }
+
+        UUID patientId = displayContextResolver.resolve(
+                prescription.getMedicalRecordId(),
+                prescription.getPrescribedBy()
+        ).patientId();
+
+        controlledMedicineRegisterRecorder.record(
+                prescription.getId(),
+                prescription.getPrescribedBy(),
+                patientId,
+                dispensedBy,
+                dispensedAt,
+                entries
+        );
     }
 
     private void validateStatus(Prescription prescription) {

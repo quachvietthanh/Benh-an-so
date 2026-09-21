@@ -41,7 +41,9 @@ import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.application.ucservice.controlledmedicine.ControlledMedicineRegisterRecorder;
 import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispensePrescriptionItemsCommand;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -76,6 +78,10 @@ class PartialDispensePrescriptionServiceTest {
     private final AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
     private final PartialDispensePrescriptionResultMapper resultMapper =
             mock(PartialDispensePrescriptionResultMapper.class);
+    private final ControlledMedicineRegisterRecorder controlledMedicineRegisterRecorder =
+            mock(ControlledMedicineRegisterRecorder.class);
+    private final PrescriptionDisplayContextResolver displayContextResolver =
+            mock(PrescriptionDisplayContextResolver.class);
 
     private PartialDispensePrescriptionService service;
 
@@ -93,7 +99,9 @@ class PartialDispensePrescriptionServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                resultMapper);
+                resultMapper,
+                controlledMedicineRegisterRecorder,
+                displayContextResolver);
         when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
         when(clockPort.now()).thenReturn(NOW);
@@ -124,6 +132,13 @@ class PartialDispensePrescriptionServiceTest {
                 NOW.minusSeconds(86400), null, 120, 20);
     }
 
+    private Medicine controlledMedicine() {
+        return Medicine.restore(
+                MEDICINE_ID, "MED-001", "Paracetamol", "Paracetamol", "500 mg",
+                DosageForm.TABLET, "vien", AdministrationRoute.ORAL, true,
+                NOW.minusSeconds(86400), null, 120, 20, true);
+    }
+
     private MedicineBatch batch(int quantity) {
         return MedicineBatch.restore(
                 UUID.randomUUID(), MEDICINE_ID, "BATCH-A", LocalDate.of(2026, 12, 1),
@@ -142,6 +157,23 @@ class PartialDispensePrescriptionServiceTest {
                 prescriptionId, "RX-001", UUID.randomUUID(), status, "note",
                 null, UUID.randomUUID(), NOW.minusSeconds(600), null, null,
                 InterconnectionStatus.NOT_SENT, null, null, null, List.of(item));
+    }
+
+    @Test
+    void rejectsControlledPartialDispenseWithoutConfirmation() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(controlledMedicine()));
+        stubBatch(12);
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(new DispenseItemCommand(itemId, 12)))));
+
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
     }
 
     @Test
