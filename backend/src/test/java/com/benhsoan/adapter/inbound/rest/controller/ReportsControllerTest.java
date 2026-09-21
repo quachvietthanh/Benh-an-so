@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,10 @@ import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
 import com.benhsoan.port.inbound.reporting.GetRevenueBreakdownReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalTimelineUseCase;
+import com.benhsoan.port.inbound.reporting.GetAppointmentEffectivenessReportUseCase;
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.port.dto.result.AppointmentEffectivenessReportResult;
+import com.benhsoan.port.dto.result.AppointmentStatusCountResult;
 import com.benhsoan.port.dto.result.DoctorRevenueResult;
 import com.benhsoan.port.dto.result.RevenueBreakdownReportResult;
 import com.benhsoan.port.dto.result.ServiceGroupRevenueResult;
@@ -68,6 +74,7 @@ class ReportsControllerTest {
     @MockitoBean private GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
     @MockitoBean private GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
+    @MockitoBean private GetAppointmentEffectivenessReportUseCase getAppointmentEffectivenessReportUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -658,6 +665,105 @@ class ReportsControllerTest {
     @Test
     void rejectsRangeExceedingMaxDaysForRevenueBreakdown() throws Exception {
         mockMvc.perform(get("/reports/revenue-breakdown")
+                        .param("from", "2025-01-01")
+                        .param("to", "2026-02-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Date range must not exceed 366 days."));
+    }
+
+    @Test
+    void returnsAppointmentEffectivenessReport() throws Exception {
+        when(getAppointmentEffectivenessReportUseCase.getReport(any(), any(), any(), any()))
+                .thenReturn(new AppointmentEffectivenessReportResult(
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31),
+                        Instant.parse("2026-08-31T08:00:00Z"),
+                        100,
+                        List.of(
+                                new AppointmentStatusCountResult(AppointmentStatus.COMPLETED, 40, new BigDecimal("40.00")),
+                                new AppointmentStatusCountResult(AppointmentStatus.CANCELLED, 30, new BigDecimal("30.00")),
+                                new AppointmentStatusCountResult(AppointmentStatus.NO_SHOW, 30, new BigDecimal("30.00"))
+                        )
+                ));
+
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(100))
+                .andExpect(jsonPath("$.items[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.items[0].count").value(40))
+                .andExpect(jsonPath("$.items[0].percentage").value(40.00));
+    }
+
+    @Test
+    void passesDoctorAndChannelFiltersToAppointmentEffectivenessReport() throws Exception {
+        UUID doctorId = UUID.randomUUID();
+        when(getAppointmentEffectivenessReportUseCase.getReport(any(), any(), any(), any()))
+                .thenReturn(new AppointmentEffectivenessReportResult(
+                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31),
+                        Instant.parse("2026-08-31T08:00:00Z"), 0, List.of()));
+
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .param("doctorId", doctorId.toString())
+                        .param("bookingChannel", "ONLINE_PORTAL"))
+                .andExpect(status().isOk());
+
+        verify(getAppointmentEffectivenessReportUseCase)
+                .getReport(eq(LocalDate.of(2026, 8, 1)), eq(LocalDate.of(2026, 8, 31)),
+                        eq(doctorId), eq("ONLINE_PORTAL"));
+    }
+
+    @Test
+    void rejectsInvalidBookingChannelForAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .param("bookingChannel", "SMS"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("bookingChannel must be one of: ONLINE_PORTAL, RECEPTION_COUNTER."));
+    }
+
+    @Test
+    void rejectsMissingFromForAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from is required."));
+    }
+
+    @Test
+    void rejectsMissingToForAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("to is required."));
+    }
+
+    @Test
+    void rejectsInvalidDateFormatForAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026/08/01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be in yyyy-MM-dd format."));
+    }
+
+    @Test
+    void rejectsInvertedRangeForAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-31")
+                        .param("to", "2026-08-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("from must be before or equal to to."));
+    }
+
+    @Test
+    void rejectsRangeExceedingMaxDaysForAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
                         .param("from", "2025-01-01")
                         .param("to", "2026-02-01"))
                 .andExpect(status().isBadRequest())

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
+import com.benhsoan.adapter.inbound.rest.response.reporting.AppointmentEffectivenessReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.DiseasePatternReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorVisitsReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.OperationalSummaryResponse;
@@ -28,6 +29,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetAppointmentEffectivenessReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
@@ -53,6 +55,7 @@ public class ReportsController {
     private final GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     private final ExportOperationalReportUseCase exportOperationalReportUseCase;
     private final GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
+    private final GetAppointmentEffectivenessReportUseCase getAppointmentEffectivenessReportUseCase;
     private final ReportingRestMapper mapper;
 
     @GetMapping("/summary")
@@ -120,6 +123,24 @@ public class ReportsController {
         return mapper.toResponse(getDoctorVisitsReportUseCase.getDoctorVisits(fromDate, toDate));
     }
 
+    @GetMapping("/appointment-effectiveness")
+    @RequirePermission("REPORT_VIEW")
+    public AppointmentEffectivenessReportResponse getAppointmentEffectiveness(
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(required = false) UUID doctorId,
+            @RequestParam(required = false) String bookingChannel
+    ) {
+        LocalDate fromDate = parseDate(from, "from");
+        LocalDate toDate = parseDate(to, "to");
+        validateRange(fromDate, toDate);
+        String channel = parseBookingChannel(bookingChannel);
+
+        return mapper.toResponse(
+                getAppointmentEffectivenessReportUseCase.getReport(fromDate, toDate, doctorId, channel)
+        );
+    }
+
     @GetMapping("/disease-patterns")
     @RequirePermission("REPORT_VIEW")
     public DiseasePatternReportResponse getDiseasePatterns(
@@ -178,6 +199,16 @@ public class ReportsController {
         } catch (IllegalArgumentException ex) {
             throw new ValidationException("reportType must be one of: VISIT_REPORT, REVENUE_REPORT, OPERATIONAL_REPORT, DISEASE_PATTERN_REPORT.");
         }
+    }
+
+    private String parseBookingChannel(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        if ("ONLINE_PORTAL".equals(value) || "RECEPTION_COUNTER".equals(value)) {
+            return value;
+        }
+        throw new ValidationException("bookingChannel must be one of: ONLINE_PORTAL, RECEPTION_COUNTER.");
     }
 
     private void validateRange(LocalDate from, LocalDate to) {
