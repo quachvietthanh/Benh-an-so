@@ -11,6 +11,8 @@ import com.benhsoan.adapter.inbound.rest.response.inventory.BatchAdjustmentRespo
 import com.benhsoan.adapter.inbound.rest.response.inventory.DiscardBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryExpiryAlertResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockReportItemResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.LowStockMedicineResponse;
 import com.benhsoan.port.dto.command.inventory.AdjustBatchStockCommand;
@@ -19,6 +21,8 @@ import com.benhsoan.port.dto.result.BatchAdjustmentResult;
 import com.benhsoan.port.dto.result.DiscardBatchResult;
 import com.benhsoan.port.dto.result.InventoryBatchResult;
 import com.benhsoan.port.dto.result.InventoryExpiryAlertResult;
+import com.benhsoan.port.dto.result.InventoryStockReportItemResult;
+import com.benhsoan.port.dto.result.InventoryStockReportResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
 import com.benhsoan.port.dto.result.LowStockMedicineResult;
 
@@ -47,6 +51,31 @@ public class InventoryRestMapper {
         return results.stream()
                 .map(this::toExpiryAlertResponse)
                 .toList();
+    }
+
+    public InventoryStockReportResponse toStockReportResponse(InventoryStockReportResult result) {
+        return new InventoryStockReportResponse(
+                result.from(),
+                result.to(),
+                result.generatedAt(),
+                result.hasTransactions(),
+                result.items().stream().map(this::toStockReportItemResponse).toList()
+        );
+    }
+
+    private InventoryStockReportItemResponse toStockReportItemResponse(InventoryStockReportItemResult result) {
+        return new InventoryStockReportItemResponse(
+                result.medicineId(),
+                result.medicineCode(),
+                result.medicineName(),
+                result.unit(),
+                result.openingQuantity(),
+                result.receivedQuantity(),
+                result.dispensedQuantity(),
+                result.returnedQuantity(),
+                result.adjustedQuantity(),
+                result.closingQuantity()
+        );
     }
 
     private InventoryBatchResponse toBatchResponse(InventoryBatchResult result) {
