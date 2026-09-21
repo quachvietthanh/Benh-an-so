@@ -1,6 +1,7 @@
 package com.benhsoan.persistence.adapterRepository.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.persistence.entity.appointment.AppointmentEntity;
 import com.benhsoan.persistence.entity.auth.UserEntity;
 import com.benhsoan.persistence.entity.patient.PatientEntity;
@@ -163,6 +165,12 @@ class AppointmentEffectivenessQueryRepositoryAdapterIntegrationTest {
     @Test
     void returnsEmptyWhenNoAppointments() {
         assertTrue(adapter().findStatusCounts(FROM, TO, null, null).isEmpty());
+    }
+
+    @Test
+    void rejectsInvalidBookingChannel() {
+        assertThrows(ValidationException.class,
+                () -> adapter().findStatusCounts(FROM, TO, null, "INVALID"));
     }
 
     private void assertSummary(List<AppointmentStatusCountSummary> counts, String channel, AppointmentStatus status, long expected) {

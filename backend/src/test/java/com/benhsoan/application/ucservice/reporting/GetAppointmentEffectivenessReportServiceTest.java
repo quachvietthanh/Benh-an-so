@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.AppointmentEffectivenessReportResult;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentEffectivenessQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentStatusCountSummary;
@@ -182,6 +183,111 @@ class GetAppointmentEffectivenessReportServiceTest {
 
         assertThrows(AccessDeniedException.class,
                 () -> service.getReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null));
+    }
+
+    @Test
+    void rejectsNullFromDate() {
+        authorizeManager();
+
+        assertThrows(ValidationException.class,
+                () -> service.getReport(null, LocalDate.of(2026, 8, 31), null, null));
+    }
+
+    @Test
+    void rejectsNullToDate() {
+        authorizeManager();
+
+        assertThrows(ValidationException.class,
+                () -> service.getReport(LocalDate.of(2026, 8, 1), null, null, null));
+    }
+
+    @Test
+    void rejectsFromAfterTo() {
+        authorizeManager();
+
+        assertThrows(ValidationException.class,
+                () -> service.getReport(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 8, 1), null, null));
+    }
+
+    @Test
+    void acceptsEqualFromAndTo() {
+        authorizeManager();
+        when(clockPort.now()).thenReturn(NOW);
+        when(queryRepository.findStatusCounts(any(), any(), any(), any())).thenReturn(List.of());
+
+        AppointmentEffectivenessReportResult result = service.getReport(
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 1), null, null);
+
+        assertEquals(0, result.total());
+    }
+
+    @Test
+    void acceptsValidDateRange() {
+        authorizeManager();
+        when(clockPort.now()).thenReturn(NOW);
+        when(queryRepository.findStatusCounts(any(), any(), any(), any())).thenReturn(List.of());
+
+        AppointmentEffectivenessReportResult result = service.getReport(
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null);
+
+        assertEquals(0, result.total());
+    }
+
+    @Test
+    void acceptsNullBookingChannelAsNoFilter() {
+        authorizeManager();
+        when(clockPort.now()).thenReturn(NOW);
+        when(queryRepository.findStatusCounts(any(), any(), any(), any())).thenReturn(List.of());
+
+        service.getReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null);
+
+        verify(queryRepository).findStatusCounts(any(), any(), eq(null), eq(null));
+    }
+
+    @Test
+    void acceptsOnlinePortalChannel() {
+        authorizeManager();
+        when(clockPort.now()).thenReturn(NOW);
+        when(queryRepository.findStatusCounts(any(), any(), any(), any())).thenReturn(List.of());
+
+        service.getReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, "ONLINE_PORTAL");
+
+        verify(queryRepository).findStatusCounts(any(), any(), eq(null), eq("ONLINE_PORTAL"));
+    }
+
+    @Test
+    void acceptsReceptionCounterChannel() {
+        authorizeManager();
+        when(clockPort.now()).thenReturn(NOW);
+        when(queryRepository.findStatusCounts(any(), any(), any(), any())).thenReturn(List.of());
+
+        service.getReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, "RECEPTION_COUNTER");
+
+        verify(queryRepository).findStatusCounts(any(), any(), eq(null), eq("RECEPTION_COUNTER"));
+    }
+
+    @Test
+    void rejectsInvalidBookingChannel() {
+        authorizeManager();
+
+        assertThrows(ValidationException.class,
+                () -> service.getReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, "INVALID"));
+    }
+
+    @Test
+    void rejectsCounterBookingChannel() {
+        authorizeManager();
+
+        assertThrows(ValidationException.class,
+                () -> service.getReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, "COUNTER"));
+    }
+
+    @Test
+    void rejectsWebBookingChannel() {
+        authorizeManager();
+
+        assertThrows(ValidationException.class,
+                () -> service.getReport(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, "WEB"));
     }
 
     private void authorizeManager() {

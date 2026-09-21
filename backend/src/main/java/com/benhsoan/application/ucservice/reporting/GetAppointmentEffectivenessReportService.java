@@ -11,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.AppointmentEffectivenessReportResult;
 import com.benhsoan.port.dto.result.AppointmentStatusCountResult;
 import com.benhsoan.port.inbound.reporting.GetAppointmentEffectivenessReportUseCase;
@@ -27,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 public class GetAppointmentEffectivenessReportService implements GetAppointmentEffectivenessReportUseCase {
 
     private static final String MANAGER_ROLE = "MANAGER";
+    private static final String ONLINE_PORTAL_CHANNEL = "ONLINE_PORTAL";
+    private static final String RECEPTION_COUNTER_CHANNEL = "RECEPTION_COUNTER";
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final AppointmentEffectivenessQueryRepository queryRepository;
@@ -42,10 +45,12 @@ public class GetAppointmentEffectivenessReportService implements GetAppointmentE
     ) {
         ensureAuthorized();
 
+        String validatedChannel = validateBookingChannel(bookingChannel);
+
         ReportingTimeRange range = ReportingTimeRange.of(from, to);
 
         List<AppointmentStatusCountSummary> counts = queryRepository.findStatusCounts(
-                range.fromInclusive(), range.toExclusive(), doctorId, bookingChannel);
+                range.fromInclusive(), range.toExclusive(), doctorId, validatedChannel);
 
         long total = counts.stream()
                 .mapToLong(AppointmentStatusCountSummary::count)
@@ -78,5 +83,17 @@ public class GetAppointmentEffectivenessReportService implements GetAppointmentE
             throw new AccessDeniedException(
                     "Only managers can view the appointment effectiveness report.");
         }
+    }
+
+    private String validateBookingChannel(String bookingChannel) {
+        if (bookingChannel == null) {
+            return null;
+        }
+        if (ONLINE_PORTAL_CHANNEL.equals(bookingChannel)
+                || RECEPTION_COUNTER_CHANNEL.equals(bookingChannel)) {
+            return bookingChannel;
+        }
+        throw new ValidationException(
+                "bookingChannel must be one of: ONLINE_PORTAL, RECEPTION_COUNTER.");
     }
 }

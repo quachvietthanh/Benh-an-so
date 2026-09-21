@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.persistence.entity.appointment.AppointmentEntity;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentEffectivenessQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentStatusCountSummary;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class AppointmentEffectivenessQueryRepositoryAdapter implements AppointmentEffectivenessQueryRepository {
 
+    private static final String PORTAL_CHANNEL = "ONLINE_PORTAL";
     private static final String COUNTER_CHANNEL = "RECEPTION_COUNTER";
 
     private final EntityManager entityManager;
@@ -31,6 +33,13 @@ public class AppointmentEffectivenessQueryRepositoryAdapter implements Appointme
             UUID doctorId,
             String bookingChannel
     ) {
+        if (bookingChannel != null
+                && !PORTAL_CHANNEL.equals(bookingChannel)
+                && !COUNTER_CHANNEL.equals(bookingChannel)) {
+            throw new ValidationException(
+                    "bookingChannel must be one of: ONLINE_PORTAL, RECEPTION_COUNTER.");
+        }
+
         String jpql = """
                 select coalesce(a.bookingChannel, :counterChannel), a.status, count(a.id)
                 from AppointmentEntity a
@@ -38,9 +47,9 @@ public class AppointmentEffectivenessQueryRepositoryAdapter implements Appointme
                   and a.startTime < :toExclusive
                 """
                 + (doctorId != null ? "  and a.doctorId = :doctorId\n" : "\n")
-                + ("ONLINE_PORTAL".equals(bookingChannel)
+                + (PORTAL_CHANNEL.equals(bookingChannel)
                         ? "  and a.bookingChannel = :bookingChannel\n"
-                        : "RECEPTION_COUNTER".equals(bookingChannel)
+                        : COUNTER_CHANNEL.equals(bookingChannel)
                                 ? "  and a.bookingChannel is null\n"
                                 : "\n")
                 + "group by coalesce(a.bookingChannel, :counterChannel), a.status\n";
@@ -53,7 +62,7 @@ public class AppointmentEffectivenessQueryRepositoryAdapter implements Appointme
         if (doctorId != null) {
             query.setParameter("doctorId", doctorId);
         }
-        if ("ONLINE_PORTAL".equals(bookingChannel)) {
+        if (PORTAL_CHANNEL.equals(bookingChannel)) {
             query.setParameter("bookingChannel", bookingChannel);
         }
 
