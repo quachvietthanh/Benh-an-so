@@ -4,7 +4,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
@@ -31,6 +35,34 @@ class ClinicalServiceFeeCalculator {
         return clinicalOrderItemRepository.findBillableByVisitId(visitId).stream()
                 .map(service -> toCharge(service, billingDate))
                 .toList();
+    }
+
+    Map<UUID, BigDecimal> calculateBatch(Collection<UUID> visitIds, Instant billingAt) {
+        if (visitIds == null || visitIds.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate billingDate = billingAt.atZone(BILLING_ZONE).toLocalDate();
+        List<BillableClinicalService> items = clinicalOrderItemRepository.findBillableByVisitIdIn(visitIds);
+        Map<UUID, BigDecimal> totals = new HashMap<>();
+        for (UUID visitId : visitIds) {
+            totals.put(visitId, BigDecimal.ZERO);
+        }
+        Map<UUID, Optional<ServicePrice>> priceCache = new HashMap<>();
+        for (BillableClinicalService item : items) {
+            if (item.visitId() == null) continue;
+            try {
+                Optional<ServicePrice> priceOpt = priceCache.computeIfAbsent(
+                        item.serviceCatalogId(),
+                        id -> servicePriceRepository.findEffectivePrice(id, billingDate)
+                );
+                if (priceOpt.isPresent() && priceOpt.get().getPrice() != null) {
+                    totals.merge(item.visitId(), priceOpt.get().getPrice(), BigDecimal::add);
+                }
+            } catch (Exception ex) {
+                // Graceful fallback for missing prices
+            }
+        }
+        return totals;
     }
 
     BigDecimal total(List<ClinicalServiceCharge> charges) {

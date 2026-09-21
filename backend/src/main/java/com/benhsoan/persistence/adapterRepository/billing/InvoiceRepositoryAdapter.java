@@ -109,9 +109,20 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable) {
-        return jpaRepository.findPayableEncounters(pageable)
+    public Page<PayableEncounterSummary> findPayableEncounters(
+            Instant fromCompletedAt,
+            Instant toCompletedAt,
+            String search,
+            Pageable pageable
+    ) {
+        return jpaRepository.findPayableEncounters(fromCompletedAt, toCompletedAt, search, pageable)
                 .map(this::toSummary);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable) {
+        return findPayableEncounters(null, null, null, pageable);
     }
 
     @Override
@@ -161,7 +172,9 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
                 projection.getPatientCode(),
                 projection.getPatientName(),
                 projection.getReason(),
-                projection.getCompletedAt()
+                projection.getCompletedAt(),
+                Boolean.TRUE.equals(projection.getHasPrescription()),
+                Boolean.TRUE.equals(projection.getHasPendingDispense())
         );
     }
 }

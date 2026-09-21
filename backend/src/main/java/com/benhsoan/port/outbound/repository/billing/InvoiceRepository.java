@@ -28,7 +28,16 @@ public interface InvoiceRepository {
 
     List<Invoice> findCreatedBetween(Instant fromInclusive, Instant toExclusive);
 
-    Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable);
+    Page<PayableEncounterSummary> findPayableEncounters(
+            Instant fromCompletedAt,
+            Instant toCompletedAt,
+            String search,
+            Pageable pageable
+    );
+
+    default Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable) {
+        return findPayableEncounters(null, null, null, pageable);
+    }
 
     Page<Invoice> search(InvoiceSearchCriteria criteria, Pageable pageable);
 }
