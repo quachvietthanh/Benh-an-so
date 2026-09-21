@@ -70,6 +70,18 @@ class GetInvoiceAdjustmentsServiceTest {
         assertThrows(InvoiceNotFoundException.class, () -> service.getAdjustments(id));
     }
 
+    @Test
+    void rejectsAdjustmentInvoiceId() {
+        UUID originalId = UUID.randomUUID();
+        UUID adjustmentId = UUID.randomUUID();
+        Invoice adjustment = invoice(adjustmentId, "HDDC000010", InvoiceType.ADJUSTMENT,
+                originalId, "Dieu chinh", new BigDecimal("-20000"));
+
+        when(invoiceRepository.findById(adjustmentId)).thenReturn(Optional.of(adjustment));
+
+        assertThrows(ValidationException.class, () -> service.getAdjustments(adjustmentId));
+    }
+
     private Invoice invoice(
             UUID id,
             String code,

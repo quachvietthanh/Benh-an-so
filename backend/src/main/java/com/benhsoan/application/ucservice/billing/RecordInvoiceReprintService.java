@@ -44,18 +44,19 @@ public class RecordInvoiceReprintService implements RecordInvoiceReprintUseCase 
                 .orElseThrow(() -> new InvoiceNotFoundException(invoiceId));
 
         invoice.recordReprint(now);
-        Invoice saved = invoiceRepository.save(invoice);
+        invoiceRepository.updateReprintMetadata(
+                invoice.getId(), invoice.getReprintCount(), invoice.getLastReprintedAt());
 
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.REPRINT,
                 ResourceType.INVOICE,
-                saved.getId(),
+                invoice.getId(),
                 "{\"invoiceCode\":\"%s\",\"reprintCount\":%d}".formatted(
-                        saved.getInvoiceCode(), saved.getReprintCount()),
+                        invoice.getInvoiceCode(), invoice.getReprintCount()),
                 null,
                 now));
 
-        return resultMapper.toResult(saved);
+        return resultMapper.toResult(invoice);
     }
 }

@@ -24,6 +24,19 @@ public interface JpaInvoiceRepository
 
     Optional<InvoiceEntity> findByPaymentId(UUID paymentId);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("""
+            update InvoiceEntity invoice
+            set invoice.reprintCount = :reprintCount,
+                invoice.lastReprintedAt = :lastReprintedAt
+            where invoice.id = :id
+            """)
+    int updateReprintMetadata(
+            @Param("id") UUID id,
+            @Param("reprintCount") int reprintCount,
+            @Param("lastReprintedAt") Instant lastReprintedAt
+    );
+
     boolean existsByOriginalInvoiceId(UUID originalInvoiceId);
 
     @Query("""

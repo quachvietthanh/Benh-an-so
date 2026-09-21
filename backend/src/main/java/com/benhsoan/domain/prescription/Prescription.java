@@ -293,7 +293,7 @@ public class Prescription {
         return status == PrescriptionStatus.PARTIALLY_DISPENSED;
     }
 
-    public void recomputeStatusAfterReturn(UUID returnedBy, Instant returnedAt) {
+    public void recomputeStatusAfterReturn(UUID returnedBy, Instant returnedAt, String returnReason) {
         if (status != PrescriptionStatus.DISPENSED && status != PrescriptionStatus.PARTIALLY_DISPENSED) {
             throw new PrescriptionInvalidStatusException(
                     "Only dispensed or partially dispensed prescriptions can accept medication returns."
@@ -304,9 +304,13 @@ public class Prescription {
         Instant validatedReturnedAt = requireNonNull(returnedAt, "Return time is required.");
 
         boolean anyDispensed = items.stream().anyMatch(item -> item.getDispensedQuantity() > 0);
-        this.status = anyDispensed
-                ? PrescriptionStatus.PARTIALLY_DISPENSED
-                : PrescriptionStatus.PENDING_DISPENSE;
+        if (anyDispensed) {
+            this.status = PrescriptionStatus.PARTIALLY_DISPENSED;
+            this.cancelReason = null;
+        } else {
+            this.status = PrescriptionStatus.CANCELLED;
+            this.cancelReason = normalizeOptionalText(returnReason);
+        }
         this.updatedBy = validatedReturnedBy;
         this.updatedAt = validatedReturnedAt;
     }

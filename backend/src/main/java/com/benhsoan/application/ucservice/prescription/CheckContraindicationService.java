@@ -2,7 +2,6 @@ package com.benhsoan.application.ucservice.prescription;
 
 import java.time.LocalDate;
 import java.time.Period;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -19,6 +18,8 @@ import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChronicDisease;
+import com.benhsoan.domain.patient.PatientMinorPolicy;
+import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.enums.PregnancyStatus;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
@@ -99,7 +100,7 @@ public class CheckContraindicationService implements CheckContraindicationUseCas
                 ingredients
         );
 
-        LocalDate today = LocalDate.ofInstant(clockPort.now(), ZoneOffset.UTC);
+        LocalDate today = clockPort.now().atZone(PatientMinorPolicy.CLINICAL_TIMEZONE).toLocalDate();
         Integer patientAge = patient.getDateOfBirth() == null
                 ? null
                 : Period.between(patient.getDateOfBirth(), today).getYears();
@@ -157,6 +158,9 @@ public class CheckContraindicationService implements CheckContraindicationUseCas
                 }
             }
             case PREGNANCY -> {
+                if (patient.getGender() != Gender.FEMALE) {
+                    return;
+                }
                 if (patient.getPregnancyStatus() == null) {
                     missingData.add(new ContraindicationMissingDataResult(
                             medicine.getId(),
@@ -170,14 +174,6 @@ public class CheckContraindicationService implements CheckContraindicationUseCas
                 }
             }
             case DISEASE -> {
-                if (chronicDiseaseCatalogIds.isEmpty()) {
-                    missingData.add(new ContraindicationMissingDataResult(
-                            medicine.getId(),
-                            medicine.getMedicineName(),
-                            ContraindicationType.DISEASE,
-                            "Patient medical history has no recorded chronic diseases; disease contraindication cannot be evaluated."));
-                    return;
-                }
                 if (chronicDiseaseCatalogIds.contains(rule.getDiagnosisCatalogId())) {
                     warnings.add(toWarning(rule, medicine, patient.getId()));
                 }

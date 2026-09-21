@@ -115,10 +115,11 @@ Business rules:
 - Only `PHARMACIST`/`ADMIN`.
 - Only `DISPENSED` / `PARTIALLY_DISPENSED` prescriptions.
 - `quantity > 0` and `<= remaining returnable` (dispensed − already returned).
+- **Same-day rule:** the dispensing slip must have been created today (clinical timezone `Asia/Ho_Chi_Minh`); returns from a previous day are rejected.
 - Stock restored to the **original batch**; every return is audited (`medication_returns` + `stock_movements` + audit log).
 - Multiple partial returns are supported.
 - **Payment guard:** if the visit is paid (`RECORDED`/`SUCCESS`) and not refunded, the return is rejected with `409 MEDICATION_RETURN_PAYMENT_NOT_REFUNDED`. The refund flow (NCL-07-CN-004) must run first.
-- Resulting status: all items returned → `PENDING_DISPENSE`; some remaining → `PARTIALLY_DISPENSED`.
+- Resulting status: all items returned → `CANCELLED` (the dispensing slip is cancelled and must not re-enter the dispensing queue); some remaining → `PARTIALLY_DISPENSED`.
 
 ---
 
@@ -160,7 +161,9 @@ Check response:
 - `type` ∈ `AGE`, `PREGNANCY`, `DISEASE`.
 - `severity` ∈ `LOW`, `MODERATE`, `SEVERE`, `CONTRAINDICATED`.
 - `warnings` = matched contraindications; `missingData` = required patient info missing
-  (no date of birth, no pregnancy status, or no recorded chronic diseases). The frontend
+  (no date of birth for an age rule, or no pregnancy status for a female patient).
+  Pregnancy evaluation is not applicable to non-female patients, and an empty chronic
+  disease list is treated as "no matching disease" (not missing data). The frontend
   must distinguish these from a genuine "no warning" result (both lists empty).
 
 Pregnancy status request:
@@ -181,6 +184,8 @@ Prescription creation now requires `contraindicationOverrides` for every detecte
 }
 ```
 If a warning is not overridden, creation fails with `409 CONTRAINDICATION_CONFIRMATION_REQUIRED`.
+If required patient data is missing, creation fails with `422 CONTRAINDICATION_DATA_MISSING`
+(even when an override reason is supplied — an override never bypasses missing data).
 Overrides are recorded in `prescription_contraindication_warning_logs` (rule, type, severity,
 medicine, reason, actor, timestamp).
 

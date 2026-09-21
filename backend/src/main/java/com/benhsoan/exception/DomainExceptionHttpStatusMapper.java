@@ -165,7 +165,8 @@ final class DomainExceptionHttpStatusMapper {
                     VISIT_ALREADY_COMPLETED,
                     VISIT_INVALID_STATUS -> HttpStatus.CONFLICT;
             case BACKUP_EXECUTION_FAILED -> HttpStatus.INTERNAL_SERVER_ERROR;
-            case REPORT_DATA_EMPTY -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case REPORT_DATA_EMPTY,
+                    CONTRAINDICATION_DATA_MISSING -> HttpStatus.UNPROCESSABLE_ENTITY;
             case TOO_MANY_LOGIN_ATTEMPTS,
                     VERIFICATION_CODE_COOLDOWN -> HttpStatus.TOO_MANY_REQUESTS;
             default -> HttpStatus.BAD_REQUEST;

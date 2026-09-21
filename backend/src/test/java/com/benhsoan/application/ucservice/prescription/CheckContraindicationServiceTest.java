@@ -24,6 +24,7 @@ import com.benhsoan.domain.contraindication.enums.ContraindicationType;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientChronicDisease;
+import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.enums.PregnancyStatus;
 import com.benhsoan.port.dto.result.ContraindicationCheckResult;
 import com.benhsoan.port.outbound.repository.contraindication.ContraindicationRuleRepository;
@@ -154,7 +155,7 @@ class CheckContraindicationServiceTest {
     }
 
     @Test
-    void reportsMissingMedicalHistoryForDiseaseRule() {
+    void doesNotReportMissingDataWhenNoChronicDiseaseRecorded() {
         Patient patient = patient(LocalDate.of(1960, 1, 1), PregnancyStatus.NOT_PREGNANT);
         Medicine medicine = medicine("Ibuprofen");
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
@@ -166,8 +167,76 @@ class CheckContraindicationServiceTest {
         ContraindicationCheckResult result = service.checkByPatientId(patientId, List.of(medicineId));
 
         assertTrue(result.warnings().isEmpty());
-        assertEquals(1, result.missingData().size());
-        assertEquals(ContraindicationType.DISEASE, result.missingData().getFirst().type());
+        assertTrue(result.missingData().isEmpty());
+    }
+
+    @Test
+    void doesNotWarnForUnrelatedChronicDisease() {
+        Patient patient = patient(LocalDate.of(1960, 1, 1), PregnancyStatus.NOT_PREGNANT);
+        Medicine medicine = medicine("Ibuprofen");
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(patientChronicDiseaseRepository.findByPatientIdAndActiveTrue(patientId))
+                .thenReturn(List.of(PatientChronicDisease.create(patientId, UUID.randomUUID(), 2010, null, patientId, NOW)));
+        when(medicineRepository.findAllById(List.of(medicineId))).thenReturn(List.of(medicine));
+        when(ruleRepository.findActiveByMedicineIdsAndIngredients(
+                List.of(medicineId), List.of("Ibuprofen"))).thenReturn(List.of(diseaseRule(UUID.randomUUID())));
+
+        ContraindicationCheckResult result = service.checkByPatientId(patientId, List.of(medicineId));
+
+        assertTrue(result.warnings().isEmpty());
+        assertTrue(result.missingData().isEmpty());
+    }
+
+    @Test
+    void warnsWhenOneOfMultipleDiseasesMatchesRule() {
+        UUID matchingDiagnosis = UUID.randomUUID();
+        Patient patient = patient(LocalDate.of(1960, 1, 1), PregnancyStatus.NOT_PREGNANT);
+        Medicine medicine = medicine("Ibuprofen");
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(patientChronicDiseaseRepository.findByPatientIdAndActiveTrue(patientId))
+                .thenReturn(List.of(
+                        PatientChronicDisease.create(patientId, UUID.randomUUID(), 2005, null, patientId, NOW),
+                        PatientChronicDisease.create(patientId, matchingDiagnosis, 2010, null, patientId, NOW)));
+        when(medicineRepository.findAllById(List.of(medicineId))).thenReturn(List.of(medicine));
+        when(ruleRepository.findActiveByMedicineIdsAndIngredients(
+                List.of(medicineId), List.of("Ibuprofen"))).thenReturn(List.of(diseaseRule(matchingDiagnosis)));
+
+        ContraindicationCheckResult result = service.checkByPatientId(patientId, List.of(medicineId));
+
+        assertEquals(1, result.warnings().size());
+        assertEquals(ContraindicationType.DISEASE, result.warnings().getFirst().type());
+    }
+
+    @Test
+    void malePatientDoesNotTriggerPregnancyMissingDataOrWarning() {
+        Patient patient = patient(LocalDate.of(1990, 1, 1), null, Gender.MALE);
+        Medicine medicine = medicine("Ibuprofen");
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(patientChronicDiseaseRepository.findByPatientIdAndActiveTrue(patientId)).thenReturn(List.of());
+        when(medicineRepository.findAllById(List.of(medicineId))).thenReturn(List.of(medicine));
+        when(ruleRepository.findActiveByMedicineIdsAndIngredients(
+                List.of(medicineId), List.of("Ibuprofen"))).thenReturn(List.of(pregnancyRule()));
+
+        ContraindicationCheckResult result = service.checkByPatientId(patientId, List.of(medicineId));
+
+        assertTrue(result.warnings().isEmpty());
+        assertTrue(result.missingData().isEmpty());
+    }
+
+    @Test
+    void nonPregnantFemaleDoesNotTriggerPregnancyWarning() {
+        Patient patient = patient(LocalDate.of(1990, 1, 1), PregnancyStatus.NOT_PREGNANT, Gender.FEMALE);
+        Medicine medicine = medicine("Ibuprofen");
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(patientChronicDiseaseRepository.findByPatientIdAndActiveTrue(patientId)).thenReturn(List.of());
+        when(medicineRepository.findAllById(List.of(medicineId))).thenReturn(List.of(medicine));
+        when(ruleRepository.findActiveByMedicineIdsAndIngredients(
+                List.of(medicineId), List.of("Ibuprofen"))).thenReturn(List.of(pregnancyRule()));
+
+        ContraindicationCheckResult result = service.checkByPatientId(patientId, List.of(medicineId));
+
+        assertTrue(result.warnings().isEmpty());
+        assertTrue(result.missingData().isEmpty());
     }
 
     @Test
@@ -188,10 +257,15 @@ class CheckContraindicationServiceTest {
     }
 
     private Patient patient(LocalDate dateOfBirth, PregnancyStatus pregnancyStatus) {
+        return patient(dateOfBirth, pregnancyStatus, Gender.FEMALE);
+    }
+
+    private Patient patient(LocalDate dateOfBirth, PregnancyStatus pregnancyStatus, Gender gender) {
         Patient patient = mock(Patient.class);
         lenient().when(patient.getId()).thenReturn(patientId);
         lenient().when(patient.getDateOfBirth()).thenReturn(dateOfBirth);
         lenient().when(patient.getPregnancyStatus()).thenReturn(pregnancyStatus);
+        lenient().when(patient.getGender()).thenReturn(gender);
         return patient;
     }
 

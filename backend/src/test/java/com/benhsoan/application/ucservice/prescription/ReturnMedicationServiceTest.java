@@ -132,6 +132,7 @@ class ReturnMedicationServiceTest {
 
         verify(medicineBatchRepository)
                 .restoreStockQuantity(eq(BATCH_ID), eq(5), eq(BatchStatus.ACTIVE), eq(NOW));
+        verify(medicineRepository).updateStockQuantity(eq(MEDICINE_ID), eq(5));
         verify(medicationReturnRepository).save(any());
         verify(stockMovementRepository).saveAll(any());
 
@@ -221,6 +222,121 @@ class ReturnMedicationServiceTest {
                         List.of(new ReturnMedicationItemCommand(UUID.randomUUID(), 1)))));
     }
 
+    @Test
+    void fullReturnCancelsPrescriptionAndRestoresMedicineStock() {
+        UUID medicalRecordId = UUID.randomUUID();
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID dispenseItemId = UUID.randomUUID();
+
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 12);
+        Prescription prescription = prescription(prescriptionId, medicalRecordId,
+                PrescriptionStatus.DISPENSED, item);
+        PrescriptionDispenseItem dispenseItem = dispenseItem(
+                dispenseItemId, prescriptionId, itemId, BATCH_ID, 12);
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId))
+                .thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        MedicalRecord medicalRecord = mock(MedicalRecord.class);
+        when(medicalRecord.getVisitId()).thenReturn(UUID.randomUUID());
+        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.of(medicalRecord));
+        when(paymentRepository.findByVisitId(any())).thenReturn(Optional.empty());
+        when(dispenseItemRepository.findByPrescriptionId(prescriptionId))
+                .thenReturn(List.of(dispenseItem));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(medicine()));
+        when(medicineBatchRepository.findAllById(any())).thenReturn(List.of(batch()));
+
+        var result = service.returnMedication(new ReturnMedicationCommand(
+                prescriptionId,
+                "Patient refused medication",
+                List.of(new ReturnMedicationItemCommand(dispenseItemId, 12))));
+
+        assertEquals(PrescriptionStatus.CANCELLED, result.status());
+        assertEquals(0, item.getDispensedQuantity());
+        verify(medicineBatchRepository)
+                .restoreStockQuantity(eq(BATCH_ID), eq(12), eq(BatchStatus.ACTIVE), eq(NOW));
+        verify(medicineRepository).updateStockQuantity(eq(MEDICINE_ID), eq(12));
+    }
+
+    @Test
+    void rejectsReturnForDispenseSlipFromPreviousDay() {
+        UUID medicalRecordId = UUID.randomUUID();
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID dispenseItemId = UUID.randomUUID();
+
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 12);
+        Prescription prescription = prescription(prescriptionId, medicalRecordId,
+                PrescriptionStatus.DISPENSED, item);
+        PrescriptionDispenseItem previousDayDispense = PrescriptionDispenseItem.create(
+                dispenseItemId, prescriptionId, itemId, MEDICINE_ID, BATCH_ID,
+                12, ACTOR_ID, NOW.minusSeconds(86400));
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId))
+                .thenReturn(Optional.of(prescription));
+        MedicalRecord medicalRecord = mock(MedicalRecord.class);
+        when(medicalRecord.getVisitId()).thenReturn(UUID.randomUUID());
+        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.of(medicalRecord));
+        when(paymentRepository.findByVisitId(any())).thenReturn(Optional.empty());
+        when(dispenseItemRepository.findByPrescriptionId(prescriptionId))
+                .thenReturn(List.of(previousDayDispense));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(medicine()));
+        when(medicineBatchRepository.findAllById(any())).thenReturn(List.of(batch()));
+
+        assertThrows(ValidationException.class,
+                () -> service.returnMedication(new ReturnMedicationCommand(
+                        prescriptionId, "reason",
+                        List.of(new ReturnMedicationItemCommand(dispenseItemId, 1)))));
+
+        verify(medicineBatchRepository, never())
+                .restoreStockQuantity(any(), any(int.class), any(), any());
+        verify(medicineRepository, never()).updateStockQuantity(any(), any(int.class));
+    }
+
+    @Test
+    void aggregatesMedicineDeltaAcrossMultipleReturnItems() {
+        UUID medicalRecordId = UUID.randomUUID();
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID dispenseItemId1 = UUID.randomUUID();
+        UUID dispenseItemId2 = UUID.randomUUID();
+        UUID batchId2 = UUID.randomUUID();
+
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 12);
+        Prescription prescription = prescription(prescriptionId, medicalRecordId,
+                PrescriptionStatus.DISPENSED, item);
+        PrescriptionDispenseItem dispenseItem1 = dispenseItem(
+                dispenseItemId1, prescriptionId, itemId, BATCH_ID, 8);
+        PrescriptionDispenseItem dispenseItem2 = dispenseItem(
+                dispenseItemId2, prescriptionId, itemId, batchId2, 4);
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId))
+                .thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        MedicalRecord medicalRecord = mock(MedicalRecord.class);
+        when(medicalRecord.getVisitId()).thenReturn(UUID.randomUUID());
+        when(medicalRecordRepository.findById(medicalRecordId)).thenReturn(Optional.of(medicalRecord));
+        when(paymentRepository.findByVisitId(any())).thenReturn(Optional.empty());
+        when(dispenseItemRepository.findByPrescriptionId(prescriptionId))
+                .thenReturn(List.of(dispenseItem1, dispenseItem2));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(medicine()));
+        when(medicineBatchRepository.findAllById(any()))
+                .thenReturn(List.of(batch(), batch(batchId2)));
+
+        var result = service.returnMedication(new ReturnMedicationCommand(
+                prescriptionId, "reason",
+                List.of(
+                        new ReturnMedicationItemCommand(dispenseItemId1, 3),
+                        new ReturnMedicationItemCommand(dispenseItemId2, 4))));
+
+        assertEquals(PrescriptionStatus.PARTIALLY_DISPENSED, result.status());
+        verify(medicineRepository).updateStockQuantity(eq(MEDICINE_ID), eq(7));
+    }
+
     private Medicine medicine() {
         return Medicine.restore(
                 MEDICINE_ID, "MED-001", "Paracetamol", "Paracetamol", "500 mg",
@@ -229,8 +345,12 @@ class ReturnMedicationServiceTest {
     }
 
     private MedicineBatch batch() {
+        return batch(BATCH_ID);
+    }
+
+    private MedicineBatch batch(UUID id) {
         return MedicineBatch.restore(
-                BATCH_ID, MEDICINE_ID, "BATCH-A", LocalDate.of(2026, 12, 1),
+                id, MEDICINE_ID, "BATCH-" + id, LocalDate.of(2026, 12, 1),
                 20, BatchStatus.ACTIVE, NOW.minusSeconds(3600), null);
     }
 

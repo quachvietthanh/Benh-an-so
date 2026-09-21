@@ -51,9 +51,11 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.domain.patient.enums.AllergySeverity;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationMissingDataException;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
 import com.benhsoan.port.dto.result.ContraindicationWarningResult;
+import com.benhsoan.port.dto.result.ContraindicationMissingDataResult;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
@@ -389,6 +391,48 @@ class CreatePrescriptionServiceTest {
                 .build();
 
         assertThrows(PrescriptionContraindicationConfirmationRequiredException.class,
+                () -> service.create(command));
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsWhenContraindicationDataMissing() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(), List.of(new ContraindicationMissingDataResult(
+                        medicineId, "Paracetamol", ContraindicationType.PREGNANCY,
+                        "Patient pregnancy status is missing."))));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .build();
+
+        assertThrows(PrescriptionContraindicationMissingDataException.class,
+                () -> service.create(command));
+        verify(prescriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsMissingDataEvenWithAttemptedOverride() {
+        prepareValidCreate();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(new ContraindicationCheckResult(
+                List.of(), List.of(new ContraindicationMissingDataResult(
+                        medicineId, "Paracetamol", ContraindicationType.PREGNANCY,
+                        "Patient pregnancy status is missing."))));
+
+        CreatePrescriptionCommand command = CreatePrescriptionCommand.builder()
+                .medicalRecordId(medicalRecordId)
+                .note("Use after meals")
+                .items(List.of(item(medicineId)))
+                .contraindicationOverrides(List.of(new PrescriptionContraindicationOverrideCommand(
+                        UUID.randomUUID(), medicineId, "Clinical necessity")))
+                .build();
+
+        assertThrows(PrescriptionContraindicationMissingDataException.class,
                 () -> service.create(command));
         verify(prescriptionRepository, never()).save(any());
     }

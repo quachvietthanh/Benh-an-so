@@ -2,7 +2,6 @@ package com.benhsoan.application.ucservice.prescription;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -27,6 +26,7 @@ import com.benhsoan.domain.inventory.enums.StockMovementReferenceType;
 import com.benhsoan.domain.inventory.enums.StockMovementType;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.exception.MedicineNotFoundException;
+import com.benhsoan.domain.patient.PatientMinorPolicy;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
 import com.benhsoan.domain.prescription.PrescriptionItem;
@@ -81,7 +81,7 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
 
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
-        LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        LocalDate today = now.atZone(PatientMinorPolicy.CLINICAL_TIMEZONE).toLocalDate();
 
         Prescription prescription = prescriptionRepository.findByIdForUpdate(command.prescriptionId())
                 .orElseThrow(() -> new PrescriptionNotFoundException(command.prescriptionId()));

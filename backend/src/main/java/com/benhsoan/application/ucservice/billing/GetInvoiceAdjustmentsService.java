@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.billing.Invoice;
+import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.billing.exception.InvoiceNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.InvoiceAdjustmentsResult;
@@ -33,6 +34,10 @@ public class GetInvoiceAdjustmentsService implements GetInvoiceAdjustmentsUseCas
 
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new InvoiceNotFoundException(invoiceId));
+
+        if (invoice.getType() != InvoiceType.ORIGINAL) {
+            throw new ValidationException("Only original invoices have adjustment history.");
+        }
 
         List<InvoiceResult> adjustments = invoiceRepository
                 .findAdjustmentsByOriginalInvoiceId(invoiceId)

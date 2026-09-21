@@ -91,4 +91,10 @@ CREATE INDEX idx_presc_contra_warning_prescription
 -- recommendation) MUST come from an authoritative clinical source and be
 -- configured by an authorized business/clinical process. No clinical
 -- thresholds or medication/disease pairings are invented by this migration.
+--
+-- Configuration mechanism: the catalog is managed as controlled schema/config
+-- changes (Flyway migrations reviewed by a clinician), NOT through a runtime
+-- write API. A runtime management endpoint is deliberately out of scope until
+-- the product defines an authoritative rule catalog and a permission model for
+-- it; ordinary clinical users must not be able to modify these rules.
 -- =====================================================

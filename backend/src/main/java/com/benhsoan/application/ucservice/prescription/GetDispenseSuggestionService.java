@@ -2,7 +2,6 @@ package com.benhsoan.application.ucservice.prescription;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.inventory.MedicineBatch;
+import com.benhsoan.domain.patient.PatientMinorPolicy;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
@@ -57,7 +57,7 @@ public class GetDispenseSuggestionService implements GetDispenseSuggestionUseCas
         }
 
         Instant now = clockPort.now();
-        LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        LocalDate today = now.atZone(PatientMinorPolicy.CLINICAL_TIMEZONE).toLocalDate();
 
         List<DispenseSuggestionItemResult> items = new ArrayList<>();
         for (PrescriptionItem item : prescription.getItems()) {

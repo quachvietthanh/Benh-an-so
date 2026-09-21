@@ -26,6 +26,7 @@ import com.benhsoan.domain.prescription.PrescriptionAllergyWarningLog;
 import com.benhsoan.domain.prescription.PrescriptionContraindicationWarningLog;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationMissingDataException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -35,6 +36,7 @@ import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
+import com.benhsoan.port.dto.result.ContraindicationCheckResult;
 import com.benhsoan.port.dto.result.ContraindicationWarningResult;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
@@ -136,10 +138,14 @@ public class CreatePrescriptionService
         );
 
         // Detect contraindication warnings by age, pregnancy and chronic disease
-        // (QTN-34, NCL-05-CN-006). Block completion unless every warning is overridden.
-        List<ContraindicationWarningResult> contraindicationWarnings = checkContraindicationUseCase
-                .check(command.medicalRecordId(), List.copyOf(medicines.keySet()))
-                .warnings();
+        // (QTN-34, NCL-05-CN-006). Block completion unless every warning is overridden,
+        // and reject creation when required patient data is missing (TC-05).
+        ContraindicationCheckResult contraindicationCheck = checkContraindicationUseCase
+                .check(command.medicalRecordId(), List.copyOf(medicines.keySet()));
+        List<ContraindicationWarningResult> contraindicationWarnings = contraindicationCheck.warnings();
+        if (!contraindicationCheck.missingData().isEmpty()) {
+            throw new PrescriptionContraindicationMissingDataException();
+        }
         Map<ContraKey, String> contraindicationOverrideReasons = validateContraindicationOverrides(
                 contraindicationWarnings,
                 command.contraindicationOverrides()

@@ -2,7 +2,6 @@ package com.benhsoan.application.ucservice.prescription;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +26,7 @@ import com.benhsoan.domain.inventory.enums.StockMovementReferenceType;
 import com.benhsoan.domain.inventory.enums.StockMovementType;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
+import com.benhsoan.domain.patient.PatientMinorPolicy;
 import com.benhsoan.domain.prescription.MedicationReturn;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
@@ -78,7 +78,7 @@ public class ReturnMedicationService implements ReturnMedicationUseCase {
 
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
-        LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        LocalDate today = now.atZone(PatientMinorPolicy.CLINICAL_TIMEZONE).toLocalDate();
 
         Prescription prescription = prescriptionRepository.findByIdForUpdate(command.prescriptionId())
                 .orElseThrow(() -> new PrescriptionNotFoundException(command.prescriptionId()));
@@ -105,6 +105,7 @@ public class ReturnMedicationService implements ReturnMedicationUseCase {
         List<MedicationReturn> returns = new ArrayList<>();
         List<StockMovement> stockMovements = new ArrayList<>();
         Map<UUID, Integer> returnedByPrescriptionItem = new HashMap<>();
+        Map<UUID, Integer> medicineDeltas = new HashMap<>();
         List<ReturnedMedicationItemResult> returnResults = new ArrayList<>();
 
         for (ReturnMedicationItemCommand itemCommand : command.items()) {
@@ -123,6 +124,15 @@ public class ReturnMedicationService implements ReturnMedicationUseCase {
                         "Medicine batch not found: " + dispenseItem.getMedicineBatchId());
             }
 
+            if (dispenseItem.getDispensedAt() == null
+                    || !dispenseItem.getDispensedAt()
+                            .atZone(PatientMinorPolicy.CLINICAL_TIMEZONE)
+                            .toLocalDate()
+                            .equals(today)) {
+                throw new ValidationException(
+                        "The dispensing slip was not created today and cannot be returned.");
+            }
+
             dispenseItem.recordReturn(itemCommand.quantity());
 
             int quantityBefore = batch.getQuantity();
@@ -131,6 +141,7 @@ public class ReturnMedicationService implements ReturnMedicationUseCase {
                     : BatchStatus.ACTIVE;
             medicineBatchRepository.restoreStockQuantity(
                     batch.getId(), itemCommand.quantity(), targetStatus, now);
+            medicineDeltas.merge(dispenseItem.getMedicineId(), itemCommand.quantity(), Integer::sum);
 
             UUID returnId = UUID.randomUUID();
             returns.add(MedicationReturn.create(
@@ -175,6 +186,7 @@ public class ReturnMedicationService implements ReturnMedicationUseCase {
                     dispenseItem.getRemainingReturnableQuantity()));
         }
 
+        medicineDeltas.forEach(medicineRepository::updateStockQuantity);
 
         for (PrescriptionItem item : prescription.getItems()) {
             Integer returned = returnedByPrescriptionItem.get(item.getId());
@@ -182,7 +194,7 @@ public class ReturnMedicationService implements ReturnMedicationUseCase {
                 item.recordReturn(returned);
             }
         }
-        prescription.recomputeStatusAfterReturn(actorId, now);
+        prescription.recomputeStatusAfterReturn(actorId, now, reason);
 
         Prescription saved = prescriptionRepository.save(prescription);
         dispenseItemRepository.saveAll(dispenseItems);

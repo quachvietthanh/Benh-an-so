@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.billing;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,4 +14,6 @@ public interface JpaInvoiceLineRepository
     void deleteAllByInvoiceId(UUID invoiceId);
 
     List<InvoiceLineEntity> findByInvoiceIdOrderByCreatedAtAsc(UUID invoiceId);
+
+    List<InvoiceLineEntity> findByInvoiceIdInOrderByCreatedAtAsc(Collection<UUID> invoiceIds);
 }

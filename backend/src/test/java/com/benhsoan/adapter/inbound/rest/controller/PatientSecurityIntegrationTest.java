@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -30,6 +31,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.PatientRestMapper;
 import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.patient.enums.PregnancyStatus;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
@@ -192,5 +194,23 @@ class PatientSecurityIntegrationTest {
                 Gender.MALE, "0909000001", null, "HCM", null, null, null, null, null, true,
                 Instant.parse("2026-08-12T02:00:00Z"), Instant.parse("2026-08-12T02:00:00Z"),
                 true, Instant.parse("2026-08-12T02:00:00Z"), "v1.0", false, null, null, false);
+    }
+
+    @Test
+    void pregnancyStatusRequiresPatientUpdatePermission() throws Exception {
+        PatientResult patient = patient();
+        when(updatePatientPregnancyStatusUseCase.update(any(), any())).thenReturn(patient);
+
+        String body = "{\"pregnancyStatus\":\"" + PregnancyStatus.PREGNANT.name() + "\"}";
+
+        mockMvc.perform(patch("/patients/{patientId}/pregnancy-status", patient.id())
+                        .contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_UPDATE"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/patients/{patientId}/pregnancy-status", patient.id())
+                        .contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
+                .andExpect(status().isForbidden());
     }
 }

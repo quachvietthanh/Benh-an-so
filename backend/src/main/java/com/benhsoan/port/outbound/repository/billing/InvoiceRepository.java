@@ -14,6 +14,8 @@ public interface InvoiceRepository {
 
     Invoice save(Invoice invoice);
 
+    void updateReprintMetadata(UUID invoiceId, int reprintCount, Instant lastReprintedAt);
+
     Optional<Invoice> findById(UUID id);
 
     Optional<Invoice> findOriginalByVisitId(UUID visitId);

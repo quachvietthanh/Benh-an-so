@@ -36,6 +36,7 @@ import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
+import com.benhsoan.port.dto.result.InvoiceAdjustmentsResult;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
@@ -373,5 +374,41 @@ class InvoiceSecurityIntegrationTest {
                             .content(body))
                     .andExpect(status().isForbidden());
         }
+    }
+
+    @Test
+    void reprintRequiresInvoiceReadPermission() throws Exception {
+        UUID invoiceId = UUID.fromString("23100000-0000-0000-0000-000000000001");
+        when(recordInvoiceReprintUseCase.recordReprint(invoiceId)).thenReturn(new InvoiceResult(
+                invoiceId, "HD000001", UUID.randomUUID(), UUID.randomUUID(), InvoiceType.ORIGINAL,
+                null, null, new BigDecimal("100000"), UUID.randomUUID(),
+                Instant.parse("2026-08-12T02:00:00Z"), 1, Instant.parse("2026-08-12T03:00:00Z"), List.of()));
+
+        mockMvc.perform(post("/invoices/{invoiceId}/reprint", invoiceId)
+                        .with(user("receptionist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/invoices/{invoiceId}/reprint", invoiceId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE_STATUS"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getAdjustmentsRequiresInvoiceReadPermission() throws Exception {
+        UUID invoiceId = UUID.fromString("23100000-0000-0000-0000-000000000001");
+        when(getInvoiceAdjustmentsUseCase.getAdjustments(invoiceId)).thenReturn(new InvoiceAdjustmentsResult(
+                invoiceId, new BigDecimal("250000"), new BigDecimal("230000"), List.of()));
+
+        mockMvc.perform(get("/invoices/{invoiceId}/adjustments", invoiceId)
+                        .with(user("manager").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_INVOICE_READ"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/invoices/{invoiceId}/adjustments", invoiceId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE_STATUS"))))
+                .andExpect(status().isForbidden());
     }
 }

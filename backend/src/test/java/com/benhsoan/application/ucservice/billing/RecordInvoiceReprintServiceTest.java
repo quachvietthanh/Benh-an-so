@@ -3,6 +3,8 @@ package com.benhsoan.application.ucservice.billing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -68,6 +70,9 @@ class RecordInvoiceReprintServiceTest {
         assertEquals(ResourceType.INVOICE, auditLog.getResourceType());
         assertEquals(invoice.getId(), auditLog.getResourceId());
         assertEquals(NOW, auditLog.getCreatedAt());
+
+        verify(invoiceRepository, never()).save(any(Invoice.class));
+        verify(invoiceRepository).updateReprintMetadata(invoice.getId(), 1, NOW);
     }
 
     @Test
@@ -98,7 +103,8 @@ class RecordInvoiceReprintServiceTest {
     void doesNotWriteAuditWhenPersistenceFails() {
         Invoice invoice = invoice(0, null);
         when(invoiceRepository.findById(invoice.getId())).thenReturn(Optional.of(invoice));
-        when(invoiceRepository.save(any(Invoice.class))).thenThrow(new RuntimeException("db error"));
+        doThrow(new RuntimeException("db error"))
+                .when(invoiceRepository).updateReprintMetadata(any(), anyInt(), any());
 
         assertThrows(RuntimeException.class, () -> service.recordReprint(invoice.getId()));
 
@@ -107,8 +113,6 @@ class RecordInvoiceReprintServiceTest {
 
     private void stubPersistence(Invoice invoice) {
         when(invoiceRepository.findById(invoice.getId())).thenReturn(Optional.of(invoice));
-        when(invoiceRepository.save(any(Invoice.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private AuditLog capturedAuditLog() {

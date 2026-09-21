@@ -2,7 +2,9 @@ package com.benhsoan.application.ucservice.prescription;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -93,6 +95,31 @@ class GetDispenseSuggestionServiceTest {
     @Test
     void rejectsMissingPrescriptionId() {
         assertThrows(ValidationException.class, () -> service.getSuggestion(null));
+    }
+
+    @Test
+    void usesClinicalTimezoneDateWhenUtcDateDiffers() {
+        when(clockPort.now()).thenReturn(Instant.parse("2026-08-20T17:30:00Z"));
+
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = PrescriptionItem.restore(
+                itemId, prescriptionId, MEDICINE_ID, "Paracetamol", "Paracetamol",
+                "500 mg", "vien", "1 vien", 2, AdministrationRoute.ORAL, 5,
+                20, 0, null, NOW, null);
+        Prescription prescription = Prescription.restore(
+                prescriptionId, "RX-001", UUID.randomUUID(), PrescriptionStatus.PENDING_DISPENSE,
+                "note", null, UUID.randomUUID(), NOW, null, null,
+                InterconnectionStatus.NOT_SENT, null, null, null, List.of(item));
+
+        when(prescriptionRepository.findById(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(medicineBatchRepository.findAvailableByMedicineId(eq(MEDICINE_ID), eq(LocalDate.of(2026, 8, 21))))
+                .thenReturn(List.of());
+
+        service.getSuggestion(prescriptionId);
+
+        verify(medicineBatchRepository)
+                .findAvailableByMedicineId(MEDICINE_ID, LocalDate.of(2026, 8, 21));
     }
 
     private MedicineBatch batch(UUID id, String batchNumber, LocalDate expiryDate, int quantity) {
