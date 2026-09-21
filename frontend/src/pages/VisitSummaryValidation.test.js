@@ -4,10 +4,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { getNavigationItems } from '../components/layout/navigationConfig.js'
+import { getNavigationItems, navigationSections } from '../components/layout/navigationConfig.js'
 import visitSummaryApi from '../api/visitSummaryApi.js'
 import axiosClient from '../api/axiosClient.js'
 import {
+  isMedicalRecordSigned,
   isMedicalRecordSignedForSummary,
   formatDateVi,
   formatDateTimeVi,
@@ -23,63 +24,60 @@ const __dirname = path.dirname(__filename)
 // NCL-04-CN-011: In phiếu tóm tắt lượt khám cho bệnh nhân
 // ==============================================================================
 
-test('NCL-04-CN-011 / QTN-01: Phân quyền truy cập menu In phiếu tóm tắt lượt khám', () => {
-  // DOCTOR with VISIT_SUMMARY_PRINT should see the menu
-  const doctorItems = getNavigationItems({
-    roles: ['doctor'],
-    permissions: ['VISIT_SUMMARY_PRINT'],
-  })
+test('NCL-04-CN-011 / QTN-01: Phân quyền truy cập menu In phiếu tóm tắt lượt khám (Lễ tân, Bác sĩ, Admin)', () => {
+  // 1. RECEPTIONIST: Lễ tân có menu Phiếu tóm tắt lượt khám trong nhóm Tiếp nhận & Chăm sóc (/visit-summaries)
+  const receptionistItems = getNavigationItems(['ROLE_RECEPTIONIST'], ['PATIENT_READ', 'APPOINTMENT_READ'])
+  const hasSummaryMenuRecep = receptionistItems.some(
+    (item) => item.key === '/visit-summaries' || item.key === '/medical-records/visit-summaries'
+  )
+  assert.strictEqual(
+    hasSummaryMenuRecep,
+    true,
+    'Lễ tân (RECEPTIONIST) phải nhìn thấy menu In phiếu tóm tắt lượt khám'
+  )
+
+  const receptionSection = navigationSections.find((s) => s.key === 'reception')
+  assert.ok(
+    receptionSection && receptionSection.paths.includes('/visit-summaries'),
+    'Nhóm Tiếp nhận & Chăm sóc (reception) phải chứa đường dẫn /visit-summaries cho Lễ tân'
+  )
+
+  // 2. DOCTOR: Bác sĩ có menu Phiếu tóm tắt lượt khám trong nhóm Khám bệnh (/medical-records/visit-summaries)
+  const doctorItems = getNavigationItems(['ROLE_DOCTOR'], ['MEDICAL_RECORD_READ'])
   const hasSummaryMenuDoctor = doctorItems.some(
     (item) => item.key === '/medical-records/visit-summaries'
   )
   assert.strictEqual(
     hasSummaryMenuDoctor,
     true,
-    'Bác sĩ có quyền VISIT_SUMMARY_PRINT phải nhìn thấy menu In phiếu tóm tắt'
+    'Bác sĩ (DOCTOR) phải nhìn thấy menu In phiếu tóm tắt tại /medical-records/visit-summaries'
   )
 
-  // RECEPTIONIST with VISIT_SUMMARY_PRINT should see the menu
-  const receptionistItems = getNavigationItems({
-    roles: ['receptionist'],
-    permissions: ['VISIT_SUMMARY_PRINT'],
-  })
-  const hasSummaryMenuRecep = receptionistItems.some(
-    (item) => item.key === '/medical-records/visit-summaries'
-  )
-  assert.strictEqual(
-    hasSummaryMenuRecep,
-    true,
-    'Lễ tân có quyền VISIT_SUMMARY_PRINT phải nhìn thấy menu In phiếu tóm tắt'
+  const examSection = navigationSections.find((s) => s.key === 'examination')
+  assert.ok(
+    examSection && examSection.paths.includes('/medical-records/visit-summaries'),
+    'Nhóm Khám bệnh (examination) phải chứa đường dẫn /medical-records/visit-summaries cho Bác sĩ'
   )
 
-  // ADMIN should see the menu
-  const adminItems = getNavigationItems({
-    roles: ['admin'],
-    permissions: ['VISIT_SUMMARY_PRINT'],
-  })
+  // 3. ADMIN: Quản trị viên có toàn quyền truy cập menu
+  const adminItems = getNavigationItems(['ROLE_ADMIN'], [])
   assert.strictEqual(
     adminItems.some((item) => item.key === '/medical-records/visit-summaries'),
     true,
     'Quản trị viên (ADMIN) phải nhìn thấy menu In phiếu tóm tắt'
   )
 
-  // Non-authorized roles (PATIENT, PHARMACIST without permission) should NOT see it
-  const patientItems = getNavigationItems({
-    roles: ['patient'],
-    permissions: [],
-  })
+  // 4. Đối tượng không có quyền (PATIENT, PHARMACIST không có VISIT_SUMMARY_PRINT) không thấy menu
+  const patientItems = getNavigationItems(['ROLE_PATIENT'], [])
   assert.strictEqual(
-    patientItems.some((item) => item.key === '/medical-records/visit-summaries'),
+    patientItems.some((item) => item.key === '/medical-records/visit-summaries' || item.key === '/visit-summaries'),
     false,
     'Bệnh nhân không được nhìn thấy menu In phiếu tóm tắt lượt khám'
   )
 
-  const pharmacistItems = getNavigationItems({
-    roles: ['pharmacist'],
-    permissions: ['PRESCRIPTION_DISPENSE'],
-  })
+  const pharmacistItems = getNavigationItems(['ROLE_PHARMACIST'], ['PHARMACY_READ'])
   assert.strictEqual(
-    pharmacistItems.some((item) => item.key === '/medical-records/visit-summaries'),
+    pharmacistItems.some((item) => item.key === '/medical-records/visit-summaries' || item.key === '/visit-summaries'),
     false,
     'Dược sĩ không có quyền VISIT_SUMMARY_PRINT thì không thấy menu In phiếu tóm tắt'
   )
@@ -190,6 +188,19 @@ test('NCL-04-CN-011-TC-01: Luồng thành công - Xem trước và in phiếu t�
     assert.strictEqual(res.data.revisitDate, '2026-10-21', 'Phải có mốc tái khám')
     assert.strictEqual(res.data.digitalSignature.isSigned, true, 'Phải có chữ ký số xác nhận')
 
+    // Verify recordPrintAudit endpoint for audit logging before printing (Blocker 3)
+    let capturedPrintAuditUrl = ''
+    axiosClient.get = async (url, config) => {
+      capturedPrintAuditUrl = url
+      return { data: new Uint8Array([1, 2, 3]) }
+    }
+    await visitSummaryApi.recordPrintAudit('visit-uuid-101')
+    assert.strictEqual(
+      capturedPrintAuditUrl,
+      '/visits/visit-uuid-101/summary/print',
+      'API recordPrintAudit phải gọi /visits/{visitId}/summary/print để ghi nhận lịch sử in vào Backend'
+    )
+
     // Verify PDF download endpoint
     let capturedPdfUrl = ''
     axiosClient.get = async (url, config) => {
@@ -204,18 +215,19 @@ test('NCL-04-CN-011-TC-01: Luồng thành công - Xem trước và in phiếu t�
 })
 
 test('NCL-04-CN-011-TC-02: Bệnh án chưa ký số - Hệ thống từ chối và nhắc nhở ký', () => {
-  // Helper isMedicalRecordSignedForSummary checks valid signed statuses
+  // Helper isMedicalRecordSigned và isMedicalRecordSignedForSummary kiểm tra các trạng thái ký hợp lệ
+  assert.strictEqual(isMedicalRecordSigned('SIGNED'), true)
+  assert.strictEqual(isMedicalRecordSigned('LOCKED'), true)
+  assert.strictEqual(isMedicalRecordSigned('ARCHIVED'), true)
   assert.strictEqual(isMedicalRecordSignedForSummary('SIGNED'), true)
-  assert.strictEqual(isMedicalRecordSignedForSummary('LOCKED'), true)
-  assert.strictEqual(isMedicalRecordSignedForSummary('ARCHIVED'), true)
 
   // Unsigned statuses must return false
-  assert.strictEqual(isMedicalRecordSignedForSummary('DRAFT'), false)
-  assert.strictEqual(isMedicalRecordSignedForSummary('IN_PROGRESS'), false)
-  assert.strictEqual(isMedicalRecordSignedForSummary('PENDING_REVIEW'), false)
-  assert.strictEqual(isMedicalRecordSignedForSummary(null), false)
-  assert.strictEqual(isMedicalRecordSignedForSummary(undefined), false)
-  assert.strictEqual(isMedicalRecordSignedForSummary(''), false)
+  assert.strictEqual(isMedicalRecordSigned('DRAFT'), false)
+  assert.strictEqual(isMedicalRecordSigned('IN_PROGRESS'), false)
+  assert.strictEqual(isMedicalRecordSigned('PENDING_REVIEW'), false)
+  assert.strictEqual(isMedicalRecordSigned(null), false)
+  assert.strictEqual(isMedicalRecordSigned(undefined), false)
+  assert.strictEqual(isMedicalRecordSigned(''), false)
 })
 
 test('NCL-04-CN-011-TC-03: Lưu vết lịch sử in phiếu tóm tắt lượt khám', () => {

@@ -37,16 +37,18 @@ import visitSummaryApi from '../api/visitSummaryApi.js'
 import patientApi from '../api/patientApi.js'
 import VisitSummaryPrintModal from '../components/clinical/VisitSummaryPrintModal.jsx'
 import { useAuthContext } from '../context/AuthContext.jsx'
+import queueApi from '../api/queueApi.js'
+import axiosClient from '../api/axiosClient.js'
+import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers.js'
 import {
   calculateAgeFromDob,
   formatDateTimeVi,
   formatDateVi,
   formatGenderVi,
   getRecordStatusBadge,
-  isMedicalRecordSignedForSummary,
 } from '../utils/visitSummaryHelpers.js'
 import { getApiErrorMessage } from '../utils/apiError.js'
-import '../styles/specialtyManagement.css'
+import '../styles/visitSummaryPrint.css'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -86,72 +88,154 @@ export default function VisitSummaryManagementPage() {
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [downloadingId, setDownloadingId] = useState(null)
 
-  // Nạp danh sách lượt khám từ hệ thống
+  // Nạp danh sách lượt khám trực tiếp từ Backend (không lặp N+1, không dùng slice giả lập)
   const fetchVisits = useCallback(async () => {
     setLoading(true)
     try {
-      // Lấy danh sách bệnh nhân và lịch sử khám bệnh tương ứng
-      const patientsRes = await patientApi.getAll({ page: 0, size: 50 })
-      const patientList = Array.isArray(patientsRes.data?.content)
-        ? patientsRes.data.content
-        : Array.isArray(patientsRes.data)
-        ? patientsRes.data
-        : []
+      const targetDate = dateRange && dateRange[0]
+        ? dateRange[0].format('YYYY-MM-DD')
+        : dayjs().format('YYYY-MM-DD')
 
-      const allVisits = []
-      // Thu thập các lượt khám của bệnh nhân
-      await Promise.all(
-        patientList.slice(0, 15).map(async (patient) => {
-          try {
-            const histRes = await patientApi.getHistory(patient.id, { page: 0, size: 10 })
-            const histItems = Array.isArray(histRes.data?.content)
-              ? histRes.data.content
-              : Array.isArray(histRes.data)
-              ? histRes.data
-              : []
+      const allVisitsMap = new Map()
 
-            histItems.forEach((item) => {
-              allVisits.push({
-                visitId: item.visitId || item.id,
-                visitCode: item.visitCode || `KB-${(item.visitId || item.id || '').slice(0, 8)}`,
-                visitAt: item.visitAt || item.createdAt || new Date().toISOString(),
-                patient: {
-                  id: patient.id,
-                  patientCode: patient.patientCode || 'BN-0000',
-                  fullName: patient.fullName || patient.name,
-                  dateOfBirth: patient.dateOfBirth,
-                  gender: patient.gender,
-                  phone: patient.phone,
-                },
-                doctor: {
-                  id: item.doctorId,
-                  fullName: item.doctorName || item.doctorFullName || 'Bác sĩ phụ trách',
-                },
-                medicalRecord: {
-                  id: item.medicalRecordId,
-                  status: item.medicalRecordStatus || (item.signedAt ? 'SIGNED' : 'IN_PROGRESS'),
-                  signedAt: item.signedAt,
-                  signedByName: item.signedByName || item.doctorName,
-                },
-                primaryDiagnosis: item.primaryDiagnosis || item.diagnosis || 'Viêm đường hô hấp trên',
-                diagnosisCode: item.diagnosisCode || 'J06.9',
-              })
+      // 1. Tải lượt khám trong ngày từ hàng đợi tiếp nhận & khám bệnh (hỗ trợ cả lễ tân và bác sĩ)
+      const [queueRes, payableRes] = await Promise.allSettled([
+        queueApi.getQueues({ date: targetDate }),
+        axiosClient.get('/invoices/payable', { params: { page: 0, size: 50 } }),
+      ])
+
+      if (queueRes.status === 'fulfilled' && Array.isArray(queueRes.value?.data)) {
+        queueRes.value.data.forEach((item) => {
+          if (item.visitId) {
+            allVisitsMap.set(String(item.visitId), {
+              visitId: item.visitId,
+              visitCode: item.visitCode || `KB-${String(item.visitId).slice(0, 8).toUpperCase()}`,
+              visitAt: item.completedAt || item.calledAt || item.checkedInAt || new Date().toISOString(),
+              patient: {
+                id: item.patientId,
+                patientCode: item.patientCode || 'BN-0000',
+                fullName: item.patientName || 'Bệnh nhân',
+                dateOfBirth: item.patientDob,
+                gender: item.patientGender,
+                phone: item.patientPhone,
+              },
+              doctor: {
+                id: item.doctorId,
+                fullName: item.doctorName || 'Bác sĩ phụ trách',
+              },
+              medicalRecord: {
+                status: item.status === 'COMPLETED' ? 'SIGNED' : (item.medicalRecordStatus || 'IN_PROGRESS'),
+                signedAt: item.completedAt,
+                signedByName: item.doctorName,
+              },
+              primaryDiagnosis: item.primaryDiagnosis || '',
+              diagnosisCode: item.diagnosisCode || '',
             })
-          } catch {
-            // bỏ qua lỗi tải lịch sử từng bệnh nhân
           }
         })
-      )
+      }
 
-      // Sắp xếp theo ngày khám mới nhất
-      allVisits.sort((a, b) => dayjs(b.visitAt).valueOf() - dayjs(a.visitAt).valueOf())
-      setVisits(allVisits)
+      // 2. Tải lượt khám đã hoàn tất ca khám có thể thanh toán / in phiếu
+      if (payableRes.status === 'fulfilled') {
+        const payableList = Array.isArray(payableRes.value?.data?.content)
+          ? payableRes.value.data.content
+          : Array.isArray(payableRes.value?.data)
+          ? payableRes.value.data
+          : []
+        payableList.forEach((item) => {
+          if (item.visitId && !allVisitsMap.has(String(item.visitId))) {
+            allVisitsMap.set(String(item.visitId), {
+              visitId: item.visitId,
+              visitCode: item.visitCode || `KB-${String(item.visitId).slice(0, 8).toUpperCase()}`,
+              visitAt: item.completedAt || new Date().toISOString(),
+              patient: {
+                id: item.patientId,
+                patientCode: item.patientCode || 'BN-0000',
+                fullName: item.patientName || 'Bệnh nhân',
+              },
+              doctor: {
+                fullName: item.doctorName || 'Bác sĩ phụ trách',
+              },
+              medicalRecord: {
+                status: 'SIGNED',
+                signedAt: item.completedAt,
+              },
+              primaryDiagnosis: item.reason || '',
+              diagnosisCode: '',
+            })
+          }
+        })
+      }
+
+      // 3. Nếu người dùng nhập từ khóa tìm kiếm bệnh nhân, tra cứu trực tiếp hồ sơ phù hợp
+      if (keyword.trim()) {
+        try {
+          const patientSearchRes = await patientApi.getAll({ keyword: keyword.trim(), page: 0, size: 5 })
+          const matchedPatients = Array.isArray(patientSearchRes.data?.content)
+            ? patientSearchRes.data.content
+            : Array.isArray(patientSearchRes.data)
+            ? patientSearchRes.data
+            : []
+
+          if (matchedPatients.length > 0) {
+            const histResponses = await Promise.allSettled(
+              matchedPatients.map((p) => patientApi.getHistory(p.id, { page: 0, size: 10 }))
+            )
+            histResponses.forEach((hr, idx) => {
+              if (hr.status === 'fulfilled') {
+                const histItems = Array.isArray(hr.value?.data?.content)
+                  ? hr.value.data.content
+                  : Array.isArray(hr.value?.data)
+                  ? hr.value.data
+                  : []
+                const p = matchedPatients[idx]
+                histItems.forEach((h) => {
+                  const vId = h.visitId || h.id
+                  if (vId) {
+                    allVisitsMap.set(String(vId), {
+                      visitId: vId,
+                      visitCode: h.visitCode || `KB-${String(vId).slice(0, 8).toUpperCase()}`,
+                      visitAt: h.visitAt || h.createdAt || new Date().toISOString(),
+                      patient: {
+                        id: p.id,
+                        patientCode: p.patientCode || 'BN-0000',
+                        fullName: p.fullName || p.name,
+                        dateOfBirth: p.dateOfBirth,
+                        gender: p.gender,
+                        phone: p.phone,
+                      },
+                      doctor: {
+                        id: h.doctorId,
+                        fullName: h.doctorName || h.doctorFullName || 'Bác sĩ phụ trách',
+                      },
+                      medicalRecord: {
+                        id: h.medicalRecordId,
+                        status: h.medicalRecordStatus || (h.signedAt ? 'SIGNED' : 'IN_PROGRESS'),
+                        signedAt: h.signedAt,
+                        signedByName: h.signedByName || h.doctorName,
+                      },
+                      primaryDiagnosis: h.primaryDiagnosis || h.diagnosis || '',
+                      diagnosisCode: h.diagnosisCode || '',
+                    })
+                  }
+                })
+              }
+            })
+          }
+        } catch {
+          // Bỏ qua lỗi tra cứu phụ
+        }
+      }
+
+      const visitsList = Array.from(allVisitsMap.values())
+      visitsList.sort((a, b) => dayjs(b.visitAt).valueOf() - dayjs(a.visitAt).valueOf())
+      setVisits(visitsList)
     } catch (err) {
       message.error(getApiErrorMessage(err, 'Không thể nạp danh sách lượt khám.'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [dateRange, keyword])
 
   useEffect(() => {
     fetchVisits()
@@ -173,7 +257,7 @@ export default function VisitSummaryManagementPage() {
       }
 
       // Lọc trạng thái bệnh án
-      const isSigned = isMedicalRecordSignedForSummary(v.medicalRecord)
+      const isSigned = isMedicalRecordSigned(v.medicalRecord)
       if (statusFilter === 'SIGNED' && !isSigned) return false
       if (statusFilter === 'UNSIGNED' && isSigned) return false
 
@@ -194,7 +278,7 @@ export default function VisitSummaryManagementPage() {
   // Thống kê KPI toàn hệ thống
   const stats = useMemo(() => {
     const total = visits.length
-    const signedCount = visits.filter((v) => isMedicalRecordSignedForSummary(v.medicalRecord)).length
+    const signedCount = visits.filter((v) => isMedicalRecordSigned(v.medicalRecord)).length
     const unsignedCount = total - signedCount
     return { total, signedCount, unsignedCount }
   }, [visits])
@@ -213,7 +297,7 @@ export default function VisitSummaryManagementPage() {
 
   // Mở modal in phiếu tóm tắt
   const handleOpenPrintModal = (visit) => {
-    const isSigned = isMedicalRecordSignedForSummary(visit.medicalRecord)
+    const isSigned = isMedicalRecordSigned(visit.medicalRecord)
     if (!isSigned) {
       message.warning(
         'Bệnh án của lượt khám chưa được ký. Vui lòng ký bệnh án trước khi in phiếu tóm tắt.'
@@ -226,7 +310,7 @@ export default function VisitSummaryManagementPage() {
 
   // Tải trực tiếp file PDF
   const handleDownloadDirectPdf = async (visit) => {
-    const isSigned = isMedicalRecordSignedForSummary(visit.medicalRecord)
+    const isSigned = isMedicalRecordSigned(visit.medicalRecord)
     if (!isSigned) {
       message.warning(
         'Bệnh án của lượt khám chưa được ký. Không thể xuất tệp PDF phiếu tóm tắt.'
@@ -335,16 +419,23 @@ export default function VisitSummaryManagementPage() {
       title: 'Chẩn đoán chính',
       key: 'diagnosis',
       ellipsis: true,
-      render: (_, record) => (
-        <Tooltip title={record.primaryDiagnosis}>
-          <span>
-            <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-              {record.diagnosisCode || 'ICD-10'}
-            </Tag>
-            <span style={{ fontWeight: 500 }}>{record.primaryDiagnosis || '---'}</span>
-          </span>
-        </Tooltip>
-      ),
+      render: (_, record) => {
+        if (!record.primaryDiagnosis && !record.diagnosisCode) {
+          return <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa ghi nhận</span>
+        }
+        return (
+          <Tooltip title={record.primaryDiagnosis || record.diagnosisCode}>
+            <span>
+              {record.diagnosisCode && (
+                <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                  {record.diagnosisCode}
+                </Tag>
+              )}
+              <span style={{ fontWeight: 500 }}>{record.primaryDiagnosis || ''}</span>
+            </span>
+          </Tooltip>
+        )
+      },
     },
     {
       title: 'Thao tác',
@@ -353,7 +444,7 @@ export default function VisitSummaryManagementPage() {
       align: 'center',
       fixed: 'right',
       render: (_, record) => {
-        const isSigned = isMedicalRecordSignedForSummary(record.medicalRecord)
+        const isSigned = isMedicalRecordSigned(record.medicalRecord)
         return (
           <Space size={8}>
             <Tooltip title={isSigned ? 'Xem trước & In phiếu tóm tắt' : 'Nhắc nhở: Bệnh án chưa ký'}>
