@@ -307,10 +307,10 @@ test('NCL-04-CN-011: Kiểm tra quy chuẩn Pure Vietnamese và kích thước n
     'Nút thao tác trên bảng phải có kích thước tối thiểu 36x36px'
   )
 
-  // Modal buttons must have height: 40 or 42px (standard 40-42px)
+  // Modal buttons must have height: 40, 42, or 46px (large comfortable size)
   assert.ok(
-    modalCode.includes('height: 42') || modalCode.includes('height: 40'),
-    'Nút thao tác trên modal phải có chiều cao chuẩn 40-42px'
+    modalCode.includes('height: 46') || modalCode.includes('height: 42') || modalCode.includes('height: 40'),
+    'Nút thao tác trên modal phải có chiều cao tối thiểu 40px'
   )
 })
 

@@ -109,7 +109,8 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
     <Modal
       open={open}
       onCancel={onClose}
-      width={880}
+      width={900}
+      style={{ top: 20 }}
       className="visit-summary-modal"
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -119,49 +120,67 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
           </span>
         </div>
       }
-      footer={[
-        <Button
-          key="close"
-          onClick={onClose}
-          style={{ height: 42, minWidth: 100, borderRadius: 8, fontSize: 15 }}
-        >
-          Đóng
-        </Button>,
-        <Button
-          key="download"
-          icon={<DownloadOutlined />}
-          loading={downloading}
-          disabled={!summaryData || Boolean(errorMsg)}
-          onClick={handleDownloadPdf}
+      footer={
+        <div
           style={{
-            height: 42,
-            minWidth: 140,
-            borderRadius: 8,
-            fontSize: 15,
-            borderColor: '#0284c7',
-            color: '#0284c7',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 16,
+            width: '100%',
           }}
         >
-          Tải file PDF
-        </Button>,
-        <Button
-          key="print"
-          type="primary"
-          icon={<PrinterOutlined />}
-          disabled={!summaryData || Boolean(errorMsg)}
-          onClick={handlePrint}
-          style={{
-            height: 42,
-            minWidth: 140,
-            borderRadius: 8,
-            fontSize: 15,
-            fontWeight: 600,
-            background: '#0284c7',
-          }}
-        >
-          In phiếu
-        </Button>,
-      ]}
+          <Button
+            key="close"
+            onClick={onClose}
+            style={{
+              height: 46,
+              minWidth: 120,
+              borderRadius: 8,
+              fontSize: 16,
+              fontWeight: 500,
+            }}
+          >
+            Đóng
+          </Button>
+          <Button
+            key="download"
+            icon={<DownloadOutlined style={{ fontSize: 18 }} />}
+            loading={downloading}
+            disabled={!summaryData || Boolean(errorMsg)}
+            onClick={handleDownloadPdf}
+            style={{
+              height: 46,
+              minWidth: 160,
+              borderRadius: 8,
+              fontSize: 16,
+              fontWeight: 600,
+              borderColor: '#0284c7',
+              color: '#0284c7',
+            }}
+          >
+            Tải file PDF
+          </Button>
+          <Button
+            key="print"
+            type="primary"
+            icon={<PrinterOutlined style={{ fontSize: 18 }} />}
+            disabled={!summaryData || Boolean(errorMsg)}
+            onClick={handlePrint}
+            style={{
+              height: 46,
+              minWidth: 160,
+              borderRadius: 8,
+              fontSize: 16,
+              fontWeight: 600,
+              background: '#0284c7',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
+            }}
+          >
+            In phiếu
+          </Button>
+        </div>
+      }
     >
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
