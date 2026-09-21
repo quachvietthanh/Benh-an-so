@@ -6,12 +6,20 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.InventoryRestMapper;
+import com.benhsoan.adapter.inbound.rest.request.inventory.AdjustBatchStockRequest;
+import com.benhsoan.adapter.inbound.rest.request.inventory.DiscardExpiredBatchRequest;
+import com.benhsoan.adapter.inbound.rest.response.inventory.BatchAdjustmentResponse;
+import com.benhsoan.adapter.inbound.rest.response.inventory.DiscardBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryBatchResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryExpiryAlertResponse;
 import com.benhsoan.adapter.inbound.rest.response.inventory.InventoryStockReportResponse;
@@ -24,14 +32,20 @@ import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.query.inventory.ListInventoryBatchesQuery;
 import com.benhsoan.port.dto.query.inventory.ListInventoryExpiryAlertsQuery;
 import com.benhsoan.port.dto.query.inventory.ListInventoryStocksQuery;
+import com.benhsoan.port.dto.result.BatchAdjustmentResult;
+import com.benhsoan.port.dto.result.DiscardBatchResult;
+import com.benhsoan.port.inbound.inventory.AdjustBatchStockUseCase;
+import com.benhsoan.port.inbound.inventory.DiscardExpiredBatchUseCase;
 import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
-import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
-import com.benhsoan.port.inbound.inventory.ListLowStockMedicinesUseCase;
+import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryStocksUseCase;
+import com.benhsoan.port.inbound.inventory.ListLowStockMedicinesUseCase;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+@Validated
 @RestController
 @RequestMapping("/inventory")
 @RequiredArgsConstructor
@@ -45,6 +59,8 @@ public class InventoryController {
     private final ListInventoryExpiryAlertsUseCase listInventoryExpiryAlertsUseCase;
     private final ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
     private final GetInventoryStockReportUseCase getInventoryStockReportUseCase;
+    private final AdjustBatchStockUseCase adjustBatchStockUseCase;
+    private final DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
     private final InventoryRestMapper mapper;
 
     @GetMapping("/stocks")
@@ -105,6 +121,30 @@ public class InventoryController {
         return mapper.toStockReportResponse(
                 getInventoryStockReportUseCase.getStockReport(fromDate, toDate)
         );
+    }
+
+    @PostMapping("/batches/{id}/adjust")
+    @RequirePermission("PHARMACY_UPDATE")
+    public BatchAdjustmentResponse adjustBatchStock(
+            @PathVariable UUID id,
+            @Valid @RequestBody AdjustBatchStockRequest request
+    ) {
+        BatchAdjustmentResult result = adjustBatchStockUseCase.adjustStock(
+                mapper.toAdjustCommand(id, request)
+        );
+        return mapper.toAdjustResponse(result);
+    }
+
+    @PostMapping("/batches/{id}/discard")
+    @RequirePermission("PHARMACY_UPDATE")
+    public DiscardBatchResponse discardExpiredBatch(
+            @PathVariable UUID id,
+            @Valid @RequestBody DiscardExpiredBatchRequest request
+    ) {
+        DiscardBatchResult result = discardExpiredBatchUseCase.discardExpired(
+                mapper.toDiscardCommand(id, request)
+        );
+        return mapper.toDiscardResponse(result);
     }
 
     private LocalDate parseDate(String value, String fieldName) {

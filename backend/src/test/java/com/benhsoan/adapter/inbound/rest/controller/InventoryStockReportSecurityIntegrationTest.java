@@ -27,6 +27,8 @@ import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.InventoryStockReportResult;
+import com.benhsoan.port.inbound.inventory.AdjustBatchStockUseCase;
+import com.benhsoan.port.inbound.inventory.DiscardExpiredBatchUseCase;
 import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
@@ -63,6 +65,10 @@ class InventoryStockReportSecurityIntegrationTest {
     private ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
     @MockitoBean
     private GetInventoryStockReportUseCase getInventoryStockReportUseCase;
+    @MockitoBean
+    private AdjustBatchStockUseCase adjustBatchStockUseCase;
+    @MockitoBean
+    private DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
     @MockitoBean
     private JwtTokenPort jwtTokenPort;
     @MockitoBean

@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,6 +28,8 @@ import com.benhsoan.port.dto.result.InventoryBatchResult;
 import com.benhsoan.port.dto.result.InventoryExpiryAlertResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
 import com.benhsoan.port.dto.result.LowStockMedicineResult;
+import com.benhsoan.port.inbound.inventory.AdjustBatchStockUseCase;
+import com.benhsoan.port.inbound.inventory.DiscardExpiredBatchUseCase;
 import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
@@ -60,6 +64,12 @@ class InventoryControllerTest {
 
     @MockitoBean
     private GetInventoryStockReportUseCase getInventoryStockReportUseCase;
+
+    @MockitoBean
+    private AdjustBatchStockUseCase adjustBatchStockUseCase;
+
+    @MockitoBean
+    private DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
@@ -208,5 +218,139 @@ class InventoryControllerTest {
                 .andExpect(jsonPath("$[0].batchNumber").value("BATCH-EXP-001"))
                 .andExpect(jsonPath("$[0].daysToExpiry").value(9))
                 .andExpect(jsonPath("$[0].alertStatus").value("NEAR_EXPIRY"));
+    }
+
+    @Test
+    @DisplayName("POST /inventory/batches/{id}/adjust returns 200 with adjustment result")
+    void adjustBatchStockReturns200WhenValid() throws Exception {
+        UUID batchId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-21T08:30:00Z");
+
+        when(adjustBatchStockUseCase.adjustStock(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new com.benhsoan.port.dto.result.BatchAdjustmentResult(
+                        batchId,
+                        medicineId,
+                        "TH001",
+                        "Paracetamol 500mg",
+                        "BATCH-001",
+                        LocalDate.of(2027, 12, 31),
+                        100,
+                        85,
+                        -15,
+                        BatchStatus.ACTIVE,
+                        "Kiểm kê hao hụt 15 viên",
+                        userId,
+                        now
+                ));
+
+        String requestBody = """
+                {
+                    "actualQuantity": 85,
+                    "reason": "Kiểm kê hao hụt 15 viên"
+                }
+                """;
+
+        mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.batchId").value(batchId.toString()))
+                .andExpect(jsonPath("$.medicineCode").value("TH001"))
+                .andExpect(jsonPath("$.quantityBefore").value(100))
+                .andExpect(jsonPath("$.quantityAfter").value(85))
+                .andExpect(jsonPath("$.quantityChange").value(-15))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.reason").value("Kiểm kê hao hụt 15 viên"));
+    }
+
+    @Test
+    @DisplayName("POST /inventory/batches/{id}/adjust returns 400 when reason is blank (QTN-32)")
+    void adjustBatchStockReturns400WhenReasonBlank() throws Exception {
+        UUID batchId = UUID.randomUUID();
+        String requestBody = """
+                {
+                    "actualQuantity": 85,
+                    "reason": "   "
+                }
+                """;
+
+        mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /inventory/batches/{id}/adjust returns 400 when actualQuantity is negative")
+    void adjustBatchStockReturns400WhenActualQuantityNegative() throws Exception {
+        UUID batchId = UUID.randomUUID();
+        String requestBody = """
+                {
+                    "actualQuantity": -5,
+                    "reason": "Lý do hợp lệ"
+                }
+                """;
+
+        mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /inventory/batches/{id}/discard returns 200 with discard result")
+    void discardExpiredBatchReturns200WhenValid() throws Exception {
+        UUID batchId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-21T08:35:00Z");
+
+        when(discardExpiredBatchUseCase.discardExpired(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new com.benhsoan.port.dto.result.DiscardBatchResult(
+                        batchId,
+                        medicineId,
+                        "TH001",
+                        "Paracetamol 500mg",
+                        "BATCH-001",
+                        LocalDate.of(2026, 9, 15),
+                        50,
+                        BatchStatus.EXPIRED,
+                        "Hủy lô hết hạn 15/09/2026",
+                        userId,
+                        now
+                ));
+
+        String requestBody = """
+                {
+                    "reason": "Hủy lô hết hạn 15/09/2026"
+                }
+                """;
+
+        mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.batchId").value(batchId.toString()))
+                .andExpect(jsonPath("$.discardedQuantity").value(50))
+                .andExpect(jsonPath("$.status").value("EXPIRED"))
+                .andExpect(jsonPath("$.reason").value("Hủy lô hết hạn 15/09/2026"));
+    }
+
+    @Test
+    @DisplayName("POST /inventory/batches/{id}/discard returns 400 when reason is blank (QTN-32)")
+    void discardExpiredBatchReturns400WhenReasonBlank() throws Exception {
+        UUID batchId = UUID.randomUUID();
+        String requestBody = """
+                {
+                    "reason": ""
+                }
+                """;
+
+        mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
     }
 }
