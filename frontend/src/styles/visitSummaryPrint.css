@@ -1,0 +1,307 @@
+/* ==============================================================================
+   Visit Summary Print Styling (NCL-04-CN-011)
+   Phiếu tóm tắt lượt khám bệnh nhân - Chuẩn A4 y khoa
+   ============================================================================== */
+
+.visit-summary-modal {
+  top: 20px !important;
+  padding-bottom: 20px !important;
+  max-width: calc(100vw - 32px);
+}
+
+.visit-summary-modal .ant-modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: calc(100vh - 40px) !important;
+  height: calc(100vh - 40px) !important;
+  padding: 0 !important;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.visit-summary-modal .ant-modal-header {
+  flex-shrink: 0 !important;
+  padding: 12px 24px !important;
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+}
+
+.visit-summary-modal .ant-modal-body {
+  flex: 1 1 auto !important;
+  padding: 16px 20px !important;
+  overflow-y: auto !important;
+  background: #f1f5f9 !important;
+}
+
+.visit-summary-modal .ant-modal-footer {
+  flex-shrink: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  text-align: center !important;
+  padding: 12px 24px !important;
+  background: #ffffff !important;
+  border-top: 1px solid #e2e8f0 !important;
+  margin: 0 !important;
+}
+
+.visit-summary-sheet {
+  background: #ffffff;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 24px 32px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  color: #1e293b;
+  font-size: 13.5px;
+  line-height: 1.5;
+  position: relative;
+  border: 1px solid #e2e8f0;
+}
+
+/* Header phòng khám */
+.visit-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2px solid #0284c7;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.visit-summary-clinic-info h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 2px 0;
+  text-transform: uppercase;
+}
+
+.visit-summary-clinic-info p {
+  margin: 1px 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.visit-summary-doc-meta {
+  text-align: right;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.visit-summary-doc-meta .doc-code {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #0284c7;
+}
+
+/* Tiêu đề tài liệu */
+.visit-summary-title {
+  text-align: center;
+  margin: 10px 0 14px 0;
+}
+
+.visit-summary-title h1 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.5px;
+  margin: 0 0 2px 0;
+  text-transform: uppercase;
+}
+
+.visit-summary-title .subtitle {
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Khối nội dung nghiệp vụ */
+.visit-summary-section {
+  margin-bottom: 12px;
+}
+
+.visit-summary-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0369a1;
+  text-transform: uppercase;
+  border-left: 4px solid #0284c7;
+  padding-left: 8px;
+  margin-bottom: 6px;
+}
+
+.visit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+}
+
+.visit-summary-row {
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.visit-summary-row .label {
+  font-weight: 600;
+  color: #475569;
+  min-width: 140px;
+}
+
+.visit-summary-row .value {
+  color: #0f172a;
+  flex: 1;
+}
+
+.visit-summary-revisit-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.visit-summary-revisit-box .date-highlight {
+  font-size: 16px;
+  font-weight: 700;
+  color: #15803d;
+}
+
+/* Bảng cận lâm sàng */
+.visit-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.visit-summary-table th,
+.visit-summary-table td {
+  border: 1px solid #cbd5e1;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.visit-summary-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #334155;
+}
+
+/* Khu vực chữ ký */
+.visit-summary-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 10px;
+}
+
+.visit-summary-sign-col {
+  text-align: center;
+  min-width: 220px;
+}
+
+.visit-summary-sign-col .role-title {
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+.visit-summary-sign-col .sign-hint {
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+  margin-bottom: 24px;
+}
+
+.visit-summary-sign-col .signer-name {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.visit-summary-sign-col .sign-date {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Dấu mộc xác thực điện tử */
+.digital-stamp {
+  display: inline-block;
+  border: 2px dashed #0284c7;
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: #0284c7;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  background: #f0f9ff;
+}
+
+/* Lịch sử in */
+.visit-summary-history-box {
+  margin-top: 14px;
+  padding: 8px 14px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px dashed #cbd5e1;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ==============================================================================
+   Quy chuẩn in ấn khổ A4 (@page & @media print)
+   ============================================================================== */
+@page {
+  size: A4 portrait;
+  margin: 10mm 12mm;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .visit-summary-sheet,
+  .visit-summary-sheet * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .visit-summary-sheet {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm 12mm !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    z-index: 999999 !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Ẩn hoàn toàn các thành phần nền, modal mask, nút bấm của Modal */
+  .ant-modal-mask,
+  .ant-modal-wrap,
+  .ant-modal-footer,
+  .ant-modal-close,
+  .ant-modal-header,
+  .visit-summary-modal-extra-actions,
+  .no-print {
+    display: none !important;
+  }
+}
+

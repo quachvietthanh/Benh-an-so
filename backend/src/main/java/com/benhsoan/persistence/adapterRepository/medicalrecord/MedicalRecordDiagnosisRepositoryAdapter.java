@@ -33,7 +33,17 @@ public class MedicalRecordDiagnosisRepositoryAdapter implements MedicalRecordDia
 
     @Override
     public List<MedicalRecordDiagnosis> findByMedicalRecordId(UUID medicalRecordId) {
-        return jpaRepository.findByMedicalRecordId(medicalRecordId).stream()
+        return jpaRepository.findByMedicalRecordIdOrdered(medicalRecordId).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<MedicalRecordDiagnosis> findByMedicalRecordIdAndDiagnosisType(
+            UUID medicalRecordId,
+            com.benhsoan.domain.medicalrecord.enums.DiagnosisType diagnosisType
+    ) {
+        return jpaRepository.findByMedicalRecordIdAndDiagnosisTypeOrdered(medicalRecordId, diagnosisType).stream()
                 .map(mapper::toDomain)
                 .toList();
     }

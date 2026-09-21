@@ -14,6 +14,11 @@ public interface MedicalRecordDiagnosisRepository {
 
     List<MedicalRecordDiagnosis> findByMedicalRecordId(UUID medicalRecordId);
 
+    List<MedicalRecordDiagnosis> findByMedicalRecordIdAndDiagnosisType(
+            UUID medicalRecordId,
+            com.benhsoan.domain.medicalrecord.enums.DiagnosisType diagnosisType
+    );
+
     List<MedicalRecordDiagnosis> findByMedicalRecordIdIn(Collection<UUID> medicalRecordIds);
 
     List<MedicalRecordDiagnosis> replaceForMedicalRecord(

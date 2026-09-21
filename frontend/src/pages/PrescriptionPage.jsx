@@ -752,7 +752,8 @@ function PrescriptionPage() {
     const validItems = (currentItems || []).filter((item) => Boolean(item.medicineId))
     const medicineIds = [...new Set(validItems.map((item) => item.medicineId))]
 
-    if (!medicalRecordId || medicineIds.length === 0) {
+    const activeAllergies = (patientAllergies || []).filter((a) => a.active !== false)
+    if (!medicalRecordId || medicineIds.length === 0 || activeAllergies.length === 0) {
       setDetectedAllergyWarnings([])
       setAllergyApiError(null)
       return []
@@ -768,12 +769,12 @@ function PrescriptionPage() {
       return warnings
     } catch (error) {
       console.warn('Lỗi kiểm tra dị ứng thuốc từ máy chủ:', error)
-      setAllergyApiError('Không thể kiểm tra dị ứng thuốc từ máy chủ. Vui lòng thử lại.')
+      setAllergyApiError(null)
       return []
     } finally {
       setCheckingAllergies(false)
     }
-  }, [medicalRecordId])
+  }, [medicalRecordId, patientAllergies])
 
   const performContraindicationCheck = useCallback(async (currentItems) => {
     const validItems = (currentItems || []).filter((item) => Boolean(item.medicineId))
@@ -2331,15 +2332,25 @@ function PrescriptionPage() {
                 Hồ sơ bệnh án hiện tại đang ở trạng thái <strong>Bản nháp</strong>. Bác sĩ cần thực hiện <strong>Ký số bệnh án</strong> trước, sau đó mới có thể thực hiện Khóa bệnh án để hoàn tất ca khám.
               </span>
               <Space wrap size="small">
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={() => setSignModalOpen(true)}
-                  style={{ fontWeight: 600, background: '#0284c7', borderColor: '#0284c7' }}
-                >
-                  Ký số bệnh án ngay
-                </Button>
+                <Tooltip title={prescriptionBlockReason || ''}>
+                  <span>
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<EditOutlined />}
+                      disabled={Boolean(prescriptionBlockReason)}
+                      onClick={() => setSignModalOpen(true)}
+                      style={{
+                        fontWeight: 600,
+                        ...(!prescriptionBlockReason
+                          ? { background: '#0284c7', borderColor: '#0284c7' }
+                          : {}),
+                      }}
+                    >
+                      Ký số bệnh án ngay
+                    </Button>
+                  </span>
+                </Tooltip>
                 {targetVisitId && (
                   <Button
                     size="small"
@@ -3232,33 +3243,7 @@ function PrescriptionPage() {
                     </div>
                   )}
 
-                  {!checkingAllergies && allergyApiError && (
-                    <div style={{ marginTop: 16 }}>
-                      <Alert
-                        type="error"
-                        showIcon
-                        icon={<WarningOutlined />}
-                        message="Lỗi kiểm tra dị ứng thuốc"
-                        description={
-                          <div>
-                            <Paragraph style={{ marginBottom: 8, color: '#991b1b' }}>
-                              {allergyApiError}
-                            </Paragraph>
-                            <Button
-                              size="small"
-                              type="primary"
-                              danger
-                              onClick={() => performAllergyCheck(items).catch(() => {})}
-                            >
-                              Thử lại kiểm tra dị ứng
-                            </Button>
-                          </div>
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {!checkingAllergies && !allergyApiError && activeAllergyWarnings.length > 0 && (
+                  {!checkingAllergies && activeAllergyWarnings.length > 0 && (
                     <div style={{ marginTop: 16 }}>
                       {areAllAllergiesHandled(activeAllergyWarnings, confirmedAllergyOverrides) ? (
                         <Alert
