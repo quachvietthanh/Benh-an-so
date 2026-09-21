@@ -51,12 +51,19 @@ class QueueOperationAuthorization {
         throw new UnauthorizedQueueOperationException();
     }
 
+    void requirePrioritizePermission(MedicalQueue queue) {
+        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST")) {
+            return;
+        }
+        throw new UnauthorizedQueueOperationException();
+    }
+
     void requireReadPermission(MedicalQueue queue) {
         requireReadPermission(queue.getDoctorId());
     }
 
     void requireReadPermission(UUID doctorId) {
-        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST")) {
+        if (currentUserPort.hasRole("ADMIN") || currentUserPort.hasRole("RECEPTIONIST") || currentUserPort.hasRole("MANAGER")) {
             return;
         }
         if (!currentUserPort.hasRole("DOCTOR") || !doctorId.equals(currentUserPort.getCurrentUserId())) {

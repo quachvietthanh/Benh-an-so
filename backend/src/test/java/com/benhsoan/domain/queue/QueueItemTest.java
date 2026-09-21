@@ -147,6 +147,96 @@ class QueueItemTest {
         return Stream.of(waiting, inProgress, waitingForResult, completed, cancelled);
     }
 
+    @Test
+    void prioritizeWaitingItemSuccessfully() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem item = newWaitingItem(checkedInAt);
+        UUID actorId = UUID.randomUUID();
+        Instant prioritizedAt = checkedInAt.plusSeconds(30);
+
+        item.prioritize(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, "Ca cap cuu - Sot cao co giat", actorId, prioritizedAt);
+
+        assertEquals(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, item.getPriority());
+        assertEquals("Ca cap cuu - Sot cao co giat", item.getPriorityReason());
+        assertEquals(actorId, item.getPrioritizedBy());
+        assertEquals(prioritizedAt, item.getPrioritizedAt());
+        assertEquals(prioritizedAt, item.getUpdatedAt());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"   ", "\t", "\n"})
+    void rejectsPrioritizeWithNullOrBlankReason(String reason) {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem item = newWaitingItem(checkedInAt);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                item.prioritize(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, reason, UUID.randomUUID(), checkedInAt.plusSeconds(10)));
+    }
+
+    @Test
+    void rejectsPrioritizeWhenReasonExceeds500Characters() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem item = newWaitingItem(checkedInAt);
+        String longReason = "a".repeat(501);
+
+        var ex = assertThrows(IllegalArgumentException.class, () ->
+                item.prioritize(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, longReason, UUID.randomUUID(), checkedInAt.plusSeconds(10)));
+        assertEquals("Priority reason cannot exceed 500 characters.", ex.getMessage());
+    }
+
+    @Test
+    void acceptsPrioritizeWhenReasonIsExactly500Characters() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem item = newWaitingItem(checkedInAt);
+        String exactReason = "a".repeat(500);
+
+        item.prioritize(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, exactReason, UUID.randomUUID(), checkedInAt.plusSeconds(10));
+        assertEquals(exactReason, item.getPriorityReason());
+    }
+
+    @Test
+    void rejectsPrioritizeWithInvalidPriorityLevel() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+        QueueItem item = newWaitingItem(checkedInAt);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                item.prioritize(null, "Reason", UUID.randomUUID(), checkedInAt.plusSeconds(10)));
+        assertThrows(IllegalArgumentException.class, () ->
+                item.prioritize(com.benhsoan.domain.queue.enums.QueuePriority.NORMAL, "Reason", UUID.randomUUID(), checkedInAt.plusSeconds(10)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonWaitingItems")
+    void rejectsPrioritizeFromStatusesOtherThanWaiting(QueueItem item) {
+        assertThrows(QueueItemInvalidStatusException.class, () ->
+                item.prioritize(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, "Emergency", UUID.randomUUID(), Instant.now()));
+    }
+
+    private static Stream<QueueItem> nonWaitingItems() {
+        Instant checkedInAt = Instant.parse("2026-07-31T01:00:00Z");
+
+        QueueItem inProgress = newWaitingItem(checkedInAt);
+        inProgress.call(checkedInAt.plusSeconds(30));
+
+        QueueItem waitingForResult = newWaitingItem(checkedInAt);
+        waitingForResult.call(checkedInAt.plusSeconds(30));
+        waitingForResult.waitForResult(checkedInAt.plusSeconds(60));
+
+        QueueItem completed = newWaitingItem(checkedInAt);
+        completed.call(checkedInAt.plusSeconds(30));
+        completed.complete(checkedInAt.plusSeconds(60));
+
+        QueueItem cancelled = newWaitingItem(checkedInAt);
+        cancelled.cancel("Cancelled", checkedInAt.plusSeconds(60));
+
+        QueueItem skipped = newWaitingItem(checkedInAt);
+        skipped.call(checkedInAt.plusSeconds(30));
+        skipped.skip("Absent", checkedInAt.plusSeconds(60));
+
+        return Stream.of(inProgress, waitingForResult, completed, cancelled, skipped);
+    }
+
     private static QueueItem newWaitingItem(Instant checkedInAt) {
         return QueueItem.create(UUID.randomUUID(), UUID.randomUUID(), null, UUID.randomUUID(),
                 QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 7, 31), UUID.randomUUID(), checkedInAt);

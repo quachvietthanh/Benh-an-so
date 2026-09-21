@@ -14,14 +14,25 @@ import com.benhsoan.domain.queue.enums.QueueSemanticAction;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Service
-@RequiredArgsConstructor
 class QueueAuditService {
 
     private final AuditLogRepository auditLogRepository;
     private final CurrentUserPort currentUserPort;
+    private final ObjectMapper objectMapper;
+
+    public QueueAuditService(AuditLogRepository auditLogRepository, CurrentUserPort currentUserPort) {
+        this(auditLogRepository, currentUserPort, new ObjectMapper());
+    }
+
+    public QueueAuditService(AuditLogRepository auditLogRepository, CurrentUserPort currentUserPort, ObjectMapper objectMapper) {
+        this.auditLogRepository = auditLogRepository;
+        this.currentUserPort = currentUserPort;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
 
     void recordCheckIn(QueueItem item, QueueItemSourceType sourceType, int queueNumber, UUID actorId) {
         UUID effectiveActorId = actorId != null ? actorId : currentUserPort.getCurrentUserId();
@@ -83,6 +94,26 @@ class QueueAuditService {
                 "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"action\":\"%s\",\"callCount\":%d}"
                         .formatted(item.getId(), item.getStatus(), QueueSemanticAction.RE_QUEUED, item.getCallCount()),
                 null));
+    }
+
+    void recordPrioritized(QueueItem item, com.benhsoan.domain.queue.enums.QueuePriority priority, String reason) {
+        UUID actorId = currentUserPort.getCurrentUserId();
+        String detail;
+        try {
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("queueItemId", item.getId().toString());
+            node.put("status", item.getStatus().name());
+            node.put("action", QueueSemanticAction.PRIORITIZED.name());
+            node.put("priority", priority.name());
+            node.put("reason", reason);
+            node.put("callCount", item.getCallCount());
+            detail = objectMapper.writeValueAsString(node);
+        } catch (Exception e) {
+            detail = "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"action\":\"%s\",\"priority\":\"%s\",\"callCount\":%d}"
+                    .formatted(item.getId(), item.getStatus(), QueueSemanticAction.PRIORITIZED, priority, item.getCallCount());
+        }
+        auditLogRepository.save(AuditLog.create(actorId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),
+                detail, null));
     }
 
     void record(ActionType actionType, QueueItem item) {
