@@ -258,30 +258,50 @@
 }
 
 /* ==============================================================================
-   Quy chuẩn in ấn (@media print)
+   Quy chuẩn in ấn khổ A4 (@page & @media print)
    ============================================================================== */
+@page {
+  size: A4 portrait;
+  margin: 10mm 12mm;
+}
+
 @media print {
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
 
   .visit-summary-sheet,
   .visit-summary-sheet * {
-    visibility: visible;
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .visit-summary-sheet {
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    padding: 20mm 15mm !important;
+    margin: 0 !important;
+    padding: 10mm 12mm !important;
+    background: #ffffff !important;
     box-shadow: none !important;
     border: none !important;
+    z-index: 999999 !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
   }
 
+  /* Ẩn hoàn toàn các thành phần nền, modal mask, nút bấm của Modal */
+  .ant-modal-mask,
+  .ant-modal-wrap,
+  .ant-modal-footer,
+  .ant-modal-close,
+  .ant-modal-header,
+  .visit-summary-modal-extra-actions,
   .no-print {
     display: none !important;
   }
 }
+
