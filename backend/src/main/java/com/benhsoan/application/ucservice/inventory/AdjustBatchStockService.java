@@ -56,7 +56,7 @@ public class AdjustBatchStockService implements AdjustBatchStockUseCase {
 
     @Override
     public BatchAdjustmentResult adjustStock(AdjustBatchStockCommand command) {
-        authorizer.requirePharmacistOrAdmin();
+        authorizer.requireInventoryUpdate();
         validateCommand(command);
 
         UUID batchId = command.batchId();

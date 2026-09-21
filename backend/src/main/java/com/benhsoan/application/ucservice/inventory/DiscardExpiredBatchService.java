@@ -56,7 +56,7 @@ public class DiscardExpiredBatchService implements DiscardExpiredBatchUseCase {
 
     @Override
     public DiscardBatchResult discardExpired(DiscardExpiredBatchCommand command) {
-        authorizer.requirePharmacistOrAdmin();
+        authorizer.requireInventoryUpdate();
         validateCommand(command);
 
         UUID batchId = command.batchId();

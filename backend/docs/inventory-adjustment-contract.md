@@ -7,8 +7,10 @@ Tài liệu này xác định toàn bộ hợp đồng API, phân quyền, quy t
 ## 2. Quy tắc nghiệp vụ & Quyền hạn
 
 - **Phân quyền (QTN-01 / NCL-06-CN-010-TC-04)**:
-  - Chỉ vai trò Dược sĩ (`PHARMACIST`) và Quản trị viên (`ADMIN`) có quyền thực hiện thao tác điều chỉnh kho và hủy lô thuốc (`PERMISSION_PHARMACY_UPDATE`).
-  - Lễ tân (`RECEPTIONIST`) và Bác sĩ (`DOCTOR`) bị từ chối truy cập với mã lỗi `403 Forbidden` và hệ thống tự động ghi nhật ký `ACCESS_DENIED` vào bảng `audit_logs` (thỏa mãn `NCL-06-CN-010-TC-04`).
+  - Cơ chế bảo vệ đa lớp (Defense-in-depth):
+    - **Tầng Controller**: Bảo vệ bằng `@RequirePermission("PHARMACY_UPDATE")`.
+    - **Tầng Application / Service**: `AdjustBatchStockService` và `DiscardExpiredBatchService` bắt buộc kiểm tra `InventoryManagementAuthorizer.requireInventoryUpdate()`, yêu cầu quyền `PHARMACY_UPDATE` hoặc vai trò `PHARMACIST` / `ADMIN`. Quyền đọc `PHARMACY_READ` bị từ chối dứt khoát tại cả hai tầng.
+  - Lễ tân (`RECEPTIONIST`), Bác sĩ (`DOCTOR`) hoặc người dùng chỉ có quyền đọc `PHARMACY_READ` bị từ chối truy cập với mã lỗi `403 Forbidden` và hệ thống tự động ghi nhật ký `ACCESS_DENIED` vào bảng `audit_logs` (thỏa mãn `NCL-06-CN-010-TC-04`).
 - **Quy tắc điều chỉnh tồn kho sau kiểm kê (QTN-32 / NCL-06-CN-010-TC-01)**:
   - Dược sĩ nhập số lượng thực tế sau kiểm kê (`actualQuantity`) và lý do (`reason`).
   - `actualQuantity >= 0`. Nếu `actualQuantity = 0`, trạng thái lô chuyển thành `DEPLETED`. Nếu `actualQuantity > 0`, trạng thái lô giữ nguyên hoặc chuyển thành `ACTIVE`.

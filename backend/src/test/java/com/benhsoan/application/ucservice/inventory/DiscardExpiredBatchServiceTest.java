@@ -210,6 +210,19 @@ class DiscardExpiredBatchServiceTest {
     }
 
     @Test
+    @DisplayName("discardExpired should throw AccessDeniedException when user only has PHARMACY_READ permission")
+    void discardExpiredShouldRejectUserWithOnlyPharmacyRead() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasPermission("PHARMACY_UPDATE")).thenReturn(false);
+        when(currentUserPort.hasPermission("PHARMACY_READ")).thenReturn(true);
+
+        UUID batchId = UUID.randomUUID();
+        assertThrows(AccessDeniedException.class, () ->
+                service.discardExpired(new DiscardExpiredBatchCommand(batchId, "Lý do hợp lệ")));
+    }
+
+    @Test
     @DisplayName("discardExpired should safely serialize reason with quotes and special characters in audit log detail")
     void discardExpiredShouldSafelySerializeSpecialCharactersInReason() {
         UUID batchId = UUID.randomUUID();

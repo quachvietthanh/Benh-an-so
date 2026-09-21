@@ -161,4 +161,16 @@ class InventoryAdjustmentSecurityIntegrationTest {
                         .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("Forbids doctor (with only PHARMACY_READ) from discarding expired batch")
+    void forbidsDoctorFromDiscardingBatch() throws Exception {
+        UUID batchId = UUID.randomUUID();
+
+        mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Bác sĩ thử hủy lô\"}")
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
+                .andExpect(status().isForbidden());
+    }
 }

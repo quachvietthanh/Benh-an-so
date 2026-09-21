@@ -268,6 +268,19 @@ class AdjustBatchStockServiceTest {
     }
 
     @Test
+    @DisplayName("adjustStock should throw AccessDeniedException when user only has PHARMACY_READ permission")
+    void adjustStockShouldRejectUserWithOnlyPharmacyRead() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasPermission("PHARMACY_UPDATE")).thenReturn(false);
+        when(currentUserPort.hasPermission("PHARMACY_READ")).thenReturn(true);
+
+        UUID batchId = UUID.randomUUID();
+        assertThrows(AccessDeniedException.class, () ->
+                service.adjustStock(new AdjustBatchStockCommand(batchId, 10, "Lý do hợp lệ")));
+    }
+
+    @Test
     @DisplayName("adjustStock should safely serialize reason with quotes and special characters in audit log detail")
     void adjustStockShouldSafelySerializeSpecialCharactersInReason() {
         UUID batchId = UUID.randomUUID();
