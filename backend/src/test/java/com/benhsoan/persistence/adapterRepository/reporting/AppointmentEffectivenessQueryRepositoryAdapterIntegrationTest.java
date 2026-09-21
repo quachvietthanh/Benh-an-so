@@ -53,8 +53,8 @@ class AppointmentEffectivenessQueryRepositoryAdapterIntegrationTest {
         List<AppointmentStatusCountSummary> counts = adapter().findStatusCounts(FROM, TO, null, null);
 
         assertEquals(2, counts.size());
-        assertSummary(counts, AppointmentStatus.COMPLETED, 2);
-        assertSummary(counts, AppointmentStatus.CANCELLED, 1);
+        assertSummary(counts, "RECEPTION_COUNTER", AppointmentStatus.COMPLETED, 2);
+        assertSummary(counts, "RECEPTION_COUNTER", AppointmentStatus.CANCELLED, 1);
     }
 
     @Test
@@ -85,7 +85,7 @@ class AppointmentEffectivenessQueryRepositoryAdapterIntegrationTest {
         List<AppointmentStatusCountSummary> counts = adapter().findStatusCounts(FROM, TO, null, null);
 
         assertEquals(1, counts.size());
-        assertSummary(counts, AppointmentStatus.SCHEDULED, 2);
+        assertSummary(counts, "RECEPTION_COUNTER", AppointmentStatus.SCHEDULED, 2);
     }
 
     @Test
@@ -103,9 +103,8 @@ class AppointmentEffectivenessQueryRepositoryAdapterIntegrationTest {
         List<AppointmentStatusCountSummary> counts = adapter().findStatusCounts(FROM, TO, doctorA, null);
 
         assertEquals(1, counts.size());
-        assertSummary(counts, AppointmentStatus.COMPLETED, 1);
+        assertSummary(counts, "RECEPTION_COUNTER", AppointmentStatus.COMPLETED, 1);
     }
-
     @Test
     void filtersByOnlinePortalChannel() {
         UUID doctorId = createDoctor();
@@ -120,7 +119,7 @@ class AppointmentEffectivenessQueryRepositoryAdapterIntegrationTest {
         List<AppointmentStatusCountSummary> counts = adapter().findStatusCounts(FROM, TO, null, "ONLINE_PORTAL");
 
         assertEquals(1, counts.size());
-        assertSummary(counts, AppointmentStatus.SCHEDULED, 1);
+        assertSummary(counts, "ONLINE_PORTAL", AppointmentStatus.SCHEDULED, 1);
     }
 
     @Test
@@ -137,7 +136,28 @@ class AppointmentEffectivenessQueryRepositoryAdapterIntegrationTest {
         List<AppointmentStatusCountSummary> counts = adapter().findStatusCounts(FROM, TO, null, "RECEPTION_COUNTER");
 
         assertEquals(1, counts.size());
-        assertSummary(counts, AppointmentStatus.SCHEDULED, 1);
+        assertSummary(counts, "RECEPTION_COUNTER", AppointmentStatus.SCHEDULED, 1);
+    }
+
+    @Test
+    void breaksDownByBookingChannelInSingleQuery() {
+        UUID doctorId = createDoctor();
+        UUID patientId = createPatient(doctorId);
+
+        createAppointment(doctorId, patientId, doctorId, AppointmentStatus.COMPLETED, FROM.plusSeconds(60), null);
+        createAppointment(doctorId, patientId, doctorId, AppointmentStatus.COMPLETED, FROM.plusSeconds(120), null);
+        createAppointment(doctorId, patientId, doctorId, AppointmentStatus.COMPLETED, FROM.plusSeconds(180), "ONLINE_PORTAL");
+        createAppointment(doctorId, patientId, doctorId, AppointmentStatus.NO_SHOW, FROM.plusSeconds(240), "ONLINE_PORTAL");
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<AppointmentStatusCountSummary> counts = adapter().findStatusCounts(FROM, TO, null, null);
+
+        assertEquals(3, counts.size());
+        assertSummary(counts, "RECEPTION_COUNTER", AppointmentStatus.COMPLETED, 2);
+        assertSummary(counts, "ONLINE_PORTAL", AppointmentStatus.COMPLETED, 1);
+        assertSummary(counts, "ONLINE_PORTAL", AppointmentStatus.NO_SHOW, 1);
     }
 
     @Test
@@ -145,11 +165,11 @@ class AppointmentEffectivenessQueryRepositoryAdapterIntegrationTest {
         assertTrue(adapter().findStatusCounts(FROM, TO, null, null).isEmpty());
     }
 
-    private void assertSummary(List<AppointmentStatusCountSummary> counts, AppointmentStatus status, long expected) {
+    private void assertSummary(List<AppointmentStatusCountSummary> counts, String channel, AppointmentStatus status, long expected) {
         AppointmentStatusCountSummary summary = counts.stream()
-                .filter(s -> s.status() == status)
+                .filter(s -> channel.equals(s.bookingChannel()) && s.status() == status)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Missing summary for " + status));
+                .orElseThrow(() -> new AssertionError("Missing summary for " + channel + "/" + status));
         assertEquals(expected, summary.count());
     }
 

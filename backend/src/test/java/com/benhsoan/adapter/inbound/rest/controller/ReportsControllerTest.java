@@ -680,9 +680,10 @@ class ReportsControllerTest {
                         Instant.parse("2026-08-31T08:00:00Z"),
                         100,
                         List.of(
-                                new AppointmentStatusCountResult(AppointmentStatus.COMPLETED, 40, new BigDecimal("40.00")),
-                                new AppointmentStatusCountResult(AppointmentStatus.CANCELLED, 30, new BigDecimal("30.00")),
-                                new AppointmentStatusCountResult(AppointmentStatus.NO_SHOW, 30, new BigDecimal("30.00"))
+                                new AppointmentStatusCountResult("RECEPTION_COUNTER", AppointmentStatus.COMPLETED, 40, new BigDecimal("40.00")),
+                                new AppointmentStatusCountResult("ONLINE_PORTAL", AppointmentStatus.COMPLETED, 10, new BigDecimal("10.00")),
+                                new AppointmentStatusCountResult("RECEPTION_COUNTER", AppointmentStatus.CANCELLED, 30, new BigDecimal("30.00")),
+                                new AppointmentStatusCountResult("ONLINE_PORTAL", AppointmentStatus.NO_SHOW, 20, new BigDecimal("20.00"))
                         )
                 ));
 
@@ -691,9 +692,14 @@ class ReportsControllerTest {
                         .param("to", "2026-08-31"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(100))
+                .andExpect(jsonPath("$.items[0].bookingChannel").value("RECEPTION_COUNTER"))
                 .andExpect(jsonPath("$.items[0].status").value("COMPLETED"))
                 .andExpect(jsonPath("$.items[0].count").value(40))
-                .andExpect(jsonPath("$.items[0].percentage").value(40.00));
+                .andExpect(jsonPath("$.items[0].percentage").value(40.00))
+                .andExpect(jsonPath("$.items[1].bookingChannel").value("ONLINE_PORTAL"))
+                .andExpect(jsonPath("$.items[1].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.items[1].count").value(10))
+                .andExpect(jsonPath("$.items[1].percentage").value(10.00));
     }
 
     @Test

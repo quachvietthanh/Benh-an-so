@@ -506,6 +506,7 @@ class ReportsSecurityIntegrationTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(getAppointmentEffectivenessReportUseCase);
+        org.mockito.Mockito.verify(auditLogRepository).save(any());
     }
 
     @Test

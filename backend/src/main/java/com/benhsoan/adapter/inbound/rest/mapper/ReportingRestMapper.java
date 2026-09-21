@@ -175,6 +175,7 @@ public class ReportingRestMapper {
 
     private AppointmentStatusCountResponse toResponse(AppointmentStatusCountResult result) {
         return new AppointmentStatusCountResponse(
+                result.bookingChannel(),
                 result.status(),
                 result.count(),
                 result.percentage()

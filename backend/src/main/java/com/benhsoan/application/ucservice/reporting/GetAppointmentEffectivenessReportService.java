@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import com.benhsoan.port.dto.result.AppointmentStatusCountResult;
 import com.benhsoan.port.inbound.reporting.GetAppointmentEffectivenessReportUseCase;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentEffectivenessQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentStatusCountSummary;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
@@ -24,10 +26,12 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class GetAppointmentEffectivenessReportService implements GetAppointmentEffectivenessReportUseCase {
 
+    private static final String MANAGER_ROLE = "MANAGER";
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final AppointmentEffectivenessQueryRepository queryRepository;
     private final ClockPort clockPort;
+    private final CurrentUserPort currentUserPort;
 
     @Override
     public AppointmentEffectivenessReportResult getReport(
@@ -36,6 +40,8 @@ public class GetAppointmentEffectivenessReportService implements GetAppointmentE
             UUID doctorId,
             String bookingChannel
     ) {
+        ensureAuthorized();
+
         ReportingTimeRange range = ReportingTimeRange.of(from, to);
 
         List<AppointmentStatusCountSummary> counts = queryRepository.findStatusCounts(
@@ -47,7 +53,10 @@ public class GetAppointmentEffectivenessReportService implements GetAppointmentE
 
         List<AppointmentStatusCountResult> items = counts.stream()
                 .map(summary -> toItem(summary, total))
-                .sorted(Comparator.comparingInt(item -> item.status().ordinal()))
+                .sorted(Comparator
+                        .comparing(AppointmentStatusCountResult::bookingChannel,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparingInt(item -> item.status().ordinal()))
                 .toList();
 
         return new AppointmentEffectivenessReportResult(from, to, clockPort.now(), total, items);
@@ -60,6 +69,14 @@ public class GetAppointmentEffectivenessReportService implements GetAppointmentE
                         .multiply(ONE_HUNDRED)
                         .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
 
-        return new AppointmentStatusCountResult(summary.status(), summary.count(), percentage);
+        return new AppointmentStatusCountResult(
+                summary.bookingChannel(), summary.status(), summary.count(), percentage);
+    }
+
+    private void ensureAuthorized() {
+        if (!currentUserPort.hasRole(MANAGER_ROLE)) {
+            throw new AccessDeniedException(
+                    "Only managers can view the appointment effectiveness report.");
+        }
     }
 }

@@ -15,6 +15,9 @@ GET /reports/appointment-effectiveness?from={yyyy-MM-dd}&to={yyyy-MM-dd}[&doctor
     - `ADMIN` → 403 (ADMIN is intentionally not granted `REPORT_VIEW`)
     - `DOCTOR`, `PHARMACIST`, `RECEPTIONIST` → 403
     - unauthenticated → 401
+  - Defense-in-depth: `GetAppointmentEffectivenessReportService` also rejects any
+    caller without the `MANAGER` role (service-level `ensureAuthorized`), mirroring
+    the sibling MANAGER-only report services.
 - Period semantics: half-open interval `[from 00:00, to+1d 00:00)` in clinic timezone
   `Asia/Ho_Chi_Minh`, keyed on `appointments.start_time` (the scheduled occurrence time, **not**
   `created_at`). A rescheduled appointment is counted once, at its current `start_time`.
@@ -40,24 +43,47 @@ Violations return `400` (`VALIDATION_ERROR` / `MISSING_PARAMETER`).
   "generatedAt": "2026-08-31T08:00:00Z",
   "total": 100,
   "items": [
-    { "status": "COMPLETED", "count": 40, "percentage": 40.00 },
-    { "status": "CANCELLED", "count": 30, "percentage": 30.00 },
-    { "status": "NO_SHOW", "count": 30, "percentage": 30.00 }
+    { "bookingChannel": "RECEPTION_COUNTER", "status": "COMPLETED", "count": 40, "percentage": 40.00 },
+    { "bookingChannel": "ONLINE_PORTAL", "status": "COMPLETED", "count": 10, "percentage": 10.00 },
+    { "bookingChannel": "RECEPTION_COUNTER", "status": "CANCELLED", "count": 30, "percentage": 30.00 },
+    { "bookingChannel": "ONLINE_PORTAL", "status": "NO_SHOW", "count": 20, "percentage": 20.00 }
   ]
 }
 ```
 
 - `total`: total appointments in the (filtered) period.
-- `items`: one entry per `AppointmentStatus` that has `count > 0`, ordered by the
-  `AppointmentStatus` enum declaration order
+- `items`: one entry per (`bookingChannel`, `AppointmentStatus`) pair that has `count > 0`.
+  Ordered by `bookingChannel` (lexicographic: `ONLINE_PORTAL` before `RECEPTION_COUNTER`)
+  then by `AppointmentStatus` enum declaration order
   (`SCHEDULED, CONFIRMED, CHECKED_IN, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW`).
+- `bookingChannel`: the normalized channel label (see below). `ONLINE_PORTAL` for portal
+  bookings; `RECEPTION_COUNTER` for at-counter/legacy bookings.
 - `percentage`: `count × 100 / total`, `BigDecimal` scale 2, `RoundingMode.HALF_UP`.
-  Percentages across items are consistent with `total` (sum ≈ 100.00 modulo rounding).
+  Percentages across all items are consistent with `total` (sum ≈ 100.00 modulo rounding).
+
+## Booking channel semantics (NCL-08-CN-008-TC-02)
+
+A single request (without the `bookingChannel` filter) returns the data split by booking
+channel: one group for at-counter appointments and one group for patient-portal
+appointments. The two groups are returned in the same `items` list, distinguished by the
+`bookingChannel` field.
+
+| `bookingChannel` value | Stored `booking_channel` column value | Meaning |
+|---|---|---|
+| `ONLINE_PORTAL` | `ONLINE_PORTAL` | Booked through the patient portal |
+| `RECEPTION_COUNTER` | `NULL` | Booked at the reception counter / legacy in-person (the column is `NULL`) |
+
+`RECEPTION_COUNTER` is an API/reporting label only; it is **not** physically stored in the
+`booking_channel` column. `NULL` is the authoritative representation of at-counter bookings
+(the `ONLINE_PORTAL` literal is written by `PatientBookAppointmentService`; counter bookings
+do not set the column). No other database value is introduced.
 
 ## Status values (authoritative)
 
 `SCHEDULED`, `CONFIRMED`, `CHECKED_IN`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, `NO_SHOW`
-(enum `com.benhsoan.domain.appointment.enums.AppointmentStatus`).
+(enum `com.benhsoan.domain.appointment.enums.AppointmentStatus`). The report does **not**
+map technical statuses to high-level business labels (for example there is **no**
+`arrived = COMPLETED` aggregation): the raw `AppointmentStatus` value is returned as-is.
 
 ## Empty period (NCL-08-CN-008-TC-03)
 
@@ -71,11 +97,11 @@ The frontend should render the "no data" state when `total == 0` (or `items` is 
 
 ## Filters
 
-- `doctorId` and `bookingChannel` narrow the report population. Percentages are always
-  relative to the filtered population's `total`.
-- To "split by booking channel" (TC-02), call the endpoint once with
-  `bookingChannel=ONLINE_PORTAL` and once with `bookingChannel=RECEPTION_COUNTER`
-  (or omit the param for the overall view).
+- `doctorId` narrows the report population to one doctor. Percentages are always relative
+  to the filtered population's `total`.
+- `bookingChannel` optionally narrows the population to a single channel
+  (`ONLINE_PORTAL` or `RECEPTION_COUNTER`). When omitted, the response contains **both**
+  channels (the TC-02 breakdown). When provided, only that channel's rows are returned.
 
 ## Error responses
 

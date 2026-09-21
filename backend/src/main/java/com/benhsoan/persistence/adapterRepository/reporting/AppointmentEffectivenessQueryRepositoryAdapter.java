@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class AppointmentEffectivenessQueryRepositoryAdapter implements AppointmentEffectivenessQueryRepository {
 
+    private static final String COUNTER_CHANNEL = "RECEPTION_COUNTER";
+
     private final EntityManager entityManager;
 
     @Override
@@ -30,7 +32,7 @@ public class AppointmentEffectivenessQueryRepositoryAdapter implements Appointme
             String bookingChannel
     ) {
         String jpql = """
-                select a.status, count(a.id)
+                select coalesce(a.bookingChannel, :counterChannel), a.status, count(a.id)
                 from AppointmentEntity a
                 where a.startTime >= :fromInclusive
                   and a.startTime < :toExclusive
@@ -41,11 +43,12 @@ public class AppointmentEffectivenessQueryRepositoryAdapter implements Appointme
                         : "RECEPTION_COUNTER".equals(bookingChannel)
                                 ? "  and a.bookingChannel is null\n"
                                 : "\n")
-                + "group by a.status\n";
+                + "group by coalesce(a.bookingChannel, :counterChannel), a.status\n";
 
         var query = entityManager.createQuery(jpql, Object[].class)
                 .setParameter("fromInclusive", fromInclusive)
-                .setParameter("toExclusive", toExclusive);
+                .setParameter("toExclusive", toExclusive)
+                .setParameter("counterChannel", COUNTER_CHANNEL);
 
         if (doctorId != null) {
             query.setParameter("doctorId", doctorId);
@@ -56,8 +59,9 @@ public class AppointmentEffectivenessQueryRepositoryAdapter implements Appointme
 
         return query.getResultList().stream()
                 .map(row -> new AppointmentStatusCountSummary(
-                        (AppointmentStatus) row[0],
-                        ((Number) row[1]).longValue()))
+                        (String) row[0],
+                        (AppointmentStatus) row[1],
+                        ((Number) row[2]).longValue()))
                 .toList();
     }
 }
