@@ -56,6 +56,7 @@ import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordMo
 import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
 import CloseVisitModal from '../components/clinical/CloseVisitModal'
 import VitalSignHistoryModal from '../components/clinical/VitalSignHistoryModal'
+import VisitSummaryPrintModal from '../components/clinical/VisitSummaryPrintModal.jsx'
 import vitalSignApi from '../api/vitalSignApi'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
@@ -172,6 +173,7 @@ function MedicalEncounter() {
   }, [medicalRecord?.status, encounter?.medicalRecord?.status])
 
   const [closeVisitModalOpen, setCloseVisitModalOpen] = useState(false)
+  const [visitSummaryModalOpen, setVisitSummaryModalOpen] = useState(false)
 
   const canCloseThisVisit = useMemo(() => {
     const isProgress =
@@ -1564,6 +1566,16 @@ function MedicalEncounter() {
                 Lịch sử phiên bản
               </Button>
             )}
+            {!isRecordSigned && currentRecordId && (
+              <Button
+                icon={<PrinterOutlined />}
+                onClick={() => {
+                  message.warning('Bệnh án của lượt khám chưa được ký. Vui lòng ký bệnh án trước khi in phiếu tóm tắt.')
+                }}
+              >
+                In phiếu tóm tắt
+              </Button>
+            )}
             <Button
               icon={<CheckCircleOutlined />}
               onClick={() => saveRecord()}
@@ -1632,6 +1644,18 @@ function MedicalEncounter() {
                   onClick={() => setSignModalOpen(true)}
                 >
                   Xem chứng thư ký số
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PrinterOutlined />}
+                  onClick={() => setVisitSummaryModalOpen(true)}
+                  style={{
+                    background: '#0284c7',
+                    borderColor: '#0284c7',
+                    fontWeight: 600,
+                  }}
+                >
+                  In phiếu tóm tắt
                 </Button>
                 <Button
                   type="primary"
@@ -2364,6 +2388,14 @@ function MedicalEncounter() {
         patientName={selectedPatientObj?.fullName || encounter?.patient?.fullName}
         patientCode={selectedPatientObj?.patientCode || encounter?.patient?.patientCode}
       />
+
+      {visitSummaryModalOpen && (
+        <VisitSummaryPrintModal
+          open={visitSummaryModalOpen}
+          visitId={visitId || encounter?.visit?.id || encounter?.id}
+          onClose={() => setVisitSummaryModalOpen(false)}
+        />
+      )}
     </div>
   )
 }
