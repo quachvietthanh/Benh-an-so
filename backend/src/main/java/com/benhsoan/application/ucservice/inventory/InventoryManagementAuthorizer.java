@@ -13,14 +13,18 @@ class InventoryManagementAuthorizer {
 
     private static final String PHARMACIST_ROLE = "PHARMACIST";
     private static final String ADMIN_ROLE = "ADMIN";
+    private static final String PHARMACY_UPDATE_PERMISSION = "PHARMACY_UPDATE";
+    private static final String PHARMACY_READ_PERMISSION = "PHARMACY_READ";
 
     private final CurrentUserPort currentUserPort;
 
     void requirePharmacistOrAdmin() {
-        if (!currentUserPort.hasRole(PHARMACIST_ROLE)
+        if (!currentUserPort.hasPermission(PHARMACY_UPDATE_PERMISSION)
+                && !currentUserPort.hasPermission(PHARMACY_READ_PERMISSION)
+                && !currentUserPort.hasRole(PHARMACIST_ROLE)
                 && !currentUserPort.hasRole(ADMIN_ROLE)) {
             throw new AccessDeniedException(
-                    "Only pharmacists or admins are allowed to receive stock."
+                    "Only pharmacists or administrators with inventory permissions are allowed to manage inventory stock."
             );
         }
     }

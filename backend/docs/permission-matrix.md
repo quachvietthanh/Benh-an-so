@@ -40,6 +40,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `POST /medicines` → `create`; `PUT /medicines/{id}` → `update`; `PATCH /medicines/{id}/status` → `updateStatus` | `PHARMACY_CREATE` / `PHARMACY_UPDATE` | Giữ kiểm tra SKU, tồn tại, trạng thái | Chuyển role tổng quát, giữ authorizer |
 | `GET /inventory/stocks`, `/batches`, `/low-stock`, `/expiry-alerts` → inventory read methods | `PHARMACY_READ` | Giữ filter tồn kho/hạn dùng | Chuyển từ role |
 | `POST /inventory/receipts` → `InventoryReceiptController.receiveStock` | `PHARMACY_CREATE` | Lô hàng, số lượng, người nhận | Chuyển role tổng quát, giữ authorizer |
+| `POST /inventory/batches/{id}/adjust`, `POST /inventory/batches/{id}/discard` → `InventoryController.adjustBatchStock`, `discardExpiredBatch` | `PHARMACY_UPDATE` | NCL-06-CN-010: PHARMACIST hoặc ADMIN; yêu cầu lý do (QTN-32); discard chỉ khi hết hạn (QTN-14); ghi nhận chênh lệch StockMovement và cập nhật tồn catalog | Đã triển khai và có acceptance-test coverage |
 | `POST /appointments` → `AppointmentController.create` | `APPOINTMENT_CREATE` | Bác sĩ tồn tại/active, không trùng lịch; ADMIN/RECEPTIONIST business authorization | Permission + service context |
 | `GET /appointments`, `/{id}`, `/overdue` → read methods | `APPOINTMENT_READ` | Phạm vi lịch hẹn/bác sĩ nếu use case áp dụng | Chuyển từ role |
 | `POST /appointments/{id}/reminder`; `PATCH /appointments/{id}/cancel`, `/{id}/no-show` | `APPOINTMENT_UPDATE` | Chỉ transition trạng thái hợp lệ; ADMIN/RECEPTIONIST business authorization | Permission + service context |
