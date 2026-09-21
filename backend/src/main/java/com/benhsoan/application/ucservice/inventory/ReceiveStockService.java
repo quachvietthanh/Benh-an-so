@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.inventory.InventoryReceipt;
 import com.benhsoan.domain.inventory.InventoryReceiptItem;
 import com.benhsoan.domain.inventory.MedicineBatch;
+import com.benhsoan.domain.inventory.StockMovement;
+import com.benhsoan.domain.inventory.enums.StockMovementReferenceType;
+import com.benhsoan.domain.inventory.enums.StockMovementType;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.inventory.ReceiveStockCommand;
 import com.benhsoan.port.dto.command.inventory.ReceiveStockItemCommand;
@@ -25,6 +28,7 @@ import com.benhsoan.port.dto.result.InventoryReceiptWarningResult;
 import com.benhsoan.port.inbound.inventory.ReceiveStockUseCase;
 import com.benhsoan.port.outbound.repository.inventory.InventoryReceiptRepository;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
+import com.benhsoan.port.outbound.repository.inventory.StockMovementRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
@@ -41,6 +45,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
     private final MedicineRepository medicineRepository;
     private final MedicineBatchRepository medicineBatchRepository;
     private final InventoryReceiptRepository inventoryReceiptRepository;
+    private final StockMovementRepository stockMovementRepository;
     private final InventoryManagementAuthorizer authorizer;
     private final InventoryReceiptResultMapper resultMapper;
     private final EligibleStockSnapshotService eligibleStockSnapshotService;
@@ -66,6 +71,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
 
         List<MedicineBatch> batches = new ArrayList<>();
         List<InventoryReceiptItem> receiptItems = new ArrayList<>();
+        List<StockMovement> stockMovements = new ArrayList<>();
         List<InventoryReceiptWarningResult> warnings = new ArrayList<>();
         Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>(
                 eligibleStockSnapshotService.snapshotEligibleStockQuantities(medicineIds, today)
@@ -95,6 +101,8 @@ public class ReceiveStockService implements ReceiveStockUseCase {
             }
 
             UUID batchId = batch.getId();
+            int quantityAfter = batch.getQuantity();
+            int quantityBefore = quantityAfter - itemCommand.quantity();
 
             InventoryReceiptItem item = InventoryReceiptItem.create(
                     itemId,
@@ -106,6 +114,21 @@ public class ReceiveStockService implements ReceiveStockUseCase {
                     now
             );
             receiptItems.add(item);
+
+            stockMovements.add(StockMovement.create(
+                    UUID.randomUUID(),
+                    medicineId,
+                    batchId,
+                    StockMovementType.RECEIPT,
+                    StockMovementReferenceType.INVENTORY_RECEIPT,
+                    receiptId,
+                    itemCommand.quantity(),
+                    quantityBefore,
+                    quantityAfter,
+                    receivedBy,
+                    now,
+                    "Received via inventory receipt " + receiptId
+            ));
 
             medicineRepository.updateStockQuantity(medicineId, itemCommand.quantity());
         }
@@ -120,6 +143,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
         );
 
         inventoryReceiptRepository.save(receipt);
+        stockMovementRepository.saveAll(stockMovements);
         lowStockAlertTransitionService.handleEligibleStockTransitions(
                 medicineIds,
                 beforeEligibleQuantities,
@@ -129,6 +153,7 @@ public class ReceiveStockService implements ReceiveStockUseCase {
 
         return resultMapper.toResult(receipt, batches, warnings);
     }
+
 
     private void validateItem(ReceiveStockItemCommand item, Instant now) {
         if (item.medicineId() == null) {

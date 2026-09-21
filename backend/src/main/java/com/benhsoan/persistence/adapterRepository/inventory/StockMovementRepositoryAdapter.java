@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.inventory;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,8 @@ import com.benhsoan.domain.inventory.enums.StockMovementReferenceType;
 import com.benhsoan.persistence.entity.inventory.StockMovementEntity;
 import com.benhsoan.persistence.jpaRepository.inventory.JpaStockMovementRepository;
 import com.benhsoan.persistence.mapper.inventory.StockMovementPersistenceMapper;
+import com.benhsoan.port.dto.result.inventory.MedicineMovementSummaryResult;
+import com.benhsoan.port.dto.result.inventory.MedicineStockQuantityResult;
 import com.benhsoan.port.outbound.repository.inventory.StockMovementRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -59,4 +62,47 @@ public class StockMovementRepositoryAdapter implements StockMovementRepository {
                 .map(mapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<MedicineStockQuantityResult> sumQuantitiesBefore(Instant beforeInstant) {
+        return jpaRepository.sumQuantitiesBefore(beforeInstant).stream()
+                .map(proj -> new MedicineStockQuantityResult(
+                        proj.getMedicineId(),
+                        proj.getTotalQuantity() != null ? proj.getTotalQuantity() : 0L
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<MedicineStockQuantityResult> sumQuantitiesBeforeForMedicine(UUID medicineId, Instant beforeInstant) {
+        return jpaRepository.sumQuantitiesBeforeForMedicine(medicineId, beforeInstant).stream()
+                .map(proj -> new MedicineStockQuantityResult(
+                        proj.getMedicineId(),
+                        proj.getTotalQuantity() != null ? proj.getTotalQuantity() : 0L
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<MedicineMovementSummaryResult> sumMovementsBetween(Instant from, Instant to) {
+        return jpaRepository.sumMovementsBetween(from, to).stream()
+                .map(proj -> new MedicineMovementSummaryResult(
+                        proj.getMedicineId(),
+                        proj.getMovementType(),
+                        proj.getTotalQuantityChange() != null ? proj.getTotalQuantityChange() : 0L
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<MedicineMovementSummaryResult> sumMovementsBetweenForMedicine(UUID medicineId, Instant from, Instant to) {
+        return jpaRepository.sumMovementsBetweenForMedicine(medicineId, from, to).stream()
+                .map(proj -> new MedicineMovementSummaryResult(
+                        proj.getMedicineId(),
+                        proj.getMovementType(),
+                        proj.getTotalQuantityChange() != null ? proj.getTotalQuantityChange() : 0L
+                ))
+                .toList();
+    }
 }
+

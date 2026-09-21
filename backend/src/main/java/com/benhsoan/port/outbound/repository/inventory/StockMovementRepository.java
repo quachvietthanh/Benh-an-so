@@ -1,11 +1,14 @@
 package com.benhsoan.port.outbound.repository.inventory;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.benhsoan.domain.inventory.StockMovement;
 import com.benhsoan.domain.inventory.enums.StockMovementReferenceType;
+import com.benhsoan.port.dto.result.inventory.MedicineMovementSummaryResult;
+import com.benhsoan.port.dto.result.inventory.MedicineStockQuantityResult;
 
 public interface StockMovementRepository {
 
@@ -18,4 +21,13 @@ public interface StockMovementRepository {
     List<StockMovement> findByMedicineBatchId(UUID medicineBatchId);
 
     List<StockMovement> findByReference(StockMovementReferenceType referenceType, UUID referenceId);
+
+    List<MedicineStockQuantityResult> sumQuantitiesBefore(Instant beforeInstant);
+
+    List<MedicineStockQuantityResult> sumQuantitiesBeforeForMedicine(UUID medicineId, Instant beforeInstant);
+
+    List<MedicineMovementSummaryResult> sumMovementsBetween(Instant from, Instant to);
+
+    List<MedicineMovementSummaryResult> sumMovementsBetweenForMedicine(UUID medicineId, Instant from, Instant to);
 }
+

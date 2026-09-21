@@ -48,6 +48,8 @@ class ReceiveStockServiceTest {
     private final MedicineRepository medicineRepository = mock(MedicineRepository.class);
     private final MedicineBatchRepository medicineBatchRepository = mock(MedicineBatchRepository.class);
     private final InventoryReceiptRepository inventoryReceiptRepository = mock(InventoryReceiptRepository.class);
+    private final com.benhsoan.port.outbound.repository.inventory.StockMovementRepository stockMovementRepository =
+            mock(com.benhsoan.port.outbound.repository.inventory.StockMovementRepository.class);
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
     private final ClockPort clockPort = mock(ClockPort.class);
     private final LowStockAlertTransitionService lowStockAlertTransitionService = mock(LowStockAlertTransitionService.class);
@@ -69,6 +71,7 @@ class ReceiveStockServiceTest {
                 medicineRepository,
                 medicineBatchRepository,
                 inventoryReceiptRepository,
+                stockMovementRepository,
                 authorizer,
                 resultMapper,
                 eligibleStockSnapshotService,
@@ -77,6 +80,7 @@ class ReceiveStockServiceTest {
                 clockPort
         );
     }
+
 
     @Test
     void successfullyReceivesStockForPharmacist() {
@@ -117,8 +121,10 @@ class ReceiveStockServiceTest {
 
         verify(medicineRepository).updateStockQuantity(medicineId, 100);
         verify(inventoryReceiptRepository).save(any());
+        verify(stockMovementRepository).saveAll(any());
         verify(lowStockAlertTransitionService).handleEligibleStockTransitions(any(), any(), eq(LocalDate.of(2026, 8, 7)), eq(NOW));
     }
+
 
     @Test
     void successfullyReceivesStockForAdmin() {
