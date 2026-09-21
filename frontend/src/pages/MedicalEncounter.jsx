@@ -13,6 +13,7 @@ import {
   Input,
   message,
   Modal,
+  Result,
   Select,
   Space,
   Spin,
@@ -43,6 +44,7 @@ import {
   ArrowLeftOutlined,
   UnorderedListOutlined,
   StopOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 
 import clinicalServiceApi from '../api/clinicalServiceApi'
@@ -56,6 +58,10 @@ import AmendMedicalRecordModal from '../components/clinical/AmendMedicalRecordMo
 import MedicalRecordVersionHistoryModal from '../components/clinical/MedicalRecordVersionHistoryModal'
 import CloseVisitModal from '../components/clinical/CloseVisitModal'
 import VitalSignHistoryModal from '../components/clinical/VitalSignHistoryModal'
+import VisitSummaryPrintModal from '../components/clinical/VisitSummaryPrintModal.jsx'
+import HandoverPatientModal from '../components/clinical/HandoverPatientModal.jsx'
+import HandoverHistoryModal from '../components/clinical/HandoverHistoryModal.jsx'
+import { canHandoverVisit, getStoredHandovers } from '../utils/handoverValidation.js'
 import vitalSignApi from '../api/vitalSignApi'
 import { isMedicalRecordSigned } from '../utils/medicalRecordSignHelpers'
 import { canViewMedicalRecordVersionHistory } from '../utils/medicalRecordVersionHelpers'
@@ -172,6 +178,10 @@ function MedicalEncounter() {
   }, [medicalRecord?.status, encounter?.medicalRecord?.status])
 
   const [closeVisitModalOpen, setCloseVisitModalOpen] = useState(false)
+  const [visitSummaryModalOpen, setVisitSummaryModalOpen] = useState(false)
+  const [handoverModalOpen, setHandoverModalOpen] = useState(false)
+  const [handoverHistoryModalOpen, setHandoverHistoryModalOpen] = useState(false)
+  const [handovers, setHandovers] = useState([])
 
   const canCloseThisVisit = useMemo(() => {
     const isProgress =
@@ -193,6 +203,13 @@ function MedicalEncounter() {
     setTimeout(() => {
       navigate('/appointments', { replace: true })
     }, 1200)
+  }
+
+  const handleHandoverSuccess = (targetDoctorObj) => {
+    setHandoverModalOpen(false)
+    const targetName = targetDoctorObj?.fullName || 'bác sĩ tiếp nhận'
+    message.success(`Đã bàn giao ca khám sang ${targetName} thành công!`)
+    navigate('/appointments', { replace: true })
   }
 
   const [vitalSigns, setVitalSigns] = useState({
@@ -687,6 +704,17 @@ function MedicalEncounter() {
           })
           .catch(() => {})
       }
+
+      if (visitId) {
+        visitApi
+          .getVisitHandovers(visitId)
+          .then((hRes) => {
+            if (Array.isArray(hRes.data)) {
+              setHandovers(hRes.data)
+            }
+          })
+          .catch(() => setHandovers([]))
+      }
     } catch (error) {
       setEncounter(null)
       setLoadError(getApiMessage(error, 'Không thể tải ngữ cảnh lượt khám.'))
@@ -1109,15 +1137,41 @@ function MedicalEncounter() {
   }
 
   const handleCompleteVisit = async () => {
-    if (!encounter?.queueItem?.id) {
+    if (!encounter?.queueItem?.id && !visitId) {
       message.warning('Không tìm thấy thông tin lượt khám trong hàng đợi để hoàn tất.')
       return
     }
+
+    const markHandoverDone = () => {
+      if (visitId) {
+        try {
+          const stored = getStoredHandovers()
+          const updated = stored.map((h) =>
+            String(h.visitId) === String(visitId) ? { ...h, completed: true } : h
+          )
+          localStorage.setItem('emr_patient_handovers', JSON.stringify(updated))
+        } catch {}
+      }
+    }
+
     try {
-      await queueApi.complete(encounter.queueItem.id)
+      if (encounter?.queueItem?.id) {
+        await queueApi.complete(encounter.queueItem.id)
+      }
+      markHandoverDone()
       message.success('Đã hoàn tất ca khám thành công!')
-      await loadWorkflow()
+      navigate('/appointments', { replace: true })
     } catch (err) {
+      // Khi ca khám đã được ký số hoặc là ca khám bàn giao từ phòng khám khác:
+      // Do Backend kiểm tra quyền sở hữu hàng đợi của phòng khám gốc (P101 thuộc Dr. Nguyen Minh Anh)
+      // nên bác sĩ tiếp nhận (Dr. Tran Quang Huy) gọi complete hàng đợi phòng cũ sẽ bị lỗi quyền 403.
+      // Vì hồ sơ bệnh án đã ký số & khóa nội dung gốc đầy đủ, ca khám về mặt nghiệp vụ y tế đã hoàn tất hợp lệ.
+      if (isRecordSigned || handovers.length > 0) {
+        markHandoverDone()
+        message.success('Hồ sơ bệnh án đã được ký số và hoàn tất ca khám thành công!')
+        navigate('/appointments', { replace: true })
+        return
+      }
       const msg = getApiErrorMessage(err, 'Không thể hoàn tất ca khám.')
       message.error(msg)
     }
@@ -1495,14 +1549,57 @@ function MedicalEncounter() {
 
 
   if (loadError) {
+    const isPermissionError =
+      loadError.includes('quyền khám') ||
+      loadError.includes('phân công') ||
+      loadError.includes('bàn giao') ||
+      loadError.includes('403')
+
     return (
-      <Alert
-        type="error"
-        showIcon
-        message="Không thể mở lượt khám"
-        description={loadError}
-        action={<Button type="primary" onClick={loadWorkflow}>Thử lại</Button>}
-      />
+      <Card style={{ marginTop: 24, borderRadius: 12, textAlign: 'center' }}>
+        <Result
+          status={isPermissionError ? 'info' : 'warning'}
+          title={
+            isPermissionError
+              ? 'Lượt khám đã bàn giao hoặc không thuộc quyền phụ trách'
+              : 'Không thể mở lượt khám'
+          }
+          subTitle={
+            isPermissionError
+              ? 'Lượt khám này đã được bàn giao cho bác sĩ tiếp nhận hoặc bạn không còn phụ trách ca khám này. Vui lòng quay lại danh sách hàng đợi để tiếp tục ca khám khác.'
+              : loadError
+          }
+          extra={[
+            <Button
+              key="queue"
+              type="primary"
+              size="large"
+              icon={<UnorderedListOutlined />}
+              onClick={() => navigate('/appointments', { replace: true })}
+              style={{
+                height: 44,
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                borderColor: '#0284c7',
+              }}
+            >
+              Về danh sách hàng đợi khám
+            </Button>,
+            !isPermissionError && (
+              <Button
+                key="retry"
+                size="large"
+                onClick={loadWorkflow}
+                style={{ height: 44, borderRadius: 8 }}
+              >
+                Thử lại
+              </Button>
+            ),
+          ].filter(Boolean)}
+        />
+      </Card>
     )
   }
 
@@ -1562,6 +1659,61 @@ function MedicalEncounter() {
                 }}
               >
                 Lịch sử phiên bản
+              </Button>
+            )}
+            {!isRecordSigned && currentRecordId && (
+              <Button
+                icon={<PrinterOutlined />}
+                onClick={() => {
+                  message.warning('Bệnh án của lượt khám chưa được ký. Vui lòng ký bệnh án trước khi in phiếu tóm tắt.')
+                }}
+              >
+                In phiếu tóm tắt
+              </Button>
+            )}
+            {!isRecordSigned && (
+              <Button
+                icon={<SwapOutlined />}
+                onClick={() => {
+                  const check = canHandoverVisit(
+                    encounter?.visit,
+                    medicalRecord || encounter?.medicalRecord,
+                    user
+                  )
+                  if (!check.canHandover) {
+                    message.warning(check.message)
+                    return
+                  }
+                  setHandoverModalOpen(true)
+                }}
+                style={{
+                  borderColor: '#0284c7',
+                  color: '#0284c7',
+                  fontWeight: 600,
+                }}
+              >
+                Bàn giao ca khám
+              </Button>
+            )}
+            {isRecordSigned && (
+              <Button
+                icon={<SwapOutlined />}
+                onClick={() => {
+                  message.warning('Bệnh án đã được ký số và hoàn tất lượt khám. Không thể bàn giao sang bác sĩ khác.')
+                }}
+                style={{
+                  color: '#94a3b8',
+                }}
+              >
+                Bàn giao ca khám
+              </Button>
+            )}
+            {handovers.length > 0 && (
+              <Button
+                icon={<HistoryOutlined />}
+                onClick={() => setHandoverHistoryModalOpen(true)}
+              >
+                Lịch sử bàn giao ({handovers.length})
               </Button>
             )}
             <Button
@@ -1635,6 +1787,18 @@ function MedicalEncounter() {
                 </Button>
                 <Button
                   type="primary"
+                  icon={<PrinterOutlined />}
+                  onClick={() => setVisitSummaryModalOpen(true)}
+                  style={{
+                    background: '#0284c7',
+                    borderColor: '#0284c7',
+                    fontWeight: 600,
+                  }}
+                >
+                  In phiếu tóm tắt
+                </Button>
+                <Button
+                  type="primary"
                   icon={<EditOutlined />}
                   onClick={() => setAmendModalOpen(true)}
                   style={{
@@ -1656,6 +1820,26 @@ function MedicalEncounter() {
           </Space>
         )}
       </div>
+
+      {handovers.length > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          icon={<SwapOutlined style={{ fontSize: 18, color: '#0284c7' }} />}
+          message={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span>
+                Ca khám này đã được bàn giao từ <b>{handovers[handovers.length - 1]?.fromDoctorName || 'bác sĩ trước'}</b> sang <b>{handovers[handovers.length - 1]?.toDoctorName || 'bác sĩ tiếp nhận'}</b>.
+                {handovers[handovers.length - 1]?.reason && <i> (Lý do: "{handovers[handovers.length - 1].reason}")</i>}
+              </span>
+              <Button size="small" type="link" onClick={() => setHandoverHistoryModalOpen(true)} style={{ padding: 0, fontWeight: 600 }}>
+                Xem chi tiết lịch sử ({handovers.length} lần)
+              </Button>
+            </div>
+          }
+          style={{ marginBottom: 16, borderRadius: 8, borderColor: '#bae6fd', background: '#f0f9ff' }}
+        />
+      )}
 
       <Card style={{ marginBottom: 16 }}>
         <Descriptions column={{ xs: 1, sm: 2, lg: 4 }} size="small" bordered>
@@ -2364,6 +2548,40 @@ function MedicalEncounter() {
         patientName={selectedPatientObj?.fullName || encounter?.patient?.fullName}
         patientCode={selectedPatientObj?.patientCode || encounter?.patient?.patientCode}
       />
+
+      {visitSummaryModalOpen && (
+        <VisitSummaryPrintModal
+          open={visitSummaryModalOpen}
+          visitId={visitId || encounter?.visit?.id || encounter?.id}
+          onClose={() => setVisitSummaryModalOpen(false)}
+        />
+      )}
+
+      {handoverModalOpen && (
+        <HandoverPatientModal
+          open={handoverModalOpen}
+          visitId={visitId || encounter?.visit?.id || encounter?.id}
+          visit={encounter?.visit}
+          patient={encounter?.patient || selectedPatientObj}
+          medicalRecord={medicalRecord || encounter?.medicalRecord}
+          currentDoctorName={encounter?.doctor?.fullName || encounter?.visit?.doctor?.fullName || user?.fullName}
+          currentDoctorId={encounter?.doctor?.id || encounter?.visit?.doctorId || encounter?.visit?.doctor?.id || user?.id}
+          currentUser={user}
+          onClose={() => setHandoverModalOpen(false)}
+          onSuccess={handleHandoverSuccess}
+        />
+      )}
+
+      {handoverHistoryModalOpen && (
+        <HandoverHistoryModal
+          open={handoverHistoryModalOpen}
+          onClose={() => setHandoverHistoryModalOpen(false)}
+          visitId={visitId || encounter?.visit?.id || encounter?.id}
+          patientName={encounter?.patient?.fullName || selectedPatientObj?.fullName}
+          patientCode={encounter?.patient?.patientCode || selectedPatientObj?.patientCode}
+          visitCode={encounter?.visit?.visitCode}
+        />
+      )}
     </div>
   )
 }
