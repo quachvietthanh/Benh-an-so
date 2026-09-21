@@ -51,126 +51,142 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = InventoryController.class)
-@Import({InventoryRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
-        RequirePermissionAspect.class, PermissionEvaluator.class, InventoryAdjustmentSecurityIntegrationTest.AspectTestConfig.class})
+@Import({ InventoryRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class,
+                RequirePermissionAspect.class, PermissionEvaluator.class,
+                InventoryAdjustmentSecurityIntegrationTest.AspectTestConfig.class })
 @DisplayName("Inventory Adjustment & Discard Security Integration Tests (TC-04)")
 class InventoryAdjustmentSecurityIntegrationTest {
 
-    @TestConfiguration
-    @EnableAspectJAutoProxy(proxyTargetClass = true)
-    static class AspectTestConfig {
-    }
+        @TestConfiguration
+        @EnableAspectJAutoProxy(proxyTargetClass = true)
+        static class AspectTestConfig {
+        }
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @MockitoBean private ListInventoryStocksUseCase listInventoryStocksUseCase;
-    @MockitoBean private ListInventoryBatchesUseCase listInventoryBatchesUseCase;
-    @MockitoBean private ListInventoryExpiryAlertsUseCase listInventoryExpiryAlertsUseCase;
-    @MockitoBean private ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
-    @MockitoBean private AdjustBatchStockUseCase adjustBatchStockUseCase;
-    @MockitoBean private DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
-    @MockitoBean private JwtTokenPort jwtTokenPort;
-    @MockitoBean private UserRepository userRepository;
-    @MockitoBean private UserSessionRepository userSessionRepository;
-    @MockitoBean private ClockPort clockPort;
-    @MockitoBean private RoleRepository roleRepository;
-    @MockitoBean private AuditLogRepository auditLogRepository;
-    @MockitoBean private CurrentUserPort currentUserPort;
+        @MockitoBean
+        private ListInventoryStocksUseCase listInventoryStocksUseCase;
+        @MockitoBean
+        private ListInventoryBatchesUseCase listInventoryBatchesUseCase;
+        @MockitoBean
+        private ListInventoryExpiryAlertsUseCase listInventoryExpiryAlertsUseCase;
+        @MockitoBean
+        private ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
+        @MockitoBean
+        private AdjustBatchStockUseCase adjustBatchStockUseCase;
+        @MockitoBean
+        private DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
+        @MockitoBean
+        private JwtTokenPort jwtTokenPort;
+        @MockitoBean
+        private UserRepository userRepository;
+        @MockitoBean
+        private UserSessionRepository userSessionRepository;
+        @MockitoBean
+        private ClockPort clockPort;
+        @MockitoBean
+        private RoleRepository roleRepository;
+        @MockitoBean
+        private AuditLogRepository auditLogRepository;
+        @MockitoBean
+        private CurrentUserPort currentUserPort;
 
-    @Test
-    @DisplayName("Allows pharmacist with PHARMACY_UPDATE to adjust batch stock")
-    void allowsPharmacistToAdjustStock() throws Exception {
-        UUID batchId = UUID.randomUUID();
-        when(adjustBatchStockUseCase.adjustStock(any())).thenReturn(new BatchAdjustmentResult(
-                batchId, UUID.randomUUID(), "TH001", "Paracetamol", "BATCH-01",
-                LocalDate.of(2027, 1, 1), 100, 85, -15, BatchStatus.ACTIVE,
-                "Kiểm kê", UUID.randomUUID(), Instant.now()
-        ));
+        @Test
+        @DisplayName("Allows pharmacist with PHARMACY_UPDATE to adjust batch stock")
+        void allowsPharmacistToAdjustStock() throws Exception {
+                UUID batchId = UUID.randomUUID();
+                when(adjustBatchStockUseCase.adjustStock(any())).thenReturn(new BatchAdjustmentResult(
+                                batchId, UUID.randomUUID(), "TH001", "Paracetamol", "BATCH-01",
+                                LocalDate.of(2027, 1, 1), 100, 85, -15, BatchStatus.ACTIVE,
+                                "Kiểm kê", UUID.randomUUID(), Instant.now()));
 
-        mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"actualQuantity\": 85, \"reason\": \"Kiểm kê\"}")
-                        .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_UPDATE"))))
-                .andExpect(status().isOk());
-    }
+                mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"actualQuantity\": 85, \"reason\": \"Kiểm kê\"}")
+                                .with(user("pharmacist")
+                                                .authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_UPDATE"))))
+                                .andExpect(status().isOk());
+        }
 
-    @Test
-    @DisplayName("Allows pharmacist with PHARMACY_UPDATE to discard expired batch")
-    void allowsPharmacistToDiscardExpiredBatch() throws Exception {
-        UUID batchId = UUID.randomUUID();
-        when(discardExpiredBatchUseCase.discardExpired(any())).thenReturn(new DiscardBatchResult(
-                batchId, UUID.randomUUID(), "TH001", "Paracetamol", "BATCH-01",
-                LocalDate.of(2026, 9, 1), 50, BatchStatus.EXPIRED,
-                "Hủy hết hạn", UUID.randomUUID(), Instant.now()
-        ));
+        @Test
+        @DisplayName("Allows pharmacist with PHARMACY_UPDATE to discard expired batch")
+        void allowsPharmacistToDiscardExpiredBatch() throws Exception {
+                UUID batchId = UUID.randomUUID();
+                when(discardExpiredBatchUseCase.discardExpired(any())).thenReturn(new DiscardBatchResult(
+                                batchId, UUID.randomUUID(), "TH001", "Paracetamol", "BATCH-01",
+                                LocalDate.of(2026, 9, 1), 50, BatchStatus.EXPIRED,
+                                "Hủy hết hạn", UUID.randomUUID(), Instant.now()));
 
-        mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\": \"Hủy hết hạn\"}")
-                        .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_UPDATE"))))
-                .andExpect(status().isOk());
-    }
+                mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\": \"Hủy hết hạn\"}")
+                                .with(user("pharmacist")
+                                                .authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_UPDATE"))))
+                                .andExpect(status().isOk());
+        }
 
-    @Test
-    @DisplayName("TC-04: Forbids receptionist and writes ACCESS_DENIED audit log when attempting to adjust inventory")
-    void forbidsReceptionistFromAdjustingStockAndAuditsDeniedAttempt() throws Exception {
-        UUID batchId = UUID.randomUUID();
-        UUID receptionistId = UUID.randomUUID();
-        when(currentUserPort.getCurrentUserId()).thenReturn(receptionistId);
+        @Test
+        @DisplayName("TC-04: Forbids receptionist and writes ACCESS_DENIED audit log when attempting to adjust inventory")
+        void forbidsReceptionistFromAdjustingStockAndAuditsDeniedAttempt() throws Exception {
+                UUID batchId = UUID.randomUUID();
+                UUID receptionistId = UUID.randomUUID();
+                when(currentUserPort.getCurrentUserId()).thenReturn(receptionistId);
 
-        mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"actualQuantity\": 85, \"reason\": \"Lễ tân thử chỉnh kho\"}")
-                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
-                .andExpect(status().isForbidden());
+                mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"actualQuantity\": 85, \"reason\": \"Lễ tân thử chỉnh kho\"}")
+                                .with(user("receptionist")
+                                                .authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
+                                .andExpect(status().isForbidden());
 
-        verify(auditLogRepository).save(argThat((AuditLog log) ->
-                log.getActionType() == ActionType.ACCESS_DENIED
-                        && log.getResourceType() == ResourceType.PERMISSION
-        ));
-    }
+                verify(auditLogRepository)
+                                .save(argThat((AuditLog log) -> log.getActionType() == ActionType.ACCESS_DENIED
+                                                && log.getResourceType() == ResourceType.PERMISSION));
+        }
 
-    @Test
-    @DisplayName("TC-04: Forbids receptionist and writes ACCESS_DENIED audit log when attempting to discard expired batch")
-    void forbidsReceptionistFromDiscardingBatchAndAuditsDeniedAttempt() throws Exception {
-        UUID batchId = UUID.randomUUID();
-        UUID receptionistId = UUID.randomUUID();
-        when(currentUserPort.getCurrentUserId()).thenReturn(receptionistId);
+        @Test
+        @DisplayName("TC-04: Forbids receptionist and writes ACCESS_DENIED audit log when attempting to discard expired batch")
+        void forbidsReceptionistFromDiscardingBatchAndAuditsDeniedAttempt() throws Exception {
+                UUID batchId = UUID.randomUUID();
+                UUID receptionistId = UUID.randomUUID();
+                when(currentUserPort.getCurrentUserId()).thenReturn(receptionistId);
 
-        mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\": \"Lễ tân thử hủy lô\"}")
-                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
-                .andExpect(status().isForbidden());
+                mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\": \"Lễ tân thử hủy lô\"}")
+                                .with(user("receptionist")
+                                                .authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
+                                .andExpect(status().isForbidden());
 
-        verify(auditLogRepository).save(argThat((AuditLog log) ->
-                log.getActionType() == ActionType.ACCESS_DENIED
-                        && log.getResourceType() == ResourceType.PERMISSION
-        ));
-    }
+                verify(auditLogRepository)
+                                .save(argThat((AuditLog log) -> log.getActionType() == ActionType.ACCESS_DENIED
+                                                && log.getResourceType() == ResourceType.PERMISSION));
+        }
 
-    @Test
-    @DisplayName("Forbids doctor (with only PHARMACY_READ) from adjusting inventory")
-    void forbidsDoctorFromAdjustingStock() throws Exception {
-        UUID batchId = UUID.randomUUID();
+        @Test
+        @DisplayName("Forbids doctor (with only PHARMACY_READ) from adjusting inventory")
+        void forbidsDoctorFromAdjustingStock() throws Exception {
+                UUID batchId = UUID.randomUUID();
 
-        mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"actualQuantity\": 85, \"reason\": \"Bác sĩ thử chỉnh kho\"}")
-                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
-                .andExpect(status().isForbidden());
-    }
+                mockMvc.perform(post("/inventory/batches/{id}/adjust", batchId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"actualQuantity\": 85, \"reason\": \"Bác sĩ thử chỉnh kho\"}")
+                                .with(user("doctor")
+                                                .authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
+                                .andExpect(status().isForbidden());
+        }
 
-    @Test
-    @DisplayName("Forbids doctor (with only PHARMACY_READ) from discarding expired batch")
-    void forbidsDoctorFromDiscardingBatch() throws Exception {
-        UUID batchId = UUID.randomUUID();
+        @Test
+        @DisplayName("Forbids doctor (with only PHARMACY_READ) from discarding expired batch")
+        void forbidsDoctorFromDiscardingBatch() throws Exception {
+                UUID batchId = UUID.randomUUID();
 
-        mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\": \"Bác sĩ thử hủy lô\"}")
-                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
-                .andExpect(status().isForbidden());
-    }
+                mockMvc.perform(post("/inventory/batches/{id}/discard", batchId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\": \"Bác sĩ thử hủy lô\"}")
+                                .with(user("doctor")
+                                                .authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
+                                .andExpect(status().isForbidden());
+        }
 }

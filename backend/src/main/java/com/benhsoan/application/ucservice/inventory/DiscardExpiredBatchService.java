@@ -71,12 +71,12 @@ public class DiscardExpiredBatchService implements DiscardExpiredBatchUseCase {
         LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
 
         Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>(
-                eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), today)
-        );
+                eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), today));
 
         int discardedQuantity = batch.getQuantity();
 
-        // Performs domain-level expiry check (expiryDate < today), status != EXPIRED, quantity > 0
+        // Performs domain-level expiry check (expiryDate < today), status != EXPIRED,
+        // quantity > 0
         batch.discardExpired(today, now);
         medicineBatchRepository.save(batch);
 
@@ -97,16 +97,14 @@ public class DiscardExpiredBatchService implements DiscardExpiredBatchUseCase {
                 0,
                 performedBy,
                 now,
-                trimmedReason
-        );
+                trimmedReason);
         stockMovementRepository.save(movement);
 
         lowStockAlertTransitionService.handleEligibleStockTransitions(
                 List.of(medicineId),
                 beforeEligibleQuantities,
                 today,
-                now
-        );
+                now);
 
         String detailJson = buildAuditDetail(batch, discardedQuantity, trimmedReason);
         auditLogRepository.save(AuditLog.create(
@@ -116,8 +114,7 @@ public class DiscardExpiredBatchService implements DiscardExpiredBatchUseCase {
                 medicineId,
                 detailJson,
                 null,
-                now
-        ));
+                now));
 
         return new DiscardBatchResult(
                 batch.getId(),
@@ -130,8 +127,7 @@ public class DiscardExpiredBatchService implements DiscardExpiredBatchUseCase {
                 batch.getStatus(),
                 trimmedReason,
                 performedBy,
-                now
-        );
+                now);
     }
 
     private void validateCommand(DiscardExpiredBatchCommand command) {
@@ -149,8 +145,7 @@ public class DiscardExpiredBatchService implements DiscardExpiredBatchUseCase {
     private String buildAuditDetail(
             MedicineBatch batch,
             int discardedQuantity,
-            String reason
-    ) {
+            String reason) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("batchId", batch.getId().toString());
         detail.put("batchNumber", batch.getBatchNumber());

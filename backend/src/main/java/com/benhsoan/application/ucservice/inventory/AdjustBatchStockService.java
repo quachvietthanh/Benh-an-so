@@ -69,8 +69,7 @@ public class AdjustBatchStockService implements AdjustBatchStockUseCase {
 
         if (quantityChange == 0) {
             throw new ValidationException(
-                    "Số lượng kiểm kê thực tế trùng khớp với tồn kho hiện tại, không có chênh lệch để điều chỉnh."
-            );
+                    "Số lượng kiểm kê thực tế trùng khớp với tồn kho hiện tại, không có chênh lệch để điều chỉnh.");
         }
 
         Instant now = clockPort.now();
@@ -81,8 +80,7 @@ public class AdjustBatchStockService implements AdjustBatchStockUseCase {
                 .orElseThrow(() -> new MedicineNotFoundException(medicineId));
 
         Map<UUID, Integer> beforeEligibleQuantities = new HashMap<>(
-                eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), today)
-        );
+                eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), today));
 
         batch.adjustStock(quantityAfter, today, now);
 
@@ -105,16 +103,14 @@ public class AdjustBatchStockService implements AdjustBatchStockUseCase {
                 quantityAfter,
                 performedBy,
                 now,
-                trimmedReason
-        );
+                trimmedReason);
         stockMovementRepository.save(movement);
 
         lowStockAlertTransitionService.handleEligibleStockTransitions(
                 List.of(medicineId),
                 beforeEligibleQuantities,
                 today,
-                now
-        );
+                now);
 
         String detailJson = buildAuditDetail(batch, quantityBefore, quantityAfter, quantityChange, trimmedReason);
         auditLogRepository.save(AuditLog.create(
@@ -124,8 +120,7 @@ public class AdjustBatchStockService implements AdjustBatchStockUseCase {
                 medicineId,
                 detailJson,
                 null,
-                now
-        ));
+                now));
 
         return new BatchAdjustmentResult(
                 batch.getId(),
@@ -140,8 +135,7 @@ public class AdjustBatchStockService implements AdjustBatchStockUseCase {
                 batch.getStatus(),
                 trimmedReason,
                 performedBy,
-                now
-        );
+                now);
     }
 
     private void validateCommand(AdjustBatchStockCommand command) {
@@ -164,8 +158,7 @@ public class AdjustBatchStockService implements AdjustBatchStockUseCase {
             int quantityBefore,
             int quantityAfter,
             int quantityChange,
-            String reason
-    ) {
+            String reason) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("batchId", batch.getId().toString());
         detail.put("batchNumber", batch.getBatchNumber());

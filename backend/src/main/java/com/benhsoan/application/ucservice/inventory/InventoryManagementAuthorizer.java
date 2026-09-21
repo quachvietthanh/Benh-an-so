@@ -23,8 +23,7 @@ class InventoryManagementAuthorizer {
                 && !currentUserPort.hasRole(PHARMACIST_ROLE)
                 && !currentUserPort.hasRole(ADMIN_ROLE)) {
             throw new AccessDeniedException(
-                    "Only pharmacists or administrators with inventory update permissions are allowed to modify inventory stock."
-            );
+                    "Only pharmacists or administrators with inventory update permissions are allowed to modify inventory stock.");
         }
     }
 
@@ -34,8 +33,7 @@ class InventoryManagementAuthorizer {
                 && !currentUserPort.hasRole(PHARMACIST_ROLE)
                 && !currentUserPort.hasRole(ADMIN_ROLE)) {
             throw new AccessDeniedException(
-                    "Only pharmacists or administrators with inventory permissions are allowed to view inventory stock."
-            );
+                    "Only pharmacists or administrators with inventory permissions are allowed to view inventory stock.");
         }
     }
 
