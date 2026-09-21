@@ -26,6 +26,7 @@ import com.benhsoan.port.dto.result.InventoryBatchResult;
 import com.benhsoan.port.dto.result.InventoryExpiryAlertResult;
 import com.benhsoan.port.dto.result.InventoryStockResult;
 import com.benhsoan.port.dto.result.LowStockMedicineResult;
+import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
 import com.benhsoan.port.inbound.inventory.ListLowStockMedicinesUseCase;
@@ -56,6 +57,9 @@ class InventoryControllerTest {
 
     @MockitoBean
     private ListInventoryExpiryAlertsUseCase listInventoryExpiryAlertsUseCase;
+
+    @MockitoBean
+    private GetInventoryStockReportUseCase getInventoryStockReportUseCase;
 
     @MockitoBean
     private CurrentUserPort currentUserPort;
