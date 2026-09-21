@@ -62,5 +62,6 @@ public enum ResourceType {
     SPECIALTY,
     DIAGNOSIS_CATALOG,
     SECURITY_ALERT,
-    PATIENT_IMPORT
+    PATIENT_IMPORT,
+    CASHIER_SHIFT
 }

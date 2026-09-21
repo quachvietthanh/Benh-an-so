@@ -119,6 +119,7 @@ public class SecurityConfig {
                                                 // ===== PHARMACY / INVOICES =====
                                                 .requestMatchers("/inventory/**").authenticated()
                                                 .requestMatchers("/invoices/**").authenticated()
+                                                .requestMatchers("/cashier-shifts/**").authenticated()
 
                                                 // ===== MEDICAL QUEUE =====
                                                 .requestMatchers("/queues/**", "/queue-items/**").authenticated()
