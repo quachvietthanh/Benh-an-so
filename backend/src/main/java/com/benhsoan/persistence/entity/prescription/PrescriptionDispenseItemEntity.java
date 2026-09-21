@@ -41,6 +41,9 @@ public class PrescriptionDispenseItemEntity {
     @Column(name = "dispensed_quantity", nullable = false)
     private int dispensedQuantity;
 
+    @Column(name = "returned_quantity", nullable = false)
+    private int returnedQuantity;
+
     @Column(name = "dispensed_by", nullable = false, columnDefinition = "BINARY(16)")
     private UUID dispensedBy;
 

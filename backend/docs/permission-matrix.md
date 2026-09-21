@@ -83,6 +83,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `POST /vital-signs` → `VitalSignController.record` | `VITAL_SIGN_CREATE` | Chỉ `DOCTOR` phụ trách lượt khám; lượt khám đang diễn ra (`IN_PROGRESS` hoặc `WAITING_FOR_RESULT`); bệnh án của lượt khám đã mở và chưa bị khóa (`ensureEditable`); audit QTN-02 | Implemented — NCL-04-CN-007 (V59) |
 | `PUT /vital-signs/{id}` → `VitalSignController.update` | `VITAL_SIGN_UPDATE` | Chỉ `DOCTOR` phụ trách lượt khám; lượt khám đang diễn ra; bệnh án liên kết chưa bị khóa (`ensureEditable`); tự động gắn kết lại `medicalRecordId` nếu đang null; audit QTN-02 | Implemented — NCL-04-CN-007 (V59) |
 | `GET /vital-signs`, `/{id}`, `/visits/{visitId}`, `/patients/{patientId}/history` → read methods | `VITAL_SIGN_READ` | Đọc dữ liệu sinh tồn; kiểm tra tồn tại bệnh nhân khi xem lịch sử để đảm bảo audit log toàn vẹn dữ liệu; audit view QTN-02 | Implemented — NCL-04-CN-007 (V59) |
+| `GET /system/specialties/{id}`; `POST /system/specialties`; `PUT /system/specialties/{id}`; `PATCH /system/specialties/{id}/deactivate`, `/{id}/activate` → `SpecialtyController` | `SPECIALTY_MANAGE` | NCL-09-CN-007: ADMIN gán bác sĩ và phòng khám; xem chi tiết cấu hình chuyên khoa; kiểm tra trùng mã/tên không phân biệt hoa thường; ngừng dùng chuyên khoa có bác sĩ/template đang dùng yêu cầu xác nhận `confirm=true`; không cho phép ngừng dùng `GENERAL` | V73; seeded to `ADMIN` |
 
 ## Quy tắc thực hiện Giai đoạn C
 

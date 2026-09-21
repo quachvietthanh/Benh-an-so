@@ -45,6 +45,7 @@ import EmergencyContactCard from '../patient/EmergencyContactCard'
 import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
 import VitalSignCard from './VitalSignCard'
 import InstructionsAndTreatmentPlanCard from './InstructionsAndTreatmentPlanCard'
+import ComorbiditiesSection from './ComorbiditiesSection'
 import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
 import { formatVisitCode } from '../../utils/helpers'
 
@@ -84,6 +85,8 @@ function MedicalEncounterForm({
   secondaryIcds,
   setSecondaryIcds,
   addSecondaryDiagnosis,
+  onUpdateSecondaryNote,
+  onSwitchToPrimary,
   diagnosisOptions,
   setDiagnosisModalOpen,
   selectedOrders,
@@ -464,39 +467,28 @@ function MedicalEncounterForm({
               )}
             </Form.Item>
 
-            <Form.Item label="Chẩn đoán kèm theo / Bệnh phụ (Mã ICD-10 phụ)">
-              <div>
-                {secondaryIcds.length > 0 && (
-                  <div style={{ marginBottom: 10 }}>
-                    <Space wrap size={[6, 8]}>
-                      {secondaryIcds.map((item) => (
-                        <Tag
-                          key={item.code}
-                          color="purple"
-                          closable
-                          onClose={() => setSecondaryIcds((prev) => prev.filter((i) => i.code !== item.code))}
-                          style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6 }}
-                        >
-                          <b>{item.code}</b>: {fixMojibake(item.name)}
-                          <span style={{ color: '#7e22ce', marginLeft: 6, fontSize: 11 }}>
-                            ({item.diseaseGroup || getDiseaseGroupName(item.code, item.diseaseGroup)})
-                          </span>
-                        </Tag>
-                      ))}
-                    </Space>
-                  </div>
-                )}
-
-                <DiagnosisCatalogAutocomplete
-                  placeholder={primaryIcd ? '🔍 Tìm mã hoặc tên bệnh kèm theo (tiếng Việt có dấu / không dấu / mã ICD)...' : 'Vui lòng chọn chẩn đoán chính trước'}
-                  value={null}
-                  disabled={!primaryIcd}
-                  style={{ width: '100%' }}
-                  fallbackSuggestions={diagnosisOptions}
-                  onSelect={(item) => addSecondaryDiagnosis(item)}
-                />
-              </div>
-            </Form.Item>
+            <ComorbiditiesSection
+              primaryIcd={primaryIcd}
+              secondaryIcds={secondaryIcds}
+              onAddSecondary={addSecondaryDiagnosis}
+              onRemoveSecondary={(codeOrId) =>
+                setSecondaryIcds((prev) =>
+                  prev.filter(
+                    (i) => (i.code ? i.code !== codeOrId : (i.id !== codeOrId && i.name !== codeOrId && i.rawName !== codeOrId))
+                  )
+                )
+              }
+              onUpdateSecondaryNote={onUpdateSecondaryNote}
+              onSwitchToPrimary={onSwitchToPrimary || ((item) => {
+                selectPrimaryDiagnosis(item)
+                setSecondaryIcds((prev) =>
+                  prev.filter((i) => (i.code ? i.code !== item.code : (i.id !== item.id && i.name !== item.name)))
+                )
+              })}
+              isSigned={isSigned}
+              isDoctor={isDoctor}
+              diagnosisOptions={diagnosisOptions}
+            />
 
             <Divider style={{ margin: '16px 0 12px' }} />
 

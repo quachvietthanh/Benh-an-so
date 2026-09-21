@@ -105,10 +105,19 @@ export const filterPrescriptionsByKeyword = (prescriptions = [], keyword = '') =
  */
 export const getElectronicPrescriptionBadgeProps = (code, status) => {
   const isRx = isStandardRxCode(code)
+  let badgeColor = '#2563eb'
+  if (status === 'DISPENSED') {
+    badgeColor = 'green'
+  } else if (status === 'PARTIALLY_DISPENSED') {
+    badgeColor = '#d97706'
+  } else if (status === 'CANCELLED') {
+    badgeColor = 'default'
+  }
+
   return {
     code: formatPrescriptionCode(code),
     isStandardRx: isRx,
-    color: status === 'DISPENSED' ? 'green' : status === 'CANCELLED' ? 'default' : '#2563eb',
+    color: badgeColor,
     tooltipText: isRx
       ? 'Mã đơn thuốc điện tử chuẩn liên thông quốc gia (Định danh duy nhất không đổi)'
       : 'Mã đơn thuốc nội bộ phục vụ tra cứu và in ấn',

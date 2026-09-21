@@ -88,6 +88,7 @@ final class DomainExceptionHttpStatusMapper {
                     SELF_DRUG_INTERACTION,
                     VALIDATION_FAILED,
                     VERIFICATION_CODE_EXPIRED,
+                    CANNOT_DEACTIVATE_DEFAULT_SPECIALTY,
                     WEAK_PASSWORD -> HttpStatus.BAD_REQUEST;
             case ALLERGY_CONFIRMATION_REQUIRED,
                     APPOINTMENT_ALREADY_CANCELLED,
@@ -109,6 +110,7 @@ final class DomainExceptionHttpStatusMapper {
                     CLINICAL_RESULT_INVALID_STATUS,
                     CLINICAL_SERVICE_CODE_ALREADY_EXISTS,
                     CLINICAL_SERVICE_UNAVAILABLE,
+                    CONTRAINDICATION_CONFIRMATION_REQUIRED,
                     DIAGNOSIS_CATALOG_CODE_ALREADY_EXISTS,
                     DIAGNOSIS_CATALOG_DELETE_NOT_ALLOWED,
                     DIAGNOSIS_CATALOG_IN_USE,
@@ -136,6 +138,10 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_TEMPLATE_LAST_ACTIVE,
                     MEDICAL_RECORD_TEMPLATE_NAME_DUPLICATE,
                     MEDICAL_RECORD_TEMPLATE_SPECIALTY_MISMATCH,
+                    SPECIALTY_CODE_ALREADY_EXISTS,
+                    SPECIALTY_IN_USE,
+                    SPECIALTY_NAME_ALREADY_EXISTS,
+                    MEDICATION_RETURN_PAYMENT_NOT_REFUNDED,
                     MEDICINE_CODE_ALREADY_EXISTS,
                     MEDICINE_INACTIVE,
                     PATIENT_ALREADY_EXISTS,
@@ -159,7 +165,8 @@ final class DomainExceptionHttpStatusMapper {
                     VISIT_ALREADY_COMPLETED,
                     VISIT_INVALID_STATUS -> HttpStatus.CONFLICT;
             case BACKUP_EXECUTION_FAILED -> HttpStatus.INTERNAL_SERVER_ERROR;
-            case REPORT_DATA_EMPTY -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case REPORT_DATA_EMPTY,
+                    CONTRAINDICATION_DATA_MISSING -> HttpStatus.UNPROCESSABLE_ENTITY;
             case TOO_MANY_LOGIN_ATTEMPTS,
                     VERIFICATION_CODE_COOLDOWN -> HttpStatus.TOO_MANY_REQUESTS;
             default -> HttpStatus.BAD_REQUEST;

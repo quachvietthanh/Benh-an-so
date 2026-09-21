@@ -33,10 +33,12 @@ import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
+import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionDispenseHistoryUseCase;
+import com.benhsoan.port.inbound.prescription.GetDispenseSuggestionUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
@@ -44,9 +46,13 @@ import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsU
 import com.benhsoan.port.inbound.prescription.SearchPrescriptionsUseCase;
 import com.benhsoan.port.inbound.prescription.SendPrescriptionInterconnectionUseCase;
 import com.benhsoan.port.inbound.prescription.RetryPrescriptionInterconnectionUseCase;
+import com.benhsoan.port.inbound.prescription.ReturnMedicationUseCase;
 import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
 import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.dto.result.PrescriptionResult;
+import com.benhsoan.port.dto.result.ContraindicationCheckResult;
+import com.benhsoan.port.dto.result.DispenseSuggestionResult;
+import com.benhsoan.port.dto.result.ReturnMedicationResult;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -77,13 +83,16 @@ class PrescriptionSecurityIntegrationTest {
     @MockitoBean private DispensePrescriptionUseCase dispensePrescriptionUseCase;
     @MockitoBean private DispensePrescriptionItemsUseCase dispensePrescriptionItemsUseCase;
     @MockitoBean private GetPrescriptionDispenseHistoryUseCase getPrescriptionDispenseHistoryUseCase;
+    @MockitoBean private GetDispenseSuggestionUseCase getDispenseSuggestionUseCase;
     @MockitoBean private CancelPrescriptionUseCase cancelPrescriptionUseCase;
     @MockitoBean private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     @MockitoBean private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
+    @MockitoBean private CheckContraindicationUseCase checkContraindicationUseCase;
     @MockitoBean private GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
     @MockitoBean private ExportPrescriptionUseCase exportPrescriptionUseCase;
     @MockitoBean private SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
     @MockitoBean private RetryPrescriptionInterconnectionUseCase retryPrescriptionInterconnectionUseCase;
+    @MockitoBean private ReturnMedicationUseCase returnMedicationUseCase;
     @MockitoBean private com.benhsoan.port.inbound.prescription.SearchPrescriptionInterconnectionsUseCase searchPrescriptionInterconnectionsUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
@@ -390,6 +399,76 @@ class PrescriptionSecurityIntegrationTest {
         mockMvc.perform(get("/prescriptions/{id}/dispense-history", prescriptionId)
                         .with(user("receptionist").authorities(
                                 new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/{id}/return requires PRESCRIPTION_UPDATE_STATUS (NCL-06-CN-009)")
+    void returnMedicationRequiresUpdateStatusPermission() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(returnMedicationUseCase.returnMedication(any())).thenReturn(new ReturnMedicationResult(
+                prescriptionId, PrescriptionStatus.PARTIALLY_DISPENSED, UUID.randomUUID(),
+                Instant.now(), List.of()));
+
+        String body = """
+                {"reason":"Bệnh nhân không dùng thuốc","items":[{"dispenseItemId":"%s","quantity":5}]}
+                """.formatted(UUID.randomUUID());
+
+        mockMvc.perform(post("/prescriptions/{id}/return", prescriptionId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE_STATUS")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/prescriptions/{id}/return", prescriptionId)
+                        .with(user("receptionist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /prescriptions/{id}/dispense-suggestion requires PRESCRIPTION_UPDATE_STATUS (NCL-06-CN-011)")
+    void dispenseSuggestionRequiresUpdateStatusPermission() throws Exception {
+        UUID prescriptionId = UUID.randomUUID();
+        when(getDispenseSuggestionUseCase.getSuggestion(prescriptionId)).thenReturn(
+                new DispenseSuggestionResult(prescriptionId, List.of()));
+
+        mockMvc.perform(get("/prescriptions/{id}/dispense-suggestion", prescriptionId)
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE_STATUS"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/prescriptions/{id}/dispense-suggestion", prescriptionId)
+                        .with(user("receptionist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /prescriptions/check-contraindications requires PRESCRIPTION_CREATE or PRESCRIPTION_UPDATE (NCL-05-CN-006)")
+    void checkContraindicationsRequiresCreateOrUpdatePermission() throws Exception {
+        when(checkContraindicationUseCase.check(any(), any())).thenReturn(
+                new ContraindicationCheckResult(List.of(), List.of()));
+
+        String body = """
+                {"medicalRecordId":"%s","medicineIds":["%s"]}
+                """.formatted(UUID.randomUUID(), UUID.randomUUID());
+
+        mockMvc.perform(post("/prescriptions/check-contraindications")
+                        .with(user("doctor").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_CREATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/prescriptions/check-contraindications")
+                        .with(user("pharmacist").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_UPDATE_STATUS")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
                 .andExpect(status().isForbidden());
     }
 }

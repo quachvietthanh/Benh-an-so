@@ -43,9 +43,11 @@ import com.benhsoan.port.dto.result.PaymentServiceFeeQuoteResult;
 import com.benhsoan.port.dto.result.RefundPaymentResult;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
+import com.benhsoan.port.inbound.billing.GetInvoiceAdjustmentsUseCase;
 import com.benhsoan.port.inbound.billing.GetInvoiceByIdUseCase;
 import com.benhsoan.port.inbound.billing.GetPayableEncountersUseCase;
 import com.benhsoan.port.inbound.billing.GetPaymentQuoteUseCase;
+import com.benhsoan.port.inbound.billing.RecordInvoiceReprintUseCase;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.inbound.billing.RefundPaymentUseCase;
 import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
@@ -70,6 +72,8 @@ class InvoiceControllerTest {
     @MockitoBean private GetPaymentQuoteUseCase getPaymentQuoteUseCase;
     @MockitoBean private SearchInvoicesUseCase searchInvoicesUseCase;
     @MockitoBean private GetInvoiceByIdUseCase getInvoiceByIdUseCase;
+    @MockitoBean private GetInvoiceAdjustmentsUseCase getInvoiceAdjustmentsUseCase;
+    @MockitoBean private RecordInvoiceReprintUseCase recordInvoiceReprintUseCase;
     @MockitoBean private CurrentUserPort currentUserPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -392,6 +396,8 @@ class InvoiceControllerTest {
                 new BigDecimal("250000"),
                 UUID.randomUUID(),
                 now,
+                0,
+                null,
                 List.of(
                         new InvoiceLineResult(
                                 UUID.randomUUID(),
@@ -433,6 +439,8 @@ class InvoiceControllerTest {
                 new BigDecimal("-20000"),
                 UUID.randomUUID(),
                 now,
+                0,
+                null,
                 List.of(
                         new InvoiceLineResult(
                                 UUID.randomUUID(),

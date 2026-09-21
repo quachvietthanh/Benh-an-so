@@ -26,6 +26,7 @@ import {
   PrinterOutlined,
   ReloadOutlined,
   UserOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import reportApi from '../api/reportApi'
@@ -56,10 +57,13 @@ import {
   mergeInvoices,
 } from '../utils/storageHelpers'
 
+import DiseasePatternReportPage from './DiseasePatternReportPage.jsx'
+import RevenueBreakdownReportPage from './RevenueBreakdownReportPage.jsx'
+
 const { RangePicker } = DatePicker
 const { Title, Text } = Typography
 
-const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit']
+const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit', 'disease-patterns', 'revenue-breakdown']
 
 function ReportsPage() {
   const { user } = useAuthContext()
@@ -562,6 +566,26 @@ function ReportsPage() {
                 </span>
               ),
             },
+            ...(isManager && !isAdmin
+              ? [
+                  {
+                    key: 'disease-patterns',
+                    label: (
+                      <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                        <BarChartOutlined /> Mô hình bệnh tật
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'revenue-breakdown',
+                    label: (
+                      <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                        <DollarCircleOutlined /> Doanh thu bóc tách
+                      </span>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </Card>
@@ -609,6 +633,14 @@ function ReportsPage() {
             auditLogs={auditLogs}
             loading={loading}
           />
+        )}
+
+        {activeTab === 'disease-patterns' && isManager && !isAdmin && (
+          <DiseasePatternReportPage />
+        )}
+
+        {activeTab === 'revenue-breakdown' && isManager && !isAdmin && (
+          <RevenueBreakdownReportPage />
         )}
       </div>
 

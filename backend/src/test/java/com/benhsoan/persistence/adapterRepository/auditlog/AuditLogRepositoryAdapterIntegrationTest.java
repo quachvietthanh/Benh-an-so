@@ -184,4 +184,29 @@ class AuditLogRepositoryAdapterIntegrationTest {
         assertEquals(detail, reloaded.getDetail());
         assertEquals(at, reloaded.getCreatedAt());
     }
+
+    @Test
+    void includesExtendedAdministrativeOperations() {
+        UUID actor = UUID.randomUUID();
+        Instant t = Instant.parse("2026-01-01T00:00:00Z");
+
+        repository.save(AuditLog.create(actor, ActionType.CREATE, ResourceType.DIAGNOSIS_CATALOG, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.UPDATE, ResourceType.DIAGNOSIS_CATALOG, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.ACTIVATE, ResourceType.DIAGNOSIS_CATALOG, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.DEACTIVATE, ResourceType.DIAGNOSIS_CATALOG, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.UPDATE, ResourceType.SECURITY_ALERT, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.UPDATE, ResourceType.CONFIGURATION, null, null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.BACKUP, ResourceType.SYSTEM_BACKUP, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.RESTORE, ResourceType.SYSTEM_BACKUP, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.EXPORT, ResourceType.SYSTEM_BACKUP, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.CREATE, ResourceType.MEDICAL_RECORD_TEMPLATE, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.UPDATE, ResourceType.CLINICAL_SERVICE, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.CREATE, ResourceType.ROOM, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.UPDATE, ResourceType.DOCTOR_SCHEDULE, UUID.randomUUID(), null, null, t));
+        repository.save(AuditLog.create(actor, ActionType.CREATE, ResourceType.DOCTOR_TIMEOFF, UUID.randomUUID(), null, null, t));
+
+        var result = repository.findAdminOperationLogs(null, null, null, null, PageRequest.of(0, 50));
+
+        assertEquals(14, result.getTotalElements());
+    }
 }

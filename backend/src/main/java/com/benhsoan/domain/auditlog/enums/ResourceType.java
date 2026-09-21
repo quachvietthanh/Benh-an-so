@@ -58,5 +58,8 @@ public enum ResourceType {
 
     DOCTOR_TIMEOFF,
     ACCESS_LOG_REPORT,
-    VITAL_SIGN
+    VITAL_SIGN,
+    SPECIALTY,
+    DIAGNOSIS_CATALOG,
+    SECURITY_ALERT
 }

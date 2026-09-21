@@ -25,7 +25,15 @@ export const sortMedicinesByStockAvailability = (medicines = []) => {
 
 export const validateItemStock = (item, medicinesData) => {
   if (!item || !item.medicineId) {
-    return { isValid: true, error: null, availableStock: 0, medicineName: '' }
+    return {
+      isValid: true,
+      error: null,
+      warning: null,
+      isOutOfStock: false,
+      isShortage: false,
+      availableStock: 0,
+      medicineName: '',
+    }
   }
 
   let medicine = null
@@ -42,6 +50,9 @@ export const validateItemStock = (item, medicinesData) => {
     return {
       isValid: false,
       error: `Không tìm thấy thông tin thuốc (${name}) trong hệ thống.`,
+      warning: null,
+      isOutOfStock: false,
+      isShortage: false,
       availableStock: 0,
       medicineName: name,
     }
@@ -49,37 +60,43 @@ export const validateItemStock = (item, medicinesData) => {
 
   const availableStock = getAvailableStock(medicine)
   const qty = Number(item.quantity || 0)
+  const isOutOfStock = availableStock <= 0
+  const isShortage = !isOutOfStock && qty > availableStock
 
-  if (availableStock <= 0) {
-    return {
-      isValid: false,
-      error: `Thuốc "${name}" hiện đã hết hàng (tồn 0 ${unit}).`,
-      availableStock,
-      medicineName: name,
-    }
+  let warning = null
+  if (isOutOfStock) {
+    warning = `Thuốc "${name}" hiện đã hết hàng (tồn 0 ${unit}) — dược sĩ sẽ cấp bù sau khi có hàng.`
+  } else if (isShortage) {
+    warning = `Tồn kho hiện tại chỉ còn ${availableStock} ${unit} — dược sĩ có thể cần cấp phát một phần.`
   }
 
-  if (qty > availableStock) {
-    return {
-      isValid: false,
-      error: `Số lượng kê (${qty} ${unit}) vượt quá tồn kho khả dụng (${availableStock} ${unit}) của thuốc "${name}".`,
-      availableStock,
-      medicineName: name,
-    }
+  return {
+    isValid: true,
+    error: null,
+    warning,
+    isOutOfStock,
+    isShortage,
+    availableStock,
+    medicineName: name,
   }
-
-  return { isValid: true, error: null, availableStock, medicineName: name }
 }
 
 export const validatePrescriptionStock = (items = [], medicinesData = []) => {
   const errors = []
+  const warnings = []
   const outOfStockItems = []
   const insufficientStockItems = []
 
   const validItems = (items || []).filter((i) => Boolean(i.medicineId))
 
   if (validItems.length === 0) {
-    return { isValid: true, errors: [], outOfStockItems: [], insufficientStockItems: [] }
+    return {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      outOfStockItems: [],
+      insufficientStockItems: [],
+    }
   }
 
   const medMap = new Map()
@@ -111,10 +128,10 @@ export const validatePrescriptionStock = (items = [], medicinesData = []) => {
     const availableStock = getAvailableStock(medicine)
 
     if (availableStock <= 0) {
-      errors.push(`Thuốc "${name}" hiện đã hết hàng (tồn 0 ${unit}).`)
+      warnings.push(`Thuốc "${name}" hiện đã hết hàng (tồn 0 ${unit}) — dược sĩ sẽ cấp bù sau khi có hàng.`)
       outOfStockItems.push({ medicineId: medIdKey, availableStock, medicineName: name })
     } else if (totalQty > availableStock) {
-      errors.push(`Tổng số lượng kê (${totalQty} ${unit}) vượt quá tồn kho khả dụng (${availableStock} ${unit}) của thuốc "${name}".`)
+      warnings.push(`Tổng số lượng kê (${totalQty} ${unit}) vượt quá tồn kho khả dụng (${availableStock} ${unit}) của thuốc "${name}" — dược sĩ có thể cần cấp phát một phần.`)
       insufficientStockItems.push({ medicineId: medIdKey, totalQty, availableStock, medicineName: name })
     }
   }
@@ -122,6 +139,7 @@ export const validatePrescriptionStock = (items = [], medicinesData = []) => {
   return {
     isValid: errors.length === 0,
     errors,
+    warnings,
     outOfStockItems,
     insufficientStockItems,
   }

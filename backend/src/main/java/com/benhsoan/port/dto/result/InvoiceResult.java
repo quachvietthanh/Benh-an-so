@@ -18,6 +18,8 @@ public record InvoiceResult(
         BigDecimal totalAmount,
         UUID createdBy,
         Instant createdAt,
+        int reprintCount,
+        Instant lastReprintedAt,
         List<InvoiceLineResult> lines
 ) {
 }

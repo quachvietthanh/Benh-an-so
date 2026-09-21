@@ -304,7 +304,11 @@ export default function SignMedicalRecordModal({
             diagnosisCatalogId: validCatalogId,
             note: primaryIcd?.note || complaintVal,
           },
-          secondaryDiagnoses: [],
+          secondaryDiagnoses: (secondaryIcds || []).map((sec) => ({
+            diagnosisCatalogId: sec.id || sec.diagnosisCatalogId || null,
+            name: sec.name || sec.rawName || '',
+            note: sec.note || '',
+          })),
         })
       }
     } catch (diagErr) {

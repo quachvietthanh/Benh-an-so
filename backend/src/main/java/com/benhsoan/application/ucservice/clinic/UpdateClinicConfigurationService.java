@@ -99,15 +99,21 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
             Instant now
     ) {
         UUID actorId = currentUserPort.getCurrentUserId();
+        String detail = """
+                {"before":{"retentionYears":%d,"signingDeadlineHours":%d},"after":{"retentionYears":%d,"signingDeadlineHours":%d},"summary":"Clinic configuration updated; retentionYears changed from %d to %d; signingDeadlineHours changed from %d to %d"}
+                """.formatted(
+                beforeRetentionYears, beforeSigningDeadlineHours,
+                afterRetentionYears, afterSigningDeadlineHours,
+                beforeRetentionYears, afterRetentionYears,
+                beforeSigningDeadlineHours, afterSigningDeadlineHours
+        ).trim();
+
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.UPDATE,
                 ResourceType.CONFIGURATION,
                 null,
-                "Clinic configuration updated; retentionYears changed from "
-                        + beforeRetentionYears + " to " + afterRetentionYears
-                        + "; signingDeadlineHours changed from "
-                        + beforeSigningDeadlineHours + " to " + afterSigningDeadlineHours,
+                detail,
                 null,
                 now
         ));

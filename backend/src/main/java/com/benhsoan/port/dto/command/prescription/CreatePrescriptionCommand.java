@@ -16,7 +16,9 @@ public record CreatePrescriptionCommand(
 
         List<PrescriptionInteractionOverrideCommand> interactionOverrides,
 
-        List<PrescriptionAllergyOverrideCommand> allergyOverrides
+        List<PrescriptionAllergyOverrideCommand> allergyOverrides,
+
+        List<PrescriptionContraindicationOverrideCommand> contraindicationOverrides
 
 ) {
 }

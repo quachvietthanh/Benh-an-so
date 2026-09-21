@@ -14,7 +14,7 @@ public class PatientPersistenceMapper {
             return null;
         }
 
-        return Patient.restore(
+        Patient patient = Patient.restore(
                 entity.getId(),
                 entity.getPatientCode(),
                 entity.getFullName(),
@@ -53,6 +53,8 @@ public class PatientPersistenceMapper {
                 entity.getMergedBy(),
                 entity.getMergeReason()
         );
+        patient.changePregnancyStatus(entity.getPregnancyStatus());
+        return patient;
     }
 
     public PatientEntity toEntity(Patient domain) {
@@ -99,6 +101,7 @@ public class PatientPersistenceMapper {
                 .mergedAt(domain.getMergedAt())
                 .mergedBy(domain.getMergedBy())
                 .mergeReason(domain.getMergeReason())
+                .pregnancyStatus(domain.getPregnancyStatus())
                 .build();
     }
 }

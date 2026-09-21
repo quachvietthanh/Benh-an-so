@@ -45,6 +45,7 @@ import com.benhsoan.port.inbound.patient.MergePatientsUseCase;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
 import com.benhsoan.port.inbound.patient.SearchPatientUseCase;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
+import com.benhsoan.port.inbound.patient.UpdatePatientPregnancyStatusUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
@@ -76,6 +77,7 @@ class PatientMergeControllerTest {
     @MockitoBean private RegisterPatientUseCase registerPatientUseCase;
     @MockitoBean private SearchPatientUseCase searchPatientUseCase;
     @MockitoBean private UpdatePatientUseCase updatePatientUseCase;
+    @MockitoBean private UpdatePatientPregnancyStatusUseCase updatePatientPregnancyStatusUseCase;
     @MockitoBean private GetPatientByIdUseCase getPatientByIdUseCase;
     @MockitoBean private GetPatientByCodeUseCase getPatientByCodeUseCase;
     @MockitoBean private MergePatientsUseCase mergePatientsUseCase;

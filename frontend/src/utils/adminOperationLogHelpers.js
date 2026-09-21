@@ -6,6 +6,15 @@ export const RESOURCE_TYPE_LABELS = {
   MEDICINE: 'Danh mục thuốc',
   SERVICE_CATALOG: 'Danh mục dịch vụ',
   SERVICE_PRICE: 'Bảng giá dịch vụ',
+  DIAGNOSIS_CATALOG: 'Danh mục mã bệnh (ICD-10)',
+  SECURITY_ALERT: 'Cảnh báo an toàn bảo mật',
+  CONFIGURATION: 'Cấu hình hệ thống & phòng khám',
+  SYSTEM_BACKUP: 'Sao lưu & Phục hồi dữ liệu',
+  MEDICAL_RECORD_TEMPLATE: 'Mẫu bệnh án chuyên khoa',
+  CLINICAL_SERVICE: 'Danh mục cận lâm sàng & ngưỡng',
+  ROOM: 'Quản lý phòng & phân phòng',
+  DOCTOR_SCHEDULE: 'Lịch làm việc bác sĩ',
+  DOCTOR_TIMEOFF: 'Lịch nghỉ của bác sĩ',
 }
 
 export const RESOURCE_TYPE_OPTIONS = [
@@ -14,6 +23,15 @@ export const RESOURCE_TYPE_OPTIONS = [
   { value: 'MEDICINE', label: 'Danh mục thuốc' },
   { value: 'SERVICE_CATALOG', label: 'Danh mục dịch vụ' },
   { value: 'SERVICE_PRICE', label: 'Bảng giá dịch vụ' },
+  { value: 'DIAGNOSIS_CATALOG', label: 'Danh mục mã bệnh (ICD-10)' },
+  { value: 'SECURITY_ALERT', label: 'Cảnh báo an toàn bảo mật' },
+  { value: 'CONFIGURATION', label: 'Cấu hình hệ thống & phòng khám' },
+  { value: 'SYSTEM_BACKUP', label: 'Sao lưu & Phục hồi dữ liệu' },
+  { value: 'MEDICAL_RECORD_TEMPLATE', label: 'Mẫu bệnh án chuyên khoa' },
+  { value: 'CLINICAL_SERVICE', label: 'Danh mục cận lâm sàng & ngưỡng' },
+  { value: 'ROOM', label: 'Quản lý phòng & phân phòng' },
+  { value: 'DOCTOR_SCHEDULE', label: 'Lịch làm việc bác sĩ' },
+  { value: 'DOCTOR_TIMEOFF', label: 'Lịch nghỉ của bác sĩ' },
 ]
 
 export const RESOURCE_TYPE_FILTER_OPTIONS = [
@@ -27,6 +45,12 @@ export const ACTION_TYPE_CONFIG = {
   ACTIVATE: { label: 'Kích hoạt', color: 'cyan' },
   DEACTIVATE: { label: 'Vô hiệu hóa', color: 'orange' },
   UNLOCK: { label: 'Mở khóa', color: 'purple' },
+  BACKUP: { label: 'Sao lưu', color: 'cyan' },
+  RESTORE: { label: 'Phục hồi', color: 'magenta' },
+  EXPORT: { label: 'Tải về / Xuất', color: 'geekblue' },
+  CANCEL: { label: 'Hủy bỏ', color: 'red' },
+  DELETE: { label: 'Xóa', color: 'red' },
+  RESET_PASSWORD: { label: 'Đặt lại mật khẩu', color: 'volcano' },
 }
 
 export const FIELD_LABEL_DICTIONARY = {
@@ -54,6 +78,37 @@ export const FIELD_LABEL_DICTIONARY = {
   price: 'Đơn giá (VNĐ)',
   effectiveFrom: 'Ngày hiệu lực',
   effectiveTo: 'Ngày hết hiệu lực',
+  code: 'Mã',
+  name: 'Tên',
+  abbreviation: 'Tên viết tắt',
+  diseaseGroup: 'Nhóm bệnh',
+  alertType: 'Loại cảnh báo',
+  severity: 'Mức độ nghiêm trọng',
+  backupCode: 'Mã bản sao lưu',
+  fileName: 'Tên tệp tin',
+  fileSize: 'Kích thước tệp (bytes)',
+  backupType: 'Loại sao lưu',
+  restoredAt: 'Thời điểm phục hồi',
+  clinicName: 'Tên phòng khám',
+  address: 'Địa chỉ',
+  openingTime: 'Giờ mở cửa',
+  closingTime: 'Giờ đóng cửa',
+  retentionYears: 'Thời hạn lưu trữ hồ sơ (năm)',
+  signingDeadlineHours: 'Hạn ký bệnh án (giờ)',
+  enabled: 'Bật chế độ ẩn danh',
+  templateName: 'Tên mẫu bệnh án',
+  templateId: 'Mã mẫu bệnh án',
+  version: 'Phiên bản',
+  serviceType: 'Loại dịch vụ CĐLS',
+  resultDataType: 'Kiểu dữ liệu kết quả',
+  roomId: 'Mã phòng',
+  doctorId: 'Mã bác sĩ',
+  dayOfWeek: 'Ngày trong tuần',
+  startTime: 'Giờ bắt đầu',
+  endTime: 'Giờ kết thúc',
+  reason: 'Lý do',
+  summary: 'Tóm tắt thay đổi',
+  event: 'Sự kiện ghi nhận',
 }
 
 /**
@@ -66,23 +121,11 @@ export const safeParseDetail = (detailString) => {
     return { before: {}, after: {}, isValid: false }
   }
 
-  if (typeof detailString === 'object' && detailString !== null && !Array.isArray(detailString)) {
-    return {
-      before:
-        detailString.before && typeof detailString.before === 'object' && !Array.isArray(detailString.before)
-          ? detailString.before
-          : {},
-      after:
-        detailString.after && typeof detailString.after === 'object' && !Array.isArray(detailString.after)
-          ? detailString.after
-          : {},
-      isValid: true,
+  const normalizeObj = (parsed) => {
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return { before: {}, after: {}, isValid: false }
     }
-  }
-
-  try {
-    const parsed = JSON.parse(detailString)
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    if ('before' in parsed || 'after' in parsed) {
       return {
         before:
           parsed.before && typeof parsed.before === 'object' && !Array.isArray(parsed.before)
@@ -95,7 +138,20 @@ export const safeParseDetail = (detailString) => {
         isValid: true,
       }
     }
-    return { before: {}, after: {}, isValid: false }
+    return {
+      before: {},
+      after: parsed,
+      isValid: true,
+    }
+  }
+
+  if (typeof detailString === 'object' && detailString !== null && !Array.isArray(detailString)) {
+    return normalizeObj(detailString)
+  }
+
+  try {
+    const parsed = JSON.parse(detailString)
+    return normalizeObj(parsed)
   } catch {
     return { before: {}, after: {}, isValid: false }
   }

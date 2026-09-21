@@ -23,6 +23,7 @@ import com.benhsoan.adapter.inbound.rest.request.billing.CreateInvoiceRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.GetPaymentQuoteRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RecordPaymentRequest;
 import com.benhsoan.adapter.inbound.rest.request.billing.RefundPaymentRequest;
+import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceAdjustmentsResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.InvoiceResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PayableEncounterResponse;
 import com.benhsoan.adapter.inbound.rest.response.billing.PaymentResponse;
@@ -34,9 +35,11 @@ import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.command.billing.SearchInvoicesQuery;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
+import com.benhsoan.port.inbound.billing.GetInvoiceAdjustmentsUseCase;
 import com.benhsoan.port.inbound.billing.GetInvoiceByIdUseCase;
 import com.benhsoan.port.inbound.billing.GetPayableEncountersUseCase;
 import com.benhsoan.port.inbound.billing.GetPaymentQuoteUseCase;
+import com.benhsoan.port.inbound.billing.RecordInvoiceReprintUseCase;
 import com.benhsoan.port.inbound.billing.RecordPaymentUseCase;
 import com.benhsoan.port.inbound.billing.RefundPaymentUseCase;
 import com.benhsoan.port.inbound.billing.SearchInvoicesUseCase;
@@ -58,6 +61,8 @@ public class InvoiceController {
     private final GetPaymentQuoteUseCase getPaymentQuoteUseCase;
     private final SearchInvoicesUseCase searchInvoicesUseCase;
     private final GetInvoiceByIdUseCase getInvoiceByIdUseCase;
+    private final GetInvoiceAdjustmentsUseCase getInvoiceAdjustmentsUseCase;
+    private final RecordInvoiceReprintUseCase recordInvoiceReprintUseCase;
     private final BillingRestMapper mapper;
 
     @PostMapping("/payments")
@@ -114,6 +119,7 @@ public class InvoiceController {
             @RequestParam(required = false) String invoiceCode,
             @RequestParam(required = false) InvoiceType invoiceType,
             @RequestParam(required = false) UUID visitId,
+            @RequestParam(required = false) String patientName,
             @RequestParam(required = false) Instant createdFrom,
             @RequestParam(required = false) Instant createdTo,
             @RequestParam(defaultValue = "0") int page,
@@ -135,6 +141,7 @@ public class InvoiceController {
                         invoiceCode,
                         invoiceType,
                         visitId,
+                        patientName,
                         createdFrom,
                         createdTo,
                         pageable
@@ -146,6 +153,18 @@ public class InvoiceController {
     @RequirePermission("INVOICE_READ")
     public InvoiceResponse getById(@PathVariable UUID invoiceId) {
         return mapper.toResponse(getInvoiceByIdUseCase.getById(invoiceId));
+    }
+
+    @GetMapping("/{invoiceId}/adjustments")
+    @RequirePermission("INVOICE_READ")
+    public InvoiceAdjustmentsResponse getAdjustments(@PathVariable UUID invoiceId) {
+        return mapper.toResponse(getInvoiceAdjustmentsUseCase.getAdjustments(invoiceId));
+    }
+
+    @PostMapping("/{invoiceId}/reprint")
+    @RequirePermission("INVOICE_READ")
+    public InvoiceResponse reprint(@PathVariable UUID invoiceId) {
+        return mapper.toResponse(recordInvoiceReprintUseCase.recordReprint(invoiceId));
     }
 
     @PostMapping("/{invoiceId}/adjustments")

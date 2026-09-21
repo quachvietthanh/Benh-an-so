@@ -46,6 +46,8 @@ const DoctorWeeklySchedulePage = React.lazy(() => import('../pages/DoctorWeeklyS
 const AnonymizationPage = React.lazy(() => import('../pages/AnonymizationPage'))
 const PendingClinicalOrdersPage = React.lazy(() => import('../pages/PendingClinicalOrdersPage'))
 const AdminOperationLogPage = React.lazy(() => import('../pages/AdminOperationLogPage'))
+const DiseasePatternReportPage = React.lazy(() => import('../pages/DiseasePatternReportPage'))
+const RevenueBreakdownReportPage = React.lazy(() => import('../pages/RevenueBreakdownReportPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -54,7 +56,7 @@ const LazyPage = ({ children }) => (
   </React.Suspense>
 )
 
-const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) => {
+const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [], disallowAdmin = false }) => {
   const { isAuthenticated, loading, user } = useAuthContext()
 
   if (loading) {
@@ -74,6 +76,11 @@ const PrivateRoute = ({ children, allowedRoles = [], allowedPermissions = [] }) 
   }
 
   const isAdmin = userRoles.includes('admin')
+
+  if (disallowAdmin && isAdmin) {
+    const defaultHome = getDefaultHomePath(user?.roles, user?.permissions)
+    return <Navigate to={defaultHome} replace />
+  }
 
   const hasRoleMatch = allowedRoles.length > 0 && allowedRoles.some((role) =>
     userRoles.includes(String(role).toLowerCase().replace(/^role_/, ''))
@@ -150,6 +157,8 @@ function AppRoutes() {
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedPermissions={['REPORT_VIEW', 'REPORT_EXPORT']} allowedRoles={['admin', 'manager']}><LazyPage><ReportsPage /></LazyPage></PrivateRoute>} />
+        <Route path="reports/disease-patterns" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><DiseasePatternReportPage /></LazyPage></PrivateRoute>} />
+        <Route path="reports/revenue-breakdown" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><RevenueBreakdownReportPage /></LazyPage></PrivateRoute>} />
         <Route path="system-management" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><SystemManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="backup-restore" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><BackupRestorePage /></LazyPage></PrivateRoute>} />
         <Route path="audit-logs" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />

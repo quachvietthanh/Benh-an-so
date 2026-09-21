@@ -77,12 +77,15 @@ public class PatientAnonymizationService
     }
 
     private void audit(boolean before, boolean after, UUID actorId, Instant now) {
+        String detail = """
+                {"before":{"enabled":%b},"after":{"enabled":%b},"summary":"Anonymization mode changed from %b to %b"}
+                """.formatted(before, after, before, after).trim();
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.UPDATE,
                 ResourceType.CONFIGURATION,
                 null,
-                "Anonymization mode changed from " + before + " to " + after,
+                detail,
                 null,
                 now
         ));

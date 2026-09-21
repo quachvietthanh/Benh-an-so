@@ -24,15 +24,20 @@ import {
 } from 'antd'
 import {
   AppstoreOutlined,
+  CalendarOutlined,
   ClockCircleOutlined,
+  DatabaseOutlined,
   DollarOutlined,
+  ExperimentOutlined,
   EyeOutlined,
   FileSearchOutlined,
+  FileTextOutlined,
   HistoryOutlined,
   MedicineBoxOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
+  SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -256,6 +261,23 @@ export default function AdminOperationLogPage() {
         return <AppstoreOutlined style={{ color: '#eb2f96', marginRight: 6 }} />
       case 'SERVICE_PRICE':
         return <DollarOutlined style={{ color: '#faad14', marginRight: 6 }} />
+      case 'DIAGNOSIS_CATALOG':
+        return <MedicineBoxOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+      case 'SECURITY_ALERT':
+        return <SafetyCertificateOutlined style={{ color: '#f5222d', marginRight: 6 }} />
+      case 'CONFIGURATION':
+        return <SettingOutlined style={{ color: '#722ed1', marginRight: 6 }} />
+      case 'SYSTEM_BACKUP':
+        return <DatabaseOutlined style={{ color: '#2f54eb', marginRight: 6 }} />
+      case 'MEDICAL_RECORD_TEMPLATE':
+        return <FileTextOutlined style={{ color: '#1890ff', marginRight: 6 }} />
+      case 'CLINICAL_SERVICE':
+        return <ExperimentOutlined style={{ color: '#fa8c16', marginRight: 6 }} />
+      case 'ROOM':
+        return <AppstoreOutlined style={{ color: '#13c2c2', marginRight: 6 }} />
+      case 'DOCTOR_SCHEDULE':
+      case 'DOCTOR_TIMEOFF':
+        return <CalendarOutlined style={{ color: '#fa541c', marginRight: 6 }} />
       default:
         return <FileSearchOutlined style={{ color: '#8c8c8c', marginRight: 6 }} />
     }
