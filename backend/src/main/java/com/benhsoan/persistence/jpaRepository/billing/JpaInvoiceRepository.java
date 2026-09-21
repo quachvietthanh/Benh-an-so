@@ -127,4 +127,13 @@ public interface JpaInvoiceRepository
             @Param("createdTo") Instant createdTo,
             Pageable pageable
     );
+
+    @Query("""
+            select invoice
+            from InvoiceEntity invoice
+            join VisitEntity visit on visit.id = invoice.visitId
+            where visit.patientId = :patientId
+            order by invoice.createdAt desc
+            """)
+    List<InvoiceEntity> findByPatientIdOrderByCreatedAtDesc(@Param("patientId") UUID patientId);
 }

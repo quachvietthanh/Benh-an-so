@@ -164,4 +164,21 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
                 projection.getCompletedAt()
         );
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Invoice> findByPatientIdOrderByCreatedAtDesc(UUID patientId) {
+        List<InvoiceEntity> entities = jpaRepository.findByPatientIdOrderByCreatedAtDesc(patientId);
+        if (entities.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> invoiceIds = entities.stream().map(InvoiceEntity::getId).toList();
+        Map<UUID, List<InvoiceLineEntity>> linesByInvoiceId = lineJpaRepository
+                .findByInvoiceIdInOrderByCreatedAtAsc(invoiceIds).stream()
+                .collect(Collectors.groupingBy(InvoiceLineEntity::getInvoiceId));
+
+        return entities.stream()
+                .map(entity -> toDomain(entity, linesByInvoiceId.getOrDefault(entity.getId(), List.of())))
+                .toList();
+    }
 }

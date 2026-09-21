@@ -31,4 +31,6 @@ public interface InvoiceRepository {
     Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable);
 
     Page<Invoice> search(InvoiceSearchCriteria criteria, Pageable pageable);
+
+    List<Invoice> findByPatientIdOrderByCreatedAtDesc(UUID patientId);
 }
