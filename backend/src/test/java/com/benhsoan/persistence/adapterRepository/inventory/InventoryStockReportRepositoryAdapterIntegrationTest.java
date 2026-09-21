@@ -84,6 +84,59 @@ class InventoryStockReportRepositoryAdapterIntegrationTest {
     }
 
     @Test
+    void receiptAndMatchingReceiptMovementDoNotDoubleCountOpening() {
+        UUID medicineId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        receipt(medicineId, batchId, actorId, FROM.minusSeconds(60), 100);
+        receiptMovement(medicineId, batchId, actorId, FROM.minusSeconds(60), 100);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<InventoryStockMovementSummary> summaries = adapter().summarizeMovements(FROM, TO);
+
+        assertEquals(1, summaries.size());
+        assertEquals(100, summaries.get(0).openingQuantity());
+        assertEquals(0, summaries.get(0).receivedQuantity());
+    }
+
+    @Test
+    void expireMovementContributesToAdjustedQuantity() {
+        UUID medicineId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        movement(medicineId, batchId, actorId, FROM.plusSeconds(120), StockMovementType.EXPIRE, -10);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<InventoryStockMovementSummary> summaries = adapter().summarizeMovements(FROM, TO);
+
+        assertEquals(1, summaries.size());
+        assertEquals(-10, summaries.get(0).adjustedQuantity());
+    }
+
+    @Test
+    void futureTransactionsAreExcludedFromReport() {
+        UUID medicineId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        receipt(medicineId, batchId, actorId, TO.plusSeconds(60), 10);
+        movement(medicineId, batchId, actorId, TO.plusSeconds(60), StockMovementType.DISPENSE, -5);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<InventoryStockMovementSummary> summaries = adapter().summarizeMovements(FROM, TO);
+
+        assertTrue(summaries.isEmpty());
+    }
+
+    @Test
     void returnsEmptyListWhenNoMovementsExist() {
         List<InventoryStockMovementSummary> summaries = adapter().summarizeMovements(FROM, TO);
         assertTrue(summaries.isEmpty());
@@ -91,6 +144,24 @@ class InventoryStockReportRepositoryAdapterIntegrationTest {
 
     private InventoryStockReportRepositoryAdapter adapter() {
         return new InventoryStockReportRepositoryAdapter(entityManager);
+    }
+
+    private void receiptMovement(UUID medicineId, UUID batchId, UUID actorId, Instant performedAt, int quantityChange) {
+        entityManager.persist(StockMovementEntity.builder()
+                .id(UUID.randomUUID())
+                .medicineId(medicineId)
+                .medicineBatchId(batchId)
+                .movementType(StockMovementType.RECEIPT)
+                .referenceType(StockMovementReferenceType.INVENTORY_RECEIPT)
+                .referenceId(UUID.randomUUID())
+                .quantityChange(quantityChange)
+                .quantityBefore(0)
+                .quantityAfter(quantityChange)
+                .performedBy(actorId)
+                .performedAt(performedAt)
+                .note(null)
+                .createdAt(performedAt)
+                .build());
     }
 
     private void receipt(UUID medicineId, UUID batchId, UUID actorId, Instant receivedAt, int quantity) {

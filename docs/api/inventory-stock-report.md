@@ -6,11 +6,14 @@ Backend API contract for the periodic stock in/out inventory report.
 
 ```
 GET /inventory/report/stock-in-out?from={yyyy-MM-dd}&to={yyyy-MM-dd}
+GET /inventory/report/stock-in-out/export?from={yyyy-MM-dd}&to={yyyy-MM-dd}
 ```
 
 - Method: `GET`
-- Authorization: `@RequirePermission({"PHARMACY_READ", "REPORT_VIEW"})` (any one)
-  - `PHARMACIST` (PHARMACY_READ), `MANAGER` (REPORT_VIEW), `ADMIN` (PHARMACY_READ) are allowed.
+- Authorization: `@RequirePermission("INVENTORY_REPORT_VIEW")`
+  - Granted (via `V77__add_inventory_report_view_permission.sql`) to `ADMIN`, `PHARMACIST`, `MANAGER`.
+  - `DOCTOR` (who holds `PHARMACY_READ` for medicine catalog lookups) and `RECEPTIONIST` are denied (403).
+  - Unauthenticated requests return 401.
 - Period semantics: half-open interval `[from 00:00, to+1d 00:00)` in clinic timezone `Asia/Ho_Chi_Minh`.
   - A transaction exactly at `from 00:00` is included; a transaction exactly at `to+1d 00:00` is excluded (it becomes the next period's opening).
 - Validation: `from`/`to` required (`yyyy-MM-dd`), `from <= to`, range ≤ 366 days.
@@ -76,15 +79,16 @@ report is internally reconcilable by construction (NCL-06-CN-013-TC-01).
 | `stock_movements` | `EXPIRE` | `adjustedQuantity` (folded) | signed |
 
 Notes:
-- The project's receiving workflow persists receipts to `inventory_receipt_items`
-  (it does **not** write a `RECEIPT` `StockMovement`), so receipts are read from
-  `inventory_receipts`/`inventory_receipt_items`.
+- `inventory_receipt_items` is the authoritative source for receipt quantities. `ReceiveStockService`
+  persists receipts there (it does **not** write a `RECEIPT` `StockMovement`). To prevent double
+  counting, the stock movement aggregation explicitly **excludes** `StockMovementType.RECEIPT`
+  (legacy seed data in `V14` recorded the same receipt in both tables). A single physical receipt
+  therefore contributes exactly once to `openingQuantity`/`receivedQuantity`.
 - The Excel report defines only the six columns above; there is no separate disposal
   column. `EXPIRE` is therefore folded into `adjustedQuantity` (its `quantity_change`
   is negative, which keeps the formula balanced). This is documented, not implicit.
-- No active workflow currently writes `ADJUSTMENT` or `EXPIRE` movements, so in practice
-  `adjustedQuantity` is `0` until such workflows are added. The enum values and columns
-  already exist in the schema, so the report is future-proof without schema changes.
+- `ADJUSTMENT` and `EXPIRE` movements are written by `AdjustBatchStockService` and
+  `DiscardExpiredBatchService` respectively (NCL-06-CN-010).
 
 ## Empty period (NCL-06-CN-013-TC-03)
 
@@ -93,6 +97,24 @@ When there are no in-period movements:
 - Each medicine with existing opening stock still appears with `openingQuantity == closingQuantity`
   and zero movement categories.
 - A completely empty inventory returns `items: []` and `hasTransactions: false`.
+
+## Export (CSV)
+
+`GET /inventory/report/stock-in-out/export` returns the same report data as the JSON endpoint,
+serialized as CSV (UTF-8 with BOM). The values are sourced from the identical use case
+(`GetInventoryStockReportUseCase`), so `JSON values == CSV values` for the same period.
+
+Columns (in order):
+
+```
+Medicine ID, Medicine Code, Medicine Name, Unit,
+Opening Quantity, Received Quantity, Dispensed Quantity, Returned Quantity,
+Adjusted Quantity, Closing Quantity
+```
+
+- Filename: `stock-in-out-report-{from}-to-{to}.csv`.
+- Content-Type: `text/csv; charset=UTF-8`.
+- An empty (no-transaction) period still returns a valid header-only CSV.
 
 ## Query design
 

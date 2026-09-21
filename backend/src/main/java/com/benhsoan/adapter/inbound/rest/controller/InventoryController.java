@@ -6,6 +6,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,8 +38,10 @@ import com.benhsoan.port.dto.query.inventory.ListInventoryExpiryAlertsQuery;
 import com.benhsoan.port.dto.query.inventory.ListInventoryStocksQuery;
 import com.benhsoan.port.dto.result.BatchAdjustmentResult;
 import com.benhsoan.port.dto.result.DiscardBatchResult;
+import com.benhsoan.port.dto.result.InventoryStockReportExportResult;
 import com.benhsoan.port.inbound.inventory.AdjustBatchStockUseCase;
 import com.benhsoan.port.inbound.inventory.DiscardExpiredBatchUseCase;
+import com.benhsoan.port.inbound.inventory.ExportInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
@@ -59,6 +65,7 @@ public class InventoryController {
     private final ListInventoryExpiryAlertsUseCase listInventoryExpiryAlertsUseCase;
     private final ListLowStockMedicinesUseCase listLowStockMedicinesUseCase;
     private final GetInventoryStockReportUseCase getInventoryStockReportUseCase;
+    private final ExportInventoryStockReportUseCase exportInventoryStockReportUseCase;
     private final AdjustBatchStockUseCase adjustBatchStockUseCase;
     private final DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
     private final InventoryRestMapper mapper;
@@ -109,7 +116,7 @@ public class InventoryController {
     }
 
     @GetMapping("/report/stock-in-out")
-    @RequirePermission({"PHARMACY_READ", "REPORT_VIEW"})
+    @RequirePermission("INVENTORY_REPORT_VIEW")
     public InventoryStockReportResponse getStockReport(
             @RequestParam String from,
             @RequestParam String to
@@ -121,6 +128,25 @@ public class InventoryController {
         return mapper.toStockReportResponse(
                 getInventoryStockReportUseCase.getStockReport(fromDate, toDate)
         );
+    }
+
+    @GetMapping("/report/stock-in-out/export")
+    @RequirePermission("INVENTORY_REPORT_VIEW")
+    public ResponseEntity<ByteArrayResource> exportStockReport(
+            @RequestParam String from,
+            @RequestParam String to
+    ) {
+        LocalDate fromDate = parseDate(from, "from");
+        LocalDate toDate = parseDate(to, "to");
+        validateRange(fromDate, toDate);
+
+        InventoryStockReportExportResult result = exportInventoryStockReportUseCase.export(fromDate, toDate);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.fileName() + "\"")
+                .contentType(MediaType.parseMediaType(result.contentType()))
+                .contentLength(result.content().length)
+                .body(new ByteArrayResource(result.content()));
     }
 
     @PostMapping("/batches/{id}/adjust")

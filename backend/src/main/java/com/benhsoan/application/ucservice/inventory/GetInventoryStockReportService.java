@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.medicine.Medicine;
-import com.benhsoan.domain.patient.PatientMinorPolicy;
 import com.benhsoan.port.dto.result.InventoryStockReportItemResult;
 import com.benhsoan.port.dto.result.InventoryStockReportResult;
 import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
@@ -30,7 +29,7 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class GetInventoryStockReportService implements GetInventoryStockReportUseCase {
 
-    private static final ZoneId CLINIC_ZONE = PatientMinorPolicy.CLINICAL_TIMEZONE;
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final InventoryStockReportRepository reportRepository;
     private final MedicineRepository medicineRepository;
@@ -42,7 +41,10 @@ public class GetInventoryStockReportService implements GetInventoryStockReportUs
         Instant toExclusive = to.plusDays(1).atStartOfDay(CLINIC_ZONE).toInstant();
 
         List<InventoryStockMovementSummary> summaries = reportRepository
-                .summarizeMovements(fromInclusive, toExclusive);
+                .summarizeMovements(fromInclusive, toExclusive)
+                .stream()
+                .filter(GetInventoryStockReportService::hasMeaningfulData)
+                .toList();
 
         Map<UUID, Medicine> medicinesById = medicineRepository
                 .findAllById(summaries.stream()
@@ -64,6 +66,14 @@ public class GetInventoryStockReportService implements GetInventoryStockReportUs
                         || summary.adjustedQuantity() != 0);
 
         return new InventoryStockReportResult(from, to, clockPort.now(), hasTransactions, items);
+    }
+
+    private static boolean hasMeaningfulData(InventoryStockMovementSummary summary) {
+        return summary.openingQuantity() != 0
+                || summary.receivedQuantity() != 0
+                || summary.dispensedQuantity() != 0
+                || summary.returnedQuantity() != 0
+                || summary.adjustedQuantity() != 0;
     }
 
     private InventoryStockReportItemResult toItem(InventoryStockMovementSummary summary, Medicine medicine) {

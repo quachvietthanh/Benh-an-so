@@ -38,6 +38,7 @@ import com.benhsoan.port.dto.result.BatchAdjustmentResult;
 import com.benhsoan.port.dto.result.DiscardBatchResult;
 import com.benhsoan.port.inbound.inventory.AdjustBatchStockUseCase;
 import com.benhsoan.port.inbound.inventory.DiscardExpiredBatchUseCase;
+import com.benhsoan.port.inbound.inventory.ExportInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
@@ -80,6 +81,8 @@ class InventoryAdjustmentSecurityIntegrationTest {
         private DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
         @MockitoBean
         private GetInventoryStockReportUseCase getInventoryStockReportUseCase;
+        @MockitoBean
+        private ExportInventoryStockReportUseCase exportInventoryStockReportUseCase;
         @MockitoBean
         private JwtTokenPort jwtTokenPort;
         @MockitoBean

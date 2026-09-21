@@ -66,6 +66,7 @@ public class InventoryStockReportRepositoryAdapter implements InventoryStockRepo
                                sum(case when ir.receivedAt >= :fromInclusive and ir.receivedAt < :toExclusive then iri.quantity else 0 end)
                         from InventoryReceiptItemEntity iri
                         join InventoryReceiptEntity ir on ir.id = iri.inventoryReceiptId
+                        where ir.receivedAt < :toExclusive
                         group by iri.medicineId
                         """, Object[].class)
                 .setParameter("fromInclusive", fromInclusive)
@@ -76,15 +77,17 @@ public class InventoryStockReportRepositoryAdapter implements InventoryStockRepo
     private List<Object[]> queryMovementSummaries(Instant fromInclusive, Instant toExclusive) {
         return entityManager.createQuery("""
                         select sm.medicineId,
-                               sum(case when sm.performedAt < :fromInclusive then sm.quantityChange else 0 end),
+                               sum(case when sm.performedAt < :fromInclusive and sm.movementType <> :receipt then sm.quantityChange else 0 end),
                                sum(case when sm.performedAt >= :fromInclusive and sm.performedAt < :toExclusive and sm.movementType = :dispense then sm.quantityChange else 0 end),
                                sum(case when sm.performedAt >= :fromInclusive and sm.performedAt < :toExclusive and sm.movementType = :return then sm.quantityChange else 0 end),
                                sum(case when sm.performedAt >= :fromInclusive and sm.performedAt < :toExclusive and sm.movementType in (:adjustment, :expire) then sm.quantityChange else 0 end)
                         from StockMovementEntity sm
+                        where sm.performedAt < :toExclusive
                         group by sm.medicineId
                         """, Object[].class)
                 .setParameter("fromInclusive", fromInclusive)
                 .setParameter("toExclusive", toExclusive)
+                .setParameter("receipt", StockMovementType.RECEIPT)
                 .setParameter("dispense", StockMovementType.DISPENSE)
                 .setParameter("return", StockMovementType.RETURN)
                 .setParameter("adjustment", StockMovementType.ADJUSTMENT)

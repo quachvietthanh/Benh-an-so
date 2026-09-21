@@ -26,9 +26,11 @@ import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
+import com.benhsoan.port.dto.result.InventoryStockReportExportResult;
 import com.benhsoan.port.dto.result.InventoryStockReportResult;
 import com.benhsoan.port.inbound.inventory.AdjustBatchStockUseCase;
 import com.benhsoan.port.inbound.inventory.DiscardExpiredBatchUseCase;
+import com.benhsoan.port.inbound.inventory.ExportInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.GetInventoryStockReportUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryBatchesUseCase;
 import com.benhsoan.port.inbound.inventory.ListInventoryExpiryAlertsUseCase;
@@ -66,6 +68,8 @@ class InventoryStockReportSecurityIntegrationTest {
     @MockitoBean
     private GetInventoryStockReportUseCase getInventoryStockReportUseCase;
     @MockitoBean
+    private ExportInventoryStockReportUseCase exportInventoryStockReportUseCase;
+    @MockitoBean
     private AdjustBatchStockUseCase adjustBatchStockUseCase;
     @MockitoBean
     private DiscardExpiredBatchUseCase discardExpiredBatchUseCase;
@@ -85,27 +89,48 @@ class InventoryStockReportSecurityIntegrationTest {
     private CurrentUserPort currentUserPort;
 
     @Test
-    void pharmacistWithPharmacyReadCanViewStockReport() throws Exception {
+    void pharmacistWithInventoryReportViewCanViewStockReport() throws Exception {
         when(getInventoryStockReportUseCase.getStockReport(any(), any()))
                 .thenReturn(emptyReport());
 
         mockMvc.perform(get("/inventory/report/stock-in-out")
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-31")
-                        .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
+                        .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_INVENTORY_REPORT_VIEW"))))
                 .andExpect(status().isOk());
     }
 
     @Test
-    void managerWithReportViewCanViewStockReport() throws Exception {
+    void managerWithInventoryReportViewCanViewStockReport() throws Exception {
         when(getInventoryStockReportUseCase.getStockReport(any(), any()))
                 .thenReturn(emptyReport());
 
         mockMvc.perform(get("/inventory/report/stock-in-out")
                         .param("from", "2026-08-01")
                         .param("to", "2026-08-31")
-                        .with(user("manager").authorities(new SimpleGrantedAuthority("PERMISSION_REPORT_VIEW"))))
+                        .with(user("manager").authorities(new SimpleGrantedAuthority("PERMISSION_INVENTORY_REPORT_VIEW"))))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void adminWithInventoryReportViewCanViewStockReport() throws Exception {
+        when(getInventoryStockReportUseCase.getStockReport(any(), any()))
+                .thenReturn(emptyReport());
+
+        mockMvc.perform(get("/inventory/report/stock-in-out")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(user("admin").authorities(new SimpleGrantedAuthority("PERMISSION_INVENTORY_REPORT_VIEW"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void doctorWithPharmacyReadButWithoutInventoryReportViewIsForbidden() throws Exception {
+        mockMvc.perform(get("/inventory/report/stock-in-out")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -115,6 +140,46 @@ class InventoryStockReportSecurityIntegrationTest {
                         .param("to", "2026-08-31")
                         .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unauthenticatedRequestIsUnauthorized() throws Exception {
+        mockMvc.perform(get("/inventory/report/stock-in-out")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void pharmacistCanExportStockReport() throws Exception {
+        when(exportInventoryStockReportUseCase.export(any(), any()))
+                .thenReturn(new InventoryStockReportExportResult(
+                        "stock-in-out-report.csv",
+                        "text/csv; charset=UTF-8",
+                        new byte[0]));
+
+        mockMvc.perform(get("/inventory/report/stock-in-out/export")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_INVENTORY_REPORT_VIEW"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void doctorCannotExportStockReport() throws Exception {
+        mockMvc.perform(get("/inventory/report/stock-in-out/export")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PHARMACY_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unauthenticatedRequestCannotExportStockReport() throws Exception {
+        mockMvc.perform(get("/inventory/report/stock-in-out/export")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isUnauthorized());
     }
 
     private InventoryStockReportResult emptyReport() {

@@ -140,6 +140,58 @@ class GetInventoryStockReportServiceTest {
         );
     }
 
+    @Test
+    void computesExplicitReconciliationFormula() {
+        UUID medicineId = UUID.randomUUID();
+        when(clockPort.now()).thenReturn(NOW);
+        when(reportRepository.summarizeMovements(any(), any())).thenReturn(List.of(
+                new InventoryStockMovementSummary(medicineId, 100, 50, 30, 5, -10)
+        ));
+        when(medicineRepository.findAllById(anyCollection())).thenReturn(List.of(
+                medicine(medicineId, "MED-001", "Paracetamol", "vien")
+        ));
+
+        InventoryStockReportResult result = service.getStockReport(
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(115, result.items().get(0).closingQuantity());
+    }
+
+    @Test
+    void filtersOutZeroOnlyRows() {
+        UUID medicineId = UUID.randomUUID();
+        when(clockPort.now()).thenReturn(NOW);
+        when(reportRepository.summarizeMovements(any(), any())).thenReturn(List.of(
+                new InventoryStockMovementSummary(medicineId, 0, 0, 0, 0, 0)
+        ));
+
+        InventoryStockReportResult result = service.getStockReport(
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertTrue(result.items().isEmpty());
+        assertFalse(result.hasTransactions());
+    }
+
+    @Test
+    void keepsMedicineWithOpeningButNoInPeriodMovement() {
+        UUID medicineId = UUID.randomUUID();
+        when(clockPort.now()).thenReturn(NOW);
+        when(reportRepository.summarizeMovements(any(), any())).thenReturn(List.of(
+                new InventoryStockMovementSummary(medicineId, 40, 0, 0, 0, 0)
+        ));
+        when(medicineRepository.findAllById(anyCollection())).thenReturn(List.of(
+                medicine(medicineId, "MED-001", "Paracetamol", "vien")
+        ));
+
+        InventoryStockReportResult result = service.getStockReport(
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(1, result.items().size());
+        assertEquals(40, result.items().get(0).openingQuantity());
+        assertEquals(40, result.items().get(0).closingQuantity());
+        assertFalse(result.hasTransactions());
+    }
+
     private Medicine medicine(UUID id, String code, String name, String unit) {
         return Medicine.restore(
                 id,
