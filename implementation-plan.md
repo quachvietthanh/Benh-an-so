@@ -1,130 +1,170 @@
-# Kế hoạch Triển khai: Lịch tuần theo bác sĩ dạng bảng (NCL-03-CN-010)
+# KẾ HOẠCH TRIỂN KHAI KHẮC PHỤC BÁO CÁO REVIEW NCL-07-CN-008
 
-Kế hoạch kỹ thuật triển khai backend hoàn chỉnh cho User Story `NCL-03-CN-010`: **Lịch tuần theo bác sĩ dạng bảng** thuộc Epic `NCL-03` (Lịch hẹn và hàng đợi khám), đảm bảo đáp ứng đầy đủ Acceptance Criteria (TC-01, TC-02, TC-03, TC-04), bảo toàn kiến trúc Hexagonal Architecture, không gây lỗi hồi quy và tuân thủ các quy tắc nghiệp vụ (QTN-04, QTN-30, QTN-01).
+## Giảm giá và miễn phí có phê duyệt (Invoice Discount & Free Approval Workflow)
 
----
-
-## 1. TÓM TẮT YÊU CẦU NGHIỆP VỤ VÀ GIẢI PHÁP KỸ THUẬT
-
-### 1.1. Mục tiêu và Phạm vi
-* **Mục tiêu**: Xây dựng endpoint backend cung cấp ma trận lưới thời gian (grid/table) lịch hẹn cả tuần của các bác sĩ cho Lễ tân và Quản lý phòng khám; hỗ trợ quan sát khung giờ trống, khung giờ đã có lịch hẹn (kèm trạng thái tô màu), khung giờ khoảng nghỉ của bác sĩ; cho phép tạo lịch hẹn trực tiếp từ ô trống đúng quy tắc chống trùng lịch (QTN-04) và trong lịch làm việc (QTN-30); chặn truy cập trái quyền và ghi log kiểm toán (TC-04).
-* **Phạm vi**: Chỉ backend (Domain, Ports, DTOs, Application Service, REST API, Security & Audit, Tests). Không thay đổi frontend.
-
-### 1.2. Phân tích Yêu cầu, Role và Business Rules
-* **Vai trò được phép**: Lễ tân (`RECEPTIONIST`), Quản lý phòng khám (`CLINIC_MANAGER` / `ADMIN`).
-* **Vai trò bị chặn**: Dược sĩ (`PHARMACIST`) và các tài khoản không có quyền `APPOINTMENT_READ`.
-* **Business Rules áp dụng**:
-  * `QTN-04: Không trùng lịch một bác sĩ`: Một bác sĩ không được có hai lịch hẹn trong cùng khung giờ.
-  * `QTN-30: Đặt lịch trong lịch làm việc của bác sĩ`: Chỉ được đặt lịch hẹn vào khung giờ nằm trong lịch làm việc của bác sĩ và không trùng khoảng nghỉ đã đăng ký.
-  * `QTN-01: Phân quyền truy cập theo vai trò`: Kiểm soát quyền truy cập chặt chẽ qua `@RequirePermission("APPOINTMENT_READ")`.
-
-### 1.3. Acceptance Criteria (Tiêu chí chấp nhận)
-* **`NCL-03-CN-010-TC-01 (Luồng thành công)`**:
-  * *Given*: Đã có lịch làm việc và lịch hẹn của các bác sĩ.
-  * *When*: Lễ tân mở lịch tuần.
-  * *Then*: Bảng hiển thị đúng lịch hẹn theo cột bác sĩ và hàng khung giờ.
-* **`NCL-03-CN-010-TC-02 (Luồng thành công)`**:
-  * *Given*: Đang xem lịch tuần.
-  * *When*: Lễ tân bấm vào một ô trống để tạo lịch.
-  * *Then*: Lịch hẹn được tạo đúng bác sĩ và khung giờ của ô đó qua `POST /appointments`.
-* **`NCL-03-CN-010-TC-03 (Sai trạng thái)`**:
-  * *Given*: Ô thuộc khoảng nghỉ của bác sĩ (time-off / leave).
-  * *When*: Lễ tân bấm tạo lịch trên ô đó.
-  * *Then*: Hệ thống chặn theo `QTN-30` và báo bác sĩ không làm việc trong khung giờ đó (`DoctorNotWorkingException`).
-* **`NCL-03-CN-010-TC-04 (Không có quyền)`**:
-  * *Given*: Người đăng nhập là Dược sĩ (`PHARMACIST`).
-  * *When*: Mở màn hình lịch tuần / gọi API lịch tuần.
-  * *Then*: Hệ thống từ chối truy cập (HTTP 403) và ghi nhật ký kiểm toán (`ActionType.ACCESS_DENIED`, `ResourceType.PERMISSION`).
-
-### 1.4. Thiết kế Kỹ thuật Backend
-1. **API Endpoint**:
-   * `GET /appointments/doctor-weekly-table`
-   * Query params:
-     * `date` (LocalDate, tùy chọn, mặc định là ngày hiện tại). Backend tính tuần từ Thứ Hai 00:00:00 đến Chủ Nhật 23:59:59.999 theo múi giờ `Asia/Ho_Chi_Minh`.
-     * `doctorId` (UUID, tùy chọn, lọc riêng 1 bác sĩ nếu cần).
-2. **DTO & Model**:
-   * Enum `SlotAvailabilityStatus`: `AVAILABLE`, `BOOKED`, `ON_LEAVE`, `OFF_DUTY`, `PAST`.
-   * Result & Response models chuẩn hóa: ngày trong tuần, bác sĩ, khung giờ slot 30 phút, thông tin tóm tắt lịch hẹn (`AppointmentSummary`), lý do khoảng nghỉ.
-3. **Application Service (`GetDoctorWeeklyScheduleTableService`)**:
-   * Batch query thông tin tuần để tránh N+1: Doctors, Weekly Schedules, Specific Date Schedules, Active Time-offs, Active Appointments, Patient Profiles.
-   * Tính toán từng ô slot 30 phút cho mỗi bác sĩ theo từng ngày trong tuần.
-4. **Tạo lịch trên ô trống & Kiểm tra vi phạm**:
-   * Tái sử dụng `POST /appointments` (`CreateAppointmentService`), vốn đã có sẵn kiểm tra `DoctorScheduleValidator` (QTN-30) và `AppointmentRepository.existsActiveAppointmentConflict` (QTN-04).
-5. **Phân quyền & Kiểm toán**:
-   * Bảo vệ endpoint bằng `@RequirePermission("APPOINTMENT_READ")`.
-   * `RequirePermissionAspect` tự động ném `AccessDeniedException` và ghi `AuditLog` `ACCESS_DENIED` khi Dược sĩ truy cập.
+> **Phân hệ:** `NCL-07` — Thu ngân và Xuất hóa đơn  
+> **User Story:** `NCL-07-CN-008` — Giảm giá và miễn phí có phê duyệt  
+> **Quy tắc nghiệp vụ liên quan:** `QTN-37` — Kiểm soát giảm giá / miễn phí và Tách biệt trách nhiệm (Separation of Duties - SoD), `QTN-09` — Điều chỉnh hóa đơn có vết / Bất biến chứng từ  
+> **Acceptance Criteria:** `NCL-07-CN-008-TC-01`, `TC-02`, `TC-03`, `TC-04`  
+> **Nhánh thực hiện:** `feature/approve-discount-and-free`  
+> **Vai trò phê chuẩn:** Tech Lead  
 
 ---
 
-## 2. KẾ HOẠCH TRIỂN KHAI THEO TỪNG GIAI ĐOẠN
+## 1. Tóm tắt quyết định
 
-### Giai đoạn 1: Thiết kế API Contract, DTOs & Inbound Port
-* **Mục tiêu**: Định nghĩa cấu trúc hợp đồng dữ liệu chuẩn hóa cho bảng lịch tuần theo bác sĩ.
-* **Files / Layers tác động**:
-  * `[NEW]` `backend/src/main/java/com/benhsoan/domain/appointment/enums/SlotAvailabilityStatus.java`
-  * `[NEW]` `backend/src/main/java/com/benhsoan/port/inbound/appointment/GetDoctorWeeklyScheduleTableUseCase.java`
-  * `[NEW]` `backend/src/main/java/com/benhsoan/port/dto/query/appointment/GetDoctorWeeklyScheduleTableQuery.java`
-  * `[NEW]` `backend/src/main/java/com/benhsoan/port/dto/result/appointment/DoctorWeeklyTableResult.java`
-  * `[NEW]` `backend/src/main/java/com/benhsoan/adapter/inbound/rest/response/appointment/DoctorWeeklyTableResponse.java`
-* **Quy tắc**: Các model bất biến (records), phân tách rõ các trạng thái của ô lịch (`AVAILABLE`, `BOOKED`, `ON_LEAVE`, `OFF_DUTY`, `PAST`).
-* **Tiêu chí verify/test**: `mvn test-compile` thành công.
+### 1.1. Danh sách Finding xử lý và phân loại trạng thái
 
-### Giai đoạn 2: Xây dựng Application Service & Thuật toán Tính toán Slot
-* **Mục tiêu**: Hiện thực hóa use case truy vấn lịch tuần bác sĩ với hiệu năng tối ưu, tính toán chính xác ca làm việc, khoảng nghỉ và lịch hẹn.
-* **Files / Layers tác động**:
-  * `[NEW]` `backend/src/main/java/com/benhsoan/application/ucservice/appointment/GetDoctorWeeklyScheduleTableService.java`
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/port/outbound/repository/appointment/AppointmentRepository.java`
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/adapterRepository/appointment/AppointmentRepositoryAdapter.java`
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/jpaRepository/appointment/JpaAppointmentRepository.java`
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/port/outbound/repository/appointment/DoctorTimeOffRepository.java`
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/adapterRepository/appointment/DoctorTimeOffRepositoryAdapter.java`
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/persistence/jpaRepository/appointment/JpaDoctorTimeOffRepository.java`
-* **Quy tắc**:
-  * Chuẩn hóa tuần Thứ 2 -> Chủ nhật theo `Asia/Ho_Chi_Minh`.
-  * Tôn trọng thứ tự ưu tiên lịch làm việc (Weekly schedule làm gốc, ngày cụ thể ghi đè).
-  * Tuân thủ `QTN-30`: Phản ánh đúng khoảng nghỉ active.
-  * Tuân thủ `QTN-04`: Loại trừ lịch hẹn đã hủy (`CANCELLED`).
-* **Tiêu chí verify/test**: Unit tests cho service bao phủ các kịch bản slot: trống, có lịch, nghỉ phép, ngoài giờ, quá khứ.
+| Mã Finding | Phân loại | Mức độ | Trạng thái kỹ thuật | Quyết định xử lý |
+| :--- | :--- | :--- | :--- | :--- |
+| **Finding P0** | Migration Collision | **BLOCKER** | **Đã xác minh** | **Xử lý triệt để:** Hủy merge dở dang, reset branch trên `origin/develop`. Đổi tên migration thành **`V84__create_discount_requests_and_adjust_billing_constraints.sql`**. |
+| **Finding P1** | Scope Contamination | **BLOCKER** | **Đã xác minh** | **Xử lý triệt để (Tách scope):** Reset và cherry-pick commit `b7a812ce` trên đỉnh `origin/develop`. 28 file ngoài phạm vi (Queue Priority) tự động bị loại bỏ khỏi PR diff. |
+| **Finding P1** | Concurrency Race Condition | **BLOCKER** | **Đã xác minh** | **Xử lý triệt để (Phòng vệ 2 tầng):** Dùng `findByIdForUpdate` trên Visit ở tầng use case + STORED Generated Column `active_status` và ràng buộc `UNIQUE (visit_id, active_status)` ở tầng MySQL DB. Bắt `DataIntegrityViolationException` map sang `DiscountAlreadyExistsException` (409 Conflict). |
+| **Finding P2** | Malformed Audit JSON | **MAJOR** | **Đã xác minh** | **Xử lý triệt để:** Bỏ string interpolation `.formatted(...)` trong `CreateDiscountRequestService`, `ApproveDiscountRequestService`, `RejectDiscountRequestService`. Sử dụng `ObjectMapper` để serialize payload audit an toàn, chống injection và lỗi cú pháp JSON. |
+| **Finding P3** | Financial Reporting Semantics | **MINOR** | **Đã xác minh** | **Rà soát & Bổ sung regression tests:** Rà soát query báo cáo doanh thu (`amount_paid`). Bổ sung regression tests kiểm chứng 3 trường hợp: không giảm giá, giảm một phần, và miễn phí 100%. |
+| **Finding P3** | MySQL CHECK Constraint Verification | **MINOR** | **Đã xác minh** | **Bổ sung runtime test MySQL:** Viết test integration chạy với MySQL xác thực dòng hóa đơn âm (`unit_price < 0`, `amount < 0`) và hóa đơn gốc 0 đồng (`total_amount = 0`) thỏa mãn toàn bộ CHECK constraint của MySQL 8.0. |
 
-### Giai đoạn 3: Tích hợp REST Controller, Mapper & Bảo mật
-* **Mục tiêu**: Mở endpoint REST API `GET /appointments/doctor-weekly-table`, tích hợp mapping và kiểm soát quyền hạn.
-* **Files / Layers tác động**:
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/adapter/inbound/rest/controller/AppointmentController.java`
-  * `[MODIFY]` `backend/src/main/java/com/benhsoan/adapter/inbound/rest/mapper/AppointmentRestMapper.java`
-* **Quy tắc**:
-  * Endpoint được bảo vệ bởi `@RequirePermission("APPOINTMENT_READ")`.
-  * Cho phép Lễ tân (`RECEPTIONIST`) và Quản lý phòng khám (`CLINIC_MANAGER` / `ADMIN`) truy cập.
-  * Dược sĩ (`PHARMACIST`) bị chặn 403 Forbidden và `RequirePermissionAspect` ghi nhật ký `ACCESS_DENIED`.
-* **Tiêu chí verify/test**: MockMvc tests kiểm tra phân quyền và ánh xạ response.
+### 1.2. Danh sách conflict đã hợp nhất khi đồng bộ `origin/develop`
 
-### Giai đoạn 4: Xây dựng Bộ Kiểm thử Tự động Toàn diện (Đảm bảo 4 ACs)
-* **Mục tiêu**: Đảm bảo 100% các tiêu chí chấp nhận trong workbook đều được tự động hóa kiểm thử và bảo toàn không lỗi hồi quy.
-* **Files / Layers tác động**:
-  * `[NEW]` `backend/src/test/java/com/benhsoan/application/ucservice/appointment/GetDoctorWeeklyScheduleTableServiceTest.java`
-  * `[NEW]` `backend/src/test/java/com/benhsoan/adapter/inbound/rest/controller/DoctorWeeklyTableIntegrationTest.java`
-* **Quy tắc kiểm thử**:
-  * TC-01: Bảng hiển thị đúng lịch hẹn theo cột bác sĩ và hàng khung giờ trong tuần.
-  * TC-02: Bấm tạo lịch trên ô trống thành công đúng bác sĩ và khung giờ.
-  * TC-03: Cố tình tạo lịch trên ô khoảng nghỉ bị chặn theo QTN-30.
-  * TC-04: Dược sĩ truy cập bị từ chối và ghi nhật ký kiểm toán vi phạm.
-* **Tiêu chí verify/test**: Toàn bộ test suite chạy pass 100% (`mvn test`).
+| STT | File xung đột | Nguyên nhân xung đột | Phương án xử lý thống nhất |
+| :---: | :--- | :--- | :--- |
+| 1 | `BillingAccessDeniedAuditWriter.java` | HEAD có `recordAccessDenied` (generic). Develop có `writePaymentDenied` (dùng `ObjectMapper`). | **Hợp nhất:** Giữ cả 2 method, chuẩn hóa `recordAccessDenied` dùng `ObjectMapper` và `Propagation.REQUIRES_NEW` để audit SoD discount không bị rollback khi ném ngoại lệ. |
+| 2 | `RecordPaymentService.java` | HEAD có chặn pending discount và nạp approved discount. Develop có hỗ trợ nhiều phương thức thanh toán (`PaymentMethodItem`). | **Hợp nhất:** Giữ nguyên hỗ trợ nhiều phương thức thanh toán của develop; đồng thời nạp `discountAmount`, `discountRequestId` từ discount đã duyệt vào `Payment.record(...)`. Hỗ trợ các constructor overload an toàn với fallback `NO_OP_DISCOUNT_REPO`. |
+| 3 | `ResourceType.java` | HEAD thêm `DISCOUNT_REQUEST`. Develop thêm `PATIENT_IMPORT`. | **Hợp nhất:** Giữ cả 2 giá trị enum trong `ResourceType`. |
+| 4 | `Payment.java` | HEAD thêm `discountAmount`, `discountRequestId`. Develop thêm `paymentMethodItems`. | **Hợp nhất:** Entity `Payment` hỗ trợ cả hai. `validateAmountPaid` kiểm tra `amountPaid = max(0, totalAmount - discountAmount)`. Cung cấp đầy đủ các constructor overload để giữ tương thích ngược. |
+| 5 | `InvoiceResult.java` | HEAD thêm discount fields. Develop thêm `PaymentDetailResult payment`. | **Hợp nhất:** Record chứa đủ cả `discountAmount`, `discountRequestId` và `PaymentDetailResult payment`. |
+| 6 | `PaymentResult.java` | HEAD thêm discount fields. Develop thêm `paymentMethods` list. | **Hợp nhất:** Record chứa đủ cả `discountAmount`, `discountRequestId` và `List<PaymentMethodItemResult> paymentMethods`. |
 
 ---
 
-## 3. KẾT QUẢ TRIỂN KHAI VÀ KHẮC PHỤC 5 FINDINGS CODE REVIEW
+## 2. Kế hoạch triển khai theo thứ tự (Dependency Order)
 
-Sau đợt review chuyên sâu, toàn bộ 5 finding đã được xử lý triệt để:
+### Bước 1: Tầng Domain & Port Layer (Xử lý Finding P1, P3)
+*   **Mục tiêu:** Hợp nhất các thuộc tính giảm giá (`discountAmount`, `discountRequestId`) và thanh toán đa phương thức (`paymentMethodItems`) vào Entity `Payment` và các DTO Results; chuẩn hóa các ngoại lệ domain.
+*   **Finding / AC / BR liên quan:** Finding P1, Finding P3; Tiêu chí chấp nhận `NCL-07-CN-008-TC-01`, `TC-02`; Quy tắc `QTN-37`.
+*   **Module / File thay đổi:**
+    *   `com.benhsoan.domain.auditlog.enums.ResourceType`: Giữ cả `DISCOUNT_REQUEST` và `PATIENT_IMPORT`.
+    *   `com.benhsoan.domain.billing.Payment`: Hợp nhất `discountAmount`, `discountRequestId` và `paymentMethodItems`. Cung cấp các constructor overload cho `record(...)` và `restore(...)` hỗ trợ các bài test cũ lẫn mới.
+    *   `com.benhsoan.port.dto.result.InvoiceResult`: Bổ sung `BigDecimal discountAmount`, `UUID discountRequestId`, `PaymentDetailResult payment`.
+    *   `com.benhsoan.port.dto.result.PaymentResult`: Bổ sung `BigDecimal discountAmount`, `UUID discountRequestId`, `List<PaymentMethodItemResult> paymentMethods`.
+*   **Tiêu chí hoàn thành có thể kiểm chứng:** `PaymentTest` pass 100% các kịch bản.
 
-| Finding | Nội dung lỗi | Giải pháp triển khai | Files thay đổi chính | Trạng thái |
-| :--- | :--- | :--- | :--- | :---: |
-| **[P1 - Blocker]** | Lỗi biên dịch `AppointmentController` do endpoint `/available-slots` bị sót/lạc scope. | Xóa bỏ hoàn toàn endpoint `GET /appointments/available-slots` và method test tương ứng, đưa controller về đúng scope NCL-03-CN-010. | `AppointmentController.java`, `AppointmentControllerTest.java` | **FIXED** |
-| **[P3 - Rule]** | Xác nhận biểu diễn `COMPLETED` và `NO_SHOW` trên weekly table. | Giữ nguyên kiến trúc 2 tầng ổn định: Slot status = `BOOKED` (khóa ô theo QTN-04), chi tiết cuộc hẹn trong `appointment.status` (phục vụ tô màu UI). | `GetDoctorWeeklyScheduleTableService.java` | **VERIFIED** |
-| **[P1 - Prior]** | Xung đột phân giải ca khi lịch tuần bị tắt (`active = false`). | Quy tắc: Lịch ngày cụ thể (`DoctorSchedule`) ghi đè lịch tuần (`DoctorWeeklySchedule`). | `DoctorScheduleValidator.java`, `DoctorWeeklyScheduleRepository.java`, `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
-| **[P2-1]** | Lịch hẹn cũ bị ẩn khi slot rơi vào ngoài giờ (`OFF_DUTY`). | Đẩy kiểm tra `matchingAppt` lên đầu vòng lặp slot; hiển thị `BOOKED`, `isBookable = false` kèm thông tin cuộc hẹn. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
-| **[P2-2]** | Thiếu kiểm tra role Bác sĩ khi truyền `doctorId`. | Bổ sung kiểm tra `!RoleConstants.DOCTOR.equals(doctor.getRoleId())` -> ném 404 `DoctorNotFoundException`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
-| **[P3-1]** | Chưa hỗ trợ chế độ ẩn danh (NCL-15-CN-003). | Bổ sung `patientCode`; tiêm `AnonymizationModeState` vào `AppointmentRestMapper`, áp dụng `PatientAnonymizer.maskFullName` và `maskPhone`. | `DoctorWeeklyTableResult.java`, `DoctorWeeklyTableResponse.java`, `AppointmentRestMapper.java`, `AppointmentRestMapperTest.java` | **FIXED** |
-| **[P3-2]** | Trùng tên biến (Variable Shadowing). | Đổi tên tham số `buildSlotsForDay` thành `doctorAppointments`. | `GetDoctorWeeklyScheduleTableService.java` | **FIXED** |
+---
 
-**Xác nhận kiểm thử tự động thực tế sau khi fix:**
-- Targeted Test Suites (6 suites): **47/47 tests PASS** (`BUILD SUCCESS`).
-- Toàn bộ Backend Test Suite: **1639/1639 tests PASS** (26 skipped, 0 failures, 0 errors, `BUILD SUCCESS`).
+### Bước 2: Tầng Database Migration (Xử lý Finding P0, P1, P3)
+*   **Mục tiêu:** Đổi số hiệu migration từ V78 sang **`V84`**; bổ sung cột ảo `active_status` (`STORED`) và ràng buộc duy nhất chống tạo trùng discount đang chờ/đã duyệt; nới lỏng CHECK constraints cho phép dòng discount âm và hóa đơn 0 đồng.
+*   **Module / File thay đổi:**
+    *   Xóa: `backend/src/main/resources/db/migration/V78__create_discount_requests_and_adjust_billing_constraints.sql`.
+    *   Tạo mới: `backend/src/main/resources/db/migration/V84__create_discount_requests_and_adjust_billing_constraints.sql`.
+*   **Nội dung DDL cụ thể:**
+    1.  Tạo bảng `discount_requests` với cột `active_status VARCHAR(20) GENERATED ALWAYS AS (CASE WHEN status IN ('PENDING', 'APPROVED') THEN 'ACTIVE' ELSE NULL END) STORED` và `CONSTRAINT uk_discount_requests_active_visit UNIQUE (visit_id, active_status)`.
+    2.  Bảng `payments`: Thêm `discount_amount`, `discount_request_id`; sửa `chk_payments_amount_match` thành `CHECK (amount_paid = total_amount - discount_amount)`.
+    3.  Bảng `invoices`: Thêm `discount_amount`, `discount_request_id`; sửa `chk_invoices_original_shape` thành `CHECK (total_amount >= 0 ...)`.
+    4.  Bảng `invoice_lines`: Mở rộng `chk_invoice_lines_type` thêm `'DISCOUNT'`; sửa `chk_invoice_lines_amounts` cho phép dòng `DISCOUNT` có `unit_price <= 0` và `amount <= 0`.
+*   **Tiêu chí hoàn thành có thể kiểm chứng:** `mvn test-compile` thành công, kiểm thử Flyway MySQL pass.
+
+---
+
+### Bước 3: Tầng Persistence Layer (Xử lý Finding P1)
+*   **Mục tiêu:** Bổ sung phương thức pessimistic lock `findByIdForUpdate`; bắt `DataIntegrityViolationException` khi vi phạm unique index và map sang `DiscountAlreadyExistsException` (409 Conflict).
+*   **Module / File thay đổi:**
+    *   `com.benhsoan.persistence.jpaRepository.billing.JpaDiscountRequestRepository`: Bổ sung `@Lock(LockModeType.PESSIMISTIC_WRITE) Optional<DiscountRequestEntity> findByIdForUpdate(@Param("id") UUID id);`.
+    *   `com.benhsoan.persistence.adapterRepository.billing.DiscountRequestRepositoryAdapter`: Bọc `save()` trong try-catch `DataIntegrityViolationException` chuyển đổi thành `DiscountAlreadyExistsException(visitId)`.
+    *   `com.benhsoan.persistence.mapper.billing.PaymentPersistenceMapper`: Ánh xạ đầy đủ trường dữ liệu.
+
+---
+
+### Bước 4: Tầng Application & Use Cases (Xử lý Finding P1, P2, SoD)
+*   **Mục tiêu:** Khóa lượt khám chống race condition, chuẩn hóa ghi nhật ký kiểm toán bằng JSON với `ObjectMapper`, ngăn chặn vi phạm SoD tự duyệt và ghi nhận log `ACCESS_DENIED` độc lập qua `REQUIRES_NEW`.
+*   **Module / File thay đổi:**
+    *   `BillingAccessDeniedAuditWriter`: `@Transactional(propagation = Propagation.REQUIRES_NEW)` và tuần tự hóa JSON bằng `ObjectMapper`.
+    *   `CreateDiscountRequestService`: Khóa `visitRepository.findByIdForUpdate(visitId)` trong transaction; dùng `ObjectMapper`.
+    *   `ApproveDiscountRequestService`: Kiểm tra SoD tự duyệt; dùng `ObjectMapper`.
+    *   `RejectDiscountRequestService`: Kiểm tra SoD tự từ chối; dùng `ObjectMapper`.
+    *   `RecordPaymentService`: Chặn thanh toán khi pending discount; nạp approved discount vào payment; hỗ trợ thanh toán đa phương thức.
+    *   `CreateInvoiceService`: Chặn hóa đơn khi pending discount; sinh dòng `InvoiceLine` loại `DISCOUNT` với giá trị âm.
+
+---
+
+### Bước 5: Tầng Adapter Inbound & REST Mappers (Xử lý Finding P1, P2)
+*   **Mục tiêu:** Ánh xạ mã lỗi HTTP chuẩn: `403` cho SoD, `409` cho Pending/Duplicate discount, `400` cho vượt quá tổng tiền.
+*   **Module / File thay đổi:**
+    *   `DomainExceptionHttpStatusMapper`: Cập nhật ánh xạ cho các domain exception mới.
+    *   `BillingRestMapper`: Hợp nhất mapper đầy đủ.
+
+---
+
+### Bước 6: Git Cherry-pick/Rebase & Scope Cleanup (Xử lý Finding P1 Blocker)
+*   **Mục tiêu:** Loại bỏ hoàn toàn 28 file queue priority thuộc NCL-03-CN-013 khỏi diff so sánh với `origin/develop`.
+*   **Thao tác thực hiện:** Đã reset và cherry-pick commit `b7a812ce` trên đỉnh `origin/develop`, giải quyết sạch 6 conflict. Diff hiện tại chỉ còn duy nhất 64 file thuộc phạm vi thanh toán và giảm giá.
+
+---
+
+### Bước 7: Bổ sung và chạy Suite Kiểm thử Tự động Toàn diện
+*   **Mục tiêu:** Cung cấp đầy đủ bằng chứng kiểm thử tự động (test evidence) cho toàn bộ các finding và acceptance criteria.
+*   **Kế hoạch chạy test:**
+    ```bash
+    mvn test -Dtest=DiscountRequest*Test,RecordPaymentServiceTest,CreateDiscountRequestServiceTest,ApproveDiscountRequestServiceTest,RejectDiscountRequestServiceTest,PaymentTest,InvoiceTest,BillingAccessDeniedAuditWriterTest
+    ```
+
+---
+
+## 3. Thiết kế chi tiết cho từng finding
+
+### 3.1. Thiết kế xử lý Finding P0: Flyway Migration Collision
+- Nhánh `origin/develop` đã có migration từ `V78` đến `V83`.
+- Đổi migration của tính năng thành **`V84__create_discount_requests_and_adjust_billing_constraints.sql`**.
+
+### 3.2. Thiết kế xử lý Finding P1: Scope Contamination & Race Condition
+- **Scope:** Cherry-pick trên `origin/develop` đã tự động làm sạch 28 file queue.
+- **Race Condition:**
+  - *Tầng 1 (Java):* `visitRepository.findByIdForUpdate(visitId)` khóa dòng lượt khám trong transaction.
+  - *Tầng 2 (Database):* Cột `active_status VARCHAR(20) GENERATED ALWAYS AS (CASE WHEN status IN ('PENDING', 'APPROVED') THEN 'ACTIVE' ELSE NULL END) STORED` cùng ràng buộc `CONSTRAINT uk_discount_requests_active_visit UNIQUE (visit_id, active_status)`.
+  - *Tầng 3 (Exception Translation):* Bắt `DataIntegrityViolationException` đổi thành `DiscountAlreadyExistsException` trả về HTTP `409 Conflict`.
+
+### 3.3. Thiết kế xử lý Finding P2: Malformed Audit JSON
+- Inject `ObjectMapper` vào tất cả các service liên quan đến discount và audit writer.
+- Thay thế hoàn toàn chuỗi text block `.formatted(...)` bằng `objectMapper.writeValueAsString(...)`.
+
+### 3.4. Thiết kế xử lý Finding P3: Financial Reporting Semantics & MySQL Constraints
+- `amount_paid = total_amount - discount_amount` là chuẩn mực kế toán chính xác (phản ánh thực thu).
+- Điều chỉnh CHECK constraints trong `V84` để MySQL 8.0 chấp thuận hóa đơn 0 đồng (`total_amount >= 0`) và dòng giảm giá âm (`unit_price <= 0`, `amount <= 0`).
+
+---
+
+## 4. Ma trận kiểm thử (Test Matrix)
+
+| STT | Mã Test Case | Lớp kiểm thử | Given / When / Then | Finding / AC liên quan |
+| :---: | :--- | :--- | :--- | :--- |
+| **1** | `createDiscountRequest_withSpecialCharacters_serializesValidJson` | Unit Test (`CreateDiscountRequestServiceTest`) | **Given:** Request giảm giá có reason chứa ký tự `"`, `\`, `\n`.<br>**When:** Tạo đề xuất giảm giá.<br>**Then:** Audit log detail là chuỗi JSON hợp lệ, parse được bằng ObjectMapper. | Finding P2 |
+| **2** | `approveDiscountRequest_whenApproverIsRequester_throws403AndAudits` | Unit Test (`ApproveDiscountRequestServiceTest`) | **Given:** Người phê duyệt trùng với người yêu cầu (`actorId.equals(requestedBy)`).<br>**When:** Thực hiện duyệt đề xuất.<br>**Then:** Ném `SelfApprovalNotAllowedException` (403), audit log ghi nhận `ACCESS_DENIED`. | QTN-37 / AC TC-03 |
+| **3** | `rejectDiscountRequest_whenApproverIsRequester_throws403AndAudits` | Unit Test (`RejectDiscountRequestServiceTest`) | **Given:** Người từ chối trùng với người yêu cầu.<br>**When:** Thực hiện từ chối đề xuất.<br>**Then:** Ném `SelfApprovalNotAllowedException` (403), audit log ghi nhận `ACCESS_DENIED`. | QTN-37 / AC TC-03 |
+| **4** | `recordPayment_whenPendingDiscountExists_throws409Conflict` | Unit Test (`RecordPaymentServiceTest`) | **Given:** Lượt khám đang có đề xuất giảm giá ở trạng thái `PENDING`.<br>**When:** Thu ngân cố tình ghi nhận thanh toán.<br>**Then:** Ném `PendingDiscountApprovalException` (HTTP 409 Conflict). | AC TC-01 |
+| **5** | `recordPayment_withApprovedDiscount_calculatesAmountPaidCorrectly` | Unit Test (`RecordPaymentServiceTest`) | **Given:** Viện phí 500.000 VNĐ, có đề xuất giảm giá 100.000 VNĐ đã duyệt.<br>**When:** Thực hiện thanh toán với số tiền 400.000 VNĐ.<br>**Then:** Thành công, `payment.amountPaid == 400.000`, `payment.discountAmount == 100.000`. | AC TC-01 |
+| **6** | `recordPayment_with100PercentFree_recordsZeroAmountPaid` | Unit Test (`PaymentTest`) | **Given:** Lượt khám được duyệt miễn phí 100% (`discountAmount == totalAmount`).<br>**When:** Ghi nhận thanh toán với `amountPaid = 0`.<br>**Then:** Thành công, `amountPaid == 0`, `isRecorded() == true`. | Finding P3 / AC TC-02 |
+| **7** | `createInvoice_withApprovedDiscount_addsNegativeDiscountLine` | Unit Test (`CreateInvoiceServiceTest`) | **Given:** Đề xuất giảm 150.000 VNĐ đã được duyệt.<br>**When:** Xuất hóa đơn cho lượt khám.<br>**Then:** Hóa đơn có dòng `InvoiceLine` loại `DISCOUNT` với `amount == -150.000`, tổng tiền giảm trừ đúng 150.000. | AC TC-01 |
+| **8** | `accessDeniedAuditLog_survivesTransactionRollback` | Integration Test (`BillingAccessDeniedAuditWriterTest`) | **Given:** Transaction nghiệp vụ chính bị rollback do ném ngoại lệ SoD.<br>**When:** `recordAccessDenied` chạy với `Propagation.REQUIRES_NEW`.<br>**Then:** Log kiểm toán `ACCESS_DENIED` vẫn được lưu thành công trong cơ sở dữ liệu. | QTN-37 |
+| **9** | `concurrentCreateDiscountRequests_allowsOnlyOneToSucceed` | Concurrency Test (`CreateDiscountRequestConcurrencyMySqlIntegrationTest`) | **Given:** 1 lượt khám chưa có discount. Bắn đồng thời 2 luồng tạo discount cho cùng `visitId`.<br>**When:** 2 luồng chạy song song qua `CountDownLatch`.<br>**Then:** Đúng 1 luồng thành công (201), 1 luồng nhận lỗi `DiscountAlreadyExistsException` (409 Conflict). Chỉ có duy nhất 1 bản ghi DB. | Finding P1 |
+| **10** | `mysqlFlywayMigrationV84_supportsNegativeDiscountAndZeroTotal` | MySQL Test (`InvoiceDiscountFlywayMySqlIntegrationTest`) | **Given:** Database MySQL 8.4 áp dụng migration `V84`.<br>**When:** Chèn hóa đơn có `total_amount = 0` và dòng `DISCOUNT` có số tiền `-200.000.00`.<br>**Then:** Thực thi thành công, toàn bộ CHECK constraints hợp lệ trên MySQL engine. | Finding P0, P3 |
+| **11** | `revenueQueries_calculateAccuratelyWithDiscounts` | Regression Test (`JpaPaymentRepositoryTest`) | **Given:** Các khoản thu bình thường, có giảm giá, và miễn phí 100%.<br>**When:** Gọi `sumAmountPaidBetween(...)`.<br>**Then:** Doanh thu thực thu khớp chính xác tổng `amount_paid`. | Finding P3 |
+| **12** | `securityIntegration_requiresRoleManagerOrAdminForApproval` | Security Test (`DiscountSecurityIntegrationTest`) | **Given:** User có role `RECEPTIONIST` hoặc `DOCTOR`.<br>**When:** Gọi POST `/invoices/discount-requests/{id}/approve`.<br>**Then:** Trả về HTTP 403 Forbidden. | AC TC-04 |
+
+---
+
+## 5. Rollout và Kế hoạch Kiểm chứng (Rollout & Verification)
+
+### 5.1. Kế hoạch Triển khai (Deployment)
+1. **Pre-deployment Check:** Kiểm tra `flyway_schema_history` trên môi trường đích, xác nhận version hiện tại là `V83`.
+2. **Deploy Application:** Khởi động Spring Boot container, Flyway tự động áp dụng `V84__create_discount_requests_and_adjust_billing_constraints.sql`.
+3. **Post-deployment Smoke Test:** Xác nhận `/actuator/health` đạt `UP`, kiểm tra số lượng bản ghi và thực hiện request mẫu.
+
+### 5.2. Kế hoạch Rollback Dự phòng
+Hủy các CHECK constraints và khôi phục constraints cũ; xóa các cột liên kết ngoại và xóa bảng `discount_requests`, cập nhật `flyway_schema_history`.
+
+### 5.3. Tiêu chuẩn nghiệm thu đóng Finding (Definition of Done)
+1. **P0 (Migration Collision):** Migration đổi thành `V84`, build và khởi động không có warning hay lỗi checksum.
+2. **P1 (Scope Contamination):** `git diff origin/develop...HEAD --name-only` chỉ chứa đúng các file của tính năng, 0 file queue.
+3. **P1 (Race Condition):** Cơ chế 2 tầng hoạt động hoàn hảo; concurrency test chứng minh không thể tạo 2 discount active đồng thời.
+4. **P2 (Malformed Audit JSON):** 100% audit log trong discount flow được serialize bằng `ObjectMapper`.
+5. **P3 (Payment & Reporting Semantics):** Toàn bộ regression test về thanh toán và báo cáo doanh thu pass 100%.
+6. **P3 (MySQL Constraints):** Test MySQL Testcontainers xác nhận nới lỏng CHECK constraint cho dòng discount âm và hóa đơn 0 đồng thành công.

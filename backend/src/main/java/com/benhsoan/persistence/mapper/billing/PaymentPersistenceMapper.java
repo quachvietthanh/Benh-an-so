@@ -4,13 +4,35 @@ import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.billing.Payment;
 import com.benhsoan.persistence.entity.billing.PaymentEntity;
+import com.benhsoan.persistence.entity.billing.PaymentMethodItemEntity;
 
 @Component
 public class PaymentPersistenceMapper {
 
+    private final PaymentMethodItemPersistenceMapper itemMapper;
+
+    public PaymentPersistenceMapper() {
+        this(new PaymentMethodItemPersistenceMapper());
+    }
+
+    public PaymentPersistenceMapper(PaymentMethodItemPersistenceMapper itemMapper) {
+        this.itemMapper = itemMapper;
+    }
+
     public Payment toDomain(PaymentEntity entity) {
+        return toDomain(entity, null);
+    }
+
+    public Payment toDomain(PaymentEntity entity, java.util.List<PaymentMethodItemEntity> itemEntities) {
         if (entity == null) {
             return null;
+        }
+
+        java.util.List<com.benhsoan.domain.billing.PaymentMethodItem> items = null;
+        if (itemEntities != null) {
+            items = itemEntities.stream()
+                    .map(itemMapper::toDomain)
+                    .toList();
         }
 
         return Payment.restore(
@@ -19,6 +41,8 @@ public class PaymentPersistenceMapper {
                 entity.getExamFee(),
                 entity.getMedicineFee(),
                 entity.getServiceFee(),
+                entity.getDiscountAmount(),
+                entity.getDiscountRequestId(),
                 entity.getTotalAmount(),
                 entity.getAmountPaid(),
                 entity.getPaymentMethod(),
@@ -28,7 +52,9 @@ public class PaymentPersistenceMapper {
                 entity.getRefundReason(),
                 entity.getRefundedBy(),
                 entity.getRefundedAt(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getCashierShiftId(),
+                items
         );
     }
 
@@ -43,6 +69,8 @@ public class PaymentPersistenceMapper {
                 .examFee(domain.getExamFee())
                 .medicineFee(domain.getMedicineFee())
                 .serviceFee(domain.getServiceFee())
+                .discountAmount(domain.getDiscountAmount() != null ? domain.getDiscountAmount() : java.math.BigDecimal.ZERO)
+                .discountRequestId(domain.getDiscountRequestId())
                 .totalAmount(domain.getTotalAmount())
                 .amountPaid(domain.getAmountPaid())
                 .paymentMethod(domain.getPaymentMethod())
@@ -53,6 +81,7 @@ public class PaymentPersistenceMapper {
                 .refundedBy(domain.getRefundedBy())
                 .refundedAt(domain.getRefundedAt())
                 .createdAt(domain.getCreatedAt())
+                .cashierShiftId(domain.getCashierShiftId())
                 .build();
     }
 }

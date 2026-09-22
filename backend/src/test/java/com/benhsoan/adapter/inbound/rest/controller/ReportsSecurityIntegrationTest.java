@@ -49,6 +49,7 @@ import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.DiseasePatternReportResult;
+import com.benhsoan.port.dto.result.AppointmentEffectivenessReportResult;
 import com.benhsoan.port.dto.result.OperationalReportExportResult;
 import com.benhsoan.port.dto.result.RevenueBreakdownReportResult;
 import com.benhsoan.port.dto.result.TopMedicinesReportResult;
@@ -58,6 +59,7 @@ import com.benhsoan.port.dto.command.role.UpdateRolePermissionsCommand;
 import com.benhsoan.port.inbound.reporting.ExportOperationalReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDiseasePatternReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetDoctorVisitsReportUseCase;
+import com.benhsoan.port.inbound.reporting.GetAppointmentEffectivenessReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetOperationalSummaryUseCase;
 import com.benhsoan.port.inbound.reporting.GetRevenueBreakdownReportUseCase;
 import com.benhsoan.port.inbound.reporting.GetTopMedicinesReportUseCase;
@@ -106,6 +108,7 @@ class ReportsSecurityIntegrationTest {
     @MockitoBean private GetDiseasePatternReportUseCase getDiseasePatternReportUseCase;
     @MockitoBean private ExportOperationalReportUseCase exportOperationalReportUseCase;
     @MockitoBean private GetRevenueBreakdownReportUseCase getRevenueBreakdownReportUseCase;
+    @MockitoBean private GetAppointmentEffectivenessReportUseCase getAppointmentEffectivenessReportUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -472,6 +475,68 @@ class ReportsSecurityIntegrationTest {
 
         verifyNoInteractions(getRevenueBreakdownReportUseCase);
         org.mockito.Mockito.verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    void allowsManagerWithReportViewToAccessAppointmentEffectiveness() throws Exception {
+        when(getAppointmentEffectivenessReportUseCase.getReport(any(), any(), any(), any()))
+                .thenReturn(new AppointmentEffectivenessReportResult(
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31),
+                        Instant.parse("2026-08-31T08:00:00Z"),
+                        0,
+                        List.of()
+                ));
+
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("MANAGER", "REPORT_VIEW")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void forbidsPharmacistFromAccessingAppointmentEffectiveness() throws Exception {
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("PHARMACIST", "PHARMACY_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getAppointmentEffectivenessReportUseCase);
+        org.mockito.Mockito.verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    void forbidsReceptionistFromAccessingAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("RECEPTIONIST", "PATIENT_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getAppointmentEffectivenessReportUseCase);
+    }
+
+    @Test
+    void forbidsAdminWithoutReportViewFromAccessingAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31")
+                        .with(permission("ADMIN", "USER_READ")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getAppointmentEffectivenessReportUseCase);
+    }
+
+    @Test
+    void requiresAuthenticationForAppointmentEffectiveness() throws Exception {
+        mockMvc.perform(get("/reports/appointment-effectiveness")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-31"))
+                .andExpect(status().isUnauthorized());
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor permission(String role, String code) {

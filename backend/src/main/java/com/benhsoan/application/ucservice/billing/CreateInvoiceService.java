@@ -47,11 +47,25 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
     private final AuditLogRepository auditLogRepository;
     private final InvoiceResultMapper resultMapper;
     private final PaymentServiceFeeRepository paymentServiceFeeRepository;
+    private final com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository;
 
     @Override
     public InvoiceResult create(CreateInvoiceCommand command) {
         ensureAuthorized();
+
+        if (command != null && command.visitId() != null
+                && discountRequestRepository.existsByVisitIdAndStatus(
+                        command.visitId(),
+                        com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING
+                )) {
+            throw new com.benhsoan.domain.billing.exception.PendingDiscountApprovalException(command.visitId());
+        }
+
         Payment payment = resolvePayment(command);
+
+        if (discountRequestRepository.existsByVisitIdAndStatus(payment.getVisitId(), com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING)) {
+            throw new com.benhsoan.domain.billing.exception.PendingDiscountApprovalException(payment.getVisitId());
+        }
 
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
@@ -74,7 +88,9 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
                 now,
                 lines,
                 paymentRecorded,
-                false
+                false,
+                payment.getDiscountAmount(),
+                payment.getDiscountRequestId()
         );
 
         Invoice saved;
@@ -87,6 +103,13 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
                 );
             }
             throw ex;
+        }
+
+        if (payment.getDiscountRequestId() != null) {
+            discountRequestRepository.findById(payment.getDiscountRequestId()).ifPresent(discountRequest -> {
+                discountRequest.markApplied(saved.getId());
+                discountRequestRepository.save(discountRequest);
+            });
         }
 
         auditLogRepository.save(
@@ -211,6 +234,20 @@ public class CreateInvoiceService implements CreateInvoiceUseCase {
                         now
                 ))
                 .forEach(lines::add);
+
+        if (payment.getDiscountAmount() != null && payment.getDiscountAmount().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            lines.add(InvoiceLine.create(
+                    UUID.randomUUID(),
+                    invoiceId,
+                    InvoiceLineType.DISCOUNT,
+                    "Giảm giá / Miễn phí được phê duyệt",
+                    payment.getDiscountRequestId(),
+                    1,
+                    payment.getDiscountAmount().negate(),
+                    payment.getDiscountAmount().negate(),
+                    now
+            ));
+        }
 
         if (lines.isEmpty()) {
             throw new ValidationException("Invoice must contain at least one non-zero charge line.");

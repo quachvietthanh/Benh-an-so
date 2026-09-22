@@ -109,9 +109,32 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable) {
-        return jpaRepository.findPayableEncounters(pageable)
+    public Page<PayableEncounterSummary> findPayableEncounters(
+            Instant fromCompletedAt,
+            Instant toCompletedAt,
+            String search,
+            Pageable pageable
+    ) {
+        String safeSearch = escapeLikePattern(search);
+        return jpaRepository.findPayableEncounters(fromCompletedAt, toCompletedAt, safeSearch, pageable)
                 .map(this::toSummary);
+    }
+
+    private String escapeLikePattern(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PayableEncounterSummary> findPayableEncounters(Pageable pageable) {
+        return findPayableEncounters(null, null, null, pageable);
     }
 
     @Override
@@ -161,7 +184,26 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
                 projection.getPatientCode(),
                 projection.getPatientName(),
                 projection.getReason(),
-                projection.getCompletedAt()
+                projection.getCompletedAt(),
+                Boolean.TRUE.equals(projection.getHasPrescription()),
+                Boolean.TRUE.equals(projection.getHasPendingDispense())
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Invoice> findByPatientIdOrderByCreatedAtDesc(UUID patientId) {
+        List<InvoiceEntity> entities = jpaRepository.findByPatientIdOrderByCreatedAtDesc(patientId);
+        if (entities.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> invoiceIds = entities.stream().map(InvoiceEntity::getId).toList();
+        Map<UUID, List<InvoiceLineEntity>> linesByInvoiceId = lineJpaRepository
+                .findByInvoiceIdInOrderByCreatedAtAsc(invoiceIds).stream()
+                .collect(Collectors.groupingBy(InvoiceLineEntity::getInvoiceId));
+
+        return entities.stream()
+                .map(entity -> toDomain(entity, linesByInvoiceId.getOrDefault(entity.getId(), List.of())))
+                .toList();
     }
 }

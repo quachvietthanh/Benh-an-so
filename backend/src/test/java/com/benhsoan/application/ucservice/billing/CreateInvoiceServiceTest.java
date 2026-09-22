@@ -79,7 +79,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                paymentServiceFeeRepository
+                paymentServiceFeeRepository,
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         InvoiceResult result = service.create(new CreateInvoiceCommand(visitId, null));
@@ -107,7 +108,8 @@ class CreateInvoiceServiceTest {
                 clockPort,
                 auditLogRepository,
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         UUID visitId = UUID.randomUUID();
@@ -141,7 +143,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
@@ -170,7 +173,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         UUID visitId = UUID.randomUUID();
@@ -213,7 +217,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         assertThrows(
@@ -240,7 +245,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         assertThrows(
@@ -263,7 +269,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
@@ -293,7 +300,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         Payment payment = payment(UUID.randomUUID(), PaymentStatus.SUCCESS);
@@ -319,7 +327,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         assertThrows(
@@ -342,7 +351,8 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         UUID paymentVisitId = UUID.randomUUID();
@@ -369,13 +379,121 @@ class CreateInvoiceServiceTest {
                 fixedClock(),
                 mock(AuditLogRepository.class),
                 new InvoiceResultMapper(),
-                noServiceFees()
+                noServiceFees(),
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class)
         );
 
         assertThrows(
                 AccessDeniedException.class,
                 () -> service.create(new CreateInvoiceCommand(UUID.randomUUID(), null))
         );
+    }
+
+    @Test
+    void rejectsCreateInvoiceWhenDiscountApprovalIsPending() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository =
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class);
+        UUID visitId = UUID.randomUUID();
+        Payment payment = payment(visitId, PaymentStatus.RECORDED);
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.of(payment));
+        when(discountRequestRepository.existsByVisitIdAndStatus(visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING))
+                .thenReturn(true);
+
+        CreateInvoiceService service = new CreateInvoiceService(
+                paymentRepository,
+                mock(InvoiceRepository.class),
+                mock(InvoiceCodeGenerator.class),
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper(),
+                noServiceFees(),
+                discountRequestRepository
+        );
+
+        assertThrows(
+                com.benhsoan.domain.billing.exception.PendingDiscountApprovalException.class,
+                () -> service.create(new CreateInvoiceCommand(visitId, null))
+        );
+    }
+
+    @Test
+    void createsOriginalInvoiceWithApprovedDiscountLine() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        InvoiceRepository invoiceRepository = mock(InvoiceRepository.class);
+        InvoiceCodeGenerator invoiceCodeGenerator = mock(InvoiceCodeGenerator.class);
+        com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository =
+                mock(com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository.class);
+        UUID visitId = UUID.randomUUID();
+        UUID discountRequestId = UUID.randomUUID();
+
+        Payment payment = Payment.restore(
+                UUID.randomUUID(),
+                visitId,
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("50000"),
+                discountRequestId,
+                new BigDecimal("250000"),
+                new BigDecimal("200000"),
+                PaymentMethod.CASH,
+                PaymentStatus.RECORDED,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-12T01:00:00Z"),
+                null,
+                null,
+                null,
+                Instant.parse("2026-08-12T01:00:00Z")
+        );
+
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.of(payment));
+        when(invoiceRepository.findOriginalByVisitId(visitId)).thenReturn(Optional.empty());
+        when(invoiceCodeGenerator.generate()).thenReturn("HD000099");
+        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        com.benhsoan.domain.billing.DiscountRequest request = com.benhsoan.domain.billing.DiscountRequest.restore(
+                discountRequestId,
+                visitId,
+                com.benhsoan.domain.billing.enums.DiscountType.PERCENTAGE,
+                new BigDecimal("20"),
+                new BigDecimal("250000"),
+                new BigDecimal("50000"),
+                new BigDecimal("200000"),
+                "Lý do",
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus.APPROVED,
+                UUID.randomUUID(),
+                Instant.now(),
+                UUID.randomUUID(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null
+        );
+        when(discountRequestRepository.findById(discountRequestId)).thenReturn(Optional.of(request));
+
+        CreateInvoiceService service = new CreateInvoiceService(
+                paymentRepository,
+                invoiceRepository,
+                invoiceCodeGenerator,
+                authorizedCurrentUser(),
+                fixedClock(),
+                mock(AuditLogRepository.class),
+                new InvoiceResultMapper(),
+                noServiceFees(),
+                discountRequestRepository
+        );
+
+        InvoiceResult result = service.create(new CreateInvoiceCommand(visitId, null));
+
+        assertEquals(new BigDecimal("200000"), result.totalAmount());
+        assertEquals(3, result.lines().size());
+        assertEquals(InvoiceLineType.DISCOUNT, result.lines().get(2).lineType());
+        assertEquals(new BigDecimal("-50000"), result.lines().get(2).amount());
+        assertEquals(new BigDecimal("50000"), result.discountAmount());
+        assertEquals(discountRequestId, result.discountRequestId());
     }
 
     private static CurrentUserPort authorizedCurrentUser() {

@@ -49,4 +49,31 @@ public interface JpaPaymentRepository
             @Param("fromInclusive") Instant fromInclusive,
             @Param("toExclusive") Instant toExclusive
     );
+
+    @Query("""
+            select payment from PaymentEntity payment
+            where payment.collectedBy = :cashierId
+              and payment.cashierShiftId is null
+              and payment.status in :statuses
+            order by payment.paidAt asc
+            """)
+    java.util.List<PaymentEntity> findUnsettledByCashier(
+            @Param("cashierId") UUID cashierId,
+            @Param("statuses") Collection<PaymentStatus> statuses
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select payment from PaymentEntity payment
+            where payment.collectedBy = :cashierId
+              and payment.cashierShiftId is null
+              and payment.status in :statuses
+            order by payment.paidAt asc
+            """)
+    java.util.List<PaymentEntity> findUnsettledByCashierForUpdate(
+            @Param("cashierId") UUID cashierId,
+            @Param("statuses") Collection<PaymentStatus> statuses
+    );
+
+    java.util.List<PaymentEntity> findByCashierShiftId(UUID cashierShiftId);
 }

@@ -7,11 +7,16 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.domain.billing.Invoice;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
+import com.benhsoan.port.dto.result.PaymentDetailResult;
 
 @Component
 public class InvoiceResultMapper {
 
     public InvoiceResult toResult(Invoice invoice) {
+        return toResult(invoice, null);
+    }
+
+    public InvoiceResult toResult(Invoice invoice, PaymentDetailResult payment) {
         List<InvoiceLineResult> lines = invoice.getLines()
                 .stream()
                 .map(line -> new InvoiceLineResult(
@@ -35,12 +40,15 @@ public class InvoiceResultMapper {
                 invoice.getType(),
                 invoice.getOriginalInvoiceId(),
                 invoice.getAdjustmentReason(),
+                invoice.getDiscountAmount(),
+                invoice.getDiscountRequestId(),
                 invoice.getTotalAmount(),
                 invoice.getCreatedBy(),
                 invoice.getCreatedAt(),
                 invoice.getReprintCount(),
                 invoice.getLastReprintedAt(),
-                lines
+                lines,
+                payment
         );
     }
 }

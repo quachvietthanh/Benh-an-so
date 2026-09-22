@@ -25,7 +25,11 @@
 | `/api/v1/patients` | POST | ✅ | ✅ | ✅ | ❌ |
 | `/api/v1/patients/{id}` | GET | ✅ | ✅ | ✅ | ❌ |
 | `/api/v1/patients/{id}` | PUT | ✅ | ✅ | ✅ | ❌ |
-| `/api/v1/patients/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/patients/import/template` | GET | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import/preview` | POST | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import` | POST | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import-logs` | GET | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import-logs/{id}` | GET | ✅ | ❌ | ✅ | ❌ |
 | `/api/v1/patients/me` | GET | ❌ | ✅ | ✅ | ❌ |
 | `/patients/{patientId}/allergies` | GET | ✅ | ✅ | ❌ | ✅ |
 | `/patients/{patientId}/allergies` | POST | ✅ | ✅ | ❌ | ❌ |
@@ -123,7 +127,12 @@
 |  |  |  |  |  |  |
 | **Medical History** |  |  |  |  |  |
 | `/patients/{patientId}/medical-history` | GET | ✅ | ✅ (chỉ BN đã khám) | ❌ | ❌ |
-
+|  |  |  |  |  |  |
+| **Patient Portal** |  |  |  |  |  |
+| `/patient-portal/invoices` | GET | ❌ | ❌ | ❌ | ❌ |
+| `/patient-portal/invoices/{id}` | GET | ❌ | ❌ | ❌ | ❌ |
+| `/patient-portal/invoices/{id}/download` | GET | ❌ | ❌ | ❌ | ❌ |
+*(Lưu ý: Các endpoint `/patient-portal/**` chỉ dành riêng cho vai trò `ROLE_PATIENT` với dữ liệu thuộc chính mình theo QTN-23)*
 |  |  |  |  |  |  |
 | **Admin / System** |  |  |  |  |  |
 | `/api/v1/admin/**` | ALL | ✅ | ❌ | ❌ | ❌ |

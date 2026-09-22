@@ -29,4 +29,18 @@ public interface PaymentRepository {
             Instant fromInclusive,
             Instant toExclusive
     );
+
+    java.util.List<Payment> saveAll(java.util.List<Payment> payments);
+
+    java.util.List<Payment> findUnsettledByCashier(
+            UUID cashierId,
+            Collection<PaymentStatus> statuses
+    );
+
+    java.util.List<Payment> findUnsettledByCashierForUpdate(
+            UUID cashierId,
+            Collection<PaymentStatus> statuses
+    );
+
+    java.util.List<Payment> findByCashierShiftId(UUID cashierShiftId);
 }

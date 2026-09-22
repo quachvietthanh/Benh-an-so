@@ -1,6 +1,5 @@
 package com.benhsoan.application.ucservice.auth;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,7 +21,6 @@ import com.benhsoan.domain.auth.exception.AccountDisabledException;
 import com.benhsoan.domain.auth.exception.InvalidVerificationCodeException;
 import com.benhsoan.domain.auth.exception.SamePasswordException;
 import com.benhsoan.domain.auth.exception.VerificationCodeCooldownException;
-import com.benhsoan.domain.auth.exception.VerificationCodeExpiredException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.auth.PatientForgotPasswordCommand;
