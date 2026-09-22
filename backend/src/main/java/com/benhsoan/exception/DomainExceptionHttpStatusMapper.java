@@ -50,7 +50,8 @@ final class DomainExceptionHttpStatusMapper {
                     SPECIALTY_NOT_FOUND,
                     USER_NOT_FOUND,
                     VISIT_NOT_FOUND,
-                    VITAL_SIGN_NOT_FOUND -> HttpStatus.NOT_FOUND;
+                    VITAL_SIGN_NOT_FOUND,
+                    WAITLIST_ENTRY_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ACCOUNT_DISABLED,
                     ACCOUNT_LOCKED,
                     DOCTOR_INACTIVE,
@@ -100,6 +101,8 @@ final class DomainExceptionHttpStatusMapper {
                     CANNOT_DEACTIVATE_DEFAULT_SPECIALTY,
                     NO_UNSETTLED_PAYMENTS,
                     CASHIER_SHIFT_NOTE_REQUIRED,
+                    DOCTOR_HAS_AVAILABLE_SLOTS,
+                    WAITLIST_INVALID_STATUS,
                     WEAK_PASSWORD -> HttpStatus.BAD_REQUEST;
             case ALLERGY_CONFIRMATION_REQUIRED,
                     APPOINTMENT_ALREADY_CANCELLED,
@@ -148,6 +151,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_INVALID_STATUS,
                     MEDICAL_RECORD_INVALID_VISIT,
                     MEDICAL_RECORD_IN_RETENTION_PERIOD,
+                    PATIENT_ALREADY_IN_WAITLIST,
                     MEDICAL_RECORD_LOCKED,
                     MEDICAL_RECORD_TEMPLATE_CHANGE_WITH_CONTENT,
                     MEDICAL_RECORD_TEMPLATE_DEFAULT_NOT_CONFIGURED,

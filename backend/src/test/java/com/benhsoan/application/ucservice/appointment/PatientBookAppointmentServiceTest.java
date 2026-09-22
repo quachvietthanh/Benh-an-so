@@ -346,4 +346,68 @@ class PatientBookAppointmentServiceTest {
         assertThrows(DoctorUnavailableException.class,
                 () -> service.book(new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, "Khám bệnh")));
     }
+
+    @Test
+    void autoSchedulesWaitlistEntryWhenPatientBooksOnline() {
+        UUID patientId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID doctorRoleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        Patient patient = mock(Patient.class);
+        when(patient.getId()).thenReturn(patientId);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
+        when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(doctorRole(doctorRoleId)));
+        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
+                .thenReturn(Optional.empty());
+
+        DoctorWeeklySchedule weeklySchedule = DoctorWeeklySchedule.create(
+                doctorId, FUTURE_DATE.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(12, 0), NOW);
+        when(doctorWeeklyScheduleRepository.findByDoctorIdAndDayOfWeek(doctorId, FUTURE_DATE.getDayOfWeek()))
+                .thenReturn(Optional.of(weeklySchedule));
+        when(doctorTimeOffRepository.existsActiveOverlapping(eq(doctorId), any(Instant.class), any(Instant.class)))
+                .thenReturn(false);
+        when(appointmentRepository.findActiveAppointmentsForDoctorBetween(eq(doctorId), any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of());
+        when(appointmentCodeGenerator.generate()).thenReturn("AP-WAITLIST");
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        com.benhsoan.port.outbound.repository.appointment.AppointmentWaitlistRepository waitlistRepo =
+                mock(com.benhsoan.port.outbound.repository.appointment.AppointmentWaitlistRepository.class);
+        com.benhsoan.domain.appointment.AppointmentWaitlist waitlistEntry =
+                com.benhsoan.domain.appointment.AppointmentWaitlist.create(
+                        patientId, doctorId, FUTURE_DATE,
+                        com.benhsoan.domain.appointment.enums.TimePreference.ANYTIME,
+                        "Cần khám sớm", userId, NOW);
+
+        when(waitlistRepo.findActiveByPatientAndDoctorAndDate(patientId, doctorId, FUTURE_DATE))
+                .thenReturn(Optional.of(waitlistEntry));
+
+        PatientBookAppointmentService serviceWithWaitlist = new PatientBookAppointmentService(
+                appointmentRepository,
+                appointmentCodeGenerator,
+                doctorScheduleRepository,
+                doctorWeeklyScheduleRepository,
+                doctorTimeOffRepository,
+                patientRepository,
+                userRepository,
+                roleRepository,
+                currentUserPort,
+                auditLogRepository,
+                clockPort,
+                objectMapper,
+                waitlistRepo
+        );
+
+        PatientAppointmentResult result = serviceWithWaitlist.book(
+                new PatientBookAppointmentCommand(doctorId, FUTURE_DATE, START_TIME, "Khám bệnh"));
+
+        assertEquals("AP-WAITLIST", result.appointmentCode());
+        assertEquals(com.benhsoan.domain.appointment.enums.WaitlistStatus.SCHEDULED, waitlistEntry.getStatus());
+        verify(waitlistRepo).save(waitlistEntry);
+    }
 }
+
