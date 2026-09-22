@@ -13,10 +13,14 @@ import com.benhsoan.persistence.entity.auth.TwoFactorChallengeEntity;
 public interface JpaTwoFactorChallengeRepository extends JpaRepository<TwoFactorChallengeEntity, UUID> {
 
     @Modifying
-    @Query("UPDATE TwoFactorChallengeEntity c SET c.attempts = c.attempts + 1 WHERE c.id = :id")
-    int incrementAttempts(@Param("id") UUID id);
+    @Query("UPDATE TwoFactorChallengeEntity c SET c.attempts = c.attempts + 1 WHERE c.id = :id AND c.attempts < :maxAttempts")
+    int incrementAttempts(@Param("id") UUID id, @Param("maxAttempts") int maxAttempts);
 
     @Modifying
     @Query("UPDATE TwoFactorChallengeEntity c SET c.consumedAt = :consumedAt WHERE c.id = :id AND c.consumedAt IS NULL")
     int markConsumed(@Param("id") UUID id, @Param("consumedAt") Instant consumedAt);
+
+    @Modifying
+    @Query("UPDATE TwoFactorChallengeEntity c SET c.consumedAt = :invalidatedAt WHERE c.userId = :userId AND c.consumedAt IS NULL")
+    int invalidatePendingChallengesByUserId(@Param("userId") UUID userId, @Param("invalidatedAt") Instant invalidatedAt);
 }

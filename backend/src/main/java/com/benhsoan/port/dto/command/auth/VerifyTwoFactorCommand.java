@@ -8,6 +8,12 @@ public record VerifyTwoFactorCommand(
         String twoFactorToken,
 
         @NotBlank
-        String code
+        String code,
 
-) {}
+        String ipAddress
+
+) {
+    public VerifyTwoFactorCommand(String twoFactorToken, String code) {
+        this(twoFactorToken, code, null);
+    }
+}

@@ -12,7 +12,19 @@ public interface TwoFactorChallengeRepository {
 
     Optional<TwoFactorChallenge> findById(UUID id);
 
-    int incrementAttempts(UUID id);
+    /**
+     * Atomically increments the failed-attempt counter only while it remains below
+     * {@code maxAttempts}, preventing the brute-force limit from being bypassed by
+     * concurrent verification requests. Returns the number of updated rows (0 when
+     * the limit has already been reached or the challenge no longer exists).
+     */
+    int incrementAttempts(UUID id, int maxAttempts);
 
     int markConsumed(UUID id, Instant consumedAt);
+
+    /**
+     * Marks all still-pending challenges for the given user as consumed so only the
+     * most recently issued challenge remains usable.
+     */
+    void invalidatePendingChallengesByUserId(UUID userId, Instant invalidatedAt);
 }

@@ -1,5 +1,5 @@
 -- =====================================================
--- V85__add_two_factor_authentication.sql
+-- V86__add_two_factor_authentication.sql
 -- Two-Factor Authentication for High-Privilege Accounts (NCL-01-CN-006)
 -- Adds role-level 2FA configuration and temporary challenge state.
 -- =====================================================

@@ -21,6 +21,7 @@ import com.benhsoan.port.inbound.auth.TwoFactorAuthenticationConfigurationUseCas
 import com.benhsoan.port.inbound.auth.TwoFactorResendUseCase;
 import com.benhsoan.port.inbound.auth.TwoFactorVerificationUseCase;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -36,11 +37,13 @@ public class TwoFactorAuthenticationController {
 
     @PostMapping("/auth/2fa/verify")
     public ResponseEntity<LoginResponse> verify(
-            @Valid @RequestBody VerifyTwoFactorRequest request
+            @Valid @RequestBody VerifyTwoFactorRequest request,
+            HttpServletRequest httpRequest
     ) {
         return ResponseEntity.ok(
                 authRestMapper.toResponse(
-                        twoFactorVerificationUseCase.verify(authRestMapper.toCommand(request))));
+                        twoFactorVerificationUseCase.verify(
+                                authRestMapper.toCommand(request, resolveIp(httpRequest)))));
     }
 
     @PostMapping("/auth/2fa/resend")
@@ -62,5 +65,13 @@ public class TwoFactorAuthenticationController {
                 authRestMapper.toResponse(
                         configurationUseCase.configure(
                                 new ConfigureTwoFactorAuthenticationCommand(roleName, request.enabled()))));
+    }
+
+    private String resolveIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

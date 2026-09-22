@@ -58,6 +58,14 @@ public class AuthRestMapper {
                                 request.code());
         }
 
+        public VerifyTwoFactorCommand toCommand(VerifyTwoFactorRequest request, String ipAddress) {
+
+                return new VerifyTwoFactorCommand(
+                                request.twoFactorToken(),
+                                request.code(),
+                                ipAddress);
+        }
+
         public ResendTwoFactorCommand toCommand(ResendTwoFactorRequest request) {
 
                 return new ResendTwoFactorCommand(

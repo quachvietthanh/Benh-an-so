@@ -33,12 +33,17 @@ public class TwoFactorChallengeRepositoryAdapter implements TwoFactorChallengeRe
     }
 
     @Override
-    public int incrementAttempts(UUID id) {
-        return jpaRepository.incrementAttempts(id);
+    public int incrementAttempts(UUID id, int maxAttempts) {
+        return jpaRepository.incrementAttempts(id, maxAttempts);
     }
 
     @Override
     public int markConsumed(UUID id, Instant consumedAt) {
         return jpaRepository.markConsumed(id, consumedAt);
+    }
+
+    @Override
+    public void invalidatePendingChallengesByUserId(UUID userId, Instant invalidatedAt) {
+        jpaRepository.invalidatePendingChallengesByUserId(userId, invalidatedAt);
     }
 }

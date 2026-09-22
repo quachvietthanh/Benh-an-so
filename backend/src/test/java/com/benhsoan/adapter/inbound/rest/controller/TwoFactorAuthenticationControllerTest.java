@@ -99,6 +99,26 @@ class TwoFactorAuthenticationControllerTest {
     }
 
     @Test
+    void verifySecondFactor_capturesXForwardedForIp() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(twoFactorVerificationUseCase.verify(any()))
+                .thenReturn(new LoginResult(userId, "doctor1", "access-token", "refresh-token", "DOCTOR",
+                        Instant.parse("2026-09-22T11:00:00Z")));
+
+        org.mockito.ArgumentCaptor<com.benhsoan.port.dto.command.auth.VerifyTwoFactorCommand> captor =
+                org.mockito.ArgumentCaptor.forClass(com.benhsoan.port.dto.command.auth.VerifyTwoFactorCommand.class);
+
+        mvc.perform(post("/auth/2fa/verify")
+                        .header("X-Forwarded-For", "198.51.100.4, 10.0.0.1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"twoFactorToken\":\"" + UUID.randomUUID() + "\",\"code\":\"123456\"}"))
+                .andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(twoFactorVerificationUseCase).verify(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("198.51.100.4", captor.getValue().ipAddress());
+    }
+
+    @Test
     void verifySecondFactor_invalidCodeReturns400() throws Exception {
         when(twoFactorVerificationUseCase.verify(any())).thenThrow(new InvalidVerificationCodeException());
 

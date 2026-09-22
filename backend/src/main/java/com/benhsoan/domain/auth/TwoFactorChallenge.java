@@ -18,6 +18,10 @@ import lombok.ToString;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TwoFactorChallenge {
 
+    public static final int MAX_ATTEMPTS = 5;
+
+    public static final long MAX_LIFETIME_SECONDS = 900; // 15 minutes from original creation
+
     private UUID id;
 
     private UUID userId;
@@ -95,8 +99,16 @@ public class TwoFactorChallenge {
         return consumedAt != null;
     }
 
+    public boolean isAttemptsExceeded() {
+        return attempts >= MAX_ATTEMPTS;
+    }
+
+    public boolean isLifetimeExceeded(Instant now) {
+        return now.isAfter(createdAt.plusSeconds(MAX_LIFETIME_SECONDS));
+    }
+
     public boolean isValid(Instant now) {
-        return !isExpired(now) && !isConsumed();
+        return !isExpired(now) && !isConsumed() && !isAttemptsExceeded();
     }
 
     public void incrementAttempts() {
@@ -107,9 +119,13 @@ public class TwoFactorChallenge {
         this.consumedAt = Objects.requireNonNull(now, "Consumed at timestamp is required");
     }
 
+    /**
+     * Rotates the verification code without resetting the cumulative attempt count.
+     * The original {@code createdAt} is intentionally left untouched so the maximum
+     * lifetime and brute-force attempt policy cannot be bypassed by repeated resends.
+     */
     public void rotateCode(String newCodeHash, Instant newExpiresAt) {
         this.codeHash = Guard.require(newCodeHash, "Code hash");
         this.expiresAt = Objects.requireNonNull(newExpiresAt, "Expires at is required");
-        this.attempts = 0;
     }
 }
