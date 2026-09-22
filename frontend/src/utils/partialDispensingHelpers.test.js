@@ -11,6 +11,10 @@ import {
   canUserDispense,
   canUserViewDispenseHistory,
   calculateBillingItemAmount,
+  getDaysUntilExpiry,
+  getExpiryStatusTag,
+  validateBatchChangeReason,
+  buildFefoDispensePayload,
 } from './partialDispensingHelpers.js'
 
 test('getRemainingQuantity correctly returns remaining quantity or defaults to (quantity - dispensedQuantity)', () => {
@@ -273,4 +277,106 @@ test('calculateBillingItemAmount uses dispensedQuantity for PARTIALLY_DISPENSED 
   const zeroRes = calculateBillingItemAmount(zeroItem, 'PARTIALLY_DISPENSED')
   assert.equal(zeroRes.effectiveQty, 0)
   assert.equal(zeroRes.amount, 0)
+})
+
+test('getDaysUntilExpiry accurately calculates day differences', () => {
+  const ref = new Date('2026-09-22T08:00:00Z')
+  assert.equal(getDaysUntilExpiry('2026-09-22', ref), 0)
+  assert.equal(getDaysUntilExpiry('2026-09-23', ref), 1)
+  assert.equal(getDaysUntilExpiry('2026-09-21', ref), -1)
+  assert.equal(getDaysUntilExpiry('2026-10-22', ref), 30)
+  assert.equal(getDaysUntilExpiry(null, ref), null)
+  assert.equal(getDaysUntilExpiry('invalid-date', ref), null)
+})
+
+test('getExpiryStatusTag assigns appropriate warning colors and tags', () => {
+  const ref = new Date('2026-09-22T08:00:00Z')
+  const expired = getExpiryStatusTag('2026-09-15', ref)
+  assert.equal(expired.color, 'red')
+  assert.equal(expired.isExpired, true)
+
+  const nearExpiry = getExpiryStatusTag('2026-10-05', ref)
+  assert.equal(nearExpiry.color, 'orange')
+  assert.equal(nearExpiry.isNearExpiry, true)
+
+  const normal = getExpiryStatusTag('2027-01-15', ref)
+  assert.equal(normal.color, 'green')
+  assert.equal(normal.isExpired, false)
+  assert.equal(normal.isNearExpiry, false)
+
+  const invalid = getExpiryStatusTag(null, ref)
+  assert.equal(invalid.color, 'default')
+})
+
+test('validateBatchChangeReason enforces required reason only when overriding FEFO', () => {
+  assert.deepEqual(validateBatchChangeReason('', false), { isValid: true, error: null })
+  assert.deepEqual(validateBatchChangeReason(null, false), { isValid: true, error: null })
+
+  const emptyWhenOverridden = validateBatchChangeReason('', true)
+  assert.equal(emptyWhenOverridden.isValid, false)
+  assert.match(emptyWhenOverridden.error, /Vui lòng nhập lý do/)
+
+  const whitespaceWhenOverridden = validateBatchChangeReason('   ', true)
+  assert.equal(whitespaceWhenOverridden.isValid, false)
+
+  const validWhenOverridden = validateBatchChangeReason('Bao bì bị móp méo', true)
+  assert.deepEqual(validWhenOverridden, { isValid: true, error: null })
+})
+
+test('buildFefoDispensePayload builds correct payload and handles batch override', () => {
+  const items = [
+    { id: 'item-rx-1', prescriptionItemId: 'item-rx-1', remainingQuantity: 60 },
+    { id: 'item-rx-2', prescriptionItemId: 'item-rx-2', remainingQuantity: 30 },
+  ]
+
+  const suggestionsMap = {
+    'item-rx-1': {
+      batches: [
+        { batchId: 'batch-metf-1', batchNumber: 'METF-2026-10', suggestedQuantity: 40 },
+        { batchId: 'batch-metf-2', batchNumber: 'METF-2027-01', suggestedQuantity: 20 },
+      ],
+    },
+    'item-rx-2': {
+      batches: [
+        { batchId: 'batch-glic-1', batchNumber: 'GLIC-2027-02', suggestedQuantity: 30 },
+      ],
+    },
+  }
+
+  // Case 1: Giữ nguyên gợi ý FEFO (không đổi lô)
+  const fefoDefault = buildFefoDispensePayload(
+    { 'item-rx-1': 60, 'item-rx-2': 30 },
+    items,
+    {},
+    {},
+    suggestionsMap
+  )
+  assert.equal(fefoDefault.isValid, true)
+  assert.equal(fefoDefault.payloadItems.length, 2)
+  assert.equal(fefoDefault.payloadItems[0].batchId, 'batch-metf-1')
+  assert.equal(fefoDefault.payloadItems[0].batchChangeReason, undefined)
+  assert.equal(fefoDefault.payloadItems[1].batchId, 'batch-glic-1')
+
+  // Case 2: Đổi lô nhưng chưa nhập lý do -> Báo lỗi validation
+  const missingReason = buildFefoDispensePayload(
+    { 'item-rx-1': 60, 'item-rx-2': 30 },
+    items,
+    { 'item-rx-1': 'batch-metf-2' }, // Đổi sang lô số 2
+    { 'item-rx-1': '' }, // Không nhập lý do
+    suggestionsMap
+  )
+  assert.equal(missingReason.isValid, false)
+  assert.ok(missingReason.validationErrors['item-rx-1'])
+
+  // Case 3: Đổi lô và có nhập lý do hợp lệ
+  const validOverride = buildFefoDispensePayload(
+    { 'item-rx-1': 60, 'item-rx-2': 30 },
+    items,
+    { 'item-rx-1': 'batch-metf-2' },
+    { 'item-rx-1': 'Lô 1 bao bì bị rách cần kiểm định lại' },
+    suggestionsMap
+  )
+  assert.equal(validOverride.isValid, true)
+  assert.equal(validOverride.payloadItems[0].batchId, 'batch-metf-2')
+  assert.equal(validOverride.payloadItems[0].batchChangeReason, 'Lô 1 bao bì bị rách cần kiểm định lại')
 })

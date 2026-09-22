@@ -15,6 +15,7 @@ final class DomainExceptionHttpStatusMapper {
                     BACKUP_NOT_FOUND,
                     BATCH_NOT_FOUND,
                     CARE_LOG_NOT_FOUND,
+                    CASHIER_SHIFT_NOT_FOUND,
                     CLINICAL_ATTACHMENT_NOT_FOUND,
                     CLINICAL_ORDER_NOT_FOUND,
                     CLINICAL_ORDER_ITEM_NOT_FOUND,
@@ -63,7 +64,8 @@ final class DomainExceptionHttpStatusMapper {
                     UNAUTHORIZED_PRESCRIPTION_AMENDMENT,
                     UNAUTHORIZED_PRESCRIPTION_CANCELLATION,
                     UNAUTHORIZED_QUEUE_OPERATION,
-                    VISIT_ENCOUNTER_ACCESS_DENIED -> HttpStatus.FORBIDDEN;
+                    VISIT_ENCOUNTER_ACCESS_DENIED,
+                    CASHIER_SHIFT_SELF_CONFIRMATION_NOT_ALLOWED -> HttpStatus.FORBIDDEN;
             case INVALID_CREDENTIALS,
                     SESSION_EXPIRED,
                     TEMP_PASSWORD_EXPIRED,
@@ -94,6 +96,8 @@ final class DomainExceptionHttpStatusMapper {
                     VALIDATION_FAILED,
                     VERIFICATION_CODE_EXPIRED,
                     CANNOT_DEACTIVATE_DEFAULT_SPECIALTY,
+                    NO_UNSETTLED_PAYMENTS,
+                    CASHIER_SHIFT_NOTE_REQUIRED,
                     WEAK_PASSWORD -> HttpStatus.BAD_REQUEST;
             case ALLERGY_CONFIRMATION_REQUIRED,
                     APPOINTMENT_ALREADY_CANCELLED,
@@ -102,6 +106,8 @@ final class DomainExceptionHttpStatusMapper {
                     APPOINTMENT_INVALID_STATUS,
                     APPOINTMENT_TIME_CONFLICT,
                     BATCH_STATE_CONFLICT,
+                    CASHIER_SHIFT_ALREADY_CONFIRMED,
+                    PAYMENT_ALREADY_SETTLED,
                     CHECK_IN_CONFLICT,
                     CLINICAL_ORDER_ALREADY_CANCELLED,
                     CLINICAL_ORDER_ALREADY_COMPLETED,
