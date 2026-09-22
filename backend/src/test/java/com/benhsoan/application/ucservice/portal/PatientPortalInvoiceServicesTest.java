@@ -44,8 +44,11 @@ import com.benhsoan.domain.specialty.Specialty;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
+import com.benhsoan.port.dto.result.billing.InvoicePrintDocument;
+import com.benhsoan.port.dto.result.billing.InvoicePrintDocument.InvoicePrintLine;
 import com.benhsoan.port.dto.result.portal.InvoicePrintResult;
 import com.benhsoan.port.dto.result.portal.PatientPortalInvoiceDetailResult;
+import com.benhsoan.port.dto.result.portal.PatientPortalInvoiceDetailResult.InvoiceLineItemView;
 import com.benhsoan.port.dto.result.portal.PatientPortalInvoiceSummaryResult;
 import com.benhsoan.port.outbound.pdf.InvoicePdfRenderer;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -123,6 +126,15 @@ class PatientPortalInvoiceServicesTest {
                 invId, "HD-001", vId, UUID.randomUUID(), type,
                 null, null, amount, userId, NOW,
                 0, null, List.of(line)
+        );
+    }
+
+    private Invoice mockInvoiceWithLines(UUID invId, UUID vId, List<InvoiceLine> lines, InvoiceType type) {
+        BigDecimal total = lines.stream().map(InvoiceLine::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return Invoice.restore(
+                invId, "HD-001", vId, UUID.randomUUID(), type,
+                null, null, total, userId, NOW,
+                0, null, lines
         );
     }
 
@@ -357,6 +369,39 @@ class PatientPortalInvoiceServicesTest {
 
             assertThrows(InvoiceNotFoundException.class, () -> service.getInvoiceDetail(invId));
         }
+
+        @Test
+        void getInvoiceDetail_verifiesSumOfLineAmountsEqualsTotalAmount() {
+            UUID invId = UUID.randomUUID();
+            InvoiceLine line1 = InvoiceLine.create(UUID.randomUUID(), invId, InvoiceLineType.EXAM_FEE, "Khám chuyên khoa", visitId, 1, new BigDecimal("150000"), new BigDecimal("150000"), NOW);
+            InvoiceLine line2 = InvoiceLine.create(UUID.randomUUID(), invId, InvoiceLineType.SERVICE_FEE, "Xét nghiệm máu", visitId, 1, new BigDecimal("100000"), new BigDecimal("100000"), NOW);
+            Invoice invoice = mockInvoiceWithLines(invId, visitId, List.of(line1, line2), InvoiceType.ORIGINAL);
+            Visit visit = mockVisit(visitId, patientId, doctorId, specialtyId);
+
+            when(invoiceRepository.findById(invId)).thenReturn(Optional.of(invoice));
+            when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+            when(clockPort.now()).thenReturn(NOW);
+            when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+            User doctor = mock(User.class);
+            when(doctor.getFullName()).thenReturn("BS. Trần Bác Sĩ");
+            when(userRepository.findById(any())).thenReturn(Optional.of(doctor));
+
+            Specialty specialty = mock(Specialty.class);
+            when(specialty.getName()).thenReturn("Khoa Nội");
+            when(specialtyRepository.findById(specialtyId)).thenReturn(Optional.of(specialty));
+
+            PatientPortalInvoiceDetailResult result = service.getInvoiceDetail(invId);
+
+            assertNotNull(result);
+            assertEquals(2, result.items().size());
+            BigDecimal linesSum = result.items().stream()
+                    .map(InvoiceLineItemView::amount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertEquals(0, result.totalAmount().compareTo(linesSum),
+                    "Invoice detail totalAmount must equal sum of line item amounts");
+            assertEquals(0, new BigDecimal("250000").compareTo(result.totalAmount()));
+        }
     }
 
     @Nested
@@ -420,6 +465,41 @@ class PatientPortalInvoiceServicesTest {
                     .thenThrow(new AccessDeniedException("Patient may only access their own data."));
 
             assertThrows(AccessDeniedException.class, () -> service.export(invId));
+        }
+
+        @Test
+        void export_verifiesPrintDocumentLinesMatchInvoiceTotal() {
+            UUID invId = UUID.randomUUID();
+            InvoiceLine line1 = InvoiceLine.create(UUID.randomUUID(), invId, InvoiceLineType.EXAM_FEE, "Khám chuyên khoa", visitId, 1, new BigDecimal("200000"), new BigDecimal("200000"), NOW);
+            InvoiceLine line2 = InvoiceLine.create(UUID.randomUUID(), invId, InvoiceLineType.SERVICE_FEE, "Siêu âm bụng", visitId, 1, new BigDecimal("150000"), new BigDecimal("150000"), NOW);
+            Invoice invoice = mockInvoiceWithLines(invId, visitId, List.of(line1, line2), InvoiceType.ORIGINAL);
+            Visit visit = mockVisit(visitId, patientId, doctorId, specialtyId);
+            Patient patient = mockPatient(patientId, userId);
+
+            when(invoiceRepository.findById(invId)).thenReturn(Optional.of(invoice));
+            when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+            when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+            when(clinicConfigurationRepository.find()).thenReturn(Optional.empty());
+            when(clockPort.now()).thenReturn(NOW);
+            when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+            byte[] fakePdf = new byte[]{1, 2, 3, 4};
+            ArgumentCaptor<InvoicePrintDocument> docCaptor = ArgumentCaptor.forClass(InvoicePrintDocument.class);
+            when(invoicePdfRenderer.render(docCaptor.capture())).thenReturn(fakePdf);
+
+            InvoicePrintResult result = service.export(invId);
+
+            assertNotNull(result);
+            InvoicePrintDocument capturedDoc = docCaptor.getValue();
+            assertNotNull(capturedDoc);
+            assertEquals(2, capturedDoc.lines().size());
+
+            BigDecimal linesSum = capturedDoc.lines().stream()
+                    .map(InvoicePrintLine::amount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertEquals(0, capturedDoc.totalAmount().compareTo(linesSum),
+                    "InvoicePrintDocument totalAmount must equal sum of line item amounts");
+            assertEquals(0, new BigDecimal("350000").compareTo(capturedDoc.totalAmount()));
         }
     }
 }

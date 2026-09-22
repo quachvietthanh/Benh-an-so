@@ -309,4 +309,48 @@ class PatientPortalInvoiceSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
+
+    @Test
+    void tc01_patientViewsInvoiceDetail_itemsSumMatchesTotalAmount() throws Exception {
+        Patient ownPatient = mockPatient(ownPatientId);
+        when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+        when(patientRepository.findByUserId(currentUserId)).thenReturn(Optional.of(ownPatient));
+
+        InvoiceLine line1 = InvoiceLine.create(
+                UUID.randomUUID(), ownInvoiceId, InvoiceLineType.EXAM_FEE, "Khám chuyên khoa",
+                ownVisitId, 1, new BigDecimal("150000"), new BigDecimal("150000"), NOW
+        );
+        InvoiceLine line2 = InvoiceLine.create(
+                UUID.randomUUID(), ownInvoiceId, InvoiceLineType.SERVICE_FEE, "Xét nghiệm sinh hóa",
+                ownVisitId, 1, new BigDecimal("200000"), new BigDecimal("200000"), NOW
+        );
+        Invoice invoice = Invoice.restore(
+                ownInvoiceId, "HD-OWN-001", ownVisitId, UUID.randomUUID(), InvoiceType.ORIGINAL,
+                null, null, new BigDecimal("350000"), currentUserId, NOW,
+                0, null, List.of(line1, line2)
+        );
+
+        when(invoiceRepository.findById(ownInvoiceId)).thenReturn(Optional.of(invoice));
+
+        Visit visit = mockVisit(ownVisitId, ownPatientId);
+        when(visitRepository.findById(ownVisitId)).thenReturn(Optional.of(visit));
+
+        User doctor = Mockito.mock(User.class);
+        when(doctor.getFullName()).thenReturn("BS. Nguyễn Văn A");
+        when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+
+        Specialty specialty = Mockito.mock(Specialty.class);
+        when(specialty.getName()).thenReturn("Khoa Nội");
+        when(specialtyRepository.findById(specialtyId)).thenReturn(Optional.of(specialty));
+
+        when(clockPort.now()).thenReturn(NOW);
+
+        mockMvc.perform(get("/patient-portal/invoices/{invoiceId}", ownInvoiceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.invoiceId").value(ownInvoiceId.toString()))
+                .andExpect(jsonPath("$.totalAmount").value(350000))
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].amount").value(150000))
+                .andExpect(jsonPath("$.items[1].amount").value(200000));
+    }
 }
