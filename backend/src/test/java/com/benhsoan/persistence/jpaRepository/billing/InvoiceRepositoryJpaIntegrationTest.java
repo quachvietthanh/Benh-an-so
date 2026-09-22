@@ -186,6 +186,76 @@ class InvoiceRepositoryJpaIntegrationTest {
     }
 
     @Test
+    void ignoresCancelledPrescriptionWhenEvaluatingHasPrescription() {
+        UUID patientId = UUID.randomUUID();
+        patientRepository.saveAndFlush(patient(patientId, "Pham Thi Cancelled"));
+
+        UUID visitId = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId, patientId, VisitStatus.COMPLETED));
+
+        UUID medicalRecordId = UUID.randomUUID();
+        medicalRecordRepository.saveAndFlush(MedicalRecordEntity.builder()
+                .id(medicalRecordId)
+                .visitId(visitId)
+                .status(MedicalRecordStatus.SIGNED)
+                .createdBy(UUID.randomUUID())
+                .createdAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .build());
+
+        UUID prescriptionId = UUID.randomUUID();
+        prescriptionRepository.saveAndFlush(PrescriptionEntity.builder()
+                .id(prescriptionId)
+                .prescriptionCode("RX-" + UUID.randomUUID().toString().substring(0, 8))
+                .medicalRecordId(medicalRecordId)
+                .status(PrescriptionStatus.CANCELLED)
+                .interconnectionStatus(InterconnectionStatus.NOT_SENT)
+                .prescribedBy(UUID.randomUUID())
+                .prescribedAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .build());
+
+        var page = repository.findPayableEncounters(PageRequest.of(0, 20));
+
+        var found = page.stream().filter(item -> visitId.equals(item.getVisitId())).findFirst();
+        assertTrue(found.isPresent());
+        assertFalse(Boolean.TRUE.equals(found.get().getHasPrescription()));
+        assertFalse(Boolean.TRUE.equals(found.get().getHasPendingDispense()));
+    }
+
+    @Test
+    void matchesLiteralUnderscoreAndPercentInSearch() {
+        UUID patientId1 = UUID.randomUUID();
+        patientRepository.saveAndFlush(patient(patientId1, "Tran_Van%Special"));
+
+        UUID visitId1 = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId1, patientId1, VisitStatus.COMPLETED));
+
+        UUID patientId2 = UUID.randomUUID();
+        patientRepository.saveAndFlush(patient(patientId2, "TranAVanBSpecial"));
+
+        UUID visitId2 = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId2, patientId2, VisitStatus.COMPLETED));
+
+        com.benhsoan.persistence.adapterRepository.billing.InvoiceRepositoryAdapter adapter =
+                new com.benhsoan.persistence.adapterRepository.billing.InvoiceRepositoryAdapter(
+                        repository,
+                        null,
+                        new com.benhsoan.persistence.mapper.billing.InvoicePersistenceMapper(
+                                new com.benhsoan.persistence.mapper.billing.InvoiceLinePersistenceMapper()
+                        ),
+                        null
+                );
+
+        var pagePercent = adapter.findPayableEncounters(null, null, "%Special", PageRequest.of(0, 20));
+        assertTrue(pagePercent.stream().anyMatch(item -> visitId1.equals(item.visitId())));
+        assertFalse(pagePercent.stream().anyMatch(item -> visitId2.equals(item.visitId())));
+
+        var pageUnderscore = adapter.findPayableEncounters(null, null, "Tran_", PageRequest.of(0, 20));
+        assertTrue(pageUnderscore.stream().anyMatch(item -> visitId1.equals(item.visitId())));
+        assertFalse(pageUnderscore.stream().anyMatch(item -> visitId2.equals(item.visitId())));
+    }
+
+
+    @Test
     void searchesInvoicesByPatientName() {
         UUID patientId = UUID.randomUUID();
         patientRepository.saveAndFlush(patient(patientId, "Nguyen Van A"));

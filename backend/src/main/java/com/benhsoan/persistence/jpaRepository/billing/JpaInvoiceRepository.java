@@ -76,6 +76,7 @@ public interface JpaInvoiceRepository
                             from MedicalRecordEntity medicalRecord
                             join PrescriptionEntity prescription on prescription.medicalRecordId = medicalRecord.id
                             where medicalRecord.visitId = visit.id
+                              and prescription.status != com.benhsoan.domain.prescription.enums.PrescriptionStatus.CANCELLED
                         ) then true else false end as hasPrescription,
                         case when exists (
                             select 1
@@ -92,9 +93,9 @@ public interface JpaInvoiceRepository
                       and (:fromCompletedAt is null or visit.completedAt >= :fromCompletedAt)
                       and (:toCompletedAt is null or visit.completedAt < :toCompletedAt)
                       and (:search is null
-                        or lower(patient.fullName) like lower(concat('%', :search, '%'))
-                        or lower(patient.patientCode) like lower(concat('%', :search, '%'))
-                        or lower(visit.visitCode) like lower(concat('%', :search, '%')))
+                        or lower(patient.fullName) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(patient.patientCode) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(visit.visitCode) like lower(concat('%', :search, '%')) escape '\\')
                     """,
             countQuery = """
                     select count(visit)
@@ -106,9 +107,9 @@ public interface JpaInvoiceRepository
                       and (:fromCompletedAt is null or visit.completedAt >= :fromCompletedAt)
                       and (:toCompletedAt is null or visit.completedAt < :toCompletedAt)
                       and (:search is null
-                        or lower(patient.fullName) like lower(concat('%', :search, '%'))
-                        or lower(patient.patientCode) like lower(concat('%', :search, '%'))
-                        or lower(visit.visitCode) like lower(concat('%', :search, '%')))
+                        or lower(patient.fullName) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(patient.patientCode) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(visit.visitCode) like lower(concat('%', :search, '%')) escape '\\')
                     """
     )
     Page<PayableEncounterProjection> findPayableEncounters(

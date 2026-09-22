@@ -47,23 +47,32 @@ class ClinicalServiceFeeCalculator {
         for (UUID visitId : visitIds) {
             totals.put(visitId, BigDecimal.ZERO);
         }
-        Map<UUID, Optional<ServicePrice>> priceCache = new HashMap<>();
+        if (items.isEmpty()) {
+            return totals;
+        }
+
+        java.util.Set<UUID> catalogIds = items.stream()
+                .map(BillableClinicalService::serviceCatalogId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        Map<UUID, ServicePrice> effectivePrices = Map.of();
+        try {
+            effectivePrices = servicePriceRepository.findEffectivePrices(catalogIds, billingDate);
+        } catch (Exception ex) {
+            // Graceful fallback for missing prices or lookup failure
+        }
+
         for (BillableClinicalService item : items) {
-            if (item.visitId() == null) continue;
-            try {
-                Optional<ServicePrice> priceOpt = priceCache.computeIfAbsent(
-                        item.serviceCatalogId(),
-                        id -> servicePriceRepository.findEffectivePrice(id, billingDate)
-                );
-                if (priceOpt.isPresent() && priceOpt.get().getPrice() != null) {
-                    totals.merge(item.visitId(), priceOpt.get().getPrice(), BigDecimal::add);
-                }
-            } catch (Exception ex) {
-                // Graceful fallback for missing prices
+            if (item.visitId() == null || item.serviceCatalogId() == null) continue;
+            ServicePrice price = effectivePrices.get(item.serviceCatalogId());
+            if (price != null && price.getPrice() != null) {
+                totals.merge(item.visitId(), price.getPrice(), BigDecimal::add);
             }
         }
         return totals;
     }
+
 
     BigDecimal total(List<ClinicalServiceCharge> charges) {
         return charges.stream()

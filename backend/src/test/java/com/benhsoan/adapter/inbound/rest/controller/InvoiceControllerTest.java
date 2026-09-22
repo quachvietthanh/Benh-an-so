@@ -64,7 +64,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = InvoiceController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({BillingRestMapper.class, AnonymizationModeState.class})
+@Import({BillingRestMapper.class, AnonymizationModeState.class, com.benhsoan.exception.GlobalExceptionHandler.class})
 class InvoiceControllerTest {
 
     @Autowired private MockMvc mockMvc;

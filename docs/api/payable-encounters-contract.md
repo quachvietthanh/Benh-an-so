@@ -115,26 +115,28 @@ GET /invoices/payable?date=YYYY-MM-DD&search={keyword}&page=0&size=20
 | `medicineFee` | `BigDecimal` | Tiền thuốc tạm tính (hiện tại mặc định 0 VND do bảng thuốc chưa có đơn giá bán lẻ). |
 | `serviceFee` | `BigDecimal` | Tiền dịch vụ cận lâm sàng tính động theo danh mục và bảng giá hiệu lực. |
 | `totalEstimatedAmount` | `BigDecimal` | Tổng tiền viện phí dự kiến (`examFee + medicineFee + serviceFee`). |
-| `hasPrescription` | `boolean` | `true` nếu lượt khám có đơn thuốc. Giúp lễ tân nhận biết và đối soát tiền thuốc quầy dược. |
+| `hasPrescription` | `boolean` | `true` nếu lượt khám có đơn thuốc hợp lệ (không tính đơn thuốc đã bị `CANCELLED`). Giúp lễ tân nhận biết và đối soát tiền thuốc quầy dược. |
 | `hasPendingDispense` | `boolean` | `true` nếu đơn thuốc đang ở trạng thái chờ cấp phát thuốc (`PENDING_DISPENSE`). Frontend dựa vào cờ này để hiển thị huy hiệu cảnh báo, hướng dẫn người bệnh hoàn tất nhận thuốc trước khi xác nhận lập phiếu thu. |
 
 ---
 
 ## 4. Business Rules & Technical Validation
 
-1. **BR-1 (Trạng thái lượt khám & Đơn thuốc - Finding P1):**
+1. **BR-1 (Trạng thái lượt khám & Đơn thuốc - Finding P1 & P3-01):**
    - Chỉ lấy các lượt khám có `visit.status = 'COMPLETED'` và chưa tồn tại bất kỳ hóa đơn nào trong bảng `invoices` (`NOT EXISTS (SELECT 1 FROM invoices i WHERE i.visit_id = v.id)`).
+   - Cờ `hasPrescription` được xác định bởi sự tồn tại của đơn thuốc có trạng thái hợp lệ (`status != CANCELLED`). Đơn thuốc đã bị hủy sẽ không kích hoạt cờ này.
    - Lượt khám có đơn thuốc ở trạng thái chờ phát thuốc (`PENDING_DISPENSE`) **vẫn được hiển thị đầy đủ** kèm cờ `hasPendingDispense = true` để Lễ tân nắm bắt toàn bộ công nợ khám chữa bệnh trong ngày, phòng ngừa thất thoát doanh thu khi bệnh nhân ra về không lấy thuốc.
    - Tuyệt đối không hiển thị các lượt tiếp đón đang chờ khám (`WAITING`), đang khám (`IN_PROGRESS`), đã hủy (`CANCELLED`), hoặc kết thúc sớm (`EARLY_ENDED`).
 
 2. **BR-2 (Lọc theo ngày):**
    - Khi có tham số `date`, lọc theo khoảng thời gian cả ngày: `visit.completedAt >= date.atStartOfDay(Asia/Ho_Chi_Minh)` và `visit.completedAt < date.plusDays(1).atStartOfDay(Asia/Ho_Chi_Minh)`.
 
-3. **BR-3 (Tìm kiếm từ khóa):**
-   - Khi có tham số `search`, áp dụng tìm kiếm chứa ký tự (case-insensitive `LOWER(...) LIKE %keyword%`) đồng thời trên Họ tên bệnh nhân, Mã bệnh nhân, và Mã tiếp đón.
+3. **BR-3 (Tìm kiếm từ khóa - Finding P3-02):**
+   - Khi có tham số `search`, áp dụng tìm kiếm chứa ký tự (case-insensitive `LOWER(...) LIKE %keyword%` kết hợp escape ký tự wildcard `\`, `%`, `_`) đồng thời trên Họ tên bệnh nhân, Mã bệnh nhân, và Mã tiếp đón.
 
-4. **BR-4 (Tính toán chi phí và cơ chế an toàn):**
-   - Tiền dịch vụ cận lâm sàng (`serviceFee`) được tổng hợp từ các chỉ định cận lâm sàng trong lượt khám (`clinical_order_items`) dựa theo bảng giá có hiệu lực (`service_price.price`).
+4. **BR-4 (Tính toán chi phí và cơ chế an toàn - Finding P2-01 & P2-02):**
+   - Tiền dịch vụ cận lâm sàng (`serviceFee`) được tổng hợp từ các chỉ định cận lâm sàng đã hoàn thành (`status = COMPLETED`) trong lượt khám (`clinical_order_items`) dựa theo bảng giá có hiệu lực (`service_price.price`).
+   - Việc tra cứu giá hiệu lực được tối ưu hóa theo batch thông qua correlated subquery cố định 1 bulk query cho toàn bộ danh sách dịch vụ trên trang, loại bỏ hoàn toàn vấn đề N+1 query.
    - Nếu xảy ra tình trạng dịch vụ chưa được cấu hình bảng giá hiệu lực, hệ thống kích hoạt cơ chế fallback trả về `serviceFee = 0` thay vì báo lỗi HTTP 500, bảo đảm danh sách thu ngân luôn hiển thị liên tục, không bị gián đoạn hoạt động.
 
 5. **BR-5 (Phân trang và kiểm tra hợp lệ):**

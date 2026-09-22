@@ -115,9 +115,21 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
             String search,
             Pageable pageable
     ) {
-        return jpaRepository.findPayableEncounters(fromCompletedAt, toCompletedAt, search, pageable)
+        String safeSearch = escapeLikePattern(search);
+        return jpaRepository.findPayableEncounters(fromCompletedAt, toCompletedAt, safeSearch, pageable)
                 .map(this::toSummary);
     }
+
+    private String escapeLikePattern(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+    }
+
 
     @Override
     @Transactional(readOnly = true)
