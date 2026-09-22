@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -94,7 +95,8 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
         List<PrescriptionItem> items = prescription.getItems();
         Map<UUID, Integer> requestedByItem = resolveRequestedQuantities(command, items);
         Map<UUID, Medicine> medicines = loadMedicines(items);
-        requireControlledMedicineConfirmation(medicines, command.controlledMedicineConfirmed());
+        Map<UUID, Medicine> dispensedMedicines = resolveDispensedMedicines(items, requestedByItem, medicines);
+        requireControlledMedicineConfirmation(dispensedMedicines, command.controlledMedicineConfirmed());
         Map<UUID, DispenseItemCommand> commandByItemId = command.items().stream()
                 .collect(Collectors.toMap(DispenseItemCommand::prescriptionItemId, Function.identity()));
 
@@ -371,6 +373,26 @@ public class PartialDispensePrescriptionService implements DispensePrescriptionI
             }
         }
         return byId;
+    }
+
+    /**
+     * Narrows the medicine map to only the medicines that are actually dispensed
+     * in this partial-dispense operation (requested quantity &gt; 0). This keeps the
+     * controlled-medicine confirmation guard in the same business scope as the
+     * register-writing logic ({@link #recordControlledRegisterEntries}).
+     */
+    private Map<UUID, Medicine> resolveDispensedMedicines(
+            List<PrescriptionItem> items,
+            Map<UUID, Integer> requestedByItem,
+            Map<UUID, Medicine> medicines
+    ) {
+        Set<UUID> dispensedMedicineIds = items.stream()
+                .filter(item -> requestedByItem.containsKey(item.getId()))
+                .map(PrescriptionItem::getMedicineId)
+                .collect(Collectors.toSet());
+        return medicines.entrySet().stream()
+                .filter(entry -> dispensedMedicineIds.contains(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private List<DispenseAllocationResult> applyAllocations(

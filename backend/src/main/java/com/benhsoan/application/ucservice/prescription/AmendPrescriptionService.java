@@ -289,7 +289,20 @@ public class AmendPrescriptionService
         }
 
         Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
-        requireControlledMedicineConfirmation(medicines, controlledMedicineConfirmed);
+
+        // Controlled-medicine confirmation is only required when this amendment
+        // actually introduces a controlled medicine that was not already on the
+        // prescription. Merely keeping an existing controlled medicine unchanged
+        // must not force confirmation (NCL-06-CN-014, same business scope as
+        // partial dispense).
+        Set<UUID> addedMedicineIds = itemCommands.stream()
+                .map(AmendPrescriptionItemCommand::medicineId)
+                .filter(id -> !existingByMedicineId.containsKey(id))
+                .collect(Collectors.toSet());
+        Map<UUID, Medicine> addedMedicines = medicines.entrySet().stream()
+                .filter(entry -> addedMedicineIds.contains(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        requireControlledMedicineConfirmation(addedMedicines, controlledMedicineConfirmed);
 
         return itemCommands.stream()
                 .map(command -> {

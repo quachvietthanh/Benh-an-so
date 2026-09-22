@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.benhsoan.adapter.inbound.rest.mapper.ControlledMedicineRegisterRestMapper;
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
@@ -37,7 +38,8 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = ControlledMedicineRegisterController.class)
-@Import({ControlledMedicineRegisterRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class,
+@Import({ControlledMedicineRegisterRestMapper.class, AnonymizationModeState.class, SecurityConfig.class,
+        JwtAuthenticationFilter.class,
         GlobalExceptionHandler.class, RequirePermissionAspect.class, PermissionEvaluator.class,
         ControlledMedicineRegisterSecurityIntegrationTest.AspectTestConfig.class})
 class ControlledMedicineRegisterSecurityIntegrationTest {

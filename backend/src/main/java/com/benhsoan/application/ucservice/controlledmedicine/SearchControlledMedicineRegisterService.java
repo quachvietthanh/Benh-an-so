@@ -118,5 +118,11 @@ public class SearchControlledMedicineRegisterService
         if (query.size() <= 0) {
             throw new ValidationException("Size must be greater than zero.");
         }
+        if (query.size() > 100) {
+            throw new ValidationException("Size must not exceed 100.");
+        }
+        if (query.from() != null && query.to() != null && query.from().isAfter(query.to())) {
+            throw new ValidationException("from must be before or equal to to.");
+        }
     }
 }

@@ -54,10 +54,10 @@ public class CreateMedicineService implements CreateMedicineUseCase {
                 command.unit(),
                 command.defaultRoute(),
                 command.minStockThreshold(),
+                command.controlled(),
                 now
         );
         validateUniqueness(medicine);
-        medicine.markControlled(command.controlled(), now);
 
         Medicine saved = medicineRepository.save(medicine);
         adminOperationAuditService.record(

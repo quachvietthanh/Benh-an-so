@@ -93,6 +93,7 @@ public class Medicine {
             String unit,
             AdministrationRoute defaultRoute,
             int minStockThreshold,
+            boolean controlled,
             Instant createdAt
     ) {
         return new Medicine(
@@ -109,7 +110,7 @@ public class Medicine {
                 null,
                 0,
                 minStockThreshold,
-                false
+                controlled
         );
     }
 
