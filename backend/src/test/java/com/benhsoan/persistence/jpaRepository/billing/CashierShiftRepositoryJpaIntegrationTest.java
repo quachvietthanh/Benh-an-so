@@ -1,7 +1,6 @@
 package com.benhsoan.persistence.jpaRepository.billing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
@@ -142,9 +141,9 @@ class CashierShiftRepositoryJpaIntegrationTest {
         PaymentEntity p2 = savePayment(cashierId, new BigDecimal("200000"), PaymentMethod.BANK_TRANSFER, PaymentStatus.SUCCESS, null, now.minusSeconds(1800));
         // Payment 3: already settled
         UUID previousShiftId = UUID.randomUUID();
-        PaymentEntity p3 = savePayment(cashierId, new BigDecimal("300000"), PaymentMethod.CASH, PaymentStatus.RECORDED, previousShiftId, now.minusSeconds(7200));
+        savePayment(cashierId, new BigDecimal("300000"), PaymentMethod.CASH, PaymentStatus.RECORDED, previousShiftId, now.minusSeconds(7200));
         // Payment 4: cancelled
-        PaymentEntity p4 = savePayment(cashierId, new BigDecimal("150000"), PaymentMethod.CASH, PaymentStatus.CANCELLED, null, now.minusSeconds(500));
+        savePayment(cashierId, new BigDecimal("150000"), PaymentMethod.CASH, PaymentStatus.CANCELLED, null, now.minusSeconds(500));
 
         List<PaymentStatus> validStatuses = List.of(PaymentStatus.RECORDED, PaymentStatus.SUCCESS, PaymentStatus.REFUNDED);
 

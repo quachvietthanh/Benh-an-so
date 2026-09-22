@@ -37,7 +37,6 @@ import com.benhsoan.domain.billing.InvoiceLine;
 import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.billing.exception.InvoiceNotFoundException;
-import com.benhsoan.domain.clinic.ClinicConfiguration;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.specialty.Specialty;

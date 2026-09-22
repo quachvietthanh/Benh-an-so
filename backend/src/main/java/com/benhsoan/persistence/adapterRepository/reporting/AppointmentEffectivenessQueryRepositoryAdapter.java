@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import com.benhsoan.persistence.entity.appointment.AppointmentEntity;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentEffectivenessQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.AppointmentStatusCountSummary;
 

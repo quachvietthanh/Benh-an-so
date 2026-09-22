@@ -240,7 +240,7 @@ public class PdfBoxInvoicePdfRenderer implements InvoicePdfRenderer {
         if (amount == null) {
             return "0";
         }
-        DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("vi", "VN"));
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.of("vi", "VN"));
         symbols.setGroupingSeparator('.');
         symbols.setDecimalSeparator(',');
         DecimalFormat df = new DecimalFormat("#,###", symbols);

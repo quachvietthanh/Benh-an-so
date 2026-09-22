@@ -41,6 +41,8 @@ public class InvoicePersistenceMapper {
                 entity.getType(),
                 entity.getOriginalInvoiceId(),
                 entity.getAdjustmentReason(),
+                entity.getDiscountAmount(),
+                entity.getDiscountRequestId(),
                 entity.getTotalAmount(),
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
@@ -63,6 +65,8 @@ public class InvoicePersistenceMapper {
                 .type(domain.getType())
                 .originalInvoiceId(domain.getOriginalInvoiceId())
                 .adjustmentReason(domain.getAdjustmentReason())
+                .discountAmount(domain.getDiscountAmount() != null ? domain.getDiscountAmount() : java.math.BigDecimal.ZERO)
+                .discountRequestId(domain.getDiscountRequestId())
                 .totalAmount(domain.getTotalAmount())
                 .createdBy(domain.getCreatedBy())
                 .createdAt(domain.getCreatedAt())

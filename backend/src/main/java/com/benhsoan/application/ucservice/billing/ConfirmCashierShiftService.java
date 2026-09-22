@@ -33,30 +33,20 @@ public class ConfirmCashierShiftService implements ConfirmCashierShiftUseCase {
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final CashierShiftResultMapper resultMapper;
-<<<<<<< HEAD
     private final CashierShiftAuthorizationAuditService authorizationAuditService;
-=======
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
     public CashierShiftResult confirm(ConfirmCashierShiftCommand command) {
         validateCommand(command);
-<<<<<<< HEAD
         UUID managerId = currentUserPort.getCurrentUserId();
         ensureAuthorized(managerId, command.shiftId());
 
-=======
-        ensureAuthorized();
-
-        UUID managerId = currentUserPort.getCurrentUserId();
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         Instant now = clockPort.now();
 
         CashierShift shift = cashierShiftRepository.findByIdForUpdate(command.shiftId())
                 .orElseThrow(() -> new CashierShiftNotFoundException(command.shiftId()));
 
-<<<<<<< HEAD
         if (shift.getCashierId() != null && shift.getCashierId().equals(managerId)) {
             authorizationAuditService.recordConfirmAccessDenied(
                     managerId,
@@ -66,8 +56,6 @@ public class ConfirmCashierShiftService implements ConfirmCashierShiftUseCase {
             throw new com.benhsoan.domain.billing.exception.SelfConfirmationNotAllowedException();
         }
 
-=======
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         shift.confirm(managerId, now, command.confirmationNotes());
         CashierShift saved = cashierShiftRepository.save(shift);
 
@@ -97,7 +85,6 @@ public class ConfirmCashierShiftService implements ConfirmCashierShiftUseCase {
         return resultMapper.toResult(saved);
     }
 
-<<<<<<< HEAD
     private void ensureAuthorized(UUID actorId, UUID shiftId) {
         if (!currentUserPort.hasRole("MANAGER") && !currentUserPort.hasRole("ADMIN")) {
             authorizationAuditService.recordConfirmAccessDenied(
@@ -105,10 +92,6 @@ public class ConfirmCashierShiftService implements ConfirmCashierShiftUseCase {
                     shiftId,
                     "Chỉ Quản lý phòng khám mới có quyền xác nhận phiếu chốt ca."
             );
-=======
-    private void ensureAuthorized() {
-        if (!currentUserPort.hasRole("MANAGER") && !currentUserPort.hasRole("ADMIN")) {
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
             throw new AccessDeniedException("Chỉ Quản lý phòng khám mới có quyền xác nhận phiếu chốt ca.");
         }
     }
