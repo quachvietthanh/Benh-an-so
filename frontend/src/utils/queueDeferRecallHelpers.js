@@ -36,6 +36,7 @@ export const QUEUE_ACTION_META = {
   CANCEL: { label: 'Hủy lượt khám', color: 'red' },
   WAIT_FOR_RESULT: { label: 'Chờ kết quả CĐLS', color: 'purple' },
   RESUME: { label: 'Tiếp tục khám', color: 'geekblue' },
+  PRIORITIZED: { label: 'Đánh dấu ưu tiên', color: 'volcano' },
 }
 
 export const QUEUE_ITEM_STATUS_VN = {
