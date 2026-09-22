@@ -33,11 +33,13 @@ import com.benhsoan.port.inbound.queue.CheckInWalkInUseCase;
 import com.benhsoan.port.inbound.queue.CloseVisitUseCase;
 import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
+import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
 import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.GetQueuesUseCase;
 import com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse;
 import com.benhsoan.port.dto.command.queue.ReQueueItemCommand;
-import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
+import com.benhsoan.adapter.inbound.rest.request.queue.PrioritizeQueueItemRequest;
+import com.benhsoan.port.inbound.queue.PrioritizeQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.ReQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
@@ -60,6 +62,7 @@ public class QueueController {
     private final GetQueueItemUseCase getQueueItemUseCase;
     private final SkipQueueItemUseCase skipQueueItemUseCase;
     private final ReQueueItemUseCase reQueueItemUseCase;
+    private final PrioritizeQueueItemUseCase prioritizeQueueItemUseCase;
     private final GetQueueHistoryUseCase getQueueHistoryUseCase;
     private final QueueRestMapper mapper;
 
@@ -126,6 +129,13 @@ public class QueueController {
     @RequirePermission("QUEUE_UPDATE_STATUS")
     public QueueItemResponse reQueue(@PathVariable UUID itemId) {
         return mapper.toResponse(reQueueItemUseCase.reQueue(new ReQueueItemCommand(itemId)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/prioritize")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse prioritize(@PathVariable UUID itemId,
+            @Valid @RequestBody PrioritizeQueueItemRequest request) {
+        return mapper.toResponse(prioritizeQueueItemUseCase.prioritize(mapper.toCommand(itemId, request)));
     }
 
     @GetMapping("/queue-items/{itemId}/history")

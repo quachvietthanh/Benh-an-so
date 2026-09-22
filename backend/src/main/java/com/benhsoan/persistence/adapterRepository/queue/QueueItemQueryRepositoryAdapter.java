@@ -57,7 +57,11 @@ public class QueueItemQueryRepositoryAdapter implements QueueItemQueryRepository
                 projection.cancelReason(),
                 projection.skippedAt(),
                 projection.skipReason(),
-                projection.callCount()
+                projection.callCount(),
+                projection.priority(),
+                projection.priorityReason(),
+                projection.prioritizedAt(),
+                projection.prioritizedBy()
         );
     }
 }

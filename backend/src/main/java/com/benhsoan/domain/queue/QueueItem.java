@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
+import com.benhsoan.domain.queue.enums.QueuePriority;
 import com.benhsoan.domain.queue.exception.QueueItemInvalidStatusException;
 import com.benhsoan.domain.shared.Guard.Guard;
 
@@ -22,11 +23,16 @@ public class QueueItem {
     private Instant calledAt, completedAt, cancelledAt, skippedAt, updatedAt;
     private String cancelReason, skipReason;
     private int callCount;
+    private QueuePriority priority;
+    private String priorityReason;
+    private Instant prioritizedAt;
+    private UUID prioritizedBy;
 
     private QueueItem(UUID id, UUID medicalQueueId, UUID patientId, UUID appointmentId, UUID visitId,
             QueueItemSourceType sourceType, QueueItemStatus status, int queueNumber, LocalDate queueDate,
             Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
             Instant skippedAt, String skipReason, int callCount,
+            QueuePriority priority, String priorityReason, Instant prioritizedAt, UUID prioritizedBy,
             UUID createdBy, Instant createdAt, Instant updatedAt) {
         this.id = Guard.require(id, "Queue item id");
         this.medicalQueueId = Guard.require(medicalQueueId, "Medical queue id");
@@ -48,6 +54,10 @@ public class QueueItem {
         this.skippedAt = skippedAt;
         this.skipReason = skipReason;
         this.callCount = Math.max(0, callCount);
+        this.priority = priority != null ? priority : QueuePriority.NORMAL;
+        this.priorityReason = priorityReason;
+        this.prioritizedAt = prioritizedAt;
+        this.prioritizedBy = prioritizedBy;
         this.createdBy = Guard.require(createdBy, "Created by");
         this.createdAt = Guard.require(createdAt, "Created at");
         this.updatedAt = Guard.require(updatedAt, "Updated at");
@@ -68,16 +78,45 @@ public class QueueItem {
             Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
             Instant skippedAt, String skipReason, int callCount,
             UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return restore(id, medicalQueueId, patientId, appointmentId, visitId, sourceType, status, queueNumber,
+                queueDate, checkedInAt, calledAt, completedAt, cancelledAt, cancelReason, skippedAt, skipReason,
+                callCount, QueuePriority.NORMAL, null, null, null, createdBy, createdAt, updatedAt);
+    }
+
+    public static QueueItem restore(UUID id, UUID medicalQueueId, UUID patientId, UUID appointmentId, UUID visitId,
+            QueueItemSourceType sourceType, QueueItemStatus status, int queueNumber, LocalDate queueDate,
+            Instant checkedInAt, Instant calledAt, Instant completedAt, Instant cancelledAt, String cancelReason,
+            Instant skippedAt, String skipReason, int callCount,
+            QueuePriority priority, String priorityReason, Instant prioritizedAt, UUID prioritizedBy,
+            UUID createdBy, Instant createdAt, Instant updatedAt) {
         return new QueueItem(id, medicalQueueId, patientId, appointmentId, visitId, sourceType, status, queueNumber,
                 queueDate, checkedInAt, calledAt, completedAt, cancelledAt, cancelReason, skippedAt, skipReason,
-                callCount, createdBy, createdAt, updatedAt);
+                callCount, priority, priorityReason, prioritizedAt, prioritizedBy, createdBy, createdAt, updatedAt);
     }
 
     public static QueueItem create(UUID medicalQueueId, UUID patientId, UUID appointmentId, UUID visitId,
             QueueItemSourceType sourceType, int queueNumber, LocalDate queueDate, UUID createdBy, Instant checkedInAt) {
         return new QueueItem(UUID.randomUUID(), medicalQueueId, patientId, appointmentId, visitId, sourceType,
                 QueueItemStatus.WAITING, queueNumber, queueDate, checkedInAt, null, null, null, null, null, null,
-                0, createdBy, checkedInAt, checkedInAt);
+                0, QueuePriority.NORMAL, null, null, null, createdBy, checkedInAt, checkedInAt);
+    }
+
+    public void prioritize(QueuePriority priority, String reason, UUID actorId, Instant prioritizedAt) {
+        requireStatus(QueueItemStatus.WAITING);
+        if (priority == null || priority == QueuePriority.NORMAL) {
+            throw new IllegalArgumentException("Priority level must be PRIORITY or EMERGENCY.");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Priority reason is required.");
+        }
+        if (reason.trim().length() > 500) {
+            throw new IllegalArgumentException("Priority reason cannot exceed 500 characters.");
+        }
+        this.priority = priority;
+        this.priorityReason = reason.trim();
+        this.prioritizedBy = Guard.require(actorId, "Prioritized by");
+        this.prioritizedAt = Guard.require(prioritizedAt, "Prioritized at");
+        this.updatedAt = prioritizedAt;
     }
 
     public void call(Instant calledAt) {
