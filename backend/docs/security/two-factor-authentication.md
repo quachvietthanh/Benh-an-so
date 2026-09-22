@@ -4,6 +4,13 @@
 
 - Quản trị viên (Admin) có thể bật/tắt yêu cầu xác thực hai lớp theo vai trò.
 - Các vai trò được hỗ trợ: `ADMIN`, `DOCTOR`.
+  - Phạm vi này được cố định theo yêu cầu hiện tại của NCL-01-CN-006
+    (chỉ các vai trò có quyền truy cập sâu vào dữ liệu lâm sàng/kê đơn).
+  - `MANAGER` và `PHARMACIST` **cố ý không** được hỗ trợ ở phiên bản này;
+    chúng được loại trừ có chủ đích (không phải do bỏ sót) và sẽ được mở rộng
+    sau nếu workbook bổ sung yêu cầu cho các vai trò này.
+  - Việc mở rộng phải đi kèm cập nhật tập hợp vai trò hỗ trợ tại tầng dịch vụ
+    (`ConfigureTwoFactorAuthenticationService`) — không tự ý mở rộng hàng loạt.
 - Người dùng thuộc vai trò bắt buộc phải nhập thêm "mã xác thực mô phỏng" sau khi
   nhập đúng mật khẩu.
 - Vai trò không bật 2FA (ví dụ `RECEPTIONIST`) đăng nhập bình thường chỉ bằng mật khẩu.
@@ -180,3 +187,23 @@ trên; không cần sửa backend.
   - Tạo bảng `two_factor_challenges`.
   - Index `idx_two_factor_challenges_user_created` cho truy vấn theo user + thời điểm tạo.
   - Seed permission `TWO_FACTOR_AUTH_MANAGE` và gán cho `ADMIN`.
+
+## 10. Challenge cleanup
+
+- Bảng `two_factor_challenges` chứa bản ghi tạm thời. Một job định kỳ sẽ dọn các bản ghi
+  không còn dùng được để tránh phình dữ liệu.
+- **Retention**: `30` ngày (`app.security.two-factor.challenge.cleanup.retention-days`).
+- **Predicate an toàn** (không bao giờ xóa challenge đang hoạt động):
+  ```
+  created_at < (now - retentionDays)
+  AND (expires_at < now OR consumed_at IS NOT NULL)
+  ```
+  Tức chỉ xóa các bản ghi **đã hết hạn hoặc đã dùng** và **đã quá thời hạn lưu trữ**.
+- **Lịch chạy**: hằng ngày lúc `03:00` (`app.security.two-factor.challenge.cleanup.cron`),
+  có thể tắt bằng `app.security.two-factor.challenge.cleanup.enabled=false`.
+- Job idempotent (chạy lại không lỗi, không xóa nhầm), và log chỉ ghi **số bản ghi đã xóa**,
+  không ghi mã xác thực, hash, token hay thông tin nhạy cảm nào.
+- Không cần thêm index riêng: bảng chỉ chứa bản ghi ngắn hạn (tuổi thọ tối đa 15 phút),
+  số dòng thấp, và index `(user_id, created_at)` hiện có đã phục vụ tra cứu theo user.
+  Bản ghi `two_factor_challenges` không bị bảng nào tham chiếu FK; audit log lưu
+  `challengeId` dạng UUID độc lập nên việc dọn không ảnh hưởng audit.

@@ -66,9 +66,36 @@ class ConfigureTwoFactorAuthenticationServiceTest {
     }
 
     @Test
+    void enableTwoFactorForAdmin_updatesRoleAndAudits() {
+        Role admin = Role.restore(ROLE_ID, "ADMIN", null, true, NOW, NOW, Set.of());
+        when(currentUserPort.hasPermission("TWO_FACTOR_AUTH_MANAGE")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(ADMIN_ID);
+        when(clockPort.now()).thenReturn(NOW);
+        when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(admin));
+        when(roleRepository.save(admin)).thenReturn(admin);
+
+        TwoFactorConfigurationResult result = service.configure(new ConfigureTwoFactorAuthenticationCommand("admin", true));
+
+        assertTrue(result.twoFactorRequired());
+        assertTrue(admin.isTwoFactorRequired());
+    }
+
+    @Test
     void unsupportedRole_throwsValidation() {
         assertThrows(ValidationException.class,
                 () -> service.configure(new ConfigureTwoFactorAuthenticationCommand("RECEPTIONIST", true)));
+    }
+
+    @Test
+    void unsupportedManagerRole_throwsValidation() {
+        assertThrows(ValidationException.class,
+                () -> service.configure(new ConfigureTwoFactorAuthenticationCommand("MANAGER", true)));
+    }
+
+    @Test
+    void unsupportedPharmacistRole_throwsValidation() {
+        assertThrows(ValidationException.class,
+                () -> service.configure(new ConfigureTwoFactorAuthenticationCommand("PHARMACIST", true)));
     }
 
     @Test

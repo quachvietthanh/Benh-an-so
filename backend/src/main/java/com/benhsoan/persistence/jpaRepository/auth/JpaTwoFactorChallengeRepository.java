@@ -23,4 +23,8 @@ public interface JpaTwoFactorChallengeRepository extends JpaRepository<TwoFactor
     @Modifying
     @Query("UPDATE TwoFactorChallengeEntity c SET c.consumedAt = :invalidatedAt WHERE c.userId = :userId AND c.consumedAt IS NULL")
     int invalidatePendingChallengesByUserId(@Param("userId") UUID userId, @Param("invalidatedAt") Instant invalidatedAt);
+
+    @Modifying
+    @Query("DELETE FROM TwoFactorChallengeEntity c WHERE c.createdAt < :retentionThreshold AND (c.expiresAt < :now OR c.consumedAt IS NOT NULL)")
+    int deleteExpiredOrConsumedBefore(@Param("retentionThreshold") Instant retentionThreshold, @Param("now") Instant now);
 }

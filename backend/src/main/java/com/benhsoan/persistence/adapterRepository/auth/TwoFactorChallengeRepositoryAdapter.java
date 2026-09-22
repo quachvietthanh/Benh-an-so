@@ -46,4 +46,9 @@ public class TwoFactorChallengeRepositoryAdapter implements TwoFactorChallengeRe
     public void invalidatePendingChallengesByUserId(UUID userId, Instant invalidatedAt) {
         jpaRepository.invalidatePendingChallengesByUserId(userId, invalidatedAt);
     }
+
+    @Override
+    public int deleteExpiredOrConsumedBefore(Instant retentionThreshold, Instant now) {
+        return jpaRepository.deleteExpiredOrConsumedBefore(retentionThreshold, now);
+    }
 }

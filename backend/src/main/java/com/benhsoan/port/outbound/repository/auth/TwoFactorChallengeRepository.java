@@ -27,4 +27,11 @@ public interface TwoFactorChallengeRepository {
      * most recently issued challenge remains usable.
      */
     void invalidatePendingChallengesByUserId(UUID userId, Instant invalidatedAt);
+
+    /**
+     * Deletes challenges that are no longer usable (already consumed or already
+     * expired) and were created before the retention threshold. Never deletes an
+     * active challenge. Returns the number of deleted rows.
+     */
+    int deleteExpiredOrConsumedBefore(Instant retentionThreshold, Instant now);
 }

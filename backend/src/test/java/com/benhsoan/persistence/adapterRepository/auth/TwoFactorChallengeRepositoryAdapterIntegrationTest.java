@@ -3,8 +3,10 @@ package com.benhsoan.persistence.adapterRepository.auth;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -127,5 +129,75 @@ class TwoFactorChallengeRepositoryAdapterIntegrationTest {
 
         // The other user's challenge remains consumable.
         assertEquals(1, challengeRepository.markConsumed(otherChallenge.getId(), now));
+    }
+
+    private static final Instant CLEANUP_NOW = Instant.parse("2026-10-01T00:00:00Z");
+
+    private TwoFactorChallenge saveChallenge(UUID userId, String hash, Instant expiresAt, int attempts, Instant consumedAt, Instant createdAt) {
+        return challengeRepository.save(TwoFactorChallenge.restore(
+                UUID.randomUUID(), userId, hash, expiresAt, attempts, consumedAt, createdAt));
+    }
+
+    @Test
+    @DisplayName("Cleanup deletes only consumed/expired challenges older than retention, never active ones")
+    void deleteExpiredOrConsumedBefore_deletesOnlyUnusableOldChallenges() {
+        Instant threshold = CLEANUP_NOW.minus(Duration.ofDays(30));
+        long day = 86400L;
+
+        // C1: expired + old -> deleted
+        saveChallenge(testUser.getId(), "expired_old", CLEANUP_NOW.minusSeconds(day), 0, null, CLEANUP_NOW.minusSeconds(31 * day));
+        // C2: consumed + old -> deleted
+        saveChallenge(testUser.getId(), "consumed_old", CLEANUP_NOW.plusSeconds(3600), 0, CLEANUP_NOW.minusSeconds(31 * day), CLEANUP_NOW.minusSeconds(31 * day));
+
+        // C3: expired + recent -> retained
+        TwoFactorChallenge expiredRecent = saveChallenge(testUser.getId(), "expired_recent", CLEANUP_NOW.minusSeconds(3600), 0, null, CLEANUP_NOW.minusSeconds(3600));
+        // C4: consumed + recent -> retained
+        TwoFactorChallenge consumedRecent = saveChallenge(testUser.getId(), "consumed_recent", CLEANUP_NOW.plusSeconds(3600), 0, CLEANUP_NOW.minusSeconds(1800), CLEANUP_NOW.minusSeconds(3600));
+        // C5: active (future expiry, not consumed) -> retained even though createdAt is old
+        TwoFactorChallenge activeOld = saveChallenge(testUser.getId(), "active_old", CLEANUP_NOW.plusSeconds(3600), 0, null, CLEANUP_NOW.minusSeconds(31 * day));
+
+        int deleted = challengeRepository.deleteExpiredOrConsumedBefore(threshold, CLEANUP_NOW);
+
+        assertEquals(2, deleted);
+        assertTrue(challengeRepository.findById(expiredRecent.getId()).isPresent());
+        assertTrue(challengeRepository.findById(consumedRecent.getId()).isPresent());
+        assertTrue(challengeRepository.findById(activeOld.getId()).isPresent());
+    }
+
+    @Test
+    @DisplayName("Cleanup is idempotent: second run deletes nothing")
+    void cleanupIsIdempotent() {
+        Instant threshold = CLEANUP_NOW.minus(Duration.ofDays(30));
+        long day = 86400L;
+        saveChallenge(testUser.getId(), "expired_old", CLEANUP_NOW.minusSeconds(day), 0, null, CLEANUP_NOW.minusSeconds(31 * day));
+
+        int first = challengeRepository.deleteExpiredOrConsumedBefore(threshold, CLEANUP_NOW);
+        int second = challengeRepository.deleteExpiredOrConsumedBefore(threshold, CLEANUP_NOW);
+
+        assertEquals(1, first);
+        assertEquals(0, second);
+    }
+
+    @Test
+    @DisplayName("Cleanup handles multiple users correctly")
+    void cleanupAffectsMultipleUsersCorrectly() {
+        Role otherRole = roleRepository.findByName("ADMIN")
+                .orElseGet(() -> roleRepository.save(Role.create("ADMIN", "Admin role", true, Set.of())));
+        User other = userRepository.save(User.create(
+                "other_cleanup_user", "hash", "Other Cleanup", "other_cleanup@test.com", null, otherRole.getId()));
+
+        Instant threshold = CLEANUP_NOW.minus(Duration.ofDays(30));
+        long day = 86400L;
+
+        saveChallenge(testUser.getId(), "expired_old_a", CLEANUP_NOW.minusSeconds(day), 0, null, CLEANUP_NOW.minusSeconds(31 * day));
+        saveChallenge(other.getId(), "expired_old_b", CLEANUP_NOW.minusSeconds(day), 0, null, CLEANUP_NOW.minusSeconds(31 * day));
+        TwoFactorChallenge activeA = saveChallenge(testUser.getId(), "active_a", CLEANUP_NOW.plusSeconds(3600), 0, null, CLEANUP_NOW);
+        TwoFactorChallenge activeB = saveChallenge(other.getId(), "active_b", CLEANUP_NOW.plusSeconds(3600), 0, null, CLEANUP_NOW);
+
+        int deleted = challengeRepository.deleteExpiredOrConsumedBefore(threshold, CLEANUP_NOW);
+
+        assertEquals(2, deleted);
+        assertTrue(challengeRepository.findById(activeA.getId()).isPresent());
+        assertTrue(challengeRepository.findById(activeB.getId()).isPresent());
     }
 }
