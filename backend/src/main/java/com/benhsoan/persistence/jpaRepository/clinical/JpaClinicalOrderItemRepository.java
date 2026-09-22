@@ -23,6 +23,8 @@ public interface JpaClinicalOrderItemRepository extends JpaRepository<ClinicalOr
 
     List<ClinicalOrderItemEntity> findByClinicalOrderIdIn(Collection<UUID> clinicalOrderIds);
 
+    List<ClinicalOrderItemEntity> findByIdIn(Collection<UUID> ids);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select item from ClinicalOrderItemEntity item where item.id = :id")
     Optional<ClinicalOrderItemEntity> findByIdForUpdate(@Param("id") UUID id);

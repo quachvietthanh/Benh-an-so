@@ -9,4 +9,8 @@ public class ClinicalResultNotFoundException extends ClinicalException {
     public ClinicalResultNotFoundException(UUID clinicalResultId) {
         super(DomainErrorCode.CLINICAL_RESULT_NOT_FOUND, "Clinical result not found: " + clinicalResultId);
     }
+
+    public ClinicalResultNotFoundException(String message) {
+        super(DomainErrorCode.CLINICAL_RESULT_NOT_FOUND, message);
+    }
 }
