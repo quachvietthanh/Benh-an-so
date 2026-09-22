@@ -22,23 +22,23 @@ import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
 
 /**
- * Executes the actual V86 migration file against an in-memory H2 database to prove
+ * Executes the actual V88 migration file against an in-memory H2 database to prove
  * the DDL is H2-compatible (the full Flyway chain cannot run on H2 in this
  * environment because of a pre-existing duplicate-V78 collision on origin/develop).
  */
 class PatientPortalNotificationMigrationH2Test {
 
     @Test
-    void v86MigrationRunsAndIsUsableOnH2() throws Exception {
+    void v88MigrationRunsAndIsUsableOnH2() throws Exception {
         try (Connection conn = DriverManager.getConnection(
-                "jdbc:h2:mem:v86;DB_CLOSE_DELAY=-1;MODE=LEGACY", "sa", "")) {
+                "jdbc:h2:mem:v88;DB_CLOSE_DELAY=-1;MODE=LEGACY", "sa", "")) {
             Statement stmt = conn.createStatement();
             stmt.execute("CREATE TABLE patients (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
             stmt.execute("CREATE TABLE appointments (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
             stmt.execute("CREATE TABLE appointment_reschedule_logs (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
             stmt.execute("CREATE TABLE clinical_results (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
 
-            String ddl = readResource("db/migration/V86__create_patient_portal_notifications.sql");
+            String ddl = readResource("db/migration/V88__create_patient_portal_notifications.sql");
             RunScript.execute(conn, new StringReader(ddl));
 
             UUID patientId = UUID.randomUUID();
