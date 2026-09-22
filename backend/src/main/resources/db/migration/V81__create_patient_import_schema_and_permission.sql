@@ -22,7 +22,7 @@ CREATE TABLE patient_import_logs (
 CREATE TABLE patient_import_log_errors (
     id BINARY(16) NOT NULL,
     import_log_id BINARY(16) NOT NULL,
-    row_number INT NOT NULL,
+    `row_number` INT NOT NULL,
     error_field VARCHAR(100) NULL,
     error_message VARCHAR(500) NOT NULL,
     raw_data TEXT NULL,
