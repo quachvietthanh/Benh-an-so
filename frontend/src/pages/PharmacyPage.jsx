@@ -500,9 +500,6 @@ function PharmacyPage() {
           </Title>
         </div>
         <Space wrap>
-          <Button icon={<InboxOutlined />} onClick={() => navigate('/pharmacy/receipts')}>
-            Nhập kho
-          </Button>
           <Button icon={<ShopOutlined />} onClick={() => navigate('/medicines')}>
             Danh mục & Ngưỡng tồn
           </Button>
