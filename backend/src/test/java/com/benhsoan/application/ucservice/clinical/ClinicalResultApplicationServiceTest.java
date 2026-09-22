@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.ClinicalResult;
@@ -94,6 +95,8 @@ class ClinicalResultApplicationServiceTest {
         @Mock
         private ClinicalResultAuditService auditService;
         @Mock
+        private PatientPortalNotificationCreator patientPortalNotificationCreator;
+        @Mock
         private ClockPort clock;
 
         @InjectMocks
@@ -163,6 +166,8 @@ class ClinicalResultApplicationServiceTest {
                 ArgumentCaptor<ClinicalResultHistory> historyCaptor = ArgumentCaptor
                                 .forClass(ClinicalResultHistory.class);
                 verify(clinicalResultHistoryRepository).save(historyCaptor.capture());
+                verify(patientPortalNotificationCreator).createLabResultAvailable(
+                                fixture.visit().getPatientId(), result.getId(), NOW.plusSeconds(60));
                 assertEquals(ClinicalResultStatus.FINAL, response.status());
                 assertEquals(ClinicalResultStatus.DRAFT, historyCaptor.getValue().getOldStatus());
                 assertEquals(ClinicalResultStatus.FINAL, historyCaptor.getValue().getNewStatus());

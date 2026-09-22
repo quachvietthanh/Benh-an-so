@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.ClinicalReferenceRange;
 import com.benhsoan.domain.clinical.ClinicalResult;
@@ -79,6 +80,7 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
     private final ReferenceRangeEvaluator referenceRangeEvaluator;
     private final ClinicalOrderAuthorizationService authorizationService;
     private final ClinicalResultAuditService auditService;
+    private final PatientPortalNotificationCreator patientPortalNotificationCreator;
     private final ClockPort clock;
 
     @Override
@@ -167,6 +169,12 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
         clinicalOrderItemRepository.save(item);
         synchronizeOrder(item.getClinicalOrderId(), now);
         auditWrite(savedResult, actorId, MedicalRecordAccessAction.UPDATE, now);
+
+        var finalizedVisit = visitRepository.findById(savedResult.getVisitId())
+                .orElseThrow(() -> new VisitNotFoundException(savedResult.getVisitId()));
+        patientPortalNotificationCreator.createLabResultAvailable(
+                finalizedVisit.getPatientId(), savedResult.getId(), now);
+
         return mapDetail(savedResult);
     }
 

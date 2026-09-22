@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.AppointmentRescheduleLog;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
@@ -65,6 +66,8 @@ class RescheduleAppointmentServiceTest {
         private ClockPort clockPort;
         @Mock
         private AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter;
+        @Mock
+        private PatientPortalNotificationCreator patientPortalNotificationCreator;
 
         private AppointmentResultMapper resultMapper;
         private AppointmentRescheduleHistoryAssembler historyAssembler;
@@ -92,6 +95,7 @@ class RescheduleAppointmentServiceTest {
                                 resultMapper,
                                 historyAssembler,
                                 accessDeniedAuditWriter,
+                                patientPortalNotificationCreator,
                                 objectMapper);
         }
 
@@ -143,6 +147,8 @@ class RescheduleAppointmentServiceTest {
 
                 verify(rescheduleLogRepository).save(any(AppointmentRescheduleLog.class));
                 verify(auditLogRepository).save(any(AuditLog.class));
+                verify(patientPortalNotificationCreator).createAppointmentChanged(
+                                any(Appointment.class), any(AppointmentRescheduleLog.class), eq(fixedNow));
         }
 
         @Test
