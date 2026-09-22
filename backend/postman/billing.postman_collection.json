@@ -65,6 +65,29 @@
       ]}}]
     },
     {
+      "name": "3b. Record Payment with Multiple Methods (NCL-07-CN-007)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{receptionistAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visitId\": \"{{payableVisitId}}\",\n  \"examFee\": 100000,\n  \"medicineFee\": 150000,\n  \"amountPaid\": 250000,\n  \"paymentMethods\": [\n    {\n      \"paymentMethod\": \"CASH\",\n      \"amount\": 100000\n    },\n    {\n      \"paymentMethod\": \"BANK_TRANSFER\",\n      \"amount\": 150000,\n      \"referenceNumber\": \"TXN-20260921-001\"\n    }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/invoices/payments"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Payment with multiple methods is recorded', function () { pm.expect([201,409]).to.include(pm.response.code); });",
+        "if (pm.response.code === 201) {",
+        "  pm.collectionVariables.set('createdPaymentId', pm.response.json().id);",
+        "  pm.test('Payment method is MULTIPLE', function () { pm.expect(pm.response.json().paymentMethod).to.eql('MULTIPLE'); });",
+        "  pm.test('Payment has 2 method items', function () { pm.expect(pm.response.json().paymentMethods.length).to.eql(2); });",
+        "}"
+      ]}}]
+    },
+    {
       "name": "4. Create Original Invoice",
       "request": {
         "method": "POST",

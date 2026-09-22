@@ -72,6 +72,21 @@ public class ClinicalOrderItemRepositoryAdapter implements ClinicalOrderItemRepo
     }
 
     @Override
+    public List<BillableClinicalService> findBillableByVisitIdIn(Collection<UUID> visitIds) {
+        if (visitIds == null || visitIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findBillableByVisitIdIn(visitIds, ClinicalOrderItemStatus.COMPLETED).stream()
+                .map(view -> new BillableClinicalService(
+                        view.getVisitId(),
+                        view.getClinicalOrderItemId(),
+                        view.getServiceCatalogId(),
+                        view.getServiceName()
+                ))
+                .toList();
+    }
+
+    @Override
     public List<ClinicalOrderItem> saveAll(Collection<ClinicalOrderItem> items) {
         if (items == null || items.isEmpty()) {
             return List.of();

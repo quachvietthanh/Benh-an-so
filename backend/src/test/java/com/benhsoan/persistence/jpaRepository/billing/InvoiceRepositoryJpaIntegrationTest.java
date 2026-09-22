@@ -21,7 +21,14 @@ import com.benhsoan.domain.visit.enums.VisitType;
 import com.benhsoan.persistence.entity.billing.InvoiceEntity;
 import com.benhsoan.persistence.entity.patient.PatientEntity;
 import com.benhsoan.persistence.entity.visit.VisitEntity;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
+import com.benhsoan.domain.prescription.enums.InterconnectionStatus;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
+import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
+import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
+import com.benhsoan.persistence.jpaRepository.medicalrecord.JpaMedicalRecordRepository;
 import com.benhsoan.persistence.jpaRepository.patient.JpaPatientRepository;
+import com.benhsoan.persistence.jpaRepository.prescription.JpaPrescriptionRepository;
 import com.benhsoan.persistence.jpaRepository.visit.JpaVisitRepository;
 
 @DataJpaTest(properties = {
@@ -41,6 +48,12 @@ class InvoiceRepositoryJpaIntegrationTest {
 
     @Autowired
     private JpaVisitRepository visitRepository;
+
+    @Autowired
+    private JpaMedicalRecordRepository medicalRecordRepository;
+
+    @Autowired
+    private JpaPrescriptionRepository prescriptionRepository;
 
     @Test
     void detectsAdjustmentLinkedToOriginalInvoice() {
@@ -71,7 +84,7 @@ class InvoiceRepositoryJpaIntegrationTest {
     }
 
     @Test
-    void returnsUncancelledVisitsWithoutPaymentAsPayable() {
+    void returnsCompletedVisitsWithoutPaymentAsPayable() {
         UUID patientId = UUID.randomUUID();
         patientRepository.saveAndFlush(PatientEntity.builder()
                 .id(patientId)
@@ -84,16 +97,163 @@ class InvoiceRepositoryJpaIntegrationTest {
                 .updatedAt(Instant.parse("2026-08-18T04:00:00Z"))
                 .createdBy(UUID.randomUUID())
                 .build());
+        UUID completedVisitId = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(completedVisitId, patientId, VisitStatus.COMPLETED));
         UUID waitingVisitId = UUID.randomUUID();
         visitRepository.saveAndFlush(visit(waitingVisitId, patientId, VisitStatus.WAITING));
         UUID cancelledVisitId = UUID.randomUUID();
         visitRepository.saveAndFlush(visit(cancelledVisitId, patientId, VisitStatus.CANCELLED));
+        UUID earlyEndedVisitId = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(earlyEndedVisitId, patientId, VisitStatus.EARLY_ENDED));
 
         var payable = repository.findPayableEncounters(PageRequest.of(0, 20));
 
-        assertTrue(payable.stream().anyMatch(item -> waitingVisitId.equals(item.getVisitId())));
+        assertTrue(payable.stream().anyMatch(item -> completedVisitId.equals(item.getVisitId())));
+        assertFalse(payable.stream().anyMatch(item -> waitingVisitId.equals(item.getVisitId())));
         assertFalse(payable.stream().anyMatch(item -> cancelledVisitId.equals(item.getVisitId())));
+        assertFalse(payable.stream().anyMatch(item -> earlyEndedVisitId.equals(item.getVisitId())));
     }
+
+    @Test
+    void returnsPayableEncountersEvenWithPendingDispensePrescription() {
+        UUID patientId = UUID.randomUUID();
+        patientRepository.saveAndFlush(patient(patientId, "Le Thi Pending"));
+
+        UUID visitId = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId, patientId, VisitStatus.COMPLETED));
+
+        UUID medicalRecordId = UUID.randomUUID();
+        medicalRecordRepository.saveAndFlush(MedicalRecordEntity.builder()
+                .id(medicalRecordId)
+                .visitId(visitId)
+                .status(MedicalRecordStatus.SIGNED)
+                .createdBy(UUID.randomUUID())
+                .createdAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .build());
+
+        UUID prescriptionId = UUID.randomUUID();
+        prescriptionRepository.saveAndFlush(PrescriptionEntity.builder()
+                .id(prescriptionId)
+                .prescriptionCode("RX-" + UUID.randomUUID().toString().substring(0, 8))
+                .medicalRecordId(medicalRecordId)
+                .status(PrescriptionStatus.PENDING_DISPENSE)
+                .interconnectionStatus(InterconnectionStatus.NOT_SENT)
+                .prescribedBy(UUID.randomUUID())
+                .prescribedAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .build());
+
+        var page = repository.findPayableEncounters(PageRequest.of(0, 20));
+
+        var found = page.stream().filter(item -> visitId.equals(item.getVisitId())).findFirst();
+        assertTrue(found.isPresent());
+        assertTrue(Boolean.TRUE.equals(found.get().getHasPrescription()));
+        assertTrue(Boolean.TRUE.equals(found.get().getHasPendingDispense()));
+    }
+
+    @Test
+    void filtersPayableEncountersByDateAndSearchKeyword() {
+        UUID patientId = UUID.randomUUID();
+        patientRepository.saveAndFlush(PatientEntity.builder()
+                .id(patientId)
+                .patientCode("BN-UNIQUE01")
+                .fullName("Nguyen Van Chon")
+                .dateOfBirth(LocalDate.of(1992, 5, 5))
+                .gender(Gender.MALE)
+                .active(true)
+                .createdAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .updatedAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .createdBy(UUID.randomUUID())
+                .build());
+        UUID visitId = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId, patientId, VisitStatus.COMPLETED));
+
+        Instant from = Instant.parse("2026-08-18T00:00:00Z");
+        Instant to = Instant.parse("2026-08-18T23:59:59Z");
+
+        var matched = repository.findPayableEncounters(from, to, "Van Chon", PageRequest.of(0, 20));
+        assertTrue(matched.stream().anyMatch(item -> visitId.equals(item.getVisitId())));
+
+        var wrongDate = repository.findPayableEncounters(
+                Instant.parse("2026-08-19T00:00:00Z"),
+                Instant.parse("2026-08-19T23:59:59Z"),
+                null,
+                PageRequest.of(0, 20)
+        );
+        assertFalse(wrongDate.stream().anyMatch(item -> visitId.equals(item.getVisitId())));
+
+        var wrongSearch = repository.findPayableEncounters(from, to, "KhongTonTai", PageRequest.of(0, 20));
+        assertFalse(wrongSearch.stream().anyMatch(item -> visitId.equals(item.getVisitId())));
+    }
+
+    @Test
+    void ignoresCancelledPrescriptionWhenEvaluatingHasPrescription() {
+        UUID patientId = UUID.randomUUID();
+        patientRepository.saveAndFlush(patient(patientId, "Pham Thi Cancelled"));
+
+        UUID visitId = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId, patientId, VisitStatus.COMPLETED));
+
+        UUID medicalRecordId = UUID.randomUUID();
+        medicalRecordRepository.saveAndFlush(MedicalRecordEntity.builder()
+                .id(medicalRecordId)
+                .visitId(visitId)
+                .status(MedicalRecordStatus.SIGNED)
+                .createdBy(UUID.randomUUID())
+                .createdAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .build());
+
+        UUID prescriptionId = UUID.randomUUID();
+        prescriptionRepository.saveAndFlush(PrescriptionEntity.builder()
+                .id(prescriptionId)
+                .prescriptionCode("RX-" + UUID.randomUUID().toString().substring(0, 8))
+                .medicalRecordId(medicalRecordId)
+                .status(PrescriptionStatus.CANCELLED)
+                .interconnectionStatus(InterconnectionStatus.NOT_SENT)
+                .prescribedBy(UUID.randomUUID())
+                .prescribedAt(Instant.parse("2026-08-18T04:00:00Z"))
+                .build());
+
+        var page = repository.findPayableEncounters(PageRequest.of(0, 20));
+
+        var found = page.stream().filter(item -> visitId.equals(item.getVisitId())).findFirst();
+        assertTrue(found.isPresent());
+        assertFalse(Boolean.TRUE.equals(found.get().getHasPrescription()));
+        assertFalse(Boolean.TRUE.equals(found.get().getHasPendingDispense()));
+    }
+
+    @Test
+    void matchesLiteralUnderscoreAndPercentInSearch() {
+        UUID patientId1 = UUID.randomUUID();
+        patientRepository.saveAndFlush(patient(patientId1, "Tran_Van%Special"));
+
+        UUID visitId1 = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId1, patientId1, VisitStatus.COMPLETED));
+
+        UUID patientId2 = UUID.randomUUID();
+        patientRepository.saveAndFlush(patient(patientId2, "TranAVanBSpecial"));
+
+        UUID visitId2 = UUID.randomUUID();
+        visitRepository.saveAndFlush(visit(visitId2, patientId2, VisitStatus.COMPLETED));
+
+        com.benhsoan.persistence.adapterRepository.billing.InvoiceRepositoryAdapter adapter =
+                new com.benhsoan.persistence.adapterRepository.billing.InvoiceRepositoryAdapter(
+                        repository,
+                        null,
+                        new com.benhsoan.persistence.mapper.billing.InvoicePersistenceMapper(
+                                new com.benhsoan.persistence.mapper.billing.InvoiceLinePersistenceMapper()
+                        ),
+                        null
+                );
+
+        var pagePercent = adapter.findPayableEncounters(null, null, "%Special", PageRequest.of(0, 20));
+        assertTrue(pagePercent.stream().anyMatch(item -> visitId1.equals(item.visitId())));
+        assertFalse(pagePercent.stream().anyMatch(item -> visitId2.equals(item.visitId())));
+
+        var pageUnderscore = adapter.findPayableEncounters(null, null, "Tran_", PageRequest.of(0, 20));
+        assertTrue(pageUnderscore.stream().anyMatch(item -> visitId1.equals(item.visitId())));
+        assertFalse(pageUnderscore.stream().anyMatch(item -> visitId2.equals(item.visitId())));
+    }
+
 
     @Test
     void searchesInvoicesByPatientName() {
@@ -200,6 +360,7 @@ class InvoiceRepositoryJpaIntegrationTest {
                 .visitType(VisitType.WALK_IN)
                 .status(status)
                 .visitAt(now)
+                .completedAt(status == VisitStatus.COMPLETED ? now : null)
                 .reason("Test visit")
                 .createdBy(UUID.randomUUID())
                 .createdAt(now)

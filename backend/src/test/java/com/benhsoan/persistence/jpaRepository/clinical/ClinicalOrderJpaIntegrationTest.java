@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -101,6 +102,12 @@ class ClinicalOrderJpaIntegrationTest {
                     UUID.randomUUID(),
                     "LAB-GLU"
             ));
+            UUID pendingClinicalServiceId = UUID.randomUUID();
+            clinicalServiceCatalogRepository.save(clinicalService(
+                    pendingClinicalServiceId,
+                    UUID.randomUUID(),
+                    "LAB-PENDING"
+            ));
             clinicalOrderItemRepository.save(item(
                     orderId,
                     completedClinicalServiceId,
@@ -113,6 +120,12 @@ class ClinicalOrderJpaIntegrationTest {
                     ClinicalOrderItemStatus.CANCELLED,
                     "LAB-GLU"
             ));
+            clinicalOrderItemRepository.save(item(
+                    orderId,
+                    pendingClinicalServiceId,
+                    ClinicalOrderItemStatus.PENDING,
+                    "LAB-PENDING"
+            ));
         });
         ClinicalOrderItemRepositoryAdapter adapter = new ClinicalOrderItemRepositoryAdapter(
                 clinicalOrderItemRepository,
@@ -120,10 +133,14 @@ class ClinicalOrderJpaIntegrationTest {
         );
 
         var billableServices = adapter.findBillableByVisitId(visitId);
-
         assertEquals(1, billableServices.size());
         assertEquals(completedMasterId, billableServices.getFirst().serviceCatalogId());
         assertEquals("Blood test", billableServices.getFirst().serviceName());
+
+        var batchServices = adapter.findBillableByVisitIdIn(List.of(visitId));
+        assertEquals(1, batchServices.size());
+        assertEquals(completedMasterId, batchServices.getFirst().serviceCatalogId());
+        assertEquals("Blood test", batchServices.getFirst().serviceName());
     }
 
     private void inTransaction(Runnable action) {
