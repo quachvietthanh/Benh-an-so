@@ -35,7 +35,6 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.User;
-import com.benhsoan.domain.clinic.ClinicConfiguration;
 import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.ClinicalResult;
