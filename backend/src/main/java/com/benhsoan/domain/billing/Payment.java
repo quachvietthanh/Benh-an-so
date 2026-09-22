@@ -261,6 +261,7 @@ public class Payment {
                 null,
                 null,
                 createdAt,
+                (UUID) null,
                 null
         );
     }
@@ -295,6 +296,7 @@ public class Payment {
                 null,
                 null,
                 createdAt,
+                (UUID) null,
                 null
         );
     }
@@ -331,6 +333,7 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+                (UUID) null,
                 null
         );
     }
@@ -368,6 +371,7 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+                (UUID) null,
                 null
         );
     }
@@ -448,6 +452,45 @@ public class Payment {
                 createdAt,
                 cashierShiftId,
                 null
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt,
+            List<PaymentMethodItem> paymentMethodItems
+    ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt,
+                null,
+                paymentMethodItems
         );
     }
 
@@ -566,12 +609,15 @@ public class Payment {
     ) {
         if (items == null || items.isEmpty()) {
             if (paymentMethod != null && paymentMethod != PaymentMethod.MULTIPLE) {
+                String defaultRef = paymentMethod == PaymentMethod.BANK_TRANSFER
+                        ? "REF-" + (paymentId != null ? paymentId.toString().substring(0, 8) : "LEGACY")
+                        : null;
                 return List.of(PaymentMethodItem.create(
                         UUID.randomUUID(),
                         paymentId,
                         paymentMethod,
                         amountPaid,
-                        null,
+                        defaultRef,
                         paidAt
                 ));
             }

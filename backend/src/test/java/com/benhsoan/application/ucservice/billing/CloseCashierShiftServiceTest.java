@@ -230,7 +230,7 @@ class CloseCashierShiftServiceTest {
                 UUID.randomUUID(), UUID.randomUUID(),
                 new BigDecimal("200000.00"), BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("200000.00"), new BigDecimal("200000.00"),
-                PaymentMethod.CASH, PaymentStatus.REFUNDED, cashierId, p2Time, "Hoàn trả test", UUID.randomUUID(), p2Time, p2Time, null
+                PaymentMethod.CASH, PaymentStatus.REFUNDED, cashierId, p2Time, "Hoàn trả test", UUID.randomUUID(), p2Time, p2Time, (UUID) null
         );
 
         when(paymentRepository.findUnsettledByCashierForUpdate(eq(cashierId), any()))
@@ -285,7 +285,7 @@ class CloseCashierShiftServiceTest {
                 UUID.randomUUID(), UUID.randomUUID(),
                 new BigDecimal("1500000.00"), BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("1500000.00"), new BigDecimal("1500000.00"),
-                PaymentMethod.CASH, PaymentStatus.REFUNDED, cashierId, p2Time, "Hoàn trả toàn bộ", UUID.randomUUID(), p2Time, p2Time, null
+                PaymentMethod.CASH, PaymentStatus.REFUNDED, cashierId, p2Time, "Hoàn trả toàn bộ", UUID.randomUUID(), p2Time, p2Time, (UUID) null
         );
 
         when(paymentRepository.findUnsettledByCashierForUpdate(eq(cashierId), any()))
@@ -313,7 +313,7 @@ class CloseCashierShiftServiceTest {
                 UUID.randomUUID(), UUID.randomUUID(),
                 amount, BigDecimal.ZERO, BigDecimal.ZERO,
                 amount, amount,
-                method, PaymentStatus.RECORDED, cashierId, paidAt, null, null, null, paidAt, null
+                method, PaymentStatus.RECORDED, cashierId, paidAt, null, null, null, paidAt, (UUID) null
         );
     }
 }

@@ -101,19 +101,19 @@ class GetCurrentShiftSummaryServiceTest {
                 UUID.randomUUID(), UUID.randomUUID(),
                 new BigDecimal("50000.00"), new BigDecimal("100000.00"), BigDecimal.ZERO,
                 new BigDecimal("150000.00"), new BigDecimal("150000.00"),
-                PaymentMethod.CASH, PaymentStatus.RECORDED, cashierId, p1Time, null, null, null, p1Time, null
+                PaymentMethod.CASH, PaymentStatus.RECORDED, cashierId, p1Time, null, null, null, p1Time, (UUID) null
         );
         Payment p2 = Payment.restore(
                 UUID.randomUUID(), UUID.randomUUID(),
                 new BigDecimal("50000.00"), new BigDecimal("250000.00"), BigDecimal.ZERO,
                 new BigDecimal("300000.00"), new BigDecimal("300000.00"),
-                PaymentMethod.BANK_TRANSFER, PaymentStatus.RECORDED, cashierId, p2Time, null, null, null, p2Time, null
+                PaymentMethod.BANK_TRANSFER, PaymentStatus.RECORDED, cashierId, p2Time, null, null, null, p2Time, (UUID) null
         );
         Payment p3 = Payment.restore(
                 UUID.randomUUID(), UUID.randomUUID(),
                 new BigDecimal("100000.00"), BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("100000.00"), new BigDecimal("100000.00"),
-                PaymentMethod.CASH, PaymentStatus.RECORDED, cashierId, p3Time, null, null, null, p3Time, null
+                PaymentMethod.CASH, PaymentStatus.RECORDED, cashierId, p3Time, null, null, null, p3Time, (UUID) null
         );
 
         when(paymentRepository.findUnsettledByCashier(eq(cashierId), any()))
