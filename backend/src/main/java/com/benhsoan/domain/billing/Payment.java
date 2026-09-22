@@ -60,8 +60,11 @@ public class Payment {
 
     private UUID cashierShiftId;
 
+<<<<<<< HEAD
     private List<PaymentMethodItem> paymentMethodItems;
 
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     private Payment(
             UUID id,
             UUID visitId,
@@ -78,8 +81,12 @@ public class Payment {
             UUID refundedBy,
             Instant refundedAt,
             Instant createdAt,
+<<<<<<< HEAD
             UUID cashierShiftId,
             List<PaymentMethodItem> paymentMethodItems
+=======
+            UUID cashierShiftId
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     ) {
         this.id = requireNonNull(id, "Payment id is required.");
         this.visitId = requireNonNull(visitId, "Visit id is required.");
@@ -102,6 +109,7 @@ public class Payment {
         this.refundedAt = refundedAt;
         this.createdAt = requireNonNull(createdAt, "Payment creation time is required.");
         this.cashierShiftId = cashierShiftId;
+<<<<<<< HEAD
         this.paymentMethodItems = validatePaymentMethodItems(
                 paymentMethodItems,
                 this.amountPaid,
@@ -167,6 +175,8 @@ public class Payment {
                 null,
                 paymentMethodItems
         );
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     }
 
     public static Payment record(
@@ -188,7 +198,8 @@ public class Payment {
                 paymentMethod,
                 amountPaid,
                 null,
-                paidAt
+                paidAt,
+                null
         );
         return record(
                 id,
@@ -333,7 +344,10 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+<<<<<<< HEAD
                 (UUID) null,
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
                 null
         );
     }
@@ -371,7 +385,10 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+<<<<<<< HEAD
                 (UUID) null,
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
                 null
         );
     }
@@ -392,8 +409,12 @@ public class Payment {
             UUID refundedBy,
             Instant refundedAt,
             Instant createdAt,
+<<<<<<< HEAD
             UUID cashierShiftId,
             List<PaymentMethodItem> paymentMethodItems
+=======
+            UUID cashierShiftId
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     ) {
         return new Payment(
                 id,
@@ -411,6 +432,7 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+<<<<<<< HEAD
                 cashierShiftId,
                 paymentMethodItems
         );
@@ -491,6 +513,9 @@ public class Payment {
                 createdAt,
                 null,
                 paymentMethodItems
+=======
+                cashierShiftId
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         );
     }
 

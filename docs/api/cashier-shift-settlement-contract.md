@@ -137,8 +137,11 @@ POST /cashier-shifts/{id}/confirm
 1. Chỉ người dùng có vai trò `MANAGER` (hoặc quyền `CASHIER_SHIFT_CONFIRM`) mới được phép thực hiện.
 2. Phiếu chốt ca phải tồn tại, nếu không trả về `404 Not Found`.
 3. Phiếu phải đang ở trạng thái `PENDING_CONFIRMATION`. Nếu phiếu đã được xác nhận trước đó, trả về `409 Conflict` với mã lỗi `SHIFT_ALREADY_CONFIRMED`.
+<<<<<<< HEAD
 4. Thu ngân không được tự xác nhận ca chốt của chính mình (vi phạm Four-Eyes Principle). Mọi thao tác trái quyền sẽ bị từ chối (`403 Forbidden`) và được ghi nhật ký kiểm toán `ACCESS_DENIED` độc lập không bị rollback.
 5. **Kiểm soát đồng thời (Concurrency Control)**: Hệ thống áp dụng khóa bi quan `PESSIMISTIC_WRITE` (`SELECT ... FOR UPDATE`) trên bản ghi `cashier_shifts` đang thao tác để tuần tự hóa các yêu cầu xác nhận đồng thời trên cùng một ca chốt, ngăn chặn hoàn toàn race condition xác nhận kép (double-confirmation) và mất mát dữ liệu (lost update).
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
 
 #### Response (200 OK)
 ```json

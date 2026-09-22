@@ -30,7 +30,10 @@ import com.benhsoan.port.outbound.time.ClockPort;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+<<<<<<< HEAD
 import static org.mockito.ArgumentMatchers.eq;
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,7 +46,10 @@ class ConfirmCashierShiftServiceTest {
     @Mock private ClockPort clockPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private UserRepository userRepository;
+<<<<<<< HEAD
     @Mock private CashierShiftAuthorizationAuditService authorizationAuditService;
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
 
     private ConfirmCashierShiftService service;
     private CashierShiftResultMapper resultMapper;
@@ -60,10 +66,15 @@ class ConfirmCashierShiftServiceTest {
                 clockPort,
                 auditLogRepository,
                 resultMapper,
+<<<<<<< HEAD
                 authorizationAuditService,
                 new com.fasterxml.jackson.databind.ObjectMapper()
         );
         org.mockito.Mockito.lenient().when(currentUserPort.getCurrentUserId()).thenReturn(managerId);
+=======
+                new com.fasterxml.jackson.databind.ObjectMapper()
+        );
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     }
 
     @Test
@@ -72,14 +83,22 @@ class ConfirmCashierShiftServiceTest {
         when(currentUserPort.hasRole("MANAGER")).thenReturn(false);
         when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
 
+<<<<<<< HEAD
         UUID shiftId = UUID.randomUUID();
         ConfirmCashierShiftCommand command = new ConfirmCashierShiftCommand(
                 shiftId,
+=======
+        ConfirmCashierShiftCommand command = new ConfirmCashierShiftCommand(
+                UUID.randomUUID(),
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
                 "Duyệt ca"
         );
 
         assertThrows(AccessDeniedException.class, () -> service.confirm(command));
+<<<<<<< HEAD
         verify(authorizationAuditService).recordConfirmAccessDenied(eq(managerId), eq(shiftId), any());
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     }
 
     @Test
@@ -220,7 +239,10 @@ class ConfirmCashierShiftServiceTest {
 
         assertThrows(com.benhsoan.domain.billing.exception.SelfConfirmationNotAllowedException.class,
                 () -> service.confirm(command));
+<<<<<<< HEAD
         verify(authorizationAuditService).recordConfirmAccessDenied(eq(managerId), eq(shiftId), any());
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     }
 
     @Test

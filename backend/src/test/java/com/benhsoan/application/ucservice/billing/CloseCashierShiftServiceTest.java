@@ -55,7 +55,10 @@ class CloseCashierShiftServiceTest {
     @Mock private ClockPort clockPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private UserRepository userRepository;
+<<<<<<< HEAD
     @Mock private CashierShiftAuthorizationAuditService authorizationAuditService;
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
 
     private CloseCashierShiftService service;
     private CashierShiftResultMapper resultMapper;
@@ -74,12 +77,18 @@ class CloseCashierShiftServiceTest {
                 clockPort,
                 auditLogRepository,
                 resultMapper,
+<<<<<<< HEAD
                 authorizationAuditService,
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
                 new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         lenient().when(currentUserPort.getCurrentUserId()).thenReturn(cashierId);
+<<<<<<< HEAD
         lenient().when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         lenient().when(clockPort.now()).thenReturn(now);
     }
 
@@ -230,7 +239,11 @@ class CloseCashierShiftServiceTest {
                 UUID.randomUUID(), UUID.randomUUID(),
                 new BigDecimal("200000.00"), BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("200000.00"), new BigDecimal("200000.00"),
+<<<<<<< HEAD
                 PaymentMethod.CASH, PaymentStatus.REFUNDED, cashierId, p2Time, "Hoàn trả test", UUID.randomUUID(), p2Time, p2Time, (UUID) null
+=======
+                PaymentMethod.CASH, PaymentStatus.REFUNDED, cashierId, p2Time, "Hoàn trả test", UUID.randomUUID(), p2Time, p2Time, null
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         );
 
         when(paymentRepository.findUnsettledByCashierForUpdate(eq(cashierId), any()))
@@ -257,6 +270,7 @@ class CloseCashierShiftServiceTest {
         assertEquals(result.id(), refunded.getCashierShiftId());
     }
 
+<<<<<<< HEAD
     @Test
     @DisplayName("P1: Người dùng không có quyền chốt ca bị từ chối và ghi nhận ACCESS_DENIED audit")
     void shouldThrowAccessDeniedAndAuditWhenNotAuthorizedToCloseShift() {
@@ -308,12 +322,18 @@ class CloseCashierShiftServiceTest {
         assertEquals(CashierShiftStatus.PENDING_CONFIRMATION, result.status());
     }
 
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     private Payment createPayment(BigDecimal amount, PaymentMethod method, Instant paidAt) {
         return Payment.restore(
                 UUID.randomUUID(), UUID.randomUUID(),
                 amount, BigDecimal.ZERO, BigDecimal.ZERO,
                 amount, amount,
+<<<<<<< HEAD
                 method, PaymentStatus.RECORDED, cashierId, paidAt, null, null, null, paidAt, (UUID) null
+=======
+                method, PaymentStatus.RECORDED, cashierId, paidAt, null, null, null, paidAt, null
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         );
     }
 }

@@ -51,8 +51,12 @@ public class PaymentPersistenceMapper {
                 entity.getRefundedBy(),
                 entity.getRefundedAt(),
                 entity.getCreatedAt(),
+<<<<<<< HEAD
                 entity.getCashierShiftId(),
                 items
+=======
+                entity.getCashierShiftId()
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         );
     }
 

@@ -255,6 +255,7 @@ class CashierShiftTest {
         assertTrue(shift.isConfirmed());
         assertEquals(differentManagerId, shift.getConfirmedBy());
     }
+<<<<<<< HEAD
 
     @Test
     @DisplayName("P1: Tiền mặt hệ thống âm do hoàn tiền vẫn tạo phiếu hợp lệ và tính chênh lệch đúng")
@@ -281,4 +282,6 @@ class CashierShiftTest {
         assertEquals(new BigDecimal("500000.00"), shift.getDifferenceAmount());
         assertEquals(CashierShiftStatus.PENDING_CONFIRMATION, shift.getStatus());
     }
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
 }
