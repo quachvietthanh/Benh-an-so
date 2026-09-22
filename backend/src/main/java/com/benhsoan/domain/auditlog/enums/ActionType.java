@@ -50,5 +50,7 @@ public enum ActionType {
 
     ACCESS_DENIED,
 
-    MERGE
+    MERGE,
+
+    IMPORT
 }

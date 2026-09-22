@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -300,5 +301,233 @@ class PaymentTest {
                 ValidationException.class,
                 () -> payment.refund("Patient cancelled", UUID.randomUUID(), null)
         );
+    }
+
+    @Test
+    @DisplayName("record with multiple payment methods should succeed and set MULTIPLE method (TC-01)")
+    void recordWithMultiplePaymentMethodsSucceeds() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        List<PaymentMethodItem> items = List.of(
+                PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.CASH, new BigDecimal("100000"), null, paidAt),
+                PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.BANK_TRANSFER, new BigDecimal("150000"), "TXN123456", paidAt)
+        );
+
+        Payment payment = Payment.record(
+                paymentId,
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("250000"),
+                items,
+                UUID.randomUUID(),
+                paidAt,
+                VisitStatus.WAITING,
+                true
+        );
+
+        assertEquals(PaymentMethod.MULTIPLE, payment.getPaymentMethod());
+        assertEquals(2, payment.getPaymentMethodItems().size());
+        assertEquals(new BigDecimal("250000"), payment.getAmountPaid());
+        assertEquals(new BigDecimal("250000"), payment.getTotalAmount());
+    }
+
+    @Test
+    @DisplayName("record with multiple payment methods should reject underpayment and report deficit (TC-02)")
+    void recordWithMultipleMethodsRejectsUnderpayment() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        List<PaymentMethodItem> items = List.of(
+                PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.CASH, new BigDecimal("100000"), null, paidAt),
+                PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.BANK_TRANSFER, new BigDecimal("100000"), "TXN123456", paidAt)
+        );
+
+        PaymentAmountMismatchException ex = assertThrows(
+                PaymentAmountMismatchException.class,
+                () -> Payment.record(
+                        paymentId,
+                        UUID.randomUUID(),
+                        new BigDecimal("100000"),
+                        new BigDecimal("150000"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("250000"),
+                        items,
+                        UUID.randomUUID(),
+                        paidAt,
+                        VisitStatus.WAITING,
+                        true
+                )
+        );
+
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("50000"));
+    }
+
+    @Test
+    @DisplayName("PaymentMethodItem should require reference number for bank transfer (TC-03)")
+    void bankTransferRequiresReferenceNumber() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> PaymentMethodItem.create(
+                        UUID.randomUUID(),
+                        paymentId,
+                        PaymentMethod.BANK_TRANSFER,
+                        new BigDecimal("150000"),
+                        "   ",
+                        paidAt
+                )
+        );
+
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("reference number"));
+    }
+
+    @Test
+    @DisplayName("record with single method items should resolve to that specific method")
+    void recordWithSingleMethodItemsResolvesToSingleMethod() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        List<PaymentMethodItem> items = List.of(
+                PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.CASH, new BigDecimal("250000"), null, paidAt)
+        );
+
+        Payment payment = Payment.record(
+                paymentId,
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("250000"),
+                items,
+                UUID.randomUUID(),
+                paidAt,
+                VisitStatus.WAITING,
+                true
+        );
+
+        assertEquals(PaymentMethod.CASH, payment.getPaymentMethod());
+        assertEquals(1, payment.getPaymentMethodItems().size());
+    }
+
+    @Test
+    @DisplayName("PaymentMethodItem should reject reference number exceeding 100 characters (Finding P2)")
+    void rejectsReferenceNumberExceeding100Chars() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+        String longRef = "R".repeat(101);
+
+        ValidationException ex = assertThrows(
+                ValidationException.class,
+                () -> PaymentMethodItem.create(
+                        UUID.randomUUID(),
+                        paymentId,
+                        PaymentMethod.BANK_TRANSFER,
+                        new BigDecimal("150000"),
+                        longRef,
+                        paidAt
+                )
+        );
+
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("100"));
+    }
+
+    @Test
+    @DisplayName("PaymentMethodItem should accept reference number with exactly 100 characters (Finding P2)")
+    void acceptsReferenceNumberWith100Chars() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+        String ref100 = "R".repeat(100);
+
+        PaymentMethodItem item = PaymentMethodItem.create(
+                UUID.randomUUID(),
+                paymentId,
+                PaymentMethod.BANK_TRANSFER,
+                new BigDecimal("150000"),
+                ref100,
+                paidAt
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(100, item.getReferenceNumber().length());
+    }
+
+    @Test
+    @DisplayName("PaymentMethodItem should trim reference number and accept if trimmed length <= 100 (Finding P2)")
+    void trimsReferenceNumberBeforeLengthCheck() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+        String paddedRef = "   " + "R".repeat(100) + "   ";
+
+        PaymentMethodItem item = PaymentMethodItem.create(
+                UUID.randomUUID(),
+                paymentId,
+                PaymentMethod.BANK_TRANSFER,
+                new BigDecimal("150000"),
+                paddedRef,
+                paidAt
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals(100, item.getReferenceNumber().length());
+    }
+
+    @Test
+    @DisplayName("computesMethodAmountsCorrectlyViaDomainHelpers: calculates cash, bank transfer, and custom amounts correctly (Finding P2 / QTN-38)")
+    void computesMethodAmountsCorrectlyViaDomainHelpers() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        Payment payment = Payment.record(
+                paymentId,
+                UUID.randomUUID(),
+                new BigDecimal("200000"),
+                new BigDecimal("300000"),
+                BigDecimal.ZERO,
+                new BigDecimal("500000"),
+                List.of(
+                        PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.CASH, new BigDecimal("200000"), null, paidAt),
+                        PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.BANK_TRANSFER, new BigDecimal("300000"), "TXN-001", paidAt)
+                ),
+                UUID.randomUUID(),
+                paidAt,
+                VisitStatus.COMPLETED,
+                true
+        );
+
+        assertEquals(0, new BigDecimal("200000").compareTo(payment.getCashAmount()));
+        assertEquals(0, new BigDecimal("300000").compareTo(payment.getBankTransferAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(payment.getAmountByMethod(PaymentMethod.CARD)));
+        assertEquals(0, new BigDecimal("200000").compareTo(payment.getAmountByMethod(PaymentMethod.CASH)));
+        assertEquals(PaymentMethod.MULTIPLE, payment.getPaymentMethod());
+    }
+
+    @Test
+    @DisplayName("computesMethodAmountsCorrectlyForLegacySingleMethodPayment: fallback to paymentMethod and amountPaid when items are empty")
+    void computesMethodAmountsCorrectlyForLegacySingleMethodPayment() {
+        Payment legacyPayment = Payment.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("250000"),
+                new BigDecimal("250000"),
+                PaymentMethod.CASH,
+                PaymentStatus.RECORDED,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                null,
+                null,
+                null,
+                Instant.parse("2026-08-11T03:00:00Z"),
+                List.of()
+        );
+
+        assertEquals(0, new BigDecimal("250000").compareTo(legacyPayment.getCashAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(legacyPayment.getBankTransferAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(legacyPayment.getAmountByMethod(PaymentMethod.CARD)));
     }
 }

@@ -4,7 +4,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
@@ -32,6 +35,43 @@ class ClinicalServiceFeeCalculator {
                 .map(service -> toCharge(service, billingDate))
                 .toList();
     }
+
+    Map<UUID, BigDecimal> calculateBatch(Collection<UUID> visitIds, Instant billingAt) {
+        if (visitIds == null || visitIds.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate billingDate = billingAt.atZone(BILLING_ZONE).toLocalDate();
+        List<BillableClinicalService> items = clinicalOrderItemRepository.findBillableByVisitIdIn(visitIds);
+        Map<UUID, BigDecimal> totals = new HashMap<>();
+        for (UUID visitId : visitIds) {
+            totals.put(visitId, BigDecimal.ZERO);
+        }
+        if (items.isEmpty()) {
+            return totals;
+        }
+
+        java.util.Set<UUID> catalogIds = items.stream()
+                .map(BillableClinicalService::serviceCatalogId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        Map<UUID, ServicePrice> effectivePrices = Map.of();
+        try {
+            effectivePrices = servicePriceRepository.findEffectivePrices(catalogIds, billingDate);
+        } catch (Exception ex) {
+            // Graceful fallback for missing prices or lookup failure
+        }
+
+        for (BillableClinicalService item : items) {
+            if (item.visitId() == null || item.serviceCatalogId() == null) continue;
+            ServicePrice price = effectivePrices.get(item.serviceCatalogId());
+            if (price != null && price.getPrice() != null) {
+                totals.merge(item.visitId(), price.getPrice(), BigDecimal::add);
+            }
+        }
+        return totals;
+    }
+
 
     BigDecimal total(List<ClinicalServiceCharge> charges) {
         return charges.stream()

@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.billing.DiscountRequest;
-import com.benhsoan.domain.billing.Payment;
 import com.benhsoan.domain.billing.enums.DiscountRequestStatus;
 import com.benhsoan.domain.billing.enums.DiscountType;
 import com.benhsoan.domain.billing.exception.DiscountAlreadyExistsException;
@@ -25,7 +24,6 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
-import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.billing.CreateDiscountRequestCommand;
 import com.benhsoan.port.dto.result.DiscountRequestResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;

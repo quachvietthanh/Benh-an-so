@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.billing.DiscountRequest;

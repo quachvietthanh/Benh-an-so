@@ -20,7 +20,6 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.billing.DiscountRequest;
 import com.benhsoan.domain.billing.enums.DiscountRequestStatus;
 import com.benhsoan.domain.billing.enums.DiscountType;
-import com.benhsoan.domain.billing.exception.DiscountRequestNotFoundException;
 import com.benhsoan.domain.billing.exception.SelfApprovalNotAllowedException;
 import com.benhsoan.port.dto.result.DiscountRequestResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;

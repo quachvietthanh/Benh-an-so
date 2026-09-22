@@ -199,3 +199,101 @@ export const calculateBillingItemAmount = (item, prescriptionStatus) => {
     amount: effectiveQty * unitPrice,
   }
 }
+
+export const getDaysUntilExpiry = (expiryDate, referenceDate = new Date()) => {
+  if (!expiryDate) return null
+  const expiry = new Date(expiryDate)
+  if (isNaN(expiry.getTime())) return null
+  const ref = new Date(referenceDate)
+  const expiryUtc = Date.UTC(expiry.getFullYear(), expiry.getMonth(), expiry.getDate())
+  const refUtc = Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate())
+  const msPerDay = 1000 * 60 * 60 * 24
+  return Math.round((expiryUtc - refUtc) / msPerDay)
+}
+
+export const getExpiryStatusTag = (expiryDate, referenceDate = new Date()) => {
+  const days = getDaysUntilExpiry(expiryDate, referenceDate)
+  if (days === null) {
+    return { color: 'default', label: 'Không rõ HSD', isExpired: false, isNearExpiry: false, days: null }
+  }
+  if (days < 0) {
+    return { color: 'red', label: `Đã hết hạn (${Math.abs(days)} ngày trước)`, isExpired: true, isNearExpiry: false, days }
+  }
+  if (days <= 30) {
+    return { color: 'orange', label: `Sắp hết hạn (còn ${days} ngày)`, isExpired: false, isNearExpiry: true, days }
+  }
+  return { color: 'green', label: `Còn hạn (${days} ngày)`, isExpired: false, isNearExpiry: false, days }
+}
+
+export const validateBatchChangeReason = (reason, isDifferentFromFefo = false) => {
+  if (!isDifferentFromFefo) {
+    return { isValid: true, error: null }
+  }
+  if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+    return {
+      isValid: false,
+      error: 'Vui lòng nhập lý do khi đổi sang lô thuốc khác với đề xuất FEFO.',
+    }
+  }
+  return { isValid: true, error: null }
+}
+
+export const buildFefoDispensePayload = (
+  quantities = {},
+  items = [],
+  selectedBatches = {},
+  batchChangeReasons = {},
+  suggestionsMap = {}
+) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { payloadItems: [], hasAnyItemToDispense: false, validationErrors: {}, isValid: true }
+  }
+
+  const payloadItems = []
+  const validationErrors = {}
+
+  items.forEach((item) => {
+    const itemId = item.id || item.prescriptionItemId
+    if (!itemId) return
+
+    const remaining = getRemainingQuantity(item)
+    const rawValue = quantities[itemId] !== undefined ? quantities[itemId] : remaining
+    const qty = Math.floor(Number(rawValue || 0))
+
+    if (qty > 0) {
+      const payloadItem = {
+        prescriptionItemId: itemId,
+        quantity: Math.min(qty, remaining),
+      }
+
+      const suggestion = suggestionsMap[itemId]
+      const fefoBatches = suggestion?.batches || []
+      const fefoFirstBatchId = fefoBatches[0]?.batchId || null
+      const selectedBatchId = selectedBatches[itemId] || fefoFirstBatchId
+
+      if (selectedBatchId) {
+        payloadItem.batchId = selectedBatchId
+
+        const isOverridden = fefoFirstBatchId && String(selectedBatchId) !== String(fefoFirstBatchId)
+        if (isOverridden) {
+          const reason = (batchChangeReasons[itemId] || '').trim()
+          const check = validateBatchChangeReason(reason, true)
+          if (!check.isValid) {
+            validationErrors[itemId] = check.error
+          } else {
+            payloadItem.batchChangeReason = reason
+          }
+        }
+      }
+
+      payloadItems.push(payloadItem)
+    }
+  })
+
+  return {
+    payloadItems,
+    hasAnyItemToDispense: payloadItems.length > 0,
+    validationErrors,
+    isValid: Object.keys(validationErrors).length === 0,
+  }
+}

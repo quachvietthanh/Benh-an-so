@@ -18,4 +18,8 @@ public interface PayableEncounterProjection {
     String getReason();
 
     Instant getCompletedAt();
+
+    Boolean getHasPrescription();
+
+    Boolean getHasPendingDispense();
 }

@@ -164,8 +164,10 @@ class UpdateServiceCatalogServiceTest {
 
         ArgumentCaptor<UUID> actorCaptor = ArgumentCaptor.forClass(UUID.class);
         ArgumentCaptor<ResourceType> resourceCaptor = ArgumentCaptor.forClass(ResourceType.class);
-        ArgumentCaptor<Map> beforeCaptor = ArgumentCaptor.forClass(Map.class);
-        ArgumentCaptor<Map> afterCaptor = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> beforeCaptor = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> afterCaptor = ArgumentCaptor.forClass(Map.class);
         ArgumentCaptor<Instant> atCaptor = ArgumentCaptor.forClass(Instant.class);
         verify(adminOperationAuditService, org.mockito.Mockito.times(1)).record(
                 actorCaptor.capture(), any(), resourceCaptor.capture(), any(),

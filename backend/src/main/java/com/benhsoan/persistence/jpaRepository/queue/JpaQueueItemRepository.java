@@ -17,79 +17,87 @@ import jakarta.persistence.LockModeType;
 import com.benhsoan.persistence.entity.queue.QueueItemEntity;
 
 public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, UUID> {
-    Optional<QueueItemEntity> findByAppointmentId(UUID appointmentId);
-    boolean existsByPatientIdAndQueueDate(UUID patientId, LocalDate queueDate);
-    boolean existsByPatientIdAndQueueDateAndStatusIn(UUID patientId, LocalDate queueDate, java.util.Collection<QueueItemStatus> statuses);
+        Optional<QueueItemEntity> findByAppointmentId(UUID appointmentId);
 
-    @Query("select coalesce(max(item.queueNumber), 0) from QueueItemEntity item where item.medicalQueueId = :medicalQueueId")
-    int findMaxQueueNumber(@Param("medicalQueueId") UUID medicalQueueId);
+        boolean existsByPatientIdAndQueueDate(UUID patientId, LocalDate queueDate);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select item from QueueItemEntity item where item.id = :id")
-    Optional<QueueItemEntity> findByIdForUpdate(@Param("id") UUID id);
+        boolean existsByPatientIdAndQueueDateAndStatusIn(UUID patientId, LocalDate queueDate,
+                        java.util.Collection<QueueItemStatus> statuses);
 
-    @Query("""
-            select new com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection(
-                item.id, item.medicalQueueId, item.patientId, patient.patientCode, patient.fullName,
-                queue.doctorId, doctor.fullName, queue.roomId, room.code,
-                item.appointmentId, item.visitId, visit.visitCode,
-                item.sourceType, item.status, item.queueNumber, item.queueDate,
-                item.checkedInAt, item.calledAt, item.completedAt, item.cancelledAt, item.cancelReason,
-                item.skippedAt, item.skipReason, item.callCount,
-                item.priority, item.priorityReason, item.prioritizedAt, item.prioritizedBy
-            )
-            from QueueItemEntity item
-            join MedicalQueueEntity queue on queue.id = item.medicalQueueId
-            join PatientEntity patient on patient.id = item.patientId
-            join UserEntity doctor on doctor.id = queue.doctorId
-            join RoomEntity room on room.id = queue.roomId
-            join VisitEntity visit on visit.id = item.visitId
-            where queue.queueDate = :queueDate
-              and (:doctorId is null or queue.doctorId = :doctorId)
-              and (:roomId is null or queue.roomId = :roomId)
-            order by queue.doctorId,
-              case item.priority
-                when com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY then 1
-                when com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY then 2
-                else 3
-              end asc,
-              item.prioritizedAt asc,
-              item.queueNumber asc
-            """)
-    List<QueueItemDetailsProjection> findQueueBoardDetails(
-            @Param("queueDate") LocalDate queueDate,
-            @Param("doctorId") UUID doctorId,
-            @Param("roomId") UUID roomId
-    );
+        @Query("select coalesce(max(item.queueNumber), 0) from QueueItemEntity item where item.medicalQueueId = :medicalQueueId")
+        int findMaxQueueNumber(@Param("medicalQueueId") UUID medicalQueueId);
 
-    @Query("""
-            select new com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection(
-                item.id, item.medicalQueueId, item.patientId, patient.patientCode, patient.fullName,
-                queue.doctorId, doctor.fullName, queue.roomId, room.code,
-                item.appointmentId, item.visitId, visit.visitCode,
-                item.sourceType, item.status, item.queueNumber, item.queueDate,
-                item.checkedInAt, item.calledAt, item.completedAt, item.cancelledAt, item.cancelReason,
-                item.skippedAt, item.skipReason, item.callCount,
-                item.priority, item.priorityReason, item.prioritizedAt, item.prioritizedBy
-            )
-            from QueueItemEntity item
-            join MedicalQueueEntity queue on queue.id = item.medicalQueueId
-            join PatientEntity patient on patient.id = item.patientId
-            join UserEntity doctor on doctor.id = queue.doctorId
-            join RoomEntity room on room.id = queue.roomId
-            join VisitEntity visit on visit.id = item.visitId
-            where item.id = :queueItemId
-            """)
-    Optional<QueueItemDetailsProjection> findQueueItemDetailsById(@Param("queueItemId") UUID queueItemId);
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("select item from QueueItemEntity item where item.id = :id")
+        Optional<QueueItemEntity> findByIdForUpdate(@Param("id") UUID id);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select item from QueueItemEntity item where item.medicalQueueId = :medicalQueueId "
-            + "and item.status = 'WAITING' order by "
-            + "case item.priority "
-            + "when com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY then 1 "
-            + "when com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY then 2 "
-            + "else 3 end asc, "
-            + "item.prioritizedAt asc, "
-            + "item.queueNumber asc")
-    List<QueueItemEntity> findWaitingForUpdate(@Param("medicalQueueId") UUID medicalQueueId);
+        @Query("""
+                        select new com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection(
+                            item.id, item.medicalQueueId, item.patientId, patient.patientCode, patient.fullName,
+                            queue.doctorId, doctor.fullName, queue.roomId, room.code,
+                            item.appointmentId, item.visitId, visit.visitCode,
+                            item.sourceType, item.status, item.queueNumber, item.queueDate,
+                            item.checkedInAt, item.calledAt, item.completedAt, item.cancelledAt, item.cancelReason,
+                            item.skippedAt, item.skipReason, item.callCount,
+                            item.priority, item.priorityReason, item.prioritizedAt, item.prioritizedBy
+                        )
+                        from QueueItemEntity item
+                        join MedicalQueueEntity queue on queue.id = item.medicalQueueId
+                        join PatientEntity patient on patient.id = item.patientId
+                        join UserEntity doctor on doctor.id = queue.doctorId
+                        join RoomEntity room on room.id = queue.roomId
+                        join VisitEntity visit on visit.id = item.visitId
+                        where queue.queueDate = :queueDate
+                          and (:doctorId is null or queue.doctorId = :doctorId)
+                          and (:roomId is null or queue.roomId = :roomId)
+                        order by queue.doctorId,
+                          case item.priority
+                            when com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY then 1
+                            when com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY then 2
+                            else 3
+                          end asc,
+                          item.prioritizedAt asc,
+                          item.queueNumber asc
+                        """)
+        List<QueueItemDetailsProjection> findQueueBoardDetails(
+                        @Param("queueDate") LocalDate queueDate,
+                        @Param("doctorId") UUID doctorId,
+                        @Param("roomId") UUID roomId);
+
+        @Query("""
+                        select new com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection(
+                            item.id, item.medicalQueueId, item.patientId, patient.patientCode, patient.fullName,
+                            queue.doctorId, doctor.fullName, queue.roomId, room.code,
+                            item.appointmentId, item.visitId, visit.visitCode,
+                            item.sourceType, item.status, item.queueNumber, item.queueDate,
+                            item.checkedInAt, item.calledAt, item.completedAt, item.cancelledAt, item.cancelReason,
+                            item.skippedAt, item.skipReason, item.callCount,
+                            item.priority, item.priorityReason, item.prioritizedAt, item.prioritizedBy
+                        )
+                        from QueueItemEntity item
+                        join MedicalQueueEntity queue on queue.id = item.medicalQueueId
+                        join PatientEntity patient on patient.id = item.patientId
+                        join UserEntity doctor on doctor.id = queue.doctorId
+                        join RoomEntity room on room.id = queue.roomId
+                        join VisitEntity visit on visit.id = item.visitId
+                        where item.id = :queueItemId
+                        """)
+        Optional<QueueItemDetailsProjection> findQueueItemDetailsById(@Param("queueItemId") UUID queueItemId);
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("select item from QueueItemEntity item where item.medicalQueueId = :medicalQueueId "
+                        + "and item.status = :status order by "
+                        + "case item.priority "
+                        + "when com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY then 1 "
+                        + "when com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY then 2 "
+                        + "else 3 end asc, "
+                        + "item.prioritizedAt asc, "
+                        + "item.queueNumber asc")
+        List<QueueItemEntity> findWaitingForUpdate(
+                        @Param("medicalQueueId") UUID medicalQueueId,
+                        @Param("status") QueueItemStatus status);
+
+        default List<QueueItemEntity> findWaitingForUpdate(UUID medicalQueueId) {
+                return findWaitingForUpdate(medicalQueueId, QueueItemStatus.WAITING);
+        }
 }

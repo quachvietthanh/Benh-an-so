@@ -25,6 +25,7 @@ const PharmacyPage = React.lazy(() => import('../pages/PharmacyPage'))
 const InventoryReceiptPage = React.lazy(() => import('../pages/InventoryReceiptPage'))
 const MedicineCatalogPage = React.lazy(() => import('../pages/MedicineCatalogPage'))
 const BillingPage = React.lazy(() => import('../pages/BillingPage'))
+const InvoiceLookupPage = React.lazy(() => import('../pages/InvoiceLookupPage'))
 const ReportsPage = React.lazy(() => import('../pages/ReportsPage'))
 const UsersPage = React.lazy(() => import('../pages/UsersPage'))
 const ServicesPage = React.lazy(() => import('../pages/ServicesPage'))
@@ -50,6 +51,9 @@ const PendingClinicalOrdersPage = React.lazy(() => import('../pages/PendingClini
 const AdminOperationLogPage = React.lazy(() => import('../pages/AdminOperationLogPage'))
 const DiseasePatternReportPage = React.lazy(() => import('../pages/DiseasePatternReportPage'))
 const RevenueBreakdownReportPage = React.lazy(() => import('../pages/RevenueBreakdownReportPage'))
+const AppointmentEffectivenessReportPage = React.lazy(() => import('../pages/AppointmentEffectivenessReportPage.jsx'))
+const InventoryStockReportPage = React.lazy(() => import('../pages/InventoryStockReportPage.jsx'))
+const ContraindicationRuleManagementPage = React.lazy(() => import('../pages/ContraindicationRuleManagementPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -161,9 +165,13 @@ function AppRoutes() {
         <Route path="medicines" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />
+        <Route path="invoices/lookup" element={<PrivateRoute allowedPermissions={['INVOICE_READ']} allowedRoles={['admin', 'manager', 'clinic_manager', 'receptionist']}><LazyPage><InvoiceLookupPage /></LazyPage></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedPermissions={['REPORT_VIEW', 'REPORT_EXPORT']} allowedRoles={['admin', 'manager']}><LazyPage><ReportsPage /></LazyPage></PrivateRoute>} />
         <Route path="reports/disease-patterns" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><DiseasePatternReportPage /></LazyPage></PrivateRoute>} />
         <Route path="reports/revenue-breakdown" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><RevenueBreakdownReportPage /></LazyPage></PrivateRoute>} />
+        <Route path="reports/appointment-effectiveness" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><AppointmentEffectivenessReportPage /></LazyPage></PrivateRoute>} />
+        <Route path="inventory/stock-report" element={<PrivateRoute allowedPermissions={['INVENTORY_REPORT_VIEW']} allowedRoles={['admin', 'manager', 'clinic_manager', 'pharmacist']}><LazyPage><InventoryStockReportPage /></LazyPage></PrivateRoute>} />
+        <Route path="pharmacy/stock-report" element={<Navigate to="/inventory/stock-report" replace />} />
         <Route path="system-management" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><SystemManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="backup-restore" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><BackupRestorePage /></LazyPage></PrivateRoute>} />
         <Route path="audit-logs" element={<PrivateRoute allowedRoles={['admin']}><LazyPage><MedicalRecordAccessLogsPage /></LazyPage></PrivateRoute>} />
@@ -183,7 +191,8 @@ function AppRoutes() {
         <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
         <Route path="admin/operation-logs" element={<PrivateRoute allowedPermissions={['ADMIN_OPERATION_LOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><AdminOperationLogPage /></LazyPage></PrivateRoute>} />
         <Route path="admin-operation-logs" element={<Navigate to="/admin/operation-logs" replace />} />
-
+        <Route path="contraindication-rules" element={<PrivateRoute allowedPermissions={['CONTRAINDICATION_RULE_MANAGE']}><LazyPage><ContraindicationRuleManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="system/contraindication-rules" element={<Navigate to="/contraindication-rules" replace />} />
 
       </Route>
 

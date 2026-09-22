@@ -90,4 +90,7 @@ public class PaymentEntity {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Column(name = "cashier_shift_id", columnDefinition = "BINARY(16)")
+    private UUID cashierShiftId;
 }

@@ -1,7 +1,6 @@
 package com.benhsoan.application.ucservice.visit;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -26,7 +25,6 @@ import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.enums.ClinicalOrderStatus;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
-import com.benhsoan.domain.medicalrecord.MedicalRecordAccessLog;
 import com.benhsoan.domain.medicalrecord.MedicalRecordDiagnosis;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotFoundException;

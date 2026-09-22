@@ -28,19 +28,19 @@ function renderSeverityTag(severity) {
     case 'SEVERE':
       return (
         <Tag color="red" style={{ fontWeight: 700 }}>
-          Nghiêm trọng (SEVERE)
+          Nghiêm trọng
         </Tag>
       )
     case 'MODERATE':
       return (
         <Tag color="orange" style={{ fontWeight: 600 }}>
-          Trung bình (MODERATE)
+          Trung bình
         </Tag>
       )
     case 'MILD':
       return (
         <Tag color="gold" style={{ fontWeight: 600 }}>
-          Nhẹ (MILD)
+          Nhẹ
         </Tag>
       )
     default:
