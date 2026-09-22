@@ -31,6 +31,7 @@ import com.benhsoan.domain.prescription.PrescriptionAllergyWarningLog;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
@@ -120,6 +121,7 @@ public class AmendPrescriptionService
         List<PrescriptionItem> replacementItems = buildReplacementItems(
                 prescription,
                 itemCommands,
+                command.controlledMedicineConfirmed(),
                 now
         );
 
@@ -218,6 +220,17 @@ public class AmendPrescriptionService
         }
     }
 
+    private void requireControlledMedicineConfirmation(
+            Map<UUID, Medicine> medicines,
+            boolean confirmed
+    ) {
+        boolean hasControlled = medicines.values().stream()
+                .anyMatch(Medicine::isControlled);
+        if (hasControlled && !confirmed) {
+            throw new ControlledMedicineConfirmationRequiredException();
+        }
+    }
+
     private Prescription loadForUpdate(UUID prescriptionId) {
         return prescriptionRepository.findByIdForUpdate(prescriptionId)
                 .orElseThrow(() ->
@@ -266,6 +279,7 @@ public class AmendPrescriptionService
     private List<PrescriptionItem> buildReplacementItems(
             Prescription prescription,
             List<AmendPrescriptionItemCommand> itemCommands,
+            boolean controlledMedicineConfirmed,
             Instant updatedAt
     ) {
         Map<UUID, PrescriptionItem> existingByMedicineId
@@ -275,6 +289,20 @@ public class AmendPrescriptionService
         }
 
         Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
+
+        // Controlled-medicine confirmation is only required when this amendment
+        // actually introduces a controlled medicine that was not already on the
+        // prescription. Merely keeping an existing controlled medicine unchanged
+        // must not force confirmation (NCL-06-CN-014, same business scope as
+        // partial dispense).
+        Set<UUID> addedMedicineIds = itemCommands.stream()
+                .map(AmendPrescriptionItemCommand::medicineId)
+                .filter(id -> !existingByMedicineId.containsKey(id))
+                .collect(Collectors.toSet());
+        Map<UUID, Medicine> addedMedicines = medicines.entrySet().stream()
+                .filter(entry -> addedMedicineIds.contains(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        requireControlledMedicineConfirmation(addedMedicines, controlledMedicineConfirmed);
 
         return itemCommands.stream()
                 .map(command -> {

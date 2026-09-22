@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mock;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +35,7 @@ import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException;
 import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionAmendmentException;
@@ -235,12 +237,20 @@ class AmendPrescriptionServiceTest {
     }
 
     private AmendPrescriptionCommand command(List<AmendPrescriptionItemCommand> items) {
+        return command(items, false);
+    }
+
+    private AmendPrescriptionCommand command(
+            List<AmendPrescriptionItemCommand> items,
+            boolean controlledMedicineConfirmed
+    ) {
         return AmendPrescriptionCommand.builder()
                 .prescriptionId(prescriptionId)
                 .note("Take after meals")
                 .changeReason("Dose adjustment")
                 .items(items)
                 .interactionOverrides(List.of())
+                .controlledMedicineConfirmed(controlledMedicineConfirmed)
                 .build();
     }
 
@@ -271,6 +281,11 @@ class AmendPrescriptionServiceTest {
     private Medicine medicine(UUID id, boolean active) {
         return Medicine.restore(id, "MED-001", "Amoxicillin", "Amoxicillin", "500 mg", DosageForm.CAPSULE,
                 "capsule", AdministrationRoute.ORAL, active, CREATED_AT, null, 0, 20);
+    }
+
+    private Medicine controlledMedicine(UUID id, boolean active) {
+        return Medicine.restore(id, "MED-CTRL", "Morphine", "Morphine", "10 mg", DosageForm.INJECTION,
+                "ong", AdministrationRoute.INTRAVENOUS, active, CREATED_AT, null, 0, 20, true);
     }
 
     @Test
@@ -338,6 +353,92 @@ class AmendPrescriptionServiceTest {
         verify(prescriptionRepository).save(any());
         verify(amendmentRepository).save(any());
         verify(allergyWarningLogRepository).save(any());
+    }
+
+    @Test
+    void addingControlledMedicineWithoutConfirmation_isRejected() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        UUID controlledMedicineId = UUID.randomUUID();
+        doReturn(List.of(medicine(existingMedicineId, true), controlledMedicine(controlledMedicineId, true)))
+                .when(medicineRepository).findAllById(any());
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class,
+                () -> service.amend(command(List.of(
+                        item(existingMedicineId, "2 tablets"),
+                        item(controlledMedicineId, "1 ong")))));
+
+        verify(prescriptionRepository, never()).save(any());
+        verify(amendmentRepository, never()).save(any());
+    }
+
+    @Test
+    void addingControlledMedicineWithConfirmation_succeeds() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID controlledMedicineId = UUID.randomUUID();
+        doReturn(List.of(medicine(existingMedicineId, true), controlledMedicine(controlledMedicineId, true)))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(
+                List.of(item(existingMedicineId, "2 tablets"), item(controlledMedicineId, "1 ong")),
+                true));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(2, result.items().size());
+        verify(prescriptionRepository).save(any());
+        verify(amendmentRepository).save(any());
+    }
+
+    @Test
+    void amendingWithOnlyOrdinaryMedicines_doesNotRequireConfirmation() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        var result = service.amend(command(List.of(item(existingMedicineId, "3 tablets"))));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
+    }
+
+    @Test
+    void amendingUnchangedControlledMedicine_doesNotRequireConfirmation() {
+        UUID controlledMedicineId = UUID.randomUUID();
+        UUID ordinaryMedicineId = UUID.randomUUID();
+
+        PrescriptionItem controlledItem = PrescriptionItem.create(
+                UUID.randomUUID(), prescriptionId, controlledMedicineId,
+                "Morphine", "Morphine", "10 mg", "ong", "1 ong", 2,
+                AdministrationRoute.INTRAVENOUS, 5, 10, null, CREATED_AT);
+        PrescriptionItem ordinaryItem = PrescriptionItem.create(
+                UUID.randomUUID(), prescriptionId, ordinaryMedicineId,
+                "Paracetamol", "Paracetamol", "500 mg", "tablet", "1 tablet", 2,
+                AdministrationRoute.ORAL, 5, 10, null, CREATED_AT);
+        Prescription prescription = Prescription.restore(
+                prescriptionId, "RX000001", UUID.randomUUID(), PrescriptionStatus.PENDING_DISPENSE,
+                "Take after meals", actorId, CREATED_AT, null, null,
+                List.of(controlledItem, ordinaryItem));
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(controlledMedicine(controlledMedicineId, true), medicine(ordinaryMedicineId, true)))
+                .when(medicineRepository).findAllById(any());
+
+        // Keeps the controlled medicine unchanged and only changes the ordinary medicine's dosage.
+        var result = service.amend(command(List.of(
+                item(controlledMedicineId, "1 ong"),
+                item(ordinaryMedicineId, "2 tablets"))));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
     }
 }
 

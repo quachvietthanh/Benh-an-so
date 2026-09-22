@@ -11,6 +11,19 @@ public record CreateMedicineCommand(
         DosageForm dosageForm,
         String unit,
         AdministrationRoute defaultRoute,
-        int minStockThreshold
+        int minStockThreshold,
+        boolean controlled
 ) {
+    public CreateMedicineCommand(
+            String medicineCode,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            DosageForm dosageForm,
+            String unit,
+            AdministrationRoute defaultRoute,
+            int minStockThreshold
+    ) {
+        this(medicineCode, medicineName, activeIngredient, strength, dosageForm, unit, defaultRoute, minStockThreshold, false);
+    }
 }

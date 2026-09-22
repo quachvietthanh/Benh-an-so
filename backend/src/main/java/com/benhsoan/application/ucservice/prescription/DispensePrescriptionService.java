@@ -23,12 +23,17 @@ import com.benhsoan.domain.inventory.StockMovement;
 import com.benhsoan.domain.inventory.enums.StockMovementReferenceType;
 import com.benhsoan.domain.inventory.enums.StockMovementType;
 import com.benhsoan.domain.medicine.exception.MedicineNotFoundException;
+import com.benhsoan.domain.medicine.Medicine;
+import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionDispenseItem;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllocationInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.application.ucservice.controlledmedicine.ControlledMedicineRegisterRecorder;
+import com.benhsoan.port.dto.command.prescription.DispensePrescriptionCommand;
 import com.benhsoan.port.dto.result.DispenseAllocationResult;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
@@ -63,9 +68,14 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final DispensePrescriptionResultMapper resultMapper;
+    private final ControlledMedicineRegisterRecorder controlledMedicineRegisterRecorder;
+    private final PrescriptionDisplayContextResolver displayContextResolver;
 
     @Override
-    public DispensePrescriptionResult dispense(UUID prescriptionId) {
+    public DispensePrescriptionResult dispense(DispensePrescriptionCommand command) {
+        if (command == null || command.prescriptionId() == null) {
+            throw new ValidationException("Prescription id is required.");
+        }
         if (!currentUserPort.hasRole("PHARMACIST")
                 && !currentUserPort.hasRole("ADMIN")) {
             throw new AccessDeniedException("Only pharmacists can dispense prescriptions.");
@@ -73,6 +83,7 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant now = clockPort.now();
         LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        UUID prescriptionId = command.prescriptionId();
         var prescription = prescriptionRepository.findByIdForUpdate(prescriptionId)
                 .orElseThrow(() -> new PrescriptionNotFoundException(prescriptionId));
         if (prescription.getStatus() == com.benhsoan.domain.prescription.enums.PrescriptionStatus.CANCELLED) {
@@ -91,6 +102,9 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
                 .distinct()
                 .toList();
 
+        Map<UUID, Medicine> medicines = loadMedicines(medicineIds);
+        requireControlledMedicineConfirmation(medicines, command.controlledMedicineConfirmed());
+
         AllocationComputation computation = computeAllocations(
                 prescription.getId(),
                 prescriptionItems,
@@ -105,6 +119,15 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
         }
         prescription.markDispensed(actorId, now);
         var saved = prescriptionRepository.save(prescription);
+
+        recordControlledRegisterEntries(
+                saved,
+                prescriptionItems,
+                medicines,
+                actorId,
+                now
+        );
+
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.DISPENSE,
@@ -120,6 +143,64 @@ public class DispensePrescriptionService implements DispensePrescriptionUseCase 
                 actorId,
                 now,
                 allocations
+        );
+    }
+
+    private Map<UUID, Medicine> loadMedicines(List<UUID> medicineIds) {
+        return medicineRepository.findAllById(medicineIds).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        Medicine::getId,
+                        medicine -> medicine
+                ));
+    }
+
+    private void requireControlledMedicineConfirmation(
+            Map<UUID, Medicine> medicines,
+            boolean confirmed
+    ) {
+        boolean hasControlled = medicines.values().stream()
+                .anyMatch(Medicine::isControlled);
+        if (hasControlled && !confirmed) {
+            throw new ControlledMedicineConfirmationRequiredException();
+        }
+    }
+
+    private void recordControlledRegisterEntries(
+            Prescription prescription,
+            List<PrescriptionItem> prescriptionItems,
+            Map<UUID, Medicine> medicines,
+            UUID dispensedBy,
+            Instant dispensedAt
+    ) {
+        List<ControlledMedicineRegisterRecorder.Entry> entries = prescriptionItems.stream()
+                .filter(item -> {
+                    Medicine medicine = medicines.get(item.getMedicineId());
+                    return medicine != null && medicine.isControlled();
+                })
+                .map(item -> new ControlledMedicineRegisterRecorder.Entry(
+                        item.getId(),
+                        item.getMedicineId(),
+                        item.getMedicineName(),
+                        item.getQuantity()
+                ))
+                .toList();
+
+        if (entries.isEmpty()) {
+            return;
+        }
+
+        UUID patientId = displayContextResolver.resolve(
+                prescription.getMedicalRecordId(),
+                prescription.getPrescribedBy()
+        ).patientId();
+
+        controlledMedicineRegisterRecorder.record(
+                prescription.getId(),
+                prescription.getPrescribedBy(),
+                patientId,
+                dispensedBy,
+                dispensedAt,
+                entries
         );
     }
 

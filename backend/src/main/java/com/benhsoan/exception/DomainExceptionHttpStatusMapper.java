@@ -126,6 +126,7 @@ final class DomainExceptionHttpStatusMapper {
                     CLINICAL_SERVICE_UNAVAILABLE,
                     CONCURRENT_IMPORT_IN_PROGRESS,
                     CONTRAINDICATION_CONFIRMATION_REQUIRED,
+                    CONTROLLED_MEDICINE_CONFIRMATION_REQUIRED,
                     DIAGNOSIS_CATALOG_CODE_ALREADY_EXISTS,
                     DIAGNOSIS_CATALOG_DELETE_NOT_ALLOWED,
                     DIAGNOSIS_CATALOG_IN_USE,
