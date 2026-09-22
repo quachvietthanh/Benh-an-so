@@ -85,15 +85,6 @@ public class GetCurrentShiftSummaryService implements GetCurrentShiftSummaryUseC
             }
         }
 
-<<<<<<< HEAD
-=======
-        cash = cash.max(BigDecimal.ZERO);
-        transfer = transfer.max(BigDecimal.ZERO);
-        card = card.max(BigDecimal.ZERO);
-        other = other.max(BigDecimal.ZERO);
-        total = total.max(BigDecimal.ZERO);
-
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         Instant startTime = unsettled.get(0).getPaidAt();
         Instant endTime = clockPort.now();
         List<UUID> paymentIds = unsettled.stream().map(Payment::getId).toList();

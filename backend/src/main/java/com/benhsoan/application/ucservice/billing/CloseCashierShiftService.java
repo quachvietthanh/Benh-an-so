@@ -47,10 +47,7 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final CashierShiftResultMapper resultMapper;
-<<<<<<< HEAD
     private final CashierShiftAuthorizationAuditService authorizationAuditService;
-=======
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
@@ -58,11 +55,8 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
         validateCommand(command);
 
         UUID cashierId = currentUserPort.getCurrentUserId();
-<<<<<<< HEAD
         ensureAuthorized(cashierId);
 
-=======
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         Instant now = clockPort.now();
 
         List<Payment> unsettled = paymentRepository
@@ -95,15 +89,6 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
             }
         }
 
-<<<<<<< HEAD
-=======
-        cash = cash.max(BigDecimal.ZERO);
-        transfer = transfer.max(BigDecimal.ZERO);
-        card = card.max(BigDecimal.ZERO);
-        other = other.max(BigDecimal.ZERO);
-        total = total.max(BigDecimal.ZERO);
-
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         Instant startTime = unsettled.get(0).getPaidAt();
         Instant endTime = now;
         UUID shiftId = UUID.randomUUID();
@@ -162,7 +147,6 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
         return resultMapper.toResult(savedShift);
     }
 
-<<<<<<< HEAD
     private void ensureAuthorized(UUID actorId) {
         if (!currentUserPort.hasPermission("CASHIER_SHIFT_CREATE")
                 && !currentUserPort.hasRole("RECEPTIONIST")
@@ -175,8 +159,6 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
         }
     }
 
-=======
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     private void validateCommand(CloseCashierShiftCommand command) {
         if (command == null) {
             throw new ValidationException("Yêu cầu chốt ca không được để trống.");
