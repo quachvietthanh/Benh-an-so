@@ -43,6 +43,23 @@ public interface JpaClinicalOrderItemRepository extends JpaRepository<ClinicalOr
             @Param("status") ClinicalOrderItemStatus status
     );
 
+    @Query("""
+            select clinicalOrder.visitId as visitId,
+                   item.id as clinicalOrderItemId,
+                   service.serviceCatalogId as serviceCatalogId,
+                   item.serviceName as serviceName
+            from ClinicalOrderItemEntity item
+            join ClinicalOrderEntity clinicalOrder on clinicalOrder.id = item.clinicalOrderId
+            join ClinicalServiceCatalogEntity service on service.id = item.clinicalServiceId
+            where clinicalOrder.visitId in :visitIds
+              and item.status = :status
+            order by item.createdAt, item.id
+            """)
+    List<BillableClinicalServiceView> findBillableByVisitIdIn(
+            @Param("visitIds") Collection<UUID> visitIds,
+            @Param("status") ClinicalOrderItemStatus status
+    );
+
     boolean existsByClinicalOrderIdAndClinicalServiceId(UUID clinicalOrderId, UUID clinicalServiceId);
 
     @Query("select item.id from ClinicalOrderItemEntity item where item.clinicalOrderId in :orderIds")

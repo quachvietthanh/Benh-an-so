@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -10,14 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -34,6 +38,7 @@ import com.benhsoan.domain.billing.exception.InvoiceAlreadyIssuedException;
 import com.benhsoan.domain.billing.exception.InvoiceNotFoundException;
 import com.benhsoan.domain.billing.exception.PaymentNotAllowedException;
 import com.benhsoan.domain.billing.exception.PaymentNotFoundException;
+import com.benhsoan.port.dto.command.billing.PayableEncounterQuery;
 import com.benhsoan.port.dto.result.InvoiceLineResult;
 import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
@@ -59,7 +64,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = InvoiceController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({BillingRestMapper.class, AnonymizationModeState.class})
+@Import({BillingRestMapper.class, AnonymizationModeState.class, com.benhsoan.exception.GlobalExceptionHandler.class})
 class InvoiceControllerTest {
 
     @Autowired private MockMvc mockMvc;
@@ -177,7 +182,13 @@ class InvoiceControllerTest {
                         "BN000010",
                         "Nguyen Van A",
                         "Kham tong quat",
-                        Instant.parse("2026-08-12T01:30:00Z")
+                        Instant.parse("2026-08-12T01:30:00Z"),
+                        new BigDecimal("100000"),
+                        BigDecimal.ZERO,
+                        new BigDecimal("50000"),
+                        new BigDecimal("150000"),
+                        true,
+                        false
                 )),
                 PageRequest.of(0, 20),
                 1
@@ -189,7 +200,45 @@ class InvoiceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].visitId").value(visitId.toString()))
                 .andExpect(jsonPath("$.content[0].visitCode").value("VIS000010"))
-                .andExpect(jsonPath("$.content[0].patientName").value("Nguyen Van A"));
+                .andExpect(jsonPath("$.content[0].patientName").value("Nguyen Van A"))
+                .andExpect(jsonPath("$.content[0].examFee").value(100000))
+                .andExpect(jsonPath("$.content[0].medicineFee").value(0))
+                .andExpect(jsonPath("$.content[0].serviceFee").value(50000))
+                .andExpect(jsonPath("$.content[0].totalEstimatedAmount").value(150000))
+                .andExpect(jsonPath("$.content[0].hasPrescription").value(true))
+                .andExpect(jsonPath("$.content[0].hasPendingDispense").value(false));
+    }
+
+    @Test
+    void filtersPayableEncountersByDateAndSearch() throws Exception {
+        ArgumentCaptor<PayableEncounterQuery> captor = ArgumentCaptor.forClass(PayableEncounterQuery.class);
+        when(getPayableEncountersUseCase.get(captor.capture())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/invoices/payable")
+                        .param("date", "2026-09-21")
+                        .param("search", "BN000010")
+                        .param("page", "1")
+                        .param("size", "10"))
+                .andExpect(status().isOk());
+
+        PayableEncounterQuery query = captor.getValue();
+        assertEquals(LocalDate.of(2026, 9, 21), query.date());
+        assertEquals("BN000010", query.search());
+        assertEquals(1, query.pageable().getPageNumber());
+        assertEquals(10, query.pageable().getPageSize());
+    }
+
+    @Test
+    void validatesPaginationOnPayableEncounters() throws Exception {
+        mockMvc.perform(get("/invoices/payable")
+                        .param("page", "-1")
+                        .param("size", "20"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/invoices/payable")
+                        .param("page", "0")
+                        .param("size", "101"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
