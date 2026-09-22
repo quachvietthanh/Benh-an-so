@@ -57,4 +57,38 @@ public record PaymentResult(
                 List.of()
         );
     }
+
+    public PaymentResult(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            Instant createdAt,
+            List<PaymentMethodItemResult> paymentMethods
+    ) {
+        this(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                BigDecimal.ZERO,
+                null,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                createdAt,
+                paymentMethods
+        );
+    }
 }

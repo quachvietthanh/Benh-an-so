@@ -62,6 +62,17 @@ public class RecordPaymentService implements RecordPaymentUseCase {
     private final ObjectMapper objectMapper;
     private final BillingAccessDeniedAuditWriter accessDeniedAuditWriter;
 
+    private static final com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository NO_OP_DISCOUNT_REPO =
+            new com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository() {
+                @Override public com.benhsoan.domain.billing.DiscountRequest save(com.benhsoan.domain.billing.DiscountRequest discountRequest) { return discountRequest; }
+                @Override public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findById(UUID id) { return java.util.Optional.empty(); }
+                @Override public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findByIdForUpdate(UUID id) { return java.util.Optional.empty(); }
+                @Override public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findByVisitIdAndStatus(UUID visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus status) { return java.util.Optional.empty(); }
+                @Override public List<com.benhsoan.domain.billing.DiscountRequest> findByVisitId(UUID visitId) { return List.of(); }
+                @Override public boolean existsByVisitIdAndStatus(UUID visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus status) { return false; }
+                @Override public org.springframework.data.domain.Page<com.benhsoan.domain.billing.DiscountRequest> search(com.benhsoan.port.outbound.repository.billing.DiscountRequestSearchCriteria criteria, org.springframework.data.domain.Pageable pageable) { return org.springframework.data.domain.Page.empty(); }
+            };
+
     @Autowired
     public RecordPaymentService(
             VisitRepository visitRepository,
@@ -88,9 +99,40 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         this.resultMapper = resultMapper;
         this.clinicalServiceFeeCalculator = clinicalServiceFeeCalculator;
         this.paymentServiceFeeRepository = paymentServiceFeeRepository;
-        this.discountRequestRepository = discountRequestRepository;
+        this.discountRequestRepository = discountRequestRepository != null ? discountRequestRepository : NO_OP_DISCOUNT_REPO;
         this.objectMapper = objectMapper;
         this.accessDeniedAuditWriter = accessDeniedAuditWriter;
+    }
+
+    public RecordPaymentService(
+            VisitRepository visitRepository,
+            MedicalRecordRepository medicalRecordRepository,
+            PrescriptionRepository prescriptionRepository,
+            PaymentRepository paymentRepository,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AuditLogRepository auditLogRepository,
+            PaymentResultMapper resultMapper,
+            ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
+            PaymentServiceFeeRepository paymentServiceFeeRepository,
+            ObjectMapper objectMapper,
+            BillingAccessDeniedAuditWriter accessDeniedAuditWriter
+    ) {
+        this(
+                visitRepository,
+                medicalRecordRepository,
+                prescriptionRepository,
+                paymentRepository,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                resultMapper,
+                clinicalServiceFeeCalculator,
+                paymentServiceFeeRepository,
+                NO_OP_DISCOUNT_REPO,
+                objectMapper,
+                accessDeniedAuditWriter
+        );
     }
 
     public RecordPaymentService(
@@ -118,6 +160,35 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 clinicalServiceFeeCalculator,
                 paymentServiceFeeRepository,
                 discountRequestRepository,
+                new ObjectMapper(),
+                new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper())
+        );
+    }
+
+    public RecordPaymentService(
+            VisitRepository visitRepository,
+            MedicalRecordRepository medicalRecordRepository,
+            PrescriptionRepository prescriptionRepository,
+            PaymentRepository paymentRepository,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AuditLogRepository auditLogRepository,
+            PaymentResultMapper resultMapper,
+            ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
+            PaymentServiceFeeRepository paymentServiceFeeRepository
+    ) {
+        this(
+                visitRepository,
+                medicalRecordRepository,
+                prescriptionRepository,
+                paymentRepository,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                resultMapper,
+                clinicalServiceFeeCalculator,
+                paymentServiceFeeRepository,
+                NO_OP_DISCOUNT_REPO,
                 new ObjectMapper(),
                 new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper())
         );

@@ -327,6 +327,8 @@ public class Payment {
                 examFee,
                 medicineFee,
                 BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                null,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -361,6 +363,8 @@ public class Payment {
                 examFee,
                 medicineFee,
                 serviceFee,
+                BigDecimal.ZERO,
+                null,
                 totalAmount,
                 amountPaid,
                 paymentMethod,
@@ -490,6 +494,46 @@ public class Payment {
                 refundedAt,
                 createdAt,
                 null
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt,
+            List<PaymentMethodItem> paymentMethodItems
+    ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                BigDecimal.ZERO,
+                null,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt,
+                paymentMethodItems
         );
     }
 
