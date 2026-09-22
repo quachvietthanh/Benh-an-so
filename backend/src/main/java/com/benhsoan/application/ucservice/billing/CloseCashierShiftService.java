@@ -47,6 +47,7 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final CashierShiftResultMapper resultMapper;
+    private final CashierShiftAuthorizationAuditService authorizationAuditService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
@@ -54,6 +55,8 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
         validateCommand(command);
 
         UUID cashierId = currentUserPort.getCurrentUserId();
+        ensureAuthorized(cashierId);
+
         Instant now = clockPort.now();
 
         List<Payment> unsettled = paymentRepository
@@ -85,12 +88,6 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
                 other = other.add(effectiveAmount);
             }
         }
-
-        cash = cash.max(BigDecimal.ZERO);
-        transfer = transfer.max(BigDecimal.ZERO);
-        card = card.max(BigDecimal.ZERO);
-        other = other.max(BigDecimal.ZERO);
-        total = total.max(BigDecimal.ZERO);
 
         Instant startTime = unsettled.get(0).getPaidAt();
         Instant endTime = now;
@@ -148,6 +145,18 @@ public class CloseCashierShiftService implements CloseCashierShiftUseCase {
         ));
 
         return resultMapper.toResult(savedShift);
+    }
+
+    private void ensureAuthorized(UUID actorId) {
+        if (!currentUserPort.hasPermission("CASHIER_SHIFT_CREATE")
+                && !currentUserPort.hasRole("RECEPTIONIST")
+                && !currentUserPort.hasRole("ADMIN")) {
+            authorizationAuditService.recordCloseAccessDenied(
+                    actorId,
+                    "Chỉ Thu ngân hoặc Quản trị viên mới có quyền chốt ca."
+            );
+            throw new org.springframework.security.access.AccessDeniedException("Chỉ Thu ngân hoặc Quản trị viên mới có quyền chốt ca.");
+        }
     }
 
     private void validateCommand(CloseCashierShiftCommand command) {

@@ -30,6 +30,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +43,7 @@ class ConfirmCashierShiftServiceTest {
     @Mock private ClockPort clockPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private UserRepository userRepository;
+    @Mock private CashierShiftAuthorizationAuditService authorizationAuditService;
 
     private ConfirmCashierShiftService service;
     private CashierShiftResultMapper resultMapper;
@@ -58,8 +60,10 @@ class ConfirmCashierShiftServiceTest {
                 clockPort,
                 auditLogRepository,
                 resultMapper,
+                authorizationAuditService,
                 new com.fasterxml.jackson.databind.ObjectMapper()
         );
+        org.mockito.Mockito.lenient().when(currentUserPort.getCurrentUserId()).thenReturn(managerId);
     }
 
     @Test
@@ -68,12 +72,14 @@ class ConfirmCashierShiftServiceTest {
         when(currentUserPort.hasRole("MANAGER")).thenReturn(false);
         when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
 
+        UUID shiftId = UUID.randomUUID();
         ConfirmCashierShiftCommand command = new ConfirmCashierShiftCommand(
-                UUID.randomUUID(),
+                shiftId,
                 "Duyệt ca"
         );
 
         assertThrows(AccessDeniedException.class, () -> service.confirm(command));
+        verify(authorizationAuditService).recordConfirmAccessDenied(eq(managerId), eq(shiftId), any());
     }
 
     @Test
@@ -214,6 +220,7 @@ class ConfirmCashierShiftServiceTest {
 
         assertThrows(com.benhsoan.domain.billing.exception.SelfConfirmationNotAllowedException.class,
                 () -> service.confirm(command));
+        verify(authorizationAuditService).recordConfirmAccessDenied(eq(managerId), eq(shiftId), any());
     }
 
     @Test

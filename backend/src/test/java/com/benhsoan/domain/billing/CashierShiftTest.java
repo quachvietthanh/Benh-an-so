@@ -255,4 +255,30 @@ class CashierShiftTest {
         assertTrue(shift.isConfirmed());
         assertEquals(differentManagerId, shift.getConfirmedBy());
     }
+
+    @Test
+    @DisplayName("P1: Tiền mặt hệ thống âm do hoàn tiền vẫn tạo phiếu hợp lệ và tính chênh lệch đúng")
+    void shouldAllowNegativeSystemAmountsWhenRefundsExceedPayments() {
+        CashierShift shift = CashierShift.create(
+                UUID.randomUUID(),
+                "CS000010",
+                CASHIER_ID,
+                START_TIME,
+                END_TIME,
+                2,
+                new BigDecimal("-500000.00"),
+                new BigDecimal("-500000.00"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                "Hoàn tiền vượt số thu trong ca",
+                END_TIME
+        );
+
+        assertEquals(new BigDecimal("-500000.00"), shift.getSystemCashAmount());
+        assertEquals(BigDecimal.ZERO, shift.getActualCashAmount());
+        assertEquals(new BigDecimal("500000.00"), shift.getDifferenceAmount());
+        assertEquals(CashierShiftStatus.PENDING_CONFIRMATION, shift.getStatus());
+    }
 }

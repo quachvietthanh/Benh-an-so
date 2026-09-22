@@ -33,18 +33,28 @@ public class ConfirmCashierShiftService implements ConfirmCashierShiftUseCase {
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final CashierShiftResultMapper resultMapper;
+    private final CashierShiftAuthorizationAuditService authorizationAuditService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
     public CashierShiftResult confirm(ConfirmCashierShiftCommand command) {
         validateCommand(command);
-        ensureAuthorized();
-
         UUID managerId = currentUserPort.getCurrentUserId();
+        ensureAuthorized(managerId, command.shiftId());
+
         Instant now = clockPort.now();
 
         CashierShift shift = cashierShiftRepository.findByIdForUpdate(command.shiftId())
                 .orElseThrow(() -> new CashierShiftNotFoundException(command.shiftId()));
+
+        if (shift.getCashierId() != null && shift.getCashierId().equals(managerId)) {
+            authorizationAuditService.recordConfirmAccessDenied(
+                    managerId,
+                    shift.getId(),
+                    "Thu ngân không được tự duyệt phiếu chốt ca của chính mình."
+            );
+            throw new com.benhsoan.domain.billing.exception.SelfConfirmationNotAllowedException();
+        }
 
         shift.confirm(managerId, now, command.confirmationNotes());
         CashierShift saved = cashierShiftRepository.save(shift);
@@ -75,8 +85,13 @@ public class ConfirmCashierShiftService implements ConfirmCashierShiftUseCase {
         return resultMapper.toResult(saved);
     }
 
-    private void ensureAuthorized() {
+    private void ensureAuthorized(UUID actorId, UUID shiftId) {
         if (!currentUserPort.hasRole("MANAGER") && !currentUserPort.hasRole("ADMIN")) {
+            authorizationAuditService.recordConfirmAccessDenied(
+                    actorId,
+                    shiftId,
+                    "Chỉ Quản lý phòng khám mới có quyền xác nhận phiếu chốt ca."
+            );
             throw new AccessDeniedException("Chỉ Quản lý phòng khám mới có quyền xác nhận phiếu chốt ca.");
         }
     }

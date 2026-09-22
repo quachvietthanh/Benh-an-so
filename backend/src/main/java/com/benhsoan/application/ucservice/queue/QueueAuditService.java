@@ -142,28 +142,6 @@ class QueueAuditService {
                                                 detail, null));
         }
 
-        void recordPrioritized(QueueItem item, com.benhsoan.domain.queue.enums.QueuePriority priority, String reason) {
-                UUID actorId = currentUserPort.getCurrentUserId();
-                String detail;
-                try {
-                        ObjectNode node = objectMapper.createObjectNode();
-                        node.put("queueItemId", item.getId().toString());
-                        node.put("status", item.getStatus().name());
-                        node.put("action", QueueSemanticAction.PRIORITIZED.name());
-                        node.put("priority", priority.name());
-                        node.put("reason", reason);
-                        node.put("callCount", item.getCallCount());
-                        detail = objectMapper.writeValueAsString(node);
-                } catch (Exception e) {
-                        detail = "{\"queueItemId\":\"%s\",\"status\":\"%s\",\"action\":\"%s\",\"priority\":\"%s\",\"callCount\":%d}"
-                                        .formatted(item.getId(), item.getStatus(), QueueSemanticAction.PRIORITIZED,
-                                                        priority, item.getCallCount());
-                }
-                auditLogRepository
-                                .save(AuditLog.create(actorId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),
-                                                detail, null));
-        }
-
         void record(ActionType actionType, QueueItem item) {
                 UUID actorId = currentUserPort.getCurrentUserId();
                 String actionName = switch (item.getStatus()) {

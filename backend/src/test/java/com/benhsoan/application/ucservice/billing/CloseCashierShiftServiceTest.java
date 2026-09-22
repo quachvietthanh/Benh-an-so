@@ -55,6 +55,7 @@ class CloseCashierShiftServiceTest {
     @Mock private ClockPort clockPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private UserRepository userRepository;
+    @Mock private CashierShiftAuthorizationAuditService authorizationAuditService;
 
     private CloseCashierShiftService service;
     private CashierShiftResultMapper resultMapper;
@@ -73,10 +74,12 @@ class CloseCashierShiftServiceTest {
                 clockPort,
                 auditLogRepository,
                 resultMapper,
+                authorizationAuditService,
                 new com.fasterxml.jackson.databind.ObjectMapper()
         );
 
         lenient().when(currentUserPort.getCurrentUserId()).thenReturn(cashierId);
+        lenient().when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
         lenient().when(clockPort.now()).thenReturn(now);
     }
 
@@ -252,6 +255,57 @@ class CloseCashierShiftServiceTest {
         assertTrue(refunded.isSettled());
         assertEquals(result.id(), recorded.getCashierShiftId());
         assertEquals(result.id(), refunded.getCashierShiftId());
+    }
+
+    @Test
+    @DisplayName("P1: Người dùng không có quyền chốt ca bị từ chối và ghi nhận ACCESS_DENIED audit")
+    void shouldThrowAccessDeniedAndAuditWhenNotAuthorizedToCloseShift() {
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasPermission("CASHIER_SHIFT_CREATE")).thenReturn(false);
+
+        CloseCashierShiftCommand command = new CloseCashierShiftCommand(
+                new BigDecimal("500000.00"),
+                null
+        );
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.close(command));
+        verify(authorizationAuditService).recordCloseAccessDenied(eq(cashierId), any());
+    }
+
+    @Test
+    @DisplayName("P1: Khi tiền hoàn trả vượt quá tiền thu (net âm), hệ thống tính đúng signed amount và không floor về 0")
+    void shouldCalculateSignedAmountWhenRefundsExceedPayments() {
+        Instant p1Time = Instant.parse("2026-09-21T02:00:00Z");
+        Instant p2Time = Instant.parse("2026-09-21T03:00:00Z");
+
+        Payment recorded = createPayment(new BigDecimal("1000000.00"), PaymentMethod.CASH, p1Time);
+        Payment refunded = Payment.restore(
+                UUID.randomUUID(), UUID.randomUUID(),
+                new BigDecimal("1500000.00"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("1500000.00"), new BigDecimal("1500000.00"),
+                PaymentMethod.CASH, PaymentStatus.REFUNDED, cashierId, p2Time, "Hoàn trả toàn bộ", UUID.randomUUID(), p2Time, p2Time, null
+        );
+
+        when(paymentRepository.findUnsettledByCashierForUpdate(eq(cashierId), any()))
+                .thenReturn(List.of(recorded, refunded));
+        when(shiftCodeGenerator.generate()).thenReturn("CS000012");
+        when(cashierShiftRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Tiền thực tế trong két = 0; Hệ thống = 1.000.000 - 1.500.000 = -500.000
+        // Chênh lệch = 0 - (-500.000) = +500.000 -> Có chênh lệch, yêu cầu ghi chú
+        CloseCashierShiftCommand command = new CloseCashierShiftCommand(
+                BigDecimal.ZERO,
+                "Hoàn tiền phát sinh vượt thu trong ca"
+        );
+
+        CashierShiftResult result = service.close(command);
+
+        assertEquals(new BigDecimal("-500000.00"), result.systemCashAmount());
+        assertEquals(BigDecimal.ZERO, result.actualCashAmount());
+        assertEquals(new BigDecimal("500000.00"), result.differenceAmount());
+        assertEquals(CashierShiftStatus.PENDING_CONFIRMATION, result.status());
     }
 
     private Payment createPayment(BigDecimal amount, PaymentMethod method, Instant paidAt) {

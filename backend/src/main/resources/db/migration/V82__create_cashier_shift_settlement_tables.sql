@@ -1,5 +1,5 @@
 -- =====================================================
--- V78__create_cashier_shift_settlement_tables.sql
+-- V82__create_cashier_shift_settlement_tables.sql
 -- Cashier shift end-of-day settlement (NCL-07-CN-009, QTN-38)
 -- =====================================================
 
@@ -81,48 +81,69 @@ ALTER TABLE payments
 CREATE INDEX idx_payments_cashier_shift
     ON payments(cashier_shift_id);
 
--- 4. Permissions for Cashier Shift Settlement
-INSERT INTO permissions (id, code, category, active, created_at)
-SELECT UUID_TO_BIN(UUID()), 'CASHIER_SHIFT_READ', 'BILLING', TRUE, CURRENT_TIMESTAMP
+-- 4. Permissions for Cashier Shift Settlement (NCL-07-CN-009)
+INSERT INTO permissions (id, code, name, module, description, active, created_at, updated_at)
+SELECT UUID_TO_BIN(UUID()),
+       'CASHIER_SHIFT_READ',
+       'CASHIER SHIFT READ',
+       'BILLING',
+       'Xem tổng hợp ca thu ngân và tra cứu phiếu chốt ca (NCL-07-CN-009).',
+       TRUE,
+       CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'CASHIER_SHIFT_READ');
 
-INSERT INTO permissions (id, code, category, active, created_at)
-SELECT UUID_TO_BIN(UUID()), 'CASHIER_SHIFT_CREATE', 'BILLING', TRUE, CURRENT_TIMESTAMP
+INSERT INTO permissions (id, code, name, module, description, active, created_at, updated_at)
+SELECT UUID_TO_BIN(UUID()),
+       'CASHIER_SHIFT_CREATE',
+       'CASHIER SHIFT CREATE',
+       'BILLING',
+       'Tạo phiếu chốt ca thu ngân và đối chiếu tiền thực tế (NCL-07-CN-009).',
+       TRUE,
+       CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'CASHIER_SHIFT_CREATE');
 
-INSERT INTO permissions (id, code, category, active, created_at)
-SELECT UUID_TO_BIN(UUID()), 'CASHIER_SHIFT_CONFIRM', 'BILLING', TRUE, CURRENT_TIMESTAMP
+INSERT INTO permissions (id, code, name, module, description, active, created_at, updated_at)
+SELECT UUID_TO_BIN(UUID()),
+       'CASHIER_SHIFT_CONFIRM',
+       'CASHIER SHIFT CONFIRM',
+       'BILLING',
+       'Quản lý phòng khám duyệt và xác nhận phiếu chốt ca thu ngân (NCL-07-CN-009).',
+       TRUE,
+       CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'CASHIER_SHIFT_CONFIRM');
 
--- Grant permissions to RECEPTIONIST (44444444-4444-4444-4444-444444444444)
+-- Grant permissions to RECEPTIONIST
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT UUID_TO_BIN('44444444-4444-4444-4444-444444444444'), p.id
-FROM permissions p
-WHERE p.code IN ('CASHIER_SHIFT_READ', 'CASHIER_SHIFT_CREATE')
-AND NOT EXISTS (
-    SELECT 1 FROM role_permissions rp
-    WHERE rp.role_id = UUID_TO_BIN('44444444-4444-4444-4444-444444444444')
-    AND rp.permission_id = p.id
-);
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.code IN ('CASHIER_SHIFT_READ', 'CASHIER_SHIFT_CREATE')
+WHERE r.name = 'RECEPTIONIST'
+  AND NOT EXISTS (
+      SELECT 1 FROM role_permissions rp
+      WHERE rp.role_id = r.id AND rp.permission_id = p.id
+  );
 
--- Grant permissions to MANAGER (66666666-6666-6666-6666-666666666666)
+-- Grant permissions to MANAGER
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT UUID_TO_BIN('66666666-6666-6666-6666-666666666666'), p.id
-FROM permissions p
-WHERE p.code IN ('CASHIER_SHIFT_READ', 'CASHIER_SHIFT_CONFIRM')
-AND NOT EXISTS (
-    SELECT 1 FROM role_permissions rp
-    WHERE rp.role_id = UUID_TO_BIN('66666666-6666-6666-6666-666666666666')
-    AND rp.permission_id = p.id
-);
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.code IN ('CASHIER_SHIFT_READ', 'CASHIER_SHIFT_CONFIRM')
+WHERE r.name = 'MANAGER'
+  AND NOT EXISTS (
+      SELECT 1 FROM role_permissions rp
+      WHERE rp.role_id = r.id AND rp.permission_id = p.id
+  );
 
--- Grant permissions to ADMIN (11111111-1111-1111-1111-111111111111)
+-- Grant permissions to ADMIN
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT UUID_TO_BIN('11111111-1111-1111-1111-111111111111'), p.id
-FROM permissions p
-WHERE p.code IN ('CASHIER_SHIFT_READ', 'CASHIER_SHIFT_CREATE', 'CASHIER_SHIFT_CONFIRM')
-AND NOT EXISTS (
-    SELECT 1 FROM role_permissions rp
-    WHERE rp.role_id = UUID_TO_BIN('11111111-1111-1111-1111-111111111111')
-    AND rp.permission_id = p.id
-);
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.code IN ('CASHIER_SHIFT_READ', 'CASHIER_SHIFT_CREATE', 'CASHIER_SHIFT_CONFIRM')
+WHERE r.name = 'ADMIN'
+  AND NOT EXISTS (
+      SELECT 1 FROM role_permissions rp
+      WHERE rp.role_id = r.id AND rp.permission_id = p.id
+  );

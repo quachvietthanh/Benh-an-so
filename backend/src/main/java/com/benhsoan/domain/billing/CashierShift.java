@@ -94,11 +94,11 @@ public class CashierShift {
             throw new ValidationException("Tổng số giao dịch không được âm.");
         }
         this.totalTransactions = totalTransactions;
-        this.totalSystemAmount = validateNonNegative(totalSystemAmount, "Tổng tiền hệ thống không được để trống.");
-        this.systemCashAmount = validateNonNegative(systemCashAmount, "Tiền mặt hệ thống không được để trống.");
-        this.systemTransferAmount = validateNonNegative(systemTransferAmount, "Tiền chuyển khoản hệ thống không được để trống.");
-        this.systemCardAmount = validateNonNegative(systemCardAmount, "Tiền quẹt thẻ hệ thống không được để trống.");
-        this.systemOtherAmount = validateNonNegative(systemOtherAmount, "Tiền phương thức khác hệ thống không được để trống.");
+        this.totalSystemAmount = requireNonNull(totalSystemAmount, "Tổng tiền hệ thống không được để trống.");
+        this.systemCashAmount = requireNonNull(systemCashAmount, "Tiền mặt hệ thống không được để trống.");
+        this.systemTransferAmount = requireNonNull(systemTransferAmount, "Tiền chuyển khoản hệ thống không được để trống.");
+        this.systemCardAmount = requireNonNull(systemCardAmount, "Tiền quẹt thẻ hệ thống không được để trống.");
+        this.systemOtherAmount = requireNonNull(systemOtherAmount, "Tiền phương thức khác hệ thống không được để trống.");
         this.actualCashAmount = validateNonNegative(actualCashAmount, "Tiền mặt thực tế không được để trống.");
         this.differenceAmount = requireNonNull(differenceAmount, "Chênh lệch tiền mặt không được để trống.");
         this.status = requireNonNull(status, "Trạng thái phiếu chốt ca không được để trống.");
@@ -126,7 +126,7 @@ public class CashierShift {
             Instant createdAt
     ) {
         BigDecimal validatedActual = validateNonNegative(actualCashAmount, "Tiền mặt thực tế không được để trống.");
-        BigDecimal validatedSysCash = validateNonNegative(systemCashAmount, "Tiền mặt hệ thống không được để trống.");
+        BigDecimal validatedSysCash = requireNonNull(systemCashAmount, "Tiền mặt hệ thống không được để trống.");
         BigDecimal difference = validatedActual.subtract(validatedSysCash);
 
         String trimmedNotes = notes != null ? notes.trim() : null;
