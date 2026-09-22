@@ -28,6 +28,20 @@ public record InvoicePrintDocument(
         Instant printedAt
 ) {
 
+    public InvoicePrintDocument {
+        if (lines != null && totalAmount != null && !lines.isEmpty()) {
+            BigDecimal calculatedTotal = lines.stream()
+                    .map(InvoicePrintLine::amount)
+                    .filter(java.util.Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (totalAmount.compareTo(calculatedTotal) != 0) {
+                throw new com.benhsoan.domain.shared.exception.ValidationException(
+                        "Tổng tiền hóa đơn không khớp với tổng các dòng chi phí."
+                );
+            }
+        }
+    }
+
     public record InvoicePrintLine(
             int itemIndex,
             String itemName,
