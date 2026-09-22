@@ -103,7 +103,7 @@ import WaitingForResultList from '../components/appointment-queue/WaitingForResu
 import CompletedTodayList from '../components/appointment-queue/CompletedTodayList'
 import { getAppointmentColumns } from './appointment-queue/appointmentColumns'
 import { getQueueBoardColumns } from './appointment-queue/queueBoardColumns'
-import PrioritizeQueueItemModal from '../components/queue/PrioritizeQueueItemModal'
+import PrioritizeQueueItemModal from '../components/queue/PrioritizeQueueItemModal.jsx'
 import { sortQueueItemsByPriority } from '../utils/queuePriorityHelpers.js'
 import {
   canRescheduleAppointment,

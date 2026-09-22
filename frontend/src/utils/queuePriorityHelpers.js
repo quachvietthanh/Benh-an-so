@@ -138,10 +138,6 @@ export function mapPrioritizeErrorMessage(error) {
   }
 
   if (status === 404 || serverMsg === 'Resource not found.') {
-    console.error(
-      '[Prioritize 404] Backend endpoint chưa sẵn sàng, kiểm tra lại việc Backend đã restart để nạp Controller mới hay chưa.',
-      error,
-    )
     return 'Không thể kết nối đến tính năng này. Vui lòng thử lại sau ít phút hoặc liên hệ bộ phận kỹ thuật.'
   }
 
