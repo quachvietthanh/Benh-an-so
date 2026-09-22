@@ -12,6 +12,7 @@ final class DomainExceptionHttpStatusMapper {
     static HttpStatus statusFor(DomainErrorCode code) {
         return switch (code) {
             case APPOINTMENT_NOT_FOUND,
+                    APPOINTMENT_SERIES_NOT_FOUND,
                     BACKUP_NOT_FOUND,
                     BATCH_NOT_FOUND,
                     CARE_LOG_NOT_FOUND,
@@ -99,6 +100,7 @@ final class DomainExceptionHttpStatusMapper {
                     APPOINTMENT_ALREADY_COMPLETED,
                     APPOINTMENT_ALREADY_IN_PROGRESS,
                     APPOINTMENT_INVALID_STATUS,
+                    APPOINTMENT_SERIES_CONFLICT,
                     APPOINTMENT_TIME_CONFLICT,
                     BATCH_STATE_CONFLICT,
                     CHECK_IN_CONFLICT,

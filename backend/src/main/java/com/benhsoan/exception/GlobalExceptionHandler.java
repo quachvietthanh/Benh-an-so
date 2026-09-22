@@ -92,6 +92,28 @@ public class GlobalExceptionHandler {
         return build(DomainExceptionHttpStatusMapper.statusFor(ex.getCode()), ex.getCode().name(), ex.getMessage(), request.getRequestURI());
     }
 
+    @ExceptionHandler(com.benhsoan.domain.appointment.exception.AppointmentSeriesConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleAppointmentSeriesConflict(
+            com.benhsoan.domain.appointment.exception.AppointmentSeriesConflictException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = DomainExceptionHttpStatusMapper.statusFor(ex.getCode());
+        Map<String, Object> details = new HashMap<>();
+        if (ex.getConflicts() != null) {
+            details.put("conflicts", ex.getConflicts().stream().map(c -> {
+                Map<String, Object> item = new HashMap<>();
+                item.put("sequenceNumber", c.sequenceNumber());
+                item.put("startTime", c.startTime());
+                item.put("endTime", c.endTime());
+                item.put("conflictType", c.conflictType());
+                item.put("reason", c.reason());
+                item.put("conflictReason", c.reason());
+                return item;
+            }).toList());
+        }
+        return build(status, ex.getCode().name(), ex.getMessage(), request.getRequestURI(), details);
+    }
+
     @ExceptionHandler(com.benhsoan.domain.patient.exception.PatientAlreadyMergedException.class)
     public ResponseEntity<ApiErrorResponse> handlePatientAlreadyMerged(
             com.benhsoan.domain.patient.exception.PatientAlreadyMergedException ex,
