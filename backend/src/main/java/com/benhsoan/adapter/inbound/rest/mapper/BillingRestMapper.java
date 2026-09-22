@@ -240,7 +240,13 @@ public class BillingRestMapper {
                 result.patientCode(),
                 anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patientCode()) : result.patientName(),
                 result.reason(),
-                result.completedAt()
+                result.completedAt(),
+                result.examFee(),
+                result.medicineFee(),
+                result.serviceFee(),
+                result.totalEstimatedAmount(),
+                result.hasPrescription(),
+                result.hasPendingDispense()
         );
     }
 

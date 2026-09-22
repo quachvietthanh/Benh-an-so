@@ -61,31 +61,67 @@ public interface JpaInvoiceRepository
             @Param("toExclusive") Instant toExclusive
     );
 
-    @Query("""
-            select
-                visit.id as visitId,
-                visit.visitCode as visitCode,
-                patient.id as patientId,
-                patient.patientCode as patientCode,
-                patient.fullName as patientName,
-                visit.reason as reason,
-                visit.completedAt as completedAt
-            from VisitEntity visit
-            join PatientEntity patient on patient.id = visit.patientId
-            left join PaymentEntity payment on payment.visitId = visit.id
-            where visit.status <> com.benhsoan.domain.visit.enums.VisitStatus.CANCELLED
-              and payment.id is null
-              and not exists (
-                  select 1
-                  from MedicalRecordEntity medicalRecord
-                  join PrescriptionEntity prescription
-                    on prescription.medicalRecordId = medicalRecord.id
-                  where medicalRecord.visitId = visit.id
-                    and prescription.status = com.benhsoan.domain.prescription.enums.PrescriptionStatus.PENDING_DISPENSE
-              )
-            order by visit.completedAt desc
-            """)
-    Page<PayableEncounterProjection> findPayableEncounters(Pageable pageable);
+    @Query(
+            value = """
+                    select
+                        visit.id as visitId,
+                        visit.visitCode as visitCode,
+                        patient.id as patientId,
+                        patient.patientCode as patientCode,
+                        patient.fullName as patientName,
+                        visit.reason as reason,
+                        visit.completedAt as completedAt,
+                        case when exists (
+                            select 1
+                            from MedicalRecordEntity medicalRecord
+                            join PrescriptionEntity prescription on prescription.medicalRecordId = medicalRecord.id
+                            where medicalRecord.visitId = visit.id
+                              and prescription.status != com.benhsoan.domain.prescription.enums.PrescriptionStatus.CANCELLED
+                        ) then true else false end as hasPrescription,
+                        case when exists (
+                            select 1
+                            from MedicalRecordEntity medicalRecord
+                            join PrescriptionEntity prescription on prescription.medicalRecordId = medicalRecord.id
+                            where medicalRecord.visitId = visit.id
+                              and prescription.status = com.benhsoan.domain.prescription.enums.PrescriptionStatus.PENDING_DISPENSE
+                        ) then true else false end as hasPendingDispense
+                    from VisitEntity visit
+                    join PatientEntity patient on patient.id = visit.patientId
+                    left join PaymentEntity payment on payment.visitId = visit.id
+                    where visit.status = com.benhsoan.domain.visit.enums.VisitStatus.COMPLETED
+                      and payment.id is null
+                      and (:fromCompletedAt is null or visit.completedAt >= :fromCompletedAt)
+                      and (:toCompletedAt is null or visit.completedAt < :toCompletedAt)
+                      and (:search is null
+                        or lower(patient.fullName) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(patient.patientCode) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(visit.visitCode) like lower(concat('%', :search, '%')) escape '\\')
+                    """,
+            countQuery = """
+                    select count(visit)
+                    from VisitEntity visit
+                    join PatientEntity patient on patient.id = visit.patientId
+                    left join PaymentEntity payment on payment.visitId = visit.id
+                    where visit.status = com.benhsoan.domain.visit.enums.VisitStatus.COMPLETED
+                      and payment.id is null
+                      and (:fromCompletedAt is null or visit.completedAt >= :fromCompletedAt)
+                      and (:toCompletedAt is null or visit.completedAt < :toCompletedAt)
+                      and (:search is null
+                        or lower(patient.fullName) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(patient.patientCode) like lower(concat('%', :search, '%')) escape '\\'
+                        or lower(visit.visitCode) like lower(concat('%', :search, '%')) escape '\\')
+                    """
+    )
+    Page<PayableEncounterProjection> findPayableEncounters(
+            @Param("fromCompletedAt") Instant fromCompletedAt,
+            @Param("toCompletedAt") Instant toCompletedAt,
+            @Param("search") String search,
+            Pageable pageable
+    );
+
+    default Page<PayableEncounterProjection> findPayableEncounters(Pageable pageable) {
+        return findPayableEncounters(null, null, null, pageable);
+    }
 
     @Query(
             value = """
