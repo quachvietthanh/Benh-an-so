@@ -210,13 +210,15 @@ public class Payment {
             Instant paidAt,
             VisitStatus visitStatus,
             boolean dispensingCompleted) {
-        PaymentMethodItem singleItem = PaymentMethodItem.create(
-                UUID.randomUUID(),
-                id,
-                paymentMethod,
-                amountPaid,
-                null,
-                paidAt);
+        List<PaymentMethodItem> singleItem = (amountPaid != null && amountPaid.compareTo(BigDecimal.ZERO) == 0)
+                ? List.of()
+                : List.of(PaymentMethodItem.create(
+                        UUID.randomUUID(),
+                        id,
+                        paymentMethod,
+                        amountPaid,
+                        null,
+                        paidAt));
         return record(
                 id,
                 visitId,
@@ -226,7 +228,7 @@ public class Payment {
                 discountAmount,
                 discountRequestId,
                 amountPaid,
-                List.of(singleItem),
+                singleItem,
                 collectedBy,
                 paidAt,
                 visitStatus,
