@@ -1,5 +1,5 @@
 -- =====================================================
--- V81__add_priority_to_queue_items.sql
+-- V83__add_priority_to_queue_items.sql
 -- NCL-03-CN-013: Ưu tiên khám cho trường hợp cấp cứu
 -- Support queue item priority level, priority reason, and audit fields
 -- =====================================================
