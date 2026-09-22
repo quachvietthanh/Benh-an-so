@@ -6,11 +6,13 @@ import {
   Card,
   Col,
   DatePicker,
+  Descriptions,
   Divider,
   Empty,
   Form,
   Input,
   InputNumber,
+  Modal,
   Row,
   Select,
   Space,
@@ -30,6 +32,7 @@ import {
   CheckCircleOutlined,
   CopyOutlined,
   DeleteOutlined,
+  EditOutlined,
   FieldTimeOutlined,
   HistoryOutlined,
   InboxOutlined,
@@ -39,6 +42,7 @@ import {
   SaveOutlined,
   SearchOutlined,
   ShopOutlined,
+  StopOutlined,
   UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
@@ -70,6 +74,26 @@ const normalizeBatch = (batch) => ({
   id: batch?.batchId || batch?.id,
 })
 
+const isDiscardableBatch = (batch) => (
+  Boolean(batch?.expiryDate)
+  && dayjs(batch.expiryDate).isBefore(dayjs(), 'day')
+  && String(batch?.status || '').toUpperCase() !== 'EXPIRED'
+  && Number(batch?.quantity || 0) > 0
+)
+
+const inventoryOperationErrorMessage = (error, fallback) => {
+  const code = error?.response?.data?.code || error?.apiError?.code
+  const messages = {
+    VALIDATION_FAILED: 'Dữ liệu điều chỉnh chưa hợp lệ. Vui lòng kiểm tra số lượng thực tế và lý do.',
+    BATCH_NOT_EXPIRED: 'Chỉ được hủy lô thuốc đã quá hạn sử dụng.',
+    BATCH_ALREADY_DISCARDED: 'Lô thuốc đã được hủy hoặc không còn số lượng tồn.',
+    ACCESS_DENIED: 'Bạn không có quyền điều chỉnh hoặc hủy lô thuốc.',
+    BATCH_NOT_FOUND: 'Không tìm thấy lô thuốc. Dữ liệu có thể đã thay đổi.',
+    BATCH_STATE_CONFLICT: 'Trạng thái lô thuốc đã thay đổi, không thể điều chỉnh.',
+  }
+  return messages[code] || getErrorMessage(error, fallback)
+}
+
 function InventoryReceiptPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -85,8 +109,12 @@ function InventoryReceiptPage() {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
   const canManageReceipts = userPermissions.includes('PHARMACY_CREATE') || roles.includes('pharmacist') || roles.includes('admin')
+  // NCL-06-CN-010: PHARMACY_UPDATE — controller + service double-check (PHARMACIST/ADMIN fallback)
+  const canAdjustDiscard = userPermissions.includes('PHARMACY_UPDATE') || roles.includes('pharmacist') || roles.includes('admin')
 
   const [form] = Form.useForm()
+  const [adjustForm] = Form.useForm()
+  const [discardForm] = Form.useForm()
 
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'create')
 
@@ -104,6 +132,13 @@ function InventoryReceiptPage() {
   const [batchEligibleFilter, setBatchEligibleFilter] = useState('ALL')
   const [batchExpiryFilter, setBatchExpiryFilter] = useState('ALL')
 
+  // NCL-06-CN-010 CV-04 — adjust / discard UI state
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false)
+  const [discardModalOpen, setDiscardModalOpen] = useState(false)
+  const [selectedBatch, setSelectedBatch] = useState(null)
+  const [submittingAdjust, setSubmittingAdjust] = useState(false)
+  const [submittingDiscard, setSubmittingDiscard] = useState(false)
+
   const formItems = Form.useWatch('items', form) || []
   const totalReceiptAmount = useMemo(() => {
     return formItems.reduce((sum, item) => {
@@ -112,6 +147,104 @@ function InventoryReceiptPage() {
       return sum + (q > 0 ? q : 0) * (p > 0 ? p : 0)
     }, 0)
   }, [formItems])
+
+  const openAdjustModal = (batch) => {
+    if (!canAdjustDiscard) {
+      message.error('Bạn không có quyền điều chỉnh tồn kho.')
+      return
+    }
+    setSelectedBatch(batch)
+    adjustForm.setFieldsValue({ actualQuantity: Number(batch?.quantity || 0), reason: '' })
+    setAdjustModalOpen(true)
+  }
+
+  const openDiscardModal = (batch) => {
+    if (!canAdjustDiscard) {
+      message.error('Bạn không có quyền hủy lô thuốc.')
+      return
+    }
+    setSelectedBatch(batch)
+    discardForm.resetFields()
+    setDiscardModalOpen(true)
+  }
+
+  const closeOperationModals = () => {
+    if (!submittingAdjust && !submittingDiscard) {
+      setAdjustModalOpen(false)
+      setDiscardModalOpen(false)
+      setSelectedBatch(null)
+      adjustForm.resetFields()
+      discardForm.resetFields()
+    }
+  }
+
+  const handleAdjustSubmit = async (values) => {
+    if (!selectedBatch || !canAdjustDiscard) return
+    const actualQuantity = Number(values.actualQuantity)
+    const currentQuantity = Number(selectedBatch.quantity || 0)
+    const reason = String(values.reason || '').trim()
+
+    if (!Number.isInteger(actualQuantity) || actualQuantity < 0) {
+      adjustForm.setFields([{ name: 'actualQuantity', errors: ['Số lượng thực tế phải là số nguyên không âm.'] }])
+      return
+    }
+    if (!reason) {
+      adjustForm.setFields([{ name: 'reason', errors: ['Vui lòng nhập lý do điều chỉnh theo QTN-32.'] }])
+      return
+    }
+    if (actualQuantity === currentQuantity) {
+      adjustForm.setFields([{ name: 'actualQuantity', errors: ['Số thực tế phải khác tồn hiện tại (chênh lệch khác 0).'] }])
+      return
+    }
+
+    setSubmittingAdjust(true)
+    try {
+      const response = await pharmacyApi.adjustBatchStock(selectedBatch.batchId || selectedBatch.id, {
+        actualQuantity,
+        reason,
+      })
+      const result = response?.data || {}
+      const change = Number(result.quantityChange ?? actualQuantity - currentQuantity)
+      const changeLabel = change > 0 ? `tăng ${change}` : `giảm ${Math.abs(change)}`
+      message.success(`Đã điều chỉnh tồn kho: ${changeLabel} ${selectedBatch.unit || ''}. Người thực hiện và lý do đã được ghi nhận.`)
+      setAdjustModalOpen(false)
+      setSelectedBatch(null)
+      adjustForm.resetFields()
+      await loadData()
+    } catch (error) {
+      message.error(inventoryOperationErrorMessage(error, 'Không thể điều chỉnh tồn kho.'))
+    } finally {
+      setSubmittingAdjust(false)
+    }
+  }
+
+  const handleDiscardSubmit = async (values) => {
+    if (!selectedBatch || !canAdjustDiscard) return
+    const reason = String(values.reason || '').trim()
+    if (!reason) {
+      discardForm.setFields([{ name: 'reason', errors: ['Vui lòng nhập lý do hủy lô theo QTN-32.'] }])
+      return
+    }
+    if (!isDiscardableBatch(selectedBatch)) {
+      message.error('Chỉ được hủy lô đã quá hạn và còn số lượng tồn.')
+      return
+    }
+
+    setSubmittingDiscard(true)
+    try {
+      const response = await pharmacyApi.discardExpiredBatch(selectedBatch.batchId || selectedBatch.id, { reason })
+      const result = response?.data || {}
+      message.success(`Đã hủy ${Number(result.discardedQuantity ?? selectedBatch.quantity ?? 0).toLocaleString('vi-VN')} ${selectedBatch.unit || ''} của lô ${selectedBatch.batchNumber}. Lô đã được loại khỏi cấp phát.`)
+      setDiscardModalOpen(false)
+      setSelectedBatch(null)
+      discardForm.resetFields()
+      await loadData()
+    } catch (error) {
+      message.error(inventoryOperationErrorMessage(error, 'Không thể hủy lô thuốc hết hạn.'))
+    } finally {
+      setSubmittingDiscard(false)
+    }
+  }
 
   const loadData = useCallback(async () => {
     if (!canManageReceipts) return
@@ -479,6 +612,31 @@ function InventoryReceiptPage() {
         return <Tag color="orange">Không đủ điều kiện</Tag>
       },
     },
+    {
+      title: 'Thao tác (NCL-06-CN-010)',
+      key: 'inventoryOps',
+      width: 210,
+      render: (_, batch) => {
+        const expired = String(batch?.status || '').toUpperCase() === 'EXPIRED'
+        const canAdjust = !expired
+        const adjustDisabled = !canAdjustDiscard || !canAdjust
+        const discardDisabled = !isDiscardableBatch(batch) || !canAdjustDiscard
+        return (
+          <Space size={6} wrap>
+            <Tooltip title={adjustDisabled ? (canAdjust ? 'Bạn không có quyền PHARMACY_UPDATE' : 'Lô đã hủy, không thể điều chỉnh') : 'Điều chỉnh tồn kho sau kiểm kê (QTN-32)'}>
+              <Button size="small" icon={<EditOutlined />} disabled={adjustDisabled} onClick={() => openAdjustModal(batch)}>
+                Điều chỉnh
+              </Button>
+            </Tooltip>
+            <Tooltip title={!isDiscardableBatch(batch) ? 'Chỉ hủy được lô đã quá hạn và còn tồn' : (!canAdjustDiscard ? 'Yêu cầu quyền PHARMACY_UPDATE' : 'Hủy lô hết hạn (QTN-14, QTN-32)')}>
+              <Button size="small" danger icon={<StopOutlined />} disabled={discardDisabled} onClick={() => openDiscardModal(batch)}>
+                Hủy lô
+              </Button>
+            </Tooltip>
+          </Space>
+        )
+      },
+    },
   ]
 
   const alertColumns = [
@@ -552,31 +710,44 @@ function InventoryReceiptPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 150,
+      width: 260,
       align: 'center',
       render: (_, record) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            form.setFieldsValue({
-              items: [
-                {
-                  medicineId: record.medicineId,
-                  batchNumber: '',
-                  expiryDate: null,
-                  quantity: Math.max(Number(record.quantity) || 10, 10),
-                  importPrice: 0,
-                },
-              ],
-              note: `Phiếu nhập thay thế lô ${record.batchNumber} sắp/đã hết hạn`,
-            })
-            setActiveTab('create')
-          }}
-        >
-          Nhập lô mới
-        </Button>
+        <Space size={6} wrap>
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              form.setFieldsValue({
+                items: [
+                  {
+                    medicineId: record.medicineId,
+                    batchNumber: '',
+                    expiryDate: null,
+                    quantity: Math.max(Number(record.quantity) || 10, 10),
+                    importPrice: 0,
+                  },
+                ],
+                note: `Phiếu nhập thay thế lô ${record.batchNumber} sắp/đã hết hạn`,
+              })
+              setActiveTab('create')
+            }}
+          >
+            Nhập lô mới
+          </Button>
+          <Tooltip title={!isDiscardableBatch(record) ? 'Chỉ hủy được lô đã quá hạn và còn tồn' : (!canAdjustDiscard ? 'Yêu cầu quyền PHARMACY_UPDATE' : 'Hủy lô hết hạn')}>
+            <Button
+              danger
+              size="small"
+              icon={<StopOutlined />}
+              disabled={!canAdjustDiscard || !isDiscardableBatch(record)}
+              onClick={() => openDiscardModal(record)}
+            >
+              Hủy lô
+            </Button>
+          </Tooltip>
+        </Space>
       ),
     },
   ]
@@ -1169,6 +1340,136 @@ function InventoryReceiptPage() {
           ]}
         />
       </Card>
+
+      <Modal
+        title={(
+          <Space>
+            <EditOutlined style={{ color: '#1677ff' }} />
+            <span>Điều chỉnh tồn kho sau kiểm kê</span>
+          </Space>
+        )}
+        open={adjustModalOpen}
+        onCancel={closeOperationModals}
+        onOk={() => adjustForm.submit()}
+        okText="Xác nhận điều chỉnh"
+        cancelText="Hủy"
+        confirmLoading={submittingAdjust}
+        destroyOnClose
+        maskClosable={!submittingAdjust}
+      >
+        {selectedBatch && (
+          <>
+            <Descriptions bordered size="small" column={1} style={{ marginBottom: 20 }}>
+              <Descriptions.Item label="Thuốc">
+                <strong>{selectedBatch.medicineName || medicineMap.get(String(selectedBatch.medicineId))?.medicineName || '—'}</strong>
+                {selectedBatch.medicineCode && <Text type="secondary"> ({selectedBatch.medicineCode})</Text>}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số lô">{selectedBatch.batchNumber || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Hạn sử dụng">
+                {selectedBatch.expiryDate ? dayjs(selectedBatch.expiryDate).format('DD/MM/YYYY') : '—'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tồn hiện tại">
+                <strong>{Number(selectedBatch.quantity || 0).toLocaleString('vi-VN')}</strong>{' '}
+                {selectedBatch.unit || medicineMap.get(String(selectedBatch.medicineId))?.unit || ''}
+              </Descriptions.Item>
+            </Descriptions>
+            <Form form={adjustForm} layout="vertical" onFinish={handleAdjustSubmit} preserve={false}>
+              <Form.Item
+                name="actualQuantity"
+                label="Số lượng thực tế sau kiểm kê *"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập số lượng thực tế.' },
+                  { type: 'number', min: 0, message: 'Số lượng thực tế không được âm.' },
+                ]}
+              >
+                <InputNumber
+                  min={0}
+                  precision={0}
+                  style={{ width: '100%' }}
+                  placeholder="Nhập số lượng thực tế"
+                  addonAfter={selectedBatch.unit || medicineMap.get(String(selectedBatch.medicineId))?.unit || 'Đơn vị'}
+                />
+              </Form.Item>
+              <Form.Item
+                name="reason"
+                label="Lý do điều chỉnh *"
+                rules={[
+                  { required: true, whitespace: true, message: 'Vui lòng nhập lý do điều chỉnh theo QTN-32.' },
+                  { max: 500, message: 'Lý do không được vượt quá 500 ký tự.' },
+                ]}
+              >
+                <Input.TextArea
+                  rows={4}
+                  maxLength={500}
+                  showCount
+                  placeholder="Ví dụ: Kiểm kê cuối tháng phát hiện thuốc bị vỡ hoặc thất thoát..."
+                />
+              </Form.Item>
+            </Form>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        title={(
+          <Space>
+            <StopOutlined style={{ color: '#ff4d4f' }} />
+            <span>Hủy lô thuốc hết hạn</span>
+          </Space>
+        )}
+        open={discardModalOpen}
+        onCancel={closeOperationModals}
+        onOk={() => discardForm.submit()}
+        okText="Xác nhận hủy lô"
+        cancelText="Đóng"
+        okButtonProps={{ danger: true }}
+        confirmLoading={submittingDiscard}
+        destroyOnClose
+        maskClosable={!submittingDiscard}
+      >
+        {selectedBatch && (
+          <>
+            <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="Thuốc">
+                <strong>{selectedBatch.medicineName || medicineMap.get(String(selectedBatch.medicineId))?.medicineName || '—'}</strong>
+                {selectedBatch.medicineCode && <Text type="secondary"> ({selectedBatch.medicineCode})</Text>}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số lô">{selectedBatch.batchNumber || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Ngày hết hạn">
+                <Tag color="red">{selectedBatch.expiryDate ? dayjs(selectedBatch.expiryDate).format('DD/MM/YYYY') : '—'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Số lượng sẽ hủy">
+                <strong style={{ color: '#cf1322' }}>{Number(selectedBatch.quantity || 0).toLocaleString('vi-VN')}</strong>{' '}
+                {selectedBatch.unit || medicineMap.get(String(selectedBatch.medicineId))?.unit || ''}
+              </Descriptions.Item>
+            </Descriptions>
+            <Alert
+              type="warning"
+              showIcon
+              message="Lô sẽ chuyển sang trạng thái EXPIRED"
+              description="Số lượng tồn sẽ về 0 và lô bị loại khỏi danh sách cấp phát FEFO. Thao tác này cần lý do theo QTN-32."
+              style={{ marginBottom: 16 }}
+            />
+            <Form form={discardForm} layout="vertical" onFinish={handleDiscardSubmit} preserve={false}>
+              <Form.Item
+                name="reason"
+                label="Lý do hủy lô *"
+                rules={[
+                  { required: true, whitespace: true, message: 'Vui lòng nhập lý do hủy lô theo QTN-32.' },
+                  { max: 500, message: 'Lý do không được vượt quá 500 ký tự.' },
+                ]}
+              >
+                <Input.TextArea
+                  rows={4}
+                  maxLength={500}
+                  showCount
+                  placeholder="Ví dụ: Hủy theo biên bản tiêu hủy lô thuốc hết hạn..."
+                />
+              </Form.Item>
+            </Form>
+          </>
+        )}
+      </Modal>
     </div>
   )
 }
