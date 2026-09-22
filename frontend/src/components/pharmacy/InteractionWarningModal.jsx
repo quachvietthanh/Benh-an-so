@@ -10,13 +10,13 @@ function renderSeverityTag(severity) {
   const sev = String(severity).toUpperCase()
   switch (sev) {
     case 'CONTRAINDICATED':
-      return <Tag color="magenta">Chống chỉ định (CONTRAINDICATED)</Tag>
+      return <Tag color="magenta">Chống chỉ định</Tag>
     case 'SEVERE':
-      return <Tag color="red">Nghiêm trọng (SEVERE)</Tag>
+      return <Tag color="red">Nghiêm trọng</Tag>
     case 'MODERATE':
-      return <Tag color="orange">Trung bình (MODERATE)</Tag>
+      return <Tag color="orange">Trung bình</Tag>
     case 'MILD':
-      return <Tag color="blue">Nhẹ (MILD)</Tag>
+      return <Tag color="blue">Nhẹ</Tag>
     default:
       return <Tag color="orange">{severity}</Tag>
   }

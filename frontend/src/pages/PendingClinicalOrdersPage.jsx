@@ -476,9 +476,6 @@ function PendingClinicalOrdersPage() {
             <ExperimentOutlined style={{ color: '#2563eb', marginRight: 8 }} />
             Theo dõi chỉ định cận lâm sàng chờ kết quả
           </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            Quản lý và rà soát các dịch vụ cận lâm sàng đang chờ kết quả, cảnh báo chỉ định treo trước khi ký bệnh án (NCL-04-CN-008).
-          </Text>
         </div>
 
         <Space wrap>

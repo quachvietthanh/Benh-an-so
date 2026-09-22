@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.domain.billing.exception.PaymentAmountMismatchException;
+import com.benhsoan.domain.billing.exception.PaymentAlreadySettledException;
 import com.benhsoan.domain.billing.exception.PaymentNotAllowedException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.enums.VisitStatus;
@@ -57,8 +58,13 @@ public class Payment {
 
     private Instant createdAt;
 
+    private UUID cashierShiftId;
+
+<<<<<<< HEAD
     private List<PaymentMethodItem> paymentMethodItems;
 
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     private Payment(
             UUID id,
             UUID visitId,
@@ -75,7 +81,12 @@ public class Payment {
             UUID refundedBy,
             Instant refundedAt,
             Instant createdAt,
+<<<<<<< HEAD
+            UUID cashierShiftId,
             List<PaymentMethodItem> paymentMethodItems
+=======
+            UUID cashierShiftId
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     ) {
         this.id = requireNonNull(id, "Payment id is required.");
         this.visitId = requireNonNull(visitId, "Visit id is required.");
@@ -97,6 +108,8 @@ public class Payment {
         this.refundedBy = refundedBy;
         this.refundedAt = refundedAt;
         this.createdAt = requireNonNull(createdAt, "Payment creation time is required.");
+        this.cashierShiftId = cashierShiftId;
+<<<<<<< HEAD
         this.paymentMethodItems = validatePaymentMethodItems(
                 paymentMethodItems,
                 this.amountPaid,
@@ -159,8 +172,11 @@ public class Payment {
                 null,
                 null,
                 paidAt,
+                null,
                 paymentMethodItems
         );
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
     }
 
     public static Payment record(
@@ -182,7 +198,8 @@ public class Payment {
                 paymentMethod,
                 amountPaid,
                 null,
-                paidAt
+                paidAt,
+                null
         );
         return record(
                 id,
@@ -255,6 +272,7 @@ public class Payment {
                 null,
                 null,
                 createdAt,
+                (UUID) null,
                 null
         );
     }
@@ -289,6 +307,7 @@ public class Payment {
                 null,
                 null,
                 createdAt,
+                (UUID) null,
                 null
         );
     }
@@ -325,6 +344,10 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+<<<<<<< HEAD
+                (UUID) null,
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
                 null
         );
     }
@@ -362,6 +385,94 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+<<<<<<< HEAD
+                (UUID) null,
+=======
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
+                null
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt,
+<<<<<<< HEAD
+            UUID cashierShiftId,
+            List<PaymentMethodItem> paymentMethodItems
+=======
+            UUID cashierShiftId
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
+    ) {
+        return new Payment(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt,
+<<<<<<< HEAD
+                cashierShiftId,
+                paymentMethodItems
+        );
+    }
+
+    public static Payment restore(
+            UUID id,
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal serviceFee,
+            BigDecimal totalAmount,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            PaymentStatus status,
+            UUID collectedBy,
+            Instant paidAt,
+            String refundReason,
+            UUID refundedBy,
+            Instant refundedAt,
+            Instant createdAt,
+            UUID cashierShiftId
+    ) {
+        return restore(
+                id,
+                visitId,
+                examFee,
+                medicineFee,
+                serviceFee,
+                totalAmount,
+                amountPaid,
+                paymentMethod,
+                status,
+                collectedBy,
+                paidAt,
+                refundReason,
+                refundedBy,
+                refundedAt,
+                createdAt,
+                cashierShiftId,
                 null
         );
     }
@@ -384,7 +495,7 @@ public class Payment {
             Instant createdAt,
             List<PaymentMethodItem> paymentMethodItems
     ) {
-        return new Payment(
+        return restore(
                 id,
                 visitId,
                 examFee,
@@ -400,7 +511,11 @@ public class Payment {
                 refundedBy,
                 refundedAt,
                 createdAt,
+                null,
                 paymentMethodItems
+=======
+                cashierShiftId
+>>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         );
     }
 
@@ -412,7 +527,22 @@ public class Payment {
         return status == PaymentStatus.REFUNDED;
     }
 
+    public boolean isSettled() {
+        return cashierShiftId != null;
+    }
+
+    public void assignToShift(UUID shiftId) {
+        if (this.cashierShiftId != null && !this.cashierShiftId.equals(shiftId)) {
+            throw new ValidationException("Khoản thu đã được gán cho một ca chốt khác.");
+        }
+        this.cashierShiftId = requireNonNull(shiftId, "Mã ca chốt không được để trống.");
+    }
+
     public void refund(String reason, UUID refundedBy, Instant refundedAt) {
+        if (isSettled()) {
+            throw new PaymentAlreadySettledException(this.id);
+        }
+
         String validatedReason = requireText(reason, "Refund reason is required.");
         UUID validatedRefundedBy = requireNonNull(
                 refundedBy,
@@ -504,12 +634,15 @@ public class Payment {
     ) {
         if (items == null || items.isEmpty()) {
             if (paymentMethod != null && paymentMethod != PaymentMethod.MULTIPLE) {
+                String defaultRef = paymentMethod == PaymentMethod.BANK_TRANSFER
+                        ? "REF-" + (paymentId != null ? paymentId.toString().substring(0, 8) : "LEGACY")
+                        : null;
                 return List.of(PaymentMethodItem.create(
                         UUID.randomUUID(),
                         paymentId,
                         paymentMethod,
                         amountPaid,
-                        null,
+                        defaultRef,
                         paidAt
                 ));
             }

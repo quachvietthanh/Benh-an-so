@@ -38,11 +38,14 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import contraindicationRuleManagementApi from '../api/contraindicationRuleManagementApi'
+import diagnosisCatalogApi from '../api/diagnosisCatalogApi'
 import DiagnosisCatalogAutocomplete from '../components/diagnosis-catalog/DiagnosisCatalogAutocomplete'
 import { useAuthContext } from '../context/AuthContext'
 import {
   CONTRAINDICATION_SEVERITY_META,
   CONTRAINDICATION_TYPE_META,
+  DIAGNOSIS_CATALOG_FALLBACK,
+  getDiagnosisInfo,
 } from '../utils/contraindicationValidation'
 
 const { Title, Text, Paragraph } = Typography
@@ -70,6 +73,9 @@ export default function ContraindicationRuleManagementPage() {
   const [searchType, setSearchType] = useState(undefined)
   const [searchSeverity, setSearchSeverity] = useState(undefined)
   const [searchActive, setSearchActive] = useState(undefined)
+
+  // State bộ map mã bệnh (ICD-10) để hiển thị chuẩn mã và tên bệnh
+  const [diagnosisMap, setDiagnosisMap] = useState(DIAGNOSIS_CATALOG_FALLBACK)
 
   // State modal thêm / sửa
   const [modalOpen, setModalOpen] = useState(false)
@@ -111,6 +117,50 @@ export default function ContraindicationRuleManagementPage() {
     loadRules()
   }, [loadRules])
 
+  // Tự động nạp thông tin mã bệnh nếu có quy tắc bệnh nền chứa mã mới
+  useEffect(() => {
+    const missingIds = rules
+      .filter(
+        (r) =>
+          r.type === 'DISEASE' &&
+          r.diagnosisCatalogId &&
+          !diagnosisMap[r.diagnosisCatalogId]
+      )
+      .map((r) => r.diagnosisCatalogId)
+
+    if (missingIds.length === 0) return
+
+    let isMounted = true
+    const fetchDiagnoses = async () => {
+      const updates = {}
+      await Promise.all(
+        missingIds.map(async (id) => {
+          try {
+            const res = await diagnosisCatalogApi.getById(id)
+            const item = res?.data || res
+            if (item && (item.code || item.name)) {
+              updates[id] = {
+                code: item.code,
+                name: item.name || item.diseaseName,
+              }
+            }
+          } catch {
+            if (DIAGNOSIS_CATALOG_FALLBACK[id]) {
+              updates[id] = DIAGNOSIS_CATALOG_FALLBACK[id]
+            }
+          }
+        })
+      )
+      if (isMounted && Object.keys(updates).length > 0) {
+        setDiagnosisMap((prev) => ({ ...prev, ...updates }))
+      }
+    }
+    fetchDiagnoses()
+    return () => {
+      isMounted = false
+    }
+  }, [rules, diagnosisMap])
+
   const handleIngredientChange = (e) => {
     setSearchIngredient(e.target.value)
     setPage(1)
@@ -146,10 +196,11 @@ export default function ContraindicationRuleManagementPage() {
   const handleOpenEditModal = (record) => {
     setEditingRule(record)
     if (record.diagnosisCatalogId) {
+      const diagInfo = getDiagnosisInfo(record, diagnosisMap)
       setSelectedDiagnosis({
         id: record.diagnosisCatalogId,
-        diseaseName: record.diagnosisName || 'Bệnh nền ICD',
-        code: 'ICD-10',
+        diseaseName: diagInfo.name || 'Bệnh nền ICD',
+        code: diagInfo.code || 'ICD-10',
       })
     } else {
       setSelectedDiagnosis(null)
@@ -315,13 +366,22 @@ export default function ContraindicationRuleManagementPage() {
           return <Tag color="purple">Phụ nữ cho con bú</Tag>
         }
         if (record.type === 'DISEASE') {
-          return record.diagnosisName ? (
-            <Tag color="cyan">{record.diagnosisName}</Tag>
-          ) : record.diagnosisCatalogId ? (
-            `Mã bệnh (${record.diagnosisCatalogId.substring(0, 8)}...)`
-          ) : (
-            'Bệnh nền mạn tính'
-          )
+          const diagInfo = getDiagnosisInfo(record, diagnosisMap)
+          if (diagInfo.code && diagInfo.name) {
+            return (
+              <Tag color="cyan" style={{ fontSize: 13, padding: '2px 8px' }}>
+                <strong style={{ color: '#0369a1' }}>{diagInfo.code}</strong> - {diagInfo.name}
+              </Tag>
+            )
+          }
+          if (diagInfo.displayText && diagInfo.displayText !== '—') {
+            return (
+              <Tag color="cyan" style={{ fontSize: 13, padding: '2px 8px' }}>
+                {diagInfo.displayText}
+              </Tag>
+            )
+          }
+          return <Tag color="cyan">Bệnh nền mạn tính</Tag>
         }
         return '—'
       },
@@ -385,14 +445,29 @@ export default function ContraindicationRuleManagementPage() {
         <Space size="small">
           <Tooltip title="Chỉnh sửa quy tắc">
             <Button
-              size="small"
-              icon={<EditOutlined />}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                backgroundColor: '#fef3c7',
+                borderColor: '#fde68a',
+                color: '#d97706',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              icon={<EditOutlined style={{ fontSize: 16 }} />}
               onClick={() => handleOpenEditModal(record)}
               disabled={!canManage}
             />
           </Tooltip>
           <Popconfirm
             title={record.active ? 'Vô hiệu hóa quy tắc?' : 'Kích hoạt lại quy tắc?'}
+            description={
+              record.active
+                ? `Tạm dừng quy tắc này sẽ không còn cảnh báo cho hoạt chất "${record.activeIngredient}".`
+                : `Kích hoạt lại quy tắc cảnh báo cho hoạt chất "${record.activeIngredient}".`
+            }
             onConfirm={() => handleToggleActive(record)}
             okText="Đồng ý"
             cancelText="Hủy"
@@ -400,9 +475,24 @@ export default function ContraindicationRuleManagementPage() {
           >
             <Tooltip title={record.active ? 'Tạm dừng quy tắc' : 'Kích hoạt lại'}>
               <Button
-                size="small"
-                danger={record.active}
-                icon={record.active ? <StopOutlined /> : <CheckCircleOutlined style={{ color: '#10b981' }} />}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: record.active ? '#fee2e2' : '#dcfce7',
+                  borderColor: record.active ? '#fecaca' : '#bbf7d0',
+                  color: record.active ? '#dc2626' : '#16a34a',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                icon={
+                  record.active ? (
+                    <StopOutlined style={{ fontSize: 16 }} />
+                  ) : (
+                    <CheckCircleOutlined style={{ fontSize: 16 }} />
+                  )
+                }
                 disabled={!canManage}
               />
             </Tooltip>
@@ -424,9 +514,6 @@ export default function ContraindicationRuleManagementPage() {
               <MedicineBoxOutlined style={{ color: '#0284c7', marginRight: 10 }} />
               Quản lý danh mục quy tắc chống chỉ định
             </Title>
-            <Paragraph style={{ margin: '4px 0 0 0', color: '#64748b' }}>
-              Cấu hình các ngưỡng chống chỉ định theo độ tuổi, tình trạng thai kỳ, nuôi con bú và bệnh nền mạn tính (NCL-05-CN-006).
-            </Paragraph>
           </Col>
           <Col xs={24} md={10} style={{ textAlign: 'right' }}>
             <Space wrap>
@@ -482,10 +569,10 @@ export default function ContraindicationRuleManagementPage() {
               onChange={handleTypeChange}
               allowClear
             >
-              <Select.Option value="AGE">Theo độ tuổi (AGE)</Select.Option>
-              <Select.Option value="PREGNANCY">Thai kỳ (PREGNANCY)</Select.Option>
-              <Select.Option value="BREASTFEEDING">Cho con bú (BREASTFEEDING)</Select.Option>
-              <Select.Option value="DISEASE">Bệnh nền mạn tính (DISEASE)</Select.Option>
+              <Select.Option value="AGE">Theo độ tuổi</Select.Option>
+              <Select.Option value="PREGNANCY">Thai kỳ</Select.Option>
+              <Select.Option value="BREASTFEEDING">Cho con bú</Select.Option>
+              <Select.Option value="DISEASE">Bệnh nền mạn tính</Select.Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -497,9 +584,9 @@ export default function ContraindicationRuleManagementPage() {
               allowClear
             >
               <Select.Option value="CONTRAINDICATED">Chống chỉ định tuyệt đối</Select.Option>
-              <Select.Option value="SEVERE">Nguy cơ nặng (SEVERE)</Select.Option>
-              <Select.Option value="MODERATE">Nguy cơ trung bình (MODERATE)</Select.Option>
-              <Select.Option value="LOW">Thấp / Nhẹ (LOW)</Select.Option>
+              <Select.Option value="SEVERE">Nguy cơ nặng</Select.Option>
+              <Select.Option value="MODERATE">Nguy cơ trung bình</Select.Option>
+              <Select.Option value="LOW">Thấp / Nhẹ</Select.Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -578,10 +665,10 @@ export default function ContraindicationRuleManagementPage() {
                     }
                   }}
                 >
-                  <Select.Option value="AGE">Theo độ tuổi (AGE)</Select.Option>
-                  <Select.Option value="PREGNANCY">Thai kỳ (PREGNANCY)</Select.Option>
-                  <Select.Option value="BREASTFEEDING">Cho con bú (BREASTFEEDING)</Select.Option>
-                  <Select.Option value="DISEASE">Bệnh nền mạn tính (DISEASE)</Select.Option>
+                  <Select.Option value="AGE">Theo độ tuổi</Select.Option>
+                  <Select.Option value="PREGNANCY">Thai kỳ</Select.Option>
+                  <Select.Option value="BREASTFEEDING">Cho con bú</Select.Option>
+                  <Select.Option value="DISEASE">Bệnh nền mạn tính</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -639,6 +726,15 @@ export default function ContraindicationRuleManagementPage() {
                   onSelect={(item) => {
                     setSelectedDiagnosis(item)
                     form.setFieldsValue({ diagnosisCatalogId: item?.id })
+                    if (item?.id) {
+                      setDiagnosisMap((prev) => ({
+                        ...prev,
+                        [item.id]: {
+                          code: item.code,
+                          name: item.name || item.diseaseName,
+                        },
+                      }))
+                    }
                   }}
                   onChange={(code, item) => {
                     if (!code) {
@@ -659,7 +755,7 @@ export default function ContraindicationRuleManagementPage() {
           )}
 
           <Form.Item
-            label="Nội dung cảnh báo chi tiết (Message)"
+            label="Nội dung cảnh báo chi tiết"
             name="message"
             rules={[{ required: true, message: 'Vui lòng nhập nội dung cảnh báo' }]}
           >
@@ -670,7 +766,7 @@ export default function ContraindicationRuleManagementPage() {
           </Form.Item>
 
           <Form.Item
-            label="Khuyến cáo xử trí lâm sàng (Recommendation)"
+            label="Khuyến cáo xử trí lâm sàng"
             name="recommendation"
           >
             <Input.TextArea
@@ -680,8 +776,18 @@ export default function ContraindicationRuleManagementPage() {
           </Form.Item>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-            <Button onClick={() => setModalOpen(false)}>Hủy</Button>
-            <Button type="primary" htmlType="submit" loading={submitting}>
+            <Button
+              style={{ height: 42, minWidth: 100, borderRadius: 6 }}
+              onClick={() => setModalOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              style={{ height: 42, minWidth: 120, borderRadius: 6, fontWeight: 600, fontSize: 15 }}
+            >
               {editingRule ? 'Lưu thay đổi' : 'Tạo quy tắc'}
             </Button>
           </div>
