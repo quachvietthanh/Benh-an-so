@@ -12,6 +12,7 @@ import {
   ClockCircleOutlined,
   HistoryOutlined,
   StepForwardOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { getAvatarStyle, getInitials } from '../../utils/appointmentQueueUiHelpers'
@@ -102,6 +103,12 @@ export default function WaitingPatientList({
                       <Tag color="cyan" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
                         <CalendarOutlined style={{ marginRight: 4 }} />
                         Hẹn trước
+                      </Tag>
+                    )}
+                    {item.isHandoverToMe && (
+                      <Tag color="cyan" style={{ margin: 0, fontSize: 11, borderRadius: 4, fontWeight: 600, background: '#e0f2fe', borderColor: '#7dd3fc', color: '#0369a1' }}>
+                        <SwapOutlined style={{ marginRight: 4 }} />
+                        Tiếp nhận từ BS: {item.fromDoctorName || 'Đồng nghiệp'}
                       </Tag>
                     )}
                     <Tag color="warning" style={{ margin: 0, fontSize: 11, borderRadius: 4 }}>
