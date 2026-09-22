@@ -189,7 +189,7 @@ function InventoryReceiptPage() {
       return
     }
     if (!reason) {
-      adjustForm.setFields([{ name: 'reason', errors: ['Vui lòng nhập lý do điều chỉnh theo QTN-32.'] }])
+      adjustForm.setFields([{ name: 'reason', errors: ['Vui lòng nhập lý do điều chỉnh tồn kho.'] }])
       return
     }
     if (actualQuantity === currentQuantity) {
@@ -222,7 +222,7 @@ function InventoryReceiptPage() {
     if (!selectedBatch || !canAdjustDiscard) return
     const reason = String(values.reason || '').trim()
     if (!reason) {
-      discardForm.setFields([{ name: 'reason', errors: ['Vui lòng nhập lý do hủy lô theo QTN-32.'] }])
+      discardForm.setFields([{ name: 'reason', errors: ['Vui lòng nhập lý do hủy lô.'] }])
       return
     }
     if (!isDiscardableBatch(selectedBatch)) {
@@ -417,7 +417,7 @@ function InventoryReceiptPage() {
           message: 'Lưu ý gộp lô thuốc đã tồn tại',
           description: warnings.map((w, idx) => (
             <div key={idx} style={{ marginBottom: 4 }}>
-              Số lô <strong>{w.batchNumber}</strong> đã có sẵn trong kho và đã được gộp số lượng tồn trên Backend.
+              Số lô <strong>{w.batchNumber}</strong> đã có sẵn trong kho và đã được gộp số lượng tồn trên hệ thống.
             </div>
           )),
           duration: 6,
@@ -502,10 +502,31 @@ function InventoryReceiptPage() {
   const batchColumns = [
     {
       title: 'Mã thuốc',
-      dataIndex: 'medicineCode',
       key: 'medicineCode',
-      width: 120,
-      render: (value) => <Text code>{value || '—'}</Text>,
+      width: 150,
+      render: (_, batch) => {
+        const med = medicineMap.get(String(batch.medicineId))
+        const code = batch.medicineCode || med?.medicineCode
+        if (!code) return <Text type="secondary">—</Text>
+        return (
+          <Text
+            code
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              letterSpacing: '0.4px',
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'inline-block',
+            }}
+          >
+            {code}
+          </Text>
+        )
+      },
     },
     {
       title: 'Tên thuốc & Thông tin',
@@ -613,9 +634,9 @@ function InventoryReceiptPage() {
       },
     },
     {
-      title: 'Thao tác (NCL-06-CN-010)',
+      title: 'Thao tác',
       key: 'inventoryOps',
-      width: 210,
+      width: 200,
       render: (_, batch) => {
         const expired = String(batch?.status || '').toUpperCase() === 'EXPIRED'
         const canAdjust = !expired
@@ -623,12 +644,12 @@ function InventoryReceiptPage() {
         const discardDisabled = !isDiscardableBatch(batch) || !canAdjustDiscard
         return (
           <Space size={6} wrap>
-            <Tooltip title={adjustDisabled ? (canAdjust ? 'Bạn không có quyền PHARMACY_UPDATE' : 'Lô đã hủy, không thể điều chỉnh') : 'Điều chỉnh tồn kho sau kiểm kê (QTN-32)'}>
+            <Tooltip title={adjustDisabled ? (canAdjust ? 'Bạn không có quyền điều chỉnh' : 'Lô đã hủy, không thể điều chỉnh') : 'Điều chỉnh tồn kho sau kiểm kê'}>
               <Button size="small" icon={<EditOutlined />} disabled={adjustDisabled} onClick={() => openAdjustModal(batch)}>
                 Điều chỉnh
               </Button>
             </Tooltip>
-            <Tooltip title={!isDiscardableBatch(batch) ? 'Chỉ hủy được lô đã quá hạn và còn tồn' : (!canAdjustDiscard ? 'Yêu cầu quyền PHARMACY_UPDATE' : 'Hủy lô hết hạn (QTN-14, QTN-32)')}>
+            <Tooltip title={!isDiscardableBatch(batch) ? 'Chỉ hủy được lô đã quá hạn và còn tồn' : (!canAdjustDiscard ? 'Yêu cầu quyền hủy lô' : 'Hủy lô hết hạn')}>
               <Button size="small" danger icon={<StopOutlined />} disabled={discardDisabled} onClick={() => openDiscardModal(batch)}>
                 Hủy lô
               </Button>
@@ -646,7 +667,7 @@ function InventoryReceiptPage() {
       render: (_, item) => (
         <Space direction="vertical" size={1}>
           <strong>{item.medicineName || '—'}</strong>
-          <Text code style={{ fontSize: 12 }}>{item.medicineCode || item.medicineId}</Text>
+          <Text code style={{ fontSize: 12, whiteSpace: 'nowrap', display: 'inline-block' }}>{item.medicineCode || item.medicineId}</Text>
         </Space>
       ),
     },
@@ -1251,10 +1272,6 @@ function InventoryReceiptPage() {
                         ]}
                       />
                     </Space>
-
-                    <Button icon={<ReloadOutlined />} loading={loading} onClick={loadData}>
-                      Làm mới dữ liệu từ Backend
-                    </Button>
                   </div>
 
                   <Table
@@ -1268,7 +1285,7 @@ function InventoryReceiptPage() {
                       pageSizeOptions: ['10', '20', '50', '100'],
                       showTotal: (total) => `Tổng số ${total} lô thuốc trong kho`,
                     }}
-                    scroll={{ x: 950 }}
+                    scroll={{ x: 1050 }}
                     locale={{ emptyText: <Empty description="Không tìm thấy lô thuốc nào phù hợp" /> }}
                   />
                 </div>
@@ -1394,7 +1411,7 @@ function InventoryReceiptPage() {
                 name="reason"
                 label="Lý do điều chỉnh *"
                 rules={[
-                  { required: true, whitespace: true, message: 'Vui lòng nhập lý do điều chỉnh theo QTN-32.' },
+                  { required: true, whitespace: true, message: 'Vui lòng nhập lý do điều chỉnh tồn kho.' },
                   { max: 500, message: 'Lý do không được vượt quá 500 ký tự.' },
                 ]}
               >
@@ -1447,7 +1464,7 @@ function InventoryReceiptPage() {
               type="warning"
               showIcon
               message="Lô sẽ chuyển sang trạng thái EXPIRED"
-              description="Số lượng tồn sẽ về 0 và lô bị loại khỏi danh sách cấp phát FEFO. Thao tác này cần lý do theo QTN-32."
+              description="Số lượng tồn sẽ về 0 và lô bị loại khỏi danh sách cấp phát FEFO. Vui lòng nhập lý do tiêu hủy lô thuốc."
               style={{ marginBottom: 16 }}
             />
             <Form form={discardForm} layout="vertical" onFinish={handleDiscardSubmit} preserve={false}>
@@ -1455,7 +1472,7 @@ function InventoryReceiptPage() {
                 name="reason"
                 label="Lý do hủy lô *"
                 rules={[
-                  { required: true, whitespace: true, message: 'Vui lòng nhập lý do hủy lô theo QTN-32.' },
+                  { required: true, whitespace: true, message: 'Vui lòng nhập lý do hủy lô.' },
                   { max: 500, message: 'Lý do không được vượt quá 500 ký tự.' },
                 ]}
               >
