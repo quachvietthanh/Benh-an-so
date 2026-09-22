@@ -12,6 +12,8 @@ import com.benhsoan.port.dto.result.DoctorVisitsReportResult;
 import com.benhsoan.port.dto.result.OperationalSummaryResult;
 import com.benhsoan.port.dto.result.OperationalTimelineItemResult;
 import com.benhsoan.port.dto.result.OperationalTimelineResult;
+import com.benhsoan.adapter.inbound.rest.response.reporting.AppointmentEffectivenessReportResponse;
+import com.benhsoan.adapter.inbound.rest.response.reporting.AppointmentStatusCountResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.DiseasePatternItemResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.DiseasePatternReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicineItemResponse;
@@ -19,6 +21,8 @@ import com.benhsoan.adapter.inbound.rest.response.reporting.TopMedicinesReportRe
 import com.benhsoan.adapter.inbound.rest.response.reporting.DoctorRevenueResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.RevenueBreakdownReportResponse;
 import com.benhsoan.adapter.inbound.rest.response.reporting.ServiceGroupRevenueResponse;
+import com.benhsoan.port.dto.result.AppointmentEffectivenessReportResult;
+import com.benhsoan.port.dto.result.AppointmentStatusCountResult;
 import com.benhsoan.port.dto.result.DiseasePatternItemResult;
 import com.benhsoan.port.dto.result.DiseasePatternReportResult;
 import com.benhsoan.port.dto.result.DoctorRevenueResult;
@@ -62,6 +66,16 @@ public class ReportingRestMapper {
                 result.from(),
                 result.to(),
                 result.generatedAt(),
+                result.items().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public AppointmentEffectivenessReportResponse toResponse(AppointmentEffectivenessReportResult result) {
+        return new AppointmentEffectivenessReportResponse(
+                result.from(),
+                result.to(),
+                result.generatedAt(),
+                result.total(),
                 result.items().stream().map(this::toResponse).toList()
         );
     }
@@ -156,6 +170,15 @@ public class ReportingRestMapper {
                 result.doctorCode(),
                 result.doctorName(),
                 result.totalVisits()
+        );
+    }
+
+    private AppointmentStatusCountResponse toResponse(AppointmentStatusCountResult result) {
+        return new AppointmentStatusCountResponse(
+                result.bookingChannel(),
+                result.status(),
+                result.count(),
+                result.percentage()
         );
     }
 }

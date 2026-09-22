@@ -385,19 +385,19 @@ export const mergePrescriptions = (apiPrescriptions = []) => {
   const localPrescriptions = getStoredPrescriptions()
   const map = new Map()
 
-  if (Array.isArray(apiPrescriptions) && apiPrescriptions.length) {
+  localPrescriptions.forEach((item) => {
+    if (item && item.id) map.set(String(item.id), item)
+  })
+
+  if (Array.isArray(apiPrescriptions) && apiPrescriptions.length > 0) {
     apiPrescriptions.forEach((item) => {
-      const key = String(item.id || item.prescriptionCode)
-      if (key && key !== 'undefined') map.set(key, item)
+      if (item && item.id) {
+        const localItem = map.get(String(item.id))
+        // Ưu tiên dữ liệu mới nhất từ API máy chủ ghi đè lên cache local
+        map.set(String(item.id), localItem ? { ...localItem, ...item } : item)
+      }
     })
   }
-  localPrescriptions.forEach((item) => {
-    const key = String(item.id || item.prescriptionCode)
-    if (key && key !== 'undefined') {
-      const existing = map.get(key)
-      map.set(key, existing ? { ...item, ...existing } : item)
-    }
-  })
 
   return Array.from(map.values())
 }

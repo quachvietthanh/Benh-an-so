@@ -82,6 +82,10 @@ class PatientMergeControllerTest {
     @MockitoBean private GetPatientByCodeUseCase getPatientByCodeUseCase;
     @MockitoBean private MergePatientsUseCase mergePatientsUseCase;
     @MockitoBean private FindDuplicatePatientsUseCase findDuplicatePatientsUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.DownloadPatientImportTemplateUseCase downloadPatientImportTemplateUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.PreviewPatientImportUseCase previewPatientImportUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.ImportPatientsUseCase importPatientsUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.GetPatientImportLogsUseCase getPatientImportLogsUseCase;
 
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
