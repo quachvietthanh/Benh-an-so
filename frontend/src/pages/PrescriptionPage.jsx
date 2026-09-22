@@ -77,6 +77,7 @@ import PatientChronicDiseaseBanner from '../components/clinical/PatientChronicDi
 import CancelPrescriptionModal from '../components/pharmacy/CancelPrescriptionModal.jsx'
 import PartialDispenseModal from '../components/pharmacy/PartialDispenseModal.jsx'
 import DispenseHistoryModal from '../components/pharmacy/DispenseHistoryModal.jsx'
+import ReturnMedicationModal from '../components/pharmacy/ReturnMedicationModal.jsx'
 import {
   canCancelPrescription,
   getCancelRestrictionMessage,
@@ -229,6 +230,8 @@ function PrescriptionPage() {
   const [selectedPrescriptionForPartial, setSelectedPrescriptionForPartial] = useState(null)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
   const [selectedPrescriptionForHistory, setSelectedPrescriptionForHistory] = useState(null)
+  const [returnModalOpen, setReturnModalOpen] = useState(false)
+  const [selectedPrescriptionForReturn, setSelectedPrescriptionForReturn] = useState(null)
 
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -1888,6 +1891,16 @@ function PrescriptionPage() {
             onClick: () => {
               setSelectedPrescriptionForHistory(prescription)
               setHistoryModalOpen(true)
+            },
+          },
+          isPharmacistOrAdmin && (prescription.status === 'DISPENSED' || isPartiallyDispensed) && {
+            key: 'return-medication',
+            icon: <RollbackOutlined style={{ color: '#dc2626' }} />,
+            label: 'Trả lại thuốc / Hủy cấp phát',
+            danger: true,
+            onClick: () => {
+              setSelectedPrescriptionForReturn(prescription)
+              setReturnModalOpen(true)
             },
           },
           canPrescribe && prescription.status !== 'CANCELLED' && {
@@ -3737,6 +3750,19 @@ function PrescriptionPage() {
           setSelectedPrescriptionForHistory(null)
         }}
         prescription={selectedPrescriptionForHistory}
+      />
+
+      <ReturnMedicationModal
+        open={returnModalOpen}
+        onClose={() => {
+          setReturnModalOpen(false)
+          setSelectedPrescriptionForReturn(null)
+        }}
+        prescription={selectedPrescriptionForReturn}
+        onSuccess={() => {
+          loadPrescriptions()
+          if (loadData) loadData()
+        }}
       />
 
       <PrescriptionPrintTemplateModal
