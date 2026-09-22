@@ -5,6 +5,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import contraindicationRuleManagementApi from '../api/contraindicationRuleManagementApi.js'
 import { getNavigationItems } from '../components/layout/navigationConfig.js'
+import {
+  DIAGNOSIS_CATALOG_FALLBACK,
+  getDiagnosisInfo,
+} from '../utils/contraindicationValidation.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -51,3 +55,29 @@ test('TC-CRM-03: AppRoutes.jsx đăng ký route /contraindication-rules và comp
     'Route phải bảo vệ bởi quyền CONTRAINDICATION_RULE_MANAGE',
   )
 })
+
+test('TC-CRM-04: getDiagnosisInfo và DIAGNOSIS_CATALOG_FALLBACK đối chiếu đúng mã ICD-10 và tên bệnh', () => {
+  const asthmaRule = {
+    type: 'DISEASE',
+    diagnosisCatalogId: 'a1000000-0000-0000-0000-000000000023',
+  }
+  const ulcerRule = {
+    type: 'DISEASE',
+    diagnosisCatalogId: 'a1000000-0000-0000-0000-000000000026',
+  }
+
+  const asthmaInfo = getDiagnosisInfo(asthmaRule)
+  assert.equal(asthmaInfo.code, 'J45.9')
+  assert.equal(asthmaInfo.name, 'Hen phế quản')
+  assert.equal(asthmaInfo.displayText, 'J45.9 - Hen phế quản')
+
+  const ulcerInfo = getDiagnosisInfo(ulcerRule)
+  assert.equal(ulcerInfo.code, 'K25.9')
+  assert.equal(ulcerInfo.name, 'Loét dạ dày')
+  assert.equal(ulcerInfo.displayText, 'K25.9 - Loét dạ dày')
+
+  // Xác nhận không còn hiển thị chuỗi kỹ thuật UUID rút gọn
+  assert.ok(!asthmaInfo.displayText.includes('a1000000'))
+  assert.ok(!ulcerInfo.displayText.includes('a1000000'))
+})
+
