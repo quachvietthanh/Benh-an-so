@@ -2,10 +2,7 @@ package com.benhsoan.application.ucservice.billing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -22,7 +19,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
-import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.billing.PayableEncounterQuery;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
 import com.benhsoan.port.outbound.repository.billing.InvoiceRepository;

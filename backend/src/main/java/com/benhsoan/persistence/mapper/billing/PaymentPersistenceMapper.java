@@ -41,6 +41,8 @@ public class PaymentPersistenceMapper {
                 entity.getExamFee(),
                 entity.getMedicineFee(),
                 entity.getServiceFee(),
+                entity.getDiscountAmount(),
+                entity.getDiscountRequestId(),
                 entity.getTotalAmount(),
                 entity.getAmountPaid(),
                 entity.getPaymentMethod(),
@@ -51,12 +53,8 @@ public class PaymentPersistenceMapper {
                 entity.getRefundedBy(),
                 entity.getRefundedAt(),
                 entity.getCreatedAt(),
-<<<<<<< HEAD
                 entity.getCashierShiftId(),
                 items
-=======
-                entity.getCashierShiftId()
->>>>>>> 49e54faef023bb919dce508eec3bf599f4759064
         );
     }
 
@@ -71,6 +69,8 @@ public class PaymentPersistenceMapper {
                 .examFee(domain.getExamFee())
                 .medicineFee(domain.getMedicineFee())
                 .serviceFee(domain.getServiceFee())
+                .discountAmount(domain.getDiscountAmount() != null ? domain.getDiscountAmount() : java.math.BigDecimal.ZERO)
+                .discountRequestId(domain.getDiscountRequestId())
                 .totalAmount(domain.getTotalAmount())
                 .amountPaid(domain.getAmountPaid())
                 .paymentMethod(domain.getPaymentMethod())

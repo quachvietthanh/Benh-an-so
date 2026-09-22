@@ -27,7 +27,6 @@ import com.benhsoan.application.ucservice.inventory.EligibleStockSnapshotService
 import com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
-import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.inventory.MedicineBatch;
 import com.benhsoan.domain.inventory.enums.BatchStatus;
 import com.benhsoan.domain.medicine.Medicine;

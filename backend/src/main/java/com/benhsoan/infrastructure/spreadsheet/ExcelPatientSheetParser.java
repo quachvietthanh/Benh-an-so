@@ -3,7 +3,6 @@ package com.benhsoan.infrastructure.spreadsheet;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -25,7 +24,6 @@ import com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort;
 public class ExcelPatientSheetParser implements PatientSpreadsheetParserPort {
 
     private static final int MAX_ALLOWED_ROWS = 5000;
-    private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public List<RawPatientRowDto> parse(InputStream inputStream) {
         try (Workbook workbook = WorkbookFactory.create(inputStream)) {

@@ -8,5 +8,8 @@ public enum InvoiceLineType {
 
     SERVICE_FEE,
 
-    ADJUSTMENT
+    ADJUSTMENT,
+
+    DISCOUNT
 }
+

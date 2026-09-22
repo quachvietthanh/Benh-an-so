@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import com.benhsoan.domain.queue.MedicalQueue;
 import com.benhsoan.domain.queue.QueueItem;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
-import com.benhsoan.domain.queue.enums.QueueItemStatus;
 import com.benhsoan.domain.queue.enums.QueuePriority;
 import com.benhsoan.domain.queue.exception.CheckInConflictException;
 import com.benhsoan.domain.queue.exception.QueueItemInvalidStatusException;

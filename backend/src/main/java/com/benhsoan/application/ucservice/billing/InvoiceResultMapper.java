@@ -40,6 +40,8 @@ public class InvoiceResultMapper {
                 invoice.getType(),
                 invoice.getOriginalInvoiceId(),
                 invoice.getAdjustmentReason(),
+                invoice.getDiscountAmount(),
+                invoice.getDiscountRequestId(),
                 invoice.getTotalAmount(),
                 invoice.getCreatedBy(),
                 invoice.getCreatedAt(),
