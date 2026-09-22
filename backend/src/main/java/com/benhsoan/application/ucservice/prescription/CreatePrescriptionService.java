@@ -27,6 +27,7 @@ import com.benhsoan.domain.prescription.PrescriptionContraindicationWarningLog;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationMissingDataException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -108,6 +109,7 @@ public class CreatePrescriptionService
         List<CreatePrescriptionItemCommand> itemCommands
                 = validateItemCommands(command.items());
         Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
+        requireControlledMedicineConfirmation(medicines, command.controlledMedicineConfirmed());
 
         UUID prescriptionId = UUID.randomUUID();
         List<PrescriptionItem> items = createItems(
@@ -195,6 +197,17 @@ public class CreatePrescriptionService
             throw new AccessDeniedException(
                     "Only doctors are allowed to create prescriptions."
             );
+        }
+    }
+
+    private void requireControlledMedicineConfirmation(
+            Map<UUID, Medicine> medicines,
+            boolean confirmed
+    ) {
+        boolean hasControlled = medicines.values().stream()
+                .anyMatch(Medicine::isControlled);
+        if (hasControlled && !confirmed) {
+            throw new ControlledMedicineConfirmationRequiredException();
         }
     }
 

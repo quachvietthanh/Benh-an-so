@@ -10,6 +10,7 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.Role;
+import com.benhsoan.domain.auth.TwoFactorChallenge;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.domain.auth.exception.AccountDisabledException;
@@ -60,6 +61,8 @@ public class LoginService implements LoginUseCase {
 
     private final ClockPort clockPort;
 
+    private final TwoFactorAuthenticationService twoFactorAuthenticationService;
+
     @Autowired
     public LoginService(
             UserRepository userRepository,
@@ -72,7 +75,8 @@ public class LoginService implements LoginUseCase {
             LoginAttemptPort loginAttemptPort,
             AuditLogRepository auditLogRepository,
             LoginLockoutAuditWriter loginLockoutAuditWriter,
-            ClockPort clockPort
+            ClockPort clockPort,
+            TwoFactorAuthenticationService twoFactorAuthenticationService
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -85,6 +89,7 @@ public class LoginService implements LoginUseCase {
         this.auditLogRepository = auditLogRepository;
         this.loginLockoutAuditWriter = loginLockoutAuditWriter;
         this.clockPort = clockPort;
+        this.twoFactorAuthenticationService = twoFactorAuthenticationService;
     }
 
     public LoginService(
@@ -97,7 +102,8 @@ public class LoginService implements LoginUseCase {
             RefreshTokenGeneratorPort refreshTokenGeneratorPort,
             LoginAttemptPort loginAttemptPort,
             AuditLogRepository auditLogRepository,
-            ClockPort clockPort
+            ClockPort clockPort,
+            TwoFactorAuthenticationService twoFactorAuthenticationService
     ) {
         this(
                 userRepository,
@@ -110,7 +116,8 @@ public class LoginService implements LoginUseCase {
                 loginAttemptPort,
                 auditLogRepository,
                 new LoginLockoutAuditWriter(auditLogRepository),
-                clockPort
+                clockPort,
+                twoFactorAuthenticationService
         );
     }
 
@@ -173,6 +180,17 @@ public class LoginService implements LoginUseCase {
 
         Role role = roleRepository.findById(user.getRoleId())
                 .orElseThrow(IllegalStateException::new);
+
+        if (role.isTwoFactorRequired()) {
+            TwoFactorChallenge challenge = twoFactorAuthenticationService.issueChallenge(user, now);
+            return LoginResult.twoFactorRequired(
+                    user.getId(),
+                    user.getUsername(),
+                    role.getName(),
+                    challenge.getId(),
+                    challenge.getExpiresAt()
+            );
+        }
 
         userSessionRepository.revokeByUserId(user.getId(), now);
 

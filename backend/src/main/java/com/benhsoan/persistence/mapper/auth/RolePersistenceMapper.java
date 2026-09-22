@@ -21,6 +21,7 @@ public class RolePersistenceMapper {
                 entity.isSystem(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
+                entity.isTwoFactorRequired(),
                 entity.getPermissions().stream()
                         .map(permission -> com.benhsoan.domain.auth.Permission.restore(
                                 permission.getId(), permission.getCode(), permission.getName(), permission.getModule(),
@@ -41,6 +42,7 @@ public class RolePersistenceMapper {
                 .isSystem(domain.isSystem())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
+                .twoFactorRequired(domain.isTwoFactorRequired())
                 .permissions(domain.getPermissions().stream()
                         .map(permission -> PermissionEntity.builder()
                                 .id(permission.getId()).code(permission.getCode()).name(permission.getName())

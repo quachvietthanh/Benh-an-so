@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.auth.Role;
+import com.benhsoan.domain.auth.TwoFactorChallenge;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
 import com.benhsoan.domain.auth.exception.TemporaryPasswordExpiredException;
@@ -72,6 +74,9 @@ class LoginServiceTest {
         @Mock
         private ClockPort clockPort;
 
+        @Mock
+        private TwoFactorAuthenticationService twoFactorAuthenticationService;
+
         private LoginService loginService;
 
         @BeforeEach
@@ -87,7 +92,8 @@ class LoginServiceTest {
                                 loginAttemptPort,
                                 auditLogRepository,
                                 loginLockoutAuditWriter,
-                                clockPort);
+                                clockPort,
+                                twoFactorAuthenticationService);
         }
 
         @Test
@@ -246,10 +252,7 @@ class LoginServiceTest {
         @Test
         @DisplayName("Mật khẩu tạm thời đã hết hạn -> Ném TemporaryPasswordExpiredException và không tạo session")
         void loginWithExpiredTemporaryPassword_throwsTemporaryPasswordExpiredException() {
-                UUID userId = UUID.randomUUID();
                 User user = mock(User.class);
-                when(user.getId()).thenReturn(userId);
-                when(user.getUsername()).thenReturn(USERNAME);
                 when(user.isActive()).thenReturn(true);
                 when(user.getPasswordHash()).thenReturn("hashed_secret");
                 when(user.getTempPasswordExpiresAt()).thenReturn(NOW.minusSeconds(1)); // Expired 1 second ago
@@ -305,5 +308,46 @@ class LoginServiceTest {
                 assertTrue(result.mustChangePassword());
                 verify(loginAttemptPort).loginSucceeded(USERNAME);
                 verify(userSessionRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("Vai trò bắt buộc 2FA -> Đăng nhập đúng mật khẩu trả về yêu cầu xác thực hai lớp, không tạo session/JWT")
+        void loginWhenRoleRequiresTwoFactor_returnsTwoFactorRequiredWithoutSession() {
+                UUID userId = UUID.randomUUID();
+                UUID roleId = UUID.randomUUID();
+                Instant expiresAt = NOW.plusSeconds(300);
+
+                User user = mock(User.class);
+                when(user.getId()).thenReturn(userId);
+                when(user.getUsername()).thenReturn(USERNAME);
+                when(user.getRoleId()).thenReturn(roleId);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+
+                Role role = mock(Role.class);
+                when(role.getName()).thenReturn("DOCTOR");
+                when(role.isTwoFactorRequired()).thenReturn(true);
+
+                TwoFactorChallenge challenge = TwoFactorChallenge.create(userId, "hashed_code", expiresAt, NOW);
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(CORRECT_PASSWORD, "hashed_secret")).thenReturn(true);
+                when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+                when(clockPort.now()).thenReturn(NOW);
+                when(twoFactorAuthenticationService.issueChallenge(user, NOW)).thenReturn(challenge);
+
+                LoginResult result = loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD));
+
+                assertTrue(result.twoFactorRequired());
+                assertEquals(challenge.getId(), result.twoFactorToken());
+                assertEquals(expiresAt, result.twoFactorExpiresAt());
+                assertNull(result.accessToken());
+                assertNull(result.refreshToken());
+
+                // Không tạo session hay JWT thông thường trước khi xác thực lớp hai
+                verify(loginAttemptPort).loginSucceeded(USERNAME);
+                verify(userSessionRepository, never()).save(any());
+                verify(jwtTokenPort, never()).generateToken(any(), any(), any(), any(), any());
         }
 }
