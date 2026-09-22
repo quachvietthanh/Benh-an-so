@@ -1,5 +1,5 @@
 -- =====================================================
--- V82__create_cashier_shift_settlement_tables.sql
+-- V84__create_cashier_shift_settlement_tables.sql
 -- Cashier shift end-of-day settlement (NCL-07-CN-009, QTN-38)
 -- =====================================================
 

@@ -32,7 +32,7 @@ public class PatientImportLogErrorEntity {
     @JoinColumn(name = "import_log_id", nullable = false)
     private PatientImportLogEntity importLog;
 
-    @Column(name = "row_number", nullable = false)
+    @Column(name = "`row_number`", nullable = false)
     private int rowNumber;
 
     @Column(name = "error_field", length = 100)

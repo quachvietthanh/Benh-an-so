@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +53,7 @@ public class ImportPatientsService implements ImportPatientsUseCase {
     private final ObjectMapper objectMapper;
     private final ReentrantLock importLock;
 
+    @Autowired
     public ImportPatientsService(
             PatientSpreadsheetParserPort sheetParser,
             PatientImportRowValidator rowValidator,

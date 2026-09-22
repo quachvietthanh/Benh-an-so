@@ -142,6 +142,7 @@ class QueueAuditService {
                                                 detail, null));
         }
 
+
         void record(ActionType actionType, QueueItem item) {
                 UUID actorId = currentUserPort.getCurrentUserId();
                 String actionName = switch (item.getStatus()) {

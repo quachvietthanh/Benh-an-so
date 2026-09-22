@@ -127,7 +127,12 @@
 |  |  |  |  |  |  |
 | **Medical History** |  |  |  |  |  |
 | `/patients/{patientId}/medical-history` | GET | ✅ | ✅ (chỉ BN đã khám) | ❌ | ❌ |
-
+|  |  |  |  |  |  |
+| **Patient Portal** |  |  |  |  |  |
+| `/patient-portal/invoices` | GET | ❌ | ❌ | ❌ | ❌ |
+| `/patient-portal/invoices/{id}` | GET | ❌ | ❌ | ❌ | ❌ |
+| `/patient-portal/invoices/{id}/download` | GET | ❌ | ❌ | ❌ | ❌ |
+*(Lưu ý: Các endpoint `/patient-portal/**` chỉ dành riêng cho vai trò `ROLE_PATIENT` với dữ liệu thuộc chính mình theo QTN-23)*
 |  |  |  |  |  |  |
 | **Admin / System** |  |  |  |  |  |
 | `/api/v1/admin/**` | ALL | ✅ | ❌ | ❌ | ❌ |

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -99,6 +100,32 @@ class ServiceCatalogRepositoryAdapterIntegrationTest {
                 LocalDate.of(2026, 1, 1)
         ));
     }
+
+    @Test
+    void findsEffectivePricesInBulkForMultipleServices() {
+        UUID serviceId1 = UUID.randomUUID();
+        UUID serviceId2 = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        catalogRepository.save(ServiceCatalog.create(serviceId1, "SRV-001", "Dich vu 1", CREATED_AT));
+        catalogRepository.save(ServiceCatalog.create(serviceId2, "SRV-002", "Dich vu 2", CREATED_AT));
+
+        priceRepository.save(price(serviceId1, actorId, "100000.00", LocalDate.of(2026, 1, 1)));
+        priceRepository.save(price(serviceId1, actorId, "120000.00", LocalDate.of(2026, 2, 1)));
+
+        priceRepository.save(price(serviceId2, actorId, "200000.00", LocalDate.of(2026, 1, 15)));
+        priceRepository.save(price(serviceId2, actorId, "250000.00", LocalDate.of(2026, 3, 1)));
+
+        var prices = priceRepository.findEffectivePrices(
+                List.of(serviceId1, serviceId2),
+                LocalDate.of(2026, 2, 15)
+        );
+
+        assertEquals(2, prices.size());
+        assertEquals(0, prices.get(serviceId1).getPrice().compareTo(new BigDecimal("120000.00")));
+        assertEquals(0, prices.get(serviceId2).getPrice().compareTo(new BigDecimal("200000.00")));
+    }
+
 
     private ServicePrice price(UUID serviceId, UUID actorId, String amount, LocalDate effectiveFrom) {
         return ServicePrice.create(
