@@ -9,16 +9,24 @@ import com.benhsoan.adapter.inbound.rest.request.auth.PatientRegistrationRequest
 import com.benhsoan.adapter.inbound.rest.request.auth.PatientResetPasswordRequest;
 import com.benhsoan.adapter.inbound.rest.request.auth.PatientVerifyRecoveryCodeRequest;
 import com.benhsoan.adapter.inbound.rest.request.auth.RefreshTokenRequest;
+import com.benhsoan.adapter.inbound.rest.request.auth.ResendTwoFactorRequest;
+import com.benhsoan.adapter.inbound.rest.request.auth.VerifyTwoFactorRequest;
 import com.benhsoan.adapter.inbound.rest.response.auth.LoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientLoginResponse;
 import com.benhsoan.adapter.inbound.rest.response.auth.PatientRegistrationResponse;
+import com.benhsoan.adapter.inbound.rest.response.auth.TwoFactorConfigurationResponse;
+import com.benhsoan.adapter.inbound.rest.response.auth.TwoFactorResendResponse;
 import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.auth.LoginCommand;
 import com.benhsoan.port.dto.command.auth.PatientPortalRegistrationCommand;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
+import com.benhsoan.port.dto.command.auth.ResendTwoFactorCommand;
+import com.benhsoan.port.dto.command.auth.VerifyTwoFactorCommand;
 import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.dto.result.PatientLoginResult;
 import com.benhsoan.port.dto.result.PatientPortalRegistrationResult;
+import com.benhsoan.port.dto.result.TwoFactorConfigurationResult;
+import com.benhsoan.port.dto.result.TwoFactorResendResult;
 
 @Component
 public class AuthRestMapper {
@@ -43,6 +51,19 @@ public class AuthRestMapper {
                                 request.refreshToken());
         }
 
+        public VerifyTwoFactorCommand toCommand(VerifyTwoFactorRequest request) {
+
+                return new VerifyTwoFactorCommand(
+                                request.twoFactorToken(),
+                                request.code());
+        }
+
+        public ResendTwoFactorCommand toCommand(ResendTwoFactorRequest request) {
+
+                return new ResendTwoFactorCommand(
+                                request.twoFactorToken());
+        }
+
         public LoginResponse toResponse(LoginResult result) {
 
                 return new LoginResponse(
@@ -52,7 +73,24 @@ public class AuthRestMapper {
                                 result.refreshToken(),
                                 result.role(),
                                 result.expiredAt(),
-                                result.mustChangePassword());
+                                result.mustChangePassword(),
+                                result.twoFactorRequired(),
+                                result.twoFactorToken(),
+                                result.twoFactorExpiresAt());
+        }
+
+        public TwoFactorResendResponse toResponse(TwoFactorResendResult result) {
+
+                return new TwoFactorResendResponse(
+                                result.twoFactorToken(),
+                                result.expiresAt());
+        }
+
+        public TwoFactorConfigurationResponse toResponse(TwoFactorConfigurationResult result) {
+
+                return new TwoFactorConfigurationResponse(
+                                result.roleName(),
+                                result.twoFactorRequired());
         }
 
         public PatientLoginResponse toResponse(PatientLoginResult result) {

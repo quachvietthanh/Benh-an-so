@@ -67,7 +67,8 @@ final class DomainExceptionHttpStatusMapper {
             case INVALID_CREDENTIALS,
                     SESSION_EXPIRED,
                     TEMP_PASSWORD_EXPIRED,
-                    TOKEN_INVALID -> HttpStatus.UNAUTHORIZED;
+                    TOKEN_INVALID,
+                    TWO_FACTOR_CHALLENGE_INVALID -> HttpStatus.UNAUTHORIZED;
             case APPOINTMENT_NOT_OVERDUE,
                     APPOINTMENT_PAST_CUTOFF,
                     APPOINTMENT_TIME_IN_PAST,
