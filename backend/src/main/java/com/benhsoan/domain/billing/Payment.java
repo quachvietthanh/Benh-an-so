@@ -42,10 +42,6 @@ public class Payment {
 
     private UUID discountRequestId;
 
-    private BigDecimal discountAmount;
-
-    private UUID discountRequestId;
-
     private BigDecimal totalAmount;
 
     private BigDecimal amountPaid;
@@ -78,8 +74,6 @@ public class Payment {
             BigDecimal serviceFee,
             BigDecimal discountAmount,
             UUID discountRequestId,
-            BigDecimal discountAmount,
-            UUID discountRequestId,
             BigDecimal totalAmount,
             BigDecimal amountPaid,
             PaymentMethod paymentMethod,
@@ -101,16 +95,11 @@ public class Payment {
                 ? validateNonNegative(discountAmount, "Discount amount is required.")
                 : BigDecimal.ZERO;
         this.discountRequestId = discountRequestId;
-        this.discountAmount = discountAmount != null
-                ? validateNonNegative(discountAmount, "Discount amount is required.")
-                : BigDecimal.ZERO;
-        this.discountRequestId = discountRequestId;
         this.totalAmount = validateTotalAmount(
                 totalAmount,
                 this.examFee,
                 this.medicineFee,
                 this.serviceFee);
-        this.amountPaid = validateAmountPaid(amountPaid, this.totalAmount, this.discountAmount);
         this.amountPaid = validateAmountPaid(amountPaid, this.totalAmount, this.discountAmount);
         this.paymentMethod = requireNonNull(paymentMethod, "Payment method is required.");
         this.status = requireNonNull(status, "Payment status is required.");
@@ -155,19 +144,32 @@ public class Payment {
             throw new ValidationException("Payment total amount must be greater than zero.");
         }
 
-        if (paymentMethodItems == null || paymentMethodItems.isEmpty()) {
-            throw new ValidationException("At least one payment method item is required.");
-        }
-
         BigDecimal validatedAmountPaid = validateAmountPaid(amountPaid, totalAmount, validatedDiscount);
 
-        BigDecimal sumItems = paymentMethodItems.stream()
-                .map(PaymentMethodItem::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (validatedAmountPaid.compareTo(BigDecimal.ZERO) > 0) {
+            if (paymentMethodItems == null || paymentMethodItems.isEmpty()) {
+                throw new ValidationException("At least one payment method item is required.");
+            }
 
-        if (sumItems.compareTo(validatedAmountPaid) != 0) {
-            throw new PaymentAmountMismatchException(validatedAmountPaid, sumItems);
+            BigDecimal sumItems = paymentMethodItems.stream()
+                    .map(PaymentMethodItem::getAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            if (sumItems.compareTo(validatedAmountPaid) != 0) {
+                throw new PaymentAmountMismatchException(validatedAmountPaid, sumItems);
+            }
+        } else {
+            if (paymentMethodItems != null && !paymentMethodItems.isEmpty()) {
+                BigDecimal sumItems = paymentMethodItems.stream()
+                        .map(PaymentMethodItem::getAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                if (sumItems.compareTo(BigDecimal.ZERO) != 0) {
+                    throw new PaymentAmountMismatchException(BigDecimal.ZERO, sumItems);
+                }
+            }
         }
 
         PaymentMethod resolvedMethod = resolvePaymentMethod(paymentMethodItems);
@@ -492,7 +494,6 @@ public class Payment {
             List<PaymentMethodItem> paymentMethodItems
     ) {
         return restore(
-        return restore(
                 id,
                 visitId,
                 examFee,
@@ -713,17 +714,8 @@ public class Payment {
     private static BigDecimal validateAmountPaid(
             BigDecimal amountPaid,
             BigDecimal totalAmount,
-            BigDecimal discountAmount
-            BigDecimal totalAmount,
-            BigDecimal discountAmount
-    ) {
+            BigDecimal discountAmount) {
         BigDecimal validatedAmountPaid = validateNonNegative(amountPaid, "Amount paid is required.");
-        BigDecimal expectedAmountPaid = totalAmount.subtract(discountAmount != null ? discountAmount : BigDecimal.ZERO);
-        if (expectedAmountPaid.compareTo(BigDecimal.ZERO) < 0) {
-            expectedAmountPaid = BigDecimal.ZERO;
-        }
-        if (validatedAmountPaid.compareTo(expectedAmountPaid) != 0) {
-            throw new PaymentAmountMismatchException(expectedAmountPaid, validatedAmountPaid);
         BigDecimal expectedAmountPaid = totalAmount.subtract(discountAmount != null ? discountAmount : BigDecimal.ZERO);
         if (expectedAmountPaid.compareTo(BigDecimal.ZERO) < 0) {
             expectedAmountPaid = BigDecimal.ZERO;

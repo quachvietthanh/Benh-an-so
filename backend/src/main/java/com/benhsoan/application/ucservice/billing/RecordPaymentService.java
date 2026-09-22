@@ -89,9 +89,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
             PaymentServiceFeeRepository paymentServiceFeeRepository,
             com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository,
-            com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository,
             ObjectMapper objectMapper,
-            BillingAccessDeniedAuditWriter accessDeniedAuditWriter) {
             BillingAccessDeniedAuditWriter accessDeniedAuditWriter) {
         this.visitRepository = visitRepository;
         this.medicalRecordRepository = medicalRecordRepository;
@@ -190,7 +188,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 null,
                 new ObjectMapper(),
                 new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper()));
-                new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper()));
     }
 
     @Override
@@ -247,7 +244,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                             cmd.amount(),
                             cmd.referenceNumber(),
                             now))
-                            now))
                     .toList();
         } else if (command.paymentMethod() != null) {
             methodItems = List.of(PaymentMethodItem.create(
@@ -256,7 +252,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                     command.paymentMethod(),
                     command.amountPaid(),
                     command.referenceNumber(),
-                    now));
                     now));
         } else {
             throw new ValidationException("Payment method or payment methods list is required.");
@@ -270,14 +265,11 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 clinicalServiceFeeCalculator.total(serviceCharges),
                 discountAmount,
                 discountRequestId,
-                discountAmount,
-                discountRequestId,
                 command.amountPaid(),
                 methodItems,
                 actorId,
                 now,
                 visit.getStatus(),
-                true);
                 true);
 
         Payment saved;
@@ -296,7 +288,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                         charge.clinicalOrderItemId(),
                         charge.serviceName(),
                         charge.price(),
-                        now))
                         now))
                 .toList());
 
@@ -335,7 +326,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 saved.getId(),
                 auditDetailsJson,
                 null));
-                null));
 
         return resultMapper.toResult(saved);
     }
@@ -348,7 +338,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                         currentUserPort.getCurrentUserId(),
                         visitId,
                         clockPort.now(),
-                        "Only receptionists can record payments.");
                         "Only receptionists can record payments.");
             }
             throw new AccessDeniedException("Only receptionists can record payments.");
@@ -372,7 +361,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         if (hasPendingDispense) {
             throw new PaymentNotAllowedException(
                     "Payment cannot be recorded before dispensing is completed.");
-                    "Payment cannot be recorded before dispensing is completed.");
         }
     }
 
@@ -380,7 +368,6 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         String message = extractMessage(ex).toLowerCase();
         return message.contains("uk_payments_visit")
                 || message.contains("duplicate entry")
-                        && message.contains("visit_id");
                         && message.contains("visit_id");
     }
 

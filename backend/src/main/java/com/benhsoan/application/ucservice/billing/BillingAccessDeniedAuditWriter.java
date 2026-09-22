@@ -16,7 +16,6 @@ import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -31,26 +30,16 @@ public class BillingAccessDeniedAuditWriter {
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordAccessDenied(
-            UUID actorId,
-            ResourceType resourceType,
-            UUID resourceId,
-            String detail,
-            Instant timestamp) {
-        if (actorId == null) {
-            return;
-        }
+    @org.springframework.beans.factory.annotation.Autowired
+    public BillingAccessDeniedAuditWriter(
+            AuditLogRepository auditLogRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper) {
+        this.auditLogRepository = auditLogRepository;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
 
-        AuditLog auditLog = AuditLog.create(
-                actorId,
-                ActionType.ACCESS_DENIED,
-                resourceType,
-                resourceId,
-                detail,
-                null,
-                timestamp != null ? timestamp : Instant.now());
-        auditLogRepository.save(auditLog);
+    public BillingAccessDeniedAuditWriter(AuditLogRepository auditLogRepository) {
+        this(auditLogRepository, new ObjectMapper());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
