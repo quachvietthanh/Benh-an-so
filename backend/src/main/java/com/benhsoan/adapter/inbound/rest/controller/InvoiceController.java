@@ -1,11 +1,13 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +34,7 @@ import com.benhsoan.adapter.inbound.rest.response.billing.RefundPaymentResponse;
 import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
+import com.benhsoan.port.dto.command.billing.PayableEncounterQuery;
 import com.benhsoan.port.dto.command.billing.SearchInvoicesQuery;
 import com.benhsoan.port.inbound.billing.AdjustInvoiceUseCase;
 import com.benhsoan.port.inbound.billing.CreateInvoiceUseCase;
@@ -99,6 +102,8 @@ public class InvoiceController {
     @GetMapping("/payable")
     @RequirePermission("INVOICE_READ")
     public Page<PayableEncounterResponse> getPayableEncounters(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
@@ -110,7 +115,9 @@ public class InvoiceController {
                 Sort.by(Sort.Direction.DESC, "completedAt")
         );
 
-        return mapper.toPayableResponse(getPayableEncountersUseCase.get(pageable));
+        return mapper.toPayableResponse(getPayableEncountersUseCase.get(
+                new PayableEncounterQuery(date, search, pageable)
+        ));
     }
 
     @GetMapping

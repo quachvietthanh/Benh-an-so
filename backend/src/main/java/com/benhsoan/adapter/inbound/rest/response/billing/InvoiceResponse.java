@@ -20,6 +20,39 @@ public record InvoiceResponse(
         Instant createdAt,
         int reprintCount,
         Instant lastReprintedAt,
-        List<InvoiceLineResponse> lines
+        List<InvoiceLineResponse> lines,
+        PaymentDetailResponse payment
 ) {
+    public InvoiceResponse(
+            UUID id,
+            String invoiceCode,
+            UUID visitId,
+            UUID paymentId,
+            InvoiceType type,
+            UUID originalInvoiceId,
+            String adjustmentReason,
+            BigDecimal totalAmount,
+            UUID createdBy,
+            Instant createdAt,
+            int reprintCount,
+            Instant lastReprintedAt,
+            List<InvoiceLineResponse> lines
+    ) {
+        this(
+                id,
+                invoiceCode,
+                visitId,
+                paymentId,
+                type,
+                originalInvoiceId,
+                adjustmentReason,
+                totalAmount,
+                createdBy,
+                createdAt,
+                reprintCount,
+                lastReprintedAt,
+                lines,
+                null
+        );
+    }
 }

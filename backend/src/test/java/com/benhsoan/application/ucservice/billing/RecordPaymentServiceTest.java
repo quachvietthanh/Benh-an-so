@@ -18,6 +18,11 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.mockito.ArgumentCaptor;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import com.benhsoan.port.dto.command.billing.PaymentMethodItemCommand;
+import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.billing.Payment;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.exception.PaymentAlreadyExistsException;
@@ -107,6 +112,72 @@ class RecordPaymentServiceTest {
                 ArgumentCaptor.forClass(List.class);
         verify(paymentServiceFeeRepository).saveAll(snapshotCaptor.capture());
         assertEquals(new BigDecimal("95000"), snapshotCaptor.getValue().getFirst().getAmount());
+        verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    void recordsPaymentWithMultipleMethodsAndWritesAuditLog() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        MedicalRecordRepository medicalRecordRepository = mock(MedicalRecordRepository.class);
+        PrescriptionRepository prescriptionRepository = mock(PrescriptionRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentServiceFeeRepository paymentServiceFeeRepository = mock(PaymentServiceFeeRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        ClockPort clockPort = mock(ClockPort.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
+        RecordPaymentService service = new RecordPaymentService(
+                visitRepository,
+                medicalRecordRepository,
+                prescriptionRepository,
+                paymentRepository,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                new PaymentResultMapper(),
+                feeCalculator,
+                paymentServiceFeeRepository
+        );
+
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-12T01:00:00Z");
+        Visit visit = completedVisit(visitId);
+
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(clockPort.now()).thenReturn(now);
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(visit));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(feeCalculator.calculate(visitId, now)).thenReturn(List.of(
+                new ClinicalServiceCharge(UUID.randomUUID(), "Blood test", new BigDecimal("95000"))
+        ));
+        when(feeCalculator.total(any())).thenReturn(new BigDecimal("95000"));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<com.benhsoan.port.dto.command.billing.PaymentMethodItemCommand> methodCommands = List.of(
+                new com.benhsoan.port.dto.command.billing.PaymentMethodItemCommand(PaymentMethod.CASH, new BigDecimal("100000"), null),
+                new com.benhsoan.port.dto.command.billing.PaymentMethodItemCommand(PaymentMethod.BANK_TRANSFER, new BigDecimal("245000"), "TXN998877")
+        );
+
+        PaymentResult result = service.record(new RecordPaymentCommand(
+                visitId,
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                new BigDecimal("345000"),
+                PaymentMethod.MULTIPLE,
+                methodCommands
+        ));
+
+        assertEquals(visitId, result.visitId());
+        assertEquals(PaymentMethod.MULTIPLE, result.paymentMethod());
+        assertEquals(2, result.paymentMethods().size());
+        assertEquals(new BigDecimal("100000"), result.paymentMethods().get(0).amount());
+        assertEquals(new BigDecimal("245000"), result.paymentMethods().get(1).amount());
+        assertEquals("TXN998877", result.paymentMethods().get(1).referenceNumber());
+        verify(paymentRepository).save(any(Payment.class));
         verify(auditLogRepository).save(any());
     }
 
@@ -557,4 +628,121 @@ class RecordPaymentServiceTest {
         );
     }
 
+    @Test
+    void serializesAuditLogCorrectlyWithSpecialChars() throws Exception {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        MedicalRecordRepository medicalRecordRepository = mock(MedicalRecordRepository.class);
+        PrescriptionRepository prescriptionRepository = mock(PrescriptionRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentServiceFeeRepository paymentServiceFeeRepository = mock(PaymentServiceFeeRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        ClockPort clockPort = mock(ClockPort.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
+        BillingAccessDeniedAuditWriter auditWriter = mock(BillingAccessDeniedAuditWriter.class);
+
+        RecordPaymentService service = new RecordPaymentService(
+                visitRepository,
+                medicalRecordRepository,
+                prescriptionRepository,
+                paymentRepository,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                new PaymentResultMapper(),
+                feeCalculator,
+                paymentServiceFeeRepository,
+                new ObjectMapper(),
+                auditWriter
+        );
+
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-12T01:00:00Z");
+
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(clockPort.now()).thenReturn(now);
+        when(visitRepository.findByIdForUpdate(visitId)).thenReturn(Optional.of(waitingVisit(visitId)));
+        when(medicalRecordRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(feeCalculator.calculate(any(), any())).thenReturn(List.of());
+        when(feeCalculator.total(any())).thenReturn(BigDecimal.ZERO);
+
+        RecordPaymentCommand command = RecordPaymentCommand.builder()
+                .visitId(visitId)
+                .examFee(new BigDecimal("100000"))
+                .medicineFee(new BigDecimal("150000"))
+                .amountPaid(new BigDecimal("250000"))
+                .paymentMethods(List.of(
+                        new PaymentMethodItemCommand(PaymentMethod.CASH, new BigDecimal("100000"), null),
+                        new PaymentMethodItemCommand(PaymentMethod.BANK_TRANSFER, new BigDecimal("150000"), "BIDV\"SPECIAL\\REF#01")
+                ))
+                .build();
+
+        PaymentResult result = service.record(command);
+        assertEquals(new BigDecimal("250000"), result.totalAmount());
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+
+        AuditLog savedAudit = auditCaptor.getValue();
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode jsonNode = mapper.readTree(savedAudit.getDetail());
+
+        assertEquals(visitId.toString(), jsonNode.get("visitId").asText());
+        JsonNode methodsNode = jsonNode.get("paymentMethods");
+        assertEquals(2, methodsNode.size());
+        assertEquals("BIDV\"SPECIAL\\REF#01", methodsNode.get(1).get("referenceNumber").asText());
+    }
+
+    @Test
+    void ensureAuthorizedWritesAccessDeniedAuditLogAndThrows() {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        MedicalRecordRepository medicalRecordRepository = mock(MedicalRecordRepository.class);
+        PrescriptionRepository prescriptionRepository = mock(PrescriptionRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentServiceFeeRepository paymentServiceFeeRepository = mock(PaymentServiceFeeRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        ClockPort clockPort = mock(ClockPort.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
+        BillingAccessDeniedAuditWriter auditWriter = mock(BillingAccessDeniedAuditWriter.class);
+
+        RecordPaymentService service = new RecordPaymentService(
+                visitRepository,
+                medicalRecordRepository,
+                prescriptionRepository,
+                paymentRepository,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                new PaymentResultMapper(),
+                feeCalculator,
+                paymentServiceFeeRepository,
+                new ObjectMapper(),
+                auditWriter
+        );
+
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-12T01:00:00Z");
+
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(clockPort.now()).thenReturn(now);
+
+        RecordPaymentCommand command = RecordPaymentCommand.builder()
+                .visitId(visitId)
+                .examFee(new BigDecimal("100000"))
+                .medicineFee(new BigDecimal("150000"))
+                .amountPaid(new BigDecimal("250000"))
+                .paymentMethod(PaymentMethod.CASH)
+                .build();
+
+        assertThrows(AccessDeniedException.class, () -> service.record(command));
+        verify(auditWriter).writePaymentDenied(actorId, visitId, now, "Only receptionists can record payments.");
+    }
 }

@@ -24,6 +24,8 @@ public interface ClinicalOrderItemRepository {
 
     List<BillableClinicalService> findBillableByVisitId(UUID visitId);
 
+    List<BillableClinicalService> findBillableByVisitIdIn(Collection<UUID> visitIds);
+
     List<ClinicalOrderItem> saveAll(Collection<ClinicalOrderItem> items);
 
     boolean existsByClinicalOrderIdAndClinicalServiceId(UUID clinicalOrderId, UUID clinicalServiceId);

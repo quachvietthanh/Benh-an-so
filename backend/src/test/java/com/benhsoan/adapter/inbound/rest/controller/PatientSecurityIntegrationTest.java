@@ -70,6 +70,10 @@ class PatientSecurityIntegrationTest {
     @MockitoBean private GetPatientByCodeUseCase getPatientByCodeUseCase;
     @MockitoBean private com.benhsoan.port.inbound.patient.MergePatientsUseCase mergePatientsUseCase;
     @MockitoBean private com.benhsoan.port.inbound.patient.FindDuplicatePatientsUseCase findDuplicatePatientsUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.DownloadPatientImportTemplateUseCase downloadPatientImportTemplateUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.PreviewPatientImportUseCase previewPatientImportUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.ImportPatientsUseCase importPatientsUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.patient.GetPatientImportLogsUseCase getPatientImportLogsUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;

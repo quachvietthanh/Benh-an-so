@@ -209,4 +209,89 @@ public class PatientRestMapper {
         );
     }
 
+    public com.benhsoan.adapter.inbound.rest.response.patient.PatientImportPreviewResponse toResponse(
+            com.benhsoan.port.dto.result.patient.PatientImportPreviewResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.patient.PatientImportPreviewResponse(
+                result.fileName(),
+                result.totalRows(),
+                result.validCount(),
+                result.errorCount(),
+                result.duplicateCount(),
+                result.errors().stream().map(this::toResponse).toList(),
+                result.suspectedDuplicates().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.patient.PatientImportResultResponse toResponse(
+            com.benhsoan.port.dto.result.patient.PatientImportResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.patient.PatientImportResultResponse(
+                result.importLogId(),
+                result.fileName(),
+                result.totalRows(),
+                result.successCount(),
+                result.errorCount(),
+                result.duplicateCount(),
+                result.createdPatientCodes(),
+                result.errors().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.patient.PatientImportLogResponse toResponse(
+            com.benhsoan.port.dto.result.patient.PatientImportLogResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.patient.PatientImportLogResponse(
+                result.id(),
+                result.fileName(),
+                result.fileSize(),
+                result.totalRows(),
+                result.successRows(),
+                result.errorRows(),
+                result.duplicateRows(),
+                result.status(),
+                result.importedBy(),
+                result.importedByName(),
+                result.createdAt(),
+                result.errors().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.patient.PatientImportRowErrorResponse toResponse(
+            com.benhsoan.port.dto.result.patient.PatientImportRowErrorResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.patient.PatientImportRowErrorResponse(
+                result.rowNumber(),
+                result.errorField(),
+                result.errorMessage(),
+                result.rawData()
+        );
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.patient.SuspectedDuplicateResponse toResponse(
+            com.benhsoan.port.dto.result.patient.SuspectedDuplicateResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.patient.SuspectedDuplicateResponse(
+                result.rowNumber(),
+                result.fullName(),
+                result.dateOfBirth(),
+                result.phone(),
+                result.identityNumber(),
+                result.matchedExistingPatientId(),
+                result.matchedExistingPatientCode(),
+                result.matchedExistingFullName(),
+                result.duplicateReason()
+        );
+    }
+
 }
