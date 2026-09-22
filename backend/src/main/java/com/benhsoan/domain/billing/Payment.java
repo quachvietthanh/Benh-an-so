@@ -144,17 +144,30 @@ public class Payment {
             expectedAmountPaid = BigDecimal.ZERO;
         }
 
-        if (paymentMethodItems == null || paymentMethodItems.isEmpty()) {
-            throw new ValidationException("At least one payment method item is required.");
-        }
+        if (expectedAmountPaid.compareTo(BigDecimal.ZERO) > 0) {
+            if (paymentMethodItems == null || paymentMethodItems.isEmpty()) {
+                throw new ValidationException("At least one payment method item is required.");
+            }
 
-        BigDecimal sumItems = paymentMethodItems.stream()
-                .map(PaymentMethodItem::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal sumItems = paymentMethodItems.stream()
+                    .map(PaymentMethodItem::getAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (sumItems.compareTo(expectedAmountPaid) != 0) {
-            throw new PaymentAmountMismatchException(expectedAmountPaid, sumItems);
+            if (sumItems.compareTo(expectedAmountPaid) != 0) {
+                throw new PaymentAmountMismatchException(expectedAmountPaid, sumItems);
+            }
+        } else {
+            if (paymentMethodItems != null && !paymentMethodItems.isEmpty()) {
+                BigDecimal sumItems = paymentMethodItems.stream()
+                        .map(PaymentMethodItem::getAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                if (sumItems.compareTo(BigDecimal.ZERO) != 0) {
+                    throw new PaymentAmountMismatchException(BigDecimal.ZERO, sumItems);
+                }
+            }
         }
 
         PaymentMethod resolvedMethod = resolvePaymentMethod(paymentMethodItems);
@@ -226,14 +239,19 @@ public class Payment {
             VisitStatus visitStatus,
             boolean dispensingCompleted
     ) {
-        PaymentMethodItem singleItem = PaymentMethodItem.create(
-                UUID.randomUUID(),
-                id,
-                paymentMethod,
-                amountPaid,
-                null,
-                paidAt
-        );
+        List<PaymentMethodItem> items;
+        if (amountPaid != null && amountPaid.compareTo(BigDecimal.ZERO) == 0) {
+            items = List.of();
+        } else {
+            items = List.of(PaymentMethodItem.create(
+                    UUID.randomUUID(),
+                    id,
+                    paymentMethod,
+                    amountPaid,
+                    null,
+                    paidAt
+            ));
+        }
         return record(
                 id,
                 visitId,
@@ -243,7 +261,7 @@ public class Payment {
                 discountAmount,
                 discountRequestId,
                 amountPaid,
-                List.of(singleItem),
+                items,
                 collectedBy,
                 paidAt,
                 visitStatus,
@@ -682,6 +700,9 @@ public class Payment {
             UUID paymentId,
             Instant paidAt
     ) {
+        if (amountPaid != null && amountPaid.compareTo(BigDecimal.ZERO) == 0) {
+            return List.of();
+        }
         if (items == null || items.isEmpty()) {
             if (paymentMethod != null && paymentMethod != PaymentMethod.MULTIPLE) {
                 return List.of(PaymentMethodItem.create(
@@ -709,6 +730,9 @@ public class Payment {
     }
 
     private static PaymentMethod resolvePaymentMethod(List<PaymentMethodItem> items) {
+        if (items == null || items.isEmpty()) {
+            return PaymentMethod.CASH;
+        }
         Set<PaymentMethod> distinctMethods = items.stream()
                 .map(PaymentMethodItem::getPaymentMethod)
                 .collect(Collectors.toSet());

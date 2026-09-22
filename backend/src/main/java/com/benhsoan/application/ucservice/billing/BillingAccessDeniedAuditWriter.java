@@ -25,11 +25,23 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class BillingAccessDeniedAuditWriter {
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public BillingAccessDeniedAuditWriter(
+            AuditLogRepository auditLogRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
+    ) {
+        this.auditLogRepository = auditLogRepository;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
+
+    public BillingAccessDeniedAuditWriter(AuditLogRepository auditLogRepository) {
+        this(auditLogRepository, new ObjectMapper());
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void writePaymentDenied(

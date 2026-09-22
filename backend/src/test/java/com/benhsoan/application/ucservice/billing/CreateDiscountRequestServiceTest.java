@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.billing.DiscountRequest;
 import com.benhsoan.domain.billing.Payment;
 import com.benhsoan.domain.billing.enums.DiscountRequestStatus;
@@ -248,7 +249,6 @@ class CreateDiscountRequestServiceTest {
                 mock(AuditLogRepository.class),
                 new DiscountRequestResultMapper()
         );
-
         CreateDiscountRequestCommand command = new CreateDiscountRequestCommand(
                 UUID.randomUUID(),
                 DiscountType.PERCENTAGE,
@@ -258,6 +258,62 @@ class CreateDiscountRequestServiceTest {
         );
 
         assertThrows(AccessDeniedException.class, () -> service.create(command));
+    }
+
+    @Test
+    void createsDiscountRequest_withSpecialCharacters_serializesValidJsonAudit() throws Exception {
+        VisitRepository visitRepository = mock(VisitRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        DiscountRequestRepository discountRequestRepository = mock(DiscountRequestRepository.class);
+        ClinicalServiceFeeCalculator feeCalculator = mock(ClinicalServiceFeeCalculator.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        ClockPort clockPort = mock(ClockPort.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+
+        UUID visitId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-21T10:00:00Z");
+
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(clockPort.now()).thenReturn(now);
+        when(visitRepository.findById(visitId)).thenReturn(Optional.of(activeVisit(visitId)));
+        when(paymentRepository.findByVisitId(visitId)).thenReturn(Optional.empty());
+        when(discountRequestRepository.existsByVisitIdAndStatus(visitId, DiscountRequestStatus.PENDING)).thenReturn(false);
+        when(discountRequestRepository.save(any(DiscountRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        org.mockito.ArgumentCaptor<AuditLog> auditCaptor = org.mockito.ArgumentCaptor.forClass(AuditLog.class);
+
+        CreateDiscountRequestService service = new CreateDiscountRequestService(
+                visitRepository,
+                paymentRepository,
+                discountRequestRepository,
+                feeCalculator,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                new DiscountRequestResultMapper()
+        );
+
+        String trickyReason = "Giảm giá 20% cho \"người quen\": \n\t\\đặc biệt//";
+        CreateDiscountRequestCommand command = new CreateDiscountRequestCommand(
+                visitId,
+                DiscountType.PERCENTAGE,
+                new BigDecimal("20"),
+                new BigDecimal("500000"),
+                trickyReason
+        );
+
+        DiscountRequestResult result = service.create(command);
+
+        assertNotNull(result);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog logged = auditCaptor.getValue();
+        assertNotNull(logged);
+        assertNotNull(logged.getDetail());
+
+        com.fasterxml.jackson.databind.JsonNode rootNode = new com.fasterxml.jackson.databind.ObjectMapper().readTree(logged.getDetail());
+        assertEquals(trickyReason, rootNode.get("reason").asText());
     }
 
     private static Visit activeVisit(UUID visitId) {

@@ -83,6 +83,7 @@ import com.benhsoan.port.outbound.time.ClockPort;
         DiscountRequestPersistenceMapper.class,
         PaymentRepositoryAdapter.class,
         PaymentPersistenceMapper.class,
+        com.benhsoan.persistence.mapper.billing.PaymentMethodItemPersistenceMapper.class,
         InvoiceRepositoryAdapter.class,
         InvoicePersistenceMapper.class,
         InvoiceLinePersistenceMapper.class,

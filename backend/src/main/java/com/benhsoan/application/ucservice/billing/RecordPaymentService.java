@@ -1,5 +1,6 @@
 package com.benhsoan.application.ucservice.billing;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -237,7 +238,9 @@ public class RecordPaymentService implements RecordPaymentUseCase {
 
         UUID paymentId = UUID.randomUUID();
         List<PaymentMethodItem> methodItems;
-        if (command.paymentMethods() != null && !command.paymentMethods().isEmpty()) {
+        if (command.amountPaid() != null && command.amountPaid().compareTo(BigDecimal.ZERO) == 0) {
+            methodItems = List.of();
+        } else if (command.paymentMethods() != null && !command.paymentMethods().isEmpty()) {
             methodItems = command.paymentMethods().stream()
                     .map(cmd -> PaymentMethodItem.create(
                             UUID.randomUUID(),

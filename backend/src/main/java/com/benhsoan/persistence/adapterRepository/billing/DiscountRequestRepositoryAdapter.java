@@ -29,8 +29,34 @@ public class DiscountRequestRepositoryAdapter implements DiscountRequestReposito
     @Override
     @Transactional
     public DiscountRequest save(DiscountRequest discountRequest) {
-        DiscountRequestEntity saved = jpaRepository.save(mapper.toEntity(discountRequest));
-        return mapper.toDomain(saved);
+        try {
+            DiscountRequestEntity entity = mapper.toEntity(discountRequest);
+            DiscountRequestEntity saved = jpaRepository.save(entity);
+            return mapper.toDomain(saved != null ? saved : entity);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            if (isDuplicateActiveDiscountConflict(ex)) {
+                throw new com.benhsoan.domain.billing.exception.DiscountAlreadyExistsException(discountRequest.getVisitId());
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isDuplicateActiveDiscountConflict(org.springframework.dao.DataIntegrityViolationException ex) {
+        String message = extractMessage(ex).toLowerCase();
+        return message.contains("uk_discount_requests_active_visit")
+                || (message.contains("duplicate entry") && message.contains("active"));
+    }
+
+    private String extractMessage(Throwable throwable) {
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append(' ');
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
     }
 
     @Override
