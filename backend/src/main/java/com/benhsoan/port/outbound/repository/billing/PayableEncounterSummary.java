@@ -10,6 +10,19 @@ public record PayableEncounterSummary(
         String patientCode,
         String patientName,
         String reason,
-        Instant completedAt
+        Instant completedAt,
+        boolean hasPrescription,
+        boolean hasPendingDispense
 ) {
+    public PayableEncounterSummary(
+            UUID visitId,
+            String visitCode,
+            UUID patientId,
+            String patientCode,
+            String patientName,
+            String reason,
+            Instant completedAt
+    ) {
+        this(visitId, visitCode, patientId, patientCode, patientName, reason, completedAt, false, false);
+    }
 }

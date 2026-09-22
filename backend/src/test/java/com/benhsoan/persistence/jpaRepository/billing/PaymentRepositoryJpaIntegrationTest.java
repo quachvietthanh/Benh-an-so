@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.persistence.entity.billing.PaymentEntity;
+import com.benhsoan.persistence.entity.billing.PaymentMethodItemEntity;
 
 @DataJpaTest(properties = {
         "spring.flyway.enabled=false",
@@ -31,6 +32,9 @@ class PaymentRepositoryJpaIntegrationTest {
 
     @Autowired
     private JpaPaymentRepository repository;
+
+    @Autowired
+    private JpaPaymentMethodItemRepository itemRepository;
 
     @Test
     void sumsOnlyRefundsInsideHalfOpenPeriod() {
@@ -135,5 +139,54 @@ class PaymentRepositoryJpaIntegrationTest {
                 .refundedAt(refundedAt)
                 .createdAt(paidAt)
                 .build());
+    }
+
+    @Test
+    void persistsAndFindsPaymentMethodItems() {
+        UUID paymentId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-18T05:00:00Z");
+
+        repository.saveAndFlush(PaymentEntity.builder()
+                .id(paymentId)
+                .visitId(UUID.randomUUID())
+                .examFee(new BigDecimal("100000"))
+                .medicineFee(new BigDecimal("150000"))
+                .serviceFee(BigDecimal.ZERO)
+                .totalAmount(new BigDecimal("250000"))
+                .amountPaid(new BigDecimal("250000"))
+                .paymentMethod(PaymentMethod.MULTIPLE)
+                .status(PaymentStatus.RECORDED)
+                .collectedBy(UUID.randomUUID())
+                .paidAt(now)
+                .createdAt(now)
+                .build());
+
+        itemRepository.save(new PaymentMethodItemEntity(
+                UUID.randomUUID(),
+                paymentId,
+                PaymentMethod.CASH,
+                new BigDecimal("100000"),
+                null,
+                now
+        ));
+
+        itemRepository.save(new PaymentMethodItemEntity(
+                UUID.randomUUID(),
+                paymentId,
+                PaymentMethod.BANK_TRANSFER,
+                new BigDecimal("150000"),
+                "TXN123456",
+                now
+        ));
+        itemRepository.flush();
+
+        List<PaymentMethodItemEntity> items = itemRepository.findAllByPaymentId(paymentId);
+
+        assertEquals(2, items.size());
+        assertEquals(PaymentMethod.CASH, items.get(0).getPaymentMethod());
+        assertEquals(0, new BigDecimal("100000").compareTo(items.get(0).getAmount()));
+        assertEquals(PaymentMethod.BANK_TRANSFER, items.get(1).getPaymentMethod());
+        assertEquals(0, new BigDecimal("150000").compareTo(items.get(1).getAmount()));
+        assertEquals("TXN123456", items.get(1).getReferenceNumber());
     }
 }

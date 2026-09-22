@@ -56,6 +56,10 @@ import com.benhsoan.port.inbound.queue.ReQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
 
+import com.benhsoan.domain.queue.enums.QueuePriority;
+import com.benhsoan.port.dto.command.queue.PrioritizeQueueItemCommand;
+import com.benhsoan.port.inbound.queue.PrioritizeQueueItemUseCase;
+
 @WebMvcTest(controllers = QueueController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import({AnonymizationModeState.class, QueueRestMapper.class, GlobalExceptionHandler.class})
@@ -74,6 +78,7 @@ class QueueControllerTest {
     @MockitoBean private GetQueueItemUseCase getQueueItemUseCase;
     @MockitoBean private SkipQueueItemUseCase skipQueueItemUseCase;
     @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
+    @MockitoBean private PrioritizeQueueItemUseCase prioritizeQueueItemUseCase;
     @MockitoBean private GetQueueHistoryUseCase getQueueHistoryUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
@@ -346,4 +351,65 @@ class QueueControllerTest {
 
         verifyNoInteractions(closeVisitUseCase);
     }
+
+    @Test
+    void prioritizesQueueItemSuccessfully() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        QueueItemResult queueItem = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "BN001", "Nguyen Van A",
+                UUID.randomUUID(), "Bac si B", UUID.randomUUID(), "P101", null,
+                UUID.randomUUID(), "VIS000001", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.WAITING, 1, LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T01:00:00Z"), null, null, null, null,
+                null, null, 0,
+                QueuePriority.EMERGENCY, "Sốt cao co giật", Instant.parse("2026-08-14T01:05:00Z"), UUID.randomUUID()
+        );
+        when(prioritizeQueueItemUseCase.prioritize(any())).thenReturn(queueItem);
+
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", itemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"EMERGENCY\",\"reason\":\"Sốt cao co giật\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(itemId.toString()))
+                .andExpect(jsonPath("$.priority").value("EMERGENCY"))
+                .andExpect(jsonPath("$.priorityReason").value("Sốt cao co giật"));
+
+        ArgumentCaptor<PrioritizeQueueItemCommand> captor = ArgumentCaptor.forClass(PrioritizeQueueItemCommand.class);
+        verify(prioritizeQueueItemUseCase).prioritize(captor.capture());
+        assertEquals(itemId, captor.getValue().queueItemId());
+        assertEquals(QueuePriority.EMERGENCY, captor.getValue().priority());
+        assertEquals("Sốt cao co giật", captor.getValue().reason());
+    }
+
+    @Test
+    void rejectsPrioritizeWithMissingPriority() throws Exception {
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Sốt cao co giật\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(prioritizeQueueItemUseCase);
+    }
+
+    @Test
+    void rejectsPrioritizeWithBlankReason() throws Exception {
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"EMERGENCY\",\"reason\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(prioritizeQueueItemUseCase);
+    }
+
+    @Test
+    void rejectsPrioritizeWithReasonExceeding500Characters() throws Exception {
+        String longReason = "r".repeat(501);
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"EMERGENCY\",\"reason\":\"" + longReason + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(prioritizeQueueItemUseCase);
+    }
 }
+
