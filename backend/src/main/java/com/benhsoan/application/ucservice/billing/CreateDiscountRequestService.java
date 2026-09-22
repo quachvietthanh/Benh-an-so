@@ -58,8 +58,7 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
             ClockPort clockPort,
             AuditLogRepository auditLogRepository,
             DiscountRequestResultMapper resultMapper,
-            ObjectMapper objectMapper
-    ) {
+            ObjectMapper objectMapper) {
         this.visitRepository = visitRepository;
         this.paymentRepository = paymentRepository;
         this.discountRequestRepository = discountRequestRepository;
@@ -79,8 +78,7 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
             CurrentUserPort currentUserPort,
             ClockPort clockPort,
             AuditLogRepository auditLogRepository,
-            DiscountRequestResultMapper resultMapper
-    ) {
+            DiscountRequestResultMapper resultMapper) {
         this(
                 visitRepository,
                 paymentRepository,
@@ -90,8 +88,7 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
                 clockPort,
                 auditLogRepository,
                 resultMapper,
-                new ObjectMapper()
-        );
+                new ObjectMapper());
     }
 
     @Override
@@ -115,7 +112,8 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
         }
 
         if (discountRequestRepository.existsByVisitIdAndStatus(command.visitId(), DiscountRequestStatus.PENDING)
-                || discountRequestRepository.existsByVisitIdAndStatus(command.visitId(), DiscountRequestStatus.APPROVED)) {
+                || discountRequestRepository.existsByVisitIdAndStatus(command.visitId(),
+                        DiscountRequestStatus.APPROVED)) {
             throw new DiscountAlreadyExistsException(command.visitId());
         }
 
@@ -132,17 +130,19 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
                 originalAmount,
                 command.reason(),
                 actorId,
-                now
-        );
+                now);
 
         DiscountRequest saved = discountRequestRepository.save(request);
 
         Map<String, Object> auditPayload = new LinkedHashMap<>();
         auditPayload.put("visitId", saved.getVisitId() != null ? saved.getVisitId().toString() : null);
         auditPayload.put("discountType", saved.getDiscountType() != null ? saved.getDiscountType().name() : null);
-        auditPayload.put("discountValue", saved.getDiscountValue() != null ? saved.getDiscountValue().toString() : null);
-        auditPayload.put("originalAmount", saved.getOriginalAmount() != null ? saved.getOriginalAmount().toString() : null);
-        auditPayload.put("discountAmount", saved.getDiscountAmount() != null ? saved.getDiscountAmount().toString() : null);
+        auditPayload.put("discountValue",
+                saved.getDiscountValue() != null ? saved.getDiscountValue().toString() : null);
+        auditPayload.put("originalAmount",
+                saved.getOriginalAmount() != null ? saved.getOriginalAmount().toString() : null);
+        auditPayload.put("discountAmount",
+                saved.getDiscountAmount() != null ? saved.getDiscountAmount().toString() : null);
         auditPayload.put("finalAmount", saved.getFinalAmount() != null ? saved.getFinalAmount().toString() : null);
         auditPayload.put("reason", saved.getReason());
 
@@ -160,8 +160,7 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
                 saved.getId(),
                 auditDetailsJson,
                 null,
-                now
-        ));
+                now));
 
         return resultMapper.toResult(saved);
     }

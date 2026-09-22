@@ -63,16 +63,47 @@ public class RecordPaymentService implements RecordPaymentUseCase {
     private final ObjectMapper objectMapper;
     private final BillingAccessDeniedAuditWriter accessDeniedAuditWriter;
 
-    private static final com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository NO_OP_DISCOUNT_REPO =
-            new com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository() {
-                @Override public com.benhsoan.domain.billing.DiscountRequest save(com.benhsoan.domain.billing.DiscountRequest discountRequest) { return discountRequest; }
-                @Override public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findById(UUID id) { return java.util.Optional.empty(); }
-                @Override public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findByIdForUpdate(UUID id) { return java.util.Optional.empty(); }
-                @Override public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findByVisitIdAndStatus(UUID visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus status) { return java.util.Optional.empty(); }
-                @Override public List<com.benhsoan.domain.billing.DiscountRequest> findByVisitId(UUID visitId) { return List.of(); }
-                @Override public boolean existsByVisitIdAndStatus(UUID visitId, com.benhsoan.domain.billing.enums.DiscountRequestStatus status) { return false; }
-                @Override public org.springframework.data.domain.Page<com.benhsoan.domain.billing.DiscountRequest> search(com.benhsoan.port.outbound.repository.billing.DiscountRequestSearchCriteria criteria, org.springframework.data.domain.Pageable pageable) { return org.springframework.data.domain.Page.empty(); }
-            };
+    private static final com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository NO_OP_DISCOUNT_REPO = new com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository() {
+        @Override
+        public com.benhsoan.domain.billing.DiscountRequest save(
+                com.benhsoan.domain.billing.DiscountRequest discountRequest) {
+            return discountRequest;
+        }
+
+        @Override
+        public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findById(UUID id) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findByIdForUpdate(UUID id) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.Optional<com.benhsoan.domain.billing.DiscountRequest> findByVisitIdAndStatus(UUID visitId,
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus status) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public List<com.benhsoan.domain.billing.DiscountRequest> findByVisitId(UUID visitId) {
+            return List.of();
+        }
+
+        @Override
+        public boolean existsByVisitIdAndStatus(UUID visitId,
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus status) {
+            return false;
+        }
+
+        @Override
+        public org.springframework.data.domain.Page<com.benhsoan.domain.billing.DiscountRequest> search(
+                com.benhsoan.port.outbound.repository.billing.DiscountRequestSearchCriteria criteria,
+                org.springframework.data.domain.Pageable pageable) {
+            return org.springframework.data.domain.Page.empty();
+        }
+    };
 
     @Autowired
     public RecordPaymentService(
@@ -88,8 +119,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             PaymentServiceFeeRepository paymentServiceFeeRepository,
             com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository,
             ObjectMapper objectMapper,
-            BillingAccessDeniedAuditWriter accessDeniedAuditWriter
-    ) {
+            BillingAccessDeniedAuditWriter accessDeniedAuditWriter) {
         this.visitRepository = visitRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.prescriptionRepository = prescriptionRepository;
@@ -100,7 +130,8 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         this.resultMapper = resultMapper;
         this.clinicalServiceFeeCalculator = clinicalServiceFeeCalculator;
         this.paymentServiceFeeRepository = paymentServiceFeeRepository;
-        this.discountRequestRepository = discountRequestRepository != null ? discountRequestRepository : NO_OP_DISCOUNT_REPO;
+        this.discountRequestRepository = discountRequestRepository != null ? discountRequestRepository
+                : NO_OP_DISCOUNT_REPO;
         this.objectMapper = objectMapper;
         this.accessDeniedAuditWriter = accessDeniedAuditWriter;
     }
@@ -117,8 +148,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
             PaymentServiceFeeRepository paymentServiceFeeRepository,
             ObjectMapper objectMapper,
-            BillingAccessDeniedAuditWriter accessDeniedAuditWriter
-    ) {
+            BillingAccessDeniedAuditWriter accessDeniedAuditWriter) {
         this(
                 visitRepository,
                 medicalRecordRepository,
@@ -132,8 +162,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 paymentServiceFeeRepository,
                 NO_OP_DISCOUNT_REPO,
                 objectMapper,
-                accessDeniedAuditWriter
-        );
+                accessDeniedAuditWriter);
     }
 
     public RecordPaymentService(
@@ -147,8 +176,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             PaymentResultMapper resultMapper,
             ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
             PaymentServiceFeeRepository paymentServiceFeeRepository,
-            com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository
-    ) {
+            com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository discountRequestRepository) {
         this(
                 visitRepository,
                 medicalRecordRepository,
@@ -162,8 +190,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 paymentServiceFeeRepository,
                 discountRequestRepository,
                 new ObjectMapper(),
-                new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper())
-        );
+                new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper()));
     }
 
     public RecordPaymentService(
@@ -176,8 +203,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
             AuditLogRepository auditLogRepository,
             PaymentResultMapper resultMapper,
             ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
-            PaymentServiceFeeRepository paymentServiceFeeRepository
-    ) {
+            PaymentServiceFeeRepository paymentServiceFeeRepository) {
         this(
                 visitRepository,
                 medicalRecordRepository,
@@ -191,8 +217,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 paymentServiceFeeRepository,
                 NO_OP_DISCOUNT_REPO,
                 new ObjectMapper(),
-                new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper())
-        );
+                new BillingAccessDeniedAuditWriter(auditLogRepository, new ObjectMapper()));
     }
 
     @Override
@@ -204,11 +229,16 @@ public class RecordPaymentService implements RecordPaymentUseCase {
 
         if (visit.getStatus() == VisitStatus.CANCELLED) {
             throw new PaymentNotAllowedException(
-                    "Payment cannot be recorded for cancelled visits."
-            );
+                    "Payment cannot be recorded for cancelled visits.");
         }
 
-        if (discountRequestRepository.existsByVisitIdAndStatus(visit.getId(), com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING)) {
+        if (discountRequestRepository.existsByVisitIdAndStatus(visit.getId(),
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING)) {
+            throw new com.benhsoan.domain.billing.exception.PendingDiscountApprovalException(visit.getId());
+        }
+
+        if (discountRequestRepository.existsByVisitIdAndStatus(visit.getId(),
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus.PENDING)) {
             throw new com.benhsoan.domain.billing.exception.PendingDiscountApprovalException(visit.getId());
         }
 
@@ -225,8 +255,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
 
         var approvedDiscountOpt = discountRequestRepository.findByVisitIdAndStatus(
                 visit.getId(),
-                com.benhsoan.domain.billing.enums.DiscountRequestStatus.APPROVED
-        );
+                com.benhsoan.domain.billing.enums.DiscountRequestStatus.APPROVED);
 
         java.math.BigDecimal discountAmount = java.math.BigDecimal.ZERO;
         UUID discountRequestId = null;
@@ -248,8 +277,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                             cmd.paymentMethod(),
                             cmd.amount(),
                             cmd.referenceNumber(),
-                            now
-                    ))
+                            now))
                     .toList();
         } else if (command.paymentMethod() != null) {
             methodItems = List.of(PaymentMethodItem.create(
@@ -258,8 +286,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                     command.paymentMethod(),
                     command.amountPaid(),
                     command.referenceNumber(),
-                    now
-            ));
+                    now));
         } else {
             throw new ValidationException("Payment method or payment methods list is required.");
         }
@@ -272,13 +299,14 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 clinicalServiceFeeCalculator.total(serviceCharges),
                 discountAmount,
                 discountRequestId,
+                discountAmount,
+                discountRequestId,
                 command.amountPaid(),
                 methodItems,
                 actorId,
                 now,
                 visit.getStatus(),
-                true
-        );
+                true);
 
         Payment saved;
         try {
@@ -296,8 +324,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                         charge.clinicalOrderItemId(),
                         charge.serviceName(),
                         charge.price(),
-                        now
-                ))
+                        now))
                 .toList());
 
         Map<String, Object> auditPayload = new LinkedHashMap<>();
@@ -334,8 +361,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                 ResourceType.PAYMENT,
                 saved.getId(),
                 auditDetailsJson,
-                null
-        ));
+                null));
 
         return resultMapper.toResult(saved);
     }
@@ -348,8 +374,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                         currentUserPort.getCurrentUserId(),
                         visitId,
                         clockPort.now(),
-                        "Only receptionists can record payments."
-                );
+                        "Only receptionists can record payments.");
             }
             throw new AccessDeniedException("Only receptionists can record payments.");
         }
@@ -371,8 +396,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
 
         if (hasPendingDispense) {
             throw new PaymentNotAllowedException(
-                    "Payment cannot be recorded before dispensing is completed."
-            );
+                    "Payment cannot be recorded before dispensing is completed.");
         }
     }
 
@@ -380,7 +404,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
         String message = extractMessage(ex).toLowerCase();
         return message.contains("uk_payments_visit")
                 || message.contains("duplicate entry")
-                && message.contains("visit_id");
+                        && message.contains("visit_id");
     }
 
     private String extractMessage(Throwable throwable) {

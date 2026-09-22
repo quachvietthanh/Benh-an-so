@@ -46,8 +46,7 @@ public class ApproveDiscountRequestService implements ApproveDiscountRequestUseC
             AuditLogRepository auditLogRepository,
             BillingAccessDeniedAuditWriter accessDeniedAuditWriter,
             DiscountRequestResultMapper resultMapper,
-            ObjectMapper objectMapper
-    ) {
+            ObjectMapper objectMapper) {
         this.discountRequestRepository = discountRequestRepository;
         this.currentUserPort = currentUserPort;
         this.clockPort = clockPort;
@@ -63,8 +62,7 @@ public class ApproveDiscountRequestService implements ApproveDiscountRequestUseC
             ClockPort clockPort,
             AuditLogRepository auditLogRepository,
             BillingAccessDeniedAuditWriter accessDeniedAuditWriter,
-            DiscountRequestResultMapper resultMapper
-    ) {
+            DiscountRequestResultMapper resultMapper) {
         this(
                 discountRequestRepository,
                 currentUserPort,
@@ -72,8 +70,7 @@ public class ApproveDiscountRequestService implements ApproveDiscountRequestUseC
                 auditLogRepository,
                 accessDeniedAuditWriter,
                 resultMapper,
-                new ObjectMapper()
-        );
+                new ObjectMapper());
     }
 
     @Override
@@ -91,9 +88,9 @@ public class ApproveDiscountRequestService implements ApproveDiscountRequestUseC
                     ResourceType.DISCOUNT_REQUEST,
                     discountRequestId,
                     "Chỉ người quản lý hoặc quản trị viên mới có quyền duyệt đề nghị giảm giá.",
-                    now
-            );
-            throw new AccessDeniedException("Chỉ người quản lý hoặc quản trị viên mới có quyền duyệt đề nghị giảm giá.");
+                    now);
+            throw new AccessDeniedException(
+                    "Chỉ người quản lý hoặc quản trị viên mới có quyền duyệt đề nghị giảm giá.");
         }
 
         DiscountRequest request = discountRequestRepository.findByIdForUpdate(discountRequestId)
@@ -105,8 +102,7 @@ public class ApproveDiscountRequestService implements ApproveDiscountRequestUseC
                     ResourceType.DISCOUNT_REQUEST,
                     request.getId(),
                     "Người yêu cầu không được tự phê duyệt đề nghị giảm giá của chính mình.",
-                    now
-            );
+                    now);
             throw new SelfApprovalNotAllowedException();
         }
 
@@ -118,7 +114,8 @@ public class ApproveDiscountRequestService implements ApproveDiscountRequestUseC
         auditPayload.put("action", "APPROVE");
         auditPayload.put("discountRequestId", saved.getId() != null ? saved.getId().toString() : null);
         auditPayload.put("visitId", saved.getVisitId() != null ? saved.getVisitId().toString() : null);
-        auditPayload.put("discountAmount", saved.getDiscountAmount() != null ? saved.getDiscountAmount().toString() : null);
+        auditPayload.put("discountAmount",
+                saved.getDiscountAmount() != null ? saved.getDiscountAmount().toString() : null);
         auditPayload.put("finalAmount", saved.getFinalAmount() != null ? saved.getFinalAmount().toString() : null);
 
         String auditDetailsJson;
@@ -135,8 +132,7 @@ public class ApproveDiscountRequestService implements ApproveDiscountRequestUseC
                 saved.getId(),
                 auditDetailsJson,
                 null,
-                now
-        ));
+                now));
 
         return resultMapper.toResult(saved);
     }

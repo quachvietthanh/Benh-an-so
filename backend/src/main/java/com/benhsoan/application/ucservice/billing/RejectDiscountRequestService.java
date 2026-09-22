@@ -47,8 +47,7 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
             AuditLogRepository auditLogRepository,
             BillingAccessDeniedAuditWriter accessDeniedAuditWriter,
             DiscountRequestResultMapper resultMapper,
-            ObjectMapper objectMapper
-    ) {
+            ObjectMapper objectMapper) {
         this.discountRequestRepository = discountRequestRepository;
         this.currentUserPort = currentUserPort;
         this.clockPort = clockPort;
@@ -64,8 +63,7 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
             ClockPort clockPort,
             AuditLogRepository auditLogRepository,
             BillingAccessDeniedAuditWriter accessDeniedAuditWriter,
-            DiscountRequestResultMapper resultMapper
-    ) {
+            DiscountRequestResultMapper resultMapper) {
         this(
                 discountRequestRepository,
                 currentUserPort,
@@ -73,8 +71,7 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
                 auditLogRepository,
                 accessDeniedAuditWriter,
                 resultMapper,
-                new ObjectMapper()
-        );
+                new ObjectMapper());
     }
 
     @Override
@@ -95,9 +92,9 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
                     ResourceType.DISCOUNT_REQUEST,
                     command.discountRequestId(),
                     "Chỉ người quản lý hoặc quản trị viên mới có quyền từ chối đề nghị giảm giá.",
-                    now
-            );
-            throw new AccessDeniedException("Chỉ người quản lý hoặc quản trị viên mới có quyền từ chối đề nghị giảm giá.");
+                    now);
+            throw new AccessDeniedException(
+                    "Chỉ người quản lý hoặc quản trị viên mới có quyền từ chối đề nghị giảm giá.");
         }
 
         DiscountRequest request = discountRequestRepository.findByIdForUpdate(command.discountRequestId())
@@ -109,8 +106,7 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
                     ResourceType.DISCOUNT_REQUEST,
                     request.getId(),
                     "Người yêu cầu không được tự xử lý đề nghị giảm giá của chính mình.",
-                    now
-            );
+                    now);
             throw new SelfApprovalNotAllowedException();
         }
 
@@ -138,8 +134,7 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
                 saved.getId(),
                 auditDetailsJson,
                 null,
-                now
-        ));
+                now));
 
         return resultMapper.toResult(saved);
     }

@@ -35,7 +35,8 @@ public class DiscountRequestRepositoryAdapter implements DiscountRequestReposito
             return mapper.toDomain(saved != null ? saved : entity);
         } catch (org.springframework.dao.DataIntegrityViolationException ex) {
             if (isDuplicateActiveDiscountConflict(ex)) {
-                throw new com.benhsoan.domain.billing.exception.DiscountAlreadyExistsException(discountRequest.getVisitId());
+                throw new com.benhsoan.domain.billing.exception.DiscountAlreadyExistsException(
+                        discountRequest.getVisitId());
             }
             throw ex;
         }
@@ -108,7 +109,6 @@ public class DiscountRequestRepositoryAdapter implements DiscountRequestReposito
                 criteria.approvedBy(),
                 criteria.requestedFrom(),
                 criteria.requestedTo(),
-                pageable
-        ).map(mapper::toDomain);
+                pageable).map(mapper::toDomain);
     }
 }

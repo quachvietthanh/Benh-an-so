@@ -20,7 +20,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Writes billing and discount access-denied audit entries in an independent transaction (REQUIRES_NEW)
+ * Writes billing and discount access-denied audit entries in an independent
+ * transaction (REQUIRES_NEW)
  * so the security trace survives business transaction rollbacks.
  */
 @Slf4j
@@ -33,8 +34,7 @@ public class BillingAccessDeniedAuditWriter {
     @org.springframework.beans.factory.annotation.Autowired
     public BillingAccessDeniedAuditWriter(
             AuditLogRepository auditLogRepository,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
-    ) {
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper) {
         this.auditLogRepository = auditLogRepository;
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
     }
@@ -48,10 +48,10 @@ public class BillingAccessDeniedAuditWriter {
             UUID actorId,
             UUID visitId,
             Instant deniedAt,
-            String errorReason
-    ) {
+            String errorReason) {
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("error", errorReason != null ? errorReason : "User lacks RECEPTIONIST or ADMIN role to record payments");
+        detail.put("error",
+                errorReason != null ? errorReason : "User lacks RECEPTIONIST or ADMIN role to record payments");
         detail.put("visitId", visitId != null ? visitId.toString() : null);
         detail.put("deniedAt", deniedAt != null ? deniedAt.toString() : null);
 
@@ -63,8 +63,7 @@ public class BillingAccessDeniedAuditWriter {
                     visitId,
                     toJson(detail),
                     null,
-                    deniedAt
-            ));
+                    deniedAt));
         } catch (RuntimeException exception) {
             log.warn("Failed to record payment access denied audit log for actor {} on visit {}: {}",
                     actorId, visitId, exception.getMessage());
@@ -77,8 +76,7 @@ public class BillingAccessDeniedAuditWriter {
             ResourceType resourceType,
             UUID resourceId,
             String detail,
-            Instant timestamp
-    ) {
+            Instant timestamp) {
         if (actorId == null) {
             return;
         }
@@ -97,8 +95,7 @@ public class BillingAccessDeniedAuditWriter {
                     resourceId,
                     toJson(detailMap),
                     null,
-                    timestamp != null ? timestamp : Instant.now()
-            );
+                    timestamp != null ? timestamp : Instant.now());
             auditLogRepository.save(logEntry);
         } catch (RuntimeException exception) {
             log.warn("Failed to record access denied audit log for actor {} on resource {}: {}",
