@@ -42,6 +42,9 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class CheckContraindicationService implements CheckContraindicationUseCase {
 
+    private static final int MIN_REPRODUCTIVE_AGE = 15;
+    private static final int MAX_REPRODUCTIVE_AGE = 49;
+
     private final PatientRepository patientRepository;
     private final PatientChronicDiseaseRepository patientChronicDiseaseRepository;
     private final ContraindicationRuleRepository ruleRepository;
@@ -159,6 +162,9 @@ public class CheckContraindicationService implements CheckContraindicationUseCas
             }
             case PREGNANCY -> {
                 if (patient.getGender() != Gender.FEMALE) {
+                    return;
+                }
+                if (patientAge != null && (patientAge < MIN_REPRODUCTIVE_AGE || patientAge > MAX_REPRODUCTIVE_AGE)) {
                     return;
                 }
                 if (patient.getPregnancyStatus() == null) {

@@ -388,5 +388,117 @@ class GetQueueHistoryServiceTest {
         assertNull(history.get(0).action(), "Legacy log without action should return null action");
         assertNull(history.get(0).status(), "Legacy log without status should not fallback to COMPLETED");
     }
+
+    @Test
+    void managerCanViewPrioritizedHistoryRecordWithReasonAndOperatorName() {
+        UUID doctorId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        MedicalQueue queue = MedicalQueue.create(doctorId, UUID.randomUUID(), LocalDate.of(2026, 8, 2), NOW);
+        QueueItem item = QueueItem.create(queue.getId(), UUID.randomUUID(), null, UUID.randomUUID(),
+                QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 8, 2), UUID.randomUUID(), NOW);
+
+        AuditLog prioritizeLog = AuditLog.restore(
+                UUID.randomUUID(), managerId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),
+                "{\"queueItemId\":\"%s\",\"status\":\"WAITING\",\"action\":\"PRIORITIZED\",\"priority\":\"EMERGENCY\",\"reason\":\"Ca cap cuu - Sot cao co giat\",\"callCount\":0}"
+                        .formatted(item.getId()),
+                "127.0.0.1", NOW.plusSeconds(30)
+        );
+
+        User managerUser = User.restore(
+                managerId, "manager1", "hashedpwd", "Pham Quan Ly", "manager@clinic.com", "0900000001",
+                UUID.randomUUID(), true, NOW, NOW
+        );
+
+        QueueItemRepository queueItemRepository = mock(QueueItemRepository.class);
+        MedicalQueueRepository medicalQueueRepository = mock(MedicalQueueRepository.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+
+        when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+        when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(false);
+
+        when(queueItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(medicalQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(auditLogRepository.findByResourceTypeAndResourceId(ResourceType.VISIT, item.getVisitId()))
+                .thenReturn(List.of(prioritizeLog));
+        when(userRepository.findAllById(List.of(managerId))).thenReturn(List.of(managerUser));
+
+        GetQueueHistoryService service = new GetQueueHistoryService(
+                queueItemRepository, medicalQueueRepository,
+                new QueueOperationAuthorization(currentUserPort),
+                auditLogRepository, userRepository, new ObjectMapper()
+        );
+
+        List<QueueHistoryResult> history = service.getHistory(item.getId());
+
+        assertEquals(1, history.size());
+        QueueHistoryResult record = history.get(0);
+        assertEquals("PRIORITIZED", record.action());
+        assertEquals("WAITING", record.status());
+        assertEquals("Ca cap cuu - Sot cao co giat", record.reason());
+        assertEquals("Pham Quan Ly", record.operatorName());
+    }
+
+    @Test
+    void parsesHistoryWithSpecialCharactersSuccessfully() {
+        UUID doctorId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        MedicalQueue queue = MedicalQueue.create(doctorId, UUID.randomUUID(), LocalDate.of(2026, 8, 2), NOW);
+        QueueItem item = QueueItem.create(queue.getId(), UUID.randomUUID(), null, UUID.randomUUID(),
+                QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 8, 2), UUID.randomUUID(), NOW);
+
+        String specialReason = "Bệnh nhân \"sốt cao co giật\"\nCần cấp cứu ngay!";
+        ObjectMapper mapper = new ObjectMapper();
+        var node = mapper.createObjectNode();
+        node.put("queueItemId", item.getId().toString());
+        node.put("status", "WAITING");
+        node.put("action", "PRIORITIZED");
+        node.put("priority", "EMERGENCY");
+        node.put("reason", specialReason);
+        node.put("callCount", 0);
+
+        AuditLog prioritizeLog = AuditLog.restore(
+                UUID.randomUUID(), managerId, ActionType.UPDATE, ResourceType.VISIT, item.getVisitId(),
+                node.toString(),
+                "127.0.0.1", NOW.plusSeconds(30)
+        );
+
+        User managerUser = User.restore(
+                managerId, "manager1", "hashedpwd", "Pham Quan Ly", "manager@clinic.com", "0900000001",
+                UUID.randomUUID(), true, NOW, NOW
+        );
+
+        QueueItemRepository queueItemRepository = mock(QueueItemRepository.class);
+        MedicalQueueRepository medicalQueueRepository = mock(MedicalQueueRepository.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+
+        when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
+        when(queueItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+        when(medicalQueueRepository.findById(queue.getId())).thenReturn(Optional.of(queue));
+        when(auditLogRepository.findByResourceTypeAndResourceId(ResourceType.VISIT, item.getVisitId()))
+                .thenReturn(List.of(prioritizeLog));
+        when(userRepository.findAllById(List.of(managerId))).thenReturn(List.of(managerUser));
+
+        GetQueueHistoryService service = new GetQueueHistoryService(
+                queueItemRepository, medicalQueueRepository,
+                new QueueOperationAuthorization(currentUserPort),
+                auditLogRepository, userRepository, mapper
+        );
+
+        List<QueueHistoryResult> history = service.getHistory(item.getId());
+
+        assertEquals(1, history.size());
+        QueueHistoryResult record = history.get(0);
+        assertEquals("PRIORITIZED", record.action());
+        assertEquals("WAITING", record.status());
+        assertEquals(specialReason, record.reason());
+        assertEquals("Pham Quan Ly", record.operatorName());
+    }
 }
+
 

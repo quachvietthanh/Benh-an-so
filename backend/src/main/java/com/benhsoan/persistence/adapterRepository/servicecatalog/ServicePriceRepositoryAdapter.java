@@ -1,7 +1,9 @@
 package com.benhsoan.persistence.adapterRepository.servicecatalog;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,9 +57,25 @@ public class ServicePriceRepositoryAdapter implements ServicePriceRepository {
     }
 
     @Override
+    public Map<UUID, ServicePrice> findEffectivePrices(Collection<UUID> serviceCatalogIds, LocalDate effectiveOn) {
+        if (serviceCatalogIds == null || serviceCatalogIds.isEmpty()) {
+            return Map.of();
+        }
+        Objects.requireNonNull(effectiveOn, "Effective date must not be null.");
+        return jpaRepository.findEffectivePrices(serviceCatalogIds, effectiveOn).stream()
+                .map(mapper::toDomain)
+                .collect(java.util.stream.Collectors.toMap(
+                        ServicePrice::getServiceCatalogId,
+                        price -> price,
+                        (existing, replacement) -> existing
+                ));
+    }
+
+    @Override
     public boolean existsByServiceCatalogIdAndEffectiveFrom(UUID serviceCatalogId, LocalDate effectiveFrom) {
         Objects.requireNonNull(serviceCatalogId, "Service catalog id must not be null.");
         Objects.requireNonNull(effectiveFrom, "Effective date must not be null.");
         return jpaRepository.existsByServiceCatalogIdAndEffectiveFrom(serviceCatalogId, effectiveFrom);
     }
 }
+

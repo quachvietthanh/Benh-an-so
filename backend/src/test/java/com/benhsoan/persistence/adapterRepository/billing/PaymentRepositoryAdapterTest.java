@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,7 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.benhsoan.domain.billing.enums.PaymentMethod;
 import com.benhsoan.domain.billing.enums.PaymentStatus;
 import com.benhsoan.persistence.entity.billing.PaymentEntity;
+import com.benhsoan.persistence.jpaRepository.billing.JpaPaymentMethodItemRepository;
 import com.benhsoan.persistence.jpaRepository.billing.JpaPaymentRepository;
+import com.benhsoan.persistence.mapper.billing.PaymentMethodItemPersistenceMapper;
 import com.benhsoan.persistence.mapper.billing.PaymentPersistenceMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +30,12 @@ class PaymentRepositoryAdapterTest {
 
     @Mock
     private JpaPaymentRepository jpaRepository;
+
+    @Mock
+    private JpaPaymentMethodItemRepository itemJpaRepository;
+
+    @Spy
+    private PaymentMethodItemPersistenceMapper itemMapper = new PaymentMethodItemPersistenceMapper();
 
     @Spy
     private PaymentPersistenceMapper mapper = new PaymentPersistenceMapper();
@@ -39,6 +48,8 @@ class PaymentRepositoryAdapterTest {
         UUID paymentId = UUID.randomUUID();
         when(jpaRepository.findByIdForUpdate(paymentId))
                 .thenReturn(Optional.of(paymentEntity(paymentId)));
+        when(itemJpaRepository.findAllByPaymentId(paymentId))
+                .thenReturn(List.of());
 
         var result = adapter.findByIdForUpdate(paymentId);
 

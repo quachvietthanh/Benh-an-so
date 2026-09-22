@@ -117,4 +117,38 @@ class ReportingRestMapperTest {
         assertEquals("Nguyễn Văn A", response.items().get(0).doctorName());
         assertEquals(25L, response.items().get(0).totalVisits());
     }
+
+    @Test
+    void mapsAppointmentEffectivenessResultToStableResponseContract() {
+        com.benhsoan.adapter.inbound.rest.response.reporting.AppointmentEffectivenessReportResponse response =
+                mapper.toResponse(new com.benhsoan.port.dto.result.AppointmentEffectivenessReportResult(
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31),
+                        Instant.parse("2026-08-31T08:00:00Z"),
+                        100,
+                        List.of(
+                                new com.benhsoan.port.dto.result.AppointmentStatusCountResult(
+                                        "RECEPTION_COUNTER",
+                                        com.benhsoan.domain.appointment.enums.AppointmentStatus.COMPLETED,
+                                        40,
+                                        new BigDecimal("40.00")
+                                ),
+                                new com.benhsoan.port.dto.result.AppointmentStatusCountResult(
+                                        "ONLINE_PORTAL",
+                                        com.benhsoan.domain.appointment.enums.AppointmentStatus.COMPLETED,
+                                        10,
+                                        new BigDecimal("10.00")
+                                )
+                        )
+                ));
+
+        assertEquals(LocalDate.of(2026, 8, 1), response.from());
+        assertEquals(100, response.total());
+        assertEquals(2, response.items().size());
+        assertEquals("RECEPTION_COUNTER", response.items().get(0).bookingChannel());
+        assertEquals(com.benhsoan.domain.appointment.enums.AppointmentStatus.COMPLETED, response.items().get(0).status());
+        assertEquals(40, response.items().get(0).count());
+        assertEquals("ONLINE_PORTAL", response.items().get(1).bookingChannel());
+        assertEquals(10, response.items().get(1).count());
+    }
 }

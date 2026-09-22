@@ -8,6 +8,8 @@ const pharmacyApi = {
   checkInteractions: (drugIds) => axiosClient.post('/prescriptions/check-interactions', { drugIds }),
   checkAllergyWarnings: (medicalRecordId, medicineIds) =>
     axiosClient.post('/prescriptions/check-allergy-warnings', { medicalRecordId, medicineIds }),
+  checkContraindications: (medicalRecordId, medicineIds) =>
+    axiosClient.post('/prescriptions/check-contraindications', { medicalRecordId, medicineIds }),
   getAllergyWarningLogs: (params) => axiosClient.get('/prescriptions/allergy-warning-logs', { params }),
   createPrescription: (data) => axiosClient.post('/prescriptions', data),
   updatePrescription: (id, data) => axiosClient.patch(`/prescriptions/${id}`, data),

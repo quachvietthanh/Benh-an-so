@@ -107,6 +107,43 @@ class QueueRestMapperTest {
         assertEquals(NOW, response.timestamp());
     }
 
+    @Test
+    void mapsPriorityFieldsToResponse() {
+        UUID prioritizedBy = UUID.randomUUID();
+        Instant prioritizedAt = Instant.parse("2026-09-08T10:15:00Z");
+        QueueItemResult itemResult = new QueueItemResult(
+                ID, QUEUE_ID, PATIENT_ID, "BN001", "Nguyễn Văn A",
+                DOCTOR_ID, "Bác sĩ B", ROOM_ID, "P101", null,
+                VISIT_ID, "VIS001", QueueItemSourceType.WALK_IN, QueueItemStatus.WAITING,
+                1, LocalDate.of(2026, 9, 8), NOW, null, null, null, null,
+                null, null, 0,
+                com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY,
+                "Sốt cao co giật", prioritizedAt, prioritizedBy
+        );
+
+        QueueItemResponse response = mapper.toResponse(itemResult);
+
+        assertEquals(com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, response.priority());
+        assertEquals("Sốt cao co giật", response.priorityReason());
+        assertEquals(prioritizedAt, response.prioritizedAt());
+        assertEquals(prioritizedBy, response.prioritizedBy());
+    }
+
+    @Test
+    void mapsPrioritizeRequestToCommand() {
+        com.benhsoan.adapter.inbound.rest.request.queue.PrioritizeQueueItemRequest request =
+                new com.benhsoan.adapter.inbound.rest.request.queue.PrioritizeQueueItemRequest(
+                        com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY,
+                        "Người già trên 80 tuổi"
+                );
+
+        com.benhsoan.port.dto.command.queue.PrioritizeQueueItemCommand command = mapper.toCommand(ID, request);
+
+        assertEquals(ID, command.queueItemId());
+        assertEquals(com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY, command.priority());
+        assertEquals("Người già trên 80 tuổi", command.reason());
+    }
+
     private static QueueItemResult result(String patientCode, String patientName) {
         return new QueueItemResult(
                 ID, QUEUE_ID, PATIENT_ID, patientCode, patientName,
@@ -116,3 +153,4 @@ class QueueRestMapperTest {
         );
     }
 }
+

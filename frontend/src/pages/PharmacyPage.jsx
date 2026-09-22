@@ -47,6 +47,7 @@ import { saveStoredPrescription, dispensePrescriptionHelper, mergePrescriptions 
 import { getRemainingQuantity } from '../utils/partialDispensingHelpers'
 import PartialDispenseModal from '../components/pharmacy/PartialDispenseModal.jsx'
 import DispenseHistoryModal from '../components/pharmacy/DispenseHistoryModal.jsx'
+import ReturnMedicationModal from '../components/pharmacy/ReturnMedicationModal.jsx'
 
 
 const { Text, Title } = Typography
@@ -99,6 +100,7 @@ function PharmacyPage() {
   const [prescriptionStatusFilter, setPrescriptionStatusFilter] = useState('ALL') // 'ALL' | 'PENDING_DISPENSE' | 'PARTIALLY_DISPENSED'
   const [partialModalOpen, setPartialModalOpen] = useState(false)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [returnModalOpen, setReturnModalOpen] = useState(false)
   const [batches, setBatches] = useState([])
   const [stocks, setStocks] = useState([])
   const [lowStockItems, setLowStockItems] = useState([])
@@ -480,7 +482,6 @@ function PharmacyPage() {
             <Title level={2} style={{ margin: 0 }}>
               <MedicineBoxOutlined /> Cấp phát thuốc
             </Title>
-            <Text type="secondary">Xử lý đơn chờ cấp phát và xem trước phân bổ lô theo FEFO.</Text>
           </div>
         </div>
         <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 20px', marginTop: 16 }}>
@@ -497,7 +498,6 @@ function PharmacyPage() {
           <Title level={2} style={{ margin: 0 }}>
             <MedicineBoxOutlined /> Cấp phát thuốc
           </Title>
-          <Text type="secondary">Xử lý đơn chờ cấp phát và xem trước phân bổ lô theo FEFO.</Text>
         </div>
         <Space wrap>
           <Button icon={<InboxOutlined />} onClick={() => navigate('/pharmacy/receipts')}>
@@ -644,7 +644,18 @@ function PharmacyPage() {
           <Card
             title={(
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <span>Đơn cần cấp ({prescriptionTotal})</span>
+                <span>
+                  {prescriptionStatusFilter === 'DISPENSED'
+                    ? 'Đơn đã cấp phát'
+                    : prescriptionStatusFilter === 'PARTIALLY_DISPENSED'
+                    ? 'Đơn cấp một phần'
+                    : prescriptionStatusFilter === 'PENDING_DISPENSE'
+                    ? 'Đơn chờ cấp phát'
+                    : prescriptionStatusFilter === 'CANCELLED'
+                    ? 'Đơn đã hủy cấp phát'
+                    : 'Đơn cần cấp'}{' '}
+                  ({prescriptionTotal})
+                </span>
                 <Select
                   size="small"
                   value={prescriptionStatusFilter}
@@ -653,11 +664,13 @@ function PharmacyPage() {
                     setPrescriptionPage(0)
                     loadPrescriptionPage(0, val)
                   }}
-                  style={{ width: 145 }}
+                  style={{ width: 160 }}
                   options={[
                     { value: 'ALL', label: 'Tất cả cần cấp' },
                     { value: 'PENDING_DISPENSE', label: 'Chờ cấp phát' },
                     { value: 'PARTIALLY_DISPENSED', label: 'Cấp một phần' },
+                    { value: 'DISPENSED', label: 'Đã cấp phát' },
+                    { value: 'CANCELLED', label: 'Đã hủy cấp phát' },
                   ]}
                 />
               </div>
@@ -732,6 +745,10 @@ function PharmacyPage() {
                           </Tooltip>
                           {item.status === 'PARTIALLY_DISPENSED' ? (
                             <Tag color="gold" style={{ fontWeight: 600, margin: 0 }}>Cấp một phần</Tag>
+                          ) : item.status === 'DISPENSED' ? (
+                            <Tag color="green" style={{ fontWeight: 600, margin: 0 }}>Đã cấp phát</Tag>
+                          ) : item.status === 'CANCELLED' ? (
+                            <Tag color="red" style={{ fontWeight: 600, margin: 0 }}>Đã hủy cấp phát</Tag>
                           ) : (
                             <Tag color="orange" style={{ margin: 0 }}>Chờ cấp phát</Tag>
                           )}
@@ -818,6 +835,10 @@ function PharmacyPage() {
                   <Descriptions.Item label="Trạng thái">
                     {selectedPrescription.status === 'PARTIALLY_DISPENSED' ? (
                       <Tag color="gold" style={{ fontWeight: 600 }}>Cấp phát một phần</Tag>
+                    ) : selectedPrescription.status === 'DISPENSED' ? (
+                      <Tag color="green" style={{ fontWeight: 600 }}>Đã cấp phát</Tag>
+                    ) : selectedPrescription.status === 'CANCELLED' ? (
+                      <Tag color="red" style={{ fontWeight: 600 }}>Đã hủy cấp phát</Tag>
                     ) : (
                       <Tag color="orange">Chờ cấp phát</Tag>
                     )}
@@ -825,7 +846,7 @@ function PharmacyPage() {
                   <Descriptions.Item label="Ghi chú">{selectedPrescription.note || 'Không có'}</Descriptions.Item>
                 </Descriptions>
 
-                {hasPreviewShortage && (
+                {hasPreviewShortage && selectedPrescription.status !== 'DISPENSED' && (
                   <Alert
                     type="warning"
                     showIcon
@@ -868,8 +889,21 @@ function PharmacyPage() {
                   />
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-                  {selectedPrescription.status === 'PARTIALLY_DISPENSED' && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    marginTop: 16,
+                    paddingTop: 16,
+                    borderTop: '1px solid #f1f5f9',
+                  }}
+                >
+                  {(selectedPrescription.status === 'PARTIALLY_DISPENSED' ||
+                    selectedPrescription.status === 'DISPENSED' ||
+                    selectedPrescription.status === 'CANCELLED') && (
                     <Button
                       icon={<HistoryOutlined />}
                       size="large"
@@ -878,68 +912,98 @@ function PharmacyPage() {
                       Xem lịch sử cấp phát
                     </Button>
                   )}
-                  <Button
-                    type={hasPreviewShortage || selectedPrescription.status === 'PARTIALLY_DISPENSED' ? 'primary' : 'default'}
-                    size="large"
-                    icon={<MedicineBoxOutlined />}
-                    style={
-                      hasPreviewShortage || selectedPrescription.status === 'PARTIALLY_DISPENSED'
-                        ? { backgroundColor: '#d97706', borderColor: '#d97706', fontWeight: 600 }
-                        : {}
-                    }
-                    disabled={!canDispense}
-                    onClick={() => setPartialModalOpen(true)}
-                  >
-                    Cấp phát một phần
-                  </Button>
-                  {selectedPrescription.status !== 'PARTIALLY_DISPENSED' && (
-                    <Popconfirm
-                      title={
-                        <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
-                          Xác nhận cấp phát đơn thuốc
-                        </Text>
-                      }
-                      description={
-                        <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
-                          <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
-                            Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
-                            <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
-                              {selectedPrescription.prescriptionCode || selectedPrescription.id}
-                            </Text>?
-                          </div>
-                          <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
-                            <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
-                            <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
-                          </div>
-                        </div>
-                      }
-                      icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
-                      okText="Xác nhận cấp phát"
-                      cancelText="Kiểm tra lại"
-                      okButtonProps={{
-                        type: 'primary',
-                        icon: <CheckCircleOutlined />,
-                        style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-                      }}
-                      cancelButtonProps={{
-                        icon: <RollbackOutlined />,
-                        style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-                      }}
-                      onConfirm={handleDispense}
-                      disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
-                      overlayClassName="dispense-confirm-popconfirm"
-                      overlayStyle={{ maxWidth: 500 }}
+
+                  {(selectedPrescription.status === 'PARTIALLY_DISPENSED' ||
+                    selectedPrescription.status === 'DISPENSED') && (
+                    <Button
+                      danger
+                      icon={<RollbackOutlined />}
+                      size="large"
+                      disabled={!canDispense}
+                      onClick={() => setReturnModalOpen(true)}
                     >
+                      Trả lại thuốc / Hủy cấp phát
+                    </Button>
+                  )}
+
+                  {selectedPrescription.status === 'PARTIALLY_DISPENSED' && (
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<MedicineBoxOutlined />}
+                      style={{ backgroundColor: '#d97706', borderColor: '#d97706', fontWeight: 600 }}
+                      disabled={!canDispense}
+                      onClick={() => setPartialModalOpen(true)}
+                    >
+                      Tiếp tục cấp một phần
+                    </Button>
+                  )}
+
+                  {selectedPrescription.status === 'PENDING_DISPENSE' && (
+                    <>
                       <Button
-                        type="primary"
+                        type={hasPreviewShortage ? 'primary' : 'default'}
                         size="large"
-                        icon={<CheckCircleOutlined />}
-                        loading={dispensingId === selectedPrescription.id}
-                        disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                        icon={<MedicineBoxOutlined />}
+                        style={
+                          hasPreviewShortage
+                            ? { backgroundColor: '#d97706', borderColor: '#d97706', fontWeight: 600 }
+                            : {}
+                        }
+                        disabled={!canDispense}
+                        onClick={() => setPartialModalOpen(true)}
                       >
-                        Xác nhận cấp phát theo FEFO
+                        Cấp phát một phần
                       </Button>
-                    </Popconfirm>
+
+                      <Popconfirm
+                        title={
+                          <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
+                            Xác nhận cấp phát đơn thuốc
+                          </Text>
+                        }
+                        description={
+                          <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
+                            <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
+                              Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
+                              <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
+                                {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                              </Text>?
+                            </div>
+                            <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
+                              <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
+                              <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
+                            </div>
+                          </div>
+                        }
+                        icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
+                        okText="Xác nhận cấp phát"
+                        cancelText="Kiểm tra lại"
+                        okButtonProps={{
+                          type: 'primary',
+                          icon: <CheckCircleOutlined />,
+                          style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+                        }}
+                        cancelButtonProps={{
+                          icon: <RollbackOutlined />,
+                          style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+                        }}
+                        onConfirm={handleDispense}
+                        disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                        overlayClassName="dispense-confirm-popconfirm"
+                        overlayStyle={{ maxWidth: 500 }}
+                      >
+                        <Button
+                          type="primary"
+                          size="large"
+                          icon={<CheckCircleOutlined />}
+                          loading={dispensingId === selectedPrescription.id}
+                          disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                        >
+                          Xác nhận cấp phát theo FEFO
+                        </Button>
+                      </Popconfirm>
+                    </>
                   )}
                 </div>
                 {!canDispense && <Text type="danger">Tài khoản hiện tại không có quyền cấp phát thuốc.</Text>}
@@ -1068,6 +1132,23 @@ function PharmacyPage() {
         open={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
         prescription={selectedPrescription}
+      />
+
+      <ReturnMedicationModal
+        open={returnModalOpen}
+        onClose={() => setReturnModalOpen(false)}
+        prescription={selectedPrescription}
+        onSuccess={(result) => {
+          const targetStatus = result?.status
+          if (targetStatus === 'CANCELLED') {
+            setPrescriptionStatusFilter('CANCELLED')
+            setPrescriptionPage(0)
+            loadPrescriptionPage(0, 'CANCELLED')
+            loadInventoryData()
+          } else {
+            loadData()
+          }
+        }}
       />
     </div>
   )
