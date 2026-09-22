@@ -1,5 +1,5 @@
 -- =====================================================
--- V78__create_discount_requests_and_adjust_billing_constraints.sql
+-- V84__create_discount_requests_and_adjust_billing_constraints.sql
 -- NCL-07-CN-008: Giảm giá và miễn phí có phê duyệt
 -- QTN-37: Giảm giá phải được phê duyệt trước khi lập hóa đơn
 -- =====================================================
@@ -15,6 +15,9 @@ CREATE TABLE discount_requests (
     final_amount DECIMAL(15, 2) NOT NULL,
     reason TEXT NOT NULL,
     status VARCHAR(30) NOT NULL,
+    active_status VARCHAR(20) GENERATED ALWAYS AS (
+        CASE WHEN status IN ('PENDING', 'APPROVED') THEN 'ACTIVE' ELSE NULL END
+    ) STORED,
     requested_by BINARY(16) NOT NULL,
     requested_at TIMESTAMP NOT NULL,
     approved_by BINARY(16) NULL,
@@ -25,6 +28,9 @@ CREATE TABLE discount_requests (
     invoice_id BINARY(16) NULL,
 
     CONSTRAINT pk_discount_requests PRIMARY KEY (id),
+
+    CONSTRAINT uk_discount_requests_active_visit
+        UNIQUE (visit_id, active_status),
 
     CONSTRAINT fk_discount_requests_visit
         FOREIGN KEY (visit_id)

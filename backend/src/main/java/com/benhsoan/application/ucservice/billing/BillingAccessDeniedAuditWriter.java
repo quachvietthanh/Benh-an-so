@@ -20,12 +20,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Writes payment and discount access-denied audit entries in an independent transaction (REQUIRES_NEW)
+ * Writes payment and discount access-denied audit entries in an independent
+ * transaction (REQUIRES_NEW)
  * so the security trace survives business transaction rollbacks.
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class BillingAccessDeniedAuditWriter {
 
     private final AuditLogRepository auditLogRepository;
@@ -37,8 +37,7 @@ public class BillingAccessDeniedAuditWriter {
             ResourceType resourceType,
             UUID resourceId,
             String detail,
-            Instant timestamp
-    ) {
+            Instant timestamp) {
         if (actorId == null) {
             return;
         }
@@ -50,8 +49,7 @@ public class BillingAccessDeniedAuditWriter {
                 resourceId,
                 detail,
                 null,
-                timestamp != null ? timestamp : Instant.now()
-        );
+                timestamp != null ? timestamp : Instant.now());
         auditLogRepository.save(auditLog);
     }
 
@@ -60,10 +58,10 @@ public class BillingAccessDeniedAuditWriter {
             UUID actorId,
             UUID visitId,
             Instant deniedAt,
-            String errorReason
-    ) {
+            String errorReason) {
         Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("error", errorReason != null ? errorReason : "User lacks RECEPTIONIST or ADMIN role to record payments");
+        detail.put("error",
+                errorReason != null ? errorReason : "User lacks RECEPTIONIST or ADMIN role to record payments");
         detail.put("visitId", visitId != null ? visitId.toString() : null);
         detail.put("deniedAt", deniedAt != null ? deniedAt.toString() : null);
 
@@ -75,11 +73,43 @@ public class BillingAccessDeniedAuditWriter {
                     visitId,
                     toJson(detail),
                     null,
-                    deniedAt
-            ));
+                    deniedAt));
         } catch (RuntimeException exception) {
             log.warn("Failed to record payment access denied audit log for actor {} on visit {}: {}",
                     actorId, visitId, exception.getMessage());
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordAccessDenied(
+            UUID actorId,
+            ResourceType resourceType,
+            UUID resourceId,
+            String detail,
+            Instant timestamp) {
+        if (actorId == null) {
+            return;
+        }
+
+        Map<String, Object> detailMap = new LinkedHashMap<>();
+        detailMap.put("message", detail);
+        detailMap.put("resourceType", resourceType != null ? resourceType.name() : null);
+        detailMap.put("resourceId", resourceId != null ? resourceId.toString() : null);
+        detailMap.put("deniedAt", timestamp != null ? timestamp.toString() : Instant.now().toString());
+
+        try {
+            AuditLog logEntry = AuditLog.create(
+                    actorId,
+                    ActionType.ACCESS_DENIED,
+                    resourceType,
+                    resourceId,
+                    toJson(detailMap),
+                    null,
+                    timestamp != null ? timestamp : Instant.now());
+            auditLogRepository.save(logEntry);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record access denied audit log for actor {} on resource {}: {}",
+                    actorId, resourceId, exception.getMessage());
         }
     }
 

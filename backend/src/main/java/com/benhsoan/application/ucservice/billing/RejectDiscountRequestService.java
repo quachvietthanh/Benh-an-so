@@ -1,8 +1,11 @@
 package com.benhsoan.application.ucservice.billing;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,11 +24,10 @@ import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.billing.DiscountRequestRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
-
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class RejectDiscountRequestService implements RejectDiscountRequestUseCase {
 
@@ -35,6 +37,42 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
     private final AuditLogRepository auditLogRepository;
     private final BillingAccessDeniedAuditWriter accessDeniedAuditWriter;
     private final DiscountRequestResultMapper resultMapper;
+    private final ObjectMapper objectMapper;
+
+    @Autowired
+    public RejectDiscountRequestService(
+            DiscountRequestRepository discountRequestRepository,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AuditLogRepository auditLogRepository,
+            BillingAccessDeniedAuditWriter accessDeniedAuditWriter,
+            DiscountRequestResultMapper resultMapper,
+            ObjectMapper objectMapper) {
+        this.discountRequestRepository = discountRequestRepository;
+        this.currentUserPort = currentUserPort;
+        this.clockPort = clockPort;
+        this.auditLogRepository = auditLogRepository;
+        this.accessDeniedAuditWriter = accessDeniedAuditWriter;
+        this.resultMapper = resultMapper;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
+
+    public RejectDiscountRequestService(
+            DiscountRequestRepository discountRequestRepository,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AuditLogRepository auditLogRepository,
+            BillingAccessDeniedAuditWriter accessDeniedAuditWriter,
+            DiscountRequestResultMapper resultMapper) {
+        this(
+                discountRequestRepository,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                accessDeniedAuditWriter,
+                resultMapper,
+                new ObjectMapper());
+    }
 
     @Override
     public DiscountRequestResult reject(RejectDiscountRequestCommand command) {
@@ -54,9 +92,9 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
                     ResourceType.DISCOUNT_REQUEST,
                     command.discountRequestId(),
                     "Chỉ người quản lý hoặc quản trị viên mới có quyền từ chối đề nghị giảm giá.",
-                    now
-            );
-            throw new AccessDeniedException("Chỉ người quản lý hoặc quản trị viên mới có quyền từ chối đề nghị giảm giá.");
+                    now);
+            throw new AccessDeniedException(
+                    "Chỉ người quản lý hoặc quản trị viên mới có quyền từ chối đề nghị giảm giá.");
         }
 
         DiscountRequest request = discountRequestRepository.findByIdForUpdate(command.discountRequestId())
@@ -68,8 +106,7 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
                     ResourceType.DISCOUNT_REQUEST,
                     request.getId(),
                     "Người yêu cầu không được tự xử lý đề nghị giảm giá của chính mình.",
-                    now
-            );
+                    now);
             throw new SelfApprovalNotAllowedException();
         }
 
@@ -77,26 +114,27 @@ public class RejectDiscountRequestService implements RejectDiscountRequestUseCas
 
         DiscountRequest saved = discountRequestRepository.save(request);
 
+        Map<String, Object> auditPayload = new LinkedHashMap<>();
+        auditPayload.put("action", "REJECT");
+        auditPayload.put("discountRequestId", saved.getId() != null ? saved.getId().toString() : null);
+        auditPayload.put("visitId", saved.getVisitId() != null ? saved.getVisitId().toString() : null);
+        auditPayload.put("rejectionReason", saved.getRejectionReason());
+
+        String auditDetailsJson;
+        try {
+            auditDetailsJson = objectMapper.writeValueAsString(auditPayload);
+        } catch (JsonProcessingException e) {
+            auditDetailsJson = "{}";
+        }
+
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.UPDATE,
                 ResourceType.DISCOUNT_REQUEST,
                 saved.getId(),
-                """
-                {
-                "action":"REJECT",
-                "discountRequestId":"%s",
-                "visitId":"%s",
-                "rejectionReason":"%s"
-                }
-                """.formatted(
-                        saved.getId(),
-                        saved.getVisitId(),
-                        saved.getRejectionReason()
-                ),
+                auditDetailsJson,
                 null,
-                now
-        ));
+                now));
 
         return resultMapper.toResult(saved);
     }

@@ -66,6 +66,10 @@ import com.benhsoan.port.outbound.time.ClockPort;
                 "spring.sql.init.mode=never",
                 "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
                 "spring.jpa.hibernate.ddl-auto=create-drop"
+                "spring.flyway.enabled=false",
+                "spring.sql.init.mode=never",
+                "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+                "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 @Import({
@@ -103,6 +107,20 @@ class InvoiceDiscountWorkflowIntegrationTest {
         private VisitRepositoryAdapter visitRepository;
         @Autowired
         private BillingAccessDeniedAuditWriter accessDeniedAuditWriter;
+        @Autowired
+        private DiscountRequestRepositoryAdapter discountRequestRepository;
+        @Autowired
+        private PaymentRepositoryAdapter paymentRepository;
+        @Autowired
+        private InvoiceRepositoryAdapter invoiceRepository;
+        @Autowired
+        private PaymentServiceFeeRepositoryAdapter paymentServiceFeeRepository;
+        @Autowired
+        private AuditLogRepositoryAdapter auditLogRepository;
+        @Autowired
+        private VisitRepositoryAdapter visitRepository;
+        @Autowired
+        private BillingAccessDeniedAuditWriter accessDeniedAuditWriter;
 
         @Autowired
         private JpaAuditLogRepository jpaAuditLogRepository;
@@ -123,14 +141,42 @@ class InvoiceDiscountWorkflowIntegrationTest {
         private CurrentUserPort currentUserPort;
         @MockitoBean
         private ClockPort clockPort;
+        @MockitoBean
+        private ClinicalServiceFeeCalculator clinicalServiceFeeCalculator;
+        @MockitoBean
+        private MedicalRecordRepository medicalRecordRepository;
+        @MockitoBean
+        private PrescriptionRepository prescriptionRepository;
+        @MockitoBean
+        private InvoiceCodeGenerator invoiceCodeGenerator;
+        @MockitoBean
+        private CurrentUserPort currentUserPort;
+        @MockitoBean
+        private ClockPort clockPort;
 
+        private CreateDiscountRequestService createDiscountRequestService;
+        private ApproveDiscountRequestService approveDiscountRequestService;
+        private RecordPaymentService recordPaymentService;
+        private CreateInvoiceService createInvoiceService;
         private CreateDiscountRequestService createDiscountRequestService;
         private ApproveDiscountRequestService approveDiscountRequestService;
         private RecordPaymentService recordPaymentService;
         private CreateInvoiceService createInvoiceService;
 
         private final Instant fixedNow = Instant.parse("2026-09-21T10:00:00Z");
+        private final Instant fixedNow = Instant.parse("2026-09-21T10:00:00Z");
 
+        @BeforeEach
+        void setUp() {
+                createDiscountRequestService = new CreateDiscountRequestService(
+                                visitRepository,
+                                paymentRepository,
+                                discountRequestRepository,
+                                clinicalServiceFeeCalculator,
+                                currentUserPort,
+                                clockPort,
+                                auditLogRepository,
+                                new DiscountRequestResultMapper());
         @BeforeEach
         void setUp() {
                 createDiscountRequestService = new CreateDiscountRequestService(
@@ -150,7 +196,26 @@ class InvoiceDiscountWorkflowIntegrationTest {
                                 auditLogRepository,
                                 accessDeniedAuditWriter,
                                 new DiscountRequestResultMapper());
+                approveDiscountRequestService = new ApproveDiscountRequestService(
+                                discountRequestRepository,
+                                currentUserPort,
+                                clockPort,
+                                auditLogRepository,
+                                accessDeniedAuditWriter,
+                                new DiscountRequestResultMapper());
 
+                recordPaymentService = new RecordPaymentService(
+                                visitRepository,
+                                medicalRecordRepository,
+                                prescriptionRepository,
+                                paymentRepository,
+                                currentUserPort,
+                                clockPort,
+                                auditLogRepository,
+                                new PaymentResultMapper(),
+                                clinicalServiceFeeCalculator,
+                                paymentServiceFeeRepository,
+                                discountRequestRepository);
                 recordPaymentService = new RecordPaymentService(
                                 visitRepository,
                                 medicalRecordRepository,
@@ -174,7 +239,22 @@ class InvoiceDiscountWorkflowIntegrationTest {
                                 new InvoiceResultMapper(),
                                 paymentServiceFeeRepository,
                                 discountRequestRepository);
+                createInvoiceService = new CreateInvoiceService(
+                                paymentRepository,
+                                invoiceRepository,
+                                invoiceCodeGenerator,
+                                currentUserPort,
+                                clockPort,
+                                auditLogRepository,
+                                new InvoiceResultMapper(),
+                                paymentServiceFeeRepository,
+                                discountRequestRepository);
 
+                when(clockPort.now()).thenReturn(fixedNow);
+                when(clinicalServiceFeeCalculator.calculate(any(), any())).thenReturn(List.of());
+                when(clinicalServiceFeeCalculator.total(any())).thenReturn(BigDecimal.ZERO);
+                when(medicalRecordRepository.findByVisitId(any())).thenReturn(Optional.empty());
+        }
                 when(clockPort.now()).thenReturn(fixedNow);
                 when(clinicalServiceFeeCalculator.calculate(any(), any())).thenReturn(List.of());
                 when(clinicalServiceFeeCalculator.total(any())).thenReturn(BigDecimal.ZERO);
@@ -185,10 +265,24 @@ class InvoiceDiscountWorkflowIntegrationTest {
         void pendingDiscountBlocksPaymentAndInvoiceCreation() {
                 UUID visitId = createVisitInDb();
                 UUID receptionistId = UUID.randomUUID();
+        @Test
+        void pendingDiscountBlocksPaymentAndInvoiceCreation() {
+                UUID visitId = createVisitInDb();
+                UUID receptionistId = UUID.randomUUID();
 
                 when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
                 when(currentUserPort.getCurrentUserId()).thenReturn(receptionistId);
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(receptionistId);
 
+                DiscountRequestResult requestResult = createDiscountRequestService
+                                .create(new CreateDiscountRequestCommand(
+                                                visitId,
+                                                DiscountType.PERCENTAGE,
+                                                new BigDecimal("20"),
+                                                new BigDecimal("200000"),
+                                                "Chính sách hỗ trợ"));
+                assertEquals(DiscountRequestStatus.PENDING, requestResult.status());
                 DiscountRequestResult requestResult = createDiscountRequestService
                                 .create(new CreateDiscountRequestCommand(
                                                 visitId,
@@ -207,7 +301,21 @@ class InvoiceDiscountWorkflowIntegrationTest {
                                                 BigDecimal.ZERO,
                                                 new BigDecimal("160000"),
                                                 PaymentMethod.CASH)));
+                // AC TC-02 & QTN-37: Payment is blocked while discount is pending
+                assertThrows(
+                                PendingDiscountApprovalException.class,
+                                () -> recordPaymentService.record(new RecordPaymentCommand(
+                                                visitId,
+                                                new BigDecimal("200000"),
+                                                BigDecimal.ZERO,
+                                                new BigDecimal("160000"),
+                                                PaymentMethod.CASH)));
 
+                // Invoice creation is also blocked
+                assertThrows(
+                                PendingDiscountApprovalException.class,
+                                () -> createInvoiceService.create(new CreateInvoiceCommand(visitId, null)));
+        }
                 // Invoice creation is also blocked
                 assertThrows(
                                 PendingDiscountApprovalException.class,
@@ -218,11 +326,25 @@ class InvoiceDiscountWorkflowIntegrationTest {
         void blocksSelfApprovalAndRecordsAccessDeniedAudit() {
                 UUID visitId = createVisitInDb();
                 UUID requesterId = UUID.randomUUID();
+        @Test
+        void blocksSelfApprovalAndRecordsAccessDeniedAudit() {
+                UUID visitId = createVisitInDb();
+                UUID requesterId = UUID.randomUUID();
 
                 when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
                 when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
                 when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+                when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
 
+                DiscountRequestResult requestResult = createDiscountRequestService
+                                .create(new CreateDiscountRequestCommand(
+                                                visitId,
+                                                DiscountType.PERCENTAGE,
+                                                new BigDecimal("10"),
+                                                new BigDecimal("100000"),
+                                                "Ưu đãi"));
                 DiscountRequestResult requestResult = createDiscountRequestService
                                 .create(new CreateDiscountRequestCommand(
                                                 visitId,
@@ -235,7 +357,19 @@ class InvoiceDiscountWorkflowIntegrationTest {
                 assertThrows(
                                 SelfApprovalNotAllowedException.class,
                                 () -> approveDiscountRequestService.approve(requestResult.id()));
+                // Requester tries to approve their own request (QTN-37 / AC TC-03)
+                assertThrows(
+                                SelfApprovalNotAllowedException.class,
+                                () -> approveDiscountRequestService.approve(requestResult.id()));
 
+                // Verify audit log has ACCESS_DENIED recorded
+                var auditLogs = jpaAuditLogRepository.findAll();
+                boolean hasAccessDenied = auditLogs.stream()
+                                .anyMatch(log -> log.getActionType() == ActionType.ACCESS_DENIED &&
+                                                log.getResourceType() == ResourceType.DISCOUNT_REQUEST &&
+                                                log.getResourceId().equals(requestResult.id()));
+                assertTrue(hasAccessDenied, "Audit log must contain ACCESS_DENIED entry for self-approval attempt.");
+        }
                 // Verify audit log has ACCESS_DENIED recorded
                 var auditLogs = jpaAuditLogRepository.findAll();
                 boolean hasAccessDenied = auditLogs.stream()
@@ -250,11 +384,28 @@ class InvoiceDiscountWorkflowIntegrationTest {
                 UUID visitId = createVisitInDb();
                 UUID requesterId = UUID.randomUUID();
                 UUID managerId = UUID.randomUUID();
+        @Test
+        void completeDiscountWorkflowFromApprovalToInvoice() {
+                UUID visitId = createVisitInDb();
+                UUID requesterId = UUID.randomUUID();
+                UUID managerId = UUID.randomUUID();
 
                 // 1. Receptionist requests discount
                 when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
                 when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
+                // 1. Receptionist requests discount
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
 
+                DiscountRequestResult requestResult = createDiscountRequestService
+                                .create(new CreateDiscountRequestCommand(
+                                                visitId,
+                                                DiscountType.PERCENTAGE,
+                                                new BigDecimal("50"),
+                                                new BigDecimal("200000"),
+                                                "Giảm 50%"));
+                assertEquals(new BigDecimal("100000.00"), requestResult.discountAmount());
+                assertEquals(new BigDecimal("100000.00"), requestResult.finalAmount());
                 DiscountRequestResult requestResult = createDiscountRequestService
                                 .create(new CreateDiscountRequestCommand(
                                                 visitId,
@@ -269,11 +420,22 @@ class InvoiceDiscountWorkflowIntegrationTest {
                 when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
                 when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
                 when(currentUserPort.getCurrentUserId()).thenReturn(managerId);
+                // 2. Manager approves discount
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
+                when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(managerId);
 
                 DiscountRequestResult approved = approveDiscountRequestService.approve(requestResult.id());
                 assertEquals(DiscountRequestStatus.APPROVED, approved.status());
                 assertEquals(managerId, approved.approvedBy());
+                DiscountRequestResult approved = approveDiscountRequestService.approve(requestResult.id());
+                assertEquals(DiscountRequestStatus.APPROVED, approved.status());
+                assertEquals(managerId, approved.approvedBy());
 
+                // 3. Receptionist records payment: 200,000 total - 100,000 discount = 100,000
+                // paid
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
                 // 3. Receptionist records payment: 200,000 total - 100,000 discount = 100,000
                 // paid
                 when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
@@ -285,7 +447,17 @@ class InvoiceDiscountWorkflowIntegrationTest {
                                 BigDecimal.ZERO,
                                 new BigDecimal("100000"),
                                 PaymentMethod.CASH));
+                PaymentResult paymentResult = recordPaymentService.record(new RecordPaymentCommand(
+                                visitId,
+                                new BigDecimal("200000"),
+                                BigDecimal.ZERO,
+                                new BigDecimal("100000"),
+                                PaymentMethod.CASH));
 
+                assertEquals(new BigDecimal("200000"), paymentResult.totalAmount());
+                assertEquals(new BigDecimal("100000.00"), paymentResult.discountAmount());
+                assertEquals(new BigDecimal("100000"), paymentResult.amountPaid());
+                assertEquals(requestResult.id(), paymentResult.discountRequestId());
                 assertEquals(new BigDecimal("200000"), paymentResult.totalAmount());
                 assertEquals(new BigDecimal("100000.00"), paymentResult.discountAmount());
                 assertEquals(new BigDecimal("100000"), paymentResult.amountPaid());
@@ -293,13 +465,24 @@ class InvoiceDiscountWorkflowIntegrationTest {
 
                 // 4. Receptionist creates invoice
                 when(invoiceCodeGenerator.generate()).thenReturn("HD000088");
+                // 4. Receptionist creates invoice
+                when(invoiceCodeGenerator.generate()).thenReturn("HD000088");
 
+                InvoiceResult invoiceResult = createInvoiceService.create(new CreateInvoiceCommand(visitId, null));
                 InvoiceResult invoiceResult = createInvoiceService.create(new CreateInvoiceCommand(visitId, null));
 
                 assertEquals("HD000088", invoiceResult.invoiceCode());
                 assertEquals(new BigDecimal("100000.00"), invoiceResult.totalAmount());
                 assertEquals(2, invoiceResult.lines().size());
+                assertEquals("HD000088", invoiceResult.invoiceCode());
+                assertEquals(new BigDecimal("100000.00"), invoiceResult.totalAmount());
+                assertEquals(2, invoiceResult.lines().size());
 
+                var discountLine = invoiceResult.lines().stream()
+                                .filter(l -> l.lineType() == InvoiceLineType.DISCOUNT)
+                                .findFirst()
+                                .orElseThrow();
+                assertEquals(new BigDecimal("-100000.00"), discountLine.amount());
                 var discountLine = invoiceResult.lines().stream()
                                 .filter(l -> l.lineType() == InvoiceLineType.DISCOUNT)
                                 .findFirst()
@@ -310,7 +493,16 @@ class InvoiceDiscountWorkflowIntegrationTest {
                 DiscountRequest updatedRequest = discountRequestRepository.findById(requestResult.id()).orElseThrow();
                 assertEquals(invoiceResult.id(), updatedRequest.getInvoiceId());
         }
+                // Verify DiscountRequest now has invoiceId linked
+                DiscountRequest updatedRequest = discountRequestRepository.findById(requestResult.id()).orElseThrow();
+                assertEquals(invoiceResult.id(), updatedRequest.getInvoiceId());
+        }
 
+        @Test
+        void fullFreeDiscountWorkflowWithZeroPaymentAndZeroInvoice() {
+                UUID visitId = createVisitInDb();
+                UUID requesterId = UUID.randomUUID();
+                UUID managerId = UUID.randomUUID();
         @Test
         void fullFreeDiscountWorkflowWithZeroPaymentAndZeroInvoice() {
                 UUID visitId = createVisitInDb();
@@ -320,7 +512,19 @@ class InvoiceDiscountWorkflowIntegrationTest {
                 // 1. Receptionist requests full free exemption (100%)
                 when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
                 when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
+                // 1. Receptionist requests full free exemption (100%)
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
 
+                DiscountRequestResult requestResult = createDiscountRequestService
+                                .create(new CreateDiscountRequestCommand(
+                                                visitId,
+                                                DiscountType.FULL_FREE,
+                                                BigDecimal.ZERO,
+                                                new BigDecimal("300000"),
+                                                "Miễn phí hoàn toàn 100%"));
+                assertEquals(new BigDecimal("300000"), requestResult.discountAmount());
+                assertEquals(BigDecimal.ZERO, requestResult.finalAmount());
                 DiscountRequestResult requestResult = createDiscountRequestService
                                 .create(new CreateDiscountRequestCommand(
                                                 visitId,
@@ -335,7 +539,14 @@ class InvoiceDiscountWorkflowIntegrationTest {
                 when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
                 when(currentUserPort.getCurrentUserId()).thenReturn(managerId);
                 approveDiscountRequestService.approve(requestResult.id());
+                // 2. Manager approves
+                when(currentUserPort.hasRole("MANAGER")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(managerId);
+                approveDiscountRequestService.approve(requestResult.id());
 
+                // 3. Record payment: amountPaid = 0
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
+                when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
                 // 3. Record payment: amountPaid = 0
                 when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(true);
                 when(currentUserPort.getCurrentUserId()).thenReturn(requesterId);
@@ -346,7 +557,16 @@ class InvoiceDiscountWorkflowIntegrationTest {
                                 BigDecimal.ZERO,
                                 BigDecimal.ZERO,
                                 PaymentMethod.CASH));
+                PaymentResult paymentResult = recordPaymentService.record(new RecordPaymentCommand(
+                                visitId,
+                                new BigDecimal("300000"),
+                                BigDecimal.ZERO,
+                                BigDecimal.ZERO,
+                                PaymentMethod.CASH));
 
+                assertEquals(new BigDecimal("300000"), paymentResult.totalAmount());
+                assertEquals(new BigDecimal("300000"), paymentResult.discountAmount());
+                assertEquals(BigDecimal.ZERO, paymentResult.amountPaid());
                 assertEquals(new BigDecimal("300000"), paymentResult.totalAmount());
                 assertEquals(new BigDecimal("300000"), paymentResult.discountAmount());
                 assertEquals(BigDecimal.ZERO, paymentResult.amountPaid());
@@ -354,7 +574,12 @@ class InvoiceDiscountWorkflowIntegrationTest {
                 // 4. Create original invoice: totalAmount = 0
                 when(invoiceCodeGenerator.generate()).thenReturn("HD000089");
                 InvoiceResult invoiceResult = createInvoiceService.create(new CreateInvoiceCommand(visitId, null));
+                // 4. Create original invoice: totalAmount = 0
+                when(invoiceCodeGenerator.generate()).thenReturn("HD000089");
+                InvoiceResult invoiceResult = createInvoiceService.create(new CreateInvoiceCommand(visitId, null));
 
+                assertEquals(BigDecimal.ZERO, invoiceResult.totalAmount());
+                assertEquals(2, invoiceResult.lines().size());
                 assertEquals(BigDecimal.ZERO, invoiceResult.totalAmount());
                 assertEquals(2, invoiceResult.lines().size());
 
@@ -364,7 +589,27 @@ class InvoiceDiscountWorkflowIntegrationTest {
                                 .orElseThrow();
                 assertEquals(new BigDecimal("-300000"), discountLine.amount());
         }
+                var discountLine = invoiceResult.lines().stream()
+                                .filter(l -> l.lineType() == InvoiceLineType.DISCOUNT)
+                                .findFirst()
+                                .orElseThrow();
+                assertEquals(new BigDecimal("-300000"), discountLine.amount());
+        }
 
+        private UUID createVisitInDb() {
+                UUID patientId = UUID.randomUUID();
+                jpaPatientRepository.saveAndFlush(PatientEntity.builder()
+                                .id(patientId)
+                                .patientCode("BN" + System.currentTimeMillis())
+                                .fullName("Nguyen Van A")
+                                .dateOfBirth(java.time.LocalDate.of(1990, 1, 1))
+                                .gender(com.benhsoan.domain.patient.enums.Gender.MALE)
+                                .phone("0901234567")
+                                .status(com.benhsoan.domain.patient.enums.PatientStatus.ACTIVE)
+                                .createdAt(fixedNow)
+                                .updatedAt(fixedNow)
+                                .createdBy(UUID.randomUUID())
+                                .build());
         private UUID createVisitInDb() {
                 UUID patientId = UUID.randomUUID();
                 jpaPatientRepository.saveAndFlush(PatientEntity.builder()
@@ -393,7 +638,22 @@ class InvoiceDiscountWorkflowIntegrationTest {
                                 .createdBy(UUID.randomUUID())
                                 .createdAt(fixedNow)
                                 .build());
+                UUID visitId = UUID.randomUUID();
+                jpaVisitRepository.saveAndFlush(VisitEntity.builder()
+                                .id(visitId)
+                                .visitCode("KB" + System.currentTimeMillis())
+                                .patientId(patientId)
+                                .doctorId(UUID.randomUUID())
+                                .visitType(VisitType.WALK_IN)
+                                .status(VisitStatus.IN_PROGRESS)
+                                .reason("Kham benh")
+                                .visitAt(fixedNow)
+                                .createdBy(UUID.randomUUID())
+                                .createdAt(fixedNow)
+                                .build());
 
+                return visitId;
+        }
                 return visitId;
         }
 }

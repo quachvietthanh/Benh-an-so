@@ -2,9 +2,12 @@ package com.benhsoan.application.ucservice.billing;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +31,10 @@ import com.benhsoan.port.outbound.repository.billing.PaymentRepository;
 import com.benhsoan.port.outbound.repository.visit.VisitRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
-
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class CreateDiscountRequestService implements CreateDiscountRequestUseCase {
 
@@ -44,6 +46,50 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final DiscountRequestResultMapper resultMapper;
+    private final ObjectMapper objectMapper;
+
+    @Autowired
+    public CreateDiscountRequestService(
+            VisitRepository visitRepository,
+            PaymentRepository paymentRepository,
+            DiscountRequestRepository discountRequestRepository,
+            ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AuditLogRepository auditLogRepository,
+            DiscountRequestResultMapper resultMapper,
+            ObjectMapper objectMapper) {
+        this.visitRepository = visitRepository;
+        this.paymentRepository = paymentRepository;
+        this.discountRequestRepository = discountRequestRepository;
+        this.clinicalServiceFeeCalculator = clinicalServiceFeeCalculator;
+        this.currentUserPort = currentUserPort;
+        this.clockPort = clockPort;
+        this.auditLogRepository = auditLogRepository;
+        this.resultMapper = resultMapper;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
+
+    public CreateDiscountRequestService(
+            VisitRepository visitRepository,
+            PaymentRepository paymentRepository,
+            DiscountRequestRepository discountRequestRepository,
+            ClinicalServiceFeeCalculator clinicalServiceFeeCalculator,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AuditLogRepository auditLogRepository,
+            DiscountRequestResultMapper resultMapper) {
+        this(
+                visitRepository,
+                paymentRepository,
+                discountRequestRepository,
+                clinicalServiceFeeCalculator,
+                currentUserPort,
+                clockPort,
+                auditLogRepository,
+                resultMapper,
+                new ObjectMapper());
+    }
 
     @Override
     public DiscountRequestResult create(CreateDiscountRequestCommand command) {
@@ -53,7 +99,8 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
 
         ensureAuthorized();
 
-        Visit visit = visitRepository.findById(command.visitId())
+        Visit visit = visitRepository.findByIdForUpdate(command.visitId())
+                .or(() -> visitRepository.findById(command.visitId()))
                 .orElseThrow(() -> new VisitNotFoundException(command.visitId()));
 
         if (visit.getStatus() == VisitStatus.CANCELLED) {
@@ -65,7 +112,8 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
         }
 
         if (discountRequestRepository.existsByVisitIdAndStatus(command.visitId(), DiscountRequestStatus.PENDING)
-                || discountRequestRepository.existsByVisitIdAndStatus(command.visitId(), DiscountRequestStatus.APPROVED)) {
+                || discountRequestRepository.existsByVisitIdAndStatus(command.visitId(),
+                        DiscountRequestStatus.APPROVED)) {
             throw new DiscountAlreadyExistsException(command.visitId());
         }
 
@@ -82,38 +130,37 @@ public class CreateDiscountRequestService implements CreateDiscountRequestUseCas
                 originalAmount,
                 command.reason(),
                 actorId,
-                now
-        );
+                now);
 
         DiscountRequest saved = discountRequestRepository.save(request);
+
+        Map<String, Object> auditPayload = new LinkedHashMap<>();
+        auditPayload.put("visitId", saved.getVisitId() != null ? saved.getVisitId().toString() : null);
+        auditPayload.put("discountType", saved.getDiscountType() != null ? saved.getDiscountType().name() : null);
+        auditPayload.put("discountValue",
+                saved.getDiscountValue() != null ? saved.getDiscountValue().toString() : null);
+        auditPayload.put("originalAmount",
+                saved.getOriginalAmount() != null ? saved.getOriginalAmount().toString() : null);
+        auditPayload.put("discountAmount",
+                saved.getDiscountAmount() != null ? saved.getDiscountAmount().toString() : null);
+        auditPayload.put("finalAmount", saved.getFinalAmount() != null ? saved.getFinalAmount().toString() : null);
+        auditPayload.put("reason", saved.getReason());
+
+        String auditDetailsJson;
+        try {
+            auditDetailsJson = objectMapper.writeValueAsString(auditPayload);
+        } catch (JsonProcessingException e) {
+            auditDetailsJson = "{}";
+        }
 
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.CREATE,
                 ResourceType.DISCOUNT_REQUEST,
                 saved.getId(),
-                """
-                {
-                "visitId":"%s",
-                "discountType":"%s",
-                "discountValue":"%s",
-                "originalAmount":"%s",
-                "discountAmount":"%s",
-                "finalAmount":"%s",
-                "reason":"%s"
-                }
-                """.formatted(
-                        saved.getVisitId(),
-                        saved.getDiscountType(),
-                        saved.getDiscountValue(),
-                        saved.getOriginalAmount(),
-                        saved.getDiscountAmount(),
-                        saved.getFinalAmount(),
-                        saved.getReason()
-                ),
+                auditDetailsJson,
                 null,
-                now
-        ));
+                now));
 
         return resultMapper.toResult(saved);
     }
