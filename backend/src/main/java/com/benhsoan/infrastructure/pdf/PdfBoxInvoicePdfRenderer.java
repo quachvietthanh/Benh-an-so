@@ -66,7 +66,7 @@ public class PdfBoxInvoicePdfRenderer implements InvoicePdfRenderer {
         }
     }
 
-    private FontMetrics createFontMetrics() {
+    FontMetrics createFontMetrics() {
         BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
         try {
@@ -94,7 +94,7 @@ public class PdfBoxInvoicePdfRenderer implements InvoicePdfRenderer {
         return image;
     }
 
-    private List<String> buildLines(InvoicePrintDocument doc, FontMetrics metrics) {
+    List<String> buildLines(InvoicePrintDocument doc, FontMetrics metrics) {
         List<String> lines = new ArrayList<>();
 
         String title = "HÓA ĐƠN THU TIỀN KHÁM CHỮA BỆNH";
@@ -146,7 +146,7 @@ public class PdfBoxInvoicePdfRenderer implements InvoicePdfRenderer {
         return lines.stream().flatMap(line -> wrap(line, metrics).stream()).toList();
     }
 
-    private List<List<String>> paginate(
+    List<List<String>> paginate(
             List<String> lines,
             InvoicePrintDocument document,
             FontMetrics metrics
