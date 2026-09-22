@@ -34,6 +34,12 @@ import com.benhsoan.port.dto.result.InvoiceResult;
 import com.benhsoan.port.dto.result.PayableEncounterResult;
 import com.benhsoan.port.dto.result.PaymentResult;
 import com.benhsoan.port.dto.result.PaymentQuoteResult;
+import com.benhsoan.adapter.inbound.rest.request.billing.PaymentMethodItemRequest;
+import com.benhsoan.adapter.inbound.rest.response.billing.PaymentDetailResponse;
+import com.benhsoan.adapter.inbound.rest.response.billing.PaymentMethodItemResponse;
+import com.benhsoan.port.dto.command.billing.PaymentMethodItemCommand;
+import com.benhsoan.port.dto.result.PaymentDetailResult;
+import com.benhsoan.port.dto.result.PaymentMethodItemResult;
 import com.benhsoan.port.dto.result.RefundPaymentResult;
 
 @Component
@@ -47,12 +53,31 @@ public class BillingRestMapper {
     }
 
     public RecordPaymentCommand toCommand(RecordPaymentRequest request) {
+        List<PaymentMethodItemCommand> methodCommands = null;
+        if (request.paymentMethods() != null && !request.paymentMethods().isEmpty()) {
+            methodCommands = request.paymentMethods().stream()
+                    .map(m -> new PaymentMethodItemCommand(
+                            m.paymentMethod(),
+                            m.amount(),
+                            m.referenceNumber()
+                    ))
+                    .toList();
+        } else if (request.paymentMethod() != null) {
+            methodCommands = List.of(new PaymentMethodItemCommand(
+                    request.paymentMethod(),
+                    request.amountPaid(),
+                    request.referenceNumber()
+            ));
+        }
+
         return RecordPaymentCommand.builder()
                 .visitId(request.visitId())
                 .examFee(request.examFee())
                 .medicineFee(request.medicineFee())
                 .amountPaid(request.amountPaid())
                 .paymentMethod(request.paymentMethod())
+                .referenceNumber(request.referenceNumber())
+                .paymentMethods(methodCommands)
                 .build();
     }
 
@@ -80,6 +105,13 @@ public class BillingRestMapper {
     }
 
     public PaymentResponse toResponse(PaymentResult result) {
+        List<PaymentMethodItemResponse> methodResponses = List.of();
+        if (result.paymentMethods() != null) {
+            methodResponses = result.paymentMethods().stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
+
         return new PaymentResponse(
                 result.id(),
                 result.visitId(),
@@ -92,7 +124,44 @@ public class BillingRestMapper {
                 result.status(),
                 result.collectedBy(),
                 result.paidAt(),
+                result.createdAt(),
+                methodResponses
+        );
+    }
+
+    public PaymentMethodItemResponse toResponse(PaymentMethodItemResult result) {
+        return new PaymentMethodItemResponse(
+                result.id(),
+                result.paymentId(),
+                result.paymentMethod(),
+                result.amount(),
+                result.referenceNumber(),
                 result.createdAt()
+        );
+    }
+
+    public PaymentDetailResponse toResponse(PaymentDetailResult result) {
+        if (result == null) {
+            return null;
+        }
+        List<PaymentMethodItemResponse> methodResponses = List.of();
+        if (result.paymentMethods() != null) {
+            methodResponses = result.paymentMethods().stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
+        return new PaymentDetailResponse(
+                result.id(),
+                result.visitId(),
+                result.status(),
+                result.totalAmount(),
+                result.amountPaid(),
+                result.paymentMethod(),
+                result.collectedBy(),
+                result.collectorName(),
+                result.paidAt(),
+                result.createdAt(),
+                methodResponses
         );
     }
 
@@ -106,7 +175,7 @@ public class BillingRestMapper {
                 result.serviceFees().stream()
                         .map(fee -> new PaymentServiceFeeQuoteResponse(
                                 fee.clinicalOrderItemId(), fee.serviceName(), fee.amount()
-                        ))
+                         ))
                         .toList(),
                 result.calculatedAt()
         );
@@ -130,7 +199,8 @@ public class BillingRestMapper {
                 result.createdAt(),
                 result.reprintCount(),
                 result.lastReprintedAt(),
-                lines
+                lines,
+                toResponse(result.payment())
         );
     }
 
