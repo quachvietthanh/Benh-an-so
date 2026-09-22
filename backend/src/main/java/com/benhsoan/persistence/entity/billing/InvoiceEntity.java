@@ -11,6 +11,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -49,6 +50,20 @@ public class InvoiceEntity {
 
     @Column(name = "adjustment_reason", columnDefinition = "TEXT")
     private String adjustmentReason;
+
+    @Builder.Default
+    @Column(name = "discount_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "discount_request_id", columnDefinition = "BINARY(16)")
+    private UUID discountRequestId;
+
+    @PrePersist
+    public void prePersist() {
+        if (discountAmount == null) {
+            discountAmount = BigDecimal.ZERO;
+        }
+    }
 
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalAmount;

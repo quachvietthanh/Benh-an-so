@@ -29,7 +29,6 @@ import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientMinorPolicy;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
-import com.benhsoan.domain.patient.enums.ImportStatus;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.spreadsheet.ExcelPatientSheetParser;
 import com.benhsoan.port.dto.command.patient.ImportPatientsCommand;
