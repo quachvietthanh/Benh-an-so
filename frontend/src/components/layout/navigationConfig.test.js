@@ -96,3 +96,29 @@ test('getNavigationItems - weekly schedule menu and admin protection', () => {
   assert.equal(hasWeeklyScheduleMgr, true, 'Manager must see /appointments/weekly-schedule')
 })
 
+test('getNavigationItems - Báo cáo xuất nhập tồn kho dược: hiển thị cho Pharmacist, Manager, Admin; ẩn với Doctor, Receptionist', () => {
+  // 1. Dược sĩ thấy Báo cáo xuất nhập tồn
+  const pharmNav = getNavigationItems(['ROLE_PHARMACIST'], ['PHARMACY_READ'])
+  assert.equal(pharmNav.some((item) => item.key === '/inventory/stock-report'), true, 'Pharmacist must see /inventory/stock-report')
+
+  // 2. Quản lý thấy Báo cáo xuất nhập tồn
+  const mgrNav = getNavigationItems(['ROLE_MANAGER'], [])
+  assert.equal(mgrNav.some((item) => item.key === '/inventory/stock-report'), true, 'Manager must see /inventory/stock-report')
+
+  // 3. Admin thấy Báo cáo xuất nhập tồn
+  const adminNav = getNavigationItems(['ROLE_ADMIN'], [])
+  assert.equal(adminNav.some((item) => item.key === '/inventory/stock-report'), true, 'Admin must see /inventory/stock-report')
+
+  // 4. Bác sĩ KHÔNG thấy Báo cáo xuất nhập tồn
+  const docNav = getNavigationItems(['ROLE_DOCTOR'], ['MEDICAL_RECORD_READ'])
+  assert.equal(docNav.some((item) => item.key === '/inventory/stock-report'), false, 'Doctor must not see /inventory/stock-report')
+
+  // 5. Lễ tân KHÔNG thấy Báo cáo xuất nhập tồn
+  const recepNav = getNavigationItems(['ROLE_RECEPTIONIST'], ['PATIENT_READ'])
+  assert.equal(recepNav.some((item) => item.key === '/inventory/stock-report'), false, 'Receptionist must not see /inventory/stock-report')
+
+  // 6. Quyền INVENTORY_REPORT_VIEW
+  const permNav = getNavigationItems([], ['INVENTORY_REPORT_VIEW'])
+  assert.equal(permNav.some((item) => item.key === '/inventory/stock-report'), true, 'User with INVENTORY_REPORT_VIEW must see /inventory/stock-report')
+})
+

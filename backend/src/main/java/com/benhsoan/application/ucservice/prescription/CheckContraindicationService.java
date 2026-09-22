@@ -184,6 +184,9 @@ public class CheckContraindicationService implements CheckContraindicationUseCas
                     warnings.add(toWarning(rule, medicine, patient.getId()));
                 }
             }
+            case BREASTFEEDING -> {
+                // Future extension: evaluate breastfeeding contraindications when tracked
+            }
         }
     }
 

@@ -1,8 +1,6 @@
 package com.benhsoan.application.ucservice.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,11 +28,9 @@ import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.PatientPasswordRecoveryToken;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
-import com.benhsoan.domain.auth.exception.AccountDisabledException;
 import com.benhsoan.domain.auth.exception.InvalidVerificationCodeException;
 import com.benhsoan.domain.auth.exception.SamePasswordException;
 import com.benhsoan.domain.auth.exception.VerificationCodeCooldownException;
-import com.benhsoan.domain.auth.exception.VerificationCodeExpiredException;
 import com.benhsoan.domain.auth.exception.WeakPasswordException;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.shared.exception.ValidationException;

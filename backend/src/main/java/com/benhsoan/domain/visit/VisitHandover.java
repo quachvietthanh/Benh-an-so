@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-import com.benhsoan.domain.shared.Guard.Guard;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
 import lombok.AccessLevel;

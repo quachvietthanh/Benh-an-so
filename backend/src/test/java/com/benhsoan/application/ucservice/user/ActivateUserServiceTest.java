@@ -73,8 +73,10 @@ class ActivateUserServiceTest {
 
         service.activate(userId);
 
-        ArgumentCaptor<Map> before = ArgumentCaptor.forClass(Map.class);
-        ArgumentCaptor<Map> after = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> before = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> after = ArgumentCaptor.forClass(Map.class);
         verify(adminOperationAuditService).record(eq(adminId), eq(ActionType.ACTIVATE),
                 eq(ResourceType.USER), eq(userId), before.capture(), after.capture(), eq(NOW));
 

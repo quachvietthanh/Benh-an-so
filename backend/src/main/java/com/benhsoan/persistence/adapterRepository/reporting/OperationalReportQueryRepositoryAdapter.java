@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.billing.enums.InvoiceLineType;
 import com.benhsoan.domain.billing.enums.InvoiceType;
 import com.benhsoan.domain.clinical.enums.ClinicalServiceType;
-import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.port.outbound.repository.reporting.DailyRevenueSummary;
 import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
@@ -31,8 +29,6 @@ import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.InvoiceLineReportDetail;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
-
-import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;

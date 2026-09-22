@@ -38,6 +38,10 @@ public class Invoice {
 
     private String adjustmentReason;
 
+    private BigDecimal discountAmount;
+
+    private UUID discountRequestId;
+
     private BigDecimal totalAmount;
 
     private UUID createdBy;
@@ -58,6 +62,8 @@ public class Invoice {
             InvoiceType type,
             UUID originalInvoiceId,
             String adjustmentReason,
+            BigDecimal discountAmount,
+            UUID discountRequestId,
             BigDecimal totalAmount,
             UUID createdBy,
             Instant createdAt,
@@ -72,6 +78,8 @@ public class Invoice {
         this.type = requireNonNull(type, "Invoice type is required.");
         this.originalInvoiceId = originalInvoiceId;
         this.adjustmentReason = normalizeOptionalText(adjustmentReason);
+        this.discountAmount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
+        this.discountRequestId = discountRequestId;
         this.createdBy = requireNonNull(createdBy, "Invoice creator id is required.");
         this.createdAt = requireNonNull(createdAt, "Invoice creation time is required.");
         this.reprintCount = validateReprintCount(reprintCount);
@@ -91,7 +99,9 @@ public class Invoice {
             Instant createdAt,
             List<InvoiceLine> lines,
             boolean paymentRecorded,
-            boolean invoiceAlreadyExists
+            boolean invoiceAlreadyExists,
+            BigDecimal discountAmount,
+            UUID discountRequestId
     ) {
         if (!paymentRecorded) {
             throw new PaymentRequiredForInvoiceException();
@@ -101,9 +111,11 @@ public class Invoice {
         }
 
         BigDecimal totalAmount = sumLineAmounts(lines);
-        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ValidationException("Original invoice total amount must be greater than zero.");
+        if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationException("Original invoice total amount must not be negative.");
         }
+
+        BigDecimal validatedDiscount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
 
         return new Invoice(
                 id,
@@ -113,12 +125,40 @@ public class Invoice {
                 InvoiceType.ORIGINAL,
                 null,
                 null,
+                validatedDiscount,
+                discountRequestId,
                 totalAmount,
                 createdBy,
                 createdAt,
                 0,
                 null,
                 lines
+        );
+    }
+
+    public static Invoice createOriginal(
+            UUID id,
+            String invoiceCode,
+            UUID visitId,
+            UUID paymentId,
+            UUID createdBy,
+            Instant createdAt,
+            List<InvoiceLine> lines,
+            boolean paymentRecorded,
+            boolean invoiceAlreadyExists
+    ) {
+        return createOriginal(
+                id,
+                invoiceCode,
+                visitId,
+                paymentId,
+                createdBy,
+                createdAt,
+                lines,
+                paymentRecorded,
+                invoiceAlreadyExists,
+                BigDecimal.ZERO,
+                null
         );
     }
 
@@ -153,6 +193,8 @@ public class Invoice {
                 InvoiceType.ADJUSTMENT,
                 requireNonNull(originalInvoiceId, "Original invoice id is required."),
                 adjustmentReason,
+                BigDecimal.ZERO,
+                null,
                 totalAmount,
                 createdBy,
                 createdAt,
@@ -207,6 +249,42 @@ public class Invoice {
             Instant lastReprintedAt,
             List<InvoiceLine> lines
     ) {
+        return restore(
+                id,
+                invoiceCode,
+                visitId,
+                paymentId,
+                type,
+                originalInvoiceId,
+                adjustmentReason,
+                BigDecimal.ZERO,
+                null,
+                totalAmount,
+                createdBy,
+                createdAt,
+                reprintCount,
+                lastReprintedAt,
+                lines
+        );
+    }
+
+    public static Invoice restore(
+            UUID id,
+            String invoiceCode,
+            UUID visitId,
+            UUID paymentId,
+            InvoiceType type,
+            UUID originalInvoiceId,
+            String adjustmentReason,
+            BigDecimal discountAmount,
+            UUID discountRequestId,
+            BigDecimal totalAmount,
+            UUID createdBy,
+            Instant createdAt,
+            int reprintCount,
+            Instant lastReprintedAt,
+            List<InvoiceLine> lines
+    ) {
         return new Invoice(
                 id,
                 invoiceCode,
@@ -215,6 +293,8 @@ public class Invoice {
                 type,
                 originalInvoiceId,
                 adjustmentReason,
+                discountAmount,
+                discountRequestId,
                 totalAmount,
                 createdBy,
                 createdAt,
@@ -249,8 +329,8 @@ public class Invoice {
             if (adjustmentReason != null) {
                 throw new ValidationException("Original invoice must not contain an adjustment reason.");
             }
-            if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new ValidationException("Original invoice total amount must be greater than zero.");
+            if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+                throw new ValidationException("Original invoice total amount must not be negative.");
             }
             return;
         }
