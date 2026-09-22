@@ -40,7 +40,7 @@ export const navigationSections = [
   { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/overdue-signing', '/medical-records/version-history', '/medical-records/copy-issuance', '/medical-records/visit-summaries', '/prescriptions', '/clinical-orders', '/clinical-results', '/results'] },
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing', '/invoices/lookup'] },
-  { key: 'reports', label: 'Báo cáo', paths: ['/reports', '/reports/disease-patterns', '/reports/revenue-breakdown'] },
+  { key: 'reports', label: 'Báo cáo', paths: ['/reports', '/reports/disease-patterns', '/reports/revenue-breakdown', '/reports/appointment-effectiveness'] },
   { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/specialties', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization', '/contraindication-rules'] },
 ]
 
@@ -91,6 +91,7 @@ export const getNavigationItems = (rolesOrUser = [], permissionsArg = []) => {
     { key: '/reports', label: 'Báo cáo vận hành', icon: FileTextOutlined, check: () => hasPerm('REPORT_VIEW') || isAdmin || isManager },
     { key: '/reports/disease-patterns', label: 'Mô hình bệnh tật', icon: BarChartOutlined, check: () => isManager && !isAdmin },
     { key: '/reports/revenue-breakdown', label: 'Doanh thu theo dịch vụ & bác sĩ', icon: DollarCircleOutlined, check: () => isManager && !isAdmin },
+    { key: '/reports/appointment-effectiveness', label: 'Hiệu quả lịch hẹn', icon: CalendarOutlined, check: () => isManager && !isAdmin },
     { key: '/users', label: 'Quản trị tài khoản', icon: TeamOutlined, check: () => isAdmin },
     { key: '/services', label: 'Danh mục dịch vụ & giá', icon: AppstoreOutlined, check: () => hasPerm('SERVICE_CATALOG_READ') || isAdmin || isManager },
     { key: '/system/clinical-services', label: 'Danh mục cận lâm sàng & ngưỡng', icon: ExperimentOutlined, check: () => hasPerm('CLINICAL_SERVICE_MANAGE') || isAdmin },

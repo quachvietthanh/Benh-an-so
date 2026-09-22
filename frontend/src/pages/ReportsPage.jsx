@@ -59,11 +59,12 @@ import {
 
 import DiseasePatternReportPage from './DiseasePatternReportPage.jsx'
 import RevenueBreakdownReportPage from './RevenueBreakdownReportPage.jsx'
+import AppointmentEffectivenessReportPage from './AppointmentEffectivenessReportPage.jsx'
 
 const { RangePicker } = DatePicker
 const { Title, Text } = Typography
 
-const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit', 'disease-patterns', 'revenue-breakdown']
+const VALID_TABS = ['overview', 'visits', 'doctor-visits', 'revenue', 'medicines', 'audit', 'disease-patterns', 'revenue-breakdown', 'appointment-effectiveness']
 
 function ReportsPage() {
   const { user } = useAuthContext()
@@ -584,6 +585,14 @@ function ReportsPage() {
                       </span>
                     ),
                   },
+                  {
+                    key: 'appointment-effectiveness',
+                    label: (
+                      <span style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                        <CalendarOutlined /> Hiệu quả lịch hẹn
+                      </span>
+                    ),
+                  },
                 ]
               : []),
           ]}
@@ -641,6 +650,10 @@ function ReportsPage() {
 
         {activeTab === 'revenue-breakdown' && isManager && !isAdmin && (
           <RevenueBreakdownReportPage />
+        )}
+
+        {activeTab === 'appointment-effectiveness' && isManager && !isAdmin && (
+          <AppointmentEffectivenessReportPage />
         )}
       </div>
 
