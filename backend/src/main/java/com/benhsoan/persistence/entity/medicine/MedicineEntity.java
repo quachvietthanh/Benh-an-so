@@ -68,4 +68,7 @@ public class MedicineEntity {
 
     @Column(name = "min_stock_threshold", nullable = false)
     private int minStockThreshold;
+
+    @Column(name = "controlled", nullable = false)
+    private boolean controlled;
 }

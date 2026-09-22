@@ -22,7 +22,8 @@ class MedicineResultMapper {
                 medicine.getCreatedAt(),
                 medicine.getUpdatedAt(),
                 medicine.getStockQuantity(),
-                medicine.getMinStockThreshold()
+                medicine.getMinStockThreshold(),
+                medicine.isControlled()
         );
     }
 }
