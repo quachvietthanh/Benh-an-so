@@ -49,6 +49,29 @@ import {
 const { RangePicker } = DatePicker
 const { Title, Text } = Typography
 
+// Chuẩn hóa tên đơn vị tính từ backend (không dấu) → hiển thị đúng tiếng Việt
+const UNIT_DISPLAY_MAP = {
+  vien: 'viên',
+  vi: 'vỉ',
+  hop: 'hộp',
+  chai: 'chai',
+  goi: 'gói',
+  ong: 'ống',
+  lo: 'lọ',
+  tuyp: 'tuýp',
+  tuýp: 'tuýp',
+  ml: 'ml',
+  mg: 'mg',
+  g: 'g',
+  kg: 'kg',
+  l: 'l',
+}
+const normalizeUnit = (unit) => {
+  if (!unit) return '—'
+  const key = String(unit).trim().toLowerCase()
+  return UNIT_DISPLAY_MAP[key] || unit
+}
+
 export default function InventoryStockReportPage() {
   const { user } = useAuthContext()
 
@@ -222,155 +245,166 @@ export default function InventoryStockReportPage() {
         title: 'Mã thuốc',
         dataIndex: 'medicineCode',
         key: 'medicineCode',
-        width: 120,
-        fixed: 'left',
+        width: 140,
         render: (code) => (
           <Tag
             color="blue"
             style={{
               fontWeight: 700,
-              fontSize: 12.5,
+              fontSize: 11,
+              fontFamily: 'Consolas, "SFMono-Regular", monospace',
               borderRadius: 6,
-              padding: '2px 8px',
+              padding: '1px 6px',
+              whiteSpace: 'nowrap',
+              display: 'inline-block',
+              maxWidth: '100%',
             }}
           >
-            {code || '-'}
+            {code || '—'}
           </Tag>
         ),
       },
+
       {
         title: 'Tên thuốc & Hoạt chất',
         dataIndex: 'medicineName',
         key: 'medicineName',
-        width: 220,
-        fixed: 'left',
         render: (name) => (
-          <Text strong style={{ color: '#0f172a', fontSize: 13.5 }}>
+          <Text strong style={{ color: '#0f172a', fontSize: 13 }}>
             {name || 'Chưa đặt tên'}
           </Text>
         ),
       },
       {
-        title: 'Đơn vị tính',
+        title: 'ĐVT',
         dataIndex: 'unit',
         key: 'unit',
-        width: 100,
+        width: 70,
         align: 'center',
         render: (unit) => (
-          <Tag style={{ borderRadius: 6, background: '#f8fafc', color: '#475569' }}>
-            {unit || '-'}
+          <Tag style={{ borderRadius: 6, background: '#f8fafc', color: '#475569', fontSize: 11, margin: 0 }}>
+            {normalizeUnit(unit)}
           </Tag>
         ),
       },
       {
-        title: 'Tồn đầu kỳ',
+        title: 'Tồn đầu',
         dataIndex: 'openingQuantity',
         key: 'openingQuantity',
-        width: 120,
+        width: 90,
         align: 'right',
         render: (qty) => (
-          <Text strong style={{ color: '#334155', fontSize: 13.5 }}>
+          <span style={{ color: '#334155', fontSize: 13, fontWeight: 500 }}>
             {formatQuantity(qty)}
-          </Text>
+          </span>
         ),
       },
       {
-        title: 'Số nhập (+)',
+        title: 'Nhập (+)',
         dataIndex: 'receivedQuantity',
         key: 'receivedQuantity',
-        width: 120,
+        width: 90,
         align: 'right',
-        render: (qty) => (
-          <Text strong style={{ color: '#059669', fontSize: 13.5 }}>
-            {qty > 0 ? `+${formatQuantity(qty)}` : '0'}
-          </Text>
-        ),
+        render: (qty) => {
+          const num = Number(qty) || 0
+          return (
+            <span style={{ color: num > 0 ? '#059669' : '#334155', fontSize: 13, fontWeight: 500 }}>
+              {num > 0 ? `+${formatQuantity(num)}` : '0'}
+            </span>
+          )
+        },
       },
       {
-        title: 'Số cấp phát (-)',
+        title: 'Cấp phát (-)',
         dataIndex: 'dispensedQuantity',
         key: 'dispensedQuantity',
-        width: 130,
+        width: 100,
         align: 'right',
-        render: (qty) => (
-          <Text strong style={{ color: '#2563eb', fontSize: 13.5 }}>
-            {qty > 0 ? `-${formatQuantity(qty)}` : '0'}
-          </Text>
-        ),
+        render: (qty) => {
+          const num = Number(qty) || 0
+          return (
+            <span style={{ color: num > 0 ? '#2563eb' : '#334155', fontSize: 13, fontWeight: 500 }}>
+              {num > 0 ? `-${formatQuantity(num)}` : '0'}
+            </span>
+          )
+        },
       },
       {
-        title: 'Số trả lại (+)',
+        title: 'Trả lại (+)',
         dataIndex: 'returnedQuantity',
         key: 'returnedQuantity',
-        width: 120,
+        width: 90,
         align: 'right',
-        render: (qty) => (
-          <Text strong style={{ color: '#7c3aed', fontSize: 13.5 }}>
-            {qty > 0 ? `+${formatQuantity(qty)}` : '0'}
-          </Text>
-        ),
+        render: (qty) => {
+          const num = Number(qty) || 0
+          return (
+            <span style={{ color: num > 0 ? '#7c3aed' : '#334155', fontSize: 13, fontWeight: 500 }}>
+              {num > 0 ? `+${formatQuantity(num)}` : '0'}
+            </span>
+          )
+        },
       },
       {
         title: (
           <Tooltip title="Bao gồm điều chỉnh kiểm kê và xuất hủy thuốc hết hạn">
             <span>
-              Số điều chỉnh (±) <InfoCircleOutlined style={{ fontSize: 12, color: '#94a3b8' }} />
+              Đ.Chỉnh (±) <InfoCircleOutlined style={{ fontSize: 11, color: '#94a3b8' }} />
             </span>
           </Tooltip>
         ),
         dataIndex: 'adjustedQuantity',
         key: 'adjustedQuantity',
-        width: 140,
+        width: 85,
         align: 'right',
         render: (qty) => {
           const num = Number(qty) || 0
-          const color = num > 0 ? '#059669' : num < 0 ? '#dc2626' : '#64748b'
+          const color = num > 0 ? '#059669' : num < 0 ? '#dc2626' : '#334155'
           return (
-            <Text strong style={{ color, fontSize: 13.5 }}>
+            <span style={{ color, fontSize: 13, fontWeight: 500 }}>
               {formatQuantity(num, { showSign: true })}
-            </Text>
+            </span>
           )
         },
       },
       {
         title: (
           <Tooltip title="Tồn cuối = Tồn đầu + Nhập - Cấp phát + Trả lại + Điều chỉnh">
-            <span style={{ color: '#0f172a', fontWeight: 800 }}>
-              Tồn cuối kỳ <InfoCircleOutlined style={{ fontSize: 12, color: '#2563eb' }} />
+            <span style={{ color: '#0f172a', fontWeight: 600 }}>
+              Tồn cuối <InfoCircleOutlined style={{ fontSize: 11, color: '#2563eb' }} />
             </span>
           </Tooltip>
         ),
         dataIndex: 'closingQuantity',
         key: 'closingQuantity',
-        width: 140,
+        width: 100,
         align: 'right',
         className: 'closing-balance-column',
         render: (qty) => (
           <div
             style={{
-              padding: '4px 8px',
+              padding: '2px 6px',
               borderRadius: 6,
               background: '#f0fdf4',
               display: 'inline-block',
             }}
           >
-            <Text strong style={{ color: '#166534', fontSize: 14.5 }}>
+            <span style={{ color: '#166534', fontSize: 13, fontWeight: 500 }}>
               {formatQuantity(qty)}
-            </Text>
+            </span>
           </div>
         ),
       },
       {
-        title: 'Đối chiếu',
+        title: 'ĐC',
         key: 'reconciliation',
-        width: 100,
+        width: 52,
         align: 'center',
         render: (_, record) => {
           const check = validateClosingBalance(record)
           if (!check.hasDiscrepancy) {
             return (
               <Tooltip title="Số liệu cân đối đúng công thức">
-                <CheckCircleOutlined style={{ color: '#059669', fontSize: 16 }} />
+                <CheckCircleOutlined style={{ color: '#059669', fontSize: 15 }} />
               </Tooltip>
             )
           }
@@ -378,7 +412,7 @@ export default function InventoryStockReportPage() {
             <Tooltip
               title={`Số liệu chưa khớp công thức cân đối kho: Tồn cuối thực tế (${check.actualClosing}) lệch ${check.difference > 0 ? `+${check.difference}` : check.difference} so với tính toán lý thuyết (${check.expectedClosing}). Vui lòng kiểm tra lại.`}
             >
-              <WarningOutlined style={{ color: '#ea580c', fontSize: 17, cursor: 'pointer' }} />
+              <WarningOutlined style={{ color: '#ea580c', fontSize: 15, cursor: 'pointer' }} />
             </Tooltip>
           )
         },
@@ -386,6 +420,7 @@ export default function InventoryStockReportPage() {
     ],
     []
   )
+
 
   // Nếu người dùng không có quyền truy cập
   if (!isAuthorized) {
@@ -640,6 +675,17 @@ export default function InventoryStockReportPage() {
               </Card>
             </Col>
 
+            {/* Tổng trả lại */}
+            <Col xs={12} sm={8} md={4}>
+              <Card bordered={false} style={{ borderRadius: 10, border: '1px solid #f1f5f9', background: stockSummary.totalReturned > 0 ? '#faf5ff' : '#fff' }} styles={{ body: { padding: '14px 16px' } }}>
+                <Text strong style={{ fontSize: 12, color: '#7c3aed', display: 'block' }}>Tổng trả lại (+)</Text>
+                <div style={{ fontSize: 20, fontWeight: 800, color: stockSummary.totalReturned > 0 ? '#7c3aed' : '#334155', marginTop: 2 }}>
+                  {stockSummary.totalReturned > 0 ? `+${stockSummary.totalReturned.toLocaleString('vi-VN')}` : '0'}
+                </div>
+                <Text style={{ fontSize: 11, color: '#6d28d9' }}>thuốc trả về kho</Text>
+              </Card>
+            </Col>
+
             {/* Tổng điều chỉnh */}
             <Col xs={12} sm={8} md={4}>
               <Card bordered={false} style={{ borderRadius: 10, border: '1px solid #f1f5f9', background: '#fff' }} styles={{ body: { padding: '14px 16px' } }}>
@@ -662,6 +708,17 @@ export default function InventoryStockReportPage() {
               </Card>
             </Col>
           </Row>
+
+          {/* AC-03: Banner khi kỳ không có giao dịch nhưng vẫn có tồn */}
+          {!reportData.hasTransactions && reportData.items?.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              message="Kỳ không có giao dịch xuất nhập (AC-03)"
+              description="Trong khoảng thời gian này không ghi nhận bất kỳ phiếu nhập, cấp phát, trả thuốc hay điều chỉnh nào. Số tồn cuối kỳ = số tồn đầu kỳ (giữ nguyên). Bảng dưới cho thấy trạng thái tồn kho hiện hành của từng mặt hàng."
+              style={{ borderRadius: 10 }}
+            />
+          )}
 
           {/* Bảng Dữ liệu Cân đối Kho 10 cột */}
           <Card
@@ -695,7 +752,7 @@ export default function InventoryStockReportPage() {
                 showSizeChanger: true,
                 pageSizeOptions: ['10', '20', '50', '100'],
               }}
-              scroll={{ x: 1300 }}
+              scroll={undefined}
               bordered
             />
           </Card>
