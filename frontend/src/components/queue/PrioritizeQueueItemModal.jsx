@@ -215,7 +215,7 @@ export default function PrioritizeQueueItemModal({
         <Alert
           type="info"
           showIcon
-          message="Quy định thứ tự ưu tiên (QTN-40)"
+          message="Quy định thứ tự ưu tiên"
           description="Hệ thống tự động đưa ca Cấp cứu lên đầu danh sách khám của bác sĩ; đối tượng Ưu tiên được xếp sau cấp cứu nhưng trước các lượt khám thông thường. Thứ tự các bệnh nhân còn lại được giữ nguyên tương đối."
           style={{ marginBottom: 16 }}
         />
