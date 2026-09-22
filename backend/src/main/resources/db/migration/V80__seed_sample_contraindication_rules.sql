@@ -1,5 +1,5 @@
 -- =====================================================
--- V77__seed_sample_contraindication_rules.sql
+-- V80__seed_sample_contraindication_rules.sql
 -- NCL-05-CN-006: Nạp dữ liệu 9 quy tắc chống chỉ định mẫu chuẩn lâm sàng
 -- Áp dụng theo độ tuổi, thai kỳ và bệnh nền (ICD-10)
 -- Đối chiếu chính xác medicine_id từ V12 và diagnosis_catalog_id từ V10
