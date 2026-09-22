@@ -32,6 +32,8 @@ public record UpdateMedicineRequest(
         AdministrationRoute defaultRoute,
 
         @PositiveOrZero(message = "Minimum stock threshold must be greater than or equal to 0.")
-        int minStockThreshold
+        int minStockThreshold,
+
+        boolean controlled
 ) {
 }

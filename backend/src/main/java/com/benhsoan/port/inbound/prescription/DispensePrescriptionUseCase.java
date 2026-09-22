@@ -1,10 +1,9 @@
 package com.benhsoan.port.inbound.prescription;
 
-import java.util.UUID;
-
+import com.benhsoan.port.dto.command.prescription.DispensePrescriptionCommand;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 
 public interface DispensePrescriptionUseCase {
 
-    DispensePrescriptionResult dispense(UUID prescriptionId);
+    DispensePrescriptionResult dispense(DispensePrescriptionCommand command);
 }

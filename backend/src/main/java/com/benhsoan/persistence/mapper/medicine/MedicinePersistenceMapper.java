@@ -26,7 +26,8 @@ public class MedicinePersistenceMapper {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 entity.getStockQuantity(),
-                entity.getMinStockThreshold()
+                entity.getMinStockThreshold(),
+                entity.isControlled()
         );
     }
 
@@ -49,6 +50,7 @@ public class MedicinePersistenceMapper {
                 .updatedAt(domain.getUpdatedAt())
                 .stockQuantity(domain.getStockQuantity())
                 .minStockThreshold(domain.getMinStockThreshold())
+                .controlled(domain.isControlled())
                 .build();
     }
 }
