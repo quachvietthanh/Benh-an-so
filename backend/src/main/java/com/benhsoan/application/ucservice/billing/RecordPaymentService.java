@@ -161,7 +161,7 @@ public class RecordPaymentService implements RecordPaymentUseCase {
                     paymentId,
                     command.paymentMethod(),
                     command.amountPaid(),
-                    null,
+                    command.referenceNumber(),
                     now
             ));
         } else {

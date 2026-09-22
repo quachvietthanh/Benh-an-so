@@ -538,6 +538,31 @@ public class Payment {
         return PaymentMethod.MULTIPLE;
     }
 
+    public BigDecimal getAmountByMethod(PaymentMethod method) {
+        if (method == null) {
+            return BigDecimal.ZERO;
+        }
+        if (paymentMethodItems != null && !paymentMethodItems.isEmpty()) {
+            return paymentMethodItems.stream()
+                    .filter(item -> item.getPaymentMethod() == method)
+                    .map(PaymentMethodItem::getAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+        if (paymentMethod == method && amountPaid != null) {
+            return amountPaid;
+        }
+        return BigDecimal.ZERO;
+    }
+
+    public BigDecimal getCashAmount() {
+        return getAmountByMethod(PaymentMethod.CASH);
+    }
+
+    public BigDecimal getBankTransferAmount() {
+        return getAmountByMethod(PaymentMethod.BANK_TRANSFER);
+    }
+
     private static <T> T requireNonNull(T value, String message) {
         if (Objects.isNull(value)) {
             throw new ValidationException(message);

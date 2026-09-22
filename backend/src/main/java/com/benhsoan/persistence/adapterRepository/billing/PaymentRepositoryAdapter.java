@@ -39,14 +39,15 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public Payment save(Payment payment) {
         PaymentEntity savedEntity = jpaRepository.saveAndFlush(mapper.toEntity(payment));
 
-        itemJpaRepository.deleteAllByPaymentId(savedEntity.getId());
-
-        List<PaymentMethodItemEntity> savedItemEntities = List.of();
-        if (payment.getPaymentMethodItems() != null && !payment.getPaymentMethodItems().isEmpty()) {
+        List<PaymentMethodItemEntity> savedItemEntities;
+        List<PaymentMethodItemEntity> existingItems = itemJpaRepository.findAllByPaymentId(savedEntity.getId());
+        if (existingItems.isEmpty() && payment.getPaymentMethodItems() != null && !payment.getPaymentMethodItems().isEmpty()) {
             List<PaymentMethodItemEntity> itemEntities = payment.getPaymentMethodItems().stream()
                     .map(itemMapper::toEntity)
                     .toList();
             savedItemEntities = itemJpaRepository.saveAll(itemEntities);
+        } else {
+            savedItemEntities = existingItems;
         }
 
         return mapper.toDomain(savedEntity, savedItemEntities);

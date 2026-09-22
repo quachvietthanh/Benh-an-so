@@ -418,4 +418,61 @@ class PaymentTest {
 
         org.junit.jupiter.api.Assertions.assertEquals(100, item.getReferenceNumber().length());
     }
+
+    @Test
+    @DisplayName("computesMethodAmountsCorrectlyViaDomainHelpers: calculates cash, bank transfer, and custom amounts correctly (Finding P2 / QTN-38)")
+    void computesMethodAmountsCorrectlyViaDomainHelpers() {
+        UUID paymentId = UUID.randomUUID();
+        Instant paidAt = Instant.parse("2026-08-11T03:00:00Z");
+
+        Payment payment = Payment.record(
+                paymentId,
+                UUID.randomUUID(),
+                new BigDecimal("200000"),
+                new BigDecimal("300000"),
+                BigDecimal.ZERO,
+                new BigDecimal("500000"),
+                List.of(
+                        PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.CASH, new BigDecimal("200000"), null, paidAt),
+                        PaymentMethodItem.create(UUID.randomUUID(), paymentId, PaymentMethod.BANK_TRANSFER, new BigDecimal("300000"), "TXN-001", paidAt)
+                ),
+                UUID.randomUUID(),
+                paidAt,
+                VisitStatus.COMPLETED,
+                true
+        );
+
+        assertEquals(0, new BigDecimal("200000").compareTo(payment.getCashAmount()));
+        assertEquals(0, new BigDecimal("300000").compareTo(payment.getBankTransferAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(payment.getAmountByMethod(PaymentMethod.CARD)));
+        assertEquals(0, new BigDecimal("200000").compareTo(payment.getAmountByMethod(PaymentMethod.CASH)));
+        assertEquals(PaymentMethod.MULTIPLE, payment.getPaymentMethod());
+    }
+
+    @Test
+    @DisplayName("computesMethodAmountsCorrectlyForLegacySingleMethodPayment: fallback to paymentMethod and amountPaid when items are empty")
+    void computesMethodAmountsCorrectlyForLegacySingleMethodPayment() {
+        Payment legacyPayment = Payment.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("100000"),
+                new BigDecimal("150000"),
+                BigDecimal.ZERO,
+                new BigDecimal("250000"),
+                new BigDecimal("250000"),
+                PaymentMethod.CASH,
+                PaymentStatus.RECORDED,
+                UUID.randomUUID(),
+                Instant.parse("2026-08-11T03:00:00Z"),
+                null,
+                null,
+                null,
+                Instant.parse("2026-08-11T03:00:00Z"),
+                List.of()
+        );
+
+        assertEquals(0, new BigDecimal("250000").compareTo(legacyPayment.getCashAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(legacyPayment.getBankTransferAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(legacyPayment.getAmountByMethod(PaymentMethod.CARD)));
+    }
 }

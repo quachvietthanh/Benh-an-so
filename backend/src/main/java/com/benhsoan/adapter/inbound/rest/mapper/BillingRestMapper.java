@@ -76,6 +76,7 @@ public class BillingRestMapper {
                 .medicineFee(request.medicineFee())
                 .amountPaid(request.amountPaid())
                 .paymentMethod(request.paymentMethod())
+                .referenceNumber(request.referenceNumber())
                 .paymentMethods(methodCommands)
                 .build();
     }

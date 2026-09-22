@@ -15,6 +15,7 @@ public record RecordPaymentCommand(
         BigDecimal medicineFee,
         BigDecimal amountPaid,
         PaymentMethod paymentMethod,
+        String referenceNumber,
         List<PaymentMethodItemCommand> paymentMethods
 ) {
     public RecordPaymentCommand(
@@ -24,6 +25,28 @@ public record RecordPaymentCommand(
             BigDecimal amountPaid,
             PaymentMethod paymentMethod
     ) {
-        this(visitId, examFee, medicineFee, amountPaid, paymentMethod, null);
+        this(visitId, examFee, medicineFee, amountPaid, paymentMethod, null, null);
+    }
+
+    public RecordPaymentCommand(
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            List<PaymentMethodItemCommand> paymentMethods
+    ) {
+        this(visitId, examFee, medicineFee, amountPaid, paymentMethod, null, paymentMethods);
+    }
+
+    public RecordPaymentCommand(
+            UUID visitId,
+            BigDecimal examFee,
+            BigDecimal medicineFee,
+            BigDecimal amountPaid,
+            PaymentMethod paymentMethod,
+            String referenceNumber
+    ) {
+        this(visitId, examFee, medicineFee, amountPaid, paymentMethod, referenceNumber, null);
     }
 }

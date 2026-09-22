@@ -1,5 +1,5 @@
 -- =====================================================
--- V79__create_payment_method_items_and_support_multiple_methods.sql
+-- V82__create_payment_method_items_and_support_multiple_methods.sql
 -- NCL-07-CN-007: Thu phí nhiều phương thức và ghi nhận phương thức thanh toán
 -- Supports multiple payment method breakdowns per payment, transaction reference
 -- numbers for non-cash transfers, and updates payments.payment_method constraint.
