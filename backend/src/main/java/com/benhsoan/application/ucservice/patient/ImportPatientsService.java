@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.PatientImportLog;
 import com.benhsoan.domain.patient.PatientImportRowError;
 import com.benhsoan.domain.patient.enums.PatientChangeAction;
+import com.benhsoan.domain.patient.exception.ConcurrentImportInProgressException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.patient.ImportPatientsCommand;
 import com.benhsoan.port.dto.result.patient.PatientImportResult;
@@ -34,10 +36,7 @@ import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.spreadsheet.PatientSpreadsheetParserPort;
 
-import lombok.RequiredArgsConstructor;
-
 @Service
-@RequiredArgsConstructor
 public class ImportPatientsService implements ImportPatientsUseCase {
 
     private final PatientSpreadsheetParserPort sheetParser;
@@ -51,13 +50,64 @@ public class ImportPatientsService implements ImportPatientsUseCase {
     private final AuditLogRepository auditLogRepository;
     private final PatientChangeDetailBuilder changeDetailBuilder;
     private final ObjectMapper objectMapper;
+    private final ReentrantLock importLock;
+
+    public ImportPatientsService(
+            PatientSpreadsheetParserPort sheetParser,
+            PatientImportRowValidator rowValidator,
+            PatientImportDuplicateDetector duplicateDetector,
+            PatientRepository patientRepository,
+            PatientImportLogRepository patientImportLogRepository,
+            PatientChangeLogRepository patientChangeLogRepository,
+            PatientCodeGenerator patientCodeGenerator,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            PatientChangeDetailBuilder changeDetailBuilder,
+            ObjectMapper objectMapper
+    ) {
+        this(sheetParser, rowValidator, duplicateDetector, patientRepository, patientImportLogRepository,
+                patientChangeLogRepository, patientCodeGenerator, currentUserPort, auditLogRepository,
+                changeDetailBuilder, objectMapper, new ReentrantLock());
+    }
+
+    public ImportPatientsService(
+            PatientSpreadsheetParserPort sheetParser,
+            PatientImportRowValidator rowValidator,
+            PatientImportDuplicateDetector duplicateDetector,
+            PatientRepository patientRepository,
+            PatientImportLogRepository patientImportLogRepository,
+            PatientChangeLogRepository patientChangeLogRepository,
+            PatientCodeGenerator patientCodeGenerator,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            PatientChangeDetailBuilder changeDetailBuilder,
+            ObjectMapper objectMapper,
+            ReentrantLock importLock
+    ) {
+        this.sheetParser = sheetParser;
+        this.rowValidator = rowValidator;
+        this.duplicateDetector = duplicateDetector;
+        this.patientRepository = patientRepository;
+        this.patientImportLogRepository = patientImportLogRepository;
+        this.patientChangeLogRepository = patientChangeLogRepository;
+        this.patientCodeGenerator = patientCodeGenerator;
+        this.currentUserPort = currentUserPort;
+        this.auditLogRepository = auditLogRepository;
+        this.changeDetailBuilder = changeDetailBuilder;
+        this.objectMapper = objectMapper;
+        this.importLock = importLock != null ? importLock : new ReentrantLock();
+    }
 
     @Override
     @Transactional
     public PatientImportResult importPatients(ImportPatientsCommand command) {
-        if (command.fileContent() == null || command.fileContent().length == 0) {
-            throw new ValidationException("Tệp tải lên không được để trống.");
+        if (!importLock.tryLock()) {
+            throw new ConcurrentImportInProgressException();
         }
+        try {
+            if (command.fileContent() == null || command.fileContent().length == 0) {
+                throw new ValidationException("Tệp tải lên không được để trống.");
+            }
 
         UUID currentUserId = currentUserPort.getCurrentUserId();
         List<RawPatientRowDto> rawRows = sheetParser.parse(new ByteArrayInputStream(command.fileContent()));
@@ -211,5 +261,8 @@ public class ImportPatientsService implements ImportPatientsUseCase {
                 createdCodes,
                 errorResults
         );
+        } finally {
+            importLock.unlock();
+        }
     }
 }

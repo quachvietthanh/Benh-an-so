@@ -1,5 +1,5 @@
 -- =====================================================
--- V77__create_patient_import_schema_and_permission.sql
+-- V81__create_patient_import_schema_and_permission.sql
 -- NCL-02-CN-010: Nhập hồ sơ bệnh nhân từ tệp bảng tính
 -- Creates patient import logging tables and seeds PATIENT_IMPORT permission.
 -- =====================================================

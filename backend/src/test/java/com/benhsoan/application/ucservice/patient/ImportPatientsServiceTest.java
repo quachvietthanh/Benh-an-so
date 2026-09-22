@@ -16,11 +16,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.locks.ReentrantLock;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientImportLog;
 import com.benhsoan.domain.patient.PatientImportRowError;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.enums.ImportStatus;
+import com.benhsoan.domain.patient.exception.ConcurrentImportInProgressException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.infrastructure.spreadsheet.ExcelPatientSheetParser;
 import com.benhsoan.port.dto.spreadsheet.RawPatientRowDto;
@@ -181,5 +183,45 @@ class ImportPatientsServiceTest {
         assertThat(result.errorCount()).isEqualTo(1);
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0).rowNumber()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("Should throw ConcurrentImportInProgressException when import lock is already held")
+    void shouldThrowConcurrentImportInProgressExceptionWhenLockIsHeld() {
+        ReentrantLock busyLock = mock(ReentrantLock.class);
+        when(busyLock.tryLock()).thenReturn(false);
+
+        ImportPatientsService lockedService = new ImportPatientsService(
+                sheetParser, rowValidator, duplicateDetector, patientRepository,
+                patientImportLogRepository, patientChangeLogRepository, patientCodeGenerator,
+                currentUserPort, auditLogRepository, changeDetailBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                busyLock
+        );
+
+        ImportPatientsCommand cmd = new ImportPatientsCommand(new byte[]{1, 2, 3}, "test.xlsx", 3L, true);
+
+        assertThatThrownBy(() -> lockedService.importPatients(cmd))
+                .isInstanceOf(ConcurrentImportInProgressException.class)
+                .hasMessageContaining("Hệ thống đang thực hiện một tiến trình nhập hồ sơ khác");
+    }
+
+    @Test
+    @DisplayName("Should release lock when import completes or fails validation")
+    void shouldReleaseLockWhenImportFailsValidation() {
+        ReentrantLock realLock = new ReentrantLock();
+
+        ImportPatientsService customService = new ImportPatientsService(
+                sheetParser, rowValidator, duplicateDetector, patientRepository,
+                patientImportLogRepository, patientChangeLogRepository, patientCodeGenerator,
+                currentUserPort, auditLogRepository, changeDetailBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                realLock
+        );
+
+        ImportPatientsCommand emptyCmd = new ImportPatientsCommand(new byte[]{}, "test.xlsx", 0L, true);
+
+        assertThatThrownBy(() -> customService.importPatients(emptyCmd))
+                .isInstanceOf(ValidationException.class);
+
+        assertThat(realLock.isLocked()).isFalse();
     }
 }

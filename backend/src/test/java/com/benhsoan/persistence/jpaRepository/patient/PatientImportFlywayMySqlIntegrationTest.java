@@ -19,7 +19,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "logging.level.org.hibernate.SQL=WARN",
         "logging.level.org.hibernate.orm.jdbc.bind=WARN"
 })
-@DisplayName("Patient Import Flyway MySQL Schema and Permission Integration Test (NCL-02-CN-010 / V77)")
+@DisplayName("Patient Import Flyway MySQL Schema and Permission Integration Test (NCL-02-CN-010 / V81)")
 class PatientImportFlywayMySqlIntegrationTest {
 
     @Container
@@ -41,7 +41,7 @@ class PatientImportFlywayMySqlIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    @DisplayName("Flyway V77 creates patient_import_logs tables and seeds PATIENT_IMPORT permission for ADMIN and RECEPTIONIST")
+    @DisplayName("Flyway V81 creates patient_import_logs tables and seeds PATIENT_IMPORT permission for ADMIN and RECEPTIONIST")
     void flywayCreatesImportTablesAndSeedsPermissions() {
         // Verify patient_import_logs columns
         assertEquals(10, jdbc.queryForObject(

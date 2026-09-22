@@ -179,6 +179,28 @@ class PatientImportControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Returns 409 Conflict when concurrent import is in progress")
+    void returns409ConflictWhenConcurrentImportInProgress() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "danh_sach.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                new byte[]{1, 2, 3}
+        );
+
+        when(importPatientsUseCase.importPatients(any()))
+                .thenThrow(new com.benhsoan.domain.patient.exception.ConcurrentImportInProgressException());
+
+        mockMvc.perform(multipart("/patients/import")
+                        .file(file)
+                        .param("skipDuplicates", "true")
+                        .with(user("admin").authorities(PERMISSION_IMPORT)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONCURRENT_IMPORT_IN_PROGRESS"))
+                .andExpect(jsonPath("$.message").value("Hệ thống đang thực hiện một tiến trình nhập hồ sơ khác, vui lòng thử lại sau."));
+    }
+
+    @Test
     @DisplayName("Allows getting import logs with pagination")
     void allowsGettingImportLogs() throws Exception {
         UUID logId = UUID.randomUUID();

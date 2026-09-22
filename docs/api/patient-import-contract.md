@@ -160,6 +160,18 @@ User Story `NCL-02-CN-010` phục vụ số hóa và chuyển đổi dữ liệu
 }
 ```
 
+#### Response (409 Conflict)
+Khi hệ thống đang có một tiến trình nhập hồ sơ khác đang diễn ra:
+```json
+{
+  "timestamp": "2026-09-22T08:50:00Z",
+  "status": 409,
+  "error": "Conflict",
+  "code": "CONCURRENT_IMPORT_IN_PROGRESS",
+  "message": "Hệ thống đang thực hiện một tiến trình nhập hồ sơ khác, vui lòng thử lại sau."
+}
+```
+
 ---
 
 ### 4.4. Tra cứu danh sách lịch sử nhập liệu
