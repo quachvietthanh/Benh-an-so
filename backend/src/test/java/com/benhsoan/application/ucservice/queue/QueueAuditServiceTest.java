@@ -235,6 +235,36 @@ class QueueAuditServiceTest {
             assertEquals(specialReason, node.get("reason").asText());
         });
     }
+
+    @Test
+    void fallsBackToSafeJsonWhenSerializationFails() throws Exception {
+        UUID actorId = UUID.randomUUID();
+        QueueItem item = QueueItem.create(UUID.randomUUID(), UUID.randomUUID(), null, UUID.randomUUID(),
+                QueueItemSourceType.WALK_IN, 1, LocalDate.of(2026, 8, 2), actorId, Instant.parse("2026-08-02T02:00:00Z"));
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(auditLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.fasterxml.jackson.databind.ObjectMapper faultyMapper = mock(com.fasterxml.jackson.databind.ObjectMapper.class);
+        when(faultyMapper.createObjectNode()).thenReturn(new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode());
+        when(faultyMapper.writeValueAsString(any())).thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("Simulated error") {});
+
+        new QueueAuditService(auditLogRepository, currentUserPort, faultyMapper)
+                .recordPrioritized(item, com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY, "Special \"reason\"");
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        String detail = captor.getValue().getDetail();
+
+        // Must still be parseable valid JSON even on fallback
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+            var node = mapper.readTree(detail);
+            assertEquals("PRIORITIZED", node.get("action").asText());
+            assertEquals("EMERGENCY", node.get("priority").asText());
+        });
+    }
 }
 
 

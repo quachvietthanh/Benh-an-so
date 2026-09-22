@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.queue;
 
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.benhsoan.domain.auditlog.AuditLog;
@@ -24,6 +25,7 @@ class QueueAuditService {
     private final CurrentUserPort currentUserPort;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public QueueAuditService(AuditLogRepository auditLogRepository, CurrentUserPort currentUserPort) {
         this(auditLogRepository, currentUserPort, new ObjectMapper());
     }

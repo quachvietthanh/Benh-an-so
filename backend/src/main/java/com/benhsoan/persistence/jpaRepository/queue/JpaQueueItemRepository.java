@@ -84,12 +84,19 @@ public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, U
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select item from QueueItemEntity item where item.medicalQueueId = :medicalQueueId "
-            + "and item.status = 'WAITING' order by "
+            + "and item.status = :status order by "
             + "case item.priority "
             + "when com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY then 1 "
             + "when com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY then 2 "
             + "else 3 end asc, "
             + "item.prioritizedAt asc, "
             + "item.queueNumber asc")
-    List<QueueItemEntity> findWaitingForUpdate(@Param("medicalQueueId") UUID medicalQueueId);
+    List<QueueItemEntity> findWaitingForUpdate(
+            @Param("medicalQueueId") UUID medicalQueueId,
+            @Param("status") QueueItemStatus status
+    );
+
+    default List<QueueItemEntity> findWaitingForUpdate(UUID medicalQueueId) {
+        return findWaitingForUpdate(medicalQueueId, QueueItemStatus.WAITING);
+    }
 }
