@@ -7,5 +7,6 @@ public enum QueueSemanticAction {
     RE_QUEUED,
     COMPLETED,
     CANCELLED,
-    EARLY_ENDED
+    EARLY_ENDED,
+    PRIORITIZED
 }

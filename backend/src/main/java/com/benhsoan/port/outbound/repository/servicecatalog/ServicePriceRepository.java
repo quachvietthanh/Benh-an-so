@@ -1,7 +1,9 @@
 package com.benhsoan.port.outbound.repository.servicecatalog;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,5 +19,8 @@ public interface ServicePriceRepository {
 
     Optional<ServicePrice> findEffectivePrice(UUID serviceCatalogId, LocalDate effectiveOn);
 
+    Map<UUID, ServicePrice> findEffectivePrices(Collection<UUID> serviceCatalogIds, LocalDate effectiveOn);
+
     boolean existsByServiceCatalogIdAndEffectiveFrom(UUID serviceCatalogId, LocalDate effectiveFrom);
 }
+

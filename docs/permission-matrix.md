@@ -25,7 +25,11 @@
 | `/api/v1/patients` | POST | ✅ | ✅ | ✅ | ❌ |
 | `/api/v1/patients/{id}` | GET | ✅ | ✅ | ✅ | ❌ |
 | `/api/v1/patients/{id}` | PUT | ✅ | ✅ | ✅ | ❌ |
-| `/api/v1/patients/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/patients/import/template` | GET | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import/preview` | POST | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import` | POST | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import-logs` | GET | ✅ | ❌ | ✅ | ❌ |
+| `/api/v1/patients/import-logs/{id}` | GET | ✅ | ❌ | ✅ | ❌ |
 | `/api/v1/patients/me` | GET | ❌ | ✅ | ✅ | ❌ |
 | `/patients/{patientId}/allergies` | GET | ✅ | ✅ | ❌ | ✅ |
 | `/patients/{patientId}/allergies` | POST | ✅ | ✅ | ❌ | ❌ |

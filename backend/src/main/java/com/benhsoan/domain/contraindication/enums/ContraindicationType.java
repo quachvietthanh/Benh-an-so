@@ -3,5 +3,6 @@ package com.benhsoan.domain.contraindication.enums;
 public enum ContraindicationType {
     AGE,
     PREGNANCY,
-    DISEASE
+    DISEASE,
+    BREASTFEEDING
 }

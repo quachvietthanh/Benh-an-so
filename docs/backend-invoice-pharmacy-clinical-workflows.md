@@ -191,9 +191,158 @@ medicine, reason, actor, timestamp).
 
 ---
 
+---
+
+## 5. NCL-07-CN-007 — Thu phí nhiều phương thức và ghi nhận phương thức thanh toán
+
+Base: `/invoices` (permission `INVOICE_CREATE` cho ghi nhận thanh toán, `INVOICE_READ` cho tra cứu hóa đơn).
+
+### 5.1. Ghi nhận thanh toán đa phương thức (`POST /invoices/payments`)
+
+Hỗ trợ đồng thời 2 định dạng:
+1. **Định dạng mới (Nhiều phương thức)**:
+```json
+{
+  "visitId": "d0000000-0000-0000-0000-000000000001",
+  "examFee": 100000,
+  "medicineFee": 150000,
+  "amountPaid": 250000,
+  "paymentMethods": [
+    {
+      "paymentMethod": "CASH",
+      "amount": 100000
+    },
+    {
+      "paymentMethod": "BANK_TRANSFER",
+      "amount": 150000,
+      "referenceNumber": "TXN-20260921-001"
+    }
+  ]
+}
+```
+
+2. **Định dạng cũ (Tương thích ngược 1 phương thức)**:
+```json
+{
+  "visitId": "d0000000-0000-0000-0000-000000000001",
+  "examFee": 100000,
+  "medicineFee": 150000,
+  "amountPaid": 250000,
+  "paymentMethod": "BANK_TRANSFER",
+  "referenceNumber": "TXN-20260921-001"
+}
+```
+
+**Quy tắc xác thực (Business Rules & Validations)**:
+- `paymentMethods`: Bắt buộc tổng `amount` của các phần tử phải khớp chính xác với `totalAmount` của hóa đơn. Nếu nhỏ hơn hoặc lớn hơn, trả về lỗi `400 Bad Request` (`PAYMENT_AMOUNT_MISMATCH`) kèm số tiền còn thiếu.
+- `BANK_TRANSFER`: Bắt buộc phải có `referenceNumber` không được để trống (vi phạm trả về `400 Bad Request` - `VALIDATION_FAILED`). Hỗ trợ truyền ở cấp con `paymentMethods[i].referenceNumber` hoặc cấp cao `referenceNumber` (cho luồng đơn phương thức).
+- `referenceNumber`: Độ dài tối đa 100 ký tự. Nếu vượt quá sẽ bị chặn với mã lỗi `400 Bad Request` (`VALIDATION_FAILED`).
+- `paymentMethod` trên response: Tự động là `MULTIPLE` nếu kết hợp từ 2 phương thức khác nhau, hoặc giữ nguyên mã phương thức đơn nếu chỉ dùng 1 loại.
+
+Response (`PaymentResponse`):
+```json
+{
+  "id": "…",
+  "visitId": "…",
+  "examFee": 100000,
+  "medicineFee": 150000,
+  "serviceFee": 0,
+  "totalAmount": 250000,
+  "amountPaid": 250000,
+  "paymentMethod": "MULTIPLE",
+  "status": "RECORDED",
+  "collectedBy": "…",
+  "paidAt": "2026-09-21T16:00:00Z",
+  "createdAt": "2026-09-21T16:00:00Z",
+  "paymentMethods": [
+    {
+      "id": "…",
+      "paymentId": "…",
+      "paymentMethod": "CASH",
+      "amount": 100000,
+      "referenceNumber": null,
+      "createdAt": "2026-09-21T16:00:00Z"
+    },
+    {
+      "id": "…",
+      "paymentId": "…",
+      "paymentMethod": "BANK_TRANSFER",
+      "amount": 150000,
+      "referenceNumber": "TXN-20260921-001",
+      "createdAt": "2026-09-21T16:00:00Z"
+    }
+  ]
+}
+```
+
+### 5.2. Tra cứu chi tiết hóa đơn kèm thanh toán (`GET /invoices/{invoiceId}`)
+
+`InvoiceResponse` bổ sung trường `payment` (`PaymentDetailResponse`), giúp frontend loại bỏ hoàn toàn cơ chế lưu tạm vào `localStorage`:
+```json
+{
+  "id": "…",
+  "invoiceCode": "HD000010",
+  "visitId": "…",
+  "paymentId": "…",
+  "type": "ORIGINAL",
+  "totalAmount": 250000,
+  "payment": {
+    "id": "…",
+    "visitId": "…",
+    "status": "RECORDED",
+    "totalAmount": 250000,
+    "amountPaid": 250000,
+    "paymentMethod": "MULTIPLE",
+    "collectedBy": "…",
+    "collectorName": "Nguyễn Văn Thu Ngân",
+    "paidAt": "2026-09-21T16:00:00Z",
+    "createdAt": "2026-09-21T16:00:00Z",
+    "paymentMethods": [
+      {
+        "id": "…",
+        "paymentId": "…",
+        "paymentMethod": "CASH",
+        "amount": 100000,
+        "referenceNumber": null,
+        "createdAt": "2026-09-21T16:00:00Z"
+      },
+      {
+        "id": "…",
+        "paymentId": "…",
+        "paymentMethod": "BANK_TRANSFER",
+        "amount": 150000,
+        "referenceNumber": "TXN-20260921-001",
+        "createdAt": "2026-09-21T16:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
 ## Database migrations
 
 - `V74__add_invoice_reprint_tracking.sql` — `invoices.reprint_count`, `invoices.last_reprinted_at`.
 - `V75__create_medication_returns.sql` — `prescription_dispense_items.returned_quantity`, new `medication_returns` table.
 - `V76__create_contraindication_schema.sql` — `patients.pregnancy_status`, new `contraindication_rules` and `prescription_contraindication_warning_logs` tables.
+- `V77__add_inventory_report_view_permission.sql` — quyền xem báo cáo xuất nhập tồn kho.
+- `V81__add_priority_to_queue_items.sql` — ưu tiên khám cho bệnh nhân cấp cứu (NCL-03-CN-013).
+- `V82__create_payment_method_items_and_support_multiple_methods.sql` — tạo bảng `payment_method_items`, cập nhật constraint `chk_payments_method` mở rộng `'MULTIPLE'`, backfill toàn bộ dữ liệu lịch sử.
+
+---
+
+## 6. Khuyến nghị tích hợp và đối soát ca thu ngân (QTN-38)
+
+Khi triển khai tính năng **Chốt ca thu ngân cuối ngày (`NCL-07-CN-009` / `QTN-38`)** hoặc các báo cáo doanh thu theo phương thức thanh toán:
+- **Không thực hiện** `GROUP BY payments.payment_method` hoặc `if (payment.getPaymentMethod() == PaymentMethod.CASH)` đơn thuần, vì các khoản thu đa phương thức sẽ có `payment_method = 'MULTIPLE'`, dẫn đến nguy cơ gom nhầm hoặc bỏ sót tiền mặt.
+- **Bắt buộc đọc từ `payment_method_items`**:
+  - Tại tầng Domain Java: Sử dụng các helper methods sẵn có trên entity `Payment`:
+    - `payment.getCashAmount()`
+    - `payment.getBankTransferAmount()`
+    - `payment.getAmountByMethod(PaymentMethod method)`
+    - `payment.getPaymentMethodItems()`
+  - Tại tầng Frontend / Client: Duyệt mảng `paymentMethods` trong `PaymentResponse` / `InvoiceResponse.payment` để phân rã chính xác số tiền từng phương thức.
+
+
 

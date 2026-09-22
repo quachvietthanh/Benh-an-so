@@ -689,9 +689,6 @@ function MedicineCatalogPage() {
             <MedicineBoxOutlined style={{ marginRight: 8, color: '#1677ff' }} />
             Quản lý Danh mục & Ngưỡng tồn thuốc
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Thiết lập ngưỡng tồn tối thiểu cho từng loại thuốc để hệ thống tự động cảnh báo bổ sung trước khi hết hàng.
-          </Paragraph>
         </div>
 
         <Space wrap>

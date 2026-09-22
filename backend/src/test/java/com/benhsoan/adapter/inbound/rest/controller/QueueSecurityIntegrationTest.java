@@ -33,6 +33,7 @@ import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
+import com.benhsoan.domain.queue.exception.UnauthorizedQueueOperationException;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
@@ -59,6 +60,10 @@ import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
+import com.benhsoan.domain.queue.enums.QueuePriority;
+import com.benhsoan.port.dto.result.QueueHistoryResult;
+import com.benhsoan.port.inbound.queue.PrioritizeQueueItemUseCase;
+
 @WebMvcTest(controllers = QueueController.class)
 @Import({AnonymizationModeState.class, QueueRestMapper.class, SecurityConfig.class, JwtAuthenticationFilter.class,
         GlobalExceptionHandler.class, RequirePermissionAspect.class, PermissionEvaluator.class,
@@ -83,6 +88,7 @@ class QueueSecurityIntegrationTest {
     @MockitoBean private GetQueueItemUseCase getQueueItemUseCase;
     @MockitoBean private SkipQueueItemUseCase skipQueueItemUseCase;
     @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
+    @MockitoBean private PrioritizeQueueItemUseCase prioritizeQueueItemUseCase;
     @MockitoBean private GetQueueHistoryUseCase getQueueHistoryUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
@@ -308,4 +314,93 @@ class QueueSecurityIntegrationTest {
                         .content("{\"outcome\":\"CANCELLED\",\"reason\":\"Nhập nhầm lượt khám\"}"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void prioritizeAllowsReceptionistWithPermission() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        QueueItemResult queueItem = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "BN001", "Nguyen Van A",
+                UUID.randomUUID(), "Bac si B", UUID.randomUUID(), "P101", null,
+                UUID.randomUUID(), "VIS000001", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.WAITING, 1, LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T01:00:00Z"), null, null, null, null,
+                null, null, 0,
+                QueuePriority.EMERGENCY, "Sốt cao co giật", Instant.parse("2026-08-14T01:05:00Z"), UUID.randomUUID()
+        );
+        when(prioritizeQueueItemUseCase.prioritize(any())).thenReturn(queueItem);
+
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", itemId)
+                        .with(permission("RECEPTIONIST", "QUEUE_UPDATE_STATUS"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"EMERGENCY\",\"reason\":\"Sốt cao co giật\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value("EMERGENCY"));
+
+        verify(prioritizeQueueItemUseCase).prioritize(any());
+    }
+
+    @Test
+    void prioritizeAllowsAdminWithPermission() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        QueueItemResult queueItem = new QueueItemResult(
+                itemId, UUID.randomUUID(), UUID.randomUUID(), "BN001", "Nguyen Van A",
+                UUID.randomUUID(), "Bac si B", UUID.randomUUID(), "P101", null,
+                UUID.randomUUID(), "VIS000001", QueueItemSourceType.WALK_IN,
+                QueueItemStatus.WAITING, 1, LocalDate.of(2026, 8, 14),
+                Instant.parse("2026-08-14T01:00:00Z"), null, null, null, null,
+                null, null, 0,
+                QueuePriority.PRIORITY, "Người già yếu", Instant.parse("2026-08-14T01:05:00Z"), UUID.randomUUID()
+        );
+        when(prioritizeQueueItemUseCase.prioritize(any())).thenReturn(queueItem);
+
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", itemId)
+                        .with(permission("ADMIN", "QUEUE_UPDATE_STATUS"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"PRIORITY\",\"reason\":\"Người già yếu\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value("PRIORITY"));
+    }
+
+    @Test
+    void prioritizeRejectsWithoutQueueUpdateStatusPermission() throws Exception {
+        UUID itemId = UUID.randomUUID();
+
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", itemId)
+                        .with(permission("DOCTOR", "VISIT_UPDATE"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"EMERGENCY\",\"reason\":\"Sốt cao co giật\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void prioritizeRejectsDoctorEvenWithQueueUpdateStatus() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        when(prioritizeQueueItemUseCase.prioritize(any()))
+                .thenThrow(new UnauthorizedQueueOperationException());
+
+        mockMvc.perform(post("/queue-items/{itemId}/prioritize", itemId)
+                        .with(permission("DOCTOR", "QUEUE_UPDATE_STATUS"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"priority\":\"EMERGENCY\",\"reason\":\"Sốt cao co giật\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void historyAllowsManagerWithQueueViewPermission() throws Exception {
+        UUID itemId = UUID.randomUUID();
+        when(getQueueHistoryUseCase.getHistory(itemId)).thenReturn(List.of(
+                new QueueHistoryResult(
+                        UUID.randomUUID(), itemId, UUID.randomUUID(), "Pham Mai Lan",
+                        "PRIORITIZED", "WAITING", 0, "Sốt cao co giật", Instant.now()
+                )
+        ));
+
+        mockMvc.perform(get("/queue-items/{itemId}/history", itemId)
+                        .with(permission("MANAGER", "QUEUE_VIEW")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].action").value("PRIORITIZED"))
+                .andExpect(jsonPath("$[0].operatorName").value("Pham Mai Lan"))
+                .andExpect(jsonPath("$[0].reason").value("Sốt cao co giật"));
+    }
 }
+

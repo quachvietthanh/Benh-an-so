@@ -661,9 +661,6 @@ function InventoryReceiptPage() {
             <InboxOutlined style={{ marginRight: 8, color: '#1677ff' }} />
             Nhập kho theo lô & Quản lý Hạn dùng
           </Title>
-          <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-            Tạo phiếu nhập thuốc theo số lô và hạn dùng chính xác, kiểm soát tồn kho và theo dõi hạn sử dụng FEFO.
-          </Paragraph>
         </div>
         <Space wrap>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/pharmacy')}>

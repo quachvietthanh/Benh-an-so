@@ -7,6 +7,8 @@ import java.util.UUID;
 import com.benhsoan.domain.queue.enums.QueueItemSourceType;
 import com.benhsoan.domain.queue.enums.QueueItemStatus;
 
+import com.benhsoan.domain.queue.enums.QueuePriority;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -38,6 +40,10 @@ public class QueueItemEntity {
     @Column(name = "skipped_at") private Instant skippedAt;
     @Column(name = "skip_reason") private String skipReason;
     @Column(name = "call_count") private int callCount;
+    @Enumerated(EnumType.STRING) @Column(name = "priority") private QueuePriority priority;
+    @Column(name = "priority_reason") private String priorityReason;
+    @Column(name = "prioritized_at") private Instant prioritizedAt;
+    @Column(name = "prioritized_by") private UUID prioritizedBy;
     @Column(name = "created_by") private UUID createdBy;
     @Column(name = "created_at") private Instant createdAt;
     @Column(name = "updated_at") private Instant updatedAt;
