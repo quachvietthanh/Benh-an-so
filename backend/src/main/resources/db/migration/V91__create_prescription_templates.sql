@@ -1,5 +1,5 @@
 -- =====================================================
--- V89__create_prescription_templates.sql
+-- V91__create_prescription_templates.sql
 -- NCL-05-CN-008: Bộ đơn thuốc mẫu theo chẩn đoán
 -- Prescription templates keyed by diagnosis code, doctor-scoped.
 -- Applying a template produces a draft only; it never persists a prescription.

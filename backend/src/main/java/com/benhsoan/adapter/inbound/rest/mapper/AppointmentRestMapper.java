@@ -12,6 +12,7 @@ import com.benhsoan.adapter.inbound.rest.request.appointment.CreateAppointmentRe
 import com.benhsoan.adapter.inbound.rest.request.appointment.RescheduleAppointmentRequest;
 import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentRescheduleHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentResponse;
+import com.benhsoan.adapter.inbound.rest.response.appointment.WaitlistSuggestionResponse;
 import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
@@ -65,6 +66,21 @@ public class AppointmentRestMapper {
                         .toList()
                 : List.of();
 
+        WaitlistSuggestionResponse waitlistSuggestion = result.suggestedWaitlistEntry() != null
+                ? WaitlistSuggestionResponse.builder()
+                        .waitlistId(result.suggestedWaitlistEntry().waitlistId())
+                        .patientId(result.suggestedWaitlistEntry().patientId())
+                        .patientName(result.suggestedWaitlistEntry().patientName())
+                        .patientPhone(result.suggestedWaitlistEntry().patientPhone())
+                        .doctorId(result.suggestedWaitlistEntry().doctorId())
+                        .doctorName(result.suggestedWaitlistEntry().doctorName())
+                        .desiredDate(result.suggestedWaitlistEntry().desiredDate())
+                        .timePreference(result.suggestedWaitlistEntry().timePreference())
+                        .note(result.suggestedWaitlistEntry().note())
+                        .createdAt(result.suggestedWaitlistEntry().createdAt())
+                        .build()
+                : null;
+
         return AppointmentResponse.builder()
                 .id(result.id())
                 .appointmentCode(result.appointmentCode())
@@ -82,6 +98,7 @@ public class AppointmentRestMapper {
                 .confirmedBy(result.confirmedBy())
                 .confirmedByName(result.confirmedByName())
                 .rescheduleHistories(histories)
+                .suggestedWaitlistEntry(waitlistSuggestion)
                 .build();
 
     }

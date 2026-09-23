@@ -22,21 +22,21 @@ import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
 
 /**
- * Executes the actual V89 migration file against an in-memory H2 database to prove the
+ * Executes the actual V91 migration file against an in-memory H2 database to prove the
  * DDL is H2-compatible and enforces the idempotency/quantity constraints.
  */
 class PrescriptionTemplateMigrationH2Test {
 
     @Test
-    void v89MigrationRunsAndEnforcesConstraintsOnH2() throws Exception {
+    void v91MigrationRunsAndEnforcesConstraintsOnH2() throws Exception {
         try (Connection conn = DriverManager.getConnection(
-                "jdbc:h2:mem:v89;DB_CLOSE_DELAY=-1;MODE=LEGACY", "sa", "")) {
+                "jdbc:h2:mem:v91;DB_CLOSE_DELAY=-1;MODE=LEGACY", "sa", "")) {
             Statement stmt = conn.createStatement();
             stmt.execute("CREATE TABLE diagnosis_catalog (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
             stmt.execute("CREATE TABLE medicines (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
             stmt.execute("CREATE TABLE users (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
 
-            String ddl = readResource("db/migration/V89__create_prescription_templates.sql");
+            String ddl = readResource("db/migration/V91__create_prescription_templates.sql");
             RunScript.execute(conn, new StringReader(ddl));
 
             UUID diagnosisId = UUID.randomUUID();

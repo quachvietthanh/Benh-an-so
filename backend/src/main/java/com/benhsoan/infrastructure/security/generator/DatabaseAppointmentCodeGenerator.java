@@ -1,35 +1,42 @@
 package com.benhsoan.infrastructure.security.generator;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.port.outbound.generator.AppointmentCodeGenerator;
-import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentCodeSequenceRepository;
 
 import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
-public class DatabaseAppointmentCodeGenerator
-        implements AppointmentCodeGenerator {
+public class DatabaseAppointmentCodeGenerator implements AppointmentCodeGenerator {
 
     private static final String PREFIX = "APT";
 
-    private final AppointmentRepository appointmentRepository;
+    private final AppointmentCodeSequenceRepository sequenceRepository;
 
     @Override
     public String generate() {
-
-        return appointmentRepository
-                .findAppointmentCodeWithHighestSequence()
-                .map(this::nextCode)
-                .orElse(PREFIX + "000001");
+        long sequence = sequenceRepository.reserveNextValue(PREFIX);
+        return PREFIX + String.format("%06d", sequence);
     }
 
-    private String nextCode(String currentCode) {
+    @Override
+    public List<String> generateBatch(int count) {
+        if (count <= 0) {
+            return List.of();
+        }
 
-        int number = Integer.parseInt(currentCode.substring(currentCode.length() - 6));
+        long endNumber = sequenceRepository.reserveNextValues(PREFIX, count);
+        long startNumber = endNumber - count + 1;
 
-        return PREFIX + String.format("%06d", number + 1);
+        List<String> codes = new ArrayList<>(count);
+        for (long i = startNumber; i <= endNumber; i++) {
+            codes.add(PREFIX + String.format("%06d", i));
+        }
+        return codes;
     }
-
 }

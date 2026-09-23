@@ -103,6 +103,8 @@ import WaitingForResultList from '../components/appointment-queue/WaitingForResu
 import CompletedTodayList from '../components/appointment-queue/CompletedTodayList'
 import { getAppointmentColumns } from './appointment-queue/appointmentColumns'
 import { getQueueBoardColumns } from './appointment-queue/queueBoardColumns'
+import PrioritizeQueueItemModal from '../components/queue/PrioritizeQueueItemModal.jsx'
+import { sortQueueItemsByPriority } from '../utils/queuePriorityHelpers.js'
 import {
   canRescheduleAppointment,
   getRescheduleRestrictionMessage,
@@ -181,6 +183,7 @@ function AppointmentQueue() {
   const [walkInModalOpen, setWalkInModalOpen] = useState(false)
   const [skipModalItem, setSkipModalItem] = useState(null)
   const [historyQueueItem, setHistoryQueueItem] = useState(null)
+  const [prioritizeModalItem, setPrioritizeModalItem] = useState(null)
   const [reQueuingId, setReQueuingId] = useState(null)
   const [closeVisitModalItem, setCloseVisitModalItem] = useState(null)
   const [cancelModalItem, setCancelModalItem] = useState(null)
@@ -465,9 +468,8 @@ function AppointmentQueue() {
       return textMatch
     })
 
-    return validItems.sort((first, second) =>
-      Number(first.queueNumber || 999999) - Number(second.queueNumber || 999999),
-    )
+    // Giữ nguyên thứ tự danh sách do Backend trả về (đã sắp xếp sẵn: CẤP CỨU -> ƯU TIÊN -> THƯỜNG)
+    return validItems
   }, [queues, queueKeyword, queueStatusFilter, queueSourceFilter, getPatientInfo, getDoctorInfo, permissions.isDoctorOnly, user?.id])
 
   const doctorQueueGroups = useMemo(() => {
@@ -539,7 +541,7 @@ function AppointmentQueue() {
     return {
       handedOverToMe,
       inProgress: sortByNumber(items.filter((q) => q.status === 'IN_PROGRESS')),
-      waiting: sortByNumber(items.filter((q) => q.status === 'WAITING')),
+      waiting: sortQueueItemsByPriority(items.filter((q) => q.status === 'WAITING')),
       waitingForResult: sortByNumber(items.filter((q) => q.status === 'WAITING_FOR_RESULT')),
       skipped: sortByNumber(items.filter((q) => q.status === 'SKIPPED')),
       completed: [...items.filter((q) => q.status === 'COMPLETED')].sort((a, b) => {
@@ -1290,6 +1292,16 @@ function AppointmentQueue() {
             patientCode: pInfo.code,
           })
         },
+        onPrioritize: (record) => {
+          const pInfo = getPatientInfo(record.patientId, record.patientName, record.patientCode, record.phone)
+          const dInfo = getDoctorInfo(record.doctorId, record.doctorName, record.department)
+          setPrioritizeModalItem({
+            ...record,
+            patientName: pInfo.name,
+            patientCode: pInfo.code,
+            doctorName: dInfo.name,
+          })
+        },
       }),
     [
       getPatientInfo,
@@ -1306,6 +1318,21 @@ function AppointmentQueue() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+      <style>{`
+        .queue-row-emergency {
+          background-color: #fff1f2 !important;
+          font-weight: 500;
+        }
+        .queue-row-emergency:hover > td {
+          background-color: #ffe4e6 !important;
+        }
+        .queue-row-priority {
+          background-color: #fffbeb !important;
+        }
+        .queue-row-priority:hover > td {
+          background-color: #fef3c7 !important;
+        }
+      `}</style>
       <Card style={{ marginBottom: 24, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <Row justify="space-between" align="middle" gutter={[16, 16]}>
           <Col>
@@ -1563,6 +1590,13 @@ function AppointmentQueue() {
                     loading={loading}
                     pagination={{ pageSize: 10, showSizeChanger: true }}
                     scroll={{ x: 1080 }}
+                    rowClassName={(record) =>
+                      record.priority === 'EMERGENCY'
+                        ? 'queue-row-emergency'
+                        : record.priority === 'PRIORITY'
+                        ? 'queue-row-priority'
+                        : ''
+                    }
                   />
                 )}
               </Card>
@@ -2094,6 +2128,15 @@ function AppointmentQueue() {
         form={quickPatientForm}
         onFinish={handleQuickRegisterPatientSubmit}
         loading={quickPatientSaving}
+      />
+
+      <PrioritizeQueueItemModal
+        open={Boolean(prioritizeModalItem)}
+        item={prioritizeModalItem}
+        onClose={() => setPrioritizeModalItem(null)}
+        onSuccess={async () => {
+          await refreshAllData()
+        }}
       />
 
       <DeferPatientModal

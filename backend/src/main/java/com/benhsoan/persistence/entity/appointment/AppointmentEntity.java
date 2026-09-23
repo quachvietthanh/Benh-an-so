@@ -76,4 +76,10 @@ public class AppointmentEntity {
     @Column(name = "confirmed_by", columnDefinition = "BINARY(16)")
     private UUID confirmedBy;
 
+    @Column(name = "series_id", columnDefinition = "BINARY(16)")
+    private UUID seriesId;
+
+    @Column(name = "sequence_number")
+    private Integer sequenceNumber;
+
 }

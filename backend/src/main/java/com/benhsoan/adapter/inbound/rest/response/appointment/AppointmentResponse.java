@@ -41,7 +41,9 @@ public record AppointmentResponse(
 
         String confirmedByName,
 
-        List<AppointmentRescheduleHistoryResponse> rescheduleHistories
+        List<AppointmentRescheduleHistoryResponse> rescheduleHistories,
+
+        WaitlistSuggestionResponse suggestedWaitlistEntry
 
 ) {
     public AppointmentResponse {
@@ -67,6 +69,29 @@ public record AppointmentResponse(
     ) {
         this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
                 reason, cancelReason, checkedInAt, completedAt, createdAt, null, null, null,
-                rescheduleHistories != null ? rescheduleHistories : List.of());
+                rescheduleHistories != null ? rescheduleHistories : List.of(), null);
+    }
+
+    public AppointmentResponse(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            Instant createdAt,
+            Instant confirmedAt,
+            UUID confirmedBy,
+            String confirmedByName,
+            List<AppointmentRescheduleHistoryResponse> rescheduleHistories
+    ) {
+        this(id, appointmentCode, patientId, doctorId, startTime, endTime, status,
+                reason, cancelReason, checkedInAt, completedAt, createdAt, confirmedAt,
+                confirmedBy, confirmedByName, rescheduleHistories != null ? rescheduleHistories : List.of(), null);
     }
 }
