@@ -22,6 +22,8 @@ public interface MedicineBatchRepository {
 
     List<MedicineBatch> findByMedicineId(UUID medicineId);
 
+    List<MedicineBatch> findByMedicineIdIn(Collection<UUID> medicineIds);
+
     Optional<MedicineBatch> findByMedicineIdAndBatchNumber(UUID medicineId, String batchNumber);
 
     List<MedicineBatch> findAvailableByMedicineId(UUID medicineId, LocalDate today);

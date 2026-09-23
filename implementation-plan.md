@@ -1,170 +1,331 @@
-# KẾ HOẠCH TRIỂN KHAI KHẮC PHỤC BÁO CÁO REVIEW NCL-07-CN-008
+# KẾ HOẠCH TRIỂN KHAI BACKEND: DỰ TRÙ MUA THUỐC VÀ PHIẾU ĐẶT HÀNG (NCL-06-CN-012)
 
-## Giảm giá và miễn phí có phê duyệt (Invoice Discount & Free Approval Workflow)
-
-> **Phân hệ:** `NCL-07` — Thu ngân và Xuất hóa đơn  
-> **User Story:** `NCL-07-CN-008` — Giảm giá và miễn phí có phê duyệt  
-> **Quy tắc nghiệp vụ liên quan:** `QTN-37` — Kiểm soát giảm giá / miễn phí và Tách biệt trách nhiệm (Separation of Duties - SoD), `QTN-09` — Điều chỉnh hóa đơn có vết / Bất biến chứng từ  
-> **Acceptance Criteria:** `NCL-07-CN-008-TC-01`, `TC-02`, `TC-03`, `TC-04`  
-> **Nhánh thực hiện:** `feature/approve-discount-and-free`  
-> **Vai trò phê chuẩn:** Tech Lead  
+> **Phân hệ (Epic):** `NCL-06` — Quản lý kho thuốc và cấp phát  
+> **User Story:** `NCL-06-CN-012` — Dự trù mua thuốc và phiếu đặt hàng  
+> **Quy tắc nghiệp vụ liên quan:** `QTN-06` (Không cấp phát vượt tồn kho), `QTN-01` (Phân quyền truy cập theo vai trò), `QTN-31` (Ghi nhật ký thao tác quản trị & kiểm toán), Quy tắc Phân tách nhiệm vụ (Separation of Duties - SoD), Quy tắc Bất biến chứng từ (Immutability)  
+> **Tiêu chí chấp nhận (AC):** `NCL-06-CN-012-TC-01`, `NCL-06-CN-012-TC-02`, `NCL-06-CN-012-TC-03`  
+> **Nhiệm vụ liên quan (Tasks):** `NCL-06-CN-012-CV-01` đến `NCL-06-CN-012-CV-05`  
+> **Phạm vi:** Phân tích toàn diện và lập kế hoạch kỹ thuật cho Backend; chưa triển khai code; không thay đổi Frontend.
 
 ---
 
-## 1. Tóm tắt quyết định
+## 1. Yêu cầu cần người dùng / Tech Lead xem xét và chốt (User Review Required)
 
-### 1.1. Danh sách Finding xử lý và phân loại trạng thái
+> [!IMPORTANT]
+> **Quyết định 1: Công thức thuật toán gợi ý số lượng cần mua (`suggestedQuantity`)**  
+> Trong mô tả User Story: *"Hệ thống gợi ý số lượng cần mua từ tồn hiện tại, tồn tối thiểu và lượng cấp phát kỳ trước, dược sĩ điều chỉnh rồi tạo phiếu dự trù gửi quản lý phòng khám."*  
+> Công thức toán học chuẩn hóa được áp dụng:
+> $$\text{Số lượng gợi ý} = \max\Big(0,\ \big(\text{Lượng cấp phát kỳ trước} + \text{Ngưỡng tồn tối thiểu}\big) - \text{Tồn khả dụng hợp lệ}\Big)$$
+> - **Lượng cấp phát kỳ trước:** Tổng lượng thuốc đã cấp phát trong chu kỳ tham chiếu (mặc định 30 ngày gần nhất, hoặc khoảng thời gian từ ngày `from` đến ngày `to` do Dược sĩ tùy chọn) lấy từ báo cáo cấp phát thuốc (`OperationalReportQueryRepository.findTopDispensedMedicines`).
+> - **Tồn khả dụng hợp lệ (`eligibleStockQuantity`):** Tổng tồn từ các lô thuốc còn hạn sử dụng tính đến ngày tham chiếu (`LowStockEvaluator.calculateEligibleStockQuantity`), thay vì chỉ lấy tổng tồn sổ sách (`stock_quantity`) nhằm tránh tính nhầm các lô thuốc đã hết hạn vào tồn khả dụng.
+> - **Ngưỡng tồn tối thiểu:** Giá trị `min_stock_threshold` đã được cấu hình trên danh mục thuốc (`medicines`) theo story phụ thuộc `NCL-06-CN-007`.
+> - Dược sĩ được toàn quyền điều chỉnh số lượng đề nghị mua (`proposedQuantity`) trước khi gửi phiếu.
 
-| Mã Finding | Phân loại | Mức độ | Trạng thái kỹ thuật | Quyết định xử lý |
-| :--- | :--- | :--- | :--- | :--- |
-| **Finding P0** | Migration Collision | **BLOCKER** | **Đã xác minh** | **Xử lý triệt để:** Hủy merge dở dang, reset branch trên `origin/develop`. Đổi tên migration thành **`V84__create_discount_requests_and_adjust_billing_constraints.sql`**. |
-| **Finding P1** | Scope Contamination | **BLOCKER** | **Đã xác minh** | **Xử lý triệt để (Tách scope):** Reset và cherry-pick commit `b7a812ce` trên đỉnh `origin/develop`. 28 file ngoài phạm vi (Queue Priority) tự động bị loại bỏ khỏi PR diff. |
-| **Finding P1** | Concurrency Race Condition | **BLOCKER** | **Đã xác minh** | **Xử lý triệt để (Phòng vệ 2 tầng):** Dùng `findByIdForUpdate` trên Visit ở tầng use case + STORED Generated Column `active_status` và ràng buộc `UNIQUE (visit_id, active_status)` ở tầng MySQL DB. Bắt `DataIntegrityViolationException` map sang `DiscountAlreadyExistsException` (409 Conflict). |
-| **Finding P2** | Malformed Audit JSON | **MAJOR** | **Đã xác minh** | **Xử lý triệt để:** Bỏ string interpolation `.formatted(...)` trong `CreateDiscountRequestService`, `ApproveDiscountRequestService`, `RejectDiscountRequestService`. Sử dụng `ObjectMapper` để serialize payload audit an toàn, chống injection và lỗi cú pháp JSON. |
-| **Finding P3** | Financial Reporting Semantics | **MINOR** | **Đã xác minh** | **Rà soát & Bổ sung regression tests:** Rà soát query báo cáo doanh thu (`amount_paid`). Bổ sung regression tests kiểm chứng 3 trường hợp: không giảm giá, giảm một phần, và miễn phí 100%. |
-| **Finding P3** | MySQL CHECK Constraint Verification | **MINOR** | **Đã xác minh** | **Bổ sung runtime test MySQL:** Viết test integration chạy với MySQL xác thực dòng hóa đơn âm (`unit_price < 0`, `amount < 0`) và hóa đơn gốc 0 đồng (`total_amount = 0`) thỏa mãn toàn bộ CHECK constraint của MySQL 8.0. |
+> [!WARNING]
+> **Quyết định 2: Quy tắc phân tách trách nhiệm (Separation of Duties - SoD) khi phê duyệt phiếu**  
+> Dược sĩ (`PHARMACIST`) là người lập và gửi duyệt phiếu dự trù. Quản lý phòng khám (`MANAGER`) là người xem xét và phê duyệt (`APPROVED`) hoặc từ chối (`REJECTED`).  
+> Nhằm đảm bảo kiểm soát nội bộ và tính minh bạch tài chính: **Người tạo phiếu tuyệt đối không được phép tự phê duyệt hoặc tự từ chối phiếu dự trù do chính mình lập** (tương tự như quy định phê duyệt giảm giá `QTN-37`). Nếu vi phạm, hệ thống ném ngoại lệ `SelfProcurementApprovalNotAllowedException` và trả về mã lỗi `403 Forbidden`.
 
-### 1.2. Danh sách conflict đã hợp nhất khi đồng bộ `origin/develop`
+> [!NOTE]
+> **Quyết định 3: Mã phiếu định danh và Tính bất biến của chứng từ**  
+> - Mã phiếu dự trù mua thuốc được cấp tự động theo mẫu chuẩn hóa: `DT` + 6 chữ số tuần tự (ví dụ: `DT000001`, `DT000002`...) thông qua bảng chuỗi số nguyên tử `medication_procurement_code_sequences` với cơ chế `LAST_INSERT_ID()`.
+> - Khi phiếu ở trạng thái kết thúc `APPROVED` (Đã duyệt) hoặc `REJECTED` (Đã từ chối): Toàn bộ thông tin dòng thuốc, số lượng và thông tin phê duyệt sẽ trở thành **bất biến** (ném lỗi `409 Conflict` nếu cố tình sửa hoặc hủy).
 
-| STT | File xung đột | Nguyên nhân xung đột | Phương án xử lý thống nhất |
-| :---: | :--- | :--- | :--- |
-| 1 | `BillingAccessDeniedAuditWriter.java` | HEAD có `recordAccessDenied` (generic). Develop có `writePaymentDenied` (dùng `ObjectMapper`). | **Hợp nhất:** Giữ cả 2 method, chuẩn hóa `recordAccessDenied` dùng `ObjectMapper` và `Propagation.REQUIRES_NEW` để audit SoD discount không bị rollback khi ném ngoại lệ. |
-| 2 | `RecordPaymentService.java` | HEAD có chặn pending discount và nạp approved discount. Develop có hỗ trợ nhiều phương thức thanh toán (`PaymentMethodItem`). | **Hợp nhất:** Giữ nguyên hỗ trợ nhiều phương thức thanh toán của develop; đồng thời nạp `discountAmount`, `discountRequestId` từ discount đã duyệt vào `Payment.record(...)`. Hỗ trợ các constructor overload an toàn với fallback `NO_OP_DISCOUNT_REPO`. |
-| 3 | `ResourceType.java` | HEAD thêm `DISCOUNT_REQUEST`. Develop thêm `PATIENT_IMPORT`. | **Hợp nhất:** Giữ cả 2 giá trị enum trong `ResourceType`. |
-| 4 | `Payment.java` | HEAD thêm `discountAmount`, `discountRequestId`. Develop thêm `paymentMethodItems`. | **Hợp nhất:** Entity `Payment` hỗ trợ cả hai. `validateAmountPaid` kiểm tra `amountPaid = max(0, totalAmount - discountAmount)`. Cung cấp đầy đủ các constructor overload để giữ tương thích ngược. |
-| 5 | `InvoiceResult.java` | HEAD thêm discount fields. Develop thêm `PaymentDetailResult payment`. | **Hợp nhất:** Record chứa đủ cả `discountAmount`, `discountRequestId` và `PaymentDetailResult payment`. |
-| 6 | `PaymentResult.java` | HEAD thêm discount fields. Develop thêm `paymentMethods` list. | **Hợp nhất:** Record chứa đủ cả `discountAmount`, `discountRequestId` và `List<PaymentMethodItemResult> paymentMethods`. |
-
----
-
-## 2. Kế hoạch triển khai theo thứ tự (Dependency Order)
-
-### Bước 1: Tầng Domain & Port Layer (Xử lý Finding P1, P3)
-*   **Mục tiêu:** Hợp nhất các thuộc tính giảm giá (`discountAmount`, `discountRequestId`) và thanh toán đa phương thức (`paymentMethodItems`) vào Entity `Payment` và các DTO Results; chuẩn hóa các ngoại lệ domain.
-*   **Finding / AC / BR liên quan:** Finding P1, Finding P3; Tiêu chí chấp nhận `NCL-07-CN-008-TC-01`, `TC-02`; Quy tắc `QTN-37`.
-*   **Module / File thay đổi:**
-    *   `com.benhsoan.domain.auditlog.enums.ResourceType`: Giữ cả `DISCOUNT_REQUEST` và `PATIENT_IMPORT`.
-    *   `com.benhsoan.domain.billing.Payment`: Hợp nhất `discountAmount`, `discountRequestId` và `paymentMethodItems`. Cung cấp các constructor overload cho `record(...)` và `restore(...)` hỗ trợ các bài test cũ lẫn mới.
-    *   `com.benhsoan.port.dto.result.InvoiceResult`: Bổ sung `BigDecimal discountAmount`, `UUID discountRequestId`, `PaymentDetailResult payment`.
-    *   `com.benhsoan.port.dto.result.PaymentResult`: Bổ sung `BigDecimal discountAmount`, `UUID discountRequestId`, `List<PaymentMethodItemResult> paymentMethods`.
-*   **Tiêu chí hoàn thành có thể kiểm chứng:** `PaymentTest` pass 100% các kịch bản.
+> [!NOTE]
+> **Quyết định 4: Xử lý hiệu năng truy vấn phân trang danh sách phiếu (N+1 Query Issue)**  
+> Hiện tại trong `MedicationProcurementPlanRepositoryAdapter.findAll`, sau khi truy vấn trang các `MedicationProcurementPlanEntity`, adapter đang gọi thêm `jpaItemRepository.findByPlanIdOrderByCreatedAtAsc(planEntity.getId())` cho từng bản ghi. Với API danh sách tóm tắt (`GET /inventory/procurements`), toàn bộ thông tin thống kê (`totalItems`, `totalProposedQuantity`, `totalApprovedQuantity`) đã có sẵn trên bảng cha `medication_procurement_plans`. Cần tối ưu để không tải chi tiết item khi chỉ hiển thị danh sách tóm tắt.
 
 ---
 
-### Bước 2: Tầng Database Migration (Xử lý Finding P0, P1, P3)
-*   **Mục tiêu:** Đổi số hiệu migration từ V78 sang **`V84`**; bổ sung cột ảo `active_status` (`STORED`) và ràng buộc duy nhất chống tạo trùng discount đang chờ/đã duyệt; nới lỏng CHECK constraints cho phép dòng discount âm và hóa đơn 0 đồng.
-*   **Module / File thay đổi:**
-    *   Xóa: `backend/src/main/resources/db/migration/V78__create_discount_requests_and_adjust_billing_constraints.sql`.
-    *   Tạo mới: `backend/src/main/resources/db/migration/V84__create_discount_requests_and_adjust_billing_constraints.sql`.
-*   **Nội dung DDL cụ thể:**
-    1.  Tạo bảng `discount_requests` với cột `active_status VARCHAR(20) GENERATED ALWAYS AS (CASE WHEN status IN ('PENDING', 'APPROVED') THEN 'ACTIVE' ELSE NULL END) STORED` và `CONSTRAINT uk_discount_requests_active_visit UNIQUE (visit_id, active_status)`.
-    2.  Bảng `payments`: Thêm `discount_amount`, `discount_request_id`; sửa `chk_payments_amount_match` thành `CHECK (amount_paid = total_amount - discount_amount)`.
-    3.  Bảng `invoices`: Thêm `discount_amount`, `discount_request_id`; sửa `chk_invoices_original_shape` thành `CHECK (total_amount >= 0 ...)`.
-    4.  Bảng `invoice_lines`: Mở rộng `chk_invoice_lines_type` thêm `'DISCOUNT'`; sửa `chk_invoice_lines_amounts` cho phép dòng `DISCOUNT` có `unit_price <= 0` và `amount <= 0`.
-*   **Tiêu chí hoàn thành có thể kiểm chứng:** `mvn test-compile` thành công, kiểm thử Flyway MySQL pass.
+## 2. Phân tích chi tiết yêu cầu nghiệp vụ và các điều kiện áp dụng
+
+### 2.1. Phân tích vai trò và ma trận phân quyền (Roles & Permissions)
+
+Căn cứ theo sheet `User Roles (Vai trò)` và `Product Backlog`:
+* **Dược sĩ (`VT-04` - `PHARMACIST`):**
+  - **Mục tiêu:** Quản lý kho thuốc, cấp phát thuốc đúng đơn và kiểm soát tồn kho không bị đứt gãy.
+  - **Quyền hạn cấp:**
+    - `MEDICATION_PROCUREMENT_READ`: Xem gợi ý số lượng cần mua, xem danh sách và chi tiết phiếu dự trù.
+    - `MEDICATION_PROCUREMENT_CREATE`: Lập phiếu dự trù mới (lưu nháp `DRAFT` hoặc gửi duyệt `PENDING_APPROVAL`), cập nhật phiếu nháp, gửi duyệt (`SUBMIT`), hủy phiếu (`CANCEL`).
+* **Quản lý phòng khám (`VT-01` - `MANAGER`):**
+  - **Mục tiêu:** Điều hành phòng khám, theo dõi vận hành, cân đối ngân sách và phê duyệt mua sắm.
+  - **Quyền hạn cấp:**
+    - `MEDICATION_PROCUREMENT_READ`: Xem danh sách toàn bộ phiếu dự trù của kho, xem chi tiết từng dòng thuốc và lịch sử tiêu thụ.
+    - `MEDICATION_PROCUREMENT_APPROVE`: Phê duyệt phiếu dự trù (`APPROVED`), điều chỉnh số lượng duyệt từng thuốc nếu cần, hoặc từ chối (`REJECTED` kèm lý do bắt buộc $\ge 5$ ký tự).
+* **Quản trị viên (`VT-05` - `ADMIN`):**
+  - Toàn quyền (`MEDICATION_PROCUREMENT_READ`, `MEDICATION_PROCUREMENT_CREATE`, `MEDICATION_PROCUREMENT_APPROVE`). Tuy nhiên vẫn bị ràng buộc bởi quy tắc SoD (nếu Admin là người tạo phiếu thì Admin đó không được tự duyệt phiếu của mình).
+* **Lễ tân (`VT-03` - `RECEPTIONIST`) & Bác sĩ (`VT-02` - `DOCTOR`) & Bệnh nhân (`PATIENT`):**
+  - Hoàn toàn **không có quyền** can thiệp vào quy trình dự trù và mua thuốc. Khi cố tình gọi API sẽ bị từ chối truy cập với lỗi `403 Forbidden` và hệ thống tự động ghi nhận nhật ký kiểm toán `ACCESS_DENIED` (`TC-03`).
+
+### 2.2. Điều kiện tiên quyết (Preconditions)
+* Danh mục thuốc (`medicines`) đã được khởi tạo, có trạng thái hoạt động (`active = true`), có cấu hình ngưỡng tồn tối thiểu (`min_stock_threshold` theo `NCL-06-CN-007`).
+* Đã có dữ liệu tồn kho thực tế (`stock_quantity`) và các lô thuốc (`medicine_batches`) để tính toán tồn kho khả dụng còn hạn dùng.
+* Đã có lịch sử cấp phát thuốc của ít nhất một kỳ tham chiếu ghi nhận trong `prescription_dispense_items` hoặc thông qua module báo cáo vận hành (`findTopDispensedMedicines` theo `NCL-08-CN-006` / `NCL-06-CN-003`).
+
+### 2.3. Tiêu chí chấp nhận (Acceptance Criteria)
+* **`NCL-06-CN-012-TC-01` (Luồng gợi ý số lượng thành công):**
+  - *Given:* Có thuốc dưới ngưỡng tồn tối thiểu và có lịch sử cấp phát kỳ trước.
+  - *When:* Dược sĩ mở chức năng dự trù mua thuốc (`GET /inventory/procurements/suggestions`).
+  - *Then:* Hệ thống trả về gợi ý số lượng cần mua cho từng thuốc kèm thông tin tồn hiện tại, tồn tối thiểu, lượng cấp phát kỳ trước và số lượng gợi ý.
+  - *Test Data:* Tồn hiện tại, tồn tối thiểu, lượng cấp phát kỳ trước.
+* **`NCL-06-CN-012-TC-02` (Luồng gửi phiếu dự trù chờ duyệt thành công):**
+  - *Given:* Dược sĩ đã điều chỉnh số lượng đề nghị mua theo nhu cầu thực tế.
+  - *When:* Dược sĩ gửi phiếu dự trù (`POST /inventory/procurements` với `submitImmediately=true` hoặc `POST /inventory/procurements/{id}/submit`).
+  - *Then:* Phiếu được tạo/chuyển trạng thái sang `PENDING_APPROVAL` (Chờ duyệt) và hiển thị trên danh sách chờ duyệt của Quản lý phòng khám.
+  - *Test Data:* Phiếu dự trù, danh sách thuốc và số lượng đề nghị.
+* **`NCL-06-CN-012-TC-03` (Bảo mật & Từ chối quyền Lễ tân):**
+  - *Given:* Người đăng nhập là lễ tân (`RECEPTIONIST`).
+  - *When:* Mở chức năng / gọi bất kỳ API nào của dự trù mua thuốc.
+  - *Then:* Hệ thống từ chối truy cập (HTTP 403 Forbidden) và tự động ghi nhận nhật ký kiểm toán `ACCESS_DENIED`.
+  - *Test Data:* Tài khoản lễ tân.
+
+### 2.4. Quy tắc nghiệp vụ áp dụng (Business Rules)
+* **`QTN-06` (Không cấp phát vượt tồn kho):** Việc lập dự trù và mua thuốc đúng số lượng giúp kho luôn duy trì cơ số thuốc trên mức tồn tối thiểu, phòng tránh tình trạng cạn kiệt thuốc khi cấp phát cho bệnh nhân.
+* **`QTN-01` (Phân quyền truy cập theo vai trò):** Mỗi vai trò chỉ truy cập đúng phạm vi chức năng được phép. Kiểm soát nghiêm ngặt bằng Spring Security kết hợp `@RequirePermission`.
+* **`QTN-31` (Ghi nhật ký thao tác quản trị & kiểm toán):** Mọi hành động làm thay đổi dữ liệu phiếu (tạo mới, cập nhật, gửi duyệt, phê duyệt, từ chối, hủy) đều phải ghi nhật ký kiểm toán với snapshot JSON trước/sau, định danh người thực hiện và thời gian chính xác.
+* **Quy tắc Phân tách nhiệm vụ (Separation of Duties - SoD):** Người tạo phiếu không được tự phê duyệt hoặc từ chối phiếu của chính mình.
+* **Quy tắc Bất biến chứng từ (Data Immutability):** Phiếu sau khi đã `APPROVED` hoặc `REJECTED` thì không được phép chỉnh sửa hoặc xóa/hủy.
 
 ---
 
-### Bước 3: Tầng Persistence Layer (Xử lý Finding P1)
-*   **Mục tiêu:** Bổ sung phương thức pessimistic lock `findByIdForUpdate`; bắt `DataIntegrityViolationException` khi vi phạm unique index và map sang `DiscountAlreadyExistsException` (409 Conflict).
-*   **Module / File thay đổi:**
-    *   `com.benhsoan.persistence.jpaRepository.billing.JpaDiscountRequestRepository`: Bổ sung `@Lock(LockModeType.PESSIMISTIC_WRITE) Optional<DiscountRequestEntity> findByIdForUpdate(@Param("id") UUID id);`.
-    *   `com.benhsoan.persistence.adapterRepository.billing.DiscountRequestRepositoryAdapter`: Bọc `save()` trong try-catch `DataIntegrityViolationException` chuyển đổi thành `DiscountAlreadyExistsException(visitId)`.
-    *   `com.benhsoan.persistence.mapper.billing.PaymentPersistenceMapper`: Ánh xạ đầy đủ trường dữ liệu.
+## 3. Rà soát Codebase hiện tại (As-Is Architecture Review)
+
+Mô hình kiến trúc tổng thể của luồng dự trù mua thuốc trong backend hiện nay:
+
+```mermaid
+flowchart TD
+    Client([Client / Frontend])
+    
+    subgraph Inbound_Adapter["Inbound Adapter (REST & Security)"]
+        Controller["MedicationProcurementController\n(/inventory/procurements)"]
+        Aspect["RequirePermissionAspect\n(@RequirePermission)"]
+        RestMapper["MedicationProcurementRestMapper"]
+    end
+
+    subgraph Application_Layer["Application Use Cases & Services"]
+        SugService["GetMedicationProcurementSuggestionService"]
+        Calculator["MedicationProcurementSuggestionCalculator"]
+        CreateService["CreateMedicationProcurementPlanService"]
+        UpdateService["UpdateMedicationProcurementPlanService"]
+        ApproveService["ApproveMedicationProcurementPlanService"]
+        RejectService["RejectMedicationProcurementPlanService"]
+        GetService["GetMedicationProcurementPlanService"]
+        ListService["ListMedicationProcurementPlansService"]
+        ResultMapper["MedicationProcurementResultMapper"]
+    end
+
+    subgraph Domain_Layer["Domain Core"]
+        Plan["MedicationProcurementPlan\n(Aggregate Root)"]
+        Item["MedicationProcurementItem\n(Entity)"]
+        StatusEnum["ProcurementPlanStatus\n(DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED)"]
+        DomainExceptions["Domain Exceptions\n(SelfProcurementApproval, DuplicateMedicine, NotFound, InvalidStatus)"]
+    end
+
+    subgraph Outbound_Adapter["Outbound Adapters & Persistence"]
+        PlanRepoAdapter["MedicationProcurementPlanRepositoryAdapter"]
+        SeqRepoAdapter["MedicationProcurementCodeSequenceRepositoryAdapter"]
+        CodeGenerator["DatabaseMedicationProcurementCodeGenerator"]
+        AuditAdapter["AuditLogRepositoryAdapter"]
+        EligibleStock["EligibleStockSnapshotService"]
+        ReportQuery["OperationalReportQueryRepository"]
+    end
+
+    subgraph Database["MySQL Database 8.x"]
+        DB_Plans[("medication_procurement_plans")]
+        DB_Items[("medication_procurement_items")]
+        DB_Seq[("medication_procurement_code_sequences")]
+        DB_Audit[("audit_logs")]
+    end
+
+    Client --> Controller
+    Controller --> Aspect
+    Controller --> RestMapper
+    Controller --> Application_Layer
+    
+    SugService --> Calculator
+    SugService --> EligibleStock
+    SugService --> ReportQuery
+    
+    CreateService --> Plan
+    CreateService --> CodeGenerator
+    CreateService --> PlanRepoAdapter
+    CreateService --> AuditAdapter
+
+    ApproveService --> Plan
+    ApproveService --> PlanRepoAdapter
+    ApproveService --> AuditAdapter
+
+    RejectService --> Plan
+    RejectService --> PlanRepoAdapter
+    RejectService --> AuditAdapter
+
+    UpdateService --> Plan
+    UpdateService --> PlanRepoAdapter
+
+    PlanRepoAdapter --> DB_Plans
+    PlanRepoAdapter --> DB_Items
+    SeqRepoAdapter --> DB_Seq
+    AuditAdapter --> DB_Audit
+```
+
+### Chi tiết các tầng trong Codebase:
+
+1. **Controller Layer:**
+   - `MedicationProcurementController.java` tại `com.benhsoan.adapter.inbound.rest.controller`
+   - Định tuyến chuẩn: `/inventory/procurements`
+   - Đầy đủ 9 API endpoints quản trị vòng đời phiếu.
+2. **Request / Mapper Layer:**
+   - DTOs: `CreateProcurementPlanRequest.java`, `UpdateProcurementPlanRequest.java`, `ApproveProcurementPlanRequest.java`, `RejectProcurementPlanRequest.java`, `CreateProcurementPlanItemRequest.java`.
+   - `MedicationProcurementRestMapper.java` ánh xạ Request/Response DTO với Command/Result.
+3. **Use Case / Service Layer:**
+   - Đầy đủ 7 Use Case interfaces và Service implementations tương ứng trong `com.benhsoan.application.ucservice.inventory`.
+   - Đã tích hợp logic tính gợi ý, SoD check, Audit log.
+4. **Domain Layer:**
+   - `MedicationProcurementPlan.java`: State machine đóng gói chặt chẽ các hành động `createDraft`, `createAndSubmit`, `submit`, `approve`, `reject`, `cancel`, `update`.
+   - `MedicationProcurementItem.java`: Dòng thuốc chi tiết.
+   - Các exception nghiệp vụ: `ProcurementPlanNotFoundException`, `ProcurementPlanInvalidStatusException`, `ProcurementPlanEmptyItemsException`, `ProcurementPlanDuplicateMedicineException`, `SelfProcurementApprovalNotAllowedException`.
+5. **Persistence / Database Layer:**
+   - `V87__create_medication_procurement_tables.sql`: Đầy đủ DDL, index, CHECK constraints, sequence table, seed permissions và gán role.
+   - JPA Entities: `MedicationProcurementPlanEntity`, `MedicationProcurementItemEntity`.
+   - Repositories & Adapters: `JpaMedicationProcurementPlanRepository`, `JpaMedicationProcurementItemRepository`, `MedicationProcurementPlanRepositoryAdapter`, `MedicationProcurementCodeSequenceRepositoryAdapter`.
+6. **Security & Audit:**
+   - Quyền: `MEDICATION_PROCUREMENT_READ`, `MEDICATION_PROCUREMENT_CREATE`, `MEDICATION_PROCUREMENT_APPROVE`.
+   - `RequirePermissionAspect` xử lý bắt quyền và tự động ghi log `ACCESS_DENIED`.
+   - Các service ghi nhận JSON audit log đầy đủ khi `CREATE`, `UPDATE`, `SUBMIT`, `CANCEL`, `APPROVE`, `REJECT`.
+7. **Test Layer:**
+   - Đã có 27 tests tự động bao phủ Unit và Security Integration, đều chạy thành công 100%.
 
 ---
 
-### Bước 4: Tầng Application & Use Cases (Xử lý Finding P1, P2, SoD)
-*   **Mục tiêu:** Khóa lượt khám chống race condition, chuẩn hóa ghi nhật ký kiểm toán bằng JSON với `ObjectMapper`, ngăn chặn vi phạm SoD tự duyệt và ghi nhận log `ACCESS_DENIED` độc lập qua `REQUIRES_NEW`.
-*   **Module / File thay đổi:**
-    *   `BillingAccessDeniedAuditWriter`: `@Transactional(propagation = Propagation.REQUIRES_NEW)` và tuần tự hóa JSON bằng `ObjectMapper`.
-    *   `CreateDiscountRequestService`: Khóa `visitRepository.findByIdForUpdate(visitId)` trong transaction; dùng `ObjectMapper`.
-    *   `ApproveDiscountRequestService`: Kiểm tra SoD tự duyệt; dùng `ObjectMapper`.
-    *   `RejectDiscountRequestService`: Kiểm tra SoD tự từ chối; dùng `ObjectMapper`.
-    *   `RecordPaymentService`: Chặn thanh toán khi pending discount; nạp approved discount vào payment; hỗ trợ thanh toán đa phương thức.
-    *   `CreateInvoiceService`: Chặn hóa đơn khi pending discount; sinh dòng `InvoiceLine` loại `DISCOUNT` với giá trị âm.
+## 4. Đối chiếu giữa Workbook và Codebase hiện có (Gap Analysis)
+
+| Hạng mục | Trong Workbook (`project-workbook.xlsx`) | Trong Codebase hiện tại | Đánh giá & Khoảng hở (Gap) |
+| :--- | :--- | :--- | :--- |
+| **Gợi ý mua thuốc (`TC-01`)** | Hệ thống gợi ý số lượng cần mua từ tồn hiện tại, tồn tối thiểu và lượng cấp phát kỳ trước. | Đã có `GetMedicationProcurementSuggestionService` và `MedicationProcurementSuggestionCalculator` kết hợp `EligibleStockSnapshotService` và `OperationalReportQueryRepository`. | **Đã đáp ứng đầy đủ.** |
+| **Lập & Gửi duyệt phiếu (`TC-02`)** | Dược sĩ điều chỉnh số lượng đề nghị, gửi phiếu dự trù chuyển sang chờ duyệt và quản lý phòng khám nhận được. | Đã có `CreateMedicationProcurementPlanService` (`createAndSubmit`) và `UpdateMedicationProcurementPlanService` (`submit`), mã sinh tự động `DTxxxxxx`. | **Đã đáp ứng đầy đủ.** |
+| **Bảo mật & Chặn Lễ tân (`TC-03`)** | Lễ tân mở chức năng dự trù mua thuốc -> Hệ thống từ chối truy cập và ghi nhật ký kiểm toán. | Đã có `@RequirePermission` chặn 403 Forbidden, `RequirePermissionAspect` tự động ghi log `ACCESS_DENIED`. Kiểm thử tự động `MedicationProcurementSecurityIntegrationTest` đã pass. | **Đã đáp ứng đầy đủ.** |
+| **Phê duyệt / Từ chối** | Quản lý phòng khám duyệt hoặc từ chối phiếu. | Đã có `ApproveMedicationProcurementPlanService` và `RejectMedicationProcurementPlanService` với SoD check. | **Đã đáp ứng đầy đủ.** |
+| **Tài liệu Hợp đồng API (API Contract)** | Chuẩn hóa tài liệu API cho frontend và kiểm thử. | Hiện tại **chưa có** file tài liệu `medication-procurement-contract.md` trong thư mục `docs/api/`. | **Còn thiếu:** Cần tạo tài liệu đặc tả API chuẩn theo conventions dự án. |
+| **Tài liệu Ma trận phân quyền** | Quản lý phân quyền hệ thống (`docs/permission-matrix.md`). | Chưa cập nhật 3 permission mới của phân hệ dự trù mua thuốc vào ma trận quyền. | **Còn thiếu:** Cần cập nhật `docs/permission-matrix.md`. |
+| **Tài liệu Database Schema** | Tài liệu kiến trúc CSDL (`dbschemas.md`). | Chưa bổ sung cấu trúc 3 bảng mới vào file `dbschemas.md`. | **Còn thiếu:** Cần cập nhật `dbschemas.md`. |
+| **Tài liệu Quy trình vận hành** | Tài liệu quy trình luồng kho (`docs/backend-invoice-pharmacy-clinical-workflows.md`). | Chưa bổ sung mô tả luồng dự trù thuốc vào tài liệu tổng hợp quy trình. | **Còn thiếu:** Cần cập nhật tài liệu workflows. |
+| **Validation DTO tầng REST** | Kiểm tra dữ liệu đầu vào chuẩn xác, thông báo 100% Tiếng Việt. | `CreateProcurementPlanRequest` chưa có `@NotNull` trên `periodStartDate`, `periodEndDate`. | **Cần cải thiện:** Bổ sung validation DTO để trả về lỗi 400 sớm và nhất quán. |
+| **Hiệu năng truy vấn phân trang** | Danh sách tóm tắt phiếu dự trù. | `MedicationProcurementPlanRepositoryAdapter.findAll` đang load thừa items con, gây N+1 queries. | **Rủi ro kỹ thuật:** Cần tối ưu để chỉ load các trường summary từ bảng cha. |
 
 ---
 
-### Bước 5: Tầng Adapter Inbound & REST Mappers (Xử lý Finding P1, P2)
-*   **Mục tiêu:** Ánh xạ mã lỗi HTTP chuẩn: `403` cho SoD, `409` cho Pending/Duplicate discount, `400` cho vượt quá tổng tiền.
-*   **Module / File thay đổi:**
-    *   `DomainExceptionHttpStatusMapper`: Cập nhật ánh xạ cho các domain exception mới.
-    *   `BillingRestMapper`: Hợp nhất mapper đầy đủ.
+## 5. Xác định cụ thể các công việc Backend cần thực hiện
+
+### 5.1. Tài liệu kiến trúc & Hợp đồng API (`docs/`)
+1. **[NEW] `docs/api/medication-procurement-contract.md`**:
+   - Đặc tả chi tiết 9 API endpoints: URL, HTTP Method, Required Permission, Request Headers, Query Parameters, Request Body mẫu, Response Body mẫu (200, 201, 204), Error Responses (400, 401, 403, 404, 409).
+   - Mô tả vòng đời trạng thái phiếu và quy tắc phân tách nhiệm vụ (SoD).
+2. **[MODIFY] `docs/permission-matrix.md`**:
+   - Bổ sung nhóm quyền `INVENTORY` gồm 3 mã quyền: `MEDICATION_PROCUREMENT_READ`, `MEDICATION_PROCUREMENT_CREATE`, `MEDICATION_PROCUREMENT_APPROVE` ánh xạ tới các vai trò `PHARMACIST`, `MANAGER`, `ADMIN`.
+3. **[MODIFY] `dbschemas.md`**:
+   - Bổ sung định nghĩa cấu trúc 3 bảng: `medication_procurement_plans`, `medication_procurement_items`, `medication_procurement_code_sequences`.
+4. **[MODIFY] `docs/backend-invoice-pharmacy-clinical-workflows.md`**:
+   - Bổ sung sơ đồ quy trình nghiệp vụ dự trù mua thuốc và đặt hàng.
+
+### 5.2. Tinh chỉnh Validation & Inbound DTOs
+1. **[MODIFY] `CreateProcurementPlanRequest.java`**:
+   - Bổ sung validation annotations thuần 100% Tiếng Việt:
+     - `@NotNull(message = "Ngày bắt đầu kỳ tham chiếu không được để trống.")`
+     - `@NotNull(message = "Ngày kết thúc kỳ tham chiếu không được để trống.")`
+
+### 5.3. Tối ưu hóa tầng Persistence Adapter
+1. **[MODIFY] `MedicationProcurementPlanRepositoryAdapter.java`**:
+   - Tối ưu hóa phương thức `findAll`: Tránh N+1 query bằng cách map trực tiếp sang `MedicationProcurementPlan` với danh sách items rỗng khi phục vụ query danh sách tóm tắt, hoặc cung cấp phương thức chuyên biệt `findSummaries`.
+
+### 5.4. Kiểm thử bổ sung (Additional Test Coverage)
+1. Bổ sung các test cases kiểm thử validation DTO ngày tháng khi nhận giá trị `null` hoặc ngày kết thúc trước ngày bắt đầu.
+2. Kiểm tra hồi quy toàn bộ hệ thống (`mvn clean test`).
 
 ---
 
-### Bước 6: Git Cherry-pick/Rebase & Scope Cleanup (Xử lý Finding P1 Blocker)
-*   **Mục tiêu:** Loại bỏ hoàn toàn 28 file queue priority thuộc NCL-03-CN-013 khỏi diff so sánh với `origin/develop`.
-*   **Thao tác thực hiện:** Đã reset và cherry-pick commit `b7a812ce` trên đỉnh `origin/develop`, giải quyết sạch 6 conflict. Diff hiện tại chỉ còn duy nhất 64 file thuộc phạm vi thanh toán và giảm giá.
+## 6. Kế hoạch triển khai theo từng giai đoạn (Dependency Ordered Phases)
+
+### Giai đoạn 1: Hoàn thiện Tài liệu kiến trúc, API Contract và Database Schema
+* **Mục tiêu:** Cung cấp đầy đủ tài liệu đặc tả API chuẩn hóa, cập nhật ma trận phân quyền, database schema và tài liệu quy trình vận hành làm căn cứ tích hợp cho toàn đội ngũ.
+* **File/Layer tác động:**
+  - `docs/api/medication-procurement-contract.md` [NEW]
+  - `docs/permission-matrix.md` [MODIFY]
+  - `dbschemas.md` [MODIFY]
+  - `docs/backend-invoice-pharmacy-clinical-workflows.md` [MODIFY]
+* **Quy tắc nghiệp vụ đảm bảo:**
+  - 100% Tiếng Việt trong toàn bộ mô tả lỗi, giải thích tham số và quy định nghiệp vụ.
+  - Phản ánh trung thực API contract hiện có và các mã quyền đã thiết lập trong migration `V87`.
+* **Tiêu chí verify/test:**
+  - Kiểm tra markdown format, liên kết file và tính đầy đủ của các bảng đặc tả.
 
 ---
 
-### Bước 7: Bổ sung và chạy Suite Kiểm thử Tự động Toàn diện
-*   **Mục tiêu:** Cung cấp đầy đủ bằng chứng kiểm thử tự động (test evidence) cho toàn bộ các finding và acceptance criteria.
-*   **Kế hoạch chạy test:**
-    ```bash
-    mvn test -Dtest=DiscountRequest*Test,RecordPaymentServiceTest,CreateDiscountRequestServiceTest,ApproveDiscountRequestServiceTest,RejectDiscountRequestServiceTest,PaymentTest,InvoiceTest,BillingAccessDeniedAuditWriterTest
-    ```
+### Giai đoạn 2: Tinh chỉnh Validation tầng Inbound REST & DTOs
+* **Mục tiêu:** Đảm bảo tất cả các trường dữ liệu bắt buộc của yêu cầu tạo phiếu dự trù được validate chặt chẽ ở tầng REST trước khi đi vào tầng Domain, thông báo lỗi thuần Tiếng Việt.
+* **File/Layer tác động:**
+  - `com.benhsoan.adapter.inbound.rest.request.inventory.CreateProcurementPlanRequest` [MODIFY]
+* **Quy tắc nghiệp vụ đảm bảo:**
+  - Tuân thủ quy chuẩn Tiếng Việt 100%: `@NotNull(message = "Ngày bắt đầu kỳ tham chiếu không được để trống.")`, `@NotNull(message = "Ngày kết thúc kỳ tham chiếu không được để trống.")`.
+* **Tiêu chí verify/test:**
+  - Chạy `mvn test-compile` thành công.
+  - Viết Unit test xác nhận gửi request thiếu ngày bắt đầu/kết thúc trả về `400 Bad Request` với message tiếng Việt rõ ràng.
 
 ---
 
-## 3. Thiết kế chi tiết cho từng finding
-
-### 3.1. Thiết kế xử lý Finding P0: Flyway Migration Collision
-- Nhánh `origin/develop` đã có migration từ `V78` đến `V83`.
-- Đổi migration của tính năng thành **`V84__create_discount_requests_and_adjust_billing_constraints.sql`**.
-
-### 3.2. Thiết kế xử lý Finding P1: Scope Contamination & Race Condition
-- **Scope:** Cherry-pick trên `origin/develop` đã tự động làm sạch 28 file queue.
-- **Race Condition:**
-  - *Tầng 1 (Java):* `visitRepository.findByIdForUpdate(visitId)` khóa dòng lượt khám trong transaction.
-  - *Tầng 2 (Database):* Cột `active_status VARCHAR(20) GENERATED ALWAYS AS (CASE WHEN status IN ('PENDING', 'APPROVED') THEN 'ACTIVE' ELSE NULL END) STORED` cùng ràng buộc `CONSTRAINT uk_discount_requests_active_visit UNIQUE (visit_id, active_status)`.
-  - *Tầng 3 (Exception Translation):* Bắt `DataIntegrityViolationException` đổi thành `DiscountAlreadyExistsException` trả về HTTP `409 Conflict`.
-
-### 3.3. Thiết kế xử lý Finding P2: Malformed Audit JSON
-- Inject `ObjectMapper` vào tất cả các service liên quan đến discount và audit writer.
-- Thay thế hoàn toàn chuỗi text block `.formatted(...)` bằng `objectMapper.writeValueAsString(...)`.
-
-### 3.4. Thiết kế xử lý Finding P3: Financial Reporting Semantics & MySQL Constraints
-- `amount_paid = total_amount - discount_amount` là chuẩn mực kế toán chính xác (phản ánh thực thu).
-- Điều chỉnh CHECK constraints trong `V84` để MySQL 8.0 chấp thuận hóa đơn 0 đồng (`total_amount >= 0`) và dòng giảm giá âm (`unit_price <= 0`, `amount <= 0`).
+### Giai đoạn 3: Tối ưu hóa hiệu năng tầng Persistence Adapter (N+1 Query Resolution)
+* **Mục tiêu:** Loại bỏ hoàn toàn vấn đề N+1 query khi phân trang danh sách phiếu dự trù mua thuốc (`GET /inventory/procurements`).
+* **File/Layer tác động:**
+  - `com.benhsoan.persistence.adapterRepository.inventory.MedicationProcurementPlanRepositoryAdapter` [MODIFY]
+* **Quy tắc nghiệp vụ đảm bảo:**
+  - Bảo toàn tính toàn vẹn của dữ liệu phân trang, không làm ảnh hưởng đến các thông tin tóm tắt (`totalItems`, `totalProposedQuantity`, `totalApprovedQuantity`).
+* **Tiêu chí verify/test:**
+  - Chạy test `MedicationProcurementPlanRepositoryAdapterTest` (nếu có) hoặc gọi service `ListMedicationProcurementPlansServiceTest` xác nhận số lượng query thực thi tối giản (chỉ 1 câu `SELECT ... FROM medication_procurement_plans`).
 
 ---
 
-## 4. Ma trận kiểm thử (Test Matrix)
-
-| STT | Mã Test Case | Lớp kiểm thử | Given / When / Then | Finding / AC liên quan |
-| :---: | :--- | :--- | :--- | :--- |
-| **1** | `createDiscountRequest_withSpecialCharacters_serializesValidJson` | Unit Test (`CreateDiscountRequestServiceTest`) | **Given:** Request giảm giá có reason chứa ký tự `"`, `\`, `\n`.<br>**When:** Tạo đề xuất giảm giá.<br>**Then:** Audit log detail là chuỗi JSON hợp lệ, parse được bằng ObjectMapper. | Finding P2 |
-| **2** | `approveDiscountRequest_whenApproverIsRequester_throws403AndAudits` | Unit Test (`ApproveDiscountRequestServiceTest`) | **Given:** Người phê duyệt trùng với người yêu cầu (`actorId.equals(requestedBy)`).<br>**When:** Thực hiện duyệt đề xuất.<br>**Then:** Ném `SelfApprovalNotAllowedException` (403), audit log ghi nhận `ACCESS_DENIED`. | QTN-37 / AC TC-03 |
-| **3** | `rejectDiscountRequest_whenApproverIsRequester_throws403AndAudits` | Unit Test (`RejectDiscountRequestServiceTest`) | **Given:** Người từ chối trùng với người yêu cầu.<br>**When:** Thực hiện từ chối đề xuất.<br>**Then:** Ném `SelfApprovalNotAllowedException` (403), audit log ghi nhận `ACCESS_DENIED`. | QTN-37 / AC TC-03 |
-| **4** | `recordPayment_whenPendingDiscountExists_throws409Conflict` | Unit Test (`RecordPaymentServiceTest`) | **Given:** Lượt khám đang có đề xuất giảm giá ở trạng thái `PENDING`.<br>**When:** Thu ngân cố tình ghi nhận thanh toán.<br>**Then:** Ném `PendingDiscountApprovalException` (HTTP 409 Conflict). | AC TC-01 |
-| **5** | `recordPayment_withApprovedDiscount_calculatesAmountPaidCorrectly` | Unit Test (`RecordPaymentServiceTest`) | **Given:** Viện phí 500.000 VNĐ, có đề xuất giảm giá 100.000 VNĐ đã duyệt.<br>**When:** Thực hiện thanh toán với số tiền 400.000 VNĐ.<br>**Then:** Thành công, `payment.amountPaid == 400.000`, `payment.discountAmount == 100.000`. | AC TC-01 |
-| **6** | `recordPayment_with100PercentFree_recordsZeroAmountPaid` | Unit Test (`PaymentTest`) | **Given:** Lượt khám được duyệt miễn phí 100% (`discountAmount == totalAmount`).<br>**When:** Ghi nhận thanh toán với `amountPaid = 0`.<br>**Then:** Thành công, `amountPaid == 0`, `isRecorded() == true`. | Finding P3 / AC TC-02 |
-| **7** | `createInvoice_withApprovedDiscount_addsNegativeDiscountLine` | Unit Test (`CreateInvoiceServiceTest`) | **Given:** Đề xuất giảm 150.000 VNĐ đã được duyệt.<br>**When:** Xuất hóa đơn cho lượt khám.<br>**Then:** Hóa đơn có dòng `InvoiceLine` loại `DISCOUNT` với `amount == -150.000`, tổng tiền giảm trừ đúng 150.000. | AC TC-01 |
-| **8** | `accessDeniedAuditLog_survivesTransactionRollback` | Integration Test (`BillingAccessDeniedAuditWriterTest`) | **Given:** Transaction nghiệp vụ chính bị rollback do ném ngoại lệ SoD.<br>**When:** `recordAccessDenied` chạy với `Propagation.REQUIRES_NEW`.<br>**Then:** Log kiểm toán `ACCESS_DENIED` vẫn được lưu thành công trong cơ sở dữ liệu. | QTN-37 |
-| **9** | `concurrentCreateDiscountRequests_allowsOnlyOneToSucceed` | Concurrency Test (`CreateDiscountRequestConcurrencyMySqlIntegrationTest`) | **Given:** 1 lượt khám chưa có discount. Bắn đồng thời 2 luồng tạo discount cho cùng `visitId`.<br>**When:** 2 luồng chạy song song qua `CountDownLatch`.<br>**Then:** Đúng 1 luồng thành công (201), 1 luồng nhận lỗi `DiscountAlreadyExistsException` (409 Conflict). Chỉ có duy nhất 1 bản ghi DB. | Finding P1 |
-| **10** | `mysqlFlywayMigrationV84_supportsNegativeDiscountAndZeroTotal` | MySQL Test (`InvoiceDiscountFlywayMySqlIntegrationTest`) | **Given:** Database MySQL 8.4 áp dụng migration `V84`.<br>**When:** Chèn hóa đơn có `total_amount = 0` và dòng `DISCOUNT` có số tiền `-200.000.00`.<br>**Then:** Thực thi thành công, toàn bộ CHECK constraints hợp lệ trên MySQL engine. | Finding P0, P3 |
-| **11** | `revenueQueries_calculateAccuratelyWithDiscounts` | Regression Test (`JpaPaymentRepositoryTest`) | **Given:** Các khoản thu bình thường, có giảm giá, và miễn phí 100%.<br>**When:** Gọi `sumAmountPaidBetween(...)`.<br>**Then:** Doanh thu thực thu khớp chính xác tổng `amount_paid`. | Finding P3 |
-| **12** | `securityIntegration_requiresRoleManagerOrAdminForApproval` | Security Test (`DiscountSecurityIntegrationTest`) | **Given:** User có role `RECEPTIONIST` hoặc `DOCTOR`.<br>**When:** Gọi POST `/invoices/discount-requests/{id}/approve`.<br>**Then:** Trả về HTTP 403 Forbidden. | AC TC-04 |
+### Giai đoạn 4: Kiểm thử toàn diện và Kiểm tra hồi quy (Verification & Regression Testing)
+* **Mục tiêu:** Chạy toàn bộ các bộ kiểm thử unit, integration, security và regression của toàn bộ backend để đảm bảo không có bất kỳ lỗi hồi quy nào.
+* **File/Layer tác động:**
+  - `src/test/java/com/benhsoan/**`
+* **Quy tắc nghiệp vụ đảm bảo:**
+  - Tất cả 3 tiêu chí chấp nhận `TC-01`, `TC-02`, `TC-03` đều được kiểm chứng độc lập.
+* **Tiêu chí verify/test:**
+  - Lệnh `mvn test` đạt 100% BUILD SUCCESS, không có failure, không có error.
 
 ---
 
-## 5. Rollout và Kế hoạch Kiểm chứng (Rollout & Verification)
+## 7. Kế hoạch kiểm chứng (Verification Plan)
 
-### 5.1. Kế hoạch Triển khai (Deployment)
-1. **Pre-deployment Check:** Kiểm tra `flyway_schema_history` trên môi trường đích, xác nhận version hiện tại là `V83`.
-2. **Deploy Application:** Khởi động Spring Boot container, Flyway tự động áp dụng `V84__create_discount_requests_and_adjust_billing_constraints.sql`.
-3. **Post-deployment Smoke Test:** Xác nhận `/actuator/health` đạt `UP`, kiểm tra số lượng bản ghi và thực hiện request mẫu.
+### 7.1. Kiểm thử tự động (Automated Tests)
+Các lệnh kiểm thử thực hiện theo thứ tự:
+```powershell
+# 1. Kiểm tra biên dịch mã nguồn và cấu trúc class
+mvn clean test-compile
 
-### 5.2. Kế hoạch Rollback Dự phòng
-Hủy các CHECK constraints và khôi phục constraints cũ; xóa các cột liên kết ngoại và xóa bảng `discount_requests`, cập nhật `flyway_schema_history`.
+# 2. Chạy toàn bộ test suites của module dự trù mua thuốc
+mvn test -Dtest="*Procurement*Test"
 
-### 5.3. Tiêu chuẩn nghiệm thu đóng Finding (Definition of Done)
-1. **P0 (Migration Collision):** Migration đổi thành `V84`, build và khởi động không có warning hay lỗi checksum.
-2. **P1 (Scope Contamination):** `git diff origin/develop...HEAD --name-only` chỉ chứa đúng các file của tính năng, 0 file queue.
-3. **P1 (Race Condition):** Cơ chế 2 tầng hoạt động hoàn hảo; concurrency test chứng minh không thể tạo 2 discount active đồng thời.
-4. **P2 (Malformed Audit JSON):** 100% audit log trong discount flow được serialize bằng `ObjectMapper`.
-5. **P3 (Payment & Reporting Semantics):** Toàn bộ regression test về thanh toán và báo cáo doanh thu pass 100%.
-6. **P3 (MySQL Constraints):** Test MySQL Testcontainers xác nhận nới lỏng CHECK constraint cho dòng discount âm và hóa đơn 0 đồng thành công.
+# 3. Chạy riêng kiểm thử bảo mật & phân quyền (xác nhận TC-03)
+mvn test -Dtest="MedicationProcurementSecurityIntegrationTest"
+
+# 4. Chạy kiểm thử hồi quy toàn bộ backend
+mvn test
+```
+
+### 7.2. Kiểm thử thủ công & Dữ liệu mẫu (Manual Verification Steps)
+
+1. **Xác minh Tiêu chí `NCL-06-CN-012-TC-01` (Gợi ý số lượng):**
+   - Đăng nhập với tài khoản Dược sĩ (`pharmacist1`).
+   - Gửi yêu cầu: `GET /inventory/procurements/suggestions?onlyBelowThreshold=true`.
+   - Kết quả mong đợi: Hệ thống trả về `200 OK` danh sách các thuốc có `eligibleStock < minStockThreshold` hoặc `suggestedQuantity > 0`, kèm theo các chỉ số: tồn hiện tại, tồn khả dụng, tồn tối thiểu, lượng tiêu thụ kỳ trước, và số lượng gợi ý tính toán chuẩn xác.
+2. **Xác minh Tiêu chí `NCL-06-CN-012-TC-02` (Lập & Gửi duyệt phiếu):**
+   - Dược sĩ chọn danh sách thuốc và điều chỉnh `proposedQuantity = 150`.
+   - Gửi yêu cầu: `POST /inventory/procurements` với `submitImmediately=true`.
+   - Kết quả mong đợi: Trả về `201 Created`, mã phiếu định dạng `DTxxxxxx`, trạng thái `PENDING_APPROVAL`, `submittedAt` được ghi nhận.
+   - Đăng nhập với tài khoản Quản lý (`manager1`), gọi `GET /inventory/procurements?status=PENDING_APPROVAL`. Thấy phiếu vừa tạo xuất hiện trên danh sách.
+   - Quản lý gửi yêu cầu `POST /inventory/procurements/{id}/approve`. Phiếu chuyển thành `APPROVED`.
+3. **Xác minh Tiêu chí `NCL-06-CN-012-TC-03` (Từ chối quyền Lễ tân):**
+   - Đăng nhập với tài khoản Lễ tân (`receptionist1`).
+   - Gửi yêu cầu: `GET /inventory/procurements/suggestions` hoặc `POST /inventory/procurements`.
+   - Kết quả mong đợi: Nhận mã lỗi `403 Forbidden`.
+   - Kiểm tra cơ sở dữ liệu bảng `audit_logs`: Có bản ghi với `action_type = 'ACCESS_DENIED'`, `resource_type = 'PERMISSION'`, chi tiết ghi rõ endpoint `/inventory/procurements/**` bị từ chối.

@@ -209,6 +209,63 @@ Tài liệu này mô tả schema đang thực sự tồn tại trong repo hiện
 | created_by | BINARY(16) | FK -> users.id |
 | created_at | TIMESTAMP | NOT NULL |
 
+## MEDICATION_PROCUREMENT_PLAN
+
+Phiếu dự trù mua thuốc (NCL-06-CN-012).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | BINARY(16) | PK |
+| plan_code | VARCHAR(30) | UNIQUE (Mã sinh tự động DTxxxxxx) |
+| status | VARCHAR(30) | DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED |
+| created_by | BINARY(16) | FK -> users.id |
+| period_start_date | DATE | Ngày bắt đầu kỳ tham chiếu tiêu thụ |
+| period_end_date | DATE | Ngày kết thúc kỳ tham chiếu tiêu thụ |
+| total_items | INT | Tổng số loại thuốc |
+| total_suggested_quantity | INT | Tổng số lượng gợi ý |
+| total_proposed_quantity | INT | Tổng số lượng đề nghị mua |
+| total_approved_quantity | INT | Tổng số lượng được duyệt |
+| note | TEXT | Ghi chú dự trù |
+| submitted_at | TIMESTAMP | Thời điểm gửi duyệt |
+| approved_by | BINARY(16) | FK -> users.id (Người phê duyệt) |
+| approved_at | TIMESTAMP | Thời điểm phê duyệt/từ chối |
+| rejection_reason | VARCHAR(500) | Lý do từ chối |
+| created_at | TIMESTAMP | Thời điểm tạo |
+| updated_at | TIMESTAMP | Thời điểm cập nhật cuối |
+
+---
+
+## MEDICATION_PROCUREMENT_ITEM
+
+Chi tiết thuốc dự trù mua sắm (NCL-06-CN-012).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | BINARY(16) | PK |
+| plan_id | BINARY(16) | FK -> medication_procurement_plans.id (CASCADE) |
+| medicine_id | BINARY(16) | FK -> medicines.id |
+| current_stock | INT | Tồn sổ sách tại thời điểm lập |
+| min_stock_threshold | INT | Ngưỡng tồn tối thiểu đã thiết lập |
+| previous_period_consumption | INT | Lượng tiêu thụ kỳ trước |
+| suggested_quantity | INT | Số lượng gợi ý từ hệ thống |
+| proposed_quantity | INT | Số lượng đề xuất mua (Dược sĩ điều chỉnh) |
+| approved_quantity | INT | Số lượng được phê duyệt |
+| note | VARCHAR(255) | Ghi chú lý do điều chỉnh |
+| created_at | TIMESTAMP | Thời điểm tạo |
+
+---
+
+## MEDICATION_PROCUREMENT_CODE_SEQUENCE
+
+Bảng chuỗi cấp mã số tự động cho phiếu dự trù.
+
+| Column | Type | Notes |
+|---|---|---|
+| code_prefix | VARCHAR(10) | PK ('DT') |
+| last_value | BIGINT | Giá trị tự tăng nguyên tử |
+
+---
+
 ## STOCK_RECEIPT
 
 Phiếu nhập kho.
