@@ -17,6 +17,7 @@ import {
   CalendarOutlined,
   ScheduleOutlined,
   FileDoneOutlined,
+  FileProtectOutlined,
 } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
 import './portalDashboard.css'
@@ -195,6 +196,28 @@ function PortalDashboard() {
               <Link to="/portal/medical-history" style={{ width: '100%', display: 'block' }}>
                 <Button className="portal-btn-outline" block>
                   Xem lịch sử khám <ArrowRightOutlined />
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <div className="portal-dashboard-card portal-card-invoices" style={{ borderColor: '#bfdbfe' }}>
+            <div className="portal-dashboard-card-top">
+              <div className="portal-dashboard-card-icon blue" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                <FileProtectOutlined />
+              </div>
+              <div className="portal-card-header-text">
+                <h3>Hóa đơn của tôi</h3>
+                <span className="portal-card-tag blue">Chứng từ</span>
+              </div>
+            </div>
+            <p className="portal-card-desc">
+              Xem lại danh sách hóa đơn viện phí các lượt khám và tải về bản in PDF phục vụ bảo hiểm hoặc quyết toán.
+            </p>
+            <div className="portal-card-action">
+              <Link to="/portal/my-invoices" style={{ width: '100%', display: 'block' }}>
+                <Button className="portal-btn-outline" block>
+                  Xem danh sách hóa đơn <ArrowRightOutlined />
                 </Button>
               </Link>
             </div>

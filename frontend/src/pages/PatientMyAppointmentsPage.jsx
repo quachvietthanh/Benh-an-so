@@ -24,6 +24,7 @@ import {
   CloseCircleOutlined,
   ExclamationCircleOutlined,
   FileDoneOutlined,
+  FileProtectOutlined,
   HomeOutlined,
   MedicineBoxOutlined,
   PlusOutlined,
@@ -333,6 +334,11 @@ function PatientMyAppointmentsPage() {
             <Link to="/portal/medical-history">
               <Button className="portal-header-btn" icon={<FileDoneOutlined style={{ color: '#16a34a' }} />}>
                 Lịch sử khám
+              </Button>
+            </Link>
+            <Link to="/portal/my-invoices">
+              <Button className="portal-header-btn" icon={<FileProtectOutlined style={{ color: '#2563eb' }} />}>
+                Hóa đơn của tôi
               </Button>
             </Link>
             <Link to="/portal/dashboard">
