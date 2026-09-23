@@ -99,6 +99,34 @@ class ClinicalResultJpaIntegrationTest {
         assertEquals(2, medicalAttachmentRepository.findByClinicalResultIdIn(List.of(first.getId(), second.getId())).size());
     }
 
+    @Test
+    @org.junit.jupiter.api.DisplayName("DB-01 / Test Gap 3: findByVisitIdAndStatusOrderByEnteredAtDesc filters FINAL and orders by enteredAt desc")
+    void findsFinalResultsByVisitIdOrderedByEnteredAtDesc() {
+        UUID visitId = UUID.randomUUID();
+        ClinicalResultEntity draft = result(UUID.randomUUID(), UUID.randomUUID(), visitId);
+
+        ClinicalResultEntity finalOlder = ClinicalResultEntity.builder()
+                .id(UUID.randomUUID()).clinicalOrderItemId(UUID.randomUUID()).visitId(visitId)
+                .resultType(ClinicalResultType.NUMBER).numericValue(BigDecimal.TEN).unit("mmol/L")
+                .abnormalFlag(ClinicalResultAbnormalFlag.NORMAL).status(ClinicalResultStatus.FINAL)
+                .enteredBy(UUID.randomUUID()).enteredAt(NOW.minusSeconds(3600)).build();
+
+        ClinicalResultEntity finalNewer = ClinicalResultEntity.builder()
+                .id(UUID.randomUUID()).clinicalOrderItemId(UUID.randomUUID()).visitId(visitId)
+                .resultType(ClinicalResultType.NUMBER).numericValue(new BigDecimal("15")).unit("mmol/L")
+                .abnormalFlag(ClinicalResultAbnormalFlag.NORMAL).status(ClinicalResultStatus.FINAL)
+                .enteredBy(UUID.randomUUID()).enteredAt(NOW).build();
+
+        inTransaction(() -> clinicalResultRepository.saveAll(List.of(draft, finalOlder, finalNewer)));
+
+        List<ClinicalResultEntity> finals = clinicalResultRepository
+                .findByVisitIdAndStatusOrderByEnteredAtDesc(visitId, ClinicalResultStatus.FINAL);
+
+        assertEquals(2, finals.size());
+        assertEquals(finalNewer.getId(), finals.get(0).getId());
+        assertEquals(finalOlder.getId(), finals.get(1).getId());
+    }
+
     private void inTransaction(Runnable action) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> action.run());
     }
