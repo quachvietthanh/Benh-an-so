@@ -1,5 +1,5 @@
 -- =====================================================
--- V87__create_appointment_waitlist_table.sql
+-- V89__create_appointment_waitlist_table.sql
 -- NCL-03-CN-012: Danh sách chờ khi hết khung giờ
 -- =====================================================
 

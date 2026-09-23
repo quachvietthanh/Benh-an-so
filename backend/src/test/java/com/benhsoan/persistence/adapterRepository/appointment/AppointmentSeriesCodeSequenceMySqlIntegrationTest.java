@@ -119,7 +119,7 @@ class AppointmentSeriesCodeSequenceMySqlIntegrationTest {
     }
 
     @Test
-    @DisplayName("P0: Flyway migration V87 tạo đúng schema appointment_series, sequence và cột liên kết")
+    @DisplayName("P0: Flyway migration V88 tạo đúng schema appointment_series, sequence và cột liên kết")
     void flywayCreatesAppointmentSeriesSchemaAndSequences() {
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables "
