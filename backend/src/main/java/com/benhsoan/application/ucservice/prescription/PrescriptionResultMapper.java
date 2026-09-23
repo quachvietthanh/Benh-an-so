@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
+import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
@@ -23,9 +24,20 @@ public class PrescriptionResultMapper {
             Prescription prescription,
             List<PrescriptionWarningLog> warningLogs
     ) {
+        return toResult(prescription, warningLogs, List.of());
+    }
+
+    public PrescriptionResult toResult(
+            Prescription prescription,
+            List<PrescriptionWarningLog> warningLogs,
+            List<MaxDailyDoseMissingDataResult> maxDailyDoseMissingData
+    ) {
         List<PrescriptionWarningLog> safeWarningLogs = warningLogs == null
                 ? List.of()
                 : warningLogs;
+        List<MaxDailyDoseMissingDataResult> safeMissingData = maxDailyDoseMissingData == null
+                ? List.of()
+                : maxDailyDoseMissingData;
         var displayContext = displayContextResolver.resolve(
                 prescription.getMedicalRecordId(),
                 prescription.getPrescribedBy()
@@ -55,7 +67,8 @@ public class PrescriptionResultMapper {
                 safeWarningLogs
                         .stream()
                         .map(this::toWarningResult)
-                        .toList()
+                        .toList(),
+                safeMissingData
         );
     }
 

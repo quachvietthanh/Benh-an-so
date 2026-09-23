@@ -68,11 +68,15 @@ import com.benhsoan.port.dto.result.ReturnedMedicationItemResult;
 
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionAllergyOverrideRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionContraindicationOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionMaxDailyDoseOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseMissingDataResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PatientAllergyWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionAllergyWarningLogResponse;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionMaxDailyDoseOverrideCommand;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
 import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
 
 @Component
@@ -146,6 +150,14 @@ public class PrescriptionRestMapper {
                                 .map(this::toCommand)
                                 .toList();
 
+        List<PrescriptionMaxDailyDoseOverrideCommand> maxDailyDoseOverrides
+                = request.maxDailyDoseOverrides() == null
+                        ? List.of()
+                        : request.maxDailyDoseOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
         return CreatePrescriptionCommand.builder()
                 .medicalRecordId(request.medicalRecordId())
                 .note(request.note())
@@ -156,6 +168,7 @@ public class PrescriptionRestMapper {
                 .interactionOverrides(interactionOverrides)
                 .allergyOverrides(allergyOverrides)
                 .contraindicationOverrides(contraindicationOverrides)
+                .maxDailyDoseOverrides(maxDailyDoseOverrides)
                 .controlledMedicineConfirmed(request.controlledMedicineConfirmed())
                 .build();
     }
@@ -204,6 +217,12 @@ public class PrescriptionRestMapper {
                         .stream()
                         .map(this::toResponse)
                         .toList())
+                .maxDailyDoseMissingData(result.maxDailyDoseMissingData() == null
+                        ? List.of()
+                        : result.maxDailyDoseMissingData()
+                                .stream()
+                                .map(this::toResponse)
+                                .toList())
                 .build();
     }
 
@@ -323,6 +342,7 @@ public class PrescriptionRestMapper {
                 .durationDays(request.durationDays())
                 .quantity(request.quantity())
                 .instructions(request.instructions())
+                .singleDoseQuantity(request.singleDoseQuantity())
                 .build();
     }
 
@@ -446,6 +466,18 @@ public class PrescriptionRestMapper {
         );
     }
 
+    public PrescriptionMaxDailyDoseOverrideCommand toCommand(
+            PrescriptionMaxDailyDoseOverrideRequest request
+    ) {
+        if (request == null) {
+            return null;
+        }
+        return new PrescriptionMaxDailyDoseOverrideCommand(
+                request.activeIngredient(),
+                request.overrideReason()
+        );
+    }
+
     public PatientAllergyWarningResponse toAllergyResponse(
             PatientAllergyWarningResult result
     ) {
@@ -563,6 +595,13 @@ public class PrescriptionRestMapper {
                 result.medicineName(),
                 result.type(),
                 result.message()
+        );
+    }
+
+    private MaxDailyDoseMissingDataResponse toResponse(MaxDailyDoseMissingDataResult result) {
+        return new MaxDailyDoseMissingDataResponse(
+                result.activeIngredient(),
+                result.reason()
         );
     }
 

@@ -3,6 +3,8 @@ package com.benhsoan.persistence.entity.prescription;
 import java.time.Instant;
 import java.util.UUID;
 
+import java.math.BigDecimal;
+
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 
 import jakarta.persistence.Column;
@@ -76,6 +78,9 @@ public class PrescriptionItemEntity {
 
     @Column(name = "instructions", columnDefinition = "TEXT")
     private String instructions;
+
+    @Column(name = "single_dose_quantity", precision = 12, scale = 3)
+    private BigDecimal singleDoseQuantity;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

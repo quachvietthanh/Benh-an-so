@@ -146,6 +146,7 @@ final class DomainExceptionHttpStatusMapper {
                     FOLLOW_UP_REMINDER_INVALID_STATUS,
                     INSUFFICIENT_STOCK,
                     INTERACTION_CONFIRMATION_REQUIRED,
+                    MAX_DAILY_DOSE_CONFIRMATION_REQUIRED,
                     INVOICE_ALREADY_ISSUED,
                     PENDING_DISCOUNT_APPROVAL,
                     INVALID_DISCOUNT_STATE,
