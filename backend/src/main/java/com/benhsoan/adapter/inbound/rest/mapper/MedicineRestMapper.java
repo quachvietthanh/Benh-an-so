@@ -24,7 +24,8 @@ public class MedicineRestMapper {
                 request.dosageForm(),
                 request.unit(),
                 request.defaultRoute(),
-                request.minStockThreshold()
+                request.minStockThreshold(),
+                request.controlled()
         );
     }
 
@@ -40,7 +41,8 @@ public class MedicineRestMapper {
                 request.dosageForm(),
                 request.unit(),
                 request.defaultRoute(),
-                request.minStockThreshold()
+                request.minStockThreshold(),
+                request.controlled()
         );
     }
 
@@ -58,7 +60,8 @@ public class MedicineRestMapper {
                 result.createdAt(),
                 result.updatedAt(),
                 result.stockQuantity(),
-                result.minStockThreshold()
+                result.minStockThreshold(),
+                result.controlled()
         );
     }
 

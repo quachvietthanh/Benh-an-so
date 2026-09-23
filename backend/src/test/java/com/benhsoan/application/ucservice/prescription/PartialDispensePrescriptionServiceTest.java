@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -40,7 +41,9 @@ import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.application.ucservice.controlledmedicine.ControlledMedicineRegisterRecorder;
 import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispensePrescriptionItemsCommand;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
@@ -75,6 +78,10 @@ class PartialDispensePrescriptionServiceTest {
     private final AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
     private final PartialDispensePrescriptionResultMapper resultMapper =
             mock(PartialDispensePrescriptionResultMapper.class);
+    private final ControlledMedicineRegisterRecorder controlledMedicineRegisterRecorder =
+            mock(ControlledMedicineRegisterRecorder.class);
+    private final PrescriptionDisplayContextResolver displayContextResolver =
+            mock(PrescriptionDisplayContextResolver.class);
 
     private PartialDispensePrescriptionService service;
 
@@ -92,7 +99,9 @@ class PartialDispensePrescriptionServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                resultMapper);
+                resultMapper,
+                controlledMedicineRegisterRecorder,
+                displayContextResolver);
         when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR_ID);
         when(clockPort.now()).thenReturn(NOW);
@@ -123,6 +132,13 @@ class PartialDispensePrescriptionServiceTest {
                 NOW.minusSeconds(86400), null, 120, 20);
     }
 
+    private Medicine controlledMedicine() {
+        return Medicine.restore(
+                MEDICINE_ID, "MED-001", "Paracetamol", "Paracetamol", "500 mg",
+                DosageForm.TABLET, "vien", AdministrationRoute.ORAL, true,
+                NOW.minusSeconds(86400), null, 120, 20, true);
+    }
+
     private MedicineBatch batch(int quantity) {
         return MedicineBatch.restore(
                 UUID.randomUUID(), MEDICINE_ID, "BATCH-A", LocalDate.of(2026, 12, 1),
@@ -141,6 +157,23 @@ class PartialDispensePrescriptionServiceTest {
                 prescriptionId, "RX-001", UUID.randomUUID(), status, "note",
                 null, UUID.randomUUID(), NOW.minusSeconds(600), null, null,
                 InterconnectionStatus.NOT_SENT, null, null, null, List.of(item));
+    }
+
+    @Test
+    void rejectsControlledPartialDispenseWithoutConfirmation() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        PrescriptionItem item = item(prescriptionId, itemId, 20, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, item);
+        stubPrescription(prescription);
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(controlledMedicine()));
+        stubBatch(12);
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(new DispenseItemCommand(itemId, 12)))));
+
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
     }
 
     @Test
@@ -447,5 +480,204 @@ class PartialDispensePrescriptionServiceTest {
         return MedicineBatch.restore(
                 id, MEDICINE_ID, batchNumber, expiryDate, quantity,
                 BatchStatus.ACTIVE, NOW.minusSeconds(3600), null);
+    }
+
+    private Medicine medicine(UUID id, String code, String name) {
+        return Medicine.restore(
+                id, code, name, name, "500 mg",
+                DosageForm.TABLET, "vien", AdministrationRoute.ORAL, true,
+                NOW.minusSeconds(86400), null, 120, 20);
+    }
+
+    private Medicine controlledMedicine(UUID id, String code, String name) {
+        return Medicine.restore(
+                id, code, name, name, "500 mg",
+                DosageForm.TABLET, "vien", AdministrationRoute.ORAL, true,
+                NOW.minusSeconds(86400), null, 120, 20, true);
+    }
+
+    private PrescriptionItem item(
+            UUID prescriptionId,
+            UUID itemId,
+            UUID medicineId,
+            String medicineName,
+            int prescribed,
+            int dispensed
+    ) {
+        return PrescriptionItem.restore(
+                itemId, prescriptionId, medicineId, medicineName, medicineName,
+                "500 mg", "vien", "1 vien", 2, AdministrationRoute.ORAL, 5,
+                prescribed, dispensed, null, NOW.minusSeconds(600), null);
+    }
+
+    private Prescription prescription(
+            UUID prescriptionId,
+            PrescriptionStatus status,
+            List<PrescriptionItem> items
+    ) {
+        return Prescription.restore(
+                prescriptionId, "RX-001", UUID.randomUUID(), status, "note",
+                null, UUID.randomUUID(), NOW.minusSeconds(600), null, null,
+                InterconnectionStatus.NOT_SENT, null, null, null, items);
+    }
+
+    private void stubMedicines(List<Medicine> medicines) {
+        when(medicineRepository.findAllById(any())).thenReturn(medicines);
+    }
+
+    private void stubBatchFor(UUID medicineId, int quantity) {
+        when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), any()))
+                .thenReturn(List.of(MedicineBatch.restore(
+                        UUID.randomUUID(), medicineId, "BATCH-A", LocalDate.of(2026, 12, 1),
+                        quantity, BatchStatus.ACTIVE, NOW.minusSeconds(3600), null)));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(any(), any()))
+                .thenReturn(Map.of(medicineId, quantity));
+    }
+
+    @Test
+    void partialDispenseOfOrdinaryMedicineOnly_doesNotRequireControlledConfirmation() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID ordinaryMedicineId = UUID.randomUUID();
+        UUID controlledMedicineId = UUID.randomUUID();
+        UUID ordinaryItemId = UUID.randomUUID();
+        UUID controlledItemId = UUID.randomUUID();
+
+        PrescriptionItem ordinaryItem = item(prescriptionId, ordinaryItemId, ordinaryMedicineId, "Paracetamol", 20, 0);
+        PrescriptionItem controlledItem = item(prescriptionId, controlledItemId, controlledMedicineId, "Morphine", 10, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE,
+                List.of(ordinaryItem, controlledItem));
+        stubPrescription(prescription);
+        stubMedicines(List.of(
+                medicine(ordinaryMedicineId, "MED-ORD", "Paracetamol"),
+                controlledMedicine(controlledMedicineId, "MED-CTRL", "Morphine")));
+        stubBatchFor(ordinaryMedicineId, 20);
+
+        service.dispense(new DispensePrescriptionItemsCommand(prescriptionId,
+                List.of(new DispenseItemCommand(ordinaryItemId, 5))));
+
+        assertEquals(5, ordinaryItem.getDispensedQuantity());
+        assertEquals(0, controlledItem.getDispensedQuantity());
+        verify(controlledMedicineRegisterRecorder, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void partialDispenseOfControlledMedicineWithoutConfirmation_isRejected() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID ordinaryMedicineId = UUID.randomUUID();
+        UUID controlledMedicineId = UUID.randomUUID();
+        UUID ordinaryItemId = UUID.randomUUID();
+        UUID controlledItemId = UUID.randomUUID();
+
+        PrescriptionItem ordinaryItem = item(prescriptionId, ordinaryItemId, ordinaryMedicineId, "Paracetamol", 20, 0);
+        PrescriptionItem controlledItem = item(prescriptionId, controlledItemId, controlledMedicineId, "Morphine", 10, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE,
+                List.of(ordinaryItem, controlledItem));
+        stubPrescription(prescription);
+        stubMedicines(List.of(
+                medicine(ordinaryMedicineId, "MED-ORD", "Paracetamol"),
+                controlledMedicine(controlledMedicineId, "MED-CTRL", "Morphine")));
+        stubBatchFor(controlledMedicineId, 10);
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(new DispenseItemCommand(controlledItemId, 5)))));
+
+        assertEquals(0, controlledItem.getDispensedQuantity());
+        assertEquals(0, ordinaryItem.getDispensedQuantity());
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
+        verify(controlledMedicineRegisterRecorder, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void partialDispenseOfControlledMedicineWithConfirmation_createsRegisterEntry() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID ordinaryMedicineId = UUID.randomUUID();
+        UUID controlledMedicineId = UUID.randomUUID();
+        UUID ordinaryItemId = UUID.randomUUID();
+        UUID controlledItemId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        PrescriptionItem ordinaryItem = item(prescriptionId, ordinaryItemId, ordinaryMedicineId, "Paracetamol", 20, 0);
+        PrescriptionItem controlledItem = item(prescriptionId, controlledItemId, controlledMedicineId, "Morphine", 10, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE,
+                List.of(ordinaryItem, controlledItem));
+        stubPrescription(prescription);
+        stubMedicines(List.of(
+                medicine(ordinaryMedicineId, "MED-ORD", "Paracetamol"),
+                controlledMedicine(controlledMedicineId, "MED-CTRL", "Morphine")));
+        stubBatchFor(controlledMedicineId, 10);
+        when(displayContextResolver.resolve(any(), any()))
+                .thenReturn(new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
+                        null, null, patientId, null, null, null));
+
+        service.dispense(new DispensePrescriptionItemsCommand(prescriptionId,
+                List.of(new DispenseItemCommand(controlledItemId, 5)), true));
+
+        assertEquals(5, controlledItem.getDispensedQuantity());
+        assertEquals(0, ordinaryItem.getDispensedQuantity());
+        verify(controlledMedicineRegisterRecorder).record(
+                eq(prescriptionId),
+                any(),
+                eq(patientId),
+                eq(ACTOR_ID),
+                eq(NOW),
+                argThat(entries -> entries != null && entries.size() == 1
+                        && entries.get(0).medicineId().equals(controlledMedicineId)
+                        && entries.get(0).quantity() == 5));
+    }
+
+    @Test
+    void partialDispenseOfMixedMedicinesRequiresConfirmationWhenControlledDispensed() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID ordinaryMedicineId = UUID.randomUUID();
+        UUID controlledMedicineId = UUID.randomUUID();
+        UUID ordinaryItemId = UUID.randomUUID();
+        UUID controlledItemId = UUID.randomUUID();
+
+        PrescriptionItem ordinaryItem = item(prescriptionId, ordinaryItemId, ordinaryMedicineId, "Paracetamol", 20, 0);
+        PrescriptionItem controlledItem = item(prescriptionId, controlledItemId, controlledMedicineId, "Morphine", 10, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE,
+                List.of(ordinaryItem, controlledItem));
+        stubPrescription(prescription);
+        stubMedicines(List.of(
+                medicine(ordinaryMedicineId, "MED-ORD", "Paracetamol"),
+                controlledMedicine(controlledMedicineId, "MED-CTRL", "Morphine")));
+        stubBatchFor(controlledMedicineId, 10);
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class, () -> service.dispense(
+                new DispensePrescriptionItemsCommand(prescriptionId,
+                        List.of(
+                                new DispenseItemCommand(ordinaryItemId, 2),
+                                new DispenseItemCommand(controlledItemId, 5)))));
+
+        assertEquals(0, ordinaryItem.getDispensedQuantity());
+        assertEquals(0, controlledItem.getDispensedQuantity());
+        verify(controlledMedicineRegisterRecorder, never()).record(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void nonRequestedMedicinesDoNotTriggerControlledConfirmationOrRegister() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID ordinaryMedicineId = UUID.randomUUID();
+        UUID controlledMedicineId = UUID.randomUUID();
+        UUID ordinaryItemId = UUID.randomUUID();
+        UUID controlledItemId = UUID.randomUUID();
+
+        PrescriptionItem ordinaryItem = item(prescriptionId, ordinaryItemId, ordinaryMedicineId, "Paracetamol", 20, 0);
+        PrescriptionItem controlledItem = item(prescriptionId, controlledItemId, controlledMedicineId, "Morphine", 10, 0);
+        Prescription prescription = prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE,
+                List.of(ordinaryItem, controlledItem));
+        stubPrescription(prescription);
+        stubMedicines(List.of(
+                medicine(ordinaryMedicineId, "MED-ORD", "Paracetamol"),
+                controlledMedicine(controlledMedicineId, "MED-CTRL", "Morphine")));
+        stubBatchFor(ordinaryMedicineId, 20);
+
+        service.dispense(new DispensePrescriptionItemsCommand(prescriptionId,
+                List.of(new DispenseItemCommand(ordinaryItemId, 3))));
+
+        assertEquals(3, ordinaryItem.getDispensedQuantity());
+        assertEquals(0, controlledItem.getDispensedQuantity());
+        verify(controlledMedicineRegisterRecorder, never()).record(any(), any(), any(), any(), any(), any());
     }
 }

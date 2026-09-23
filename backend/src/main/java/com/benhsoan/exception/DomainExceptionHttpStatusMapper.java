@@ -71,7 +71,8 @@ final class DomainExceptionHttpStatusMapper {
             case INVALID_CREDENTIALS,
                     SESSION_EXPIRED,
                     TEMP_PASSWORD_EXPIRED,
-                    TOKEN_INVALID -> HttpStatus.UNAUTHORIZED;
+                    TOKEN_INVALID,
+                    TWO_FACTOR_CHALLENGE_INVALID -> HttpStatus.UNAUTHORIZED;
             case APPOINTMENT_NOT_OVERDUE,
                     APPOINTMENT_PAST_CUTOFF,
                     APPOINTMENT_TIME_IN_PAST,
@@ -126,6 +127,7 @@ final class DomainExceptionHttpStatusMapper {
                     CLINICAL_SERVICE_UNAVAILABLE,
                     CONCURRENT_IMPORT_IN_PROGRESS,
                     CONTRAINDICATION_CONFIRMATION_REQUIRED,
+                    CONTROLLED_MEDICINE_CONFIRMATION_REQUIRED,
                     DIAGNOSIS_CATALOG_CODE_ALREADY_EXISTS,
                     DIAGNOSIS_CATALOG_DELETE_NOT_ALLOWED,
                     DIAGNOSIS_CATALOG_IN_USE,
