@@ -24,10 +24,11 @@ import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class RegisterPatientService
         implements RegisterPatientUseCase {
@@ -48,6 +49,41 @@ public class RegisterPatientService
     private final PatientResultMapper patientResultMapper;
 
     private final AuditLogRepository auditLogRepository;
+
+    private final com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository;
+
+    @Autowired
+    public RegisterPatientService(
+            PatientRepository patientRepository,
+            PatientChangeLogRepository patientChangeLogRepository,
+            PatientCodeGenerator patientCodeGenerator,
+            CurrentUserPort currentUserPort,
+            PatientChangeDetailBuilder changeDetailBuilder,
+            PatientResultMapper patientResultMapper,
+            AuditLogRepository auditLogRepository,
+            com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository
+    ) {
+        this.patientRepository = patientRepository;
+        this.patientChangeLogRepository = patientChangeLogRepository;
+        this.patientCodeGenerator = patientCodeGenerator;
+        this.currentUserPort = currentUserPort;
+        this.changeDetailBuilder = changeDetailBuilder;
+        this.patientResultMapper = patientResultMapper;
+        this.auditLogRepository = auditLogRepository;
+        this.patientConsentHistoryRepository = patientConsentHistoryRepository;
+    }
+
+    public RegisterPatientService(
+            PatientRepository patientRepository,
+            PatientChangeLogRepository patientChangeLogRepository,
+            PatientCodeGenerator patientCodeGenerator,
+            CurrentUserPort currentUserPort,
+            PatientChangeDetailBuilder changeDetailBuilder,
+            PatientResultMapper patientResultMapper,
+            AuditLogRepository auditLogRepository
+    ) {
+        this(patientRepository, patientChangeLogRepository, patientCodeGenerator, currentUserPort, changeDetailBuilder, patientResultMapper, auditLogRepository, null);
+    }
 
     @Override
     public PatientResult register(RegisterPatientCommand command) {
@@ -135,6 +171,26 @@ public class RegisterPatientService
                         null
                 )
         );
+
+        if (patientConsentHistoryRepository != null && saved.isConsentAgreed()) {
+            com.benhsoan.domain.patient.PatientConsentRecord initialRecord = com.benhsoan.domain.patient.PatientConsentRecord.create(
+                    saved.getId(),
+                    1,
+                    saved.getConsentVersion() != null ? saved.getConsentVersion() : com.benhsoan.domain.patient.PatientConsentVersion.current(),
+                    com.benhsoan.domain.patient.enums.ConsentHistoryStatus.AGREED,
+                    com.benhsoan.domain.patient.enums.ConsentScope.defaultAll(),
+                    saved.isConsentAgreed(),
+                    saved.getConsentAgreedAt(),
+                    false,
+                    null,
+                    null,
+                    false,
+                    saved.getConsentSignerName(),
+                    currentUserId,
+                    saved.getConsentAgreedAt() != null ? saved.getConsentAgreedAt() : java.time.Instant.now()
+            );
+            patientConsentHistoryRepository.save(initialRecord);
+        }
 
         return patientResultMapper.toResult(saved);
     }

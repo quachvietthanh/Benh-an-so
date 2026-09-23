@@ -1,8 +1,8 @@
 # API Contract: Phiếu đồng ý xử lý dữ liệu cá nhân (Patient Data Processing Consent)
 
-> **User Story:** NCL-15-CN-001
-> **Business Rule:** QTN-24 (*Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân*)
-> **Acceptance Criteria:** NCL-15-CN-001-TC-01, NCL-15-CN-001-TC-02, NCL-15-CN-001-TC-03, NCL-15-CN-001-TC-04
+> **User Story:** NCL-15-CN-001, NCL-15-CN-005 (*Rút lại và cập nhật phiếu đồng ý xử lý dữ liệu*)
+> **Business Rule:** QTN-24 (*Phải có phiếu đồng ý trước khi xử lý dữ liệu cá nhân*), QTN-19 (*Bảo quản và lưu trữ hồ sơ bệnh án tối thiểu 10 năm*)
+> **Acceptance Criteria:** AC-01 (Thu hẹp phạm vi / rút lại đồng ý), AC-02 (Tra cứu lịch sử phiên bản), AC-03 (Ngoại lệ từ chối xóa hồ sơ bệnh án theo QTN-19)
 
 ---
 
@@ -202,3 +202,148 @@ Quy tắc `QTN-24` quy định: Mọi hồ sơ bệnh nhân mới được tạo
   "nonMedicalUseRestricted": true
 }
 ```
+
+---
+
+### 3.5. Tra cứu lịch sử phiên bản phiếu đồng ý (Quầy tiếp đón / Nhân viên y tế)
+- **Method**: `GET`
+- **Path**: `/api/v1/patients/{patientId}/consent-history`
+- **Permission**: `PATIENT_READ` hoặc `PATIENT_CONSENT_UPDATE` (RECEPTIONIST, DOCTOR, ADMIN)
+
+#### Response (200 OK)
+```json
+[
+  {
+    "id": "f1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+    "patientId": "e4b2d19f-1234-4567-8901-abcdef123456",
+    "versionNumber": 1,
+    "versionCode": "v1.0",
+    "status": "AGREED",
+    "scopes": ["TREATMENT", "COMMUNICATION", "RESEARCH"],
+    "consentAgreed": true,
+    "consentAgreedAt": "2026-08-27T08:30:00Z",
+    "consentWithdrawn": false,
+    "consentWithdrawnAt": null,
+    "consentWithdrawnReason": null,
+    "nonMedicalUseRestricted": false,
+    "signerName": "Nguyễn Văn A",
+    "createdBy": "00000000-0000-0000-0000-000000000001",
+    "createdAt": "2026-08-27T08:30:00Z"
+  },
+  {
+    "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+    "patientId": "e4b2d19f-1234-4567-8901-abcdef123456",
+    "versionNumber": 2,
+    "versionCode": "v1.0",
+    "status": "PARTIALLY_WITHDRAWN",
+    "scopes": ["TREATMENT"],
+    "consentAgreed": true,
+    "consentAgreedAt": "2026-08-27T08:30:00Z",
+    "consentWithdrawn": false,
+    "consentWithdrawnAt": null,
+    "consentWithdrawnReason": null,
+    "nonMedicalUseRestricted": true,
+    "signerName": "Nguyễn Văn A",
+    "createdBy": "00000000-0000-0000-0000-000000000002",
+    "createdAt": "2026-09-15T09:00:00Z"
+  }
+]
+```
+
+---
+
+### 3.6. Yêu cầu xóa dữ liệu cá nhân theo QTN-19 (Quầy tiếp đón)
+- **Method**: `POST`
+- **Path**: `/api/v1/patients/{patientId}/data-erasure-request`
+- **Permission**: `PATIENT_CONSENT_UPDATE` (RECEPTIONIST, ADMIN)
+- **Quy tắc nghiệp vụ (QTN-19)**: Hồ sơ bệnh án chuyên môn **không thể xóa** trước hạn do quy định lưu trữ tối thiểu 10 năm theo Luật Khám bệnh, chữa bệnh. Hệ thống tự động thu hồi sự đồng ý và hạn chế sử dụng đối với các mục đích ngoài khám chữa bệnh.
+
+#### Request Body
+```json
+{
+  "reason": "Người bệnh yêu cầu xóa toàn bộ dữ liệu cá nhân"
+}
+```
+
+#### Response (200 OK)
+```json
+{
+  "patientId": "e4b2d19f-1234-4567-8901-abcdef123456",
+  "consentWithdrawn": true,
+  "nonMedicalUseRestricted": true,
+  "medicalRecordsRetained": true,
+  "retentionYears": 10,
+  "message": "Hồ sơ bệnh án được lưu trữ tối thiểu 10 năm theo Luật Khám bệnh, chữa bệnh (QTN-19) và không thể xóa trước hạn. Hệ thống đã thu hồi sự đồng ý đối với các mục đích xử lý ngoài khám chữa bệnh."
+}
+```
+
+---
+
+### 3.7. Cổng bệnh nhân: Tra cứu lịch sử phiếu đồng ý cá nhân
+- **Method**: `GET`
+- **Path**: `/api/v1/patient-portal/consent/history`
+- **Permission**: Người dùng đăng nhập có liên kết hồ sơ bệnh nhân (`ROLE_PATIENT`)
+
+#### Response (200 OK)
+Trả về danh sách `PatientConsentHistoryResponse` tương tự endpoint 3.5.
+
+---
+
+### 3.8. Cổng bệnh nhân: Cập nhật phạm vi / rút lại đồng ý
+- **Method**: `PUT`
+- **Path**: `/api/v1/patient-portal/consent`
+- **Permission**: Người dùng đăng nhập có liên kết hồ sơ bệnh nhân (`ROLE_PATIENT`)
+
+#### Request Body (Thu hẹp phạm vi - AC-01)
+```json
+{
+  "scopes": ["TREATMENT"]
+}
+```
+
+#### Request Body (Rút lại toàn bộ - AC-01)
+```json
+{
+  "consentWithdrawn": true,
+  "consentWithdrawnReason": "Tôi không muốn tiếp tục xử lý thông tin"
+}
+```
+
+#### Response (200 OK)
+Trả về `PatientResponse` đã cập nhật.
+
+---
+
+### 3.9. Cổng bệnh nhân: Yêu cầu xóa dữ liệu cá nhân (Áp dụng QTN-19)
+- **Method**: `POST`
+- **Path**: `/api/v1/patient-portal/consent/data-erasure-request`
+- **Permission**: Người dùng đăng nhập có liên kết hồ sơ bệnh nhân (`ROLE_PATIENT`)
+
+#### Request Body
+```json
+{
+  "reason": "Yêu cầu xóa toàn bộ dữ liệu tài khoản"
+}
+```
+
+#### Response (200 OK)
+Trả về `DataErasureResponse` tương tự endpoint 3.6.
+
+---
+
+## 4. Danh mục Giá trị Chuẩn hóa
+
+### 4.1. Phạm vi xử lý dữ liệu (`ConsentScope`)
+| Mã phạm vi | Tên hiển thị Tiếng Việt | Bắt buộc | Ghi chú |
+| :--- | :--- | :---: | :--- |
+| `TREATMENT` | Khám bệnh, chữa bệnh | **Có** | Bắt buộc phải có khi duy trì sự đồng ý. Không thể loại bỏ trừ khi rút lại toàn bộ. |
+| `COMMUNICATION` | Thông báo, liên lạc y tế, khảo sát | Không | Có thể thu hẹp / rút bớt. |
+| `RESEARCH` | Nghiên cứu khoa học, thống kê y học | Không | Có thể thu hẹp / rút bớt. |
+
+### 4.2. Trạng thái lịch sử phiên bản (`ConsentHistoryStatus`)
+| Mã trạng thái | Diễn giải |
+| :--- | :--- |
+| `AGREED` | Đồng ý toàn bộ các phạm vi tiêu chuẩn |
+| `PARTIALLY_WITHDRAWN` | Thu hẹp phạm vi (rút một phần, chỉ duy trì khám chữa bệnh `TREATMENT`) |
+| `WITHDRAWN` | Rút lại toàn bộ sự đồng ý |
+

@@ -1,16 +1,19 @@
-package com.benhsoan.adapter.inbound.rest.request.patient;
+package com.benhsoan.port.dto.command.patient;
 
 import java.util.Set;
 
 import com.benhsoan.domain.patient.enums.ConsentScope;
 
-public record UpdatePatientConsentRequest(
+import lombok.Builder;
+
+@Builder
+public record UpdatePatientConsentCommand(
+
+        Boolean consentAgreed,
 
         Boolean consentWithdrawn,
 
         String consentWithdrawnReason,
-
-        Boolean consentAgreed,
 
         String consentVersion,
 
