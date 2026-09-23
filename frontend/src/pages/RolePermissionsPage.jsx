@@ -26,6 +26,7 @@ import RolePermissionsMatrixTable from '../components/rolePermissions/RolePermis
 import RolePermissionsSingleRoleView from '../components/rolePermissions/RolePermissionsSingleRoleView'
 import RolePermissionsMobileView from '../components/rolePermissions/RolePermissionsMobileView'
 import RolePermissionsConfirmModal from '../components/rolePermissions/RolePermissionsConfirmModal'
+import RoleTwoFactorSecurityCard from '../components/rolePermissions/RoleTwoFactorSecurityCard.jsx'
 
 const { Title } = Typography
 
@@ -533,6 +534,11 @@ function RolePermissionsPage() {
           }
         />
       )}
+
+      <RoleTwoFactorSecurityCard
+        userPermissions={userPermissions}
+        userRoles={user?.roles || []}
+      />
 
       <RoleOverviewCards
             roles={roles}

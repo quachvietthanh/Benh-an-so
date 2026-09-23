@@ -8,6 +8,7 @@ import { getDefaultHomePath } from '../utils/roleRouting'
 import PatientRoute from '../components/common/PatientRoute'
 
 const Login = React.lazy(() => import('../pages/Login'))
+const TwoFactorVerifyPage = React.lazy(() => import('../pages/TwoFactorVerifyPage.jsx'))
 const PortalLogin = React.lazy(() => import('../pages/PortalLogin'))
 const PortalRegister = React.lazy(() => import('../pages/PortalRegister'))
 const PortalDashboard = React.lazy(() => import('../pages/PortalDashboard'))
@@ -114,6 +115,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
+      <Route path="/login/verify-2fa" element={<LazyPage><TwoFactorVerifyPage /></LazyPage>} />
       <Route path="/portal/login" element={<LazyPage><PortalLogin /></LazyPage>} />
       <Route path="/portal/register" element={<LazyPage><PortalRegister /></LazyPage>} />
       <Route path="/portal/dashboard" element={<PatientRoute><LazyPage><PortalDashboard /></LazyPage></PatientRoute>} />
