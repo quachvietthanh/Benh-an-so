@@ -51,7 +51,7 @@ import {
 import { unwrapCollection } from '../utils/workflowContract'
 
 const { RangePicker } = DatePicker
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 const DEFAULT_PAGE_SIZE = 10
 
 const createSourceState = () => ({
@@ -943,11 +943,7 @@ function AfterCarePage() {
     <main className="aftercare-page">
       <header className="aftercare-page-header">
         <div>
-          <Text className="aftercare-eyebrow">Theo dõi sau điều trị</Text>
-          <Title level={2}>Chăm sóc sau khám</Title>
-          <Paragraph>
-            Theo dõi lịch nhắc tái khám và quá trình chăm sóc bệnh nhân sau điều trị.
-          </Paragraph>
+          <Title level={2} style={{ margin: 0 }}>Chăm sóc sau khám</Title>
         </div>
         <Space wrap className="aftercare-header-actions">
           <Button icon={<ReloadOutlined />} loading={refreshing} onClick={handleRefresh}>
