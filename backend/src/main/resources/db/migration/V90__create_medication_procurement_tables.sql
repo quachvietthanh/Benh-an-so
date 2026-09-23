@@ -1,5 +1,5 @@
 -- =====================================================
--- V87__create_medication_procurement_tables.sql
+-- V90__create_medication_procurement_tables.sql
 -- NCL-06-CN-012: Dự trù mua thuốc và phiếu đặt hàng
 -- Schema for medication procurement plans, items, code sequences and permissions
 -- MySQL 8.x

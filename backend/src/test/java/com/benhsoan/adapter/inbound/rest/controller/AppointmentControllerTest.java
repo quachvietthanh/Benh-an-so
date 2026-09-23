@@ -59,7 +59,7 @@ import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
 
 @WebMvcTest(controllers = AppointmentController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({ AppointmentRestMapper.class, AnonymizationModeState.class, GlobalExceptionHandler.class,
+@Import({ AppointmentRestMapper.class, com.benhsoan.adapter.inbound.rest.mapper.AppointmentSeriesRestMapper.class, AnonymizationModeState.class, GlobalExceptionHandler.class,
                 RequirePermissionAspect.class,
                 PermissionEvaluator.class, AppointmentControllerTest.AspectTestConfig.class })
 class AppointmentControllerTest {
@@ -97,6 +97,14 @@ class AppointmentControllerTest {
         private SendAppointmentReminderManuallyUseCase sendAppointmentReminderManuallyUseCase;
         @MockitoBean
         private com.benhsoan.port.inbound.appointment.GetDoctorWeeklyScheduleTableUseCase getDoctorWeeklyScheduleTableUseCase;
+        @MockitoBean
+        private com.benhsoan.port.inbound.appointment.PreviewAppointmentSeriesUseCase previewAppointmentSeriesUseCase;
+        @MockitoBean
+        private com.benhsoan.port.inbound.appointment.CreateAppointmentSeriesUseCase createAppointmentSeriesUseCase;
+        @MockitoBean
+        private com.benhsoan.port.inbound.appointment.GetAppointmentSeriesByIdUseCase getAppointmentSeriesByIdUseCase;
+        @MockitoBean
+        private com.benhsoan.port.inbound.appointment.GetPatientAppointmentSeriesUseCase getPatientAppointmentSeriesUseCase;
         @MockitoBean
         private JwtTokenPort jwtTokenPort;
         @MockitoBean
@@ -436,5 +444,299 @@ class AppointmentControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.content[0].id").value(appointmentId.toString()))
                                 .andExpect(jsonPath("$.content[0].status").value("SCHEDULED"));
+        }
+
+        @Test
+        void previewSeries_returnsPreviewResponse() throws Exception {
+                UUID patientId = UUID.randomUUID();
+                UUID doctorId = UUID.randomUUID();
+
+                when(previewAppointmentSeriesUseCase.preview(any()))
+                                .thenReturn(com.benhsoan.port.dto.result.appointment.AppointmentSeriesPreviewResult.builder()
+                                                .totalSessions(2)
+                                                .intervalDays(7)
+                                                .allAvailable(true)
+                                                .conflictCount(0)
+                                                .sessions(List.of(
+                                                                com.benhsoan.port.dto.result.appointment.AppointmentSeriesSessionPreviewResult.builder()
+                                                                                .sequenceNumber(1)
+                                                                                .startTime(APPOINTMENT_START)
+                                                                                .endTime(APPOINTMENT_END)
+                                                                                .status("AVAILABLE")
+                                                                                .build()
+                                                ))
+                                                .build());
+
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "firstSessionStartTime": "%s",
+                                  "sessionDurationMinutes": 30,
+                                  "totalSessions": 2,
+                                  "intervalDays": 7
+                                }
+                                """.formatted(patientId, doctorId, APPOINTMENT_START);
+
+                mockMvc.perform(post("/appointments/series/preview")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_CREATE")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.totalSessions").value(2))
+                                .andExpect(jsonPath("$.allAvailable").value(true))
+                                .andExpect(jsonPath("$.sessions[0].sequenceNumber").value(1));
+        }
+
+        @Test
+        void createSeries_returnsCreatedResponse() throws Exception {
+                UUID seriesId = UUID.randomUUID();
+                UUID patientId = UUID.randomUUID();
+                UUID doctorId = UUID.randomUUID();
+
+                when(createAppointmentSeriesUseCase.create(any()))
+                                .thenReturn(com.benhsoan.port.dto.result.appointment.AppointmentSeriesResult.builder()
+                                                .id(seriesId)
+                                                .seriesCode("SER000001")
+                                                .patientId(patientId)
+                                                .doctorId(doctorId)
+                                                .totalSessions(2)
+                                                .intervalDays(7)
+                                                .title("Lieu trinh VLTL")
+                                                .status(com.benhsoan.domain.appointment.enums.AppointmentSeriesStatus.ACTIVE)
+                                                .appointments(List.of())
+                                                .build());
+
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "title": "Lieu trinh VLTL",
+                                  "totalSessions": 2,
+                                  "intervalDays": 7,
+                                  "sessions": [
+                                    {
+                                      "sequenceNumber": 1,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    },
+                                    {
+                                      "sequenceNumber": 2,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(patientId, doctorId, APPOINTMENT_START, APPOINTMENT_END,
+                                                APPOINTMENT_START.plusSeconds(86400 * 7), APPOINTMENT_END.plusSeconds(86400 * 7));
+
+                mockMvc.perform(post("/appointments/series")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_CREATE")))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.id").value(seriesId.toString()))
+                                .andExpect(jsonPath("$.seriesCode").value("SER000001"))
+                                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        }
+
+        @Test
+        void createSeries_whenConflict_returns409WithDetails() throws Exception {
+                UUID patientId = UUID.randomUUID();
+                UUID doctorId = UUID.randomUUID();
+
+                var conflictDetail = new com.benhsoan.domain.appointment.AppointmentSeriesConflictDetail(
+                                2, APPOINTMENT_START.plusSeconds(86400 * 7), APPOINTMENT_END.plusSeconds(86400 * 7),
+                                "APPOINTMENT_CONFLICT", "Bác sĩ đã có lịch hẹn khác trong khung giờ này."
+                );
+
+                when(createAppointmentSeriesUseCase.create(any()))
+                                .thenThrow(new com.benhsoan.domain.appointment.exception.AppointmentSeriesConflictException(List.of(conflictDetail)));
+
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "totalSessions": 2,
+                                  "intervalDays": 7,
+                                  "sessions": [
+                                    {
+                                      "sequenceNumber": 1,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    },
+                                    {
+                                      "sequenceNumber": 2,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(patientId, doctorId, APPOINTMENT_START, APPOINTMENT_END,
+                                                APPOINTMENT_START.plusSeconds(86400 * 7), APPOINTMENT_END.plusSeconds(86400 * 7));
+
+                mockMvc.perform(post("/appointments/series")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_CREATE")))
+                                .andExpect(status().isConflict())
+                                .andExpect(jsonPath("$.code").value("APPOINTMENT_SERIES_CONFLICT"))
+                                .andExpect(jsonPath("$.details.conflicts[0].sequenceNumber").value(2))
+                                .andExpect(jsonPath("$.details.conflicts[0].conflictType").value("APPOINTMENT_CONFLICT"));
+        }
+
+        @Test
+        void getSeriesById_returnsSeries() throws Exception {
+                UUID seriesId = UUID.randomUUID();
+                when(getAppointmentSeriesByIdUseCase.getById(seriesId))
+                                .thenReturn(com.benhsoan.port.dto.result.appointment.AppointmentSeriesResult.builder()
+                                                .id(seriesId)
+                                                .seriesCode("SER000001")
+                                                .status(com.benhsoan.domain.appointment.enums.AppointmentSeriesStatus.ACTIVE)
+                                                .appointments(List.of())
+                                                .build());
+
+                mockMvc.perform(get("/appointments/series/{id}", seriesId)
+                                .with(withPermissions("APPOINTMENT_READ")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.id").value(seriesId.toString()))
+                                .andExpect(jsonPath("$.seriesCode").value("SER000001"));
+        }
+
+        @Test
+        void getSeriesByPatientId_returnsList() throws Exception {
+                UUID patientId = UUID.randomUUID();
+                UUID seriesId = UUID.randomUUID();
+
+                when(getPatientAppointmentSeriesUseCase.getByPatientId(patientId))
+                                .thenReturn(List.of(
+                                                com.benhsoan.port.dto.result.appointment.AppointmentSeriesResult.builder()
+                                                                .id(seriesId)
+                                                                .seriesCode("SER000001")
+                                                                .patientId(patientId)
+                                                                .status(com.benhsoan.domain.appointment.enums.AppointmentSeriesStatus.ACTIVE)
+                                                                .appointments(List.of())
+                                                                .build()
+                                ));
+
+                mockMvc.perform(get("/appointments/series/patient/{patientId}", patientId)
+                                .with(withPermissions("APPOINTMENT_READ")))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].id").value(seriesId.toString()))
+                                .andExpect(jsonPath("$[0].seriesCode").value("SER000001"));
+        }
+
+        @Test
+        void previewSeries_whenMissingAppointmentCreatePermission_returns403() throws Exception {
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "firstSessionStartTime": "%s",
+                                  "sessionDurationMinutes": 30,
+                                  "totalSessions": 2,
+                                  "intervalDays": 7
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START);
+
+                mockMvc.perform(post("/appointments/series/preview")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_READ")))
+                                .andExpect(status().isForbidden());
+
+                verifyNoInteractions(previewAppointmentSeriesUseCase);
+        }
+
+        @Test
+        void previewSeries_whenUnauthorizedRole_returns403() throws Exception {
+                when(previewAppointmentSeriesUseCase.preview(any()))
+                                .thenThrow(new com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException());
+
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "firstSessionStartTime": "%s",
+                                  "sessionDurationMinutes": 30,
+                                  "totalSessions": 2,
+                                  "intervalDays": 7
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START);
+
+                mockMvc.perform(post("/appointments/series/preview")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_CREATE")))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.code").value("UNAUTHORIZED_APPOINTMENT_OPERATION"));
+        }
+
+        @Test
+        void createSeries_whenMissingAppointmentCreatePermission_returns403() throws Exception {
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "totalSessions": 2,
+                                  "intervalDays": 7,
+                                  "sessions": [
+                                    {
+                                      "sequenceNumber": 1,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    },
+                                    {
+                                      "sequenceNumber": 2,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START, APPOINTMENT_END,
+                                                APPOINTMENT_START.plusSeconds(86400 * 7), APPOINTMENT_END.plusSeconds(86400 * 7));
+
+                mockMvc.perform(post("/appointments/series")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_READ")))
+                                .andExpect(status().isForbidden());
+
+                verifyNoInteractions(createAppointmentSeriesUseCase);
+        }
+
+        @Test
+        void createSeries_whenUnauthorizedRole_returns403() throws Exception {
+                when(createAppointmentSeriesUseCase.create(any()))
+                                .thenThrow(new com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException());
+
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "totalSessions": 2,
+                                  "intervalDays": 7,
+                                  "sessions": [
+                                    {
+                                      "sequenceNumber": 1,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    },
+                                    {
+                                      "sequenceNumber": 2,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START, APPOINTMENT_END,
+                                                APPOINTMENT_START.plusSeconds(86400 * 7), APPOINTMENT_END.plusSeconds(86400 * 7));
+
+                mockMvc.perform(post("/appointments/series")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_CREATE")))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.code").value("UNAUTHORIZED_APPOINTMENT_OPERATION"));
         }
 }

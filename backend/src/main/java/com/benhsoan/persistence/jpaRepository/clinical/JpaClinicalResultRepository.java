@@ -18,6 +18,7 @@ public interface JpaClinicalResultRepository extends JpaRepository<ClinicalResul
     Optional<ClinicalResultEntity> findByClinicalOrderItemId(UUID clinicalOrderItemId);
     Page<ClinicalResultEntity> findByVisitIdOrderByEnteredAtDesc(UUID visitId, Pageable pageable);
     List<ClinicalResultEntity> findByClinicalOrderItemIdIn(Collection<UUID> clinicalOrderItemIds);
+    List<ClinicalResultEntity> findByVisitIdAndStatusOrderByEnteredAtDesc(UUID visitId, com.benhsoan.domain.clinical.enums.ClinicalResultStatus status);
 
     @Query("select result.id from ClinicalResultEntity result where result.clinicalOrderItemId in :itemIds")
     List<UUID> findIdsByClinicalOrderItemIdIn(@Param("itemIds") Collection<UUID> itemIds);

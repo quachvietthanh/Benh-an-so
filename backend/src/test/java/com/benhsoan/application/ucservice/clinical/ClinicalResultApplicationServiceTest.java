@@ -22,6 +22,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.benhsoan.domain.clinical.ClinicalOrder;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
@@ -43,6 +44,7 @@ import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.portal.notification.LabResultAvailableNotificationRequested;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
@@ -93,6 +95,8 @@ class ClinicalResultApplicationServiceTest {
         private ClinicalOrderAuthorizationService authorizationService;
         @Mock
         private ClinicalResultAuditService auditService;
+        @Mock
+        private ApplicationEventPublisher applicationEventPublisher;
         @Mock
         private ClockPort clock;
 
@@ -163,6 +167,11 @@ class ClinicalResultApplicationServiceTest {
                 ArgumentCaptor<ClinicalResultHistory> historyCaptor = ArgumentCaptor
                                 .forClass(ClinicalResultHistory.class);
                 verify(clinicalResultHistoryRepository).save(historyCaptor.capture());
+                ArgumentCaptor<LabResultAvailableNotificationRequested> eventCaptor =
+                                ArgumentCaptor.forClass(LabResultAvailableNotificationRequested.class);
+                verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+                assertEquals(fixture.visit().getPatientId(), eventCaptor.getValue().patientId());
+                assertEquals(result.getId(), eventCaptor.getValue().clinicalResultId());
                 assertEquals(ClinicalResultStatus.FINAL, response.status());
                 assertEquals(ClinicalResultStatus.DRAFT, historyCaptor.getValue().getOldStatus());
                 assertEquals(ClinicalResultStatus.FINAL, historyCaptor.getValue().getNewStatus());

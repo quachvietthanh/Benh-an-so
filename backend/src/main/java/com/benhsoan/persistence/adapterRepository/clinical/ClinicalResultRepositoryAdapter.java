@@ -28,4 +28,7 @@ public class ClinicalResultRepositoryAdapter implements ClinicalResultRepository
     public List<ClinicalResult> findByClinicalOrderItemIdIn(Collection<UUID> itemIds) {
         return itemIds == null || itemIds.isEmpty() ? List.of() : jpaRepository.findByClinicalOrderItemIdIn(itemIds).stream().map(mapper::toDomain).toList();
     }
+    public List<ClinicalResult> findByVisitIdAndStatus(UUID visitId, com.benhsoan.domain.clinical.enums.ClinicalResultStatus status) {
+        return jpaRepository.findByVisitIdAndStatusOrderByEnteredAtDesc(visitId, status).stream().map(mapper::toDomain).toList();
+    }
 }

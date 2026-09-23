@@ -12,6 +12,7 @@ final class DomainExceptionHttpStatusMapper {
     static HttpStatus statusFor(DomainErrorCode code) {
         return switch (code) {
             case APPOINTMENT_NOT_FOUND,
+                    APPOINTMENT_SERIES_NOT_FOUND,
                     BACKUP_NOT_FOUND,
                     BATCH_NOT_FOUND,
                     CARE_LOG_NOT_FOUND,
@@ -38,6 +39,7 @@ final class DomainExceptionHttpStatusMapper {
                     PATIENT_FAMILY_HISTORY_NOT_FOUND,
                     PATIENT_NOT_FOUND,
                     PATIENT_IMPORT_LOG_NOT_FOUND,
+                    PATIENT_PORTAL_NOTIFICATION_NOT_FOUND,
                     PAYMENT_NOT_FOUND,
                     PORTAL_LOOKUP_NOT_FOUND,
                     PRESCRIPTION_ITEM_NOT_FOUND,
@@ -51,7 +53,8 @@ final class DomainExceptionHttpStatusMapper {
                     SPECIALTY_NOT_FOUND,
                     USER_NOT_FOUND,
                     VISIT_NOT_FOUND,
-                    VITAL_SIGN_NOT_FOUND -> HttpStatus.NOT_FOUND;
+                    VITAL_SIGN_NOT_FOUND,
+                    WAITLIST_ENTRY_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ACCOUNT_DISABLED,
                     ACCOUNT_LOCKED,
                     DOCTOR_INACTIVE,
@@ -104,12 +107,15 @@ final class DomainExceptionHttpStatusMapper {
                     CASHIER_SHIFT_NOTE_REQUIRED,
                     PROCUREMENT_PLAN_EMPTY_ITEMS,
                     PROCUREMENT_PLAN_DUPLICATE_MEDICINE,
+                    DOCTOR_HAS_AVAILABLE_SLOTS,
+                    WAITLIST_INVALID_STATUS,
                     WEAK_PASSWORD -> HttpStatus.BAD_REQUEST;
             case ALLERGY_CONFIRMATION_REQUIRED,
                     APPOINTMENT_ALREADY_CANCELLED,
                     APPOINTMENT_ALREADY_COMPLETED,
                     APPOINTMENT_ALREADY_IN_PROGRESS,
                     APPOINTMENT_INVALID_STATUS,
+                    APPOINTMENT_SERIES_CONFLICT,
                     APPOINTMENT_TIME_CONFLICT,
                     BATCH_STATE_CONFLICT,
                     CASHIER_SHIFT_ALREADY_CONFIRMED,
@@ -153,6 +159,7 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_INVALID_STATUS,
                     MEDICAL_RECORD_INVALID_VISIT,
                     MEDICAL_RECORD_IN_RETENTION_PERIOD,
+                    PATIENT_ALREADY_IN_WAITLIST,
                     MEDICAL_RECORD_LOCKED,
                     MEDICAL_RECORD_TEMPLATE_CHANGE_WITH_CONTENT,
                     MEDICAL_RECORD_TEMPLATE_DEFAULT_NOT_CONFIGURED,
