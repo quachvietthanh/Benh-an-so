@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.AppointmentRescheduleLog;
@@ -29,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.REQUIRES_NEW)
 public class PatientPortalNotificationCreator {
 
     private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");

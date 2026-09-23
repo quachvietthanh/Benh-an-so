@@ -10,12 +10,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.domain.clinical.ClinicalOrderItem;
 import com.benhsoan.domain.clinical.ClinicalReferenceRange;
 import com.benhsoan.domain.clinical.ClinicalResult;
@@ -32,6 +32,7 @@ import com.benhsoan.domain.clinical.exception.ClinicalOrderItemNotFoundException
 import com.benhsoan.domain.clinical.exception.ClinicalOrderLockedMedicalRecordException;
 import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
 import com.benhsoan.domain.medicalrecord.enums.MedicalRecordAccessAction;
+import com.benhsoan.domain.portal.notification.LabResultAvailableNotificationRequested;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.command.clinical.EnterClinicalResultCommand;
@@ -80,7 +81,7 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
     private final ReferenceRangeEvaluator referenceRangeEvaluator;
     private final ClinicalOrderAuthorizationService authorizationService;
     private final ClinicalResultAuditService auditService;
-    private final PatientPortalNotificationCreator patientPortalNotificationCreator;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final ClockPort clock;
 
     @Override
@@ -172,8 +173,8 @@ public class ClinicalResultService implements EnterClinicalResultUseCase, Update
 
         var finalizedVisit = visitRepository.findById(savedResult.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(savedResult.getVisitId()));
-        patientPortalNotificationCreator.createLabResultAvailable(
-                finalizedVisit.getPatientId(), savedResult.getId(), now);
+        applicationEventPublisher.publishEvent(new LabResultAvailableNotificationRequested(
+                finalizedVisit.getPatientId(), savedResult.getId(), now));
 
         return mapDetail(savedResult);
     }

@@ -1,5 +1,5 @@
 -- =====================================================
--- V88__create_patient_portal_notifications.sql
+-- V87__create_patient_portal_notifications.sql
 -- NCL-14-CN-008: Thông báo và nhắc lịch trên cổng bệnh nhân
 -- Business Rule: QTN-23 (patient data isolation)
 -- Acceptance Criteria: TC-01 (reminder), TC-02 (changed), TC-03 (no cross-patient access)

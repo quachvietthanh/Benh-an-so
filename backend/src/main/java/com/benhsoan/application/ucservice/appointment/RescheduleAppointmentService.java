@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.AppointmentRescheduleLog;
 import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
@@ -22,6 +22,7 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.portal.notification.AppointmentChangedNotificationRequested;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.appointment.RescheduleAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
@@ -62,7 +63,7 @@ public class RescheduleAppointmentService implements RescheduleAppointmentUseCas
     private final AppointmentResultMapper resultMapper;
     private final AppointmentRescheduleHistoryAssembler historyAssembler;
     private final AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter;
-    private final PatientPortalNotificationCreator patientPortalNotificationCreator;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -142,7 +143,8 @@ public class RescheduleAppointmentService implements RescheduleAppointmentUseCas
         );
         rescheduleLogRepository.save(rescheduleLog);
 
-        patientPortalNotificationCreator.createAppointmentChanged(saved, rescheduleLog, now);
+        applicationEventPublisher.publishEvent(
+                new AppointmentChangedNotificationRequested(saved, rescheduleLog, now));
 
         // General system audit log
         auditLogRepository.save(AuditLog.create(

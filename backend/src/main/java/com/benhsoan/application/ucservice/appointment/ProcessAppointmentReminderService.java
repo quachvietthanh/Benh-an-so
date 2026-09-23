@@ -5,17 +5,18 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.config.AppointmentReminderProperties;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
 import com.benhsoan.domain.appointment.notification.AppointmentNotificationLog;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.patient.Patient;
+import com.benhsoan.domain.portal.notification.AppointmentReminderNotificationRequested;
 import com.benhsoan.port.outbound.notification.AppointmentNotificationPort;
 import com.benhsoan.port.outbound.notification.AppointmentReminderMessage;
 import com.benhsoan.port.outbound.notification.NotificationSendResult;
@@ -42,7 +43,7 @@ public class ProcessAppointmentReminderService {
     private final UserRepository userRepository;
     private final AppointmentNotificationPort appointmentNotificationPort;
     private final AppointmentReminderProperties properties;
-    private final PatientPortalNotificationCreator patientPortalNotificationCreator;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AppointmentReminderResult process(UUID appointmentId, Instant now) {
@@ -76,7 +77,8 @@ public class ProcessAppointmentReminderService {
             if (result != null && result.sent()) {
                 notificationLogRepository.save(AppointmentNotificationLog.sent(
                         appointment.getId(), appointment.getPatientId(), content, now));
-                patientPortalNotificationCreator.createAppointmentReminder(appointment, patient, doctor, now);
+                applicationEventPublisher.publishEvent(
+                        new AppointmentReminderNotificationRequested(appointment, patient, doctor, now));
                 return AppointmentReminderResult.sent();
             }
 

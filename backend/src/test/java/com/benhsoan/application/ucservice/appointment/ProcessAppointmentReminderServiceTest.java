@@ -19,8 +19,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
-import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.config.AppointmentReminderProperties;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
@@ -28,6 +28,7 @@ import com.benhsoan.domain.appointment.notification.AppointmentNotificationLog;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.enums.Gender;
+import com.benhsoan.domain.portal.notification.AppointmentReminderNotificationRequested;
 import com.benhsoan.port.outbound.notification.AppointmentNotificationPort;
 import com.benhsoan.port.outbound.notification.AppointmentReminderMessage;
 import com.benhsoan.port.outbound.notification.NotificationSendResult;
@@ -49,7 +50,7 @@ class ProcessAppointmentReminderServiceTest {
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
     @Mock private AppointmentNotificationPort appointmentNotificationPort;
-    @Mock private PatientPortalNotificationCreator patientPortalNotificationCreator;
+    @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Captor private ArgumentCaptor<AppointmentNotificationLog> logCaptor;
     @Captor private ArgumentCaptor<AppointmentReminderMessage> messageCaptor;
 
@@ -61,7 +62,7 @@ class ProcessAppointmentReminderServiceTest {
                 notificationLogRepository, patientRepository, userRepository,
                 appointmentNotificationPort,
                 new AppointmentReminderProperties(true, 24, 60_000, ZoneId.of("Asia/Ho_Chi_Minh")),
-                patientPortalNotificationCreator);
+                applicationEventPublisher);
     }
 
     @Test
@@ -75,7 +76,10 @@ class ProcessAppointmentReminderServiceTest {
 
         verify(appointmentNotificationPort).sendAppointmentReminder(messageCaptor.capture());
         verify(notificationLogRepository).save(logCaptor.capture());
-        verify(patientPortalNotificationCreator).createAppointmentReminder(any(), any(), any(), any());
+        ArgumentCaptor<AppointmentReminderNotificationRequested> eventCaptor =
+                ArgumentCaptor.forClass(AppointmentReminderNotificationRequested.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(APPOINTMENT_ID, eventCaptor.getValue().appointment().getId());
         assertEquals("AP000123", messageCaptor.getValue().appointmentCode());
         assertEquals("Nguyen Van A", messageCaptor.getValue().patientName());
         assertEquals("Nguyen Van B", messageCaptor.getValue().doctorName());
@@ -104,7 +108,7 @@ class ProcessAppointmentReminderServiceTest {
 
         verify(appointmentNotificationPort, never()).sendAppointmentReminder(any());
         verify(notificationLogRepository, never()).save(any());
-        verify(patientPortalNotificationCreator, never()).createAppointmentReminder(any(), any(), any(), any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     @Test

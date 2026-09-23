@@ -37,7 +37,7 @@ Không thêm kênh/hạng mục ngoài lề (SMS, email, push, WhatsApp…) vì 
 
 ## 3. Data model
 
-Bảng `patient_portal_notifications` (Flyway `V88__create_patient_portal_notifications.sql`):
+Bảng `patient_portal_notifications` (Flyway `V87__create_patient_portal_notifications.sql`):
 
 | Cột | Kiểu | Ghi chú |
 | :--- | :--- | :--- |

@@ -17,12 +17,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
-import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.AppointmentRescheduleLog;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
@@ -35,6 +36,7 @@ import com.benhsoan.domain.appointment.exception.DoctorNotWorkingException;
 import com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.portal.notification.AppointmentChangedNotificationRequested;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.appointment.RescheduleAppointmentCommand;
 import com.benhsoan.port.dto.result.AppointmentResult;
@@ -67,7 +69,7 @@ class RescheduleAppointmentServiceTest {
         @Mock
         private AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter;
         @Mock
-        private PatientPortalNotificationCreator patientPortalNotificationCreator;
+        private ApplicationEventPublisher applicationEventPublisher;
 
         private AppointmentResultMapper resultMapper;
         private AppointmentRescheduleHistoryAssembler historyAssembler;
@@ -95,7 +97,7 @@ class RescheduleAppointmentServiceTest {
                                 resultMapper,
                                 historyAssembler,
                                 accessDeniedAuditWriter,
-                                patientPortalNotificationCreator,
+                                applicationEventPublisher,
                                 objectMapper);
         }
 
@@ -147,8 +149,11 @@ class RescheduleAppointmentServiceTest {
 
                 verify(rescheduleLogRepository).save(any(AppointmentRescheduleLog.class));
                 verify(auditLogRepository).save(any(AuditLog.class));
-                verify(patientPortalNotificationCreator).createAppointmentChanged(
-                                any(Appointment.class), any(AppointmentRescheduleLog.class), eq(fixedNow));
+                ArgumentCaptor<AppointmentChangedNotificationRequested> eventCaptor =
+                                ArgumentCaptor.forClass(AppointmentChangedNotificationRequested.class);
+                verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+                assertEquals(fixedNow, eventCaptor.getValue().now());
+                assertNotNull(eventCaptor.getValue().rescheduleLog());
         }
 
         @Test
