@@ -20,6 +20,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.config.AppointmentReminderProperties;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.enums.AppointmentStatus;
@@ -48,6 +49,7 @@ class ProcessAppointmentReminderServiceTest {
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
     @Mock private AppointmentNotificationPort appointmentNotificationPort;
+    @Mock private PatientPortalNotificationCreator patientPortalNotificationCreator;
     @Captor private ArgumentCaptor<AppointmentNotificationLog> logCaptor;
     @Captor private ArgumentCaptor<AppointmentReminderMessage> messageCaptor;
 
@@ -58,7 +60,8 @@ class ProcessAppointmentReminderServiceTest {
         service = new ProcessAppointmentReminderService(appointmentRepository,
                 notificationLogRepository, patientRepository, userRepository,
                 appointmentNotificationPort,
-                new AppointmentReminderProperties(true, 24, 60_000, ZoneId.of("Asia/Ho_Chi_Minh")));
+                new AppointmentReminderProperties(true, 24, 60_000, ZoneId.of("Asia/Ho_Chi_Minh")),
+                patientPortalNotificationCreator);
     }
 
     @Test
@@ -72,6 +75,7 @@ class ProcessAppointmentReminderServiceTest {
 
         verify(appointmentNotificationPort).sendAppointmentReminder(messageCaptor.capture());
         verify(notificationLogRepository).save(logCaptor.capture());
+        verify(patientPortalNotificationCreator).createAppointmentReminder(any(), any(), any(), any());
         assertEquals("AP000123", messageCaptor.getValue().appointmentCode());
         assertEquals("Nguyen Van A", messageCaptor.getValue().patientName());
         assertEquals("Nguyen Van B", messageCaptor.getValue().doctorName());
@@ -100,6 +104,7 @@ class ProcessAppointmentReminderServiceTest {
 
         verify(appointmentNotificationPort, never()).sendAppointmentReminder(any());
         verify(notificationLogRepository, never()).save(any());
+        verify(patientPortalNotificationCreator, never()).createAppointmentReminder(any(), any(), any(), any());
     }
 
     @Test

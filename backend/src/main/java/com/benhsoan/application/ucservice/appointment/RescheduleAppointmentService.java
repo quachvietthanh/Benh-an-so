@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.portal.PatientPortalNotificationCreator;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.AppointmentRescheduleLog;
 import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
@@ -61,6 +62,7 @@ public class RescheduleAppointmentService implements RescheduleAppointmentUseCas
     private final AppointmentResultMapper resultMapper;
     private final AppointmentRescheduleHistoryAssembler historyAssembler;
     private final AppointmentAccessDeniedAuditWriter accessDeniedAuditWriter;
+    private final PatientPortalNotificationCreator patientPortalNotificationCreator;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -139,6 +141,8 @@ public class RescheduleAppointmentService implements RescheduleAppointmentUseCas
                 now
         );
         rescheduleLogRepository.save(rescheduleLog);
+
+        patientPortalNotificationCreator.createAppointmentChanged(saved, rescheduleLog, now);
 
         // General system audit log
         auditLogRepository.save(AuditLog.create(
