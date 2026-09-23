@@ -625,4 +625,118 @@ class AppointmentControllerTest {
                                 .andExpect(jsonPath("$[0].id").value(seriesId.toString()))
                                 .andExpect(jsonPath("$[0].seriesCode").value("SER000001"));
         }
+
+        @Test
+        void previewSeries_whenMissingAppointmentCreatePermission_returns403() throws Exception {
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "firstSessionStartTime": "%s",
+                                  "sessionDurationMinutes": 30,
+                                  "totalSessions": 2,
+                                  "intervalDays": 7
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START);
+
+                mockMvc.perform(post("/appointments/series/preview")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_READ")))
+                                .andExpect(status().isForbidden());
+
+                verifyNoInteractions(previewAppointmentSeriesUseCase);
+        }
+
+        @Test
+        void previewSeries_whenUnauthorizedRole_returns403() throws Exception {
+                when(previewAppointmentSeriesUseCase.preview(any()))
+                                .thenThrow(new com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException());
+
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "firstSessionStartTime": "%s",
+                                  "sessionDurationMinutes": 30,
+                                  "totalSessions": 2,
+                                  "intervalDays": 7
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START);
+
+                mockMvc.perform(post("/appointments/series/preview")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_CREATE")))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.code").value("UNAUTHORIZED_APPOINTMENT_OPERATION"));
+        }
+
+        @Test
+        void createSeries_whenMissingAppointmentCreatePermission_returns403() throws Exception {
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "totalSessions": 2,
+                                  "intervalDays": 7,
+                                  "sessions": [
+                                    {
+                                      "sequenceNumber": 1,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    },
+                                    {
+                                      "sequenceNumber": 2,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START, APPOINTMENT_END,
+                                                APPOINTMENT_START.plusSeconds(86400 * 7), APPOINTMENT_END.plusSeconds(86400 * 7));
+
+                mockMvc.perform(post("/appointments/series")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_READ")))
+                                .andExpect(status().isForbidden());
+
+                verifyNoInteractions(createAppointmentSeriesUseCase);
+        }
+
+        @Test
+        void createSeries_whenUnauthorizedRole_returns403() throws Exception {
+                when(createAppointmentSeriesUseCase.create(any()))
+                                .thenThrow(new com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException());
+
+                String payload = """
+                                {
+                                  "patientId": "%s",
+                                  "doctorId": "%s",
+                                  "totalSessions": 2,
+                                  "intervalDays": 7,
+                                  "sessions": [
+                                    {
+                                      "sequenceNumber": 1,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    },
+                                    {
+                                      "sequenceNumber": 2,
+                                      "startTime": "%s",
+                                      "endTime": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_START, APPOINTMENT_END,
+                                                APPOINTMENT_START.plusSeconds(86400 * 7), APPOINTMENT_END.plusSeconds(86400 * 7));
+
+                mockMvc.perform(post("/appointments/series")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload)
+                                .with(withPermissions("APPOINTMENT_CREATE")))
+                                .andExpect(status().isForbidden())
+                                .andExpect(jsonPath("$.code").value("UNAUTHORIZED_APPOINTMENT_OPERATION"));
+        }
 }

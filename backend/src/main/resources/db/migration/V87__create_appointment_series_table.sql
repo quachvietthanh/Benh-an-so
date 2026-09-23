@@ -32,3 +32,20 @@ ALTER TABLE appointments ADD CONSTRAINT fk_appointments_series
     FOREIGN KEY (series_id) REFERENCES appointment_series(id) ON DELETE SET NULL;
 
 CREATE INDEX idx_appointments_series_id ON appointments(series_id);
+
+-- Sequence table for atomic, concurrency-safe code generation (APT and SER)
+CREATE TABLE appointment_code_sequences (
+    code_prefix VARCHAR(10) NOT NULL,
+    `last_value` BIGINT NOT NULL,
+    CONSTRAINT pk_appointment_code_sequences PRIMARY KEY (code_prefix),
+    CONSTRAINT chk_appointment_code_sequences_last_value CHECK (`last_value` >= 0)
+);
+
+INSERT INTO appointment_code_sequences (code_prefix, `last_value`)
+VALUES (
+    'APT',
+    COALESCE((SELECT MAX(CAST(RIGHT(appointment_code, 6) AS UNSIGNED)) FROM appointments WHERE appointment_code REGEXP '[0-9]{6}$'), 0)
+);
+
+INSERT INTO appointment_code_sequences (code_prefix, `last_value`)
+VALUES ('SER', 0);

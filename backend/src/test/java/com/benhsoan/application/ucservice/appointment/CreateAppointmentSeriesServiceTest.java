@@ -3,6 +3,7 @@ package com.benhsoan.application.ucservice.appointment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -299,5 +300,40 @@ class CreateAppointmentSeriesServiceTest {
 
                 verify(appointmentSeriesRepository, never()).save(any());
                 verify(appointmentRepository, never()).save(any());
+        }
+
+        @Test
+        void rejectsWhenSessionStructureIsInvalid() {
+                UUID patientId = UUID.randomUUID();
+                UUID doctorId = UUID.randomUUID();
+
+                when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+                when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+
+                Patient patient = mock(Patient.class);
+                when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+
+                User doctor = User.restore(doctorId, "doctor1", "hash", "Dr. A", "a@example.com", "0900000001",
+                                UUID.randomUUID(), true, null, NOW);
+                when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor));
+
+                org.mockito.Mockito.doThrow(new ValidationException("Số thứ tự các buổi khám phải liên tục từ 1 đến 2."))
+                                .when(appointmentSeriesValidator).validateSessionStructure(any(), eq(2), eq(7));
+
+                CreateAppointmentSeriesCommand command = CreateAppointmentSeriesCommand.builder()
+                                .patientId(patientId)
+                                .doctorId(doctorId)
+                                .totalSessions(2)
+                                .intervalDays(7)
+                                .sessions(List.of(
+                                                new AppointmentSeriesSessionCommand(1, NOW.plusSeconds(3600),
+                                                                NOW.plusSeconds(5400)),
+                                                new AppointmentSeriesSessionCommand(3, NOW.plusSeconds(86400 * 7),
+                                                                NOW.plusSeconds(86400 * 7 + 1800))))
+                                .build();
+
+                ValidationException ex = assertThrows(ValidationException.class, () -> service.create(command));
+                assertTrue(ex.getMessage().contains("liên tục"));
+                verify(appointmentSeriesRepository, never()).save(any());
         }
 }

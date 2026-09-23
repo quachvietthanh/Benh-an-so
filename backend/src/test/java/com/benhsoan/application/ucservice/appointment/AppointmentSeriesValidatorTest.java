@@ -44,7 +44,7 @@ class AppointmentSeriesValidatorTest {
                 appointmentRepository,
                 clockPort
         );
-        when(clockPort.now()).thenReturn(NOW);
+        org.mockito.Mockito.lenient().when(clockPort.now()).thenReturn(NOW);
     }
 
     @Test
@@ -192,5 +192,98 @@ class AppointmentSeriesValidatorTest {
         var conflicts = validator.validateSessions(DOCTOR_ID, sessions);
 
         assertTrue(conflicts.isEmpty());
+    }
+
+    @Test
+    void validateSessionStructureSucceedsForValidConsecutiveSessions() {
+        Instant s1Start = Instant.parse("2026-09-08T02:00:00Z");
+        Instant s1End = Instant.parse("2026-09-08T03:00:00Z");
+        Instant s2Start = Instant.parse("2026-09-15T02:00:00Z"); // 7 days later
+        Instant s2End = Instant.parse("2026-09-15T03:00:00Z");
+
+        var sessions = List.of(
+                new AppointmentSeriesValidator.SessionSlot(1, s1Start, s1End),
+                new AppointmentSeriesValidator.SessionSlot(2, s2Start, s2End)
+        );
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
+                validator.validateSessionStructure(sessions, 2, 7)
+        );
+    }
+
+    @Test
+    void validateSessionStructureRejectsDuplicateSequenceNumbers() {
+        Instant s1Start = Instant.parse("2026-09-08T02:00:00Z");
+        Instant s1End = Instant.parse("2026-09-08T03:00:00Z");
+        Instant s2Start = Instant.parse("2026-09-15T02:00:00Z");
+        Instant s2End = Instant.parse("2026-09-15T03:00:00Z");
+
+        var sessions = List.of(
+                new AppointmentSeriesValidator.SessionSlot(1, s1Start, s1End),
+                new AppointmentSeriesValidator.SessionSlot(1, s2Start, s2End)
+        );
+
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> validator.validateSessionStructure(sessions, 2, 7)
+        );
+        assertTrue(ex.getMessage().contains("trùng lặp"));
+    }
+
+    @Test
+    void validateSessionStructureRejectsNonContiguousSequence() {
+        Instant s1Start = Instant.parse("2026-09-08T02:00:00Z");
+        Instant s1End = Instant.parse("2026-09-08T03:00:00Z");
+        Instant s2Start = Instant.parse("2026-09-15T02:00:00Z");
+        Instant s2End = Instant.parse("2026-09-15T03:00:00Z");
+
+        var sessions = List.of(
+                new AppointmentSeriesValidator.SessionSlot(1, s1Start, s1End),
+                new AppointmentSeriesValidator.SessionSlot(5, s2Start, s2End)
+        );
+
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> validator.validateSessionStructure(sessions, 2, 7)
+        );
+        assertTrue(ex.getMessage().contains("không hợp lệ") || ex.getMessage().contains("liên tục"));
+    }
+
+    @Test
+    void validateSessionStructureRejectsSessionsTooCloseToEachOther() {
+        Instant s1Start = Instant.parse("2026-09-08T02:00:00Z");
+        Instant s1End = Instant.parse("2026-09-08T03:00:00Z");
+        Instant s2Start = Instant.parse("2026-09-09T02:00:00Z"); // Only 1 day later when interval is 7
+        Instant s2End = Instant.parse("2026-09-09T03:00:00Z");
+
+        var sessions = List.of(
+                new AppointmentSeriesValidator.SessionSlot(1, s1Start, s1End),
+                new AppointmentSeriesValidator.SessionSlot(2, s2Start, s2End)
+        );
+
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> validator.validateSessionStructure(sessions, 2, 7)
+        );
+        assertTrue(ex.getMessage().contains("không phù hợp với chu kỳ"));
+    }
+
+    @Test
+    void validateSessionStructureRejectsChronologicalViolation() {
+        Instant s1Start = Instant.parse("2026-09-15T02:00:00Z");
+        Instant s1End = Instant.parse("2026-09-15T03:00:00Z");
+        Instant s2Start = Instant.parse("2026-09-08T02:00:00Z"); // Earlier than session 1
+        Instant s2End = Instant.parse("2026-09-08T03:00:00Z");
+
+        var sessions = List.of(
+                new AppointmentSeriesValidator.SessionSlot(1, s1Start, s1End),
+                new AppointmentSeriesValidator.SessionSlot(2, s2Start, s2End)
+        );
+
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> validator.validateSessionStructure(sessions, 2, 7)
+        );
+        assertTrue(ex.getMessage().contains("phải diễn ra sau"));
     }
 }

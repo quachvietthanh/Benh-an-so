@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.appointment.AppointmentSeriesConflictDetail;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
 import com.benhsoan.domain.appointment.exception.DoctorNotFoundException;
+import com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.patient.exception.PatientNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -23,6 +25,8 @@ import com.benhsoan.port.dto.result.appointment.AppointmentSeriesSessionPreviewR
 import com.benhsoan.port.inbound.appointment.PreviewAppointmentSeriesUseCase;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -34,9 +38,22 @@ public class PreviewAppointmentSeriesService implements PreviewAppointmentSeries
     private final PatientRepository patientRepository;
     private final UserRepository userRepository;
     private final AppointmentSeriesValidator appointmentSeriesValidator;
+    private final CurrentUserPort currentUserPort;
+    private final ClockPort clockPort;
+    private final AppointmentAccessDeniedAuditWriter appointmentAccessDeniedAuditWriter;
 
     @Override
     public AppointmentSeriesPreviewResult preview(PreviewAppointmentSeriesCommand command) {
+        UUID currentUserId = currentUserPort.getCurrentUserId();
+        if (!currentUserPort.hasRole("ADMIN") && !currentUserPort.hasRole("RECEPTIONIST")) {
+            appointmentAccessDeniedAuditWriter.writeSeriesPreviewDenied(
+                    currentUserId,
+                    clockPort.now(),
+                    "User lacks RECEPTIONIST or ADMIN role to preview appointment series"
+            );
+            throw new UnauthorizedAppointmentOperationException();
+        }
+
         if (command.totalSessions() < 2) {
             throw new ValidationException("Số buổi của liệu trình phải từ 2 trở lên.");
         }

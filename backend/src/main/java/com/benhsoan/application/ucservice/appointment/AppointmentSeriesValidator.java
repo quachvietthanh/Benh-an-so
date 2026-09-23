@@ -6,13 +6,17 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
 import com.benhsoan.domain.appointment.AppointmentSeriesConflictDetail;
+import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
 import com.benhsoan.port.outbound.repository.appointment.DoctorTimeOffRepository;
 import com.benhsoan.port.outbound.time.ClockPort;
@@ -35,6 +39,77 @@ public class AppointmentSeriesValidator {
             Instant startTime,
             Instant endTime
     ) {}
+
+    public void validateSessionStructure(List<SessionSlot> sessions, int totalSessions, int intervalDays) {
+        if (sessions == null || sessions.isEmpty()) {
+            throw new ValidationException("Danh sách các buổi của liệu trình không được để trống.");
+        }
+        if (sessions.size() != totalSessions) {
+            throw new ValidationException("Số lượng buổi trong danh sách (" + sessions.size()
+                    + ") không khớp với tổng số buổi (" + totalSessions + ").");
+        }
+
+        Set<Integer> seenSequences = new HashSet<>();
+        for (SessionSlot slot : sessions) {
+            if (slot.sequenceNumber() < 1 || slot.sequenceNumber() > totalSessions) {
+                throw new ValidationException("Số thứ tự buổi khám (" + slot.sequenceNumber()
+                        + ") không hợp lệ, phải nằm trong khoảng từ 1 đến " + totalSessions + ".");
+            }
+            if (!seenSequences.add(slot.sequenceNumber())) {
+                throw new ValidationException("Số thứ tự buổi khám " + slot.sequenceNumber() + " bị trùng lặp.");
+            }
+            if (slot.startTime() == null || slot.endTime() == null) {
+                throw new ValidationException("Thời gian bắt đầu và kết thúc của buổi số "
+                        + slot.sequenceNumber() + " không được để trống.");
+            }
+            if (!slot.endTime().isAfter(slot.startTime())) {
+                throw new ValidationException("Buổi số " + slot.sequenceNumber() + ": Thời gian kết thúc phải sau thời gian bắt đầu.");
+            }
+        }
+
+        if (seenSequences.size() != totalSessions) {
+            throw new ValidationException("Số thứ tự các buổi khám phải duy nhất và liên tục từ 1 đến " + totalSessions + ".");
+        }
+
+        List<SessionSlot> sorted = sessions.stream()
+                .sorted(Comparator.comparingInt(SessionSlot::sequenceNumber))
+                .toList();
+
+        for (int i = 1; i < sorted.size(); i++) {
+            SessionSlot prev = sorted.get(i - 1);
+            SessionSlot curr = sorted.get(i);
+
+            if (!curr.startTime().isAfter(prev.endTime())) {
+                throw new ValidationException("Buổi số " + curr.sequenceNumber()
+                        + " phải diễn ra sau khi buổi số " + prev.sequenceNumber() + " kết thúc.");
+            }
+
+            LocalDate prevDate = prev.startTime().atZone(CLINIC_ZONE).toLocalDate();
+            LocalDate currDate = curr.startTime().atZone(CLINIC_ZONE).toLocalDate();
+
+            if (!currDate.isAfter(prevDate)) {
+                throw new ValidationException("Buổi số " + curr.sequenceNumber() + " (" + currDate
+                        + ") phải diễn ra sau ngày của buổi số " + prev.sequenceNumber() + " (" + prevDate + ").");
+            }
+
+            long gapDays = java.time.temporal.ChronoUnit.DAYS.between(prevDate, currDate);
+            if (intervalDays == 1) {
+                if (gapDays > 3) {
+                    throw new ValidationException("Khoảng cách giữa buổi số " + prev.sequenceNumber()
+                            + " và buổi số " + curr.sequenceNumber() + " (" + gapDays
+                            + " ngày) vượt quá giới hạn chu kỳ hàng ngày.");
+                }
+            } else {
+                long minGap = Math.max(1, intervalDays - 3);
+                long maxGap = intervalDays + 7;
+                if (gapDays < minGap || gapDays > maxGap) {
+                    throw new ValidationException("Khoảng cách giữa buổi số " + prev.sequenceNumber()
+                            + " và buổi số " + curr.sequenceNumber() + " (" + gapDays
+                            + " ngày) không phù hợp với chu kỳ " + intervalDays + " ngày của liệu trình.");
+                }
+            }
+        }
+    }
 
     public List<AppointmentSeriesConflictDetail> validateSessions(UUID doctorId, List<SessionSlot> sessions) {
         List<AppointmentSeriesConflictDetail> conflicts = new ArrayList<>();

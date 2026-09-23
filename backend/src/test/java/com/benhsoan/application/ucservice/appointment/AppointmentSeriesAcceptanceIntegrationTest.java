@@ -395,4 +395,28 @@ class AppointmentSeriesAcceptanceIntegrationTest {
                 assertTrue(audits.get(0).getDetail()
                                 .contains("User lacks RECEPTIONIST or ADMIN role to create appointment series"));
         }
+
+        @Test
+        void doctorRoleRejectedWith403OnPreviewAndIndependentAuditLogRecorded() {
+                when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+                when(currentUserPort.hasRole("RECEPTIONIST")).thenReturn(false);
+
+                PreviewAppointmentSeriesCommand command = PreviewAppointmentSeriesCommand.builder()
+                                .patientId(PATIENT_ID)
+                                .doctorId(DOCTOR_ID)
+                                .firstSessionStartTime(NOW.plusSeconds(3600))
+                                .sessionDurationMinutes(30)
+                                .totalSessions(3)
+                                .intervalDays(7)
+                                .build();
+
+                assertThrows(UnauthorizedAppointmentOperationException.class, () -> previewService.preview(command));
+
+                var audits = auditLogJpaRepository.findAll();
+                assertEquals(1, audits.size());
+                assertEquals(ActionType.ACCESS_DENIED, audits.get(0).getActionType());
+                assertEquals(ResourceType.APPOINTMENT, audits.get(0).getResourceType());
+                assertTrue(audits.get(0).getDetail()
+                                .contains("User lacks RECEPTIONIST or ADMIN role to preview appointment series"));
+        }
 }

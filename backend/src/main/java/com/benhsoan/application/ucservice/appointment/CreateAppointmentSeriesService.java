@@ -117,6 +117,9 @@ public class CreateAppointmentSeriesService implements CreateAppointmentSeriesUs
             throw new ValidationException("Danh sách các buổi của liệu trình không được để trống.");
         }
 
+        appointmentSeriesValidator.validateSessionStructure(sessionSlots, command.totalSessions(), command.intervalDays());
+        sessionSlots.sort(java.util.Comparator.comparingInt(AppointmentSeriesValidator.SessionSlot::sequenceNumber));
+
         List<AppointmentSeriesConflictDetail> conflicts = appointmentSeriesValidator.validateSessions(command.doctorId(), sessionSlots);
         if (!conflicts.isEmpty()) {
             throw new AppointmentSeriesConflictException(conflicts);

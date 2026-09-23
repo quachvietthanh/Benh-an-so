@@ -1,48 +1,58 @@
 package com.benhsoan.infrastructure.security.generator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import java.util.Optional;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentCodeSequenceRepository;
 
 @ExtendWith(MockitoExtension.class)
 class DatabaseAppointmentCodeGeneratorTest {
 
-    @Mock private AppointmentRepository appointmentRepository;
+    @Mock
+    private AppointmentCodeSequenceRepository sequenceRepository;
 
     @Test
-    void generatesFirstAppointmentCodeWhenNoAppointmentExists() {
-        when(appointmentRepository.findAppointmentCodeWithHighestSequence()).thenReturn(Optional.empty());
+    void generatesFirstAppointmentCodeWhenSequenceIsOne() {
+        when(sequenceRepository.reserveNextValue("APT")).thenReturn(1L);
 
-        assertEquals("APT000001", new DatabaseAppointmentCodeGenerator(appointmentRepository).generate());
+        assertEquals("APT000001", new DatabaseAppointmentCodeGenerator(sequenceRepository).generate());
     }
 
     @Test
     void incrementsTheHighestNumericSequenceAcrossLegacyAndNewPrefixes() {
-        when(appointmentRepository.findAppointmentCodeWithHighestSequence()).thenReturn(Optional.of("APT000009"));
+        when(sequenceRepository.reserveNextValue("APT")).thenReturn(10L);
 
-        assertEquals("APT000010", new DatabaseAppointmentCodeGenerator(appointmentRepository).generate());
+        assertEquals("APT000010", new DatabaseAppointmentCodeGenerator(sequenceRepository).generate());
     }
 
     @Test
-    void keepsWorkingWhenLegacyCodeHasTheHighestSequence() {
-        when(appointmentRepository.findAppointmentCodeWithHighestSequence()).thenReturn(Optional.of("LH000123"));
+    void keepsWorkingWhenContinuingFromLegacyCodeSequence() {
+        when(sequenceRepository.reserveNextValue("APT")).thenReturn(124L);
 
-        assertEquals("APT000124", new DatabaseAppointmentCodeGenerator(appointmentRepository).generate());
+        assertEquals("APT000124", new DatabaseAppointmentCodeGenerator(sequenceRepository).generate());
     }
 
     @Test
-    void generatesBatchCodesSequentiallyWhenNoAppointmentExists() {
-        when(appointmentRepository.findAppointmentCodeWithHighestSequence()).thenReturn(Optional.empty());
+    void generatesBatchCodesSequentiallyWhenStartingFromBeginning() {
+        when(sequenceRepository.reserveNextValues("APT", 3)).thenReturn(3L);
 
-        var generator = new DatabaseAppointmentCodeGenerator(appointmentRepository);
+        var generator = new DatabaseAppointmentCodeGenerator(sequenceRepository);
         var codes = generator.generateBatch(3);
 
         assertEquals(3, codes.size());
@@ -52,10 +62,10 @@ class DatabaseAppointmentCodeGeneratorTest {
     }
 
     @Test
-    void generatesBatchCodesSequentiallyFromExistingHighestSequence() {
-        when(appointmentRepository.findAppointmentCodeWithHighestSequence()).thenReturn(Optional.of("APT000009"));
+    void generatesBatchCodesSequentiallyFromExistingSequence() {
+        when(sequenceRepository.reserveNextValues("APT", 4)).thenReturn(13L);
 
-        var generator = new DatabaseAppointmentCodeGenerator(appointmentRepository);
+        var generator = new DatabaseAppointmentCodeGenerator(sequenceRepository);
         var codes = generator.generateBatch(4);
 
         assertEquals(4, codes.size());
@@ -67,8 +77,53 @@ class DatabaseAppointmentCodeGeneratorTest {
 
     @Test
     void generatesEmptyListWhenBatchCountIsZeroOrNegative() {
-        var generator = new DatabaseAppointmentCodeGenerator(appointmentRepository);
+        var generator = new DatabaseAppointmentCodeGenerator(sequenceRepository);
         assertEquals(0, generator.generateBatch(0).size());
         assertEquals(0, generator.generateBatch(-1).size());
+    }
+
+    @Test
+    void generatesUniqueCodesUnderConcurrentExecution() throws Exception {
+        AtomicLong counter = new AtomicLong(0);
+        when(sequenceRepository.reserveNextValue(eq("APT")))
+                .thenAnswer(inv -> counter.incrementAndGet());
+
+        DatabaseAppointmentCodeGenerator generator = new DatabaseAppointmentCodeGenerator(sequenceRepository);
+
+        int threads = 10;
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(threads)) {
+            List<Future<String>> futures = new java.util.ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                futures.add(executor.submit(generateAfterStart(generator, ready, start)));
+            }
+
+            ready.await();
+            start.countDown();
+
+            Set<String> generatedCodes = new java.util.HashSet<>();
+            for (var future : futures) {
+                generatedCodes.add(future.get());
+            }
+
+            assertEquals(threads, generatedCodes.size());
+            for (int i = 1; i <= threads; i++) {
+                assertTrue(generatedCodes.contains(String.format("APT%06d", i)));
+            }
+        }
+    }
+
+    private Callable<String> generateAfterStart(
+            DatabaseAppointmentCodeGenerator generator,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) {
+        return () -> {
+            ready.countDown();
+            start.await();
+            return generator.generate();
+        };
     }
 }
