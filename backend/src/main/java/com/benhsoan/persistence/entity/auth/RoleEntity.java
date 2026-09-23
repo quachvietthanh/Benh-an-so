@@ -46,6 +46,9 @@ public class RoleEntity {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Column(name = "two_factor_required", nullable = false)
+    private boolean twoFactorRequired;
+
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
