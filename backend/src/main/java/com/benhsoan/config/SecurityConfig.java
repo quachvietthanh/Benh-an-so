@@ -99,6 +99,7 @@ public class SecurityConfig {
                                                 // ===== PRESCRIPTIONS / CLINICAL =====
                                                 .requestMatchers("/medicines/**").authenticated()
                                                 .requestMatchers("/prescriptions/**").authenticated()
+                                                .requestMatchers("/prescription-templates/**").authenticated()
                                                 .requestMatchers("/clinical-services/**").authenticated()
                                                 .requestMatchers("/clinical-orders/**").authenticated()
                                                 .requestMatchers("/clinical-order-items/**").authenticated()
