@@ -376,4 +376,30 @@ class PatientPortalClinicalResultSecurityIntegrationTest {
         assertEquals(ActionType.ACCESS_DENIED, captor.getValue().getActionType());
         assertEquals(ResourceType.CLINICAL_RESULT, captor.getValue().getResourceType());
     }
+
+    @Test
+    @DisplayName("TC-02 / FD-03: Intermediate unfinalized (CORRECTED) result detail returns 404 for own patient")
+    void getClinicalResultDetail_correctedResult_returns404() throws Exception {
+        ClinicalResult correctedResult = mockResult(ownResultId, ownVisitId, ClinicalResultStatus.CORRECTED);
+        when(clinicalResultRepository.findById(ownResultId)).thenReturn(Optional.of(correctedResult));
+
+        Visit visit = mockVisit(ownVisitId, ownPatientId);
+        when(visitRepository.findById(ownVisitId)).thenReturn(Optional.of(visit));
+
+        mockMvc.perform(get("/patient-portal/clinical-results/" + ownResultId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("TC-02 / FD-03: Downloading intermediate unfinalized (CORRECTED) result returns 404 for own patient")
+    void downloadResult_correctedResult_returns404() throws Exception {
+        ClinicalResult correctedResult = mockResult(ownResultId, ownVisitId, ClinicalResultStatus.CORRECTED);
+        when(clinicalResultRepository.findById(ownResultId)).thenReturn(Optional.of(correctedResult));
+
+        Visit visit = mockVisit(ownVisitId, ownPatientId);
+        when(visitRepository.findById(ownVisitId)).thenReturn(Optional.of(visit));
+
+        mockMvc.perform(get("/patient-portal/clinical-results/" + ownResultId + "/download"))
+                .andExpect(status().isNotFound());
+    }
 }

@@ -396,6 +396,21 @@ class PatientPortalClinicalResultServicesTest {
         }
 
         @Test
+        @DisplayName("TC-02 / FD-03: Own patient accessing CORRECTED result throws ClinicalResultNotFoundException (hidden until re-finalized)")
+        void throwsNotFound_whenCorrected_ownPatient() {
+            UUID resultId = UUID.randomUUID();
+            UUID itemId = UUID.randomUUID();
+            ClinicalResult result = mockResult(resultId, itemId, visitId, ClinicalResultStatus.CORRECTED);
+            when(clinicalResultRepository.findById(resultId)).thenReturn(Optional.of(result));
+
+            Visit visit = mockVisit(visitId, patientId, VisitStatus.IN_PROGRESS);
+            when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+
+            assertThrows(ClinicalResultNotFoundException.class, () -> service.getClinicalResultDetail(resultId));
+            verify(patientAccessGuard).requirePatientOwnership(patientId, ResourceType.CLINICAL_RESULT, resultId);
+        }
+
+        @Test
         @DisplayName("TC-03 / UT-02 / P2-01: Other patient accessing DRAFT result throws AccessDeniedException and audits denial")
         void throwsAccessDenied_whenDraft_otherPatient() {
             UUID resultId = UUID.randomUUID();
@@ -570,6 +585,20 @@ class PatientPortalClinicalResultServicesTest {
                     .thenReturn(List.of());
 
             assertThrows(ClinicalResultNotFoundException.class, () -> service.exportByVisit(visitId));
+        }
+
+        @Test
+        @DisplayName("TC-02 / FD-03: Exporting single CORRECTED result throws ClinicalResultNotFoundException (hidden until re-finalized)")
+        void exportByResult_corrected_throwsNotFound() {
+            UUID resultId = UUID.randomUUID();
+            ClinicalResult result = mockResult(resultId, UUID.randomUUID(), visitId, ClinicalResultStatus.CORRECTED);
+            when(clinicalResultRepository.findById(resultId)).thenReturn(Optional.of(result));
+
+            Visit visit = mockVisit(visitId, patientId, VisitStatus.COMPLETED);
+            when(visitRepository.findById(visitId)).thenReturn(Optional.of(visit));
+
+            assertThrows(ClinicalResultNotFoundException.class, () -> service.exportByResult(resultId));
+            verify(patientAccessGuard).requirePatientOwnership(patientId, ResourceType.CLINICAL_RESULT, resultId);
         }
     }
 }
