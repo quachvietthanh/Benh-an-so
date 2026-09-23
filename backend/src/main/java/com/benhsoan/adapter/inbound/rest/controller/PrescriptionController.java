@@ -26,6 +26,7 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescription
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckContraindicationRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.DispensePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PartialDispensePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.ReturnMedicationRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.ContraindicationCheckResponse;
@@ -160,8 +161,11 @@ public class PrescriptionController {
 
         @PostMapping("/{id}/dispense")
         @RequirePermission("PRESCRIPTION_UPDATE_STATUS")
-        public DispensePrescriptionResponse dispense(@PathVariable UUID id) {
-                return mapper.toResponse(dispensePrescriptionUseCase.dispense(id));
+        public DispensePrescriptionResponse dispense(
+                        @PathVariable UUID id,
+                        @RequestBody(required = false) DispensePrescriptionRequest request) {
+                return mapper.toResponse(
+                                dispensePrescriptionUseCase.dispense(mapper.toCommand(id, request)));
         }
 
         @PostMapping("/{id}/partial-dispense")

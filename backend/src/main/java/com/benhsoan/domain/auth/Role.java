@@ -35,6 +35,8 @@ public class Role {
 
     private Instant updatedAt;
 
+    private boolean twoFactorRequired;
+
     private final Set<Permission> permissions = new HashSet<>();
 
     private Role(
@@ -44,6 +46,7 @@ public class Role {
             boolean system,
             Instant createdAt,
             Instant updatedAt,
+            boolean twoFactorRequired,
             Set<?> permissions
     ) {
         this.id = Objects.requireNonNull(id);
@@ -52,6 +55,7 @@ public class Role {
         this.system = system;
         this.createdAt = Objects.requireNonNull(createdAt);
         this.updatedAt = updatedAt;
+        this.twoFactorRequired = twoFactorRequired;
 
         if (permissions != null) {
             permissions.stream()
@@ -75,6 +79,7 @@ public class Role {
                 system,
                 now,
                 now,
+                false,
                 permissions
         );
     }
@@ -88,6 +93,19 @@ public class Role {
             Instant updatedAt,
             Set<?> permissions
     ) {
+        return restore(id, name, description, system, createdAt, updatedAt, false, permissions);
+    }
+
+    public static Role restore(
+            UUID id,
+            String name,
+            String description,
+            boolean system,
+            Instant createdAt,
+            Instant updatedAt,
+            boolean twoFactorRequired,
+            Set<?> permissions
+    ) {
         return new Role(
                 id,
                 name,
@@ -95,6 +113,7 @@ public class Role {
                 system,
                 createdAt,
                 updatedAt,
+                twoFactorRequired,
                 permissions
         );
     }
@@ -110,6 +129,11 @@ public class Role {
 
     public void changeDescription(String description) {
         this.description = description;
+        this.updatedAt = Instant.now();
+    }
+
+    public void setTwoFactorRequired(boolean required) {
+        this.twoFactorRequired = required;
         this.updatedAt = Instant.now();
     }
 

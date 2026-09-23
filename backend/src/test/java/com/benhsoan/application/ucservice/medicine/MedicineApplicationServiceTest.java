@@ -88,6 +88,33 @@ class MedicineApplicationServiceTest {
     }
 
     @Test
+    void createsControlledMedicineFlag() {
+        when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
+        CreateMedicineService service = new CreateMedicineService(
+                medicineRepository,
+                authorizer,
+                resultMapper,
+                clockPort,
+                adminOperationAuditService,
+                currentUserPort
+        );
+
+        var result = service.create(new CreateMedicineCommand(
+                "med-ctrl",
+                "Morphine",
+                "Morphine sulfate",
+                "10 mg",
+                DosageForm.INJECTION,
+                "ong",
+                AdministrationRoute.INTRAVENOUS,
+                10,
+                true
+        ));
+
+        assertTrue(result.controlled());
+    }
+
+    @Test
     void rejectsDuplicateMedicineCodeBeforeSave() {
         when(currentUserPort.hasRole("PHARMACIST")).thenReturn(true);
         when(medicineRepository.existsByMedicineCode("med-001")).thenReturn(true);

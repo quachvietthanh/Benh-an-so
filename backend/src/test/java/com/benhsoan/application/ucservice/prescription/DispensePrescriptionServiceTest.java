@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,7 +29,10 @@ import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.application.ucservice.controlledmedicine.ControlledMedicineRegisterRecorder;
+import com.benhsoan.port.dto.command.prescription.DispensePrescriptionCommand;
 import com.benhsoan.port.dto.result.DispensePrescriptionResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.inventory.MedicineBatchRepository;
@@ -62,6 +66,8 @@ class DispensePrescriptionServiceTest {
     private final com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService lowStockAlertTransitionService =
             mock(com.benhsoan.application.ucservice.inventory.LowStockAlertTransitionService.class);
     private final PrescriptionDisplayContextResolver displayContextResolver = mock(PrescriptionDisplayContextResolver.class);
+    private final ControlledMedicineRegisterRecorder controlledMedicineRegisterRecorder =
+            mock(ControlledMedicineRegisterRecorder.class);
     private final DispensePrescriptionResultMapper dispensePrescriptionResultMapper =
             new DispensePrescriptionResultMapper(new PrescriptionResultMapper(displayContextResolver));
 
@@ -85,6 +91,7 @@ class DispensePrescriptionServiceTest {
                 ));
         when(prescriptionDispenseItemRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(stockMovementRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of());
 
         service = new DispensePrescriptionService(
                 prescriptionRepository,
@@ -99,7 +106,9 @@ class DispensePrescriptionServiceTest {
                 currentUserPort,
                 clockPort,
                 auditLogRepository,
-                dispensePrescriptionResultMapper
+                dispensePrescriptionResultMapper,
+                controlledMedicineRegisterRecorder,
+                displayContextResolver
         );
     }
 
@@ -122,7 +131,7 @@ class DispensePrescriptionServiceTest {
                 .thenReturn(java.util.Map.of(medicineId, 80));
         when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        DispensePrescriptionResult result = service.dispense(prescriptionId);
+        DispensePrescriptionResult result = service.dispense(new DispensePrescriptionCommand(prescriptionId));
 
         assertNotNull(result);
         assertEquals(PrescriptionStatus.DISPENSED, result.prescription().status());
@@ -163,7 +172,7 @@ class DispensePrescriptionServiceTest {
 
         PrescriptionInsufficientStockException ex = assertThrows(
                 PrescriptionInsufficientStockException.class,
-                () -> service.dispense(prescriptionId)
+                () -> service.dispense(new DispensePrescriptionCommand(prescriptionId))
         );
 
         assertEquals(prescriptionId, ex.getPrescriptionId());
@@ -194,7 +203,7 @@ class DispensePrescriptionServiceTest {
 
         PrescriptionInsufficientStockException ex = assertThrows(
                 PrescriptionInsufficientStockException.class,
-                () -> service.dispense(prescriptionId)
+                () -> service.dispense(new DispensePrescriptionCommand(prescriptionId))
         );
 
         assertEquals(prescriptionId, ex.getPrescriptionId());
@@ -228,7 +237,7 @@ class DispensePrescriptionServiceTest {
                 .thenReturn(java.util.Map.of(medicineId, 130));
         when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.dispense(prescriptionId);
+        service.dispense(new DispensePrescriptionCommand(prescriptionId));
 
         verify(lowStockAlertTransitionService).handleEligibleStockTransitions(
                 argThat(ids -> ids.size() == 1 && ids.contains(medicineId)),
@@ -255,12 +264,61 @@ class DispensePrescriptionServiceTest {
                 .thenReturn(java.util.Map.of(medicineId, 70));
         when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        DispensePrescriptionResult result = service.dispense(prescriptionId);
+        DispensePrescriptionResult result = service.dispense(new DispensePrescriptionCommand(prescriptionId));
 
         assertEquals(PrescriptionStatus.DISPENSED, result.prescription().status());
         assertEquals(1, result.prescription().items().size());
         assertEquals(70, result.prescription().items().get(0).dispensedQuantity());
         assertEquals(0, result.prescription().items().get(0).remainingQuantity());
+    }
+
+    @Test
+    void rejectsControlledDispenseWithoutConfirmation() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        Prescription prescription = prescription(prescriptionId, medicineId);
+        PrescriptionItem prescriptionItem = prescriptionItem(prescriptionId, medicineId, 70);
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionItemRepository.findByPrescriptionId(prescriptionId)).thenReturn(List.of(prescriptionItem));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(controlledMedicine(medicineId, "MED-001", "Morphine")));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(controlledMedicine(medicineId, "MED-001", "Morphine")));
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class,
+                () -> service.dispense(new DispensePrescriptionCommand(prescriptionId)));
+
+        verify(prescriptionRepository, never()).save(any(Prescription.class));
+    }
+
+    @Test
+    void acceptsControlledDispenseWithConfirmationAndRecordsRegister() {
+        UUID prescriptionId = UUID.randomUUID();
+        UUID medicineId = UUID.randomUUID();
+        Prescription prescription = prescription(prescriptionId, medicineId);
+        PrescriptionItem prescriptionItem = prescriptionItem(prescriptionId, medicineId, 70);
+        MedicineBatch onlyBatch = batch(medicineId, "BATCH-A", LocalDate.of(2026, 10, 1), 70);
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionItemRepository.findByPrescriptionId(prescriptionId)).thenReturn(List.of(prescriptionItem));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(controlledMedicine(medicineId, "MED-001", "Morphine")));
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(controlledMedicine(medicineId, "MED-001", "Morphine")));
+        when(medicineBatchRepository.findAvailableByMedicineIdForUpdate(eq(medicineId), eq(LocalDate.of(2026, 8, 7))))
+                .thenReturn(List.of(onlyBatch));
+        when(eligibleStockSnapshotService.snapshotEligibleStockQuantities(List.of(medicineId), LocalDate.of(2026, 8, 7)))
+                .thenReturn(java.util.Map.of(medicineId, 70));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DispensePrescriptionResult result = service.dispense(new DispensePrescriptionCommand(prescriptionId, true));
+
+        assertEquals(PrescriptionStatus.DISPENSED, result.prescription().status());
+        verify(controlledMedicineRegisterRecorder).record(
+                eq(prescriptionId),
+                eq(prescription.getPrescribedBy()),
+                any(),
+                eq(ACTOR_ID),
+                eq(NOW),
+                argThat(entries -> entries != null && entries.size() == 1)
+        );
     }
 
     private Prescription prescription(UUID prescriptionId, UUID medicineId) {
@@ -327,6 +385,25 @@ class DispensePrescriptionServiceTest {
                 null,
                 120,
                 20
+        );
+    }
+
+    private Medicine controlledMedicine(UUID medicineId, String code, String name) {
+        return Medicine.restore(
+                medicineId,
+                code,
+                name,
+                name,
+                "500 mg",
+                DosageForm.TABLET,
+                "vien",
+                AdministrationRoute.ORAL,
+                true,
+                NOW.minusSeconds(86400),
+                null,
+                120,
+                20,
+                true
         );
     }
 }

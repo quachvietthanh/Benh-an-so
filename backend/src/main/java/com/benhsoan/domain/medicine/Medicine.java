@@ -46,6 +46,8 @@ public class Medicine {
 
     private int minStockThreshold;
 
+    private boolean controlled;
+
     private Medicine(
             UUID id,
             String medicineCode,
@@ -59,7 +61,8 @@ public class Medicine {
             Instant createdAt,
             Instant updatedAt,
             int stockQuantity,
-            int minStockThreshold
+            int minStockThreshold,
+            boolean controlled
     ) {
         this.id = requireNonNull(id, "Medicine id is required.");
         this.medicineCode = requireText(medicineCode, "Medicine code is required.");
@@ -77,6 +80,7 @@ public class Medicine {
                 minStockThreshold,
                 "Medicine minimum stock threshold must not be negative."
         );
+        this.controlled = controlled;
     }
 
     public static Medicine create(
@@ -89,6 +93,7 @@ public class Medicine {
             String unit,
             AdministrationRoute defaultRoute,
             int minStockThreshold,
+            boolean controlled,
             Instant createdAt
     ) {
         return new Medicine(
@@ -104,7 +109,8 @@ public class Medicine {
                 createdAt,
                 null,
                 0,
-                minStockThreshold
+                minStockThreshold,
+                controlled
         );
     }
 
@@ -123,6 +129,40 @@ public class Medicine {
             int stockQuantity,
             int minStockThreshold
     ) {
+        return restore(
+                id,
+                medicineCode,
+                medicineName,
+                activeIngredient,
+                strength,
+                dosageForm,
+                unit,
+                defaultRoute,
+                active,
+                createdAt,
+                updatedAt,
+                stockQuantity,
+                minStockThreshold,
+                false
+        );
+    }
+
+    public static Medicine restore(
+            UUID id,
+            String medicineCode,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            DosageForm dosageForm,
+            String unit,
+            AdministrationRoute defaultRoute,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt,
+            int stockQuantity,
+            int minStockThreshold,
+            boolean controlled
+    ) {
         return new Medicine(
                 id,
                 medicineCode,
@@ -136,7 +176,8 @@ public class Medicine {
                 createdAt,
                 updatedAt,
                 stockQuantity,
-                minStockThreshold
+                minStockThreshold,
+                controlled
         );
     }
 
@@ -148,6 +189,7 @@ public class Medicine {
             String unit,
             AdministrationRoute defaultRoute,
             int minStockThreshold,
+            boolean controlled,
             Instant updatedAt
     ) {
         String validatedMedicineName = requireText(medicineName, "Medicine name is required.");
@@ -172,6 +214,7 @@ public class Medicine {
         this.unit = validatedUnit;
         this.defaultRoute = validatedDefaultRoute;
         this.minStockThreshold = validatedMinStockThreshold;
+        this.controlled = controlled;
         this.updatedAt = validatedUpdatedAt;
     }
 
@@ -184,6 +227,12 @@ public class Medicine {
     public void deactivate(Instant updatedAt) {
         Instant validatedUpdatedAt = requireNonNull(updatedAt, "Medicine update time is required.");
         this.active = false;
+        this.updatedAt = validatedUpdatedAt;
+    }
+
+    public void markControlled(boolean controlled, Instant updatedAt) {
+        Instant validatedUpdatedAt = requireNonNull(updatedAt, "Medicine update time is required.");
+        this.controlled = controlled;
         this.updatedAt = validatedUpdatedAt;
     }
 

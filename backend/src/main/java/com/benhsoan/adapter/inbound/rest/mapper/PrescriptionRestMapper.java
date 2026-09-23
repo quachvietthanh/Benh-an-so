@@ -13,6 +13,7 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteracti
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.DispenseItemRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.DispensePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PartialDispensePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.ReturnMedicationItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.ReturnMedicationRequest;
@@ -42,6 +43,7 @@ import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
+import com.benhsoan.port.dto.command.prescription.DispensePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.DispensePrescriptionItemsCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.ReturnMedicationCommand;
@@ -113,6 +115,7 @@ public class PrescriptionRestMapper {
                         .toList())
                 .interactionOverrides(interactionOverrides)
                 .allergyOverrides(allergyOverrides)
+                .controlledMedicineConfirmed(request.controlledMedicineConfirmed())
                 .build();
     }
 
@@ -153,6 +156,7 @@ public class PrescriptionRestMapper {
                 .interactionOverrides(interactionOverrides)
                 .allergyOverrides(allergyOverrides)
                 .contraindicationOverrides(contraindicationOverrides)
+                .controlledMedicineConfirmed(request.controlledMedicineConfirmed())
                 .build();
     }
 
@@ -225,6 +229,16 @@ public class PrescriptionRestMapper {
         );
     }
 
+    public DispensePrescriptionCommand toCommand(
+            UUID prescriptionId,
+            DispensePrescriptionRequest request
+    ) {
+        return new DispensePrescriptionCommand(
+                prescriptionId,
+                request != null && request.controlledMedicineConfirmed()
+        );
+    }
+
     public DispensePrescriptionItemsCommand toCommand(
             UUID prescriptionId,
             PartialDispensePrescriptionRequest request
@@ -234,7 +248,12 @@ public class PrescriptionRestMapper {
                 : request.items().stream()
                         .map(this::toCommand)
                         .toList();
-        return new DispensePrescriptionItemsCommand(prescriptionId, items);
+        boolean controlledMedicineConfirmed = request != null && request.controlledMedicineConfirmed();
+        return new DispensePrescriptionItemsCommand(
+                prescriptionId,
+                items,
+                controlledMedicineConfirmed
+        );
     }
 
     private DispenseItemCommand toCommand(DispenseItemRequest request) {

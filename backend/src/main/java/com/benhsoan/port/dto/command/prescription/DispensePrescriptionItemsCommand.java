@@ -10,9 +10,14 @@ import java.util.UUID;
  */
 public record DispensePrescriptionItemsCommand(
         UUID prescriptionId,
-        List<DispenseItemCommand> items
+        List<DispenseItemCommand> items,
+        boolean controlledMedicineConfirmed
 ) {
     public DispensePrescriptionItemsCommand {
         items = items == null ? List.of() : List.copyOf(items);
+    }
+
+    public DispensePrescriptionItemsCommand(UUID prescriptionId, List<DispenseItemCommand> items) {
+        this(prescriptionId, items, false);
     }
 }
