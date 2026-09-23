@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,8 +83,8 @@ class ApplyPrescriptionTemplateServiceTest {
 
         when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine));
         when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
-        when(checkPatientDrugAllergyUseCase.check(any(), anyList())).thenReturn(List.of());
-        when(checkContraindicationUseCase.check(any(), anyList()))
+        when(checkPatientDrugAllergyUseCase.check(eq(MEDICAL_RECORD_ID), anyList())).thenReturn(List.of());
+        when(checkContraindicationUseCase.check(eq(MEDICAL_RECORD_ID), anyList()))
                 .thenReturn(new ContraindicationCheckResult(List.of(), List.of()));
 
         AppliedPrescriptionTemplateResult result = service.apply(
@@ -93,8 +94,36 @@ class ApplyPrescriptionTemplateServiceTest {
         assertTrue(result.skippedItems().isEmpty());
         assertEquals("J06.9", result.diagnosisCode());
         verify(checkDrugInteractionUseCase).check(any());
-        verify(checkPatientDrugAllergyUseCase).check(any(), anyList());
-        verify(checkContraindicationUseCase).check(any(), anyList());
+        // Patient context must be forwarded to the safety services that enforce
+        // doctor/visit ownership (STEP 6): the actual medicalRecordId, not a mock.
+        verify(checkPatientDrugAllergyUseCase).check(eq(MEDICAL_RECORD_ID), anyList());
+        verify(checkContraindicationUseCase).check(eq(MEDICAL_RECORD_ID), anyList());
+    }
+
+    @Test
+    void missingMedicineReferenceIsSkippedWithMissingReason() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
+
+        UUID missingMedicineId = UUID.randomUUID();
+        when(templateRepository.findById(TEMPLATE_ID))
+                .thenReturn(Optional.of(template(List.of(missingMedicineId))));
+        when(diagnosisCatalogRepository.findById(DIAGNOSIS_ID))
+                .thenReturn(Optional.of(mock(DiagnosisCatalog.class)));
+        when(medicineRepository.findById(missingMedicineId)).thenReturn(Optional.empty());
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        when(checkPatientDrugAllergyUseCase.check(eq(MEDICAL_RECORD_ID), anyList())).thenReturn(List.of());
+        when(checkContraindicationUseCase.check(eq(MEDICAL_RECORD_ID), anyList()))
+                .thenReturn(new ContraindicationCheckResult(List.of(), List.of()));
+
+        AppliedPrescriptionTemplateResult result = service.apply(
+                new ApplyPrescriptionTemplateCommand(TEMPLATE_ID, MEDICAL_RECORD_ID));
+
+        assertTrue(result.items().isEmpty());
+        assertEquals(1, result.skippedItems().size());
+        // Missing reference is reported distinctly from a discontinued medicine (TC-03).
+        assertEquals(missingMedicineId, result.skippedItems().get(0).medicineId());
+        assertEquals("Không tìm thấy thuốc trong danh mục", result.skippedItems().get(0).reason());
     }
 
     @Test
