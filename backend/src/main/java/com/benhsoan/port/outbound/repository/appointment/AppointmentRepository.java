@@ -23,6 +23,8 @@ public interface AppointmentRepository {
             Collection<AppointmentStatus> statuses
     );
 
+    List<Appointment> findBySeriesIdOrderBySequenceNumberAsc(UUID seriesId);
+
     Appointment save(Appointment appointment);
 
     Optional<Appointment> findByAppointmentCode(String appointmentCode);
