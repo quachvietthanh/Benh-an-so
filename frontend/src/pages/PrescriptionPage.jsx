@@ -78,6 +78,11 @@ import CancelPrescriptionModal from '../components/pharmacy/CancelPrescriptionMo
 import PartialDispenseModal from '../components/pharmacy/PartialDispenseModal.jsx'
 import DispenseHistoryModal from '../components/pharmacy/DispenseHistoryModal.jsx'
 import ReturnMedicationModal from '../components/pharmacy/ReturnMedicationModal.jsx'
+import SpecialControlPrescribeConfirmModal from '../components/prescription/SpecialControlPrescribeConfirmModal.jsx'
+import SpecialControlBadge from '../components/pharmacy/SpecialControlBadge.jsx'
+import specialControlledDrugApi, {
+  mergeSpecialControlData,
+} from '../api/specialControlledDrugApi'
 import {
   canCancelPrescription,
   getCancelRestrictionMessage,
@@ -214,6 +219,10 @@ function PrescriptionPage() {
   const [contraindicationApiError, setContraindicationApiError] = useState(null)
   const [quickPregnancyModalOpen, setQuickPregnancyModalOpen] = useState(false)
   const contraindicationRequestIdRef = useRef(0)
+
+  const [specialControlModalOpen, setSpecialControlModalOpen] = useState(false)
+  const [pendingSpecialControlData, setPendingSpecialControlData] = useState(null)
+  const [specialControlSubmitting, setSpecialControlSubmitting] = useState(false)
 
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedPrescriptionForDetail, setSelectedPrescriptionForDetail] = useState(null)
@@ -604,7 +613,7 @@ function PrescriptionPage() {
           unit: m.unit || 'viên',
         }
       })
-      setMedicines(normalizedMeds)
+      setMedicines(mergeSpecialControlData(normalizedMeds))
 
       let loadedEncounterPatientId = null
       const effectiveVisitId = recordData?.visitId || routeState.visitId || routeState.encounter?.visit?.id
@@ -820,7 +829,92 @@ function PrescriptionPage() {
     }
   }, [medicalRecordId])
 
+  const handleConfirmSpecialControlPrescribe = (reason) => {
+    if (!pendingSpecialControlData) return
+    const { clientId, medicine, medicineId, isEditingExisting } = pendingSpecialControlData
+
+    if (isEditingExisting) {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.clientId === clientId
+            ? { ...item, specialControlConfirmed: true, specialControlReason: reason }
+            : item,
+        ),
+      )
+      setSpecialControlModalOpen(false)
+      setPendingSpecialControlData(null)
+      message.success(`Đã cập nhật lý do chỉ định thuốc: ${medicine?.medicineName || medicine?.name}`)
+      return
+    }
+
+    const unit = medicine?.unit || 'viên'
+    const targetItem = items.find((i) => i.clientId === clientId)
+    const initialDosage = targetItem?.dosage || `1 ${unit}`
+    const initialRoute = targetItem?.route || 'ORAL'
+    const freq = Number(targetItem?.frequency) || 2
+    const days = Number(targetItem?.durationDays) || 5
+    const initialQty = targetItem?.quantity > 1 ? targetItem.quantity : freq * days
+
+    const nextItems = items.map((item) => {
+      if (item.clientId !== clientId) return item
+      return {
+        ...item,
+        medicineId,
+        dosage: initialDosage,
+        route: initialRoute,
+        quantity: initialQty,
+        specialControlConfirmed: true,
+        specialControlReason: reason,
+      }
+    })
+
+    setItems(nextItems)
+    setSpecialControlModalOpen(false)
+    setPendingSpecialControlData(null)
+
+    setConfirmedOverrides([])
+    setConfirmedAllergyOverrides([])
+    setConfirmedContraindicationOverrides([])
+    performInteractionCheck(nextItems).catch(() => {})
+    performAllergyCheck(nextItems).catch(() => {})
+    performContraindicationCheck(nextItems).catch(() => {})
+    message.success(`Đã xác nhận lý do chỉ định thuốc kiểm soát đặc biệt: ${medicine?.medicineName || medicine?.name}`)
+  }
+
+  const handleCancelSpecialControlPrescribe = () => {
+    setSpecialControlModalOpen(false)
+    setPendingSpecialControlData(null)
+    message.info('Đã hủy thao tác chỉ định thuốc kiểm soát đặc biệt.')
+  }
+
+  const handleEditSpecialControlReason = (item) => {
+    const chosenMed = selectedMedicineMap.get(String(item.medicineId))
+    setPendingSpecialControlData({
+      clientId: item.clientId,
+      medicine: chosenMed,
+      medicineId: item.medicineId,
+      initialReason: item.specialControlReason,
+      isEditingExisting: true,
+    })
+    setSpecialControlModalOpen(true)
+  }
+
   const handleItemChange = (clientId, field, value) => {
+    if (field === 'medicineId') {
+      const chosenMed = selectedMedicineMap.get(String(value))
+      if (chosenMed?.isSpecialControl) {
+        setPendingSpecialControlData({
+          clientId,
+          medicine: chosenMed,
+          medicineId: value,
+          initialReason: '',
+          isEditingExisting: false,
+        })
+        setSpecialControlModalOpen(true)
+        return
+      }
+    }
+
     const nextItems = items.map((item) => {
       if (item.clientId !== clientId) return item
 
@@ -839,6 +933,8 @@ function PrescriptionPage() {
           dosage: initialDosage,
           route: initialRoute,
           quantity: initialQty,
+          specialControlConfirmed: false,
+          specialControlReason: undefined,
         }
       }
 
@@ -935,6 +1031,14 @@ function PrescriptionPage() {
       if (!itemStockRes.isValid) {
         return `Dòng ${index + 1}: ${itemStockRes.error}`
       }
+
+      const chosenMed = selectedMedicineMap.get(String(item.medicineId))
+      if (
+        (chosenMed?.isSpecialControl || item.specialControlConfirmed) &&
+        (!item.specialControlConfirmed || !item.specialControlReason?.trim())
+      ) {
+        return `Dòng ${index + 1}: Thuốc "${chosenMed?.medicineName || chosenMed?.name || 'kiểm soát đặc biệt'}" thuộc danh mục kiểm soát đặc biệt, bắt buộc phải xác nhận lý do chỉ định.`
+      }
     }
 
     if (editingPrescription && !changeReason.trim()) {
@@ -944,15 +1048,26 @@ function PrescriptionPage() {
   }
 
   const formatItems = () =>
-    items.map((item) => ({
-      medicineId: item.medicineId,
-      dosage: item.dosage.trim(),
-      frequency: Number(item.frequency),
-      route: item.route,
-      durationDays: Number(item.durationDays),
-      quantity: Number(item.quantity),
-      instructions: (item.instructions || '').trim(),
-    }))
+    items.map((item) => {
+      const chosenMed = selectedMedicineMap.get(String(item.medicineId))
+      const isSpec = Boolean(chosenMed?.isSpecialControl || item.specialControlConfirmed)
+      return {
+        medicineId: item.medicineId,
+        dosage: item.dosage.trim(),
+        frequency: Number(item.frequency),
+        route: item.route,
+        durationDays: Number(item.durationDays),
+        quantity: Number(item.quantity),
+        instructions: (item.instructions || '').trim(),
+        ...(isSpec
+          ? {
+              isSpecialControl: true,
+              specialControlGroup: chosenMed?.specialControlGroup,
+              specialControlReason: item.specialControlReason,
+            }
+          : {}),
+      }
+    })
 
   const executeSavePrescription = async (
     overrides = [],
@@ -1130,6 +1245,36 @@ function PrescriptionPage() {
           }
         })
         saveStoredAllergyWarningLogs(localLogsToSave)
+      }
+
+      // Ghi nhận sổ theo dõi thuốc kiểm soát đặc biệt (QTN-39)
+      try {
+        const targetPrescriptionId = pData?.id || savedObj?.id
+        const targetPrescriptionCode = prescriptionCode || savedObj?.prescriptionCode
+        const specialItems = items.filter((it) => {
+          const med = selectedMedicineMap.get(String(it.medicineId))
+          return med?.isSpecialControl || it.specialControlConfirmed
+        })
+        for (const sItem of specialItems) {
+          const med = selectedMedicineMap.get(String(sItem.medicineId))
+          await specialControlledDrugApi.confirmPrescribe(
+            targetPrescriptionId,
+            {
+              prescriptionCode: targetPrescriptionCode,
+              medicineId: sItem.medicineId,
+              medicineName: med?.medicineName || med?.name || 'Thuốc kiểm soát đặc biệt',
+              specialControlGroup: med?.specialControlGroup || 'NARCOTIC',
+              patientName: encounter?.patientName || encounter?.patient?.fullName || record?.patientName || 'Bệnh nhân',
+              patientCode: encounter?.patientCode || encounter?.patient?.patientCode || record?.patientCode || '',
+              quantity: Number(sItem.quantity),
+              unit: med?.unit || 'viên',
+              reason: sItem.specialControlReason,
+              confirmedByName: currentUser?.fullName || encounter?.doctor?.fullName || 'Bác sĩ điều trị',
+            },
+          )
+        }
+      } catch (scErr) {
+        console.warn('Lỗi ghi sổ theo dõi thuốc kiểm soát đặc biệt:', scErr)
       }
 
       message.success(
@@ -2727,12 +2872,13 @@ function PrescriptionPage() {
                                   const allergyPrefix = medConflict.hasConflict
                                     ? `[⚠️ DỊ ỨNG${medConflict.isLifeThreatening ? ' - SỐC PHẢN VỆ' : ''}] `
                                     : ''
+                                  const specialPrefix = medicine.isSpecialControl ? '[KSĐB] ' : ''
                                   return {
                                     value: medicine.id,
                                     disabled: false,
                                     label: isOut
-                                      ? `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— [Hết hàng — cấp bù sau]`
-                                      : `${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
+                                      ? `${specialPrefix}${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— [Hết hàng — cấp bù sau]`
+                                      : `${specialPrefix}${allergyPrefix}${medicine.medicineName} — ${medicine.strength ? `${medicine.strength} ` : ''}— Còn ${availStock} ${medicine.unit || 'viên'}`,
                                   }
                                 })}
                                 placeholder="Tìm kiếm thuốc theo tên hoặc hoạt chất..."
@@ -2790,6 +2936,48 @@ function PrescriptionPage() {
                                 </Tag>
                               )
                             })()}
+                          </div>
+                        )}
+
+                        {selectedMed?.isSpecialControl && (
+                          <div
+                            style={{
+                              background: '#FFFBEB',
+                              border: '1px solid #FDE68A',
+                              padding: '8px 12px',
+                              borderRadius: 6,
+                              marginBottom: 12,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: 8,
+                            }}
+                          >
+                            <Space size={8} wrap align="center">
+                              <SpecialControlBadge
+                                isSpecialControl={true}
+                                group={selectedMed.specialControlGroup}
+                              />
+                              {selectedMed.specialControlNote && (
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  <strong>Cảnh báo danh mục:</strong> {selectedMed.specialControlNote}
+                                </Text>
+                              )}
+                              {item.specialControlReason && (
+                                <Text style={{ fontSize: 12, color: '#92400E' }}>
+                                  <strong>Lý do chỉ định:</strong> {item.specialControlReason}
+                                </Text>
+                              )}
+                            </Space>
+                            <Button
+                              size="small"
+                              type="link"
+                              onClick={() => handleEditSpecialControlReason(item)}
+                              style={{ padding: 0, height: 'auto', fontWeight: 600, color: '#D97706' }}
+                            >
+                              {item.specialControlReason ? 'Sửa lý do chỉ định' : 'Xác nhận lý do ngay'}
+                            </Button>
                           </div>
                         )}
 
@@ -3693,6 +3881,16 @@ function PrescriptionPage() {
           })
           performContraindicationCheck(items).catch(() => {})
         }}
+      />
+
+      <SpecialControlPrescribeConfirmModal
+        open={specialControlModalOpen}
+        medicine={pendingSpecialControlData?.medicine}
+        patient={encounter?.patient || record || { fullName: routeState.patientName, patientCode: routeState.patientCode }}
+        initialReason={pendingSpecialControlData?.initialReason || ''}
+        onCancel={handleCancelSpecialControlPrescribe}
+        onConfirm={handleConfirmSpecialControlPrescribe}
+        submitting={specialControlSubmitting}
       />
 
       <PrescriptionAllergyWarningLogsModal

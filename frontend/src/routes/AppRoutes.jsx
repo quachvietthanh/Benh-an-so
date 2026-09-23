@@ -8,6 +8,7 @@ import { getDefaultHomePath } from '../utils/roleRouting'
 import PatientRoute from '../components/common/PatientRoute'
 
 const Login = React.lazy(() => import('../pages/Login'))
+const TwoFactorVerifyPage = React.lazy(() => import('../pages/TwoFactorVerifyPage.jsx'))
 const PortalLogin = React.lazy(() => import('../pages/PortalLogin'))
 const PortalRegister = React.lazy(() => import('../pages/PortalRegister'))
 const PortalDashboard = React.lazy(() => import('../pages/PortalDashboard'))
@@ -24,6 +25,7 @@ const PrescriptionPage = React.lazy(() => import('../pages/PrescriptionPage'))
 const PharmacyPage = React.lazy(() => import('../pages/PharmacyPage'))
 const InventoryReceiptPage = React.lazy(() => import('../pages/InventoryReceiptPage'))
 const MedicineCatalogPage = React.lazy(() => import('../pages/MedicineCatalogPage'))
+const SpecialControlledDrugRegisterPage = React.lazy(() => import('../pages/SpecialControlledDrugRegisterPage'))
 const BillingPage = React.lazy(() => import('../pages/BillingPage'))
 const InvoiceLookupPage = React.lazy(() => import('../pages/InvoiceLookupPage'))
 const ReportsPage = React.lazy(() => import('../pages/ReportsPage'))
@@ -113,6 +115,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
+      <Route path="/login/verify-2fa" element={<LazyPage><TwoFactorVerifyPage /></LazyPage>} />
       <Route path="/portal/login" element={<LazyPage><PortalLogin /></LazyPage>} />
       <Route path="/portal/register" element={<LazyPage><PortalRegister /></LazyPage>} />
       <Route path="/portal/dashboard" element={<PatientRoute><LazyPage><PortalDashboard /></LazyPage></PatientRoute>} />
@@ -162,6 +165,8 @@ function AppRoutes() {
         <Route path="results" element={<Navigate to="/clinical-results" replace />} />
         <Route path="pharmacy" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PRESCRIPTION_READ']} allowedRoles={['admin', 'pharmacist']}><LazyPage><PharmacyPage /></LazyPage></PrivateRoute>} />
         <Route path="pharmacy/receipts" element={<PrivateRoute allowedPermissions={['PHARMACY_CREATE', 'PHARMACY_READ']} allowedRoles={['admin', 'pharmacist']}><LazyPage><InventoryReceiptPage /></LazyPage></PrivateRoute>} />
+        <Route path="pharmacy/special-control-register" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PRESCRIPTION_READ']} allowedRoles={['admin', 'pharmacist', 'doctor']}><LazyPage><SpecialControlledDrugRegisterPage /></LazyPage></PrivateRoute>} />
+        <Route path="special-controlled-drugs" element={<Navigate to="/pharmacy/special-control-register" replace />} />
         <Route path="medicines" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />

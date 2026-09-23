@@ -12,6 +12,7 @@ final class DomainExceptionHttpStatusMapper {
     static HttpStatus statusFor(DomainErrorCode code) {
         return switch (code) {
             case APPOINTMENT_NOT_FOUND,
+                    APPOINTMENT_SERIES_NOT_FOUND,
                     BACKUP_NOT_FOUND,
                     BATCH_NOT_FOUND,
                     CARE_LOG_NOT_FOUND,
@@ -37,6 +38,7 @@ final class DomainExceptionHttpStatusMapper {
                     PATIENT_FAMILY_HISTORY_NOT_FOUND,
                     PATIENT_NOT_FOUND,
                     PATIENT_IMPORT_LOG_NOT_FOUND,
+                    PATIENT_PORTAL_NOTIFICATION_NOT_FOUND,
                     PAYMENT_NOT_FOUND,
                     PORTAL_LOOKUP_NOT_FOUND,
                     PRESCRIPTION_ITEM_NOT_FOUND,
@@ -72,7 +74,8 @@ final class DomainExceptionHttpStatusMapper {
             case INVALID_CREDENTIALS,
                     SESSION_EXPIRED,
                     TEMP_PASSWORD_EXPIRED,
-                    TOKEN_INVALID -> HttpStatus.UNAUTHORIZED;
+                    TOKEN_INVALID,
+                    TWO_FACTOR_CHALLENGE_INVALID -> HttpStatus.UNAUTHORIZED;
             case APPOINTMENT_NOT_OVERDUE,
                     APPOINTMENT_PAST_CUTOFF,
                     APPOINTMENT_TIME_IN_PAST,
@@ -109,6 +112,7 @@ final class DomainExceptionHttpStatusMapper {
                     APPOINTMENT_ALREADY_COMPLETED,
                     APPOINTMENT_ALREADY_IN_PROGRESS,
                     APPOINTMENT_INVALID_STATUS,
+                    APPOINTMENT_SERIES_CONFLICT,
                     APPOINTMENT_TIME_CONFLICT,
                     BATCH_STATE_CONFLICT,
                     CASHIER_SHIFT_ALREADY_CONFIRMED,

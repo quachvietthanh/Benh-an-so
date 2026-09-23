@@ -10,13 +10,15 @@ import com.benhsoan.config.AnomalyDetectionProperties;
 import com.benhsoan.config.AppointmentReminderProperties;
 import com.benhsoan.config.ClinicalAttachmentProperties;
 import com.benhsoan.config.MockInterconnectionGatewayProperties;
+import com.benhsoan.config.TwoFactorChallengeCleanupProperties;
 import com.benhsoan.infrastructure.storage.CloudinaryProperties;
 
 @SpringBootApplication
 @EnableAsync
 @EnableScheduling
 @EnableConfigurationProperties({AppointmentReminderProperties.class, ClinicalAttachmentProperties.class,
-        CloudinaryProperties.class, MockInterconnectionGatewayProperties.class, AnomalyDetectionProperties.class})
+        CloudinaryProperties.class, MockInterconnectionGatewayProperties.class, AnomalyDetectionProperties.class,
+        TwoFactorChallengeCleanupProperties.class})
 public class BenhSoAnApplication {
 
     public static void main(String[] args) {

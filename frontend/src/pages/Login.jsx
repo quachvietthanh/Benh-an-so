@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Form, Input, Button, Alert, message } from 'antd'
 import { UserOutlined, LockOutlined, SearchOutlined } from '@ant-design/icons'
-import { useAuthContext } from '../context/AuthContext'
-import { getDefaultHomePath } from '../components/layout/navigationConfig'
+import { useAuthContext } from '../context/AuthContext.jsx'
+import { getDefaultHomePath } from '../components/layout/navigationConfig.js'
 import './login.css'
 
 function Login() {
@@ -45,6 +45,16 @@ function Login() {
     try {
       const result = await login(values)
       if (result.success) {
+        if (result.twoFactorRequired) {
+          navigate('/login/verify-2fa', {
+            state: {
+              twoFactorToken: result.twoFactorToken,
+              twoFactorExpiresAt: result.twoFactorExpiresAt,
+              username: values.username,
+            },
+          })
+          return
+        }
         setLockoutSeconds(0)
         setErrorMessage('')
         const targetUser = result.user || JSON.parse(localStorage.getItem('user') || '{}')

@@ -1287,7 +1287,6 @@ function BillingPage() {
           <Title level={2} style={{ margin: 0 }}>
             <DollarCircleOutlined style={{ color: '#2563eb', marginRight: 8 }} /> Thu phí &amp; Hóa đơn
           </Title>
-          <Text type="secondary">Quản lý thu tiền viện phí, thanh toán dịch vụ và lập hóa đơn điện tử.</Text>
         </div>
         <Button icon={<ReloadOutlined />} loading={loadingVisits || loadingHistory} onClick={refreshAllData}>
           Làm mới dữ liệu

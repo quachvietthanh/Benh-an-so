@@ -58,6 +58,16 @@ public class ClinicalOrderItemRepositoryAdapter implements ClinicalOrderItemRepo
     }
 
     @Override
+    public List<ClinicalOrderItem> findByIdIn(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findByIdIn(ids).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<BillableClinicalService> findBillableByVisitId(UUID visitId) {
         if (visitId == null) {
             return List.of();
