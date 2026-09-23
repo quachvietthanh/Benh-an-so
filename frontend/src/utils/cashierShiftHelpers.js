@@ -1,8 +1,4 @@
 /**
- * Tiện ích và hàm bổ trợ cho tính năng Chốt ca thu ngân (NCL-07-CN-009)
- */
-
-/**
  * Định dạng tiền tệ VND
  * @param {number|string|null|undefined} amount
  * @returns {string}
