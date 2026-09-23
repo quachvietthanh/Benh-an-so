@@ -91,6 +91,7 @@ public class PrescriptionResultMapper {
                 item.getDispensedQuantity(),
                 item.getRemainingQuantity(),
                 item.getInstructions(),
+                item.getSingleDoseQuantity(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()
         );

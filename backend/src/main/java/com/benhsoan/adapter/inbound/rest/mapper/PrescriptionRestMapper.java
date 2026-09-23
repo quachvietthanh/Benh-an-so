@@ -109,6 +109,14 @@ public class PrescriptionRestMapper {
                                 .map(this::toCommand)
                                 .toList();
 
+        List<PrescriptionMaxDailyDoseOverrideCommand> maxDailyDoseOverrides
+                = request.maxDailyDoseOverrides() == null
+                        ? List.of()
+                        : request.maxDailyDoseOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
         return AmendPrescriptionCommand.builder()
                 .prescriptionId(prescriptionId)
                 .note(request.note())
@@ -119,6 +127,7 @@ public class PrescriptionRestMapper {
                         .toList())
                 .interactionOverrides(interactionOverrides)
                 .allergyOverrides(allergyOverrides)
+                .maxDailyDoseOverrides(maxDailyDoseOverrides)
                 .controlledMedicineConfirmed(request.controlledMedicineConfirmed())
                 .build();
     }
@@ -357,6 +366,7 @@ public class PrescriptionRestMapper {
                 .durationDays(request.durationDays())
                 .quantity(request.quantity())
                 .instructions(request.instructions())
+                .singleDoseQuantity(request.singleDoseQuantity())
                 .build();
     }
 
@@ -388,6 +398,7 @@ public class PrescriptionRestMapper {
                 .dispensedQuantity(result.dispensedQuantity())
                 .remainingQuantity(result.remainingQuantity())
                 .instructions(result.instructions())
+                .singleDoseQuantity(result.singleDoseQuantity())
                 .createdAt(result.createdAt())
                 .updatedAt(result.updatedAt())
                 .build();
