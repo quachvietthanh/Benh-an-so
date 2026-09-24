@@ -2,7 +2,9 @@ package com.benhsoan.application.ucservice.medicalrecord;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
@@ -14,7 +16,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.benhsoan.domain.medicalrecord.MedicalRecord;
+import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
+import com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
@@ -280,5 +285,75 @@ class MedicalRecordAuthorizationServiceTest {
                 () -> service.requireVisitTemplateVisitAccess(actorId, doctorId, visitId));
 
         verify(authorizationAuditService).recordVisitTemplateAccessDenied(actorId, visitId, "Medical record template access denied");
+    }
+
+    @Test
+    @DisplayName("allows archive manage access when user has MEDICAL_RECORD_ARCHIVE_MANAGE permission")
+    void allowsArchiveManageAccess() {
+        UUID userId = UUID.randomUUID();
+        when(permissionEvaluator.hasPermission("MEDICAL_RECORD_ARCHIVE_MANAGE")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireArchiveManageAccess());
+    }
+
+    @Test
+    @DisplayName("denies archive manage access without permission and audits")
+    void deniesArchiveManageAccessWithoutPermission() {
+        UUID userId = UUID.randomUUID();
+        when(permissionEvaluator.hasPermission("MEDICAL_RECORD_ARCHIVE_MANAGE")).thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, service::requireArchiveManageAccess);
+        verify(authorizationAuditService).recordArchiveAccessDenied(userId, "Medical record archive manage access denied");
+    }
+
+    @Test
+    @DisplayName("allows archive read access when user has MEDICAL_RECORD_ARCHIVE_READ permission")
+    void allowsArchiveReadAccess() {
+        UUID userId = UUID.randomUUID();
+        when(permissionEvaluator.hasPermission("MEDICAL_RECORD_ARCHIVE_READ")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertEquals(userId, service.requireArchiveReadAccess());
+    }
+
+    @Test
+    @DisplayName("denies archive read access without permission and audits")
+    void deniesArchiveReadAccessWithoutPermission() {
+        UUID userId = UUID.randomUUID();
+        when(permissionEvaluator.hasPermission("MEDICAL_RECORD_ARCHIVE_READ")).thenReturn(false);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        assertThrows(MedicalRecordAccessDeniedException.class, service::requireArchiveReadAccess);
+        verify(authorizationAuditService).recordArchiveAccessDenied(userId, "Medical record archive read access denied");
+    }
+
+    @Test
+    @DisplayName("ensureNotArchived throws MedicalRecordArchivedReadOnlyException and audits when record is ARCHIVED")
+    void ensureNotArchived_throwsWhenRecordIsArchived() {
+        UUID actorId = UUID.randomUUID();
+        UUID recordId = UUID.randomUUID();
+        MedicalRecord record = mock(MedicalRecord.class);
+        when(record.isArchived()).thenReturn(true);
+        when(record.getId()).thenReturn(recordId);
+
+        assertThrows(MedicalRecordArchivedReadOnlyException.class,
+                () -> service.ensureNotArchived(record, actorId, "Chỉnh sửa bệnh án"));
+
+        verify(authorizationAuditService).recordArchiveAccessDenied(actorId, recordId,
+                "Medical record modification denied: record is archived (QTN-19). Action: Chỉnh sửa bệnh án");
+    }
+
+    @Test
+    @DisplayName("ensureNotArchived does nothing when record is not ARCHIVED")
+    void ensureNotArchived_doesNothingWhenRecordIsNotArchived() {
+        UUID actorId = UUID.randomUUID();
+        MedicalRecord record = mock(MedicalRecord.class);
+        when(record.isArchived()).thenReturn(false);
+
+        service.ensureNotArchived(record, actorId, "Chỉnh sửa bệnh án");
+
+        verifyNoInteractions(authorizationAuditService);
     }
 }

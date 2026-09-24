@@ -196,7 +196,7 @@ public class MedicalRecordController {
     }
 
     @PostMapping("/{medicalRecordId}/archive")
-    @RequirePermission("MEDICAL_RECORD_UPDATE_STATUS")
+    @RequirePermission("MEDICAL_RECORD_ARCHIVE_MANAGE")
     public MedicalRecordResponse archive(@PathVariable UUID medicalRecordId) {
         return mapper.toResponse(archiveMedicalRecordUseCase.archive(medicalRecordId));
     }

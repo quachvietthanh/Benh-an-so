@@ -28,6 +28,9 @@ public record UpdateClinicConfigurationRequest(
         Integer retentionYears,
 
         @Min(value = 1, message = "Signing deadline hours must be at least 1.")
-        Integer signingDeadlineHours
+        Integer signingDeadlineHours,
+
+        @Min(value = 1, message = "Active record duration months must be at least 1.")
+        Integer activeRecordDurationMonths
 ) {
 }

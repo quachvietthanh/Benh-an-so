@@ -53,8 +53,15 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 ? command.signingDeadlineHours()
                 : beforeSigningDeadlineHours;
 
+        int beforeActiveRecordDurationMonths = clinicConfigurationRepository.find()
+                .map(ClinicConfiguration::getActiveRecordDurationMonths)
+                .orElse(ClinicConfiguration.DEFAULT_ACTIVE_RECORD_DURATION_MONTHS);
+        int afterActiveRecordDurationMonths = command.activeRecordDurationMonths() != null
+                ? command.activeRecordDurationMonths()
+                : beforeActiveRecordDurationMonths;
+
         ClinicConfiguration configuration = clinicConfigurationRepository.find()
-                .map(existing -> update(existing, command, afterRetentionYears, afterSigningDeadlineHours, now))
+                .map(existing -> update(existing, command, afterRetentionYears, afterSigningDeadlineHours, afterActiveRecordDurationMonths, now))
                 .orElseGet(() -> ClinicConfiguration.create(
                         command.clinicName(),
                         command.address(),
@@ -63,12 +70,14 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                         command.closingTime(),
                         afterRetentionYears,
                         afterSigningDeadlineHours,
+                        afterActiveRecordDurationMonths,
                         now
                 ));
 
         ClinicConfiguration saved = clinicConfigurationRepository.save(configuration);
         auditConfigurationUpdate(beforeRetentionYears, saved.getRetentionYears(),
-                beforeSigningDeadlineHours, saved.getSigningDeadlineHours(), now);
+                beforeSigningDeadlineHours, saved.getSigningDeadlineHours(),
+                beforeActiveRecordDurationMonths, saved.getActiveRecordDurationMonths(), now);
 
         return resultMapper.toResult(saved);
     }
@@ -78,6 +87,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
             UpdateClinicConfigurationCommand command,
             int retentionYears,
             int signingDeadlineHours,
+            int activeRecordDurationMonths,
             Instant updatedAt
     ) {
         configuration.update(
@@ -88,6 +98,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 command.closingTime(),
                 retentionYears,
                 signingDeadlineHours,
+                activeRecordDurationMonths,
                 updatedAt
         );
         return configuration;
@@ -96,16 +107,15 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
     private void auditConfigurationUpdate(
             int beforeRetentionYears, int afterRetentionYears,
             int beforeSigningDeadlineHours, int afterSigningDeadlineHours,
+            int beforeActiveDuration, int afterActiveDuration,
             Instant now
     ) {
         UUID actorId = currentUserPort.getCurrentUserId();
         String detail = """
-                {"before":{"retentionYears":%d,"signingDeadlineHours":%d},"after":{"retentionYears":%d,"signingDeadlineHours":%d},"summary":"Clinic configuration updated; retentionYears changed from %d to %d; signingDeadlineHours changed from %d to %d"}
+                {"before":{"retentionYears":%d,"signingDeadlineHours":%d,"activeRecordDurationMonths":%d},"after":{"retentionYears":%d,"signingDeadlineHours":%d,"activeRecordDurationMonths":%d},"summary":"Clinic configuration updated"}
                 """.formatted(
-                beforeRetentionYears, beforeSigningDeadlineHours,
-                afterRetentionYears, afterSigningDeadlineHours,
-                beforeRetentionYears, afterRetentionYears,
-                beforeSigningDeadlineHours, afterSigningDeadlineHours
+                beforeRetentionYears, beforeSigningDeadlineHours, beforeActiveDuration,
+                afterRetentionYears, afterSigningDeadlineHours, afterActiveDuration
         ).trim();
 
         auditLogRepository.save(AuditLog.create(

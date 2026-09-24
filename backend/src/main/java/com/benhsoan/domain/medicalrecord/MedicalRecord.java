@@ -22,12 +22,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MedicalRecord {
 
-    private UUID id, visitId, signedBy, lockedBy, createdBy, updatedBy, appliedTemplateVersionId, templateAppliedBy;
+    private UUID id, visitId, signedBy, lockedBy, createdBy, updatedBy, appliedTemplateVersionId, templateAppliedBy, archivedBy;
     private String chiefComplaint, symptoms, medicalHistory, physicalExamination, clinicalProgress, treatmentPlan, doctorInstructions, conclusion;
     private LocalDate revisitDate;
     private String signatureData;
     private MedicalRecordStatus status;
-    private Instant signedAt, lockedAt, createdAt, updatedAt, templateAppliedAt;
+    private Instant signedAt, lockedAt, createdAt, updatedAt, templateAppliedAt, archivedAt;
 
     private MedicalRecord(
             UUID id,
@@ -53,7 +53,9 @@ public class MedicalRecord {
             Instant updatedAt,
             UUID appliedTemplateVersionId,
             UUID templateAppliedBy,
-            Instant templateAppliedAt
+            Instant templateAppliedAt,
+            Instant archivedAt,
+            UUID archivedBy
     ) {
         this.id = Objects.requireNonNull(id);
         this.visitId = Objects.requireNonNull(visitId);
@@ -79,6 +81,8 @@ public class MedicalRecord {
         this.appliedTemplateVersionId = appliedTemplateVersionId;
         this.templateAppliedBy = templateAppliedBy;
         this.templateAppliedAt = templateAppliedAt;
+        this.archivedAt = archivedAt;
+        this.archivedBy = archivedBy;
     }
 
     public static MedicalRecord create(
@@ -162,6 +166,8 @@ public class MedicalRecord {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null
         );
     }
@@ -236,10 +242,24 @@ public class MedicalRecord {
             Instant lockedAt, UUID lockedBy, UUID createdBy, Instant createdAt, UUID updatedBy, Instant updatedAt,
             UUID appliedTemplateVersionId, UUID templateAppliedBy, Instant templateAppliedAt
     ) {
+        return restore(id, visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
+                clinicalProgress, treatmentPlan, doctorInstructions, conclusion, revisitDate, status, signatureData, signedAt,
+                signedBy, lockedAt, lockedBy, createdBy, createdAt, updatedBy, updatedAt, appliedTemplateVersionId,
+                templateAppliedBy, templateAppliedAt, null, null);
+    }
+
+    public static MedicalRecord restore(
+            UUID id, UUID visitId, String chiefComplaint, String symptoms, String medicalHistory,
+            String physicalExamination, String clinicalProgress, String treatmentPlan, String doctorInstructions,
+            String conclusion, LocalDate revisitDate, MedicalRecordStatus status, String signatureData, Instant signedAt, UUID signedBy,
+            Instant lockedAt, UUID lockedBy, UUID createdBy, Instant createdAt, UUID updatedBy, Instant updatedAt,
+            UUID appliedTemplateVersionId, UUID templateAppliedBy, Instant templateAppliedAt,
+            Instant archivedAt, UUID archivedBy
+    ) {
         return new MedicalRecord(id, visitId, chiefComplaint, symptoms, medicalHistory, physicalExamination,
                 clinicalProgress, treatmentPlan, doctorInstructions, conclusion, revisitDate, status, signatureData, signedAt,
                 signedBy, lockedAt, lockedBy, createdBy, createdAt, updatedBy, updatedAt, appliedTemplateVersionId,
-                templateAppliedBy, templateAppliedAt);
+                templateAppliedBy, templateAppliedAt, archivedAt, archivedBy);
     }
 
     public static MedicalRecord restore(
@@ -474,15 +494,23 @@ public class MedicalRecord {
     }
 
     public void archive(UUID by, Instant at) {
-        if (status != MedicalRecordStatus.LOCKED) {
-            conflict("Only locked records can be archived.");
+        if (status == MedicalRecordStatus.ARCHIVED) {
+            throw new MedicalRecordInvalidStatusException("Medical record is already archived.");
+        }
+        if (status != MedicalRecordStatus.SIGNED && status != MedicalRecordStatus.LOCKED) {
+            throw new MedicalRecordNotSignedException(this.id, "Chỉ bệnh án ở trạng thái đã ký mới được chuyển sang kho lưu trữ theo QTN-41.");
         }
         status = MedicalRecordStatus.ARCHIVED;
+        archivedBy = Objects.requireNonNull(by);
+        archivedAt = Objects.requireNonNull(at);
         updatedBy = Objects.requireNonNull(by);
         updatedAt = Objects.requireNonNull(at);
     }
 
     public void ensureEditable() {
+        if (isArchived()) {
+            throw new com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException();
+        }
         if (isContentLocked()) {
             throw new MedicalRecordAlreadyLockedException();
         }

@@ -50,6 +50,11 @@ public class AmendMedicalRecordService implements AmendMedicalRecordUseCase {
 
         validateCommand(command);
 
+        if (record.getStatus() == MedicalRecordStatus.ARCHIVED) {
+            UUID actorId = currentUserPort.getCurrentUserId();
+            authorizationService.ensureNotArchived(record, actorId, "Lập bản đính chính cho bệnh án");
+        }
+
         if (record.getStatus() != MedicalRecordStatus.SIGNED
                 && record.getStatus() != MedicalRecordStatus.LOCKED) {
             throw new MedicalRecordNotLockedException();
