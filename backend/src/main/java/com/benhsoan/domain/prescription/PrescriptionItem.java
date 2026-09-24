@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+import java.math.BigDecimal;
+
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.shared.exception.ValidationException;
 
@@ -47,6 +49,8 @@ public class PrescriptionItem {
 
     private String instructions;
 
+    private BigDecimal singleDoseQuantity;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -66,6 +70,7 @@ public class PrescriptionItem {
             int quantity,
             int dispensedQuantity,
             String instructions,
+            BigDecimal singleDoseQuantity,
             Instant createdAt,
             Instant updatedAt
     ) {
@@ -83,6 +88,7 @@ public class PrescriptionItem {
         this.quantity = validateQuantity(quantity);
         this.dispensedQuantity = validateDispensedQuantity(dispensedQuantity, this.quantity);
         this.instructions = normalizeOptionalText(instructions);
+        this.singleDoseQuantity = validateOptionalPositive(singleDoseQuantity);
         this.createdAt = requireNonNull(createdAt, "Prescription item creation time is required.");
         this.updatedAt = updatedAt;
     }
@@ -118,6 +124,45 @@ public class PrescriptionItem {
                 quantity,
                 0,
                 instructions,
+                null,
+                createdAt,
+                null
+        );
+    }
+
+    public static PrescriptionItem create(
+            UUID id,
+            UUID prescriptionId,
+            UUID medicineId,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            String unit,
+            String dosage,
+            Integer frequency,
+            AdministrationRoute route,
+            Integer durationDays,
+            int quantity,
+            String instructions,
+            BigDecimal singleDoseQuantity,
+            Instant createdAt
+    ) {
+        return new PrescriptionItem(
+                id,
+                prescriptionId,
+                medicineId,
+                medicineName,
+                activeIngredient,
+                strength,
+                unit,
+                dosage,
+                frequency,
+                route,
+                durationDays,
+                quantity,
+                0,
+                instructions,
+                singleDoseQuantity,
                 createdAt,
                 null
         );
@@ -193,6 +238,47 @@ public class PrescriptionItem {
                 quantity,
                 dispensedQuantity,
                 instructions,
+                null,
+                createdAt,
+                updatedAt
+        );
+    }
+
+    public static PrescriptionItem restore(
+            UUID id,
+            UUID prescriptionId,
+            UUID medicineId,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            String unit,
+            String dosage,
+            Integer frequency,
+            AdministrationRoute route,
+            Integer durationDays,
+            int quantity,
+            int dispensedQuantity,
+            String instructions,
+            BigDecimal singleDoseQuantity,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        return new PrescriptionItem(
+                id,
+                prescriptionId,
+                medicineId,
+                medicineName,
+                activeIngredient,
+                strength,
+                unit,
+                dosage,
+                frequency,
+                route,
+                durationDays,
+                quantity,
+                dispensedQuantity,
+                instructions,
+                singleDoseQuantity,
                 createdAt,
                 updatedAt
         );
@@ -242,6 +328,16 @@ public class PrescriptionItem {
             throw new ValidationException("Prescription item quantity must be greater than zero.");
         }
         return quantity;
+    }
+
+    private static BigDecimal validateOptionalPositive(BigDecimal value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidationException("Single dose quantity must be greater than zero.");
+        }
+        return value;
     }
 
     private static Integer validateDurationDays(Integer durationDays) {

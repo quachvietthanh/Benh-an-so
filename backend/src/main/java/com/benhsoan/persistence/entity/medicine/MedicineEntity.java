@@ -3,6 +3,8 @@ package com.benhsoan.persistence.entity.medicine;
 import java.time.Instant;
 import java.util.UUID;
 
+import java.math.BigDecimal;
+
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
 
@@ -68,4 +70,13 @@ public class MedicineEntity {
 
     @Column(name = "min_stock_threshold", nullable = false)
     private int minStockThreshold;
+
+    @Column(name = "controlled", nullable = false)
+    private boolean controlled;
+
+    @Column(name = "strength_value_mg", precision = 12, scale = 3)
+    private BigDecimal strengthValueMg;
+
+    @Column(name = "max_daily_dose_mg", precision = 12, scale = 3)
+    private BigDecimal maxDailyDoseMg;
 }

@@ -45,7 +45,9 @@ public record PrescriptionResponse(
 
         List<PrescriptionItemResponse> items,
 
-        List<PrescriptionWarningResponse> warnings
+        List<PrescriptionWarningResponse> warnings,
+
+        List<MaxDailyDoseMissingDataResponse> maxDailyDoseMissingData
 
 ) {
 }

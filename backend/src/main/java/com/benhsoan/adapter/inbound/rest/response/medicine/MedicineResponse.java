@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.response.medicine;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -19,6 +20,9 @@ public record MedicineResponse(
         Instant createdAt,
         Instant updatedAt,
         int stockQuantity,
-        int minStockThreshold
+        int minStockThreshold,
+        boolean controlled,
+        BigDecimal strengthValueMg,
+        BigDecimal maxDailyDoseMg
 ) {
 }

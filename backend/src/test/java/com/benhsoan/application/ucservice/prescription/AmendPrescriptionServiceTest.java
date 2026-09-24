@@ -1,12 +1,14 @@
 package com.benhsoan.application.ucservice.prescription;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,7 +17,9 @@ import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mock;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,16 +35,20 @@ import com.benhsoan.domain.medicine.enums.DosageForm;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionAmendment;
 import com.benhsoan.domain.prescription.PrescriptionItem;
+import com.benhsoan.domain.prescription.PrescriptionMaxDailyDoseWarningLog;
 import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
+import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
+import com.benhsoan.domain.prescription.exception.PrescriptionMaxDailyDoseConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException;
 import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionAmendmentException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionMaxDailyDoseOverrideCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
@@ -49,6 +57,7 @@ import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAmendmentRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionMaxDailyDoseWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -66,6 +75,7 @@ class AmendPrescriptionServiceTest {
     @Mock private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
+    @Mock private PrescriptionMaxDailyDoseWarningLogRepository maxDailyDoseWarningLogRepository;
     @Mock private PrescriptionAmendmentRepository amendmentRepository;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private CurrentUserPort currentUserPort;
@@ -76,14 +86,16 @@ class AmendPrescriptionServiceTest {
     private UUID actorId;
     private UUID prescriptionId;
     private UUID existingMedicineId;
+    private UUID patientId;
 
     @BeforeEach
     void setUp() {
+        patientId = UUID.randomUUID();
         lenient().when(displayContextResolver.resolve(any(), any()))
                 .thenReturn(new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
                         null,
                         null,
-                        null,
+                        patientId,
                         null,
                         null,
                         null
@@ -95,10 +107,12 @@ class AmendPrescriptionServiceTest {
                 checkPatientDrugAllergyUseCase,
                 warningLogRepository,
                 allergyWarningLogRepository,
+                maxDailyDoseWarningLogRepository,
                 amendmentRepository,
                 auditLogRepository,
                 currentUserPort,
                 new PrescriptionResultMapper(displayContextResolver),
+                displayContextResolver,
                 new PrescriptionSnapshotMapper(),
                 new PrescriptionSnapshotSerializer(new ObjectMapper().findAndRegisterModules()),
                 () -> AMENDED_AT,
@@ -235,12 +249,20 @@ class AmendPrescriptionServiceTest {
     }
 
     private AmendPrescriptionCommand command(List<AmendPrescriptionItemCommand> items) {
+        return command(items, false);
+    }
+
+    private AmendPrescriptionCommand command(
+            List<AmendPrescriptionItemCommand> items,
+            boolean controlledMedicineConfirmed
+    ) {
         return AmendPrescriptionCommand.builder()
                 .prescriptionId(prescriptionId)
                 .note("Take after meals")
                 .changeReason("Dose adjustment")
                 .items(items)
                 .interactionOverrides(List.of())
+                .controlledMedicineConfirmed(controlledMedicineConfirmed)
                 .build();
     }
 
@@ -271,6 +293,56 @@ class AmendPrescriptionServiceTest {
     private Medicine medicine(UUID id, boolean active) {
         return Medicine.restore(id, "MED-001", "Amoxicillin", "Amoxicillin", "500 mg", DosageForm.CAPSULE,
                 "capsule", AdministrationRoute.ORAL, active, CREATED_AT, null, 0, 20);
+    }
+
+    private Medicine controlledMedicine(UUID id, boolean active) {
+        return Medicine.restore(id, "MED-CTRL", "Morphine", "Morphine", "10 mg", DosageForm.INJECTION,
+                "ong", AdministrationRoute.INTRAVENOUS, active, CREATED_AT, null, 0, 20, true);
+    }
+
+    private AmendPrescriptionCommand command(
+            List<AmendPrescriptionItemCommand> items,
+            List<PrescriptionMaxDailyDoseOverrideCommand> maxDailyDoseOverrides
+    ) {
+        return AmendPrescriptionCommand.builder()
+                .prescriptionId(prescriptionId)
+                .note("Take after meals")
+                .changeReason("Dose adjustment")
+                .items(items)
+                .interactionOverrides(List.of())
+                .allergyOverrides(List.of())
+                .maxDailyDoseOverrides(maxDailyDoseOverrides)
+                .controlledMedicineConfirmed(false)
+                .build();
+    }
+
+    private AmendPrescriptionItemCommand dosedItem(
+            UUID medicineId,
+            String dosage,
+            int frequency,
+            BigDecimal singleDoseQuantity
+    ) {
+        return AmendPrescriptionItemCommand.builder()
+                .medicineId(medicineId)
+                .dosage(dosage)
+                .frequency(frequency)
+                .route(AdministrationRoute.ORAL)
+                .durationDays(5)
+                .quantity(10)
+                .instructions(null)
+                .singleDoseQuantity(singleDoseQuantity)
+                .build();
+    }
+
+    private Medicine dosedMedicine(
+            UUID id,
+            String activeIngredient,
+            String strengthValueMg,
+            String maxDailyDoseMg
+    ) {
+        return Medicine.restore(id, "MED-" + activeIngredient, activeIngredient, activeIngredient, "500 mg",
+                DosageForm.TABLET, "tablet", AdministrationRoute.ORAL, true, CREATED_AT, null, 0, 20, false,
+                new BigDecimal(strengthValueMg), new BigDecimal(maxDailyDoseMg));
     }
 
     @Test
@@ -339,5 +411,329 @@ class AmendPrescriptionServiceTest {
         verify(amendmentRepository).save(any());
         verify(allergyWarningLogRepository).save(any());
     }
+
+    @Test
+    void addingControlledMedicineWithoutConfirmation_isRejected() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        UUID controlledMedicineId = UUID.randomUUID();
+        doReturn(List.of(medicine(existingMedicineId, true), controlledMedicine(controlledMedicineId, true)))
+                .when(medicineRepository).findAllById(any());
+
+        assertThrows(ControlledMedicineConfirmationRequiredException.class,
+                () -> service.amend(command(List.of(
+                        item(existingMedicineId, "2 tablets"),
+                        item(controlledMedicineId, "1 ong")))));
+
+        verify(prescriptionRepository, never()).save(any());
+        verify(amendmentRepository, never()).save(any());
+    }
+
+    @Test
+    void addingControlledMedicineWithConfirmation_succeeds() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        UUID controlledMedicineId = UUID.randomUUID();
+        doReturn(List.of(medicine(existingMedicineId, true), controlledMedicine(controlledMedicineId, true)))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(
+                List.of(item(existingMedicineId, "2 tablets"), item(controlledMedicineId, "1 ong")),
+                true));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(2, result.items().size());
+        verify(prescriptionRepository).save(any());
+        verify(amendmentRepository).save(any());
+    }
+
+    @Test
+    void amendingWithOnlyOrdinaryMedicines_doesNotRequireConfirmation() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        var result = service.amend(command(List.of(item(existingMedicineId, "3 tablets"))));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
+    }
+
+    @Test
+    void amendingUnchangedControlledMedicine_doesNotRequireConfirmation() {
+        UUID controlledMedicineId = UUID.randomUUID();
+        UUID ordinaryMedicineId = UUID.randomUUID();
+
+        PrescriptionItem controlledItem = PrescriptionItem.create(
+                UUID.randomUUID(), prescriptionId, controlledMedicineId,
+                "Morphine", "Morphine", "10 mg", "ong", "1 ong", 2,
+                AdministrationRoute.INTRAVENOUS, 5, 10, null, CREATED_AT);
+        PrescriptionItem ordinaryItem = PrescriptionItem.create(
+                UUID.randomUUID(), prescriptionId, ordinaryMedicineId,
+                "Paracetamol", "Paracetamol", "500 mg", "tablet", "1 tablet", 2,
+                AdministrationRoute.ORAL, 5, 10, null, CREATED_AT);
+        Prescription prescription = Prescription.restore(
+                prescriptionId, "RX000001", UUID.randomUUID(), PrescriptionStatus.PENDING_DISPENSE,
+                "Take after meals", actorId, CREATED_AT, null, null,
+                List.of(controlledItem, ordinaryItem));
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(controlledMedicine(controlledMedicineId, true), medicine(ordinaryMedicineId, true)))
+                .when(medicineRepository).findAllById(any());
+
+        // Keeps the controlled medicine unchanged and only changes the ordinary medicine's dosage.
+        var result = service.amend(command(List.of(
+                item(controlledMedicineId, "1 ong"),
+                item(ordinaryMedicineId, "2 tablets"))));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
+    }
+
+    @Test
+    void addingMedicineThatExceedsMaxDailyDose_rejectsWithoutOverride() {
+        Prescription prescription = pendingPrescription(actorId);
+        UUID secondMedicineId = UUID.randomUUID();
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(
+                dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000"),
+                dosedMedicine(secondMedicineId, "Paracetamol", "500", "4000")))
+                .when(medicineRepository).findAllById(any());
+
+        assertThrows(PrescriptionMaxDailyDoseConfirmationRequiredException.class,
+                () -> service.amend(command(List.of(
+                        dosedItem(existingMedicineId, "1 tablet", 3, new BigDecimal("2")),
+                        dosedItem(secondMedicineId, "1 tablet", 1, new BigDecimal("3"))
+                ), List.of())));
+
+        verify(prescriptionRepository, never()).save(any());
+        verify(amendmentRepository, never()).save(any());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void increasingFrequencyThatExceedsMaxDailyDose_rejectsWithoutOverride() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000")))
+                .when(medicineRepository).findAllById(any());
+
+        assertThrows(PrescriptionMaxDailyDoseConfirmationRequiredException.class,
+                () -> service.amend(command(List.of(
+                        dosedItem(existingMedicineId, "1 tablet", 5, new BigDecimal("2"))
+                ), List.of())));
+
+        verify(prescriptionRepository, never()).save(any());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void exceedingMaxDailyDoseWithValidOverride_allowsAmendmentAndSavesLog() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000")))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(
+                List.of(dosedItem(existingMedicineId, "1 tablet", 5, new BigDecimal("2"))),
+                List.of(new PrescriptionMaxDailyDoseOverrideCommand("Paracetamol", "Clinical necessity"))
+        ));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(prescriptionRepository).save(any());
+        verify(amendmentRepository).save(any());
+
+        ArgumentCaptor<PrescriptionMaxDailyDoseWarningLog> logCaptor =
+                ArgumentCaptor.forClass(PrescriptionMaxDailyDoseWarningLog.class);
+        verify(maxDailyDoseWarningLogRepository).save(logCaptor.capture());
+        assertEquals("Paracetamol", logCaptor.getValue().getActiveIngredient());
+        assertEquals("Clinical necessity", logCaptor.getValue().getOverrideReason());
+        assertEquals(actorId, logCaptor.getValue().getHandledBy());
+        assertEquals(AMENDED_AT, logCaptor.getValue().getHandledAt());
+        assertEquals(patientId, logCaptor.getValue().getPatientId());
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        assertTrue(auditCaptor.getValue().getDetail().contains("\"warningOverrideCount\":1"));
+    }
+
+
+    @Test
+    void removingContributingMedicine_recalculatesTotalAndAllowsAmendment() {
+        UUID secondMedicineId = UUID.randomUUID();
+        PrescriptionItem item1 = PrescriptionItem.create(UUID.randomUUID(), prescriptionId, existingMedicineId,
+                "Paracetamol", "Paracetamol", "500 mg", "tablet", "1 tablet", 3,
+                AdministrationRoute.ORAL, 5, 10, null, new BigDecimal("2"), CREATED_AT);
+        PrescriptionItem item2 = PrescriptionItem.create(UUID.randomUUID(), prescriptionId, secondMedicineId,
+                "Paracetamol", "Paracetamol", "500 mg", "tablet", "1 tablet", 1,
+                AdministrationRoute.ORAL, 5, 10, null, new BigDecimal("3"), CREATED_AT);
+        Prescription prescription = Prescription.restore(prescriptionId, "RX000001", UUID.randomUUID(),
+                PrescriptionStatus.PENDING_DISPENSE, "Take after meals", actorId, CREATED_AT, null, null,
+                List.of(item1, item2));
+
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000")))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(List.of(
+                dosedItem(existingMedicineId, "1 tablet", 3, new BigDecimal("2"))
+        ), List.of()));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(1, result.items().size());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void reducingFrequency_recalculatesTotalAndAllowsAmendmentWithoutOverride() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000")))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(List.of(
+                dosedItem(existingMedicineId, "1 tablet", 3, new BigDecimal("2"))
+        ), List.of()));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void missingSingleDoseQuantity_reportsMissingDataAndDoesNotBlock() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000")))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(List.of(
+                dosedItem(existingMedicineId, "1 tablet", 3, null)
+        ), List.of()));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(1, result.maxDailyDoseMissingData().size());
+        assertEquals("Paracetamol", result.maxDailyDoseMissingData().getFirst().activeIngredient());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+
+    @Test
+    void missingMaxDailyDose_reportsMissingDataAndDoesNotBlock() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(Medicine.restore(existingMedicineId, "MED-Paracetamol", "Paracetamol", "Paracetamol", "500 mg",
+                DosageForm.TABLET, "tablet", AdministrationRoute.ORAL, true, CREATED_AT, null, 0, 20, false,
+                new BigDecimal("500"), null)))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(List.of(
+                dosedItem(existingMedicineId, "1 tablet", 3, new BigDecimal("2"))
+        ), List.of()));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(1, result.maxDailyDoseMissingData().size());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void conflictingMaxDailyDose_reportsMissingDataAndDoesNotBlock() {
+        UUID secondMedicineId = UUID.randomUUID();
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(
+                dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000"),
+                dosedMedicine(secondMedicineId, "Paracetamol", "500", "2000")))
+                .when(medicineRepository).findAllById(any());
+
+        var result = service.amend(command(List.of(
+                dosedItem(existingMedicineId, "1 tablet", 2, new BigDecimal("1")),
+                dosedItem(secondMedicineId, "1 tablet", 2, new BigDecimal("1"))
+        ), List.of()));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        assertEquals(1, result.maxDailyDoseMissingData().size());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void multipleExceededIngredients_requireAllOverrides() {
+        UUID secondMedicineId = UUID.randomUUID();
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(prescriptionRepository.save(any(Prescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(amendmentRepository.save(any(PrescriptionAmendment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        doReturn(List.of(
+                dosedMedicine(existingMedicineId, "Paracetamol", "500", "4000"),
+                dosedMedicine(secondMedicineId, "Ibuprofen", "200", "1200")))
+                .when(medicineRepository).findAllById(any());
+
+        var items = List.of(
+                dosedItem(existingMedicineId, "1 tablet", 5, new BigDecimal("2")),
+                dosedItem(secondMedicineId, "1 tablet", 3, new BigDecimal("3"))
+        );
+
+        assertThrows(PrescriptionMaxDailyDoseConfirmationRequiredException.class,
+                () -> service.amend(command(items,
+                        List.of(new PrescriptionMaxDailyDoseOverrideCommand("Paracetamol", "Necessary")))));
+        verify(prescriptionRepository, never()).save(any());
+
+        var result = service.amend(command(items, List.of(
+                new PrescriptionMaxDailyDoseOverrideCommand("Paracetamol", "Necessary"),
+                new PrescriptionMaxDailyDoseOverrideCommand("Ibuprofen", "Necessary")
+        )));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(maxDailyDoseWarningLogRepository, times(2)).save(any(PrescriptionMaxDailyDoseWarningLog.class));
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        assertTrue(auditCaptor.getValue().getDetail().contains("\"warningOverrideCount\":2"));
+    }
+
+    @Test
+    void unauthorizedDoctorCannotUseMaxDoseOverrideFlow() {
+        Prescription prescription = pendingPrescription(actorId);
+        when(prescriptionRepository.findByIdForUpdate(prescriptionId)).thenReturn(Optional.of(prescription));
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        assertThrows(UnauthorizedPrescriptionAmendmentException.class,
+                () -> service.amend(command(
+                        List.of(dosedItem(existingMedicineId, "1 tablet", 5, new BigDecimal("2"))),
+                        List.of(new PrescriptionMaxDailyDoseOverrideCommand("Paracetamol", "Necessary"))
+                )));
+
+        verify(prescriptionRepository, never()).save(any());
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
 }
 

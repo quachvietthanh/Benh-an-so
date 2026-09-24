@@ -48,6 +48,7 @@ import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.prescription.exception.PrescriptionAlreadyDispensedException;
 import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
+import com.benhsoan.port.dto.command.prescription.DispensePrescriptionCommand;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
@@ -461,7 +462,7 @@ class PrescriptionControllerTest {
                 List.of()
         );
 
-        when(dispensePrescriptionUseCase.dispense(prescriptionId))
+        when(dispensePrescriptionUseCase.dispense(any(DispensePrescriptionCommand.class)))
                 .thenReturn(new DispensePrescriptionResult(
                         prescription,
                         pharmacistId,

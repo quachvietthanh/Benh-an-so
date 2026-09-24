@@ -1,10 +1,13 @@
 package com.benhsoan.adapter.inbound.rest.request.medicine;
 
+import java.math.BigDecimal;
+
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.medicine.enums.DosageForm;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
@@ -36,6 +39,14 @@ public record CreateMedicineRequest(
         AdministrationRoute defaultRoute,
 
         @PositiveOrZero(message = "Minimum stock threshold must be greater than or equal to 0.")
-        int minStockThreshold
+        int minStockThreshold,
+
+        boolean controlled,
+
+        @Positive(message = "Strength value (mg) must be greater than 0.")
+        BigDecimal strengthValueMg,
+
+        @Positive(message = "Max daily dose (mg) must be greater than 0.")
+        BigDecimal maxDailyDoseMg
 ) {
 }

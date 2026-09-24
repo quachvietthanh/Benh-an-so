@@ -21,6 +21,8 @@ import {
   Tag,
   Tooltip,
   Typography,
+  Divider,
+  Switch,
   message,
 } from 'antd'
 import {
@@ -37,6 +39,7 @@ import {
   MedicineBoxOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SafetyCertificateOutlined,
   SearchOutlined,
   StopOutlined,
   WarningOutlined,
@@ -47,6 +50,14 @@ import pharmacyApi from '../api/pharmacyApi'
 import { useAuthContext } from '../context/AuthContext'
 import StockThresholdModal from '../components/pharmacy/StockThresholdModal'
 import LowStockAlertTable from '../components/pharmacy/LowStockAlertTable'
+import SpecialControlBadge from '../components/pharmacy/SpecialControlBadge.jsx'
+import specialControlledDrugApi, {
+  mergeSpecialControlData,
+} from '../api/specialControlledDrugApi.js'
+import {
+  SPECIAL_CONTROL_GROUPS,
+  validateSpecialControlMedicineForm,
+} from '../utils/specialControlHelpers.js'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -139,6 +150,9 @@ function MedicineCatalogPage() {
   const [inlineValue, setInlineValue] = useState(0)
   const [inlineSaving, setInlineSaving] = useState(false)
 
+  const [isSpecialControlChecked, setIsSpecialControlChecked] = useState(false)
+  const [specialControlFilter, setSpecialControlFilter] = useState('ALL')
+
   const [form] = Form.useForm()
 
   const loadLowStockAlerts = useCallback(async () => {
@@ -182,8 +196,10 @@ function MedicineCatalogPage() {
         ? responseData
         : []
 
-      setMedicines(Array.isArray(content) ? content : [])
-      setTotalElements(responseData?.totalElements ?? content.length)
+      const rawList = Array.isArray(content) ? content : []
+      const mergedContent = mergeSpecialControlData(rawList)
+      setMedicines(mergedContent)
+      setTotalElements(responseData?.totalElements ?? mergedContent.length)
     } catch (err) {
       const status = err.response?.status
       const msg =
@@ -223,6 +239,7 @@ function MedicineCatalogPage() {
       return
     }
     setEditingMedicine(null)
+    setIsSpecialControlChecked(false)
     form.resetFields()
     form.setFieldsValue({
       medicineCode: `MED-${Date.now().toString().slice(-6)}`,
@@ -230,6 +247,7 @@ function MedicineCatalogPage() {
       defaultRoute: 'ORAL',
       unit: 'Viên',
       minStockThreshold: 10,
+      isSpecialControl: false,
     })
     setModalOpen(true)
   }
@@ -239,7 +257,10 @@ function MedicineCatalogPage() {
       message.error('Bạn không có quyền quản lý danh mục thuốc.')
       return
     }
+    const isSpecial = Boolean(record.isSpecialControl)
     setEditingMedicine(record)
+    setIsSpecialControlChecked(isSpecial)
+    form.resetFields()
     form.setFieldsValue({
       medicineCode: record.medicineCode || '',
       medicineName: record.medicineName || '',
@@ -249,6 +270,9 @@ function MedicineCatalogPage() {
       unit: record.unit || '',
       defaultRoute: record.defaultRoute || 'ORAL',
       minStockThreshold: record.minStockThreshold ?? 0,
+      isSpecialControl: isSpecial,
+      specialControlGroup: record.specialControlGroup || undefined,
+      specialControlNote: record.specialControlNote || '',
     })
     setModalOpen(true)
   }
@@ -311,6 +335,19 @@ function MedicineCatalogPage() {
       return
     }
 
+    const specialValidation = validateSpecialControlMedicineForm(values)
+    if (!specialValidation.valid) {
+      message.error(specialValidation.error)
+      return
+    }
+
+    const isSpecial = Boolean(values.isSpecialControl)
+    const specialPayload = {
+      isSpecialControl: isSpecial,
+      specialControlGroup: isSpecial ? values.specialControlGroup : null,
+      specialControlNote: isSpecial ? (values.specialControlNote || '').trim() : null,
+    }
+
     setSubmitting(true)
     try {
       if (editingMedicine) {
@@ -324,6 +361,19 @@ function MedicineCatalogPage() {
           minStockThreshold: thresholdVal,
         }
         await medicineApi.update(editingMedicine.id, updatePayload)
+        try {
+          await specialControlledDrugApi.patchSpecialControl(editingMedicine.id, specialPayload)
+        } catch {
+          // backend update fallback
+        }
+        // Cập nhật ngay state trước khi fetch lại từ backend
+        setMedicines((prev) =>
+          prev.map((m) =>
+            String(m.id) === String(editingMedicine.id)
+              ? { ...m, ...updatePayload, ...specialPayload }
+              : m
+          )
+        )
         message.success(`Đã cập nhật thuốc ${trimmedName}`)
       } else {
         const createPayload = {
@@ -336,12 +386,21 @@ function MedicineCatalogPage() {
           defaultRoute: defaultRouteVal,
           minStockThreshold: thresholdVal,
         }
-        await medicineApi.create(createPayload)
+        const createdRes = await medicineApi.create(createPayload)
+        const createdId = createdRes?.data?.id || createdRes?.id
+        if (createdId) {
+          try {
+            await specialControlledDrugApi.patchSpecialControl(createdId, specialPayload)
+          } catch {
+            // fallback
+          }
+        }
         message.success(`Đã thêm thuốc mới ${trimmedName} vào danh mục thành công`)
       }
 
       setModalOpen(false)
       setEditingMedicine(null)
+      setIsSpecialControlChecked(false)
       form.resetFields()
       refreshAll()
     } catch (err) {
@@ -437,15 +496,25 @@ function MedicineCatalogPage() {
     } else if (stockStatusFilter === 'SAFE') {
       list = list.filter(
         (m) =>
-          Number(m.minStockThreshold || 0) === 0 ||
+          Number(m.minStockThreshold || 0) > 0 &&
           Number(m.stockQuantity || 0) >= Number(m.minStockThreshold || 0)
       )
     } else if (stockStatusFilter === 'UNSET') {
       list = list.filter((m) => Number(m.minStockThreshold || 0) === 0)
     }
 
+    if (specialControlFilter === 'SPECIAL') {
+      list = list.filter((m) => Boolean(m.isSpecialControl))
+    } else if (specialControlFilter === 'NORMAL') {
+      list = list.filter((m) => !m.isSpecialControl)
+    } else if (specialControlFilter && specialControlFilter !== 'ALL') {
+      list = list.filter(
+        (m) => Boolean(m.isSpecialControl) && m.specialControlGroup === specialControlFilter
+      )
+    }
+
     return list
-  }, [medicines, stockStatusFilter])
+  }, [medicines, stockStatusFilter, specialControlFilter])
 
   const stats = useMemo(() => {
     const total = totalElements || medicines.length
@@ -480,8 +549,17 @@ function MedicineCatalogPage() {
       title: 'Tên thuốc & Hoạt chất',
       key: 'medicineInfo',
       render: (_, record) => (
-        <Space direction="vertical" size={1}>
-          <strong>{record.medicineName || '—'}</strong>
+        <Space direction="vertical" size={2}>
+          <Space align="center" wrap>
+            <strong>{record.medicineName || '—'}</strong>
+            {record.isSpecialControl && (
+              <SpecialControlBadge
+                group={record.specialControlGroup}
+                note={record.specialControlNote}
+                short
+              />
+            )}
+          </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>
             {[record.activeIngredient, record.strength].filter(Boolean).join(' · ')}
           </Text>
@@ -871,6 +949,22 @@ function MedicineCatalogPage() {
                           { value: 'UNSET', label: '⚪ Chưa đặt ngưỡng (0)' },
                         ]}
                       />
+
+                      <Select
+                        defaultValue="ALL"
+                        value={specialControlFilter}
+                        style={{ width: 230 }}
+                        onChange={setSpecialControlFilter}
+                        options={[
+                          { value: 'ALL', label: 'Tất cả nhóm kiểm soát' },
+                          { value: 'SPECIAL', label: '⭐ Tất cả thuốc kiểm soát đặc biệt' },
+                          { value: 'NARCOTIC', label: '🔴 Thuốc gây nghiện' },
+                          { value: 'PSYCHOTROPIC', label: '🟠 Thuốc hướng thần' },
+                          { value: 'PRECURSOR', label: '🟡 Thuốc tiền chất' },
+                          { value: 'TOXIC', label: '🟣 Thuốc độc / Dược chất độc' },
+                          { value: 'NORMAL', label: 'Thuốc thông thường' },
+                        ]}
+                      />
                     </Space>
                   </div>
 
@@ -965,127 +1059,386 @@ function MedicineCatalogPage() {
 
       <Modal
         title={
-          editingMedicine
-            ? `Sửa thông tin thuốc: ${editingMedicine.medicineName}`
-            : 'Thêm thuốc mới vào danh mục'
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 4 }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                backgroundColor: editingMedicine ? '#eff6ff' : '#f0fdf4',
+                color: editingMedicine ? '#2563eb' : '#16a34a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                border: editingMedicine ? '1px solid #bfdbfe' : '1px solid #bbf7d0',
+              }}
+            >
+              {editingMedicine ? <EditOutlined /> : <PlusOutlined />}
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
+                {editingMedicine
+                  ? `Sửa thông tin thuốc: ${editingMedicine.medicineName}`
+                  : 'Thêm thuốc mới vào danh mục'}
+              </div>
+              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 400, marginTop: 2 }}>
+                {editingMedicine
+                  ? 'Cập nhật thông tin chi tiết, ngưỡng tồn kho và phân loại kiểm soát đặc biệt'
+                  : 'Khai báo thông số thuốc, hoạt chất và thiết lập giám sát dược phẩm'}
+              </div>
+            </div>
+          </div>
         }
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false)
           setEditingMedicine(null)
         }}
-        onOk={() => form.submit()}
-        confirmLoading={submitting}
-        okText={editingMedicine ? 'Cập nhật' : 'Thêm mới'}
-        cancelText="Hủy"
-        width={650}
+        footer={[
+          <Button
+            key="cancel"
+            size="large"
+            onClick={() => {
+              setModalOpen(false)
+              setEditingMedicine(null)
+            }}
+            style={{
+              height: 42,
+              minWidth: 100,
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 500,
+            }}
+          >
+            Hủy bỏ
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            size="large"
+            loading={submitting}
+            onClick={() => form.submit()}
+            style={{
+              height: 42,
+              minWidth: 130,
+              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: 600,
+            }}
+          >
+            {editingMedicine ? 'Lưu thay đổi' : 'Tạo mới'}
+          </Button>,
+        ]}
+        width={700}
         destroyOnClose
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSaveMedicine}
+          onValuesChange={(changedValues) => {
+            if ('isSpecialControl' in changedValues) {
+              setIsSpecialControlChecked(Boolean(changedValues.isSpecialControl))
+            }
+          }}
           initialValues={{
             dosageForm: 'TABLET',
             defaultRoute: 'ORAL',
             unit: 'Viên',
             minStockThreshold: 10,
+            isSpecialControl: false,
           }}
+          style={{ marginTop: 12 }}
         >
-          <Form.Item
-            name="medicineCode"
-            label="Mã thuốc"
-            rules={[{ required: true, message: 'Vui lòng nhập mã thuốc.' }]}
-          >
-            <Input
-              placeholder="Nhập mã thuốc (VD: MED-001)"
-              disabled={!!editingMedicine}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="medicineName"
-            label="Tên thuốc"
-            rules={[{ required: true, message: 'Vui lòng nhập tên thuốc.' }]}
-          >
-            <Input placeholder="Nhập tên thuốc (VD: Paracetamol 500mg)" />
-          </Form.Item>
-
-          <Form.Item
-            name="activeIngredient"
-            label="Hoạt chất"
-            rules={[{ required: true, message: 'Vui lòng nhập hoạt chất.' }]}
-          >
-            <Input placeholder="Nhập hoạt chất (VD: Paracetamol)" />
-          </Form.Item>
-
-          <Form.Item
-            name="strength"
-            label="Hàm lượng"
-            rules={[{ required: true, message: 'Vui lòng nhập hàm lượng.' }]}
-          >
-            <Input placeholder="Nhập hàm lượng (VD: 500 mg, 10mg/5ml...)" />
-          </Form.Item>
-
-          <Space style={{ display: 'flex' }} align="baseline">
-            <Form.Item
-              name="dosageForm"
-              label="Dạng bào chế"
-              rules={[{ required: true, message: 'Vui lòng chọn dạng bào chế.' }]}
-              style={{ flex: 1 }}
-            >
-              <Select
-                options={Object.entries(DOSAGE_FORM_LABELS).map(
-                  ([key, val]) => ({
-                    value: key,
-                    label: val,
-                  })
-                )}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="defaultRoute"
-              label="Cách dùng"
-              rules={[{ required: true, message: 'Vui lòng chọn cách dùng.' }]}
-              style={{ flex: 1 }}
-            >
-              <Select
-                options={Object.entries(ROUTE_LABELS).map(([key, val]) => ({
-                  value: key,
-                  label: val,
-                }))}
-              />
-            </Form.Item>
-          </Space>
-
           <Row gutter={16}>
-            <Col xs={24} md={12}>
+            <Col xs={24} sm={8}>
               <Form.Item
-                name="unit"
-                label="Đơn vị tính"
-                rules={[{ required: true, message: 'Vui lòng nhập đơn vị tính.' }]}
+                name="medicineCode"
+                label={<strong>Mã thuốc</strong>}
+                rules={[{ required: true, message: 'Vui lòng nhập mã thuốc.' }]}
               >
-                <Input placeholder="Nhập đơn vị tính (Viên / Chai / Tuýp...)" />
+                <Input
+                  placeholder="VD: MED-001"
+                  disabled={!!editingMedicine}
+                  style={{ borderRadius: 8, height: 38 }}
+                />
               </Form.Item>
             </Col>
 
-            <Col xs={24} md={12}>
+            <Col xs={24} sm={16}>
+              <Form.Item
+                name="medicineName"
+                label={<strong>Tên thuốc</strong>}
+                rules={[{ required: true, message: 'Vui lòng nhập tên thuốc.' }]}
+              >
+                <Input
+                  placeholder="VD: Paracetamol 500mg"
+                  style={{ borderRadius: 8, height: 38 }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={14}>
+              <Form.Item
+                name="activeIngredient"
+                label={<strong>Hoạt chất chính</strong>}
+                rules={[{ required: true, message: 'Vui lòng nhập hoạt chất.' }]}
+              >
+                <Input
+                  placeholder="VD: Paracetamol"
+                  style={{ borderRadius: 8, height: 38 }}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={10}>
+              <Form.Item
+                name="strength"
+                label={<strong>Hàm lượng</strong>}
+                rules={[{ required: true, message: 'Vui lòng nhập hàm lượng.' }]}
+              >
+                <Input
+                  placeholder="VD: 500 mg, 10mg/5ml..."
+                  style={{ borderRadius: 8, height: 38 }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="dosageForm"
+                label={<strong>Dạng bào chế</strong>}
+                rules={[{ required: true, message: 'Vui lòng chọn dạng bào chế.' }]}
+              >
+                <Select
+                  style={{ borderRadius: 8, height: 38 }}
+                  options={Object.entries(DOSAGE_FORM_LABELS).map(
+                    ([key, val]) => ({
+                      value: key,
+                      label: val,
+                    })
+                  )}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="defaultRoute"
+                label={<strong>Đường dùng / Cách dùng</strong>}
+                rules={[{ required: true, message: 'Vui lòng chọn cách dùng.' }]}
+              >
+                <Select
+                  style={{ borderRadius: 8, height: 38 }}
+                  options={Object.entries(ROUTE_LABELS).map(([key, val]) => ({
+                    value: key,
+                    label: val,
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="unit"
+                label={<strong>Đơn vị tính</strong>}
+                rules={[{ required: true, message: 'Vui lòng nhập đơn vị tính.' }]}
+              >
+                <Input
+                  placeholder="VD: Viên, Chai, Gói, Tuýp..."
+                  style={{ borderRadius: 8, height: 38 }}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="minStockThreshold"
-                label="Ngưỡng tồn kho tối thiểu"
+                label={<strong>Ngưỡng tồn kho tối thiểu</strong>}
                 rules={[{ required: true, message: 'Vui lòng nhập ngưỡng tồn kho.' }]}
-                extra="Hệ thống sẽ bật cảnh báo khi lượng tồn < mức này"
+                tooltip="Hệ thống sẽ bật cảnh báo khi lượng tồn khả dụng thấp hơn mức này"
               >
                 <InputNumber
                   min={0}
                   max={1000000}
                   precision={0}
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', borderRadius: 8, height: 38, lineHeight: '38px' }}
                 />
               </Form.Item>
             </Col>
           </Row>
+
+          {/* Khung cấu hình Thuốc kiểm soát đặc biệt thiết kế cao cấp */}
+          <div
+            style={{
+              marginTop: 10,
+              marginBottom: 10,
+              padding: '16px 18px',
+              borderRadius: 12,
+              border: isSpecialControlChecked
+                ? '1px solid #fdba74'
+                : '1px solid #e2e8f0',
+              backgroundColor: isSpecialControlChecked ? '#fffaf5' : '#f8fafc',
+              transition: 'all 0.25s ease',
+              boxShadow: isSpecialControlChecked
+                ? '0 4px 14px rgba(249, 115, 22, 0.08)'
+                : 'none',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 16,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isSpecialControlChecked ? '#ffedd5' : '#f1f5f9',
+                    color: isSpecialControlChecked ? '#ea580c' : '#64748b',
+                    fontSize: 22,
+                    flexShrink: 0,
+                    border: isSpecialControlChecked
+                      ? '1px solid #fed7aa'
+                      : '1px solid #e2e8f0',
+                    transition: 'all 0.25s ease',
+                  }}
+                >
+                  <SafetyCertificateOutlined />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: isSpecialControlChecked ? '#9a3412' : '#1e293b',
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    Thuốc kiểm soát đặc biệt
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: isSpecialControlChecked ? '#c2410c' : '#64748b',
+                      marginTop: 2,
+                    }}
+                  >
+                    Áp dụng quy chế giám sát nghiêm ngặt khi kê đơn và cấp phát
+                  </div>
+                </div>
+              </div>
+
+              <Form.Item
+                name="isSpecialControl"
+                valuePropName="checked"
+                style={{ margin: 0 }}
+              >
+                <Switch
+                  checked={isSpecialControlChecked}
+                  checkedChildren="BẬT"
+                  unCheckedChildren="TẮT"
+                  onChange={(checked) => {
+                    setIsSpecialControlChecked(checked)
+                    form.setFieldsValue({ isSpecialControl: checked })
+                  }}
+                  style={{
+                    backgroundColor: isSpecialControlChecked ? '#ea580c' : undefined,
+                    minWidth: 54,
+                  }}
+                />
+              </Form.Item>
+            </div>
+
+            {isSpecialControlChecked && (
+              <div
+                style={{
+                  marginTop: 16,
+                  paddingTop: 16,
+                  borderTop: '1px dashed #fed7aa',
+                }}
+              >
+                <Form.Item
+                  name="specialControlGroup"
+                  label={
+                    <span style={{ fontWeight: 600, color: '#334155', fontSize: 14 }}>
+                      Nhóm kiểm soát đặc biệt
+                    </span>
+                  }
+                  rules={[
+                    {
+                      required: isSpecialControlChecked,
+                      message: 'Vui lòng chọn nhóm kiểm soát đặc biệt.',
+                    },
+                  ]}
+                  style={{ marginBottom: 14 }}
+                >
+                  <Select
+                    size="large"
+                    placeholder="Chọn nhóm kiểm soát theo quy định Bộ Y tế"
+                    style={{ width: '100%', borderRadius: 8 }}
+                    options={Object.values(SPECIAL_CONTROL_GROUPS).map((g) => ({
+                      value: g.code,
+                      label: (
+                        <Space align="center">
+                          <Tag
+                            color={g.tagColor}
+                            style={{
+                              margin: 0,
+                              fontWeight: 600,
+                              borderRadius: 4,
+                              padding: '2px 8px',
+                            }}
+                          >
+                            {g.shortLabel}
+                          </Tag>
+                          <span style={{ fontWeight: 500 }}>{g.label}</span>
+                        </Space>
+                      ),
+                    }))}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="specialControlNote"
+                  label={
+                    <span style={{ fontWeight: 600, color: '#334155', fontSize: 14 }}>
+                      Ghi chú và cảnh báo lâm sàng
+                    </span>
+                  }
+                  tooltip="Thông tin này sẽ hiển thị cảnh báo trực tiếp cho Bác sĩ khi kê đơn và Dược sĩ khi cấp phát thuốc."
+                  style={{ marginBottom: 0 }}
+                >
+                  <Input.TextArea
+                    rows={3}
+                    maxLength={500}
+                    showCount
+                    placeholder="Nhập hướng dẫn liều dùng tối đa, lưu ý bảo quản hoặc quy chế cấp phát..."
+                    style={{
+                      borderRadius: 8,
+                      fontSize: 14,
+                      padding: '8px 12px',
+                    }}
+                  />
+                </Form.Item>
+              </div>
+            )}
+          </div>
         </Form>
       </Modal>
 
@@ -1097,8 +1450,16 @@ function MedicineCatalogPage() {
           deactivatingMedicine && handleToggleStatus(deactivatingMedicine, false)
         }
         okText="Xác nhận ngừng dùng"
-        okButtonProps={{ danger: true }}
-        cancelText="Hủy"
+        okButtonProps={{
+          danger: true,
+          size: 'large',
+          style: { height: 42, minWidth: 140, borderRadius: 8, fontWeight: 600 },
+        }}
+        cancelText="Hủy bỏ"
+        cancelButtonProps={{
+          size: 'large',
+          style: { height: 42, minWidth: 100, borderRadius: 8 },
+        }}
       >
         <p>
           Bạn có chắc chắn muốn <strong>ngừng sử dụng</strong> thuốc{' '}

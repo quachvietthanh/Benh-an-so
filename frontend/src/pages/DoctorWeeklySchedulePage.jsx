@@ -1,45 +1,14 @@
 import React from 'react'
-import { Breadcrumb, Card, Typography } from 'antd'
-import {
-  CalendarOutlined,
-  HomeOutlined,
-  TableOutlined,
-} from '@ant-design/icons'
+import { Card, Typography } from 'antd'
+import { CalendarOutlined } from '@ant-design/icons'
 import DoctorWeeklyScheduleTable from '../components/appointment/DoctorWeeklyScheduleTable.jsx'
 
-const { Title, Paragraph, Text } = Typography
+const { Title } = Typography
 
 export default function DoctorWeeklySchedulePage() {
   return (
     <div style={{ padding: '0 0 24px 0' }}>
-      {/* 1. BREADCRUMB */}
-      <Breadcrumb
-        style={{ marginBottom: 16 }}
-        items={[
-          {
-            href: '/',
-            title: (
-              <span>
-                <HomeOutlined style={{ marginRight: 4 }} />
-                Trang chủ
-              </span>
-            ),
-          },
-          {
-            title: 'Tiếp nhận & Chăm sóc',
-          },
-          {
-            title: (
-              <span>
-                <TableOutlined style={{ marginRight: 4 }} />
-                Lịch tuần theo bác sĩ
-              </span>
-            ),
-          },
-        ]}
-      />
-
-      {/* 2. TIÊU ĐỀ TRANG RIÊNG BIỆT */}
+      {/* TIÊU ĐỀ TRANG RIÊNG BIỆT */}
       <Card
         style={{
           borderRadius: 12,
@@ -50,11 +19,8 @@ export default function DoctorWeeklySchedulePage() {
         }}
         bodyStyle={{ padding: '14px 20px' }}
       >
-        <div style={{ color: '#2563eb', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
-          ĐIỀU PHỐI LỊCH KHÁM
-        </div>
         <Title level={2} style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>
-          Lịch tuần bác sĩ
+          <CalendarOutlined style={{ color: '#2563eb', marginRight: 8 }} /> Lịch tuần theo bác sĩ
         </Title>
       </Card>
 

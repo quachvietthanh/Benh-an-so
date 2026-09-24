@@ -53,7 +53,10 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
                 "dosageForm", medicine.getDosageForm(),
                 "unit", medicine.getUnit(),
                 "defaultRoute", medicine.getDefaultRoute(),
-                "minStockThreshold", medicine.getMinStockThreshold());
+                "minStockThreshold", medicine.getMinStockThreshold(),
+                "controlled", medicine.isControlled(),
+                "strengthValueMg", medicine.getStrengthValueMg(),
+                "maxDailyDoseMg", medicine.getMaxDailyDoseMg());
 
         medicine.updateInformation(
                 command.medicineName(),
@@ -63,6 +66,9 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
                 command.unit(),
                 command.defaultRoute(),
                 command.minStockThreshold(),
+                command.controlled(),
+                command.strengthValueMg(),
+                command.maxDailyDoseMg(),
                 clockPort.now()
         );
         validateUniqueness(medicine);
@@ -81,7 +87,10 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
                         "dosageForm", saved.getDosageForm(),
                         "unit", saved.getUnit(),
                         "defaultRoute", saved.getDefaultRoute(),
-                        "minStockThreshold", saved.getMinStockThreshold()),
+                        "minStockThreshold", saved.getMinStockThreshold(),
+                        "controlled", saved.isControlled(),
+                        "strengthValueMg", saved.getStrengthValueMg(),
+                        "maxDailyDoseMg", saved.getMaxDailyDoseMg()),
                 clockPort.now()
         );
 

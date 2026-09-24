@@ -21,7 +21,12 @@ public record AmendPrescriptionRequest(
         List<PrescriptionInteractionOverrideRequest> interactionOverrides,
 
         @Valid
-        List<PrescriptionAllergyOverrideRequest> allergyOverrides
+        List<PrescriptionAllergyOverrideRequest> allergyOverrides,
+
+        @Valid
+        List<PrescriptionMaxDailyDoseOverrideRequest> maxDailyDoseOverrides,
+
+        boolean controlledMedicineConfirmed
 
 ) {
     public AmendPrescriptionRequest(
@@ -30,6 +35,6 @@ public record AmendPrescriptionRequest(
             List<AmendPrescriptionItemRequest> items,
             List<PrescriptionInteractionOverrideRequest> interactionOverrides
     ) {
-        this(note, changeReason, items, interactionOverrides, null);
+        this(note, changeReason, items, interactionOverrides, null, null, false);
     }
 }

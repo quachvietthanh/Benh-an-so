@@ -1,5 +1,6 @@
 package com.benhsoan.domain.medicine;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -46,6 +47,12 @@ public class Medicine {
 
     private int minStockThreshold;
 
+    private boolean controlled;
+
+    private BigDecimal strengthValueMg;
+
+    private BigDecimal maxDailyDoseMg;
+
     private Medicine(
             UUID id,
             String medicineCode,
@@ -59,7 +66,10 @@ public class Medicine {
             Instant createdAt,
             Instant updatedAt,
             int stockQuantity,
-            int minStockThreshold
+            int minStockThreshold,
+            boolean controlled,
+            BigDecimal strengthValueMg,
+            BigDecimal maxDailyDoseMg
     ) {
         this.id = requireNonNull(id, "Medicine id is required.");
         this.medicineCode = requireText(medicineCode, "Medicine code is required.");
@@ -77,6 +87,9 @@ public class Medicine {
                 minStockThreshold,
                 "Medicine minimum stock threshold must not be negative."
         );
+        this.controlled = controlled;
+        this.strengthValueMg = validateOptionalPositive(strengthValueMg, "Medicine strength value (mg) must be greater than zero.");
+        this.maxDailyDoseMg = validateOptionalPositive(maxDailyDoseMg, "Medicine max daily dose (mg) must be greater than zero.");
     }
 
     public static Medicine create(
@@ -89,6 +102,7 @@ public class Medicine {
             String unit,
             AdministrationRoute defaultRoute,
             int minStockThreshold,
+            boolean controlled,
             Instant createdAt
     ) {
         return new Medicine(
@@ -104,7 +118,45 @@ public class Medicine {
                 createdAt,
                 null,
                 0,
-                minStockThreshold
+                minStockThreshold,
+                controlled,
+                null,
+                null
+        );
+    }
+
+    public static Medicine create(
+            UUID id,
+            String medicineCode,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            DosageForm dosageForm,
+            String unit,
+            AdministrationRoute defaultRoute,
+            int minStockThreshold,
+            boolean controlled,
+            BigDecimal strengthValueMg,
+            BigDecimal maxDailyDoseMg,
+            Instant createdAt
+    ) {
+        return new Medicine(
+                id,
+                medicineCode,
+                medicineName,
+                activeIngredient,
+                strength,
+                dosageForm,
+                unit,
+                defaultRoute,
+                true,
+                createdAt,
+                null,
+                0,
+                minStockThreshold,
+                controlled,
+                strengthValueMg,
+                maxDailyDoseMg
         );
     }
 
@@ -123,6 +175,40 @@ public class Medicine {
             int stockQuantity,
             int minStockThreshold
     ) {
+        return restore(
+                id,
+                medicineCode,
+                medicineName,
+                activeIngredient,
+                strength,
+                dosageForm,
+                unit,
+                defaultRoute,
+                active,
+                createdAt,
+                updatedAt,
+                stockQuantity,
+                minStockThreshold,
+                false
+        );
+    }
+
+    public static Medicine restore(
+            UUID id,
+            String medicineCode,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            DosageForm dosageForm,
+            String unit,
+            AdministrationRoute defaultRoute,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt,
+            int stockQuantity,
+            int minStockThreshold,
+            boolean controlled
+    ) {
         return new Medicine(
                 id,
                 medicineCode,
@@ -136,7 +222,48 @@ public class Medicine {
                 createdAt,
                 updatedAt,
                 stockQuantity,
-                minStockThreshold
+                minStockThreshold,
+                controlled,
+                null,
+                null
+        );
+    }
+
+    public static Medicine restore(
+            UUID id,
+            String medicineCode,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            DosageForm dosageForm,
+            String unit,
+            AdministrationRoute defaultRoute,
+            boolean active,
+            Instant createdAt,
+            Instant updatedAt,
+            int stockQuantity,
+            int minStockThreshold,
+            boolean controlled,
+            BigDecimal strengthValueMg,
+            BigDecimal maxDailyDoseMg
+    ) {
+        return new Medicine(
+                id,
+                medicineCode,
+                medicineName,
+                activeIngredient,
+                strength,
+                dosageForm,
+                unit,
+                defaultRoute,
+                active,
+                createdAt,
+                updatedAt,
+                stockQuantity,
+                minStockThreshold,
+                controlled,
+                strengthValueMg,
+                maxDailyDoseMg
         );
     }
 
@@ -148,6 +275,7 @@ public class Medicine {
             String unit,
             AdministrationRoute defaultRoute,
             int minStockThreshold,
+            boolean controlled,
             Instant updatedAt
     ) {
         String validatedMedicineName = requireText(medicineName, "Medicine name is required.");
@@ -172,7 +300,26 @@ public class Medicine {
         this.unit = validatedUnit;
         this.defaultRoute = validatedDefaultRoute;
         this.minStockThreshold = validatedMinStockThreshold;
+        this.controlled = controlled;
         this.updatedAt = validatedUpdatedAt;
+    }
+
+    public void updateInformation(
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            DosageForm dosageForm,
+            String unit,
+            AdministrationRoute defaultRoute,
+            int minStockThreshold,
+            boolean controlled,
+            BigDecimal strengthValueMg,
+            BigDecimal maxDailyDoseMg,
+            Instant updatedAt
+    ) {
+        updateInformation(medicineName, activeIngredient, strength, dosageForm, unit, defaultRoute, minStockThreshold, controlled, updatedAt);
+        this.strengthValueMg = validateOptionalPositive(strengthValueMg, "Medicine strength value (mg) must be greater than zero.");
+        this.maxDailyDoseMg = validateOptionalPositive(maxDailyDoseMg, "Medicine max daily dose (mg) must be greater than zero.");
     }
 
     public void activate(Instant updatedAt) {
@@ -184,6 +331,12 @@ public class Medicine {
     public void deactivate(Instant updatedAt) {
         Instant validatedUpdatedAt = requireNonNull(updatedAt, "Medicine update time is required.");
         this.active = false;
+        this.updatedAt = validatedUpdatedAt;
+    }
+
+    public void markControlled(boolean controlled, Instant updatedAt) {
+        Instant validatedUpdatedAt = requireNonNull(updatedAt, "Medicine update time is required.");
+        this.controlled = controlled;
         this.updatedAt = validatedUpdatedAt;
     }
 
@@ -203,6 +356,16 @@ public class Medicine {
 
     private static int requireNonNegative(int value, String message) {
         if (value < 0) {
+            throw new ValidationException(message);
+        }
+        return value;
+    }
+
+    private static BigDecimal validateOptionalPositive(BigDecimal value, String message) {
+        if (value == null) {
+            return null;
+        }
+        if (value.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ValidationException(message);
         }
         return value;

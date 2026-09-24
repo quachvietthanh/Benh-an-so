@@ -54,6 +54,9 @@ public class CreateMedicineService implements CreateMedicineUseCase {
                 command.unit(),
                 command.defaultRoute(),
                 command.minStockThreshold(),
+                command.controlled(),
+                command.strengthValueMg(),
+                command.maxDailyDoseMg(),
                 now
         );
         validateUniqueness(medicine);
@@ -73,7 +76,10 @@ public class CreateMedicineService implements CreateMedicineUseCase {
                         "dosageForm", saved.getDosageForm(),
                         "unit", saved.getUnit(),
                         "defaultRoute", saved.getDefaultRoute(),
-                        "minStockThreshold", saved.getMinStockThreshold()),
+                        "minStockThreshold", saved.getMinStockThreshold(),
+                        "controlled", saved.isControlled(),
+                        "strengthValueMg", saved.getStrengthValueMg(),
+                        "maxDailyDoseMg", saved.getMaxDailyDoseMg()),
                 now
         );
 

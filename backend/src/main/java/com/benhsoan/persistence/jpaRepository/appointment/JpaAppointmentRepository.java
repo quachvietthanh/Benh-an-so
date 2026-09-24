@@ -37,6 +37,8 @@ public interface JpaAppointmentRepository
             Collection<AppointmentStatus> statuses
     );
 
+    List<AppointmentEntity> findBySeriesIdOrderBySequenceNumberAsc(UUID seriesId);
+
     Optional<AppointmentEntity> findTopByOrderByAppointmentCodeDesc();
 
     @Query(value = """

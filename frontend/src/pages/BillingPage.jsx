@@ -7,6 +7,7 @@ import {
   Col,
   Descriptions,
   Divider,
+  Drawer,
   Dropdown,
   Empty,
   Form,
@@ -48,15 +49,28 @@ import {
   TeamOutlined,
   UserOutlined,
   WarningOutlined,
+  PercentageOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import billingApi from '../api/billingApi'
-import medicalRecordApi from '../api/medicalRecordApi'
-import patientApi from '../api/patientApi'
-import pharmacyApi from '../api/pharmacyApi'
-import queueApi from '../api/queueApi'
-import { useAuthContext } from '../context/AuthContext'
-import { getStoredPrescriptions, mergeMedicines } from '../utils/storageHelpers'
+import billingApi from '../api/billingApi.js'
+import invoiceApi from '../api/invoiceApi.js'
+import discountRequestApi from '../api/discountRequestApi.js'
+import medicalRecordApi from '../api/medicalRecordApi.js'
+import patientApi from '../api/patientApi.js'
+import pharmacyApi from '../api/pharmacyApi.js'
+import queueApi from '../api/queueApi.js'
+import { useAuthContext } from '../context/AuthContext.jsx'
+import { getStoredPrescriptions, mergeMedicines } from '../utils/storageHelpers.js'
+import RecordPaymentModal from '../components/billing/RecordPaymentModal.jsx'
+import CreateDiscountRequestModal from '../components/billing/CreateDiscountRequestModal.jsx'
+import { getStatusTag, DISCOUNT_TYPE_OPTIONS } from '../utils/discountRequestHelpers.js'
+import {
+  getPaymentMethodMeta,
+  formatCurrency,
+  buildCreateInvoicePayload,
+  extractInvoicePaymentMeta,
+  classifyInvoiceError,
+} from '../utils/paymentMethodHelpers.js'
 
 const { Text, Title } = Typography
 
@@ -155,7 +169,8 @@ const normalizePaymentHistoryItem = (item, payableList = [], patientList = [], a
     originalInvoiceId: item.originalInvoiceId || null,
     originalInvoiceCode: originalInvoiceCode,
     adjustmentReason: item.adjustmentReason || null,
-    paymentMethod: item.paymentMethod || getPaymentMethodForVisit(item.id) || getPaymentMethodForVisit(item.visitId) || null,
+    paymentMethod: item.paymentMethod || item.payment?.paymentMethod || null,
+    paymentMethods: item.paymentMethods || item.payment?.paymentMethods || [],
     createdAt: createdAt,
     paidAt: item.paidAt || item.createdAt || null,
   }
@@ -192,27 +207,6 @@ const formatDoctorDisplayName = (doctorOrUuid, fallback = 'Dr. Nguyen Minh Anh')
     return 'Dr. Nguyen Minh Anh'
   }
   return str
-}
-
-const savePaymentMethodForVisit = (visitId, method) => {
-  if (!visitId || !method) return
-  try {
-    const raw = localStorage.getItem('app_visit_payment_methods')
-    const map = raw ? JSON.parse(raw) : {}
-    map[String(visitId)] = method
-    localStorage.setItem('app_visit_payment_methods', JSON.stringify(map))
-  } catch {}
-}
-
-const getPaymentMethodForVisit = (visitId) => {
-  if (!visitId) return null
-  try {
-    const raw = localStorage.getItem('app_visit_payment_methods')
-    const map = raw ? JSON.parse(raw) : {}
-    return map[String(visitId)] || null
-  } catch {
-    return null
-  }
 }
 
 const parsePrescriptionItems = (raw) => {
@@ -272,6 +266,9 @@ function BillingPage() {
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER')
+  const [recordPaymentModalOpen, setRecordPaymentModalOpen] = useState(false)
+  const [createDiscountModalOpen, setCreateDiscountModalOpen] = useState(false)
+  const [discountDetailDrawerOpen, setDiscountDetailDrawerOpen] = useState(false)
   const [apiError, setApiError] = useState('')
   const [viewingInvoiceModal, setViewingInvoiceModal] = useState(null)
 
@@ -350,14 +347,6 @@ function BillingPage() {
     }
   }, [location.state])
 
-  const refreshAllData = useCallback(async () => {
-    const historyList = await loadHistoryInvoices()
-    await loadPendingVisits(historyList)
-  }, [loadHistoryInvoices, loadPendingVisits])
-
-  useEffect(() => {
-    refreshAllData()
-  }, [])
 
   const loadInvoiceData = useCallback(async (visitId) => {
     if (!visitId) {
@@ -561,13 +550,26 @@ function BillingPage() {
         : (examFee + medicineFee + serviceFee)
 
       const totalAmount = invoiceData?.totalAmount ? Number(invoiceData.totalAmount) : calculatedTotal
-
       const hasInvoice = !!(invoiceData && (invoiceData.id || invoiceData.invoiceCode))
+
+      let activeDiscount = null
+      try {
+        const discountRes = await discountRequestApi.list({ visitId, size: 5 })
+        const discList = discountRes?.data?.content || (Array.isArray(discountRes?.data) ? discountRes.data : [])
+        activeDiscount = discList.find((d) => d.status === 'PENDING') || discList.find((d) => d.status === 'APPROVED') || discList[0] || null
+      } catch (discErr) {
+        console.warn('[BillingPage] Lỗi discountRequestApi.list:', discErr?.message)
+      }
+
+      const isDiscountApproved = activeDiscount?.status === 'APPROVED'
+      const hasPendingDiscount = activeDiscount?.status === 'PENDING'
+      const discountAmount = isDiscountApproved ? Number(activeDiscount.discountAmount || 0) : 0
+      const finalAmount = isDiscountApproved ? Number(activeDiscount.finalAmount ?? (totalAmount - discountAmount)) : totalAmount
 
       setSelectedVisitData((prev) => {
         const currentPaymentId = invoiceData?.paymentId || (prev?.visitId === visitId ? prev?.paymentId : null)
         const isPaid = hasInvoice || !!currentPaymentId || (prev?.visitId === visitId && prev?.paymentStatus === 'PAID')
-        const isBusinessEligible = !isPaid && !isCancelled && isDispensingCompleted && totalAmount > 0
+        const isBusinessEligible = !isPaid && !isCancelled && isDispensingCompleted && !hasPendingDiscount && (isDiscountApproved ? finalAmount >= 0 : totalAmount > 0)
 
         return {
           visitId,
@@ -594,9 +596,15 @@ function BillingPage() {
           serviceFee,
           serviceFeesList,
           totalAmount,
+          activeDiscount,
+          hasPendingDiscount,
+          isDiscountApproved,
+          discountAmount,
+          finalAmount,
           paymentStatus: isPaid ? 'PAID' : 'UNPAID',
           paidAt: invoiceData?.paidAt || (prev?.visitId === visitId ? prev?.paidAt : null) || invoiceData?.createdAt || null,
-          paymentMethod: getPaymentMethodForVisit(visitId) || getPaymentMethodForVisit(matchedVisit?.visitCode) || (prev?.visitId === visitId ? prev?.paymentMethod : null) || 'BANK_TRANSFER',
+          paymentMethod: invoiceData?.payment?.paymentMethod || invoiceData?.paymentMethod || (prev?.visitId === visitId ? prev?.paymentMethod : null) || 'CASH',
+          paymentMethods: invoiceData?.payment?.paymentMethods || invoiceData?.paymentMethods || (prev?.visitId === visitId ? prev?.paymentMethods : null) || [],
           collectedBy: formatUserDisplayName(invoiceData?.createdBy || (prev?.visitId === visitId ? prev?.collectedBy : null) || user?.fullName),
           prescriptionItems,
         }
@@ -608,6 +616,19 @@ function BillingPage() {
       setLoadingData(false)
     }
   }, [pendingVisits, user])
+
+  const refreshAllData = useCallback(async () => {
+    setApiError('')
+    const historyList = await loadHistoryInvoices()
+    await loadPendingVisits(historyList)
+    if (selectedVisitId) {
+      await loadInvoiceData(selectedVisitId)
+    }
+  }, [loadHistoryInvoices, loadPendingVisits, loadInvoiceData, selectedVisitId])
+
+  useEffect(() => {
+    refreshAllData()
+  }, [])
 
   useEffect(() => {
     if (selectedVisitId) loadInvoiceData(selectedVisitId)
@@ -636,101 +657,28 @@ function BillingPage() {
     )
   }, [historyInvoices, searchKeyword])
 
-  const handleConfirmPayment = async () => {
-    if (!selectedVisitData || !selectedVisitId) return
-    if (!canCollectPayment) {
-      message.error('Bạn không có quyền thực hiện thu phí.')
-      return
-    }
-    if (selectedVisitData.paymentStatus === 'PAID') {
-      message.info('Khoản thu cho lượt khám này đã được thanh toán.')
-      return
-    }
+  const handlePaymentSuccess = (paymentRes) => {
+    if (!paymentRes) return
+    const finalMethod = paymentRes.paymentMethod || 'MULTIPLE'
+    const isPaidSuccess = paymentRes.status === 'RECORDED' || paymentRes.status === 'SUCCESS'
 
-    setSubmittingPayment(true)
-    setApiError('')
-    try {
-      const payload = {
-        visitId: selectedVisitId,
-        examFee: selectedVisitData.examFee,
-        medicineFee: selectedVisitData.medicineFee,
-        amountPaid: selectedVisitData.totalAmount,
-        paymentMethod,
-      }
+    message.success(
+      `✓ Đã thu thành công ${money(paymentRes.amountPaid || selectedVisitData?.totalAmount)} cho lượt khám ${selectedVisitData?.visitCode}!`
+    )
 
-      const res = await billingApi.pay(payload)
-      const paymentRes = res?.data
+    setSelectedVisitData((prev) => ({
+      ...prev,
+      paymentId: paymentRes.id,
+      paymentStatus: isPaidSuccess ? 'PAID' : 'UNPAID',
+      paymentMethod: finalMethod,
+      paymentMethods: paymentRes.paymentMethods || [],
+      paidAt: paymentRes.paidAt || paymentRes.createdAt,
+      collectedBy: formatUserDisplayName(paymentRes.collectedBy || user?.fullName),
+      totalAmount: Number(paymentRes.amountPaid || prev?.totalAmount),
+    }))
 
-      if (!paymentRes || !paymentRes.id) {
-        throw new Error('Backend không trả về paymentId hợp lệ.')
-      }
-
-      const isPaidSuccess = paymentRes.status === 'RECORDED' || paymentRes.status === 'SUCCESS'
-
-      message.success(`✓ Đã thu thành công ${money(paymentRes.amountPaid || selectedVisitData.totalAmount)} cho lượt khám ${selectedVisitData.visitCode}!`)
-
-      const finalMethod = paymentRes.paymentMethod || paymentMethod || 'BANK_TRANSFER'
-      savePaymentMethodForVisit(selectedVisitId, finalMethod)
-      if (selectedVisitData?.visitCode) savePaymentMethodForVisit(selectedVisitData.visitCode, finalMethod)
-      if (paymentRes?.id) savePaymentMethodForVisit(paymentRes.id, finalMethod)
-
-      setSelectedVisitData((prev) => ({
-        ...prev,
-        paymentId: paymentRes.id,
-        paymentStatus: isPaidSuccess ? 'PAID' : 'UNPAID',
-        paymentMethod: finalMethod,
-        paidAt: paymentRes.paidAt || paymentRes.createdAt,
-        collectedBy: paymentRes.collectedBy || user?.fullName || 'Pham Mai Lan',
-        totalAmount: Number(paymentRes.amountPaid || prev.totalAmount),
-      }))
-
-      setPendingVisits((prev) => prev.filter((v) => String(v.visitId || v.id) !== String(selectedVisitId)))
-      await loadHistoryInvoices()
-
-    } catch (err) {
-      console.error('[BillingPage] Lỗi payment:', err?.config?.url, err?.response?.status, err?.response?.data)
-      const status = err?.response?.status
-      const msg = err?.response?.data?.message
-
-      if (status === 409) {
-        message.warning('Khoản thu này đã được ghi nhận thanh toán từ trước (409). Đang đồng bộ dữ liệu thực tế từ Backend...')
-        
-        try {
-          const invoiceRes = await billingApi.getByVisit(selectedVisitId)
-          const rawData = invoiceRes?.data
-          const list = Array.isArray(rawData?.content) ? rawData.content : Array.isArray(rawData) ? rawData : (rawData ? [rawData] : [])
-          const foundInvoice = list.find((i) => i && (i.id || i.invoiceCode))
-
-          setSelectedVisitData((prev) => ({
-            ...prev,
-            paymentStatus: 'PAID',
-            invoiceId: foundInvoice?.id || prev?.invoiceId || null,
-            invoiceCode: foundInvoice?.invoiceCode || prev?.invoiceCode || null,
-            invoiceLines: foundInvoice?.lines || prev?.invoiceLines || [],
-            invoiceCreatedAt: foundInvoice?.createdAt || prev?.invoiceCreatedAt || null,
-            paymentId: foundInvoice?.paymentId || prev?.paymentId || null,
-            paidAt: foundInvoice?.paidAt || foundInvoice?.createdAt || prev?.paidAt || new Date().toISOString(),
-          }))
-
-          setPendingVisits((prev) => prev.filter((v) => String(v.visitId || v.id) !== String(selectedVisitId)))
-          await loadHistoryInvoices()
-        } catch (getErr) {
-          console.error('[BillingPage] Lỗi GET lại thông tin sau 409:', getErr)
-        }
-      } else if (status === 400) {
-        setApiError(msg || 'Dữ liệu ghi nhận thanh toán không hợp lệ (400).')
-      } else if (status === 401) {
-        setApiError('Hết phiên làm việc. Vui lòng đăng nhập lại (401).')
-      } else if (status === 403) {
-        setApiError('Bạn không có quyền thực hiện thu phí (403).')
-      } else if (status === 404) {
-        setApiError('Không tìm thấy thông tin lượt khám trên hệ thống (404).')
-      } else {
-        setApiError(msg || 'Không thể ghi nhận thanh toán từ Backend. Vui lòng thử lại.')
-      }
-    } finally {
-      setSubmittingPayment(false)
-    }
+    setPendingVisits((prev) => prev.filter((v) => String(v.visitId || v.id) !== String(selectedVisitId)))
+    loadHistoryInvoices()
   }
 
   const handleCreateInvoice = async () => {
@@ -751,10 +699,10 @@ function BillingPage() {
     setSubmittingInvoice(true)
     setApiError('')
     try {
-      const payload = {
+      const payload = buildCreateInvoicePayload({
         visitId: selectedVisitData.visitId,
         paymentId: selectedVisitData.paymentId,
-      }
+      })
 
       const res = await billingApi.createInvoice(payload)
       const invoiceRes = res?.data
@@ -775,11 +723,7 @@ function BillingPage() {
         }
       }
 
-      const activeMethod = selectedVisitData?.paymentMethod || paymentMethod || 'BANK_TRANSFER'
-      if (invoiceRes?.id) savePaymentMethodForVisit(invoiceRes.id, activeMethod)
-      if (invoiceRes?.invoiceCode) savePaymentMethodForVisit(invoiceRes.invoiceCode, activeMethod)
-      if (detailInvoice?.id) savePaymentMethodForVisit(detailInvoice.id, activeMethod)
-      if (detailInvoice?.invoiceCode) savePaymentMethodForVisit(detailInvoice.invoiceCode, activeMethod)
+      const { paymentMethod: finalMethod, paymentMethods: finalMethods } = extractInvoicePaymentMeta(detailInvoice)
 
       setSelectedVisitData((prev) => ({
         ...prev,
@@ -788,32 +732,26 @@ function BillingPage() {
         invoiceType: detailInvoice.type || 'ORIGINAL',
         invoiceLines: detailInvoice.lines || [],
         invoiceCreatedAt: detailInvoice.createdAt,
-        totalAmount: Number(detailInvoice.totalAmount || prev.totalAmount),
+        totalAmount: Number(detailInvoice.totalAmount || prev?.totalAmount),
         paymentStatus: 'PAID',
-        paymentMethod: activeMethod,
+        paymentMethod: finalMethod || prev?.paymentMethod || 'CASH',
+        paymentMethods: finalMethods.length > 0 ? finalMethods : (prev?.paymentMethods || []),
       }))
 
+      setApiError('')
       await loadHistoryInvoices()
 
     } catch (err) {
-      console.error('[BillingPage] Lỗi createInvoice:', err?.config?.url, err?.response?.status, err?.response?.data)
-      const status = err?.response?.status
-      const msg = err?.response?.data?.message
+      console.error('[BillingPage] Lỗi createInvoice:', err?.config?.url, err?.response?.status, err?.response?.data, err)
+      const errorInfo = classifyInvoiceError(err)
 
-      if (status === 409) {
+      if (errorInfo.status === 409) {
         message.warning('Lượt khám này đã được lập hóa đơn trước đó (409). Đang tải hóa đơn từ Backend...')
+        setApiError('')
         await loadInvoiceData(selectedVisitData.visitId)
         await loadHistoryInvoices()
-      } else if (status === 400) {
-        setApiError(msg || 'Dữ liệu tạo hóa đơn không hợp lệ (400).')
-      } else if (status === 401) {
-        setApiError('Hết phiên làm việc. Vui lòng đăng nhập lại (401).')
-      } else if (status === 403) {
-        setApiError('Bạn không có quyền lập hóa đơn (403).')
-      } else if (status === 404) {
-        setApiError('Không tìm thấy thông tin lượt khám / thanh toán (404).')
       } else {
-        setApiError(msg || 'Không thể lập hóa đơn điện tử từ Backend. Vui lòng thử lại.')
+        setApiError(errorInfo.message)
       }
     } finally {
       setSubmittingInvoice(false)
@@ -841,29 +779,14 @@ function BillingPage() {
     const matchedHist = historyInvoices.find((h) => h.id === targetId || h.invoiceCode === targetId)
     const resolvedCode = invoiceData?.invoiceCode || selectedVisitData?.invoiceCode || matchedHist?.invoiceCode || ''
 
-    const storedMethod =
-      getPaymentMethodForVisit(targetId) ||
-      getPaymentMethodForVisit(invoiceData?.id) ||
-      getPaymentMethodForVisit(invoiceData?.invoiceCode) ||
-      getPaymentMethodForVisit(invoiceData?.visitId) ||
-      getPaymentMethodForVisit(selectedVisitData?.visitId) ||
-      getPaymentMethodForVisit(selectedVisitData?.invoiceCode) ||
-      getPaymentMethodForVisit(matchedHist?.visitId)
-
-    const explicitMethod = invoiceData?.paymentMethod || matchedHist?.paymentMethod
-
-    const demoMap = {
-      HD000001: 'CASH',
-      HD000002: 'BANK_TRANSFER',
-      HD000003: 'CARD',
-    }
-    const demoFallback = demoMap[resolvedCode] || null
+    const explicitMethod = invoiceData?.payment?.paymentMethod || invoiceData?.paymentMethod || matchedHist?.paymentMethod
 
     const visitMethod = (selectedVisitData?.visitId === (invoiceData?.visitId || targetId) || selectedVisitData?.invoiceCode === resolvedCode)
       ? selectedVisitData?.paymentMethod
       : null
 
-    const finalPaymentMethod = storedMethod || explicitMethod || visitMethod || demoFallback || 'CASH'
+    const finalPaymentMethod = explicitMethod || visitMethod || 'CASH'
+    const finalPaymentMethods = invoiceData?.payment?.paymentMethods || invoiceData?.paymentMethods || selectedVisitData?.paymentMethods || []
 
     const modalPayload = {
       id: invoiceData?.id || selectedVisitData?.invoiceId || matchedHist?.id,
@@ -876,6 +799,7 @@ function BillingPage() {
       doctorName: formatDoctorDisplayName(matchedHist?.doctorName || (selectedVisitData?.visitId === (invoiceData?.visitId || targetId) ? selectedVisitData?.doctorName : null) || invoiceData?.doctorName),
       createdBy: formatUserDisplayName(invoiceData?.createdBy || (selectedVisitData?.visitId === (invoiceData?.visitId || targetId) ? selectedVisitData?.collectedBy : null) || user?.fullName),
       paymentMethod: finalPaymentMethod,
+      paymentMethods: finalPaymentMethods,
       totalAmount: Number(invoiceData?.totalAmount || selectedVisitData?.totalAmount || matchedHist?.totalAmount || 0),
       createdAt: invoiceData?.createdAt || matchedHist?.createdAt || (selectedVisitData?.visitId === (invoiceData?.visitId || targetId) ? selectedVisitData?.invoiceCreatedAt || selectedVisitData?.paidAt : null),
       lines: invoiceData?.lines || selectedVisitData?.invoiceLines || [],
@@ -1061,6 +985,22 @@ function BillingPage() {
         quantity: 1,
         price: selectedVisitData.serviceFee,
         amount: selectedVisitData.serviceFee,
+      })
+    }
+
+    if (selectedVisitData.isDiscountApproved && selectedVisitData.discountAmount > 0) {
+      items.push({
+        key: 'discount-approved',
+        name: (
+          <Space>
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>Giảm giá / Miễn phí viện phí</span>
+            <Tag color="green" style={{ margin: 0 }}>Đã duyệt</Tag>
+          </Space>
+        ),
+        quantity: 1,
+        price: -selectedVisitData.discountAmount,
+        amount: -selectedVisitData.discountAmount,
+        isDiscount: true,
       })
     }
 
@@ -1287,7 +1227,6 @@ function BillingPage() {
           <Title level={2} style={{ margin: 0 }}>
             <DollarCircleOutlined style={{ color: '#2563eb', marginRight: 8 }} /> Thu phí &amp; Hóa đơn
           </Title>
-          <Text type="secondary">Quản lý thu tiền viện phí, thanh toán dịch vụ và lập hóa đơn điện tử.</Text>
         </div>
         <Button icon={<ReloadOutlined />} loading={loadingVisits || loadingHistory} onClick={refreshAllData}>
           Làm mới dữ liệu
@@ -1549,13 +1488,14 @@ function BillingPage() {
                               showIcon
                               icon={<CheckCircleOutlined />}
                               message={
-                                <Text strong style={{ color: '#1e40af', fontSize: 15 }}>
-                                  {selectedVisitData.paymentMethod === 'CASH'
-                                    ? '✓ Đã thanh toán tiền mặt'
-                                    : selectedVisitData.paymentMethod === 'BANK_TRANSFER'
-                                    ? '✓ Đã thanh toán chuyển khoản'
-                                    : '✓ Thanh toán thành công'}
-                                </Text>
+                                <Space wrap>
+                                  <Text strong style={{ color: '#1e40af', fontSize: 15 }}>
+                                    ✓ Thanh toán thành công
+                                  </Text>
+                                  <Tag color={getPaymentMethodMeta(selectedVisitData.paymentMethod).tagColor} style={{ fontWeight: 600 }}>
+                                    {getPaymentMethodMeta(selectedVisitData.paymentMethod).label}
+                                  </Tag>
+                                </Space>
                               }
                               description={
                                 <Space direction="vertical" size={8} style={{ width: '100%', marginTop: 8 }}>
@@ -1566,6 +1506,23 @@ function BillingPage() {
                                     <Divider type="vertical" />
                                     <Text>Thời gian: {formatDateTime(selectedVisitData.paidAt)}</Text>
                                   </div>
+
+                                  {Array.isArray(selectedVisitData.paymentMethods) && selectedVisitData.paymentMethods.length > 0 && (
+                                    <div style={{ marginTop: 6, background: '#ffffff', padding: '8px 12px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+                                      <Text strong style={{ fontSize: 12, color: '#1e40af', display: 'block', marginBottom: 4 }}>
+                                        Chi tiết các phương thức đã ghi nhận ({selectedVisitData.paymentMethods.length}):
+                                      </Text>
+                                      <Space wrap size={[10, 6]}>
+                                        {selectedVisitData.paymentMethods.map((m, idx) => (
+                                          <Tag key={idx} color={getPaymentMethodMeta(m.paymentMethod).tagColor} style={{ padding: '2px 8px' }}>
+                                            <strong>{getPaymentMethodMeta(m.paymentMethod).label}:</strong> {money(m.amount)}
+                                            {m.referenceNumber ? ` (Mã GD: ${m.referenceNumber})` : ''}
+                                          </Tag>
+                                        ))}
+                                      </Space>
+                                    </div>
+                                  )}
+
                                   <div style={{ marginTop: 6 }}>
                                     <Button
                                       type="primary"
@@ -1583,7 +1540,7 @@ function BillingPage() {
                               style={{ border: '1px solid #bfdbfe', background: '#eff6ff' }}
                             />
                           ) : (
-                            <Card style={{ backgroundColor: '#f0f7ff', borderColor: '#bae6fd' }}>
+                            <Card style={{ backgroundColor: '#f0fdfa', borderColor: '#99f6e4', borderRadius: 8 }}>
                               <Space direction="vertical" size="middle" style={{ width: '100%' }}>
                                 {!canCollectPayment && (
                                   <Alert
@@ -1621,134 +1578,183 @@ function BillingPage() {
                                   />
                                 )}
 
-                                <Form layout="vertical">
-                                  <Form.Item label={<strong>Phương thức thanh toán *</strong>} style={{ marginBottom: 0 }}>
-                                    <Select
-                                      value={paymentMethod}
-                                      onChange={setPaymentMethod}
-                                      options={PAYMENT_METHODS}
-                                      disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                    />
-                                  </Form.Item>
-                                </Form>
-
-                                {paymentMethod === 'CASH' && (
-                                  <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
-                                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                                      <Text strong style={{ color: '#0f172a', fontSize: 14 }}>THANH TOÁN TIỀN MẶT</Text>
-                                      <Text type="secondary">Thu tiền mặt trực tiếp từ bệnh nhân tại quầy Lễ tân.</Text>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-                                        <Text>Tổng phải thu: <strong style={{ color: '#dc2626', fontSize: 17 }}>{money(selectedVisitData.totalAmount)}</strong></Text>
-                                        <Popconfirm
-                                          title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận ghi nhận thu tiền mặt</Text>}
-                                          description={`Xác nhận đã thu ${money(selectedVisitData.totalAmount)} tiền mặt cho ${selectedVisitData.visitCode}?`}
-                                          okText="Xác nhận đã thu tiền"
-                                          cancelText="Hủy"
-                                          onConfirm={handleConfirmPayment}
-                                          disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                        >
-                                          <Button
-                                            type="primary"
-                                            icon={<DollarCircleOutlined />}
-                                            loading={submittingPayment}
-                                            disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                            style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 600 }}
-                                          >
-                                            Xác nhận đã thu tiền
+                                {selectedVisitData.hasPendingDiscount && (
+                                  <Alert
+                                    type="warning"
+                                    showIcon
+                                    icon={<ClockCircleOutlined style={{ fontSize: 18 }} />}
+                                    message={<strong>Lượt khám đang chờ duyệt giảm giá (QTN-37)</strong>}
+                                    description={
+                                      <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 4 }}>
+                                        <div>
+                                          Lượt khám này đang có đề xuất giảm giá ({DISCOUNT_TYPE_OPTIONS[selectedVisitData.activeDiscount?.discountType] || selectedVisitData.activeDiscount?.discountType}) chờ Quản lý phê duyệt. Theo quy định QTN-37, hệ thống tạm khóa chức năng thu phí và lập hóa đơn cho đến khi có kết quả duyệt.
+                                        </div>
+                                        <div>
+                                          <Button size="small" type="link" onClick={() => setDiscountDetailDrawerOpen(true)} style={{ padding: 0, fontWeight: 600 }}>
+                                            Xem chi tiết đề xuất &rarr;
                                           </Button>
-                                        </Popconfirm>
-                                      </div>
-                                    </Space>
-                                  </div>
+                                        </div>
+                                      </Space>
+                                    }
+                                    style={{ borderRadius: 8, border: '1px solid #fde68a' }}
+                                  />
                                 )}
 
-                                {paymentMethod === 'BANK_TRANSFER' && (
-                                  <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #93c5fd' }}>
-                                    <Title level={5} style={{ color: '#1e40af', marginTop: 0, marginBottom: 12 }}>
-                                      🏦 THANH TOÁN CHUYỂN KHOẢN NGÂN HÀNG
-                                    </Title>
-                                    <Row gutter={[16, 16]} align="middle">
-                                      <Col xs={24} sm={14}>
-                                        <Space direction="vertical" size={6} style={{ width: '100%', fontSize: 13 }}>
-                                          <div>Tổng tiền: <strong style={{ color: '#dc2626', fontSize: 16 }}>{money(selectedVisitData.totalAmount)}</strong></div>
-                                          <div>Ngân hàng: <strong>VietinBank (NH TMCP Công Thương VN)</strong></div>
-                                          <div>Chủ tài khoản: <strong>HỆ THỐNG PHÒNG KHÁM BỆNH ÁN SỐ</strong></div>
-                                          <div>Số tài khoản: <Text code style={{ fontSize: 14, fontWeight: 700, color: '#1e40af' }}>102800999999</Text></div>
-                                          <div>Nội dung CK: <Text code style={{ fontSize: 14, fontWeight: 700, color: '#d97706' }}>TT {selectedVisitData.visitCode}</Text></div>
-                                        </Space>
-                                      </Col>
-                                      <Col xs={24} sm={10} style={{ textAlign: 'center' }}>
-                                        <div style={{ border: '1px dashed #2563eb', padding: 8, borderRadius: 8, background: '#eff6ff', display: 'inline-block' }}>
-                                          <img
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`STK: 102800999999 | Ngan hang: VietinBank | So tien: ${selectedVisitData.totalAmount} | Noi dung: TT ${selectedVisitData.visitCode}`)}`}
-                                            alt="QR Thanh toán Chuyển khoản"
-                                            style={{ width: 130, height: 130, borderRadius: 4 }}
-                                          />
-                                          <div style={{ fontSize: 11, color: '#1e40af', marginTop: 4, fontWeight: 600 }}>
-                                            📱 QR Thanh toán chuyển khoản
-                                          </div>
+                                {selectedVisitData.isDiscountApproved && (
+                                  <Alert
+                                    type="success"
+                                    showIcon
+                                    message={<strong>Đề xuất giảm giá đã được duyệt</strong>}
+                                    description={
+                                      <div>
+                                        Khoản giảm trừ <strong>{money(selectedVisitData.discountAmount)}</strong> đã được phê duyệt và tự động áp dụng vào số tiền cần thu.
+                                      </div>
+                                    }
+                                    style={{ borderRadius: 8 }}
+                                  />
+                                )}
+
+                                <div
+                                  style={{
+                                    background: '#ffffff',
+                                    padding: '20px 24px',
+                                    borderRadius: 12,
+                                    border: '1px solid #ccfbf1',
+                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                                  }}
+                                >
+                                  <Row gutter={[16, 16]} align="middle" justify="space-between">
+                                    <Col xs={24} lg={12} xl={13}>
+                                      <Space direction="vertical" size={2}>
+                                        <Text strong style={{ fontSize: 16, color: '#0f172a' }}>
+                                          Ghi nhận thanh toán viện phí
+                                        </Text>
+                                        <Text type="secondary" style={{ fontSize: 13 }}>
+                                          Hỗ trợ thu 1 hoặc kết hợp nhiều phương thức: Tiền mặt, Chuyển khoản (có mã GD), Thẻ POS, QR Code, Ví điện tử.
+                                        </Text>
+                                        <div style={{ marginTop: 8 }}>
+                                          <Text style={{ fontSize: 14 }}>Số tiền cần thu: </Text>
+                                          {selectedVisitData.isDiscountApproved ? (
+                                            <Space align="center" wrap>
+                                              <Text type="secondary" delete style={{ fontSize: 16 }}>
+                                                {money(selectedVisitData.totalAmount)}
+                                              </Text>
+                                              <strong style={{ color: '#0284c7', fontSize: 22, fontWeight: 700 }}>
+                                                {money(selectedVisitData.finalAmount)}
+                                              </strong>
+                                              <Tag color="green" style={{ borderRadius: 4, fontWeight: 600 }}>
+                                                Đã giảm {money(selectedVisitData.discountAmount)}
+                                              </Tag>
+                                            </Space>
+                                          ) : (
+                                            <strong style={{ color: '#0284c7', fontSize: 22, fontWeight: 700 }}>
+                                              {money(selectedVisitData.totalAmount)}
+                                            </strong>
+                                          )}
                                         </div>
-                                      </Col>
-                                    </Row>
-                                    <Divider style={{ margin: '12px 0' }} />
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                      <Popconfirm
-                                        title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận đã nhận chuyển khoản</Text>}
-                                        description={`Xác nhận đã kiểm tra tài khoản và nhận đủ ${money(selectedVisitData.totalAmount)} cho ${selectedVisitData.visitCode}?`}
-                                        okText="Xác nhận đã nhận chuyển khoản"
-                                        cancelText="Hủy"
-                                        onConfirm={handleConfirmPayment}
-                                        disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                      </Space>
+                                    </Col>
+
+                                    <Col xs={24} lg={12} xl={11}>
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: 12,
+                                          justifyContent: 'flex-end',
+                                          alignItems: 'center',
+                                          flexWrap: 'wrap',
+                                        }}
                                       >
                                         <Button
-                                          type="primary"
-                                          icon={<CheckCircleOutlined />}
-                                          loading={submittingPayment}
-                                          disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                          style={{ background: '#2563eb', fontWeight: 600 }}
+                                          size="middle"
+                                          icon={<PercentageOutlined />}
+                                          disabled={
+                                            !canCollectPayment ||
+                                            selectedVisitData.paymentStatus === 'PAID' ||
+                                            selectedVisitData.hasPendingDiscount ||
+                                            selectedVisitData.isDiscountApproved ||
+                                            selectedVisitData.isCancelled
+                                          }
+                                          onClick={() => setCreateDiscountModalOpen(true)}
+                                          style={
+                                            !canCollectPayment ||
+                                            selectedVisitData.paymentStatus === 'PAID' ||
+                                            selectedVisitData.hasPendingDiscount ||
+                                            selectedVisitData.isDiscountApproved ||
+                                            selectedVisitData.isCancelled
+                                              ? {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 500,
+                                                  fontSize: 13.5,
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                              : {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 600,
+                                                  fontSize: 13.5,
+                                                  borderColor: '#0284c7',
+                                                  color: '#0284c7',
+                                                  background: '#f0f9ff',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                          }
                                         >
-                                          Xác nhận đã nhận chuyển khoản
+                                          Đề nghị giảm giá
                                         </Button>
-                                      </Popconfirm>
-                                    </div>
-                                  </div>
-                                )}
 
-                                {paymentMethod === 'CARD' && (
-                                  <div style={{ background: '#ffffff', padding: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}>
-                                    <Space direction="vertical" size={6} style={{ width: '100%' }}>
-                                      <Title level={5} style={{ color: '#0f172a', margin: 0 }}>
-                                        💳 THANH TOÁN THẺ NGÂN HÀNG
-                                      </Title>
-                                      <Text type="secondary" style={{ fontSize: 13 }}>
-                                        Thực hiện quẹt thẻ ATM / Thẻ ghi nợ / VISA / MasterCard trên thiết bị quẹt thẻ POS của phòng khám.
-                                      </Text>
-                                      <div style={{ fontSize: 14, margin: '6px 0' }}>
-                                        Tổng thanh toán: <strong style={{ color: '#dc2626', fontSize: 17 }}>{money(selectedVisitData.totalAmount)}</strong>
-                                      </div>
-                                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-                                        <Popconfirm
-                                          title={<Text strong style={{ color: '#1e3a8a' }}>Xác nhận quẹt thẻ ngân hàng</Text>}
-                                          description={`Xác nhận đã quẹt thẻ thành công ${money(selectedVisitData.totalAmount)} cho ${selectedVisitData.visitCode}?`}
-                                          okText="Xác nhận quẹt thẻ thành công"
-                                          cancelText="Hủy"
-                                          onConfirm={handleConfirmPayment}
-                                          disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
+                                        <Button
+                                          type="primary"
+                                          size="middle"
+                                          icon={<DollarCircleOutlined />}
+                                          disabled={
+                                            !canCollectPayment ||
+                                            !selectedVisitData.isEligibleToPay ||
+                                            selectedVisitData.hasPendingDiscount
+                                          }
+                                          onClick={() => setRecordPaymentModalOpen(true)}
+                                          style={
+                                            !canCollectPayment ||
+                                            !selectedVisitData.isEligibleToPay ||
+                                            selectedVisitData.hasPendingDiscount
+                                              ? {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 500,
+                                                  fontSize: 13.5,
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                              : {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 600,
+                                                  fontSize: 13.5,
+                                                  background: '#0d9488',
+                                                  borderColor: '#0d9488',
+                                                  boxShadow: '0 2px 8px rgba(13, 148, 136, 0.2)',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                          }
                                         >
-                                          <Button
-                                            type="primary"
-                                            icon={<CreditCardOutlined />}
-                                            loading={submittingPayment}
-                                            disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay || submittingPayment}
-                                            style={{ background: '#0284c7', borderColor: '#0284c7', fontWeight: 600 }}
-                                          >
-                                            Xác nhận quẹt thẻ thành công
-                                          </Button>
-                                        </Popconfirm>
+                                          Mở cửa sổ Thu phí
+                                        </Button>
                                       </div>
-                                    </Space>
-                                  </div>
-                                )}
+                                    </Col>
+                                  </Row>
+                                </div>
                               </Space>
                             </Card>
                           )}
@@ -1923,13 +1929,11 @@ function BillingPage() {
                   <div>
                     <div style={{ fontSize: 12, color: '#64748b' }}>Phương thức thanh toán</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
-                      {(viewingInvoiceModal?.paymentMethod || selectedVisitData?.paymentMethod || paymentMethod) === 'BANK_TRANSFER'
-                        ? 'Chuyển khoản'
-                        : (viewingInvoiceModal?.paymentMethod || selectedVisitData?.paymentMethod || paymentMethod) === 'CARD'
-                        ? 'Thẻ ngân hàng'
-                        : (viewingInvoiceModal?.paymentMethod || selectedVisitData?.paymentMethod || paymentMethod) === 'QR_CODE'
-                        ? 'QR Code'
-                        : 'Tiền mặt'}
+                      {(() => {
+                        const method = viewingInvoiceModal?.paymentMethod || selectedVisitData?.paymentMethod || paymentMethod
+                        const meta = getPaymentMethodMeta(method)
+                        return <Tag color={meta.tagColor} style={{ fontWeight: 600 }}>{meta.label}</Tag>
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -2003,6 +2007,25 @@ function BillingPage() {
                 {money(viewingInvoiceModal.totalAmount || selectedVisitData?.totalAmount)}
               </div>
             </div>
+
+            {Array.isArray(viewingInvoiceModal?.paymentMethods) && viewingInvoiceModal.paymentMethods.length > 0 && (
+              <div style={{ border: '1px dashed #0284c7', borderRadius: 8, padding: '12px 16px', background: '#f0f9ff', marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 6, textTransform: 'uppercase' }}>
+                  Chi tiết phương thức thanh toán ({viewingInvoiceModal.paymentMethods.length}):
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {viewingInvoiceModal.paymentMethods.map((pm, idx) => {
+                    const meta = getPaymentMethodMeta(pm.paymentMethod)
+                    return (
+                      <Tag key={idx} color={meta.tagColor} style={{ padding: '3px 8px', fontSize: 12 }}>
+                        {meta.label}: <strong>{money(pm.amount)}</strong>
+                        {pm.referenceNumber ? ` (Mã GD: ${pm.referenceNumber})` : ''}
+                      </Tag>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '190px 1fr', gap: 16, marginBottom: 16 }}>
               <div style={{ border: '1px solid #008080', borderRadius: 10, overflow: 'hidden', textAlign: 'center', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
@@ -2217,7 +2240,10 @@ function BillingPage() {
                   <Text strong style={{ color: '#dc2626', fontSize: 16 }}>{money(refundingPaymentModal.totalAmount || refundingPaymentModal.amountPaid)}</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Phương thức TT">
-                  {refundingPaymentModal.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : refundingPaymentModal.paymentMethod === 'CARD' ? 'Thẻ ngân hàng' : 'Tiền mặt'}
+                  {(() => {
+                    const meta = getPaymentMethodMeta(refundingPaymentModal.paymentMethod)
+                    return <Tag color={meta.tagColor} style={{ fontWeight: 600 }}>{meta.label}</Tag>
+                  })()}
                 </Descriptions.Item>
                 <Descriptions.Item label="Thời gian thanh toán">
                   {formatDateTime(refundingPaymentModal.createdAt || refundingPaymentModal.paidAt)}
@@ -2238,6 +2264,77 @@ function BillingPage() {
           </Space>
         )}
       </Modal>
+
+      <RecordPaymentModal
+        open={recordPaymentModalOpen}
+        onClose={() => setRecordPaymentModalOpen(false)}
+        onSuccess={handlePaymentSuccess}
+        visitData={selectedVisitData}
+        canCollectPayment={canCollectPayment}
+      />
+
+      <CreateDiscountRequestModal
+        open={createDiscountModalOpen}
+        onClose={() => setCreateDiscountModalOpen(false)}
+        onSuccess={() => {
+          if (selectedVisitId) {
+            loadInvoiceData(selectedVisitId)
+          }
+        }}
+        visitData={selectedVisitData}
+      />
+
+      <Drawer
+        title="Chi tiết đề xuất giảm giá của lượt khám"
+        placement="right"
+        width={460}
+        open={discountDetailDrawerOpen}
+        onClose={() => setDiscountDetailDrawerOpen(false)}
+      >
+        {selectedVisitData?.activeDiscount && (
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Alert
+              type={selectedVisitData.activeDiscount.status === 'APPROVED' ? 'success' : selectedVisitData.activeDiscount.status === 'REJECTED' ? 'error' : 'warning'}
+              showIcon
+              message={
+                <strong>
+                  Trạng thái: {getStatusTag(selectedVisitData.activeDiscount.status).label}
+                </strong>
+              }
+              description={
+                selectedVisitData.activeDiscount.status === 'PENDING'
+                  ? 'Đề xuất đang chờ cấp quản lý phê duyệt trước khi lập hóa đơn hoặc thu tiền.'
+                  : selectedVisitData.activeDiscount.status === 'APPROVED'
+                  ? 'Đề xuất đã được duyệt và áp dụng giảm trừ vào viện phí.'
+                  : 'Đề xuất đã bị từ chối, viện phí thu theo giá gốc.'
+              }
+            />
+
+            <Descriptions title="Thông tin giảm trừ" column={1} bordered size="small">
+              <Descriptions.Item label="Hình thức">
+                {DISCOUNT_TYPE_OPTIONS[selectedVisitData.activeDiscount.discountType] || selectedVisitData.activeDiscount.discountType}
+              </Descriptions.Item>
+              <Descriptions.Item label="Viện phí gốc">
+                {formatCurrency(selectedVisitData.activeDiscount.originalAmount)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số tiền giảm">
+                <strong style={{ color: '#16a34a' }}>-{formatCurrency(selectedVisitData.activeDiscount.discountAmount)}</strong>
+              </Descriptions.Item>
+              <Descriptions.Item label="Số tiền thực thu">
+                <strong style={{ color: '#0284c7' }}>{formatCurrency(selectedVisitData.activeDiscount.finalAmount)}</strong>
+              </Descriptions.Item>
+              <Descriptions.Item label="Lý do đề xuất">
+                {selectedVisitData.activeDiscount.reason || '—'}
+              </Descriptions.Item>
+              {selectedVisitData.activeDiscount.rejectionReason && (
+                <Descriptions.Item label="Lý do từ chối">
+                  <strong style={{ color: '#dc2626' }}>{selectedVisitData.activeDiscount.rejectionReason}</strong>
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+          </Space>
+        )}
+      </Drawer>
     </div>
   )
 }

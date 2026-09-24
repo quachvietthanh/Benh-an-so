@@ -28,10 +28,11 @@ import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class UpdatePatientService
         implements UpdatePatientUseCase {
@@ -50,6 +51,31 @@ public class UpdatePatientService
     private final PatientChangeDetailBuilder changeDetailBuilder;
 
     private final AuditLogRepository auditLogRepository;
+
+    private final com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository;
+
+    private final com.benhsoan.port.outbound.time.ClockPort clockPort;
+
+    @Autowired
+    public UpdatePatientService(
+            PatientRepository patientRepository,
+            PatientChangeLogRepository patientChangeLogRepository,
+            CurrentUserPort currentUserPort,
+            PatientResultMapper patientResultMapper,
+            PatientChangeDetailBuilder changeDetailBuilder,
+            AuditLogRepository auditLogRepository,
+            com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository,
+            com.benhsoan.port.outbound.time.ClockPort clockPort
+    ) {
+        this.patientRepository = patientRepository;
+        this.patientChangeLogRepository = patientChangeLogRepository;
+        this.currentUserPort = currentUserPort;
+        this.patientResultMapper = patientResultMapper;
+        this.changeDetailBuilder = changeDetailBuilder;
+        this.auditLogRepository = auditLogRepository;
+        this.patientConsentHistoryRepository = patientConsentHistoryRepository;
+        this.clockPort = clockPort;
+    }
 
     @Override
     public PatientResult update( UUID patientId, UpdatePatientCommand command ) {
@@ -101,6 +127,7 @@ public class UpdatePatientService
 
         UUID currentUserId =
                 currentUserPort.getCurrentUserId();
+        Instant now = clockPort != null ? clockPort.now() : Instant.now();
 
         // NCL-15-CN-003: never persist anonymized identity values back as real
         // patient data. If a client round-trips a masked value (only possible
@@ -271,11 +298,13 @@ public class UpdatePatientService
                 && !Objects.equals(command.consentVersion(), patient.getConsentVersion());
         boolean isChangingWithdrawReason = command.consentWithdrawnReason() != null
                 && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason());
+        boolean isChangingScopes = command.scopes() != null;
 
         boolean isModifyingConsent = isChangingWithdrawal
                 || isChangingAgreement
                 || isChangingVersion
-                || isChangingWithdrawReason;
+                || isChangingWithdrawReason
+                || isChangingScopes;
 
         if (isModifyingConsent) {
             if (!currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")) {
@@ -292,7 +321,7 @@ public class UpdatePatientService
 
         if (Boolean.TRUE.equals(command.consentWithdrawn())) {
             if (!patient.isConsentWithdrawn()) {
-                patient.withdrawConsent(command.consentWithdrawnReason(), Instant.now());
+                patient.withdrawConsent(command.consentWithdrawnReason(), now);
             } else if (command.consentWithdrawnReason() != null
                     && !Objects.equals(command.consentWithdrawnReason(), patient.getConsentWithdrawnReason())) {
                 patient.withdrawConsent(command.consentWithdrawnReason(), patient.getConsentWithdrawnAt());
@@ -303,9 +332,51 @@ public class UpdatePatientService
                         "Phải ghi nhận sự đồng ý mới trước khi gia hạn xử lý dữ liệu cá nhân (QTN-24)."
                 );
             }
-            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
+            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), now);
+            if (command.scopes() != null) {
+                boolean nonMedicalRestricted = !command.scopes().contains(com.benhsoan.domain.patient.enums.ConsentScope.COMMUNICATION)
+                        && !command.scopes().contains(com.benhsoan.domain.patient.enums.ConsentScope.RESEARCH);
+                patient.updateConsentScope(nonMedicalRestricted, now);
+            }
         } else if (Boolean.TRUE.equals(command.consentAgreed()) && !patient.isConsentAgreed()) {
-            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), Instant.now());
+            patient.renewConsent(PatientConsentVersion.requireSupported(command.consentVersion()), now);
+            if (command.scopes() != null) {
+                boolean nonMedicalRestricted = !command.scopes().contains(com.benhsoan.domain.patient.enums.ConsentScope.COMMUNICATION)
+                        && !command.scopes().contains(com.benhsoan.domain.patient.enums.ConsentScope.RESEARCH);
+                patient.updateConsentScope(nonMedicalRestricted, now);
+            }
+        } else if (command.scopes() != null) {
+            boolean nonMedicalRestricted = !command.scopes().contains(com.benhsoan.domain.patient.enums.ConsentScope.COMMUNICATION)
+                    && !command.scopes().contains(com.benhsoan.domain.patient.enums.ConsentScope.RESEARCH);
+            patient.updateConsentScope(nonMedicalRestricted, now);
+        }
+
+        if (isModifyingConsent) {
+            int nextVersion = patientConsentHistoryRepository.getNextVersionNumber(patient.getId());
+            com.benhsoan.domain.patient.enums.ConsentHistoryStatus status = patient.isConsentWithdrawn()
+                    ? com.benhsoan.domain.patient.enums.ConsentHistoryStatus.WITHDRAWN
+                    : (patient.isNonMedicalUseRestricted() ? com.benhsoan.domain.patient.enums.ConsentHistoryStatus.PARTIALLY_WITHDRAWN : com.benhsoan.domain.patient.enums.ConsentHistoryStatus.AGREED);
+            java.util.Set<com.benhsoan.domain.patient.enums.ConsentScope> scopes = command.scopes() != null ? command.scopes()
+                    : (patient.isConsentWithdrawn() ? java.util.Collections.emptySet()
+                    : (patient.isNonMedicalUseRestricted() ? java.util.EnumSet.of(com.benhsoan.domain.patient.enums.ConsentScope.TREATMENT) : com.benhsoan.domain.patient.enums.ConsentScope.defaultAll()));
+
+            com.benhsoan.domain.patient.PatientConsentRecord historyRecord = com.benhsoan.domain.patient.PatientConsentRecord.create(
+                    patient.getId(),
+                    nextVersion,
+                    patient.getConsentVersion() != null ? patient.getConsentVersion() : PatientConsentVersion.current(),
+                    status,
+                    scopes,
+                    patient.isConsentAgreed(),
+                    patient.getConsentAgreedAt(),
+                    patient.isConsentWithdrawn(),
+                    patient.getConsentWithdrawnAt(),
+                    patient.getConsentWithdrawnReason(),
+                    patient.isNonMedicalUseRestricted(),
+                    patient.getConsentSignerName(),
+                    currentUserId,
+                    now
+            );
+            patientConsentHistoryRepository.save(historyRecord);
         }
 
         String detail = changeDetailBuilder.forUpdate( oldPatient, patient );
@@ -350,7 +421,8 @@ public class UpdatePatientService
                                 patient.isConsentWithdrawn(),
                                 patient.isNonMedicalUseRestricted()
                         ),
-                        null
+                        null,
+                        now
                 )
         );
 

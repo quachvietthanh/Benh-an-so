@@ -38,6 +38,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.ReportingRestMapper;
 import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.application.ucservice.auth.LoginService;
 import com.benhsoan.application.ucservice.auth.RefreshTokenService;
+import com.benhsoan.application.ucservice.auth.TwoFactorAuthenticationService;
 import com.benhsoan.application.ucservice.role.RolePermissionsResultMapper;
 import com.benhsoan.application.ucservice.role.UpdateRolePermissionsService;
 import com.benhsoan.config.SecurityConfig;
@@ -394,7 +395,7 @@ class ReportsSecurityIntegrationTest {
 
         LoginService loginService = new LoginService(userRepository, roleRepository, userSessionRepository,
                 passwordEncoder, jwtTokenPort, tokenHash, refreshTokenGenerator, loginAttempt,
-                auditLogRepository, clockPort);
+                auditLogRepository, clockPort, mock(TwoFactorAuthenticationService.class));
         String oldAccessToken = loginService.login(new LoginCommand("doctor", "password")).accessToken();
         assertEquals(Set.of("REPORT_VIEW", "REPORT_EXPORT"), tokenPermissions.get(oldAccessToken));
         when(exportOperationalReportUseCase.export(any(), any(), any())).thenReturn(new OperationalReportExportResult(
