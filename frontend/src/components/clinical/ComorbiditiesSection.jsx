@@ -262,19 +262,19 @@ function ComorbiditiesSection({
     <Card
       size="small"
       style={{
-        borderRadius: 10,
+        borderRadius: 8,
         border: '1px solid #E2E8F0',
         backgroundColor: '#FFFFFF',
         boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-        marginBottom: 16,
+        marginBottom: 12,
       }}
-      bodyStyle={{ padding: '16px 18px' }}
+      bodyStyle={{ padding: '10px 14px' }}
     >
       {/* Header khu vực bệnh mắc kèm */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <MedicineBoxOutlined style={{ color: '#7C3AED', fontSize: 20 }} />
-          <Text strong style={{ fontSize: 16, color: '#0F172A' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MedicineBoxOutlined style={{ color: '#7C3AED', fontSize: 16 }} />
+          <Text strong style={{ fontSize: 14, color: '#0F172A' }}>
             Bệnh mắc kèm (Chẩn đoán kèm theo)
           </Text>
           <Badge
@@ -283,29 +283,28 @@ function ComorbiditiesSection({
             style={{
               backgroundColor: secondaryIcds.length > 0 ? '#7C3AED' : '#94A3B8',
               fontWeight: 600,
-              fontSize: 13,
+              fontSize: 12,
             }}
           />
           <Tooltip title="Mỗi bệnh án bắt buộc phải có 1 chẩn đoán chính và có thể ghi thêm nhiều bệnh mắc kèm. Dữ liệu được lưu tách bạch để phục vụ phân tích mô hình bệnh tật.">
-            <InfoCircleOutlined style={{ color: '#64748B', cursor: 'pointer', fontSize: 15 }} />
+            <InfoCircleOutlined style={{ color: '#64748B', cursor: 'pointer', fontSize: 14 }} />
           </Tooltip>
         </div>
 
         {canEdit && (
           <Button
-            size="middle"
-            icon={<PlusCircleOutlined style={{ fontSize: 15 }} />}
+            size="small"
+            icon={<PlusCircleOutlined style={{ fontSize: 13 }} />}
             onClick={() => setIsFreeTextModalOpen(true)}
             style={{
-              fontSize: 13.5,
-              height: 38,
-              padding: '0 16px',
-              borderRadius: 8,
+              fontSize: 12,
+              height: 28,
+              padding: '0 10px',
+              borderRadius: 6,
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+              gap: 4,
             }}
           >
             Thêm chẩn đoán tự do
@@ -319,18 +318,18 @@ function ComorbiditiesSection({
           type="info"
           showIcon
           message="Vui lòng chọn mã bệnh chẩn đoán chính trước khi thêm bệnh mắc kèm."
-          style={{ marginBottom: 14, fontSize: 13, borderRadius: 6 }}
+          style={{ marginBottom: 10, padding: '4px 10px', fontSize: 12, borderRadius: 6 }}
         />
       )}
 
       {/* Thanh tìm kiếm & thêm bệnh kèm qua Autocomplete */}
       {canEdit && (
-        <div style={{ marginBottom: 14 }}>
+        <div style={{ marginBottom: 10 }}>
           <DiagnosisCatalogAutocomplete
-            size="large"
+            size="middle"
             placeholder={
               primaryIcd
-                ? '🔍 Tra cứu mã hoặc tên bệnh kèm theo (nhập mã ICD: I10, E11... hoặc tên bệnh có dấu/không dấu)'
+                ? '🔍 Tra cứu mã hoặc tên bệnh kèm theo (I10, E11...)'
                 : 'Vui lòng chọn chẩn đoán chính ở mục trên trước'
             }
             value={null}
@@ -341,8 +340,8 @@ function ComorbiditiesSection({
           />
 
           {/* Gợi ý các bệnh mắc kèm thường gặp */}
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Text type="secondary" style={{ fontSize: 13, fontWeight: 600, marginRight: 2, color: '#475569' }}>
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text type="secondary" style={{ fontSize: 12, fontWeight: 500, marginRight: 2, color: '#475569' }}>
               Gợi ý bệnh kèm thường gặp:
             </Text>
             {COMMON_COMORBIDITIES_SUGGESTIONS.slice(0, 8).map((suggested) => {
@@ -356,17 +355,16 @@ function ComorbiditiesSection({
                   color={isAdded ? 'purple' : isPrimary ? 'blue' : 'default'}
                   style={{
                     cursor: isDisabled ? 'not-allowed' : 'pointer',
-                    fontSize: 13,
-                    padding: '4px 12px',
-                    borderRadius: 8,
+                    fontSize: 12,
+                    padding: '2px 8px',
+                    borderRadius: 4,
                     opacity: isDisabled ? 0.6 : 1,
-                    margin: '3px 0',
+                    margin: '2px 0',
                     fontWeight: 500,
                     border: isAdded ? '1px solid #C084FC' : '1px solid #CBD5E1',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 4,
+                    gap: 3,
                   }}
                   onClick={() => {
                     if (!isDisabled) {
@@ -387,23 +385,17 @@ function ComorbiditiesSection({
       {/* Bảng danh sách bệnh mắc kèm */}
       {secondaryIcds.length > 0 ? (
         <Table
-          size="middle"
+          size="small"
           rowKey={(record, idx) => record.code || record.id || `sec-${idx}`}
           dataSource={secondaryIcds}
           columns={columns}
           pagination={false}
-          style={{ border: '1px solid #F1F5F9', borderRadius: 8 }}
+          style={{ border: '1px solid #F1F5F9', borderRadius: 6 }}
         />
       ) : (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={
-            <span style={{ color: '#94A3B8', fontSize: 13.5 }}>
-              Chưa có bệnh mắc kèm nào. Hãy sử dụng thanh tìm kiếm hoặc gợi ý phía trên để thêm mã bệnh.
-            </span>
-          }
-          style={{ margin: '18px 0' }}
-        />
+        <div style={{ textAlign: 'center', padding: '10px 0', color: '#94A3B8', fontSize: 12.5 }}>
+          Chưa có bệnh mắc kèm nào. Sử dụng thanh tìm kiếm hoặc gợi ý phía trên để thêm mã bệnh.
+        </div>
       )}
 
       {/* Modal thêm chẩn đoán tự do khi chưa có trong danh mục ICD-10 */}
