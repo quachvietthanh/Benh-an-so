@@ -1,5 +1,5 @@
 -- =====================================================
--- V92__add_max_daily_dose_to_medicines.sql
+-- V94__add_max_daily_dose_to_medicines.sql
 -- NCL-05-CN-007: Kiểm tra liều dùng tối đa theo ngày (mg/day)
 --
 -- 1) medicine catalog gains:

@@ -24,6 +24,7 @@ import DoctorSelector from '../components/portal/DoctorSelector'
 import TimeSlotPicker from '../components/portal/TimeSlotPicker'
 import BookingConfirmationModal from '../components/portal/BookingConfirmationModal'
 import { useAuthContext } from '../context/AuthContext'
+import PatientNotificationBell from '../components/portal/PatientNotificationBell.jsx'
 import './patientPortalBooking.css'
 
 const DEFAULT_SPECIALTIES = [
@@ -226,7 +227,8 @@ function PatientPortalBookingPage() {
             </span>
           </Link>
 
-          <Space size={10} wrap>
+          <Space size={10} wrap align="center">
+            <PatientNotificationBell />
             <Link to="/portal/my-appointments">
               <Button className="portal-header-btn" icon={<ScheduleOutlined style={{ color: '#2563eb' }} />}>
                 Lịch hẹn của tôi

@@ -35,7 +35,7 @@ class MedicineMaxDailyDoseMissingDataMigrationH2Test {
             Statement stmt = conn.createStatement();
             stmt.execute("CREATE TABLE medicines (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
 
-            String ddl = readResource("db/migration/V93__create_medicine_max_daily_dose_missing_flags.sql");
+            String ddl = readResource("db/migration/V95__create_medicine_max_daily_dose_missing_flags.sql");
             RunScript.execute(conn, new StringReader(ddl));
 
             UUID medicineId = UUID.randomUUID();

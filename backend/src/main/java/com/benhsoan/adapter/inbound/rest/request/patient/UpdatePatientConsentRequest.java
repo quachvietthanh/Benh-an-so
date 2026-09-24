@@ -1,5 +1,9 @@
 package com.benhsoan.adapter.inbound.rest.request.patient;
 
+import java.util.Set;
+
+import com.benhsoan.domain.patient.enums.ConsentScope;
+
 public record UpdatePatientConsentRequest(
 
         Boolean consentWithdrawn,
@@ -8,7 +12,11 @@ public record UpdatePatientConsentRequest(
 
         Boolean consentAgreed,
 
-        String consentVersion
+        String consentVersion,
+
+        Set<ConsentScope> scopes,
+
+        Boolean requestDataErasure
 
 ) {
 }

@@ -36,6 +36,9 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `GET /prescriptions`, `/{id}`, `/medical-records/{medicalRecordId}` → read methods | `PRESCRIPTION_READ` | DOCTOR chỉ đọc prescription của visit mình phụ trách; admin/pharmacist theo service | Permission + service context |
 | `POST /prescriptions/{id}/dispense` → `dispense` | `PRESCRIPTION_UPDATE_STATUS` | Chỉ trạng thái có thể dispense; tồn kho/lot hợp lệ | Chuyển role tổng quát, giữ service context |
 | `POST /prescriptions/check-interactions` → `checkInteractions` | `PRESCRIPTION_CREATE` | Chỉ kiểm tra lâm sàng, không ghi đơn | Chuyển từ role |
+| `POST /prescription-templates` → `save` | `PRESCRIPTION_CREATE` | NCL-05-CN-008: chỉ `DOCTOR`; đơn thuốc nguồn thuộc về bác sĩ đang thao tác và không bị hủy (`PENDING_DISPENSE`/`PARTIALLY_DISPENSED`/`DISPENSED`); chẩn đoán phải thuộc bệnh án của đơn thuốc nguồn | Implemented — NCL-05-CN-008 |
+| `POST /prescription-templates/{id}/apply` → `apply` | `PRESCRIPTION_CREATE` | NCL-05-CN-008: chỉ `DOCTOR`; chỉ áp dụng template của chính mình; trả về draft (không lưu đơn); dùng lại check tương tác/dị ứng/chống chỉ định | Implemented — NCL-05-CN-008 |
+| `GET /prescription-templates`, `/{id}` → `getByDiagnosisCode`, `getById` | `PRESCRIPTION_READ` | NCL-05-CN-008: chỉ `DOCTOR`; chỉ đọc template của chính mình | Implemented — NCL-05-CN-008 |
 | `GET /medicines`, `/medicines/{medicineId}` → `search`, `getById` | `PHARMACY_READ` | Chỉ catalog active nếu use case yêu cầu | Chuyển từ role |
 | `POST /medicines` → `create`; `PUT /medicines/{id}` → `update`; `PATCH /medicines/{id}/status` → `updateStatus` | `PHARMACY_CREATE` / `PHARMACY_UPDATE` | Giữ kiểm tra SKU, tồn tại, trạng thái | Chuyển role tổng quát, giữ authorizer |
 | `GET /inventory/stocks`, `/batches`, `/low-stock`, `/expiry-alerts` → inventory read methods | `PHARMACY_READ` | Giữ filter tồn kho/hạn dùng | Chuyển từ role |

@@ -75,6 +75,18 @@ public class MedicineBatchRepositoryAdapter implements MedicineBatchRepository {
     }
 
     @Override
+    public List<MedicineBatch> findByMedicineIdIn(Collection<UUID> medicineIds) {
+        if (medicineIds == null || medicineIds.isEmpty()) {
+            return List.of();
+        }
+
+        return jpaRepository.findByMedicineIdInOrderByExpiryDateAscCreatedAtAsc(medicineIds)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<MedicineBatch> findByMedicineIdAndBatchNumber(
             UUID medicineId, String batchNumber) {
         Objects.requireNonNull(medicineId, "Medicine id must not be null.");

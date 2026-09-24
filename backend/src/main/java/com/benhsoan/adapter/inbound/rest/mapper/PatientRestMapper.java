@@ -92,6 +92,7 @@ public class PatientRestMapper {
                 .consentWithdrawn(request.consentWithdrawn())
                 .consentWithdrawnReason(request.consentWithdrawnReason())
                 .consentVersion(request.consentVersion())
+                .scopes(request.scopes())
                 .build();
     }
 

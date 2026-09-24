@@ -35,6 +35,7 @@ import dayjs from 'dayjs'
 
 import patientPortalMedicalHistoryApi from '../api/patientPortalMedicalHistoryApi'
 import MedicalHistoryDetailModal from '../components/portal/MedicalHistoryDetailModal'
+import PatientNotificationBell from '../components/portal/PatientNotificationBell.jsx'
 import { getApiErrorMessage } from '../utils/apiError'
 import './patientMedicalHistory.css'
 
@@ -102,7 +103,8 @@ function PatientMedicalHistoryPage() {
             </span>
           </Link>
 
-          <Space size={10} wrap>
+          <Space size={10} wrap align="center">
+            <PatientNotificationBell />
             <Link to="/portal/book-appointment">
               <Button type="primary" className="portal-header-btn-primary" icon={<PlusOutlined />}>
                 Đặt lịch khám mới

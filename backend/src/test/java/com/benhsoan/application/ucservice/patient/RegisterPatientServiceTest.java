@@ -45,6 +45,7 @@ class RegisterPatientServiceTest {
     @Mock private PatientCodeGenerator patientCodeGenerator;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository;
 
     private RegisterPatientService service;
     private final UUID currentUserId = UUID.randomUUID();
@@ -61,7 +62,9 @@ class RegisterPatientServiceTest {
                 currentUserPort,
                 changeDetailBuilder,
                 patientResultMapper,
-                auditLogRepository
+                auditLogRepository,
+                patientConsentHistoryRepository,
+                new ObjectMapper()
         );
 
         lenient().when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
@@ -96,6 +99,7 @@ class RegisterPatientServiceTest {
         verify(patientRepository).save(any(Patient.class));
         verify(patientChangeLogRepository).save(any(PatientChangeLog.class));
         verify(auditLogRepository).save(any(AuditLog.class));
+        verify(patientConsentHistoryRepository).save(any(com.benhsoan.domain.patient.PatientConsentRecord.class));
     }
 
     @Test
