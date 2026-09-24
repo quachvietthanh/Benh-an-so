@@ -15,8 +15,10 @@ const PortalDashboard = React.lazy(() => import('../pages/PortalDashboard'))
 const PatientPortalBookingPage = React.lazy(() => import('../pages/PatientPortalBookingPage'))
 const PatientMyAppointmentsPage = React.lazy(() => import('../pages/PatientMyAppointmentsPage'))
 const PatientMedicalHistoryPage = React.lazy(() => import('../pages/PatientMedicalHistoryPage'))
+const PatientMyInvoicesPage = React.lazy(() => import('../pages/PatientMyInvoicesPage'))
 const Dashboard = React.lazy(() => import('../pages/Dashboard'))
 const PatientList = React.lazy(() => import('../pages/PatientList'))
+const PatientImportPage = React.lazy(() => import('../pages/PatientImportPage'))
 const PatientDetail = React.lazy(() => import('../pages/PatientDetail'))
 const AppointmentQueue = React.lazy(() => import('../pages/AppointmentQueue'))
 const AfterCarePage = React.lazy(() => import('../pages/AfterCarePage'))
@@ -126,6 +128,8 @@ function AppRoutes() {
       <Route path="/portal/book-appointment" element={<PatientRoute><LazyPage><PatientPortalBookingPage /></LazyPage></PatientRoute>} />
       <Route path="/portal/my-appointments" element={<PatientRoute><LazyPage><PatientMyAppointmentsPage /></LazyPage></PatientRoute>} />
       <Route path="/portal/medical-history" element={<PatientRoute><LazyPage><PatientMedicalHistoryPage /></LazyPage></PatientRoute>} />
+      <Route path="/portal/my-invoices" element={<PatientRoute><LazyPage><PatientMyInvoicesPage /></LazyPage></PatientRoute>} />
+      <Route path="/portal/invoices" element={<Navigate to="/portal/my-invoices" replace />} />
       <Route path="/public-lookup" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/portal" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/tra-cuu-ket-qua" element={<LazyPage><PublicLookupPage /></LazyPage>} />
@@ -141,6 +145,7 @@ function AppRoutes() {
       >
         <Route index element={<LazyPage><Dashboard /></LazyPage>} />
         <Route path="patients" element={<PrivateRoute allowedPermissions={['PATIENT_READ', 'PATIENT_CREATE', 'PATIENT_UPDATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientList /></LazyPage></PrivateRoute>} />
+        <Route path="patients/import" element={<PrivateRoute allowedPermissions={['PATIENT_IMPORT']} allowedRoles={['admin', 'receptionist']}><LazyPage><PatientImportPage /></LazyPage></PrivateRoute>} />
         <Route path="patients/:id" element={<PrivateRoute allowedPermissions={['PATIENT_READ', 'PATIENT_CREATE', 'PATIENT_UPDATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><PatientDetail /></LazyPage></PrivateRoute>} />
         <Route path="appointments" element={<PrivateRoute allowedPermissions={['APPOINTMENT_READ', 'APPOINTMENT_CREATE', 'APPOINTMENT_UPDATE', 'QUEUE_VIEW', 'QUEUE_CREATE']} allowedRoles={['admin', 'doctor', 'receptionist']}><LazyPage><AppointmentQueue /></LazyPage></PrivateRoute>} />
         <Route path="appointments/weekly-schedule" element={<PrivateRoute allowedRoles={['admin', 'receptionist', 'manager', 'clinic_manager']}><LazyPage><DoctorWeeklySchedulePage /></LazyPage></PrivateRoute>} />
