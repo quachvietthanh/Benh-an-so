@@ -119,4 +119,43 @@ class OperationalReportAuditServiceTest {
         assertTrue(captor.getValue().getDetail().contains("\"role\":\"MANAGER\""));
         assertFalse(captor.getValue().getDetail().contains("PERMISSION_REPORT_EXPORT"));
     }
+
+    @Test
+    void writesUnmaskDetailsInExportAuditLog() {
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        ClockPort clockPort = mock(ClockPort.class);
+        UUID actorId = UUID.randomUUID();
+        Instant exportedAt = Instant.parse("2026-08-13T02:15:30Z");
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(actorId);
+        when(currentUserPort.getCurrentUserRoles()).thenReturn(Set.of("ADMIN"));
+        when(clockPort.now()).thenReturn(exportedAt);
+
+        OperationalReportAuditService service = new OperationalReportAuditService(
+                auditLogRepository,
+                currentUserPort,
+                clockPort
+        );
+
+        service.logExport(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "Clinical research study #123"
+        );
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+
+        AuditLog auditLog = captor.getValue();
+        assertEquals(actorId, auditLog.getUserId());
+        assertEquals(ActionType.EXPORT, auditLog.getActionType());
+        assertEquals(ResourceType.OPERATIONAL_REPORT, auditLog.getResourceType());
+        assertTrue(auditLog.getDetail().contains("\"reportType\":\"VISIT_REPORT\""));
+        assertTrue(auditLog.getDetail().contains("\"unmasked\":true"));
+        assertTrue(auditLog.getDetail().contains("\"unmaskReason\":\"Clinical research study #123\""));
+    }
 }

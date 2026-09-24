@@ -36,10 +36,13 @@ import com.benhsoan.persistence.entity.medicalrecord.MedicalRecordEntity;
 import com.benhsoan.persistence.entity.medicine.MedicineEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionDispenseItemEntity;
 import com.benhsoan.persistence.entity.prescription.PrescriptionEntity;
+import com.benhsoan.persistence.entity.patient.PatientEntity;
+import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.persistence.entity.visit.VisitEntity;
 import com.benhsoan.persistence.jpaRepository.billing.JpaInvoiceRepository;
 import com.benhsoan.persistence.jpaRepository.visit.JpaVisitRepository;
 import com.benhsoan.port.outbound.repository.reporting.InvoiceLineReportDetail;
+import com.benhsoan.port.outbound.repository.reporting.VisitReportDetailItem;
 
 import jakarta.persistence.EntityManager;
 
@@ -689,6 +692,60 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 assertNull(adjLine.targetLineType(), "Unresolved adjustment must have null targetLineType");
                 assertNull(adjLine.doctorId(),
                                 "Unresolved adjustment must not be attributed to visitDoctor, doctorId must be null");
+        }
+
+        @Test
+        void findsCompletedVisitDetailsWithPatientAndDoctorInfo() {
+                UUID patientId = UUID.randomUUID();
+                entityManager.persist(PatientEntity.builder()
+                                .id(patientId)
+                                .patientCode("BN000001")
+                                .fullName("Nguyễn Văn An")
+                                .dateOfBirth(LocalDate.of(1990, 1, 1))
+                                .gender(Gender.MALE)
+                                .phone("0912345678")
+                                .address("123 Lê Lợi, TP.HCM")
+                                .active(true)
+                                .createdBy(UUID.randomUUID())
+                                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                                .updatedAt(Instant.parse("2026-08-01T00:00:00Z"))
+                                .build());
+
+                UUID docId = UUID.randomUUID();
+                createDoctor(docId, "docExamDetail", "Dr. Exam Detail");
+
+                UUID visitId = UUID.randomUUID();
+                entityManager.persist(VisitEntity.builder()
+                                .id(visitId)
+                                .visitCode("VIS-DET-001")
+                                .patientId(patientId)
+                                .doctorId(docId)
+                                .visitType(VisitType.WALK_IN)
+                                .status(VisitStatus.COMPLETED)
+                                .visitAt(Instant.parse("2026-08-01T02:00:00Z"))
+                                .completedAt(Instant.parse("2026-08-01T02:30:00Z"))
+                                .reason("Kham benh")
+                                .createdBy(docId)
+                                .createdAt(Instant.parse("2026-08-01T01:00:00Z"))
+                                .build());
+
+                List<VisitReportDetailItem> details = repositoryAdapter.findCompletedVisitDetails(
+                                Instant.parse("2026-08-01T00:00:00Z"),
+                                Instant.parse("2026-08-02T00:00:00Z"));
+
+                assertEquals(1, details.size());
+                VisitReportDetailItem item = details.get(0);
+                assertEquals(visitId, item.visitId());
+                assertEquals("VIS-DET-001", item.visitCode());
+                assertEquals(Instant.parse("2026-08-01T02:30:00Z"), item.completedAt());
+                assertEquals(patientId, item.patientId());
+                assertEquals("BN000001", item.patientCode());
+                assertEquals("Nguyễn Văn An", item.patientFullName());
+                assertEquals("0912345678", item.patientPhone());
+                assertEquals("123 Lê Lợi, TP.HCM", item.patientAddress());
+                assertEquals(docId, item.doctorId());
+                assertEquals("Dr. Exam Detail", item.doctorFullName());
+                assertEquals("COMPLETED", item.status());
         }
 
         private UUID createDiagnosisCatalog(String code, String name, String diseaseGroup) {

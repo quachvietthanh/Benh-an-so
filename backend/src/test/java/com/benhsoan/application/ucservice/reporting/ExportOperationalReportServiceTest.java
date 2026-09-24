@@ -2,7 +2,9 @@ package com.benhsoan.application.ucservice.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -12,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +26,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.reporting.enums.ReportType;
+import com.benhsoan.port.outbound.repository.reporting.VisitReportDetailItem;
 import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.result.DiseasePatternItemResult;
@@ -330,6 +334,198 @@ class ExportOperationalReportServiceTest {
         assertEquals("Doctor not found.", ex.getMessage());
         verifyNoInteractions(dataService);
         verify(auditService, never()).logExport(any(), any(), any(), any());
+    }
+
+    @Test
+    void exportsVisitCsvWithMaskedPatientDetailsByDefault() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(dataService.hasReportData(any(), any(), any())).thenReturn(true);
+        when(dataService.getReportData(any(), any())).thenReturn(sampleReportData());
+
+        List<VisitReportDetailItem> details = List.of(
+                new VisitReportDetailItem(
+                        UUID.randomUUID(),
+                        "VISIT-2026-001",
+                        Instant.parse("2026-08-01T10:30:00Z"),
+                        UUID.randomUUID(),
+                        "BN-0001",
+                        "Nguyễn Văn An",
+                        "0912345678",
+                        "123 Đường Lê Lợi, Quận 1, TP.HCM",
+                        UUID.randomUUID(),
+                        "Bác sĩ Trần Bình",
+                        "COMPLETED"
+                )
+        );
+        when(dataService.getCompletedVisitDetails(any(), any())).thenReturn(details);
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+        OperationalReportExportResult result = service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3)
+        );
+
+        String csv = new String(result.content(), StandardCharsets.UTF_8);
+        assertTrue(csv.contains("VISIT DETAILS"));
+        assertTrue(csv.contains("BỆNH NHÂN #BN-0001"));
+        assertTrue(csv.contains("09******78"));
+        assertTrue(csv.contains("[ĐỊA CHỈ ĐÃ ẨN DANH]"));
+        assertFalse(csv.contains("Nguyễn Văn An"));
+        assertFalse(csv.contains("0912345678"));
+        assertFalse(csv.contains("123 Đường Lê Lợi"));
+
+        verify(auditService).logExport(ReportType.VISIT_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+    }
+
+    @Test
+    void exportsVisitCsvWithUnmaskedPatientDetailsWhenUserHasPermissionAndValidReason() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(dataService.hasReportData(any(), any(), any())).thenReturn(true);
+        when(dataService.getReportData(any(), any())).thenReturn(sampleReportData());
+        when(currentUserPort.hasPermission("REPORT_UNMASKED_EXPORT")).thenReturn(true);
+
+        List<VisitReportDetailItem> details = List.of(
+                new VisitReportDetailItem(
+                        UUID.randomUUID(),
+                        "VISIT-2026-001",
+                        Instant.parse("2026-08-01T10:30:00Z"),
+                        UUID.randomUUID(),
+                        "BN-0001",
+                        "Nguyễn Văn An",
+                        "0912345678",
+                        "123 Đường Lê Lợi, Quận 1, TP.HCM",
+                        UUID.randomUUID(),
+                        "Bác sĩ Trần Bình",
+                        "COMPLETED"
+                )
+        );
+        when(dataService.getCompletedVisitDetails(any(), any())).thenReturn(details);
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+        OperationalReportExportResult result = service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "Clinical research study #123"
+        );
+
+        String csv = new String(result.content(), StandardCharsets.UTF_8);
+        assertTrue(csv.contains("VISIT DETAILS"));
+        assertTrue(csv.contains("Nguyễn Văn An"));
+        assertTrue(csv.contains("0912345678"));
+        assertTrue(csv.contains("123 Đường Lê Lợi, Quận 1, TP.HCM"));
+        assertFalse(csv.contains("BỆNH NHÂN #BN-0001"));
+
+        verify(auditService).logExport(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "Clinical research study #123"
+        );
+    }
+
+    @Test
+    void rejectsUnmaskedExportWhenUserLacksPermissionAndIsNotAdmin() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(currentUserPort.hasPermission("REPORT_UNMASKED_EXPORT")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(false);
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "Clinical research study #123"
+        ));
+
+        assertEquals("User lacks permission to export unmasked patient data.", ex.getMessage());
+        verify(auditService).logAccessDenied(
+                ReportType.VISIT_REPORT,
+                "User lacks high-privilege permission REPORT_UNMASKED_EXPORT to export unmasked patient data."
+        );
+        verifyNoInteractions(dataService);
+    }
+
+    @Test
+    void rejectsUnmaskedExportWhenReasonIsBlankOrTooShort() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(currentUserPort.hasPermission("REPORT_UNMASKED_EXPORT")).thenReturn(true);
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+
+        ValidationException ex1 = assertThrows(ValidationException.class, () -> service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                null
+        ));
+        assertEquals("Reason is required and must be at least 5 characters for unmasked export.", ex1.getMessage());
+
+        ValidationException ex2 = assertThrows(ValidationException.class, () -> service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "   "
+        ));
+        assertEquals("Reason is required and must be at least 5 characters for unmasked export.", ex2.getMessage());
+
+        ValidationException ex3 = assertThrows(ValidationException.class, () -> service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "1234"
+        ));
+        assertEquals("Reason is required and must be at least 5 characters for unmasked export.", ex3.getMessage());
+
+        verifyNoInteractions(dataService);
+    }
+
+    @Test
+    void allowsUnmaskedExportWhenUserHasAdminRole() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(dataService.hasReportData(any(), any(), any())).thenReturn(true);
+        when(dataService.getReportData(any(), any())).thenReturn(sampleReportData());
+        when(currentUserPort.hasPermission("REPORT_UNMASKED_EXPORT")).thenReturn(false);
+        when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+        OperationalReportExportResult result = service.export(
+                ReportType.OPERATIONAL_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "Internal system audit"
+        );
+
+        assertEquals(ReportType.OPERATIONAL_REPORT, result.reportType());
+        verify(auditService).logExport(
+                ReportType.OPERATIONAL_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "Internal system audit"
+        );
     }
 
     private OperationalReportData sampleReportData() {

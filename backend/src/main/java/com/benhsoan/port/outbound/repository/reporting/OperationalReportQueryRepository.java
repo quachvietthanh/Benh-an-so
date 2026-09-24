@@ -27,4 +27,6 @@ public interface OperationalReportQueryRepository {
     List<DiseasePatternSummary> findDiseasePatternSummaries(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
 
     boolean hasDiagnoses(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
+
+    List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive);
 }

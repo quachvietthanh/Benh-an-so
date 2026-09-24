@@ -25,6 +25,8 @@ import com.benhsoan.port.outbound.repository.reporting.DailyVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.DiseasePatternSummary;
 import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
+import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
+import com.benhsoan.port.outbound.repository.reporting.VisitReportDetailItem;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 import java.util.UUID;
@@ -68,6 +70,11 @@ public class OperationalReportDataService {
                 getSummary(from, to),
                 getTimeline(from, to)
         );
+    }
+
+    public List<VisitReportDetailItem> getCompletedVisitDetails(LocalDate from, LocalDate to) {
+        ReportingTimeRange range = ReportingTimeRange.of(from, to);
+        return operationalReportQueryRepository.findCompletedVisitDetails(range.fromInclusive(), range.toExclusive());
     }
 
     public boolean hasReportData(ReportType reportType, LocalDate from, LocalDate to) {

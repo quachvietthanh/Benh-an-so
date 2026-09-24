@@ -539,6 +539,64 @@ class ReportsControllerTest {
     }
 
     @Test
+    void exportsCsvWithUnmaskAndReason() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any(), any(), eq(true), any())).thenReturn(new OperationalReportExportResult(
+                ReportType.VISIT_REPORT,
+                "visit-report-2026-08-01-to-2026-08-03.csv",
+                "text/csv; charset=UTF-8",
+                "\uFEFFVISIT REPORT\nFrom,2026-08-01\nTo,2026-08-03\n".getBytes(StandardCharsets.UTF_8)
+        ));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "VISIT_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .param("unmask", "true")
+                        .param("reason", "Nghien cuu lam sang"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"visit-report-2026-08-01-to-2026-08-03.csv\""));
+
+        verify(exportOperationalReportUseCase).export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                "Nghien cuu lam sang"
+        );
+    }
+
+    @Test
+    void exportsCsvReturnsForbiddenWhenUnmaskedExportLacksPermission() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any(), any(), eq(true), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("User lacks permission to export unmasked patient data."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "VISIT_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .param("unmask", "true")
+                        .param("reason", "Nghien cuu lam sang"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void exportsCsvReturnsBadRequestWhenReasonValidationFails() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any(), any(), eq(true), any()))
+                .thenThrow(new com.benhsoan.domain.shared.exception.ValidationException("Reason is required and must be at least 5 characters for unmasked export."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "VISIT_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .param("unmask", "true")
+                        .param("reason", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Reason is required and must be at least 5 characters for unmasked export."));
+    }
+
+    @Test
     void returnsStructuredErrorWhenNoDataCanBeExported() throws Exception {
         when(exportOperationalReportUseCase.export(any(), any(), any()))
                 .thenThrow(new OperationalReportDataEmptyException());

@@ -181,4 +181,30 @@ class OperationalReportDataServiceTest {
         assertEquals(1, result.items().size());
         assertEquals("J00", result.items().get(0).diseaseCode());
     }
+
+    @Test
+    void returnsCompletedVisitDetailsFromRepository() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        var item = new com.benhsoan.port.outbound.repository.reporting.VisitReportDetailItem(
+                java.util.UUID.randomUUID(),
+                "V001",
+                Instant.parse("2026-08-01T10:00:00Z"),
+                java.util.UUID.randomUUID(),
+                "BN001",
+                "Nguyen Van A",
+                "0900000000",
+                "Hanoi",
+                java.util.UUID.randomUUID(),
+                "Dr X",
+                "COMPLETED"
+        );
+        when(repository.findCompletedVisitDetails(any(), any())).thenReturn(List.of(item));
+
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
+        var details = service.getCompletedVisitDetails(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+        assertEquals(1, details.size());
+        assertEquals("V001", details.get(0).visitCode());
+        assertEquals("Nguyen Van A", details.get(0).patientFullName());
+    }
 }

@@ -641,6 +641,47 @@ Các quyết định đã chốt:
 - Mốc thời gian tính doanh thu là `invoice.createdAt`.
 - Adjustment invoice được trừ vào **ngày nó được tạo**, không hồi tố về ngày invoice gốc.
 - `summary` trả về tổng lượt khám và tổng doanh thu thuần.
-- `timeline` trả về đủ từng ngày trong kỳ, kể cả ngày không có dữ liệu.
 - `export` chốt dùng `CSV` cho Phase 1.
+
+---
+
+## 13. Export Operational Report & Patient Data Masking (NCL-15-CN-007)
+
+### 13.1 Endpoint Contract
+
+```http
+GET /reports/export?reportType={reportType}&from={yyyy-MM-dd}&to={yyyy-MM-dd}&doctorId={uuid}&unmask={true|false}&reason={text}
+```
+
+- **Headers**: `Authorization: Bearer <token>`
+- **Permission**:
+  - Mặc định: Yêu cầu `REPORT_EXPORT`.
+  - Khi `unmask=true`: Yêu cầu thêm quyền cao `REPORT_UNMASKED_EXPORT` hoặc role `ADMIN`.
+- **Query Parameters**:
+  - `reportType` (bắt buộc): `OPERATIONAL_REPORT`, `VISIT_REPORT`, `REVENUE_REPORT`, `DISEASE_PATTERN_REPORT`.
+  - `from` (bắt buộc): định dạng `yyyy-MM-dd`.
+  - `to` (bắt buộc): định dạng `yyyy-MM-dd` (`to >= from`).
+  - `doctorId` (tùy chọn): lọc theo bác sĩ.
+  - `unmask` (tùy chọn, mặc định `false`): yêu cầu xuất dữ liệu đầy đủ không che.
+  - `reason` (tùy chọn, bắt buộc khi `unmask=true`): lý do xuất dữ liệu nhạy cảm (tối thiểu 5 ký tự).
+
+### 13.2 Data Masking Rules (Default)
+
+Khi `unmask=false` (mặc định), bảng `VISIT DETAILS` trong báo cáo lượt khám / vận hành tự động ẩn danh hóa thông tin nhận dạng bệnh nhân bằng `PatientAnonymizer`:
+
+- **Họ tên**: `BỆNH NHÂN #<patientCode>` (không lộ tên thật).
+- **Số điện thoại**: Giữ 2 số đầu và 2 số cuối (VD: `09******78`).
+- **Địa chỉ**: `[ĐỊA CHỈ ĐÃ ẨN DANH]`.
+
+### 13.3 High-Privilege Unmask Export & Reason Validation
+
+Khi người dùng chọn xuất bản đầy đủ (`unmask=true`):
+
+1. **Phân quyền**: Người dùng phải có quyền `REPORT_UNMASKED_EXPORT` hoặc role `ADMIN`. Nếu không có, hệ thống từ chối với HTTP 403 Forbidden và ghi nhật ký truy cập trái phép.
+2. **Lý do**: Bắt buộc cung cấp tham số `reason` với độ dài tối thiểu 5 ký tự. Nếu thiếu hoặc dưới 5 ký tự, hệ thống trả về HTTP 400 Bad Request.
+3. **Nhật ký kiểm toán (Audit Log)**: Mỗi lượt xuất dữ liệu không che được ghi nhận riêng biệt trong bảng `audit_logs` với action `EXPORT`, resource `OPERATIONAL_REPORT`, chi tiết JSON chứa `unmasked: true`, `unmaskReason`, `reportType`, thời điểm, phạm vi kỳ báo cáo và người thực hiện.
+
+### 13.4 Security & Formula Injection Neutralization
+
+Tất cả các trường chuỗi xuất ra CSV đều được làm sạch (neutralize CSV Formula Injection): nếu ký tự đầu là `=`, `+`, `-`, `@`, `\t` thì được tự động gắn thêm dấu nháy đơn `'` phía trước để phòng tránh tấn công thực thi mã khi mở tệp trên Excel.
 
