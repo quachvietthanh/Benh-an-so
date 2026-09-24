@@ -55,6 +55,13 @@ public class AppointmentRepositoryAdapter
     }
 
     @Override
+    public List<Appointment> findBySeriesIdOrderBySequenceNumberAsc(UUID seriesId) {
+        return jpaRepository.findBySeriesIdOrderBySequenceNumberAsc(seriesId).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public Appointment save(Appointment appointment) {
 
         AppointmentEntity entity

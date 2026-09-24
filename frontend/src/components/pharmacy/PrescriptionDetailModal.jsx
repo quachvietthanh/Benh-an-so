@@ -49,6 +49,7 @@ import {
   getInterconnectionStatusInfo,
   isStandardRxCode,
 } from '../../utils/electronicPrescriptionValidation'
+import SpecialControlBadge from './SpecialControlBadge.jsx'
 
 const { Text, Paragraph, Title } = Typography
 
@@ -173,19 +174,34 @@ function PrescriptionDetailModal({
     {
       title: 'Tên thuốc / Hàm lượng',
       key: 'medicineName',
-      render: (_, item) => (
-        <div>
-          <Text strong style={{ color: '#1e40af' }}>
-            {item.medicineName || getMedicineName(item.medicineId)}
-          </Text>
-          {item.strength && <Text type="secondary" style={{ marginLeft: 6 }}>({item.strength})</Text>}
-          {item.activeIngredient && (
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
-              Hoạt chất: {item.activeIngredient}
-            </div>
-          )}
-        </div>
-      ),
+      render: (_, item) => {
+        const med = (medicines || []).find((m) => String(m.id) === String(item.medicineId))
+        const isSpecial = Boolean(item.isSpecialControl || med?.isSpecialControl)
+        const sGroup = item.specialControlGroup || med?.specialControlGroup
+        return (
+          <div>
+            <Text strong style={{ color: '#1e40af' }}>
+              {item.medicineName || getMedicineName(item.medicineId)}
+            </Text>
+            {item.strength && <Text type="secondary" style={{ marginLeft: 6 }}>({item.strength})</Text>}
+            {isSpecial && (
+              <div style={{ marginTop: 2 }}>
+                <SpecialControlBadge isSpecialControl={true} group={sGroup} />
+              </div>
+            )}
+            {item.activeIngredient && (
+              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                Hoạt chất: {item.activeIngredient}
+              </div>
+            )}
+            {item.specialControlReason && (
+              <div style={{ fontSize: 11.5, color: '#b45309', marginTop: 2 }}>
+                <strong>Lý do chỉ định:</strong> {item.specialControlReason}
+              </div>
+            )}
+          </div>
+        )
+      },
     },
     {
       title: 'Cách dùng',

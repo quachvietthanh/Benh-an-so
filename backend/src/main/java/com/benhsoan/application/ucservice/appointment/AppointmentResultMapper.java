@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.port.dto.result.AppointmentResult;
 import com.benhsoan.port.dto.result.appointment.AppointmentRescheduleHistoryResult;
+import com.benhsoan.port.dto.result.appointment.WaitlistSuggestionResult;
 
 @Component
 public class AppointmentResultMapper {
@@ -29,6 +30,15 @@ public class AppointmentResultMapper {
             List<AppointmentRescheduleHistoryResult> histories,
             String confirmedByName
     ) {
+        return toResult(appointment, histories, confirmedByName, null);
+    }
+
+    public AppointmentResult toResult(
+            Appointment appointment,
+            List<AppointmentRescheduleHistoryResult> histories,
+            String confirmedByName,
+            WaitlistSuggestionResult suggestedWaitlistEntry
+    ) {
         return AppointmentResult.builder()
                 .id(appointment.getId())
                 .appointmentCode(appointment.getAppointmentCode())
@@ -47,6 +57,7 @@ public class AppointmentResultMapper {
                 .confirmedBy(appointment.getConfirmedBy())
                 .confirmedByName(confirmedByName)
                 .rescheduleHistories(histories != null ? histories : List.of())
+                .suggestedWaitlistEntry(suggestedWaitlistEntry)
                 .build();
     }
 

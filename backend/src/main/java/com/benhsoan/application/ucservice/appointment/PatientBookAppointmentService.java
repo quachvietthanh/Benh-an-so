@@ -56,8 +56,10 @@ import lombok.RequiredArgsConstructor;
  * online portal, guarding past time (TC-03), slot collision (TC-02 / QTN-04) and writing an
  * audit trail (TC-04).
  */
+import org.springframework.beans.factory.annotation.Autowired;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentWaitlistRepository;
+
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class PatientBookAppointmentService implements PatientBookAppointmentUseCase {
 
@@ -92,6 +94,60 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
     private final ClockPort clockPort;
 
     private final ObjectMapper objectMapper;
+
+    private final AppointmentWaitlistRepository appointmentWaitlistRepository;
+
+    public PatientBookAppointmentService(
+            AppointmentRepository appointmentRepository,
+            AppointmentCodeGenerator appointmentCodeGenerator,
+            DoctorScheduleRepository doctorScheduleRepository,
+            DoctorWeeklyScheduleRepository doctorWeeklyScheduleRepository,
+            DoctorTimeOffRepository doctorTimeOffRepository,
+            PatientRepository patientRepository,
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            ObjectMapper objectMapper
+    ) {
+        this(appointmentRepository, appointmentCodeGenerator, doctorScheduleRepository,
+                doctorWeeklyScheduleRepository, doctorTimeOffRepository, patientRepository,
+                userRepository, roleRepository, currentUserPort, auditLogRepository, clockPort,
+                objectMapper, null);
+    }
+
+    @Autowired
+    public PatientBookAppointmentService(
+            AppointmentRepository appointmentRepository,
+            AppointmentCodeGenerator appointmentCodeGenerator,
+            DoctorScheduleRepository doctorScheduleRepository,
+            DoctorWeeklyScheduleRepository doctorWeeklyScheduleRepository,
+            DoctorTimeOffRepository doctorTimeOffRepository,
+            PatientRepository patientRepository,
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            ObjectMapper objectMapper,
+            @Autowired(required = false) AppointmentWaitlistRepository appointmentWaitlistRepository
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.appointmentCodeGenerator = appointmentCodeGenerator;
+        this.doctorScheduleRepository = doctorScheduleRepository;
+        this.doctorWeeklyScheduleRepository = doctorWeeklyScheduleRepository;
+        this.doctorTimeOffRepository = doctorTimeOffRepository;
+        this.patientRepository = patientRepository;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.currentUserPort = currentUserPort;
+        this.auditLogRepository = auditLogRepository;
+        this.clockPort = clockPort;
+        this.objectMapper = objectMapper;
+        this.appointmentWaitlistRepository = appointmentWaitlistRepository;
+    }
+
 
     @Override
     public PatientAppointmentResult book(PatientBookAppointmentCommand command) {
@@ -202,6 +258,19 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
         );
 
         Appointment saved = appointmentRepository.save(appointment);
+
+        // NCL-03-CN-012-TC-03: Tự động chuyển trạng thái mục chờ thành SCHEDULED khi bệnh nhân đặt lịch online
+        if (appointmentWaitlistRepository != null && command.appointmentDate() != null) {
+            appointmentWaitlistRepository.findActiveByPatientAndDoctorAndDate(
+                    patientId,
+                    command.doctorId(),
+                    command.appointmentDate()
+            ).ifPresent(waitlist -> {
+                waitlist.markScheduled(saved.getId(), now);
+                appointmentWaitlistRepository.save(waitlist);
+            });
+        }
+
 
         auditLogRepository.save(AuditLog.create(
                 userId,

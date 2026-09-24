@@ -176,9 +176,12 @@ Với vai trò không bắt buộc 2FA trả về cấu trúc cũ (`accessToken`
 
 Workbook chỉ yêu cầu "mã xác thực mô phỏng", không chỉ định SMS/email/TOTP. Backend dùng
 `VerificationCodeGeneratorPort` (mã 6 chữ số) và `TwoFactorCodeDeliveryPort` với mock adapter
-(`MockTwoFactorCodeDeliveryAdapter`). Mã được giữ trong bộ nhớ của mock để phục vụ test và
-KHÔNG được ghi vào log ứng dụng thông thường. Frontend tương lai chỉ cần gọi các endpoint
-trên; không cần sửa backend.
+(`MockTwoFactorCodeDeliveryAdapter`).
+
+> ⚠️ **LƯU Ý MÔI TRƯỜNG DEV/TEST**: Để phục vụ việc kiểm thử nhanh cho dự án cá nhân/nội bộ,
+> `MockTwoFactorCodeDeliveryAdapter` hiện có log mã xác thực (OTP) ra console terminal server.
+> Trước khi đưa vào production thật với người dùng cuối, BẮT BUỘC phải gỡ dòng log này và tích hợp
+> SMS/Email Provider thật (Twilio, ESMS, SendGrid, v.v.). Xem chi tiết tại `frontend/README-2FA-DEV-NOTES.md`.
 
 ## 9. Database
 
