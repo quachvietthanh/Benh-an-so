@@ -36,16 +36,22 @@ public class EligibleStockSnapshotService {
             return eligibleStockByMedicineId;
         }
 
-        Map<UUID, List<MedicineBatch>> batchesByMedicineId = medicineBatchRepository
-                .findByMedicineIdIn(validMedicineIds)
-                .stream()
-                .collect(Collectors.groupingBy(MedicineBatch::getMedicineId));
+        List<MedicineBatch> batchList = medicineBatchRepository.findByMedicineIdIn(validMedicineIds);
+        Map<UUID, List<MedicineBatch>> batchesByMedicineId = (batchList != null && !batchList.isEmpty())
+                ? batchList.stream().collect(Collectors.groupingBy(MedicineBatch::getMedicineId))
+                : new LinkedHashMap<>();
 
         for (UUID medicineId : validMedicineIds) {
-            List<MedicineBatch> batches = batchesByMedicineId.getOrDefault(medicineId, List.of());
+            List<MedicineBatch> batches = batchesByMedicineId.get(medicineId);
+            if (batches == null || batches.isEmpty()) {
+                List<MedicineBatch> singleBatches = medicineBatchRepository.findByMedicineId(medicineId);
+                if (singleBatches != null && !singleBatches.isEmpty()) {
+                    batches = singleBatches;
+                }
+            }
             eligibleStockByMedicineId.put(
                     medicineId,
-                    lowStockEvaluator.calculateEligibleStockQuantity(batches, today)
+                    lowStockEvaluator.calculateEligibleStockQuantity(batches != null ? batches : List.of(), today)
             );
         }
         return eligibleStockByMedicineId;
