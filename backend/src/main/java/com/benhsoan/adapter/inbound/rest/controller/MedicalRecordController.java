@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -7,6 +8,7 @@ import java.util.UUID;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,6 +31,7 @@ import com.benhsoan.adapter.inbound.rest.mapper.MedicalRecordRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.AmendMedicalRecordRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ApplyMedicalRecordTemplateRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.CreateMedicalRecordRequest;
+import com.benhsoan.adapter.inbound.rest.request.medicalrecord.ExportMedicalRecordExchangeRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.IssueMedicalRecordCopyRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateInstructionsAndTreatmentPlanRequest;
 import com.benhsoan.adapter.inbound.rest.request.medicalrecord.UpdateMedicalRecordRequest;
@@ -47,6 +50,7 @@ import com.benhsoan.port.inbound.medicalrecord.ApplyMedicalRecordTemplateUseCase
 import com.benhsoan.port.inbound.medicalrecord.ArchiveMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.CreateMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.DeleteMedicalRecordUseCase;
+import com.benhsoan.port.inbound.medicalrecord.ExportMedicalRecordExchangeUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordAccessLogsUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordUseCase;
 import com.benhsoan.port.inbound.medicalrecord.GetMedicalRecordTemplateSelectionUseCase;
@@ -98,6 +102,7 @@ public class MedicalRecordController {
     private final GetOverdueMedicalRecordsUseCase getOverdueMedicalRecordsUseCase;
     private final SendSigningReminderUseCase sendSigningReminderUseCase;
     private final GetSigningRemindersUseCase getSigningRemindersUseCase;
+    private final ExportMedicalRecordExchangeUseCase exportMedicalRecordExchangeUseCase;
     private final MedicalRecordRestMapper mapper;
     private final MedicalRecordDetailRestMapper detailMapper;
     private final MedicalRecordDiagnosisRestMapper diagnosisMapper;
@@ -209,6 +214,41 @@ public class MedicalRecordController {
         var result = issueMedicalRecordCopyUseCase.issue(mapper.toCommand(medicalRecordId, request));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.fileName() + "\"")
+                .contentType(MediaType.parseMediaType(result.contentType()))
+                .contentLength(result.content().length)
+                .body(new ByteArrayResource(result.content()));
+    }
+
+    @PostMapping("/export")
+    @RequirePermission("MEDICAL_RECORD_EXPORT")
+    public ResponseEntity<ByteArrayResource> exportRecords(
+            @Valid @RequestBody ExportMedicalRecordExchangeRequest request) {
+        var result = exportMedicalRecordExchangeUseCase.exportRecords(
+                new com.benhsoan.port.dto.command.medicalrecord.ExportMedicalRecordExchangeCommand(
+                        request.medicalRecordIds(),
+                        request.visitIds(),
+                        request.format()
+                )
+        );
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(result.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType(result.contentType()))
+                .contentLength(result.content().length)
+                .body(new ByteArrayResource(result.content()));
+    }
+
+    @GetMapping("/{medicalRecordId}/export")
+    @RequirePermission("MEDICAL_RECORD_EXPORT")
+    public ResponseEntity<ByteArrayResource> exportSingleRecord(@PathVariable UUID medicalRecordId) {
+        var result = exportMedicalRecordExchangeUseCase.exportSingleRecord(medicalRecordId);
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(result.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .contentType(MediaType.parseMediaType(result.contentType()))
                 .contentLength(result.content().length)
                 .body(new ByteArrayResource(result.content()));

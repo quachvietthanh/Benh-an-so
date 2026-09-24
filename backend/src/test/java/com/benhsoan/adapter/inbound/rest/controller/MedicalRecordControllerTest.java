@@ -103,6 +103,7 @@ class MedicalRecordControllerTest {
     private DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
     @MockitoBean
     private IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.ExportMedicalRecordExchangeUseCase exportMedicalRecordExchangeUseCase;
     @MockitoBean
     private GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
     @MockitoBean
