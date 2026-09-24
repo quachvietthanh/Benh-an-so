@@ -289,7 +289,6 @@ function MedicalEncounter() {
         setVitalSignId(res.data.id)
         setVitalSignBackendFlags(res.data.abnormalFlags || [])
       }
-      message.success('Đã lưu chỉ số sinh tồn thành công.')
       return true
     } catch (err) {
       const msg = mapVitalSignErrorMessage(err)
