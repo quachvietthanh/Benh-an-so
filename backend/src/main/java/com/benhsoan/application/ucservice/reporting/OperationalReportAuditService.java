@@ -126,6 +126,9 @@ public class OperationalReportAuditService {
         if (roles == null || roles.isEmpty()) {
             return "UNKNOWN";
         }
+        if (roles.contains("ADMIN")) {
+            return "ADMIN";
+        }
         if (roles.contains("MANAGER")) {
             return "MANAGER";
         }

@@ -73,8 +73,16 @@ public class OperationalReportDataService {
     }
 
     public List<VisitReportDetailItem> getCompletedVisitDetails(LocalDate from, LocalDate to) {
+        return getCompletedVisitDetails(from, to, null);
+    }
+
+    public List<VisitReportDetailItem> getCompletedVisitDetails(LocalDate from, LocalDate to, UUID doctorId) {
         ReportingTimeRange range = ReportingTimeRange.of(from, to);
-        return operationalReportQueryRepository.findCompletedVisitDetails(range.fromInclusive(), range.toExclusive());
+        return operationalReportQueryRepository.findCompletedVisitDetails(
+                range.fromInclusive(),
+                range.toExclusive(),
+                doctorId
+        );
     }
 
     public boolean hasReportData(ReportType reportType, LocalDate from, LocalDate to) {

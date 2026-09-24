@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -198,7 +200,7 @@ class OperationalReportDataServiceTest {
                 "Dr X",
                 "COMPLETED"
         );
-        when(repository.findCompletedVisitDetails(any(), any())).thenReturn(List.of(item));
+        when(repository.findCompletedVisitDetails(any(), any(), any())).thenReturn(List.of(item));
 
         OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
         var details = service.getCompletedVisitDetails(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
@@ -206,5 +208,35 @@ class OperationalReportDataServiceTest {
         assertEquals(1, details.size());
         assertEquals("V001", details.get(0).visitCode());
         assertEquals("Nguyen Van A", details.get(0).patientFullName());
+    }
+
+    @Test
+    void getCompletedVisitDetailsWithDoctorIdCallsQueryRepositoryWithDoctorId() {
+        OperationalReportQueryRepository repository = mock(OperationalReportQueryRepository.class);
+        ClockPort clockPort = mock(ClockPort.class);
+        java.util.UUID doctorId = java.util.UUID.randomUUID();
+
+        var item = new com.benhsoan.port.outbound.repository.reporting.VisitReportDetailItem(
+                java.util.UUID.randomUUID(),
+                "V002",
+                Instant.parse("2026-08-01T10:00:00Z"),
+                java.util.UUID.randomUUID(),
+                "BN002",
+                "Nguyen Van B",
+                "0900000001",
+                "Hanoi",
+                doctorId,
+                "Dr Y",
+                "COMPLETED"
+        );
+        when(repository.findCompletedVisitDetails(any(), any(), eq(doctorId))).thenReturn(List.of(item));
+
+        OperationalReportDataService service = new OperationalReportDataService(repository, clockPort);
+        var details = service.getCompletedVisitDetails(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), doctorId);
+
+        assertEquals(1, details.size());
+        assertEquals("V002", details.get(0).visitCode());
+        assertEquals(doctorId, details.get(0).doctorId());
+        verify(repository).findCompletedVisitDetails(any(), any(), eq(doctorId));
     }
 }

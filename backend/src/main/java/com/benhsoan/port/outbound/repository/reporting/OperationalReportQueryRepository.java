@@ -28,5 +28,9 @@ public interface OperationalReportQueryRepository {
 
     boolean hasDiagnoses(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
 
-    List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive);
+    default List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive) {
+        return findCompletedVisitDetails(fromInclusive, toExclusive, null);
+    }
+
+    List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
 }

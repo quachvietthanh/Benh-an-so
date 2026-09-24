@@ -73,13 +73,37 @@ class OperationalReportAuditServiceTest {
     }
 
     @Test
-    void prefersManagerRoleInAuditWhenUserHasMultipleRoles() {
+    void prefersAdminRoleInAuditWhenUserHasBothAdminAndManager() {
         AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
         CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
         ClockPort clockPort = mock(ClockPort.class);
 
         when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
         when(currentUserPort.getCurrentUserRoles()).thenReturn(Set.of("ADMIN", "MANAGER"));
+        when(clockPort.now()).thenReturn(Instant.parse("2026-08-13T02:15:30Z"));
+
+        OperationalReportAuditService service = new OperationalReportAuditService(
+                auditLogRepository,
+                currentUserPort,
+                clockPort
+        );
+
+        service.logExport(ReportType.OPERATIONAL_REPORT, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+
+        assertTrue(captor.getValue().getDetail().contains("\"role\":\"ADMIN\""));
+    }
+
+    @Test
+    void prefersManagerRoleInAuditWhenUserHasManagerAndDoctorRoles() {
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
+        ClockPort clockPort = mock(ClockPort.class);
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(currentUserPort.getCurrentUserRoles()).thenReturn(Set.of("MANAGER", "DOCTOR"));
         when(clockPort.now()).thenReturn(Instant.parse("2026-08-13T02:15:30Z"));
 
         OperationalReportAuditService service = new OperationalReportAuditService(

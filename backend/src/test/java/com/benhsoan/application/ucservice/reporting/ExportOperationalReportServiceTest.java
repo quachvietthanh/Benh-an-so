@@ -3,9 +3,11 @@ package com.benhsoan.application.ucservice.reporting;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -358,7 +360,7 @@ class ExportOperationalReportServiceTest {
                         "COMPLETED"
                 )
         );
-        when(dataService.getCompletedVisitDetails(any(), any())).thenReturn(details);
+        when(dataService.getCompletedVisitDetails(any(), any(), any())).thenReturn(details);
 
         ExportOperationalReportService service = createService(dataService, auditService);
         OperationalReportExportResult result = service.export(
@@ -402,7 +404,7 @@ class ExportOperationalReportServiceTest {
                         "COMPLETED"
                 )
         );
-        when(dataService.getCompletedVisitDetails(any(), any())).thenReturn(details);
+        when(dataService.getCompletedVisitDetails(any(), any(), any())).thenReturn(details);
 
         ExportOperationalReportService service = createService(dataService, auditService);
         OperationalReportExportResult result = service.export(
@@ -526,6 +528,99 @@ class ExportOperationalReportServiceTest {
                 true,
                 "Internal system audit"
         );
+    }
+
+    @Test
+    void rejectsUnmaskedExportWhenReasonExceeds500Chars() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(currentUserPort.hasPermission("REPORT_UNMASKED_EXPORT")).thenReturn(true);
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+
+        String tooLongReason = "A".repeat(501);
+        ValidationException ex = assertThrows(ValidationException.class, () -> service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                tooLongReason
+        ));
+        assertEquals("Reason must not exceed 500 characters.", ex.getMessage());
+        verifyNoInteractions(dataService);
+    }
+
+    @Test
+    void allowsUnmaskedExportWhenReasonIsExactly500Chars() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        when(dataService.hasReportData(any(), any(), any())).thenReturn(true);
+        when(dataService.getReportData(any(), any())).thenReturn(sampleReportData());
+        when(currentUserPort.hasPermission("REPORT_UNMASKED_EXPORT")).thenReturn(true);
+        when(dataService.getCompletedVisitDetails(any(), any(), any())).thenReturn(List.of());
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+
+        String exact500Reason = "A".repeat(500);
+        OperationalReportExportResult result = service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                exact500Reason
+        );
+
+        assertNotNull(result);
+        verify(auditService).logExport(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                true,
+                exact500Reason
+        );
+    }
+
+    @Test
+    void exportsVisitCsvFilteredByDoctorIdInVisitDetails() {
+        OperationalReportDataService dataService = mock(OperationalReportDataService.class);
+        OperationalReportAuditService auditService = mock(OperationalReportAuditService.class);
+        UUID doctorId = UUID.randomUUID();
+        when(dataService.hasReportData(any(), any(), any(), any())).thenReturn(true);
+        when(dataService.getReportData(any(), any())).thenReturn(sampleReportData());
+
+        List<VisitReportDetailItem> doctorVisits = List.of(
+                new VisitReportDetailItem(
+                        UUID.randomUUID(),
+                        "VISIT-2026-DOC1",
+                        Instant.parse("2026-08-01T10:30:00Z"),
+                        UUID.randomUUID(),
+                        "BN-0001",
+                        "Bệnh nhân A",
+                        "0912345678",
+                        "Địa chỉ A",
+                        doctorId,
+                        "BS. Trần Bình",
+                        "COMPLETED"
+                )
+        );
+        when(dataService.getCompletedVisitDetails(eq(LocalDate.of(2026, 8, 1)), eq(LocalDate.of(2026, 8, 3)), eq(doctorId)))
+                .thenReturn(doctorVisits);
+
+        ExportOperationalReportService service = createService(dataService, auditService);
+        OperationalReportExportResult result = service.export(
+                ReportType.VISIT_REPORT,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                doctorId
+        );
+
+        assertNotNull(result);
+        String csv = new String(result.content(), StandardCharsets.UTF_8);
+        assertTrue(csv.contains("VISIT-2026-DOC1"));
+        verify(dataService).getCompletedVisitDetails(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), doctorId);
     }
 
     private OperationalReportData sampleReportData() {

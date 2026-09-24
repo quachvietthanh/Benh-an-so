@@ -597,6 +597,21 @@ class ReportsControllerTest {
     }
 
     @Test
+    void exportsCsvReturnsBadRequestWhenReasonExceeds500Characters() throws Exception {
+        when(exportOperationalReportUseCase.export(any(), any(), any(), any(), eq(true), any()))
+                .thenThrow(new com.benhsoan.domain.shared.exception.ValidationException("Reason must not exceed 500 characters."));
+
+        mockMvc.perform(get("/reports/export")
+                        .param("reportType", "VISIT_REPORT")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-03")
+                        .param("unmask", "true")
+                        .param("reason", "A".repeat(501)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Reason must not exceed 500 characters."));
+    }
+
+    @Test
     void returnsStructuredErrorWhenNoDataCanBeExported() throws Exception {
         when(exportOperationalReportUseCase.export(any(), any(), any()))
                 .thenThrow(new OperationalReportDataEmptyException());

@@ -748,6 +748,70 @@ class OperationalReportQueryRepositoryAdapterIntegrationTest {
                 assertEquals("COMPLETED", item.status());
         }
 
+        @Test
+        void filtersCompletedVisitDetailsByDoctorId() {
+                UUID patientId = UUID.randomUUID();
+                entityManager.persist(PatientEntity.builder()
+                                .id(patientId)
+                                .patientCode("BN000002")
+                                .fullName("Trần Thị Bình")
+                                .dateOfBirth(LocalDate.of(1995, 5, 5))
+                                .gender(Gender.FEMALE)
+                                .phone("0987654321")
+                                .address("456 Hai Bà Trưng, TP.HCM")
+                                .active(true)
+                                .createdBy(UUID.randomUUID())
+                                .createdAt(Instant.parse("2026-08-01T00:00:00Z"))
+                                .updatedAt(Instant.parse("2026-08-01T00:00:00Z"))
+                                .build());
+
+                UUID docA = UUID.randomUUID();
+                UUID docB = UUID.randomUUID();
+                createDoctor(docA, "docAFilter", "Dr. Doctor A");
+                createDoctor(docB, "docBFilter", "Dr. Doctor B");
+
+                UUID visitA = UUID.randomUUID();
+                entityManager.persist(VisitEntity.builder()
+                                .id(visitA)
+                                .visitCode("VIS-DOC-A")
+                                .patientId(patientId)
+                                .doctorId(docA)
+                                .visitType(VisitType.WALK_IN)
+                                .status(VisitStatus.COMPLETED)
+                                .visitAt(Instant.parse("2026-08-01T02:00:00Z"))
+                                .completedAt(Instant.parse("2026-08-01T02:30:00Z"))
+                                .reason("Kham A")
+                                .createdBy(docA)
+                                .createdAt(Instant.parse("2026-08-01T01:00:00Z"))
+                                .build());
+
+                UUID visitB = UUID.randomUUID();
+                entityManager.persist(VisitEntity.builder()
+                                .id(visitB)
+                                .visitCode("VIS-DOC-B")
+                                .patientId(patientId)
+                                .doctorId(docB)
+                                .visitType(VisitType.WALK_IN)
+                                .status(VisitStatus.COMPLETED)
+                                .visitAt(Instant.parse("2026-08-01T03:00:00Z"))
+                                .completedAt(Instant.parse("2026-08-01T03:30:00Z"))
+                                .reason("Kham B")
+                                .createdBy(docB)
+                                .createdAt(Instant.parse("2026-08-01T01:00:00Z"))
+                                .build());
+
+                Instant from = Instant.parse("2026-08-01T00:00:00Z");
+                Instant to = Instant.parse("2026-08-02T00:00:00Z");
+
+                List<VisitReportDetailItem> detailsDocA = repositoryAdapter.findCompletedVisitDetails(from, to, docA);
+                assertEquals(1, detailsDocA.size());
+                assertEquals("VIS-DOC-A", detailsDocA.get(0).visitCode());
+                assertEquals(docA, detailsDocA.get(0).doctorId());
+
+                List<VisitReportDetailItem> detailsAll = repositoryAdapter.findCompletedVisitDetails(from, to, null);
+                assertTrue(detailsAll.size() >= 2);
+        }
+
         private UUID createDiagnosisCatalog(String code, String name, String diseaseGroup) {
                 UUID id = UUID.randomUUID();
                 entityManager.persist(DiagnosisCatalogEntity.builder()

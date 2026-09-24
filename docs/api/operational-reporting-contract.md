@@ -661,9 +661,9 @@ GET /reports/export?reportType={reportType}&from={yyyy-MM-dd}&to={yyyy-MM-dd}&do
   - `reportType` (bắt buộc): `OPERATIONAL_REPORT`, `VISIT_REPORT`, `REVENUE_REPORT`, `DISEASE_PATTERN_REPORT`.
   - `from` (bắt buộc): định dạng `yyyy-MM-dd`.
   - `to` (bắt buộc): định dạng `yyyy-MM-dd` (`to >= from`).
-  - `doctorId` (tùy chọn): lọc theo bác sĩ.
+  - `doctorId` (tùy chọn): lọc theo bác sĩ (áp dụng đồng bộ cho cả dữ liệu tổng hợp và bảng chi tiết `VISIT DETAILS`).
   - `unmask` (tùy chọn, mặc định `false`): yêu cầu xuất dữ liệu đầy đủ không che.
-  - `reason` (tùy chọn, bắt buộc khi `unmask=true`): lý do xuất dữ liệu nhạy cảm (tối thiểu 5 ký tự).
+  - `reason` (tùy chọn, bắt buộc khi `unmask=true`): lý do xuất dữ liệu nhạy cảm (tối thiểu 5 ký tự, tối đa 500 ký tự).
 
 ### 13.2 Data Masking Rules (Default)
 
@@ -678,8 +678,8 @@ Khi `unmask=false` (mặc định), bảng `VISIT DETAILS` trong báo cáo lư�
 Khi người dùng chọn xuất bản đầy đủ (`unmask=true`):
 
 1. **Phân quyền**: Người dùng phải có quyền `REPORT_UNMASKED_EXPORT` hoặc role `ADMIN`. Nếu không có, hệ thống từ chối với HTTP 403 Forbidden và ghi nhật ký truy cập trái phép.
-2. **Lý do**: Bắt buộc cung cấp tham số `reason` với độ dài tối thiểu 5 ký tự. Nếu thiếu hoặc dưới 5 ký tự, hệ thống trả về HTTP 400 Bad Request.
-3. **Nhật ký kiểm toán (Audit Log)**: Mỗi lượt xuất dữ liệu không che được ghi nhận riêng biệt trong bảng `audit_logs` với action `EXPORT`, resource `OPERATIONAL_REPORT`, chi tiết JSON chứa `unmasked: true`, `unmaskReason`, `reportType`, thời điểm, phạm vi kỳ báo cáo và người thực hiện.
+2. **Lý do**: Bắt buộc cung cấp tham số `reason` với độ dài từ 5 đến 500 ký tự (sau khi cắt khoảng trắng `trim()`). Nếu thiếu, dưới 5 ký tự hoặc vượt quá 500 ký tự, hệ thống trả về HTTP 400 Bad Request (`"Reason is required and must be at least 5 characters for unmasked export."` hoặc `"Reason must not exceed 500 characters."`).
+3. **Nhật ký kiểm toán (Audit Log)**: Mỗi lượt xuất dữ liệu không che được ghi nhận riêng biệt trong bảng `audit_logs` với action `EXPORT`, resource `OPERATIONAL_REPORT`, chi tiết JSON chứa `unmasked: true`, `unmaskReason`, `reportType`, thời điểm, phạm vi kỳ báo cáo và người thực hiện. Khi tài khoản có nhiều vai trò, vai trò quản trị `ADMIN` luôn được ưu tiên ghi nhận.
 
 ### 13.4 Security & Formula Injection Neutralization
 

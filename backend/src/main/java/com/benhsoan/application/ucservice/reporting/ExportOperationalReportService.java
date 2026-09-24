@@ -70,6 +70,9 @@ public class ExportOperationalReportService implements ExportOperationalReportUs
             if (reason == null || reason.trim().length() < 5) {
                 throw new ValidationException("Reason is required and must be at least 5 characters for unmasked export.");
             }
+            if (reason.trim().length() > 500) {
+                throw new ValidationException("Reason must not exceed 500 characters.");
+            }
         }
 
         String doctorName = null;
@@ -107,7 +110,7 @@ public class ExportOperationalReportService implements ExportOperationalReportUs
             OperationalSummaryResult summary = reportData.summary();
             OperationalTimelineResult timeline = reportData.timeline();
             List<VisitReportDetailItem> visitDetails = (reportType == ReportType.VISIT_REPORT || reportType == ReportType.OPERATIONAL_REPORT)
-                    ? operationalReportDataService.getCompletedVisitDetails(from, to)
+                    ? operationalReportDataService.getCompletedVisitDetails(from, to, doctorId)
                     : List.of();
 
             fileName = buildFileName(reportType, from, to);

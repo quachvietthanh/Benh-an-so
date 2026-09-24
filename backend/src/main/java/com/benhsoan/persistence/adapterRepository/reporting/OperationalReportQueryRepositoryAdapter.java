@@ -576,6 +576,11 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
 
     @Override
     public List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive) {
+        return findCompletedVisitDetails(fromInclusive, toExclusive, null);
+    }
+
+    @Override
+    public List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive, UUID doctorId) {
         return entityManager.createQuery("""
                 select visit.id,
                        visit.visitCode,
@@ -594,11 +599,13 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
                 where visit.status = :completedStatus
                   and visit.completedAt >= :fromInclusive
                   and visit.completedAt < :toExclusive
+                  and (:doctorId is null or visit.doctorId = :doctorId)
                 order by visit.completedAt asc, visit.visitCode asc
                 """, Object[].class)
                 .setParameter("completedStatus", VisitStatus.COMPLETED)
                 .setParameter("fromInclusive", fromInclusive)
                 .setParameter("toExclusive", toExclusive)
+                .setParameter("doctorId", doctorId)
                 .getResultList()
                 .stream()
                 .map(row -> new VisitReportDetailItem(
