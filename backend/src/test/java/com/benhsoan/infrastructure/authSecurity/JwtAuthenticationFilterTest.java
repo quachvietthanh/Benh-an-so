@@ -136,12 +136,63 @@ class JwtAuthenticationFilterTest {
         org.junit.jupiter.api.Assertions.assertNotNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
+    @Test
+    void rejectsIdleTimedOutSessionWith401SessionExpired() throws Exception {
+        UserSession idleSession = UserSession.restore(SESSION_ID, USER_ID, "hash", null,
+                NOW.plus(Duration.ofDays(7)), NOW.minus(Duration.ofMinutes(40)), NOW.minus(Duration.ofMinutes(35)), null);
+        JwtAuthenticationFilter filter = configuredFilter(idleSession, activeUser());
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(requestWithToken(), response, new MockFilterChain());
+
+        assertEquals(401, response.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(response.getContentAsString().contains("SESSION_EXPIRED"));
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void rejectsRevokedSessionWith401SessionTerminated() throws Exception {
+        UserSession revokedSession = UserSession.restore(SESSION_ID, USER_ID, "hash", null,
+                NOW.plus(Duration.ofDays(7)), NOW.minus(Duration.ofMinutes(10)), NOW.minus(Duration.ofMinutes(5)), NOW);
+        JwtAuthenticationFilter filter = configuredFilter(revokedSession, activeUser());
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(requestWithToken(), response, new MockFilterChain());
+
+        assertEquals(401, response.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(response.getContentAsString().contains("SESSION_TERMINATED"));
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void allowsLogoutAndRefreshEvenWhenSessionIsExpired() throws Exception {
+        UserSession expiredSession = UserSession.restore(SESSION_ID, USER_ID, "hash", null,
+                NOW.plus(Duration.ofDays(7)), NOW.minus(Duration.ofMinutes(40)), NOW.minus(Duration.ofMinutes(35)), null);
+        JwtAuthenticationFilter filter = configuredFilter(expiredSession, activeUser());
+
+        MockHttpServletRequest logoutRequest = new MockHttpServletRequest("POST", "/auth/logout");
+        logoutRequest.addHeader("Authorization", "Bearer access-token");
+        MockHttpServletResponse logoutResponse = new MockHttpServletResponse();
+
+        filter.doFilter(logoutRequest, logoutResponse, new MockFilterChain());
+        // Should not be short-circuited with 401 writeUnauthorizedError
+        org.junit.jupiter.api.Assertions.assertNotEquals(401, logoutResponse.getStatus());
+
+        MockHttpServletRequest refreshRequest = new MockHttpServletRequest("POST", "/auth/refresh");
+        refreshRequest.addHeader("Authorization", "Bearer access-token");
+        MockHttpServletResponse refreshResponse = new MockHttpServletResponse();
+
+        filter.doFilter(refreshRequest, refreshResponse, new MockFilterChain());
+        // Should not be short-circuited with 401 writeUnauthorizedError
+        org.junit.jupiter.api.Assertions.assertNotEquals(401, refreshResponse.getStatus());
+    }
+
     private JwtAuthenticationFilter configuredFilter(UserSession session, User user) {
         when(jwtTokenPort.validate("access-token")).thenReturn(true);
         when(jwtTokenPort.getUserId("access-token")).thenReturn(USER_ID);
         when(jwtTokenPort.getSessionId("access-token")).thenReturn(SESSION_ID);
         when(userSessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(session));
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        org.mockito.Mockito.lenient().when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(clockPort.now()).thenReturn(NOW);
         return new JwtAuthenticationFilter(jwtTokenPort, userSessionRepository, userRepository, clockPort);
     }

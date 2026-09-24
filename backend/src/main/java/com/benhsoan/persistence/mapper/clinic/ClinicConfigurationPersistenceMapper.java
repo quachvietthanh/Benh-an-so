@@ -22,6 +22,7 @@ public class ClinicConfigurationPersistenceMapper {
                 entity.getClosingTime(),
                 entity.getRetentionYears(),
                 entity.getSigningDeadlineHours(),
+                entity.getSessionIdleTimeoutMinutes(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -41,6 +42,7 @@ public class ClinicConfigurationPersistenceMapper {
                 .closingTime(domain.getClosingTime())
                 .retentionYears(domain.getRetentionYears())
                 .signingDeadlineHours(domain.getSigningDeadlineHours())
+                .sessionIdleTimeoutMinutes(domain.getSessionIdleTimeoutMinutes())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

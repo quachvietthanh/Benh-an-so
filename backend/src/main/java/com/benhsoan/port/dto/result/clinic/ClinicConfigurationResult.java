@@ -9,7 +9,8 @@ public record ClinicConfigurationResult(
         LocalTime openingTime,
         LocalTime closingTime,
         Integer retentionYears,
-        Integer signingDeadlineHours
+        Integer signingDeadlineHours,
+        Integer sessionIdleTimeoutMinutes
 ) {
 
     public ClinicConfigurationResult(
@@ -20,10 +21,22 @@ public record ClinicConfigurationResult(
             LocalTime closingTime,
             Integer retentionYears
     ) {
-        this(clinicName, address, phone, openingTime, closingTime, retentionYears, 24);
+        this(clinicName, address, phone, openingTime, closingTime, retentionYears, 24, 30);
+    }
+
+    public ClinicConfigurationResult(
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            Integer retentionYears,
+            Integer signingDeadlineHours
+    ) {
+        this(clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, 30);
     }
 
     public static ClinicConfigurationResult empty() {
-        return new ClinicConfigurationResult(null, null, null, null, null, null, null);
+        return new ClinicConfigurationResult(null, null, null, null, null, null, null, null);
     }
 }

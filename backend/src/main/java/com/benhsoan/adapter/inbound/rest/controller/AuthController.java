@@ -27,7 +27,9 @@ import com.benhsoan.port.inbound.auth.LogoutUseCase;
 import com.benhsoan.port.inbound.auth.PatientLoginUseCase;
 import com.benhsoan.port.inbound.auth.PatientPortalRegistrationUseCase;
 import com.benhsoan.port.inbound.auth.RefreshTokenUseCase;
+import com.benhsoan.port.inbound.auth.ExtendSessionUseCase;
 import com.benhsoan.domain.auth.exception.TokenInvalidException;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -35,7 +37,6 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/auth")
-@RequiredArgsConstructor
 @Validated
 public class AuthController {
 
@@ -46,17 +47,61 @@ public class AuthController {
     private final PatientPortalRegistrationUseCase patientPortalRegistrationUseCase;
     private final com.benhsoan.port.inbound.auth.ChangePasswordUseCase changePasswordUseCase;
     private final com.benhsoan.port.outbound.security.CurrentUserPort currentUserPort;
-
     private final AuthRestMapper authRestMapper;
+
+    @Autowired(required = false)
+    private ExtendSessionUseCase extendSessionUseCase;
+
+    @Autowired(required = false)
+    private com.benhsoan.adapter.inbound.rest.mapper.SessionRestMapper sessionRestMapper;
+
+    public AuthController(
+            LoginUseCase loginUseCase,
+            LogoutUseCase logoutUseCase,
+            RefreshTokenUseCase refreshTokenUseCase,
+            PatientLoginUseCase patientLoginUseCase,
+            PatientPortalRegistrationUseCase patientPortalRegistrationUseCase,
+            com.benhsoan.port.inbound.auth.ChangePasswordUseCase changePasswordUseCase,
+            com.benhsoan.port.outbound.security.CurrentUserPort currentUserPort,
+            AuthRestMapper authRestMapper
+    ) {
+        this.loginUseCase = loginUseCase;
+        this.logoutUseCase = logoutUseCase;
+        this.refreshTokenUseCase = refreshTokenUseCase;
+        this.patientLoginUseCase = patientLoginUseCase;
+        this.patientPortalRegistrationUseCase = patientPortalRegistrationUseCase;
+        this.changePasswordUseCase = changePasswordUseCase;
+        this.currentUserPort = currentUserPort;
+        this.authRestMapper = authRestMapper;
+    }
+
+    @Autowired
+    public AuthController(
+            LoginUseCase loginUseCase,
+            LogoutUseCase logoutUseCase,
+            RefreshTokenUseCase refreshTokenUseCase,
+            PatientLoginUseCase patientLoginUseCase,
+            PatientPortalRegistrationUseCase patientPortalRegistrationUseCase,
+            com.benhsoan.port.inbound.auth.ChangePasswordUseCase changePasswordUseCase,
+            com.benhsoan.port.outbound.security.CurrentUserPort currentUserPort,
+            AuthRestMapper authRestMapper,
+            @Autowired(required = false) ExtendSessionUseCase extendSessionUseCase,
+            @Autowired(required = false) com.benhsoan.adapter.inbound.rest.mapper.SessionRestMapper sessionRestMapper
+    ) {
+        this(loginUseCase, logoutUseCase, refreshTokenUseCase, patientLoginUseCase, patientPortalRegistrationUseCase, changePasswordUseCase, currentUserPort, authRestMapper);
+        this.extendSessionUseCase = extendSessionUseCase;
+        this.sessionRestMapper = sessionRestMapper;
+    }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
-            @Valid @RequestBody LoginRequest request
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest
     ) {
 
         LoginResult result =
                 loginUseCase.login(
-                        authRestMapper.toCommand(request));
+                        authRestMapper.toCommand(request, resolveIp(httpRequest), httpRequest.getHeader("User-Agent")));
 
         return ResponseEntity.ok(
                 authRestMapper.toResponse(result));
@@ -153,5 +198,11 @@ public class AuthController {
         );
 
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/sessions/current/extend")
+    public ResponseEntity<com.benhsoan.adapter.inbound.rest.response.auth.ExtendSessionResponse> extendCurrentSession() {
+        var result = extendSessionUseCase.extendCurrentSession();
+        return ResponseEntity.ok(sessionRestMapper.toResponse(result));
     }
 }
