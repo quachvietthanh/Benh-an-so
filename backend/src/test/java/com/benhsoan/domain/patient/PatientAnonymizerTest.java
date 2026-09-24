@@ -69,4 +69,16 @@ class PatientAnonymizerTest {
         assertTrue(PatientAnonymizer.isMaskedAddress("[ĐỊA CHỈ ĐÃ ẨN DANH]"));
         assertFalse(PatientAnonymizer.isMaskedAddress("123 Nguyễn Trãi"));
     }
+
+    @Test
+    void abbreviatesPatientNameForWaitingDisplay() {
+        assertEquals("N. V. A", PatientAnonymizer.abbreviateName("Nguyễn Văn An"));
+        assertEquals("L. N", PatientAnonymizer.abbreviateName("Lê Nam"));
+        assertEquals("T. T. M. P", PatientAnonymizer.abbreviateName("Trần Thị Mai Phương"));
+        assertEquals("T. T. H", PatientAnonymizer.abbreviateName("   trần   thị   hoa  "));
+        assertEquals("Đ. B. L", PatientAnonymizer.abbreviateName("Đào Bá Lộc"));
+        assertEquals("Ú", PatientAnonymizer.abbreviateName("Út"));
+        assertEquals("", PatientAnonymizer.abbreviateName(null));
+        assertEquals("", PatientAnonymizer.abbreviateName("   "));
+    }
 }

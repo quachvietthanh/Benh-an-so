@@ -128,4 +128,28 @@ public final class PatientAnonymizer {
     public static boolean isMaskedAddress(String value) {
         return value != null && value.equals(MASKED_ADDRESS);
     }
+
+    /**
+     * Converts a patient's full name to abbreviated initials (e.g., "Nguyễn Văn An" -> "N. V. A")
+     * for public waiting area displays (NCL-03-CN-014 / QTN-43) to prevent identification.
+     * Null or blank inputs return an empty string "".
+     */
+    public static String abbreviateName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return "";
+        }
+        String[] parts = fullName.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                if (!first) {
+                    sb.append(". ");
+                }
+                sb.append(Character.toUpperCase(part.charAt(0)));
+                first = false;
+            }
+        }
+        return sb.toString();
+    }
 }

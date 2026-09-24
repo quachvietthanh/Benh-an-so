@@ -28,6 +28,13 @@ public class QueueItemQueryRepositoryAdapter implements QueueItemQueryRepository
     }
 
     @Override
+    public List<QueueItemResult> findActiveQueueBoard(LocalDate queueDate, UUID roomId) {
+        return jpaRepository.findActiveQueueBoardDetails(queueDate, roomId).stream()
+                .map(this::toResult)
+                .toList();
+    }
+
+    @Override
     public Optional<QueueItemResult> findDetailById(UUID queueItemId) {
         return jpaRepository.findQueueItemDetailsById(queueItemId).map(this::toResult);
     }

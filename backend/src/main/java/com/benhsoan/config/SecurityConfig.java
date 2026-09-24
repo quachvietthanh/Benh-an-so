@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -123,6 +124,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/cashier-shifts/**").authenticated()
 
                                                 // ===== MEDICAL QUEUE =====
+                                                .requestMatchers(HttpMethod.GET, "/queues/display").permitAll()
                                                 .requestMatchers("/queues/**", "/queue-items/**").authenticated()
 
                                                 // ===== ROOMS =====
