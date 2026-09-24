@@ -20,6 +20,7 @@ import {
   FileProtectOutlined,
 } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
+import PatientNotificationBell from '../components/portal/PatientNotificationBell.jsx'
 import './portalDashboard.css'
 
 function PortalDashboard() {
@@ -58,7 +59,8 @@ function PortalDashboard() {
             </span>
           </Link>
 
-          <div className="portal-dashboard-user-bar">
+          <div className="portal-dashboard-user-bar" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <PatientNotificationBell />
             <div className="portal-user-chip">
               <div className="portal-user-avatar">
                 <UserOutlined />

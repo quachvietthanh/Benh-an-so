@@ -23,7 +23,9 @@ class MedicineResultMapper {
                 medicine.getUpdatedAt(),
                 medicine.getStockQuantity(),
                 medicine.getMinStockThreshold(),
-                medicine.isControlled()
+                medicine.isControlled(),
+                medicine.getStrengthValueMg(),
+                medicine.getMaxDailyDoseMg()
         );
     }
 }

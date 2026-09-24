@@ -1,5 +1,6 @@
 package com.benhsoan.port.dto.command.prescription;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
@@ -21,7 +22,9 @@ public record AmendPrescriptionItemCommand(
 
         int quantity,
 
-        String instructions
+        String instructions,
+
+        BigDecimal singleDoseQuantity
 
 ) {
 }
