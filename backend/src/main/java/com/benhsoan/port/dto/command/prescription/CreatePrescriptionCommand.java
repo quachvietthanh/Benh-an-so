@@ -20,6 +20,8 @@ public record CreatePrescriptionCommand(
 
         List<PrescriptionContraindicationOverrideCommand> contraindicationOverrides,
 
+        List<PrescriptionMaxDailyDoseOverrideCommand> maxDailyDoseOverrides,
+
         boolean controlledMedicineConfirmed
 
 ) {

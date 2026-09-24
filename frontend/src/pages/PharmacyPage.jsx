@@ -48,6 +48,12 @@ import { getRemainingQuantity } from '../utils/partialDispensingHelpers'
 import PartialDispenseModal from '../components/pharmacy/PartialDispenseModal.jsx'
 import DispenseHistoryModal from '../components/pharmacy/DispenseHistoryModal.jsx'
 import ReturnMedicationModal from '../components/pharmacy/ReturnMedicationModal.jsx'
+import SpecialControlDispenseConfirmModal from '../components/pharmacy/SpecialControlDispenseConfirmModal.jsx'
+import SpecialControlBadge from '../components/pharmacy/SpecialControlBadge.jsx'
+import specialControlledDrugApi, {
+  mergeSpecialControlData,
+} from '../api/specialControlledDrugApi'
+import { SafetyCertificateOutlined } from '@ant-design/icons'
 
 
 const { Text, Title } = Typography
@@ -101,8 +107,11 @@ function PharmacyPage() {
   const [partialModalOpen, setPartialModalOpen] = useState(false)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
   const [returnModalOpen, setReturnModalOpen] = useState(false)
+  const [specialControlDispenseModalOpen, setSpecialControlDispenseModalOpen] = useState(false)
+  const [specialControlDispenseLoading, setSpecialControlDispenseLoading] = useState(false)
   const [batches, setBatches] = useState([])
   const [stocks, setStocks] = useState([])
+  const [medicines, setMedicines] = useState([])
   const [lowStockItems, setLowStockItems] = useState([])
   const [expiryAlerts, setExpiryAlerts] = useState([])
   const [expiryModalOpen, setExpiryModalOpen] = useState(false)
@@ -232,11 +241,12 @@ function PharmacyPage() {
     setInventoryLoading(true)
     setInventoryLoadError('')
     try {
-      const [batchResponse, stockResponse, lowStockResponse, expiryResponse] = await Promise.allSettled([
+      const [batchResponse, stockResponse, lowStockResponse, expiryResponse, medicineResponse] = await Promise.allSettled([
         pharmacyApi.batches(),
         pharmacyApi.stocks({ active: true }),
         pharmacyApi.lowStock(),
         pharmacyApi.expiryAlerts(),
+        pharmacyApi.medicines({ active: true }),
       ])
       if (requestId !== inventoryRequestIdRef.current) return
 
@@ -245,6 +255,9 @@ function PharmacyPage() {
       }
       if (stockResponse.status === 'fulfilled') {
         setStocks(toCollection(stockResponse.value?.data))
+      }
+      if (medicineResponse.status === 'fulfilled') {
+        setMedicines(mergeSpecialControlData(toCollection(medicineResponse.value?.data)))
       }
       if (lowStockResponse.status === 'fulfilled') {
         setLowStockItems(toCollection(lowStockResponse.value?.data))
@@ -318,6 +331,28 @@ function PharmacyPage() {
   }, [selectedPrescription, batches])
   const hasPreviewShortage = fefoPreview.some((item) => Number(item.shortageQuantity) > 0)
 
+  const specialControlItemsInPrescription = useMemo(() => {
+    if (!selectedPrescription?.items) return []
+    const rawItems = parseItems(selectedPrescription.items)
+    const medsList = Array.isArray(medicines) ? medicines : []
+    return rawItems
+      .map((item) => {
+        const med = medsList.find((m) => String(m.id) === String(item.medicineId))
+        const isSpecial = Boolean(item.isSpecialControl || med?.isSpecialControl)
+        if (!isSpecial) return null
+        return {
+          ...item,
+          medicineName: item.medicineName || med?.name || med?.medicineName || 'Thuốc kiểm soát đặc biệt',
+          specialControlGroup: item.specialControlGroup || med?.specialControlGroup || 'NARCOTIC',
+          specialControlReason: item.specialControlReason,
+          unit: item.unit || med?.unit || 'viên',
+        }
+      })
+      .filter(Boolean)
+  }, [selectedPrescription, medicines])
+
+  const hasSpecialControlDrugs = specialControlItemsInPrescription.length > 0
+
   const selectPrescription = (prescriptionId) => {
     setSelectedPrescriptionId(prescriptionId)
     setShortageDetails([])
@@ -329,6 +364,43 @@ function PharmacyPage() {
     setSelectedPrescriptionId(null)
     setSearchKeyword('')
     setShortageDetails([])
+  }
+
+  const handleConfirmSpecialControlDispense = async ({
+    receiverName,
+    receiverIdCard,
+    confirmationNote,
+    selectedBatches,
+  }) => {
+    setSpecialControlDispenseLoading(true)
+    try {
+      for (const item of specialControlItemsInPrescription) {
+        const batchId = selectedBatches[item.medicineId]
+        const batch = batches.find((b) => String(b.id) === String(batchId) || String(b.batchNumber) === String(batchId))
+        await specialControlledDrugApi.confirmDispense(selectedPrescription.id, {
+          medicineId: item.medicineId,
+          medicineName: item.medicineName,
+          specialControlGroup: item.specialControlGroup,
+          batchId: batch?.id || batchId,
+          batchNumber: batch?.batchNumber || String(batchId || 'Lô mặc định'),
+          patientName: receiverName || selectedPrescription.patientName,
+          patientCode: selectedPrescription.patientCode || '',
+          patientIdCard: receiverIdCard,
+          quantity: Number(item.quantity),
+          unit: item.unit || 'viên',
+          reason: confirmationNote || item.specialControlReason || 'Cấp phát thuốc theo đơn hợp lệ',
+          confirmedByName: currentUser?.fullName || currentUser?.name || 'Dược sĩ cấp phát',
+        })
+      }
+
+      await handleDispense()
+      setSpecialControlDispenseModalOpen(false)
+    } catch (err) {
+      console.error('Lỗi khi cấp phát thuốc kiểm soát đặc biệt:', err)
+      message.error(getErrorMessage(err, 'Không thể hoàn tất cấp phát thuốc kiểm soát đặc biệt.'))
+    } finally {
+      setSpecialControlDispenseLoading(false)
+    }
   }
 
   const handleDispense = async () => {
@@ -385,14 +457,23 @@ function PharmacyPage() {
       title: 'Thuốc',
       key: 'medicine',
       width: 210,
-      render: (_, item) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{item.medicineName || item.medicineId}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {[item.activeIngredient, item.strength].filter(Boolean).join(' · ') || item.dosage || '—'}
-          </Text>
-        </Space>
-      ),
+      render: (_, item) => {
+        const medsList = Array.isArray(medicines) ? medicines : []
+        const med = medsList.find((m) => String(m.id) === String(item.medicineId))
+        const isSpecial = Boolean(item.isSpecialControl || med?.isSpecialControl)
+        const sGroup = item.specialControlGroup || med?.specialControlGroup
+        return (
+          <Space direction="vertical" size={2}>
+            <Text strong>{item.medicineName || item.medicineId}</Text>
+            {isSpecial && (
+              <SpecialControlBadge isSpecialControl={true} group={sGroup} />
+            )}
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {[item.activeIngredient, item.strength].filter(Boolean).join(' · ') || item.dosage || '—'}
+            </Text>
+          </Space>
+        )
+      },
     },
     {
       title: selectedPrescription?.status === 'PARTIALLY_DISPENSED' ? 'Kê / Đã cấp' : 'Kê đơn',
@@ -500,9 +581,6 @@ function PharmacyPage() {
           </Title>
         </div>
         <Space wrap>
-          <Button icon={<InboxOutlined />} onClick={() => navigate('/pharmacy/receipts')}>
-            Nhập kho
-          </Button>
           <Button icon={<ShopOutlined />} onClick={() => navigate('/medicines')}>
             Danh mục & Ngưỡng tồn
           </Button>
@@ -956,53 +1034,72 @@ function PharmacyPage() {
                         Cấp phát một phần
                       </Button>
 
-                      <Popconfirm
-                        title={
-                          <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
-                            Xác nhận cấp phát đơn thuốc
-                          </Text>
-                        }
-                        description={
-                          <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
-                            <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
-                              Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
-                              <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
-                                {selectedPrescription.prescriptionCode || selectedPrescription.id}
-                              </Text>?
-                            </div>
-                            <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
-                              <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
-                              <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
-                            </div>
-                          </div>
-                        }
-                        icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
-                        okText="Xác nhận cấp phát"
-                        cancelText="Kiểm tra lại"
-                        okButtonProps={{
-                          type: 'primary',
-                          icon: <CheckCircleOutlined />,
-                          style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-                        }}
-                        cancelButtonProps={{
-                          icon: <RollbackOutlined />,
-                          style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-                        }}
-                        onConfirm={handleDispense}
-                        disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
-                        overlayClassName="dispense-confirm-popconfirm"
-                        overlayStyle={{ maxWidth: 500 }}
-                      >
+                      {hasSpecialControlDrugs ? (
                         <Button
                           type="primary"
                           size="large"
-                          icon={<CheckCircleOutlined />}
-                          loading={dispensingId === selectedPrescription.id}
+                          icon={<SafetyCertificateOutlined />}
+                          loading={dispensingId === selectedPrescription.id || specialControlDispenseLoading}
                           disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                          onClick={() => setSpecialControlDispenseModalOpen(true)}
+                          style={{
+                            height: 42,
+                            fontWeight: 600,
+                            backgroundColor: '#d97706',
+                            borderColor: '#d97706',
+                          }}
                         >
-                          Xác nhận cấp phát theo FEFO
+                          Xác nhận cấp phát thuốc kiểm soát đặc biệt
                         </Button>
-                      </Popconfirm>
+                      ) : (
+                        <Popconfirm
+                          title={
+                            <Text strong style={{ fontSize: 17, color: '#1e3a8a' }}>
+                              Xác nhận cấp phát đơn thuốc
+                            </Text>
+                          }
+                          description={
+                            <div style={{ marginTop: 8, marginBottom: 10, maxWidth: 420, fontSize: 14.5 }}>
+                              <div style={{ color: '#1e293b', lineHeight: 1.5 }}>
+                                Bạn có chắc chắn muốn xuất kho cho đơn thuốc{' '}
+                                <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
+                                  {selectedPrescription.prescriptionCode || selectedPrescription.id}
+                                </Text>?
+                              </div>
+                              <div style={{ marginTop: 8, padding: '10px 14px', backgroundColor: '#f0f7ff', borderRadius: 8, fontSize: 13.5, color: '#334155', border: '1px solid #bae6fd', lineHeight: 1.6 }}>
+                                <div>• Bệnh nhân: <strong style={{ color: '#0f172a' }}>{fixMojibake(selectedPrescription.patientName) || '—'}</strong> ({selectedPrescription.patientCode || '—'})</div>
+                                <div>• Tổng số thuốc: <strong style={{ color: '#0f172a' }}>{fefoPreview.length} loại</strong> theo phân bổ FEFO.</div>
+                              </div>
+                            </div>
+                          }
+                          icon={<MedicineBoxOutlined style={{ color: '#1677ff', fontSize: 24, marginTop: 2 }} />}
+                          okText="Xác nhận cấp phát"
+                          cancelText="Kiểm tra lại"
+                          okButtonProps={{
+                            type: 'primary',
+                            icon: <CheckCircleOutlined />,
+                            style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+                          }}
+                          cancelButtonProps={{
+                            icon: <RollbackOutlined />,
+                            style: { flex: 1, height: 38, borderRadius: 8, fontWeight: 500, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+                          }}
+                          onConfirm={handleDispense}
+                          disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                          overlayClassName="dispense-confirm-popconfirm"
+                          overlayStyle={{ maxWidth: 500 }}
+                        >
+                          <Button
+                            type="primary"
+                            size="large"
+                            icon={<CheckCircleOutlined />}
+                            loading={dispensingId === selectedPrescription.id}
+                            disabled={!canDispense || hasPreviewShortage || fefoPreview.length === 0}
+                          >
+                            Xác nhận cấp phát theo FEFO
+                          </Button>
+                        </Popconfirm>
+                      )}
                     </>
                   )}
                 </div>
@@ -1149,6 +1246,16 @@ function PharmacyPage() {
             loadData()
           }
         }}
+      />
+
+      <SpecialControlDispenseConfirmModal
+        open={specialControlDispenseModalOpen}
+        prescription={selectedPrescription}
+        specialItems={specialControlItemsInPrescription}
+        batches={batches}
+        loading={specialControlDispenseLoading}
+        onCancel={() => setSpecialControlDispenseModalOpen(false)}
+        onConfirm={handleConfirmSpecialControlDispense}
       />
     </div>
   )

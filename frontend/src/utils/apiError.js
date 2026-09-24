@@ -211,6 +211,13 @@ export const DOMAIN_ERROR_MESSAGES = {
   REPORT_DATA_EMPTY: 'Không có dữ liệu báo cáo thống kê trong khoảng thời gian đã chọn.',
   REQUEST_TIMEOUT: 'Hệ thống đang bận hoặc phản hồi chậm. Vui lòng thử lại sau ít giây.',
   VALIDATION_FAILED: 'Dữ liệu nhập vào chưa hợp lệ hoặc thiếu thông tin bắt buộc. Vui lòng kiểm tra lại.',
+
+  NO_UNSETTLED_PAYMENTS: 'Ca hiện tại chưa có khoản thu nào để thực hiện chốt ca.',
+  CASHIER_SHIFT_NOTE_REQUIRED: 'Số tiền thực tế có chênh lệch so với hệ thống, bắt buộc phải nhập ghi chú giải trình.',
+  CASHIER_SHIFT_SELF_CONFIRMATION_NOT_ALLOWED: 'Thu ngân không được phép tự duyệt phiếu chốt ca của chính mình.',
+  PAYMENT_ALREADY_SETTLED: 'Khoản thu này đã nằm trong ca đã chốt, không thể chỉnh sửa hoặc hoàn tiền.',
+  CASHIER_SHIFT_ALREADY_CONFIRMED: 'Phiếu chốt ca này đã được xác nhận trước đó.',
+  CASHIER_SHIFT_NOT_FOUND: 'Không tìm thấy thông tin phiếu chốt ca.',
 }
 
 export const translateApiErrorMessage = (rawMessage) => {

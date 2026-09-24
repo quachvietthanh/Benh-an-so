@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.request.prescription;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
@@ -32,7 +33,21 @@ public record CreatePrescriptionItemRequest(
         @Positive
         int quantity,
 
-        String instructions
+        String instructions,
+
+        @Positive
+        BigDecimal singleDoseQuantity
 
 ) {
+    public CreatePrescriptionItemRequest(
+            UUID medicineId,
+            String dosage,
+            Integer frequency,
+            AdministrationRoute route,
+            Integer durationDays,
+            int quantity,
+            String instructions
+    ) {
+        this(medicineId, dosage, frequency, route, durationDays, quantity, instructions, null);
+    }
 }

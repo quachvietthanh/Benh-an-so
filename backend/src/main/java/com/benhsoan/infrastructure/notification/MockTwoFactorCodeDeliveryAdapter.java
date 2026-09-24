@@ -22,11 +22,20 @@ public class MockTwoFactorCodeDeliveryAdapter implements TwoFactorCodeDeliveryPo
 
     private final Map<String, String> lastSentCodes = new ConcurrentHashMap<>();
 
+    // TODO [SECURITY - PRODUCTION BLOCKER]: Dòng log dưới đây in mã OTP dạng 
+    // plaintext ra console, CHỈ được chấp nhận trong môi trường phát triển cá 
+    // nhân. TUYỆT ĐỐI PHẢI XÓA hoặc thay bằng tích hợp SMS/Email Provider thật 
+    // (Twilio, SendGrid, ESMS...) trước khi triển khai hệ thống cho người dùng 
+    // thật, nếu không đây là lỗ hổng bảo mật nghiêm trọng.
     @Override
     public void sendVerificationCode(String username, String code, long ttlSeconds) {
         lastSentCodes.put(username, code);
-        log.info("[MOCK 2FA] Simulated verification code issued for user {} (valid for {}s)",
-                maskUsername(username), ttlSeconds);
+        log.warn("===> [MOCK 2FA - CHỈ DÙNG CHO MÔI TRƯỜNG DEV/TEST] User: {} | " +
+                "Mã xác thực: [ {} ] | Hiệu lực: {}s | " +
+                "⚠️ CẢNH BÁO: Dòng log này lộ mã OTP dạng plaintext — BẮT BUỘC " +
+                "phải gỡ bỏ hoặc chuyển sang cơ chế gửi SMS/Email thật trước khi " +
+                "triển khai cho người dùng thật <===",
+                username, code, ttlSeconds);
     }
 
     public String getLastSentCode(String username) {

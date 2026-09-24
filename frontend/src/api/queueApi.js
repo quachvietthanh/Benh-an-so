@@ -49,6 +49,9 @@ const queueApi = {
 
   close: (itemId, outcome, reason) =>
     axiosClient.post(`/queue-items/${itemId}/close`, { outcome, reason }),
+
+  prioritize: (itemId, priority, reason) =>
+    axiosClient.post(`/queue-items/${itemId}/prioritize`, { priority, reason }),
 }
 
 export default queueApi

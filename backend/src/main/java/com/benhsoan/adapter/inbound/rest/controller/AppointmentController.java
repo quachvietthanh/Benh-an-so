@@ -44,7 +44,11 @@ import com.benhsoan.adapter.inbound.rest.request.appointment.RescheduleAppointme
 import com.benhsoan.adapter.inbound.rest.response.appointment.DoctorWeeklyTableResponse;
 import com.benhsoan.port.dto.query.appointment.GetDoctorWeeklyScheduleTableQuery;
 import com.benhsoan.port.dto.result.appointment.DoctorWeeklyTableResult;
+import com.benhsoan.port.inbound.appointment.CreateAppointmentSeriesUseCase;
+import com.benhsoan.port.inbound.appointment.GetAppointmentSeriesByIdUseCase;
 import com.benhsoan.port.inbound.appointment.GetDoctorWeeklyScheduleTableUseCase;
+import com.benhsoan.port.inbound.appointment.GetPatientAppointmentSeriesUseCase;
+import com.benhsoan.port.inbound.appointment.PreviewAppointmentSeriesUseCase;
 import com.benhsoan.port.inbound.appointment.RescheduleAppointmentUseCase;
 
 import jakarta.validation.Valid;
@@ -78,7 +82,47 @@ public class AppointmentController {
 
     private final GetDoctorWeeklyScheduleTableUseCase getDoctorWeeklyScheduleTableUseCase;
 
+    private final PreviewAppointmentSeriesUseCase previewAppointmentSeriesUseCase;
+
+    private final CreateAppointmentSeriesUseCase createAppointmentSeriesUseCase;
+
+    private final GetAppointmentSeriesByIdUseCase getAppointmentSeriesByIdUseCase;
+
+    private final GetPatientAppointmentSeriesUseCase getPatientAppointmentSeriesUseCase;
+
     private final AppointmentRestMapper mapper;
+
+    private final com.benhsoan.adapter.inbound.rest.mapper.AppointmentSeriesRestMapper seriesMapper;
+
+    @PostMapping("/series/preview")
+    @RequirePermission("APPOINTMENT_CREATE")
+    public com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentSeriesPreviewResponse previewSeries(
+            @Valid @RequestBody com.benhsoan.adapter.inbound.rest.request.appointment.PreviewAppointmentSeriesRequest request) {
+        var result = previewAppointmentSeriesUseCase.preview(seriesMapper.toCommand(request));
+        return seriesMapper.toResponse(result);
+    }
+
+    @PostMapping("/series")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequirePermission("APPOINTMENT_CREATE")
+    public com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentSeriesResponse createSeries(
+            @Valid @RequestBody com.benhsoan.adapter.inbound.rest.request.appointment.CreateAppointmentSeriesRequest request) {
+        var result = createAppointmentSeriesUseCase.create(seriesMapper.toCommand(request));
+        return seriesMapper.toResponse(result);
+    }
+
+    @GetMapping("/series/{id}")
+    @RequirePermission("APPOINTMENT_READ")
+    public com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentSeriesResponse getSeriesById(@PathVariable UUID id) {
+        return seriesMapper.toResponse(getAppointmentSeriesByIdUseCase.getById(id));
+    }
+
+    @GetMapping("/series/patient/{patientId}")
+    @RequirePermission("APPOINTMENT_READ")
+    public java.util.List<com.benhsoan.adapter.inbound.rest.response.appointment.AppointmentSeriesResponse> getSeriesByPatientId(
+            @PathVariable UUID patientId) {
+        return seriesMapper.toResponseList(getPatientAppointmentSeriesUseCase.getByPatientId(patientId));
+    }
 
     @GetMapping("/doctor-weekly-table")
     @RequirePermission("APPOINTMENT_READ")

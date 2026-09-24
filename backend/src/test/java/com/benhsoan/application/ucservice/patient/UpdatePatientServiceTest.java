@@ -47,6 +47,8 @@ class UpdatePatientServiceTest {
     @Mock private PatientChangeLogRepository patientChangeLogRepository;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository;
+    @Mock private com.benhsoan.port.outbound.time.ClockPort clockPort;
 
     private UpdatePatientService service;
     private final UUID currentUserId = UUID.randomUUID();
@@ -62,10 +64,14 @@ class UpdatePatientServiceTest {
                 currentUserPort,
                 patientResultMapper,
                 changeDetailBuilder,
-                auditLogRepository
+                auditLogRepository,
+                patientConsentHistoryRepository,
+                clockPort
         );
 
         lenient().when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
+        lenient().when(clockPort.now()).thenReturn(java.time.Instant.parse("2026-09-24T10:00:00Z"));
+        lenient().when(patientConsentHistoryRepository.getNextVersionNumber(any())).thenReturn(2);
     }
 
     @Test

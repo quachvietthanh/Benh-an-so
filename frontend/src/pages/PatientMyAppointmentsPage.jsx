@@ -38,6 +38,7 @@ import dayjs from 'dayjs'
 import patientPortalAppointmentApi from '../api/patientPortalAppointmentApi'
 import RescheduleAppointmentModal from '../components/portal/RescheduleAppointmentModal'
 import { useAuthContext } from '../context/AuthContext'
+import PatientNotificationBell from '../components/portal/PatientNotificationBell.jsx'
 import './patientMyAppointments.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -325,7 +326,8 @@ function PatientMyAppointmentsPage() {
             </span>
           </Link>
 
-          <Space size={10} wrap>
+          <Space size={10} wrap align="center">
+            <PatientNotificationBell />
             <Link to="/portal/book-appointment">
               <Button type="primary" className="portal-header-btn-primary" icon={<PlusOutlined />}>
                 Đặt lịch khám mới

@@ -1,5 +1,6 @@
 package com.benhsoan.adapter.inbound.rest.response.prescription;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -39,6 +40,8 @@ public record PrescriptionItemResponse(
         int remainingQuantity,
 
         String instructions,
+
+        BigDecimal singleDoseQuantity,
 
         Instant createdAt,
 

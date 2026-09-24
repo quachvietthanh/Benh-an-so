@@ -14,6 +14,8 @@ public interface JpaDiagnosisCatalogRepository extends JpaRepository<DiagnosisCa
 
     boolean existsByCode(String code);
 
+    java.util.Optional<DiagnosisCatalogEntity> findByCode(String code);
+
     @Query("""
             SELECT diagnosis
             FROM DiagnosisCatalogEntity diagnosis

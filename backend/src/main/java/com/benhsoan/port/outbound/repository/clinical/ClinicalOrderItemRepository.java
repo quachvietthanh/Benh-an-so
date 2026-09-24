@@ -22,6 +22,8 @@ public interface ClinicalOrderItemRepository {
 
     List<ClinicalOrderItem> findByClinicalOrderIdIn(Collection<UUID> clinicalOrderIds);
 
+    List<ClinicalOrderItem> findByIdIn(Collection<UUID> ids);
+
     List<BillableClinicalService> findBillableByVisitId(UUID visitId);
 
     List<BillableClinicalService> findBillableByVisitIdIn(Collection<UUID> visitIds);

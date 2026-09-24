@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
-import authApi, { parseRetryAfterSeconds, isLockoutError } from '../api/authApi'
+import authApi, { parseRetryAfterSeconds, isLockoutError } from '../api/authApi.js'
 
 const AuthContext = createContext(null)
 
@@ -97,30 +97,48 @@ export const AuthProvider = ({ children }) => {
     setLoading(false)
   }, [])
 
+  const handleLoginSuccess = (data, fallbackUsername) => {
+    const payload = getJwtPayload(data.accessToken)
+    const rawRoles = payload?.role || data.roles || (data.role ? [data.role] : [])
+    const username = payload?.username || data.username || fallbackUsername
+
+    const normalizedUser = {
+      id: data.userId || data.id || payload?.userId || payload?.sub,
+      username: username,
+      fullName: username,
+      roles: normalizeRoles(rawRoles),
+      permissions: normalizePermissions(payload?.permissions || data.permissions),
+      expiredAt: data.expiredAt,
+      mustChangePassword: Boolean(data.mustChangePassword),
+    }
+
+    localStorage.setItem('token', data.accessToken)
+    localStorage.setItem('user', JSON.stringify(normalizedUser))
+    setUser(normalizedUser)
+
+    return { success: true, user: normalizedUser }
+  }
+
+  const completeTwoFactorLogin = (data) => {
+    return handleLoginSuccess(data, data?.username || 'User')
+  }
+
   const login = async (credentials) => {
     try {
       const response = await authApi.login(credentials)
       const data = response.data
 
-      const payload = getJwtPayload(data.accessToken)
-      const rawRoles = payload?.role || data.roles || (data.role ? [data.role] : [])
-      const username = payload?.username || data.username || credentials.username
-
-      const normalizedUser = {
-        id: data.userId || data.id || payload?.userId || payload?.sub,
-        username: username,
-        fullName: username,
-        roles: normalizeRoles(rawRoles),
-        permissions: normalizePermissions(payload?.permissions || data.permissions),
-        expiredAt: data.expiredAt,
-        mustChangePassword: Boolean(data.mustChangePassword),
+      if (data?.twoFactorRequired) {
+        return {
+          success: true,
+          twoFactorRequired: true,
+          twoFactorToken: data.twoFactorToken,
+          twoFactorExpiresAt: data.twoFactorExpiresAt,
+          username: data.username || credentials.username,
+        }
       }
 
-      localStorage.setItem('token', data.accessToken)
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
-      setUser(normalizedUser)
-
-      return { success: true, user: normalizedUser }
+      return handleLoginSuccess(data, credentials.username)
     } catch (error) {
       const status = error.response?.status
       const isLockout = isLockoutError(error)
@@ -304,6 +322,7 @@ export const AuthProvider = ({ children }) => {
       user,
       setUser,
       login,
+      completeTwoFactorLogin,
       patientLogin,
       patientRegister,
       logout,

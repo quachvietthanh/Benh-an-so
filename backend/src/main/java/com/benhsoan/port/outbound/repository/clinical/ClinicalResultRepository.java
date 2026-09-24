@@ -15,4 +15,5 @@ public interface ClinicalResultRepository {
     Optional<ClinicalResult> findByClinicalOrderItemId(UUID clinicalOrderItemId);
     Page<ClinicalResult> findByVisitId(UUID visitId, Pageable pageable);
     List<ClinicalResult> findByClinicalOrderItemIdIn(Collection<UUID> clinicalOrderItemIds);
+    List<ClinicalResult> findByVisitIdAndStatus(UUID visitId, com.benhsoan.domain.clinical.enums.ClinicalResultStatus status);
 }
