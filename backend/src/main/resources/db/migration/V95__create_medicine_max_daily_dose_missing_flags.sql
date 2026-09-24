@@ -1,5 +1,5 @@
 -- =====================================================
--- V93__create_medicine_max_daily_dose_missing_flags.sql
+-- V95__create_medicine_max_daily_dose_missing_flags.sql
 -- NCL-05-CN-007: persistent flag for missing max-daily-dose
 -- catalog configuration (TC-04).
 --
