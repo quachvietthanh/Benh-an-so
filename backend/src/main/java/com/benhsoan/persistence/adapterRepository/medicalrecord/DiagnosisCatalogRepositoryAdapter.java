@@ -34,6 +34,11 @@ public class DiagnosisCatalogRepositoryAdapter implements DiagnosisCatalogReposi
     }
 
     @Override
+    public Optional<DiagnosisCatalog> findByCode(String code) {
+        return jpaRepository.findByCode(normalizeCode(code)).map(mapper::toDomain);
+    }
+
+    @Override
     public List<DiagnosisCatalog> findAllByIds(Collection<UUID> ids) {
         return jpaRepository.findAllById(ids).stream().map(mapper::toDomain).toList();
     }
