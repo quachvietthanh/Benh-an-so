@@ -54,6 +54,9 @@ export default function RecordPaymentModal({
 
   const amountDue = useMemo(() => {
     if (!visitData) return 0
+    if (visitData.finalAmount !== undefined && visitData.finalAmount !== null && (visitData.isDiscountApproved || Number(visitData.discountAmount) > 0)) {
+      return Math.max(0, Number(visitData.finalAmount))
+    }
     const total = Number(visitData.totalAmount) || 0
     const discount = Number(visitData.discountAmount) || 0
     const due = total - discount

@@ -118,7 +118,7 @@ export const validatePaymentMethods = (methods, expectedTotal) => {
         message: `Dòng ${index + 1}: Vui lòng nhập số tiền hợp lệ.`,
       })
       errors.push(`Dòng ${index + 1}: Vui lòng nhập số tiền hợp lệ.`)
-    } else if (numericAmount <= 0) {
+    } else if (numericAmount < 0 || (numericAmount === 0 && safeExpected > 0)) {
       itemErrors.push({
         index,
         field: 'amount',

@@ -7,6 +7,7 @@ import {
   Col,
   Descriptions,
   Divider,
+  Drawer,
   Dropdown,
   Empty,
   Form,
@@ -48,10 +49,12 @@ import {
   TeamOutlined,
   UserOutlined,
   WarningOutlined,
+  PercentageOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import billingApi from '../api/billingApi.js'
 import invoiceApi from '../api/invoiceApi.js'
+import discountRequestApi from '../api/discountRequestApi.js'
 import medicalRecordApi from '../api/medicalRecordApi.js'
 import patientApi from '../api/patientApi.js'
 import pharmacyApi from '../api/pharmacyApi.js'
@@ -59,6 +62,8 @@ import queueApi from '../api/queueApi.js'
 import { useAuthContext } from '../context/AuthContext.jsx'
 import { getStoredPrescriptions, mergeMedicines } from '../utils/storageHelpers.js'
 import RecordPaymentModal from '../components/billing/RecordPaymentModal.jsx'
+import CreateDiscountRequestModal from '../components/billing/CreateDiscountRequestModal.jsx'
+import { getStatusTag, DISCOUNT_TYPE_OPTIONS } from '../utils/discountRequestHelpers.js'
 import {
   getPaymentMethodMeta,
   formatCurrency,
@@ -262,6 +267,8 @@ function BillingPage() {
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER')
   const [recordPaymentModalOpen, setRecordPaymentModalOpen] = useState(false)
+  const [createDiscountModalOpen, setCreateDiscountModalOpen] = useState(false)
+  const [discountDetailDrawerOpen, setDiscountDetailDrawerOpen] = useState(false)
   const [apiError, setApiError] = useState('')
   const [viewingInvoiceModal, setViewingInvoiceModal] = useState(null)
 
@@ -543,13 +550,26 @@ function BillingPage() {
         : (examFee + medicineFee + serviceFee)
 
       const totalAmount = invoiceData?.totalAmount ? Number(invoiceData.totalAmount) : calculatedTotal
-
       const hasInvoice = !!(invoiceData && (invoiceData.id || invoiceData.invoiceCode))
+
+      let activeDiscount = null
+      try {
+        const discountRes = await discountRequestApi.list({ visitId, size: 5 })
+        const discList = discountRes?.data?.content || (Array.isArray(discountRes?.data) ? discountRes.data : [])
+        activeDiscount = discList.find((d) => d.status === 'PENDING') || discList.find((d) => d.status === 'APPROVED') || discList[0] || null
+      } catch (discErr) {
+        console.warn('[BillingPage] Lỗi discountRequestApi.list:', discErr?.message)
+      }
+
+      const isDiscountApproved = activeDiscount?.status === 'APPROVED'
+      const hasPendingDiscount = activeDiscount?.status === 'PENDING'
+      const discountAmount = isDiscountApproved ? Number(activeDiscount.discountAmount || 0) : 0
+      const finalAmount = isDiscountApproved ? Number(activeDiscount.finalAmount ?? (totalAmount - discountAmount)) : totalAmount
 
       setSelectedVisitData((prev) => {
         const currentPaymentId = invoiceData?.paymentId || (prev?.visitId === visitId ? prev?.paymentId : null)
         const isPaid = hasInvoice || !!currentPaymentId || (prev?.visitId === visitId && prev?.paymentStatus === 'PAID')
-        const isBusinessEligible = !isPaid && !isCancelled && isDispensingCompleted && totalAmount > 0
+        const isBusinessEligible = !isPaid && !isCancelled && isDispensingCompleted && !hasPendingDiscount && (isDiscountApproved ? finalAmount >= 0 : totalAmount > 0)
 
         return {
           visitId,
@@ -576,6 +596,11 @@ function BillingPage() {
           serviceFee,
           serviceFeesList,
           totalAmount,
+          activeDiscount,
+          hasPendingDiscount,
+          isDiscountApproved,
+          discountAmount,
+          finalAmount,
           paymentStatus: isPaid ? 'PAID' : 'UNPAID',
           paidAt: invoiceData?.paidAt || (prev?.visitId === visitId ? prev?.paidAt : null) || invoiceData?.createdAt || null,
           paymentMethod: invoiceData?.payment?.paymentMethod || invoiceData?.paymentMethod || (prev?.visitId === visitId ? prev?.paymentMethod : null) || 'CASH',
@@ -960,6 +985,22 @@ function BillingPage() {
         quantity: 1,
         price: selectedVisitData.serviceFee,
         amount: selectedVisitData.serviceFee,
+      })
+    }
+
+    if (selectedVisitData.isDiscountApproved && selectedVisitData.discountAmount > 0) {
+      items.push({
+        key: 'discount-approved',
+        name: (
+          <Space>
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>Giảm giá / Miễn phí viện phí</span>
+            <Tag color="green" style={{ margin: 0 }}>Đã duyệt</Tag>
+          </Space>
+        ),
+        quantity: 1,
+        price: -selectedVisitData.discountAmount,
+        amount: -selectedVisitData.discountAmount,
+        isDiscount: true,
       })
     }
 
@@ -1537,9 +1578,53 @@ function BillingPage() {
                                   />
                                 )}
 
-                                <div style={{ background: '#ffffff', padding: 18, borderRadius: 8, border: '1px solid #ccfbf1' }}>
-                                  <Row gutter={[16, 16]} align="middle">
-                                    <Col xs={24} md={15}>
+                                {selectedVisitData.hasPendingDiscount && (
+                                  <Alert
+                                    type="warning"
+                                    showIcon
+                                    icon={<ClockCircleOutlined style={{ fontSize: 18 }} />}
+                                    message={<strong>Lượt khám đang chờ duyệt giảm giá (QTN-37)</strong>}
+                                    description={
+                                      <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 4 }}>
+                                        <div>
+                                          Lượt khám này đang có đề xuất giảm giá ({DISCOUNT_TYPE_OPTIONS[selectedVisitData.activeDiscount?.discountType] || selectedVisitData.activeDiscount?.discountType}) chờ Quản lý phê duyệt. Theo quy định QTN-37, hệ thống tạm khóa chức năng thu phí và lập hóa đơn cho đến khi có kết quả duyệt.
+                                        </div>
+                                        <div>
+                                          <Button size="small" type="link" onClick={() => setDiscountDetailDrawerOpen(true)} style={{ padding: 0, fontWeight: 600 }}>
+                                            Xem chi tiết đề xuất &rarr;
+                                          </Button>
+                                        </div>
+                                      </Space>
+                                    }
+                                    style={{ borderRadius: 8, border: '1px solid #fde68a' }}
+                                  />
+                                )}
+
+                                {selectedVisitData.isDiscountApproved && (
+                                  <Alert
+                                    type="success"
+                                    showIcon
+                                    message={<strong>Đề xuất giảm giá đã được duyệt</strong>}
+                                    description={
+                                      <div>
+                                        Khoản giảm trừ <strong>{money(selectedVisitData.discountAmount)}</strong> đã được phê duyệt và tự động áp dụng vào số tiền cần thu.
+                                      </div>
+                                    }
+                                    style={{ borderRadius: 8 }}
+                                  />
+                                )}
+
+                                <div
+                                  style={{
+                                    background: '#ffffff',
+                                    padding: '20px 24px',
+                                    borderRadius: 12,
+                                    border: '1px solid #ccfbf1',
+                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                                  }}
+                                >
+                                  <Row gutter={[16, 16]} align="middle" justify="space-between">
+                                    <Col xs={24} lg={12} xl={13}>
                                       <Space direction="vertical" size={2}>
                                         <Text strong style={{ fontSize: 16, color: '#0f172a' }}>
                                           Ghi nhận thanh toán viện phí
@@ -1548,34 +1633,125 @@ function BillingPage() {
                                           Hỗ trợ thu 1 hoặc kết hợp nhiều phương thức: Tiền mặt, Chuyển khoản (có mã GD), Thẻ POS, QR Code, Ví điện tử.
                                         </Text>
                                         <div style={{ marginTop: 8 }}>
-                                          <Text>Số tiền cần thu: </Text>
-                                          <strong style={{ color: '#0284c7', fontSize: 20 }}>
-                                            {money(selectedVisitData.totalAmount)}
-                                          </strong>
+                                          <Text style={{ fontSize: 14 }}>Số tiền cần thu: </Text>
+                                          {selectedVisitData.isDiscountApproved ? (
+                                            <Space align="center" wrap>
+                                              <Text type="secondary" delete style={{ fontSize: 16 }}>
+                                                {money(selectedVisitData.totalAmount)}
+                                              </Text>
+                                              <strong style={{ color: '#0284c7', fontSize: 22, fontWeight: 700 }}>
+                                                {money(selectedVisitData.finalAmount)}
+                                              </strong>
+                                              <Tag color="green" style={{ borderRadius: 4, fontWeight: 600 }}>
+                                                Đã giảm {money(selectedVisitData.discountAmount)}
+                                              </Tag>
+                                            </Space>
+                                          ) : (
+                                            <strong style={{ color: '#0284c7', fontSize: 22, fontWeight: 700 }}>
+                                              {money(selectedVisitData.totalAmount)}
+                                            </strong>
+                                          )}
                                         </div>
                                       </Space>
                                     </Col>
 
-                                    <Col xs={24} md={9} style={{ textAlign: 'right' }}>
-                                      <Button
-                                        type="primary"
-                                        size="large"
-                                        icon={<DollarCircleOutlined />}
-                                        disabled={!canCollectPayment || !selectedVisitData.isEligibleToPay}
-                                        onClick={() => setRecordPaymentModalOpen(true)}
+                                    <Col xs={24} lg={12} xl={11}>
+                                      <div
                                         style={{
-                                          background: '#0d9488',
-                                          borderColor: '#0d9488',
-                                          fontWeight: 700,
-                                          height: 46,
-                                          padding: '0 22px',
-                                          fontSize: 15,
-                                          borderRadius: 8,
-                                          boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
+                                          display: 'flex',
+                                          gap: 12,
+                                          justifyContent: 'flex-end',
+                                          alignItems: 'center',
+                                          flexWrap: 'wrap',
                                         }}
                                       >
-                                        Mở cửa sổ Thu phí
-                                      </Button>
+                                        <Button
+                                          size="middle"
+                                          icon={<PercentageOutlined />}
+                                          disabled={
+                                            !canCollectPayment ||
+                                            selectedVisitData.paymentStatus === 'PAID' ||
+                                            selectedVisitData.hasPendingDiscount ||
+                                            selectedVisitData.isDiscountApproved ||
+                                            selectedVisitData.isCancelled
+                                          }
+                                          onClick={() => setCreateDiscountModalOpen(true)}
+                                          style={
+                                            !canCollectPayment ||
+                                            selectedVisitData.paymentStatus === 'PAID' ||
+                                            selectedVisitData.hasPendingDiscount ||
+                                            selectedVisitData.isDiscountApproved ||
+                                            selectedVisitData.isCancelled
+                                              ? {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 500,
+                                                  fontSize: 13.5,
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                              : {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 600,
+                                                  fontSize: 13.5,
+                                                  borderColor: '#0284c7',
+                                                  color: '#0284c7',
+                                                  background: '#f0f9ff',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                          }
+                                        >
+                                          Đề nghị giảm giá
+                                        </Button>
+
+                                        <Button
+                                          type="primary"
+                                          size="middle"
+                                          icon={<DollarCircleOutlined />}
+                                          disabled={
+                                            !canCollectPayment ||
+                                            !selectedVisitData.isEligibleToPay ||
+                                            selectedVisitData.hasPendingDiscount
+                                          }
+                                          onClick={() => setRecordPaymentModalOpen(true)}
+                                          style={
+                                            !canCollectPayment ||
+                                            !selectedVisitData.isEligibleToPay ||
+                                            selectedVisitData.hasPendingDiscount
+                                              ? {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 500,
+                                                  fontSize: 13.5,
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                              : {
+                                                  width: 170,
+                                                  height: 38,
+                                                  borderRadius: 6,
+                                                  fontWeight: 600,
+                                                  fontSize: 13.5,
+                                                  background: '#0d9488',
+                                                  borderColor: '#0d9488',
+                                                  boxShadow: '0 2px 8px rgba(13, 148, 136, 0.2)',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                }
+                                          }
+                                        >
+                                          Mở cửa sổ Thu phí
+                                        </Button>
+                                      </div>
                                     </Col>
                                   </Row>
                                 </div>
@@ -2096,6 +2272,69 @@ function BillingPage() {
         visitData={selectedVisitData}
         canCollectPayment={canCollectPayment}
       />
+
+      <CreateDiscountRequestModal
+        open={createDiscountModalOpen}
+        onClose={() => setCreateDiscountModalOpen(false)}
+        onSuccess={() => {
+          if (selectedVisitId) {
+            loadInvoiceData(selectedVisitId)
+          }
+        }}
+        visitData={selectedVisitData}
+      />
+
+      <Drawer
+        title="Chi tiết đề xuất giảm giá của lượt khám"
+        placement="right"
+        width={460}
+        open={discountDetailDrawerOpen}
+        onClose={() => setDiscountDetailDrawerOpen(false)}
+      >
+        {selectedVisitData?.activeDiscount && (
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Alert
+              type={selectedVisitData.activeDiscount.status === 'APPROVED' ? 'success' : selectedVisitData.activeDiscount.status === 'REJECTED' ? 'error' : 'warning'}
+              showIcon
+              message={
+                <strong>
+                  Trạng thái: {getStatusTag(selectedVisitData.activeDiscount.status).label}
+                </strong>
+              }
+              description={
+                selectedVisitData.activeDiscount.status === 'PENDING'
+                  ? 'Đề xuất đang chờ cấp quản lý phê duyệt trước khi lập hóa đơn hoặc thu tiền.'
+                  : selectedVisitData.activeDiscount.status === 'APPROVED'
+                  ? 'Đề xuất đã được duyệt và áp dụng giảm trừ vào viện phí.'
+                  : 'Đề xuất đã bị từ chối, viện phí thu theo giá gốc.'
+              }
+            />
+
+            <Descriptions title="Thông tin giảm trừ" column={1} bordered size="small">
+              <Descriptions.Item label="Hình thức">
+                {DISCOUNT_TYPE_OPTIONS[selectedVisitData.activeDiscount.discountType] || selectedVisitData.activeDiscount.discountType}
+              </Descriptions.Item>
+              <Descriptions.Item label="Viện phí gốc">
+                {formatCurrency(selectedVisitData.activeDiscount.originalAmount)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số tiền giảm">
+                <strong style={{ color: '#16a34a' }}>-{formatCurrency(selectedVisitData.activeDiscount.discountAmount)}</strong>
+              </Descriptions.Item>
+              <Descriptions.Item label="Số tiền thực thu">
+                <strong style={{ color: '#0284c7' }}>{formatCurrency(selectedVisitData.activeDiscount.finalAmount)}</strong>
+              </Descriptions.Item>
+              <Descriptions.Item label="Lý do đề xuất">
+                {selectedVisitData.activeDiscount.reason || '—'}
+              </Descriptions.Item>
+              {selectedVisitData.activeDiscount.rejectionReason && (
+                <Descriptions.Item label="Lý do từ chối">
+                  <strong style={{ color: '#dc2626' }}>{selectedVisitData.activeDiscount.rejectionReason}</strong>
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+          </Space>
+        )}
+      </Drawer>
     </div>
   )
 }
