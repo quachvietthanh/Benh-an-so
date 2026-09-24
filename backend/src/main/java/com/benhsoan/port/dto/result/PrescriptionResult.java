@@ -42,9 +42,36 @@ public record PrescriptionResult(
 
         List<PrescriptionItemResult> items,
 
-        List<PrescriptionWarningResult> warnings
+        List<PrescriptionWarningResult> warnings,
+
+        List<MaxDailyDoseMissingDataResult> maxDailyDoseMissingData
 
 ) {
+
+    public PrescriptionResult(
+            UUID id,
+            String prescriptionCode,
+            UUID medicalRecordId,
+            UUID visitId,
+            String visitCode,
+            UUID patientId,
+            String patientCode,
+            String patientName,
+            PrescriptionStatus status,
+            String note,
+            String cancelReason,
+            UUID prescribedBy,
+            String doctorName,
+            Instant prescribedAt,
+            UUID updatedBy,
+            Instant updatedAt,
+            List<PrescriptionItemResult> items,
+            List<PrescriptionWarningResult> warnings
+    ) {
+        this(id, prescriptionCode, medicalRecordId, visitId, visitCode, patientId, patientCode, patientName,
+                status, note, cancelReason, prescribedBy, doctorName, prescribedAt, updatedBy, updatedAt, items,
+                warnings, List.of());
+    }
 
     public PrescriptionResult(
             UUID id,
@@ -66,6 +93,7 @@ public record PrescriptionResult(
             List<PrescriptionWarningResult> warnings
     ) {
         this(id, prescriptionCode, medicalRecordId, visitId, visitCode, patientId, patientCode, patientName,
-                status, note, null, prescribedBy, doctorName, prescribedAt, updatedBy, updatedAt, items, warnings);
+                status, note, null, prescribedBy, doctorName, prescribedAt, updatedBy, updatedAt, items, warnings,
+                List.of());
     }
 }

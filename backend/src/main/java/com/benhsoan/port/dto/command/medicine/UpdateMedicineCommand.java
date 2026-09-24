@@ -1,5 +1,6 @@
 package com.benhsoan.port.dto.command.medicine;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
@@ -14,7 +15,9 @@ public record UpdateMedicineCommand(
         String unit,
         AdministrationRoute defaultRoute,
         int minStockThreshold,
-        boolean controlled
+        boolean controlled,
+        BigDecimal strengthValueMg,
+        BigDecimal maxDailyDoseMg
 ) {
     public UpdateMedicineCommand(
             UUID medicineId,
@@ -26,6 +29,20 @@ public record UpdateMedicineCommand(
             AdministrationRoute defaultRoute,
             int minStockThreshold
     ) {
-        this(medicineId, medicineName, activeIngredient, strength, dosageForm, unit, defaultRoute, minStockThreshold, false);
+        this(medicineId, medicineName, activeIngredient, strength, dosageForm, unit, defaultRoute, minStockThreshold, false, null, null);
+    }
+
+    public UpdateMedicineCommand(
+            UUID medicineId,
+            String medicineName,
+            String activeIngredient,
+            String strength,
+            DosageForm dosageForm,
+            String unit,
+            AdministrationRoute defaultRoute,
+            int minStockThreshold,
+            boolean controlled
+    ) {
+        this(medicineId, medicineName, activeIngredient, strength, dosageForm, unit, defaultRoute, minStockThreshold, controlled, null, null);
     }
 }
