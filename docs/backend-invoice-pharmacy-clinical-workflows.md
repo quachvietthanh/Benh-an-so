@@ -344,5 +344,30 @@ Khi triển khai tính năng **Chốt ca thu ngân cuối ngày (`NCL-07-CN-009`
     - `payment.getPaymentMethodItems()`
   - Tại tầng Frontend / Client: Duyệt mảng `paymentMethods` trong `PaymentResponse` / `InvoiceResponse.payment` để phân rã chính xác số tiền từng phương thức.
 
+---
+
+## 7. NCL-06-CN-012 — Dự trù mua thuốc và phiếu đặt hàng
+
+Base: `/inventory/procurements` (Quyền: `MEDICATION_PROCUREMENT_READ`, `MEDICATION_PROCUREMENT_CREATE`, `MEDICATION_PROCUREMENT_APPROVE`).
+
+| Phương thức | Đường dẫn | Mô tả chức năng | Quyền yêu cầu |
+| --- | --- | --- | --- |
+| GET | `/inventory/procurements/suggestions` | Gợi ý số lượng cần mua (kết hợp tồn khả dụng lô còn hạn, tồn tối thiểu, lượng cấp phát kỳ trước) | `MEDICATION_PROCUREMENT_READ` |
+| POST | `/inventory/procurements` | Lập phiếu dự trù mới (lưu nháp `DRAFT` hoặc gửi duyệt `PENDING_APPROVAL`) | `MEDICATION_PROCUREMENT_CREATE` |
+| GET | `/inventory/procurements` | Danh sách tóm tắt phiếu dự trù (phân trang, lọc theo status, ngày tạo, người tạo) | `MEDICATION_PROCUREMENT_READ` |
+| GET | `/inventory/procurements/{id}` | Chi tiết phiếu dự trù và các dòng thuốc kèm số lượng duyệt | `MEDICATION_PROCUREMENT_READ` |
+| PUT | `/inventory/procurements/{id}` | Điều chỉnh danh sách thuốc / số lượng đề nghị (khi phiếu nháp hoặc chờ duyệt) | `MEDICATION_PROCUREMENT_CREATE` |
+| POST | `/inventory/procurements/{id}/submit` | Gửi duyệt phiếu dự trù đang ở trạng thái `DRAFT` | `MEDICATION_PROCUREMENT_CREATE` |
+| POST | `/inventory/procurements/{id}/cancel` | Hủy phiếu dự trù đang ở trạng thái `DRAFT` hoặc `PENDING_APPROVAL` | `MEDICATION_PROCUREMENT_CREATE` |
+| POST | `/inventory/procurements/{id}/approve` | Quản lý phê duyệt phiếu dự trù (SoD: Người lập không được tự duyệt) | `MEDICATION_PROCUREMENT_APPROVE` |
+| POST | `/inventory/procurements/{id}/reject` | Quản lý từ chối phiếu dự trù kèm lý do bắt buộc $\ge 5$ ký tự (SoD) | `MEDICATION_PROCUREMENT_APPROVE` |
+
+**Quy tắc kiểm soát Separation of Duties (SoD):**
+- Dược sĩ lập phiếu dự trù. Quản lý phòng khám duyệt hoặc từ chối phiếu.
+- Người lập phiếu tuyệt đối không thể tự phê duyệt hoặc tự từ chối phiếu của mình (ném lỗi `403 Forbidden` - `SELF_APPROVAL_NOT_ALLOWED`).
+- Lễ tân và Bác sĩ không có quyền truy cập, hệ thống tự động ghi nhật ký `ACCESS_DENIED` (`TC-03`).
+
+
+
 
 

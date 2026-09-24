@@ -30,12 +30,10 @@ class EligibleStockSnapshotServiceTest {
         UUID secondMedicineId = UUID.randomUUID();
         LocalDate today = LocalDate.of(2026, 8, 8);
 
-        when(medicineBatchRepository.findByMedicineId(firstMedicineId)).thenReturn(List.of(
+        when(medicineBatchRepository.findByMedicineIdIn(List.of(firstMedicineId, secondMedicineId))).thenReturn(List.of(
                 batch(firstMedicineId, "F1", LocalDate.of(2026, 8, 8), 10, BatchStatus.ACTIVE),
                 batch(firstMedicineId, "F2", LocalDate.of(2026, 8, 7), 20, BatchStatus.ACTIVE),
-                batch(firstMedicineId, "F3", LocalDate.of(2026, 8, 20), 0, BatchStatus.ACTIVE)
-        ));
-        when(medicineBatchRepository.findByMedicineId(secondMedicineId)).thenReturn(List.of(
+                batch(firstMedicineId, "F3", LocalDate.of(2026, 8, 20), 0, BatchStatus.ACTIVE),
                 batch(secondMedicineId, "S1", LocalDate.of(2026, 8, 20), 15, BatchStatus.ACTIVE),
                 batch(secondMedicineId, "S2", LocalDate.of(2026, 8, 20), 30, BatchStatus.DEPLETED),
                 batch(secondMedicineId, "S3", LocalDate.of(2026, 8, 8), 5, BatchStatus.ACTIVE)

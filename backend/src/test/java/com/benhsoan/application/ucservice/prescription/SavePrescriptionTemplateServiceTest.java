@@ -2,6 +2,7 @@ package com.benhsoan.application.ucservice.prescription;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,11 +26,13 @@ import com.benhsoan.domain.medicine.enums.AdministrationRoute;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionTemplate;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.SavePrescriptionTemplateCommand;
 import com.benhsoan.port.dto.result.PrescriptionTemplateResult;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.DiagnosisCatalogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionTemplateRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -43,10 +46,12 @@ class SavePrescriptionTemplateServiceTest {
     private static final UUID DOCTOR_ID = UUID.randomUUID();
     private static final UUID PRESCRIPTION_ID = UUID.randomUUID();
     private static final UUID DIAGNOSIS_ID = UUID.randomUUID();
+    private static final UUID MEDICAL_RECORD_ID = UUID.randomUUID();
 
     @Mock private PrescriptionRepository prescriptionRepository;
     @Mock private PrescriptionTemplateRepository templateRepository;
     @Mock private DiagnosisCatalogRepository diagnosisCatalogRepository;
+    @Mock private MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     @Mock private PrescriptionTemplateResultMapper resultMapper;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
@@ -58,6 +63,7 @@ class SavePrescriptionTemplateServiceTest {
     void setUp() {
         service = new SavePrescriptionTemplateService(
                 prescriptionRepository, templateRepository, diagnosisCatalogRepository,
+                medicalRecordDiagnosisRepository,
                 resultMapper, currentUserPort, auditLogRepository, clockPort, new ObjectMapper());
     }
 
@@ -69,8 +75,9 @@ class SavePrescriptionTemplateServiceTest {
 
         Prescription prescription = mock(Prescription.class);
         when(prescription.getId()).thenReturn(PRESCRIPTION_ID);
-        when(prescription.isPendingDispense()).thenReturn(true);
+        when(prescription.getStatus()).thenReturn(PrescriptionStatus.PENDING_DISPENSE);
         when(prescription.getPrescribedBy()).thenReturn(DOCTOR_ID);
+        when(prescription.getMedicalRecordId()).thenReturn(MEDICAL_RECORD_ID);
         PrescriptionItem item = prescriptionItem();
         when(prescription.getItems()).thenReturn(List.of(item));
         when(prescriptionRepository.findById(PRESCRIPTION_ID)).thenReturn(Optional.of(prescription));
@@ -79,6 +86,9 @@ class SavePrescriptionTemplateServiceTest {
         when(diagnosis.getId()).thenReturn(DIAGNOSIS_ID);
         when(diagnosis.getCode()).thenReturn("J06.9");
         when(diagnosisCatalogRepository.findByCode("J06.9")).thenReturn(Optional.of(diagnosis));
+        when(medicalRecordDiagnosisRepository
+                .existsByMedicalRecordIdAndDiagnosisCatalogId(MEDICAL_RECORD_ID, DIAGNOSIS_ID))
+                .thenReturn(true);
 
         PrescriptionTemplate saved = mock(PrescriptionTemplate.class);
         when(saved.getId()).thenReturn(UUID.randomUUID());
@@ -103,16 +113,58 @@ class SavePrescriptionTemplateServiceTest {
     }
 
     @Test
-    void notCompletedPrescriptionIsRejected() {
+    void cancelledPrescriptionIsRejected() {
         when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
 
         Prescription prescription = mock(Prescription.class);
-        when(prescription.isPendingDispense()).thenReturn(false);
+        when(prescription.getStatus()).thenReturn(PrescriptionStatus.CANCELLED);
         when(prescriptionRepository.findById(PRESCRIPTION_ID)).thenReturn(Optional.of(prescription));
 
         assertThrows(ValidationException.class,
                 () -> service.save(new SavePrescriptionTemplateCommand(PRESCRIPTION_ID, "J06.9")));
+
+        verify(templateRepository, never()).save(any());
+    }
+
+    @Test
+    void dispensedAndPartiallyDispensedPrescriptionsAreAllowed() {
+        for (PrescriptionStatus status : new PrescriptionStatus[] {
+                PrescriptionStatus.PARTIALLY_DISPENSED,
+                PrescriptionStatus.DISPENSED
+        }) {
+            when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+            when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
+            when(clockPort.now()).thenReturn(NOW);
+
+            Prescription prescription = mock(Prescription.class);
+            when(prescription.getId()).thenReturn(PRESCRIPTION_ID);
+            when(prescription.getStatus()).thenReturn(status);
+            when(prescription.getPrescribedBy()).thenReturn(DOCTOR_ID);
+            when(prescription.getMedicalRecordId()).thenReturn(MEDICAL_RECORD_ID);
+            PrescriptionItem item = prescriptionItem();
+            when(prescription.getItems()).thenReturn(List.of(item));
+            when(prescriptionRepository.findById(PRESCRIPTION_ID)).thenReturn(Optional.of(prescription));
+
+            DiagnosisCatalog diagnosis = mock(DiagnosisCatalog.class);
+            when(diagnosis.getId()).thenReturn(DIAGNOSIS_ID);
+            when(diagnosis.getCode()).thenReturn("J06.9");
+            when(diagnosisCatalogRepository.findByCode("J06.9")).thenReturn(Optional.of(diagnosis));
+            when(medicalRecordDiagnosisRepository
+                    .existsByMedicalRecordIdAndDiagnosisCatalogId(MEDICAL_RECORD_ID, DIAGNOSIS_ID))
+                    .thenReturn(true);
+
+            PrescriptionTemplate saved = mock(PrescriptionTemplate.class);
+            when(saved.getId()).thenReturn(UUID.randomUUID());
+            when(saved.getItems()).thenReturn(List.of());
+            when(templateRepository.save(any(PrescriptionTemplate.class))).thenReturn(saved);
+            when(resultMapper.toResult(saved)).thenReturn(mock(PrescriptionTemplateResult.class));
+
+            service.save(new SavePrescriptionTemplateCommand(PRESCRIPTION_ID, "J06.9"));
+        }
+
+        verify(templateRepository, org.mockito.Mockito.times(2))
+                .save(any(PrescriptionTemplate.class));
     }
 
     @Test
@@ -121,7 +173,7 @@ class SavePrescriptionTemplateServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
 
         Prescription prescription = mock(Prescription.class);
-        when(prescription.isPendingDispense()).thenReturn(true);
+        when(prescription.getStatus()).thenReturn(PrescriptionStatus.PENDING_DISPENSE);
         when(prescription.getPrescribedBy()).thenReturn(UUID.randomUUID());
         when(prescriptionRepository.findById(PRESCRIPTION_ID)).thenReturn(Optional.of(prescription));
 
@@ -135,13 +187,75 @@ class SavePrescriptionTemplateServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
 
         Prescription prescription = mock(Prescription.class);
-        when(prescription.isPendingDispense()).thenReturn(true);
+        when(prescription.getStatus()).thenReturn(PrescriptionStatus.PENDING_DISPENSE);
         when(prescription.getPrescribedBy()).thenReturn(DOCTOR_ID);
         when(prescriptionRepository.findById(PRESCRIPTION_ID)).thenReturn(Optional.of(prescription));
         when(diagnosisCatalogRepository.findByCode("UNKNOWN")).thenReturn(Optional.empty());
 
         assertThrows(ValidationException.class,
                 () -> service.save(new SavePrescriptionTemplateCommand(PRESCRIPTION_ID, "UNKNOWN")));
+
+        verify(templateRepository, never()).save(any());
+    }
+
+    @Test
+    void diagnosisNotBelongingToMedicalRecordIsRejected() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
+
+        Prescription prescription = mock(Prescription.class);
+        when(prescription.getStatus()).thenReturn(PrescriptionStatus.PENDING_DISPENSE);
+        when(prescription.getPrescribedBy()).thenReturn(DOCTOR_ID);
+        when(prescription.getMedicalRecordId()).thenReturn(MEDICAL_RECORD_ID);
+        when(prescriptionRepository.findById(PRESCRIPTION_ID)).thenReturn(Optional.of(prescription));
+
+        DiagnosisCatalog diagnosis = mock(DiagnosisCatalog.class);
+        when(diagnosis.getId()).thenReturn(DIAGNOSIS_ID);
+        when(diagnosisCatalogRepository.findByCode("A00.0")).thenReturn(Optional.of(diagnosis));
+        when(medicalRecordDiagnosisRepository
+                .existsByMedicalRecordIdAndDiagnosisCatalogId(MEDICAL_RECORD_ID, DIAGNOSIS_ID))
+                .thenReturn(false);
+
+        assertThrows(ValidationException.class,
+                () -> service.save(new SavePrescriptionTemplateCommand(PRESCRIPTION_ID, "A00.0")));
+
+        verify(templateRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    void diagnosisCheckUsesPrescriptionMedicalRecordId() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
+        when(clockPort.now()).thenReturn(NOW);
+
+        Prescription prescription = mock(Prescription.class);
+        when(prescription.getId()).thenReturn(PRESCRIPTION_ID);
+        when(prescription.getStatus()).thenReturn(PrescriptionStatus.PENDING_DISPENSE);
+        when(prescription.getPrescribedBy()).thenReturn(DOCTOR_ID);
+        when(prescription.getMedicalRecordId()).thenReturn(MEDICAL_RECORD_ID);
+        PrescriptionItem item = prescriptionItem();
+        when(prescription.getItems()).thenReturn(List.of(item));
+        when(prescriptionRepository.findById(PRESCRIPTION_ID)).thenReturn(Optional.of(prescription));
+
+        DiagnosisCatalog diagnosis = mock(DiagnosisCatalog.class);
+        when(diagnosis.getId()).thenReturn(DIAGNOSIS_ID);
+        when(diagnosis.getCode()).thenReturn("J06.9");
+        when(diagnosisCatalogRepository.findByCode("J06.9")).thenReturn(Optional.of(diagnosis));
+        when(medicalRecordDiagnosisRepository
+                .existsByMedicalRecordIdAndDiagnosisCatalogId(MEDICAL_RECORD_ID, DIAGNOSIS_ID))
+                .thenReturn(true);
+
+        PrescriptionTemplate saved = mock(PrescriptionTemplate.class);
+        when(saved.getId()).thenReturn(UUID.randomUUID());
+        when(saved.getItems()).thenReturn(List.of());
+        when(templateRepository.save(any(PrescriptionTemplate.class))).thenReturn(saved);
+        when(resultMapper.toResult(saved)).thenReturn(mock(PrescriptionTemplateResult.class));
+
+        service.save(new SavePrescriptionTemplateCommand(PRESCRIPTION_ID, "J06.9"));
+
+        verify(medicalRecordDiagnosisRepository)
+                .existsByMedicalRecordIdAndDiagnosisCatalogId(eq(MEDICAL_RECORD_ID), eq(DIAGNOSIS_ID));
     }
 
     private PrescriptionItem prescriptionItem() {

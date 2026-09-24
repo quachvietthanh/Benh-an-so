@@ -54,7 +54,9 @@ public record UpdatePatientCommand(
 
         String consentSignerName,
 
-        Boolean transitionToAdult
+        Boolean transitionToAdult,
+
+        java.util.Set<com.benhsoan.domain.patient.enums.ConsentScope> scopes
 
 ) {
 }

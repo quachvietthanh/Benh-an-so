@@ -12,6 +12,11 @@ public interface MedicalRecordDiagnosisRepository {
 
     boolean existsByDiagnosisCatalogId(UUID diagnosisCatalogId);
 
+    boolean existsByMedicalRecordIdAndDiagnosisCatalogId(
+            UUID medicalRecordId,
+            UUID diagnosisCatalogId
+    );
+
     List<MedicalRecordDiagnosis> findByMedicalRecordId(UUID medicalRecordId);
 
     List<MedicalRecordDiagnosis> findByMedicalRecordIdAndDiagnosisType(

@@ -71,7 +71,7 @@ class PrescriptionTemplateControllerTest {
                         .with(user("doctor").roles("DOCTOR"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"prescriptionId\":\"" + UUID.randomUUID() + "\",\"diagnosisCode\":\"J06.9\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.diagnosisCode").value("J06.9"));
     }
 
