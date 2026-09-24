@@ -17,25 +17,25 @@ import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the V94 {@code clinic_configuration} ALTER statements (session
+ * Verifies the V96 {@code clinic_configuration} ALTER statements (session
  * timeout/warning columns, defaults and CHECK constraints) against H2.
  *
- * <p>The permission-seeding section of V94 uses MySQL {@code UUID_TO_BIN(...)}
+ * <p>The permission-seeding section of V96 uses MySQL {@code UUID_TO_BIN(...)}
  * (same pattern as V40/V86) which H2 does not support, so it is intentionally
  * not executed here; it is covered by the MySQL Flyway path.</p>
  */
 class SessionManagementMigrationH2Test {
 
     @Test
-    void v94MigrationAltersClinicConfigurationOnH2() throws Exception {
+    void v96MigrationAltersClinicConfigurationOnH2() throws Exception {
         try (Connection conn = DriverManager.getConnection(
-                "jdbc:h2:mem:v94;DB_CLOSE_DELAY=-1;MODE=MySQL", "sa", "")) {
+                "jdbc:h2:mem:v96;DB_CLOSE_DELAY=-1;MODE=MySQL", "sa", "")) {
             Statement stmt = conn.createStatement();
 
             stmt.execute("CREATE TABLE clinic_configuration (id INT NOT NULL, PRIMARY KEY (id))");
             stmt.execute("INSERT INTO clinic_configuration (id) VALUES (1)");
 
-            String ddl = readResource("db/migration/V94__add_session_management.sql");
+            String ddl = readResource("db/migration/V96__add_session_management.sql");
             String alterPortion = ddl.substring(0, ddl.indexOf("-- Session-management permissions"));
             RunScript.execute(conn, new StringReader(alterPortion));
 
