@@ -76,7 +76,7 @@ class PatientConsentConcurrencyIntegrationTest {
         });
     }
 
-    private Patient seedPatientWithInitialConsent(UUID patientId, UUID userId) {
+    private Patient seedPatientWithInitialConsent(UUID userId) {
         return new TransactionTemplate(transactionManager).execute(status -> {
             Patient patient = Patient.create(
                     "BN000001",
@@ -106,7 +106,7 @@ class PatientConsentConcurrencyIntegrationTest {
 
             // Version 1 ban đầu
             PatientConsentRecord v1 = PatientConsentRecord.create(
-                    patientId,
+                    saved.getId(),
                     1,
                     "v1.0",
                     ConsentHistoryStatus.AGREED,
@@ -131,8 +131,8 @@ class PatientConsentConcurrencyIntegrationTest {
     @DisplayName("P1 & P2-2: Hai giao dịch đồng thời cập nhật/xóa consent serialize trật tự qua findByIdForUpdate, không bị trùng version")
     void concurrentConsentUpdates_serializeViaPessimisticLock_andProduceSequentialVersions() throws Exception {
         UUID userId = UUID.randomUUID();
-        UUID patientId = UUID.randomUUID();
-        seedPatientWithInitialConsent(patientId, userId);
+        Patient savedPatient = seedPatientWithInitialConsent(userId);
+        UUID patientId = savedPatient.getId();
 
         CountDownLatch startSignal = new CountDownLatch(1);
         AtomicReference<Exception> thread1Error = new AtomicReference<>();

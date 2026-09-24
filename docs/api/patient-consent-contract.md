@@ -347,3 +347,30 @@ Trả về `DataErasureResponse` tương tự endpoint 3.6.
 | `PARTIALLY_WITHDRAWN` | Thu hẹp phạm vi (rút một phần, chỉ duy trì khám chữa bệnh `TREATMENT`) |
 | `WITHDRAWN` | Rút lại toàn bộ sự đồng ý |
 
+---
+
+## 5. Kiến trúc Concurrency & Cơ sở dữ liệu
+
+### 5.1. Database Migration (`V90__create_patient_consent_history.sql`)
+- Phiên bản migration chính thức sau rebase `origin/develop`: **`V90`** (tránh va chạm với `V87-V89` của develop).
+- Bảng lưu trữ: `patient_consent_history`.
+- Ràng buộc toàn vẹn: Unique constraint `uk_patient_consent_version (patient_id, version_number)`.
+- Foreign key: `fk_patient_consent_patient` liên kết đến bảng `patients(id)` với `ON DELETE CASCADE`.
+
+### 5.2. Concurrency Control (Race-Condition Protection)
+- **Aggregate Root Pessimistic Locking**: Mọi use case sinh phiên bản consent mới (`UpdatePatientConsentService`, `RequestPatientDataErasureService`) bắt buộc phải lock bản ghi bệnh nhân thông qua:
+  ```java
+  Patient patient = patientRepository.findByIdForUpdate(patientId)
+          .orElseThrow(() -> new PatientNotFoundException(patientId));
+  ```
+- **Serialization Guarantee**: Lệnh `SELECT ... FOR UPDATE` trên dòng `patients` tuần tự hóa các yêu cầu cập nhật đồng thời của cùng một bệnh nhân. Nhờ đó, việc tính toán `getNextVersionNumber(patientId)` (`max(version_number) + 1`) luôn an toàn, tránh `DataIntegrityViolationException` do vi phạm unique constraint.
+
+### 5.3. Audit Log Isolation (`REQUIRES_NEW`)
+- Thao tác ghi log từ chối xóa dữ liệu và thu hồi đồng ý (`PatientConsentErasureAuditWriter`) được thực thi với:
+  ```java
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  ```
+- **Rollback Survival Guarantee**: Bản ghi audit log được commit trong transaction riêng biệt độc lập với transaction nghiệp vụ chính. Ngay cả khi transaction nghiệp vụ bị rollback do lỗi hệ thống, bằng chứng yêu cầu và từ chối xóa dữ liệu theo `QTN-19` vẫn được bảo toàn nguyên vẹn trong hệ thống.
+- **Malformed JSON Protection**: Mọi payload audit log được serialize chuẩn hóa bằng `ObjectMapper` thay vì nối chuỗi, đảm bảo an toàn tuyệt đối với các ký tự đặc biệt (`"`, `\`) do người dùng nhập.
+
+
