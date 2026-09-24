@@ -27,6 +27,9 @@ public record CreatePrescriptionRequest(
         @Valid
         List<PrescriptionContraindicationOverrideRequest> contraindicationOverrides,
 
+        @Valid
+        List<PrescriptionMaxDailyDoseOverrideRequest> maxDailyDoseOverrides,
+
         boolean controlledMedicineConfirmed
 
 ) {
@@ -36,7 +39,7 @@ public record CreatePrescriptionRequest(
             List<CreatePrescriptionItemRequest> items,
             List<PrescriptionInteractionOverrideRequest> interactionOverrides
     ) {
-        this(medicalRecordId, note, items, interactionOverrides, null, null, false);
+        this(medicalRecordId, note, items, interactionOverrides, null, null, null, false);
     }
 
     public CreatePrescriptionRequest(
@@ -46,6 +49,6 @@ public record CreatePrescriptionRequest(
             List<PrescriptionInteractionOverrideRequest> interactionOverrides,
             List<PrescriptionAllergyOverrideRequest> allergyOverrides
     ) {
-        this(medicalRecordId, note, items, interactionOverrides, allergyOverrides, null, false);
+        this(medicalRecordId, note, items, interactionOverrides, allergyOverrides, null, null, false);
     }
 }

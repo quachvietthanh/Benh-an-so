@@ -28,6 +28,7 @@ public class PrescriptionItemPersistenceMapper {
                 entity.getQuantity(),
                 entity.getDispensedQuantity(),
                 entity.getInstructions(),
+                entity.getSingleDoseQuantity(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -53,6 +54,7 @@ public class PrescriptionItemPersistenceMapper {
                 .quantity(domain.getQuantity())
                 .dispensedQuantity(domain.getDispensedQuantity())
                 .instructions(domain.getInstructions())
+                .singleDoseQuantity(domain.getSingleDoseQuantity())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

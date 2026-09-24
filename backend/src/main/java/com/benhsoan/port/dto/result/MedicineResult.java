@@ -1,5 +1,6 @@
 package com.benhsoan.port.dto.result;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -20,6 +21,8 @@ public record MedicineResult(
         Instant updatedAt,
         int stockQuantity,
         int minStockThreshold,
-        boolean controlled
+        boolean controlled,
+        BigDecimal strengthValueMg,
+        BigDecimal maxDailyDoseMg
 ) {
 }
