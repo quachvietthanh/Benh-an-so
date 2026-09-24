@@ -12,6 +12,8 @@ public interface DiagnosisCatalogRepository {
 
     Optional<DiagnosisCatalog> findById(UUID id);
 
+    Optional<DiagnosisCatalog> findByCode(String code);
+
     List<DiagnosisCatalog> findAllByIds(Collection<UUID> ids);
 
     boolean existsByCode(String code);

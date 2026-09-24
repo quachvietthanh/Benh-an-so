@@ -40,6 +40,7 @@ import {
   INVOICE_LINE_TYPE_META,
   INVOICE_TYPE_META,
 } from '../../utils/invoiceLookupHelpers'
+import { getPaymentMethodMeta } from '../../utils/paymentMethodHelpers.js'
 
 const { Text, Title } = Typography
 
@@ -488,6 +489,26 @@ export default function InvoiceDetailModal({
               <span style={{ fontSize: 16, fontWeight: 800, color: '#0369a1' }}>
                 {formatCurrency(invoice.totalAmount)}
               </span>
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Phương thức thanh toán">
+              <Tag color={getPaymentMethodMeta(invoice.payment?.paymentMethod || invoice.paymentMethod).tagColor}>
+                {getPaymentMethodMeta(invoice.payment?.paymentMethod || invoice.paymentMethod).label}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Chi tiết thanh toán">
+              {Array.isArray(invoice.payment?.paymentMethods) && invoice.payment.paymentMethods.length > 0 ? (
+                <Space wrap size={[6, 4]}>
+                  {invoice.payment.paymentMethods.map((m, idx) => (
+                    <Tag key={idx} color={getPaymentMethodMeta(m.paymentMethod).tagColor} style={{ fontSize: 11 }}>
+                      <strong>{getPaymentMethodMeta(m.paymentMethod).label}:</strong> {formatCurrency(m.amount)}
+                      {m.referenceNumber ? ` (${m.referenceNumber})` : ''}
+                    </Tag>
+                  ))}
+                </Space>
+              ) : (
+                <span>{getPaymentMethodMeta(invoice.payment?.paymentMethod || invoice.paymentMethod).label}</span>
+              )}
             </Descriptions.Item>
 
             <Descriptions.Item label="Số lần in lại">

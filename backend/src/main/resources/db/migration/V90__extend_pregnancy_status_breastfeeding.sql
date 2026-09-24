@@ -1,7 +1,8 @@
 -- =====================================================
--- V78__extend_pregnancy_status_breastfeeding.sql
+-- V90__extend_pregnancy_status_breastfeeding.sql
 -- NCL-05-CN-006: Mở rộng trạng thái thai kỳ và loại chống chỉ định
 -- Bổ sung giá trị BREASTFEEDING (Phụ nữ đang cho con bú)
+-- (Đánh lại version để tránh trùng V78 với NCL-06-CN-014)
 -- =====================================================
 
 ALTER TABLE patients DROP CONSTRAINT chk_patients_pregnancy_status;

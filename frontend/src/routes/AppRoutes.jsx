@@ -56,6 +56,9 @@ const RevenueBreakdownReportPage = React.lazy(() => import('../pages/RevenueBrea
 const AppointmentEffectivenessReportPage = React.lazy(() => import('../pages/AppointmentEffectivenessReportPage.jsx'))
 const InventoryStockReportPage = React.lazy(() => import('../pages/InventoryStockReportPage.jsx'))
 const ContraindicationRuleManagementPage = React.lazy(() => import('../pages/ContraindicationRuleManagementPage'))
+const CashierShiftClosingPage = React.lazy(() => import('../pages/CashierShiftClosingPage.jsx'))
+const CashierShiftHistoryPage = React.lazy(() => import('../pages/CashierShiftHistoryPage.jsx'))
+const DiscountRequestManagementPage = React.lazy(() => import('../pages/DiscountRequestManagementPage.jsx'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -170,6 +173,8 @@ function AppRoutes() {
         <Route path="medicines" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />
+        <Route path="invoices/discount-requests" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_UPDATE', 'INVOICE_CREATE']} allowedRoles={['admin', 'manager', 'clinic_manager', 'receptionist']}><LazyPage><DiscountRequestManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="discount-requests" element={<Navigate to="/invoices/discount-requests" replace />} />
         <Route path="invoices/lookup" element={<PrivateRoute allowedPermissions={['INVOICE_READ']} allowedRoles={['admin', 'manager', 'clinic_manager', 'receptionist']}><LazyPage><InvoiceLookupPage /></LazyPage></PrivateRoute>} />
         <Route path="reports" element={<PrivateRoute allowedPermissions={['REPORT_VIEW', 'REPORT_EXPORT']} allowedRoles={['admin', 'manager']}><LazyPage><ReportsPage /></LazyPage></PrivateRoute>} />
         <Route path="reports/disease-patterns" element={<PrivateRoute allowedPermissions={['REPORT_VIEW']} allowedRoles={['manager', 'clinic_manager']} disallowAdmin={true}><LazyPage><DiseasePatternReportPage /></LazyPage></PrivateRoute>} />
@@ -198,6 +203,9 @@ function AppRoutes() {
         <Route path="admin-operation-logs" element={<Navigate to="/admin/operation-logs" replace />} />
         <Route path="contraindication-rules" element={<PrivateRoute allowedPermissions={['CONTRAINDICATION_RULE_MANAGE']}><LazyPage><ContraindicationRuleManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="system/contraindication-rules" element={<Navigate to="/contraindication-rules" replace />} />
+        <Route path="cashier-shifts/close" element={<PrivateRoute allowedPermissions={['CASHIER_SHIFT_CREATE']} allowedRoles={['receptionist', 'admin']}><LazyPage><CashierShiftClosingPage /></LazyPage></PrivateRoute>} />
+        <Route path="cashier-shifts/history" element={<PrivateRoute allowedPermissions={['CASHIER_SHIFT_READ']} allowedRoles={['receptionist', 'manager', 'clinic_manager', 'admin']}><LazyPage><CashierShiftHistoryPage /></LazyPage></PrivateRoute>} />
+        <Route path="cashier-shifts" element={<Navigate to="/cashier-shifts/history" replace />} />
 
       </Route>
 
