@@ -115,6 +115,11 @@ function PatientMedicalHistoryPage() {
                 Lịch hẹn của tôi
               </Button>
             </Link>
+            <Link to="/portal/my-invoices">
+              <Button className="portal-header-btn" icon={<FileTextOutlined style={{ color: '#2563eb' }} />}>
+                Hóa đơn của tôi
+              </Button>
+            </Link>
             <Link to="/portal/dashboard">
               <Button className="portal-header-btn" icon={<HomeOutlined style={{ color: '#64748b' }} />}>
                 Trang chủ
