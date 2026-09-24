@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.backup.BackupRecord;
+import com.benhsoan.domain.backup.enums.BackupStatus;
+import com.benhsoan.domain.backup.enums.BackupType;
 import com.benhsoan.persistence.jpaRepository.backup.JpaBackupRecordRepository;
 import com.benhsoan.persistence.mapper.backup.BackupPersistenceMapper;
 import com.benhsoan.port.outbound.repository.backup.BackupRecordRepository;
@@ -45,5 +47,17 @@ public class BackupRecordRepositoryAdapter implements BackupRecordRepository {
     @Transactional(readOnly = true)
     public Optional<BackupRecord> findTopByOrderByBackupCodeDesc() {
         return jpaRepository.findTopByOrderByBackupCodeDesc().map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<BackupRecord> findTopByStatusOrderByCreatedAtDesc(BackupStatus status) {
+        return jpaRepository.findTopByStatusOrderByCreatedAtDesc(status).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<BackupRecord> findTopByBackupTypeOrderByCreatedAtDesc(BackupType backupType) {
+        return jpaRepository.findTopByBackupTypeOrderByCreatedAtDesc(backupType).map(mapper::toDomain);
     }
 }

@@ -4,11 +4,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,12 +27,17 @@ import com.benhsoan.adapter.inbound.rest.mapper.BackupRestMapper;
 import com.benhsoan.domain.backup.enums.BackupStatus;
 import com.benhsoan.domain.backup.enums.BackupType;
 import com.benhsoan.port.dto.result.BackupDownloadResult;
+import com.benhsoan.port.dto.result.BackupIntegrityResult;
 import com.benhsoan.port.dto.result.BackupResult;
+import com.benhsoan.port.dto.result.BackupScheduleResult;
 import com.benhsoan.port.inbound.backup.CreateBackupUseCase;
 import com.benhsoan.port.inbound.backup.DownloadBackupUseCase;
 import com.benhsoan.port.inbound.backup.GetBackupByIdUseCase;
+import com.benhsoan.port.inbound.backup.GetBackupScheduleUseCase;
 import com.benhsoan.port.inbound.backup.ListBackupsUseCase;
 import com.benhsoan.port.inbound.backup.RestoreBackupUseCase;
+import com.benhsoan.port.inbound.backup.UpdateBackupScheduleUseCase;
+import com.benhsoan.port.inbound.backup.VerifyLatestBackupUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -56,6 +63,12 @@ class BackupControllerTest {
     private RestoreBackupUseCase restoreBackupUseCase;
     @MockitoBean
     private DownloadBackupUseCase downloadBackupUseCase;
+    @MockitoBean
+    private GetBackupScheduleUseCase getBackupScheduleUseCase;
+    @MockitoBean
+    private UpdateBackupScheduleUseCase updateBackupScheduleUseCase;
+    @MockitoBean
+    private VerifyLatestBackupUseCase verifyLatestBackupUseCase;
 
     @MockitoBean
     private JwtTokenPort jwtTokenPort;
@@ -117,6 +130,45 @@ class BackupControllerTest {
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"BKP-20260814-0001.json\""));
     }
 
+    @Test
+    void getsBackupSchedule() throws Exception {
+        when(getBackupScheduleUseCase.get())
+                .thenReturn(new BackupScheduleResult(true, LocalTime.of(2, 0), Instant.parse("2026-08-14T08:00:00Z")));
+
+        mockMvc.perform(get("/backups/schedule"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.backupTime").value("02:00:00"));
+    }
+
+    @Test
+    void updatesBackupSchedule() throws Exception {
+        when(updateBackupScheduleUseCase.update(any()))
+                .thenReturn(new BackupScheduleResult(true, LocalTime.of(3, 30), Instant.parse("2026-08-14T08:00:00Z")));
+
+        mockMvc.perform(put("/backups/schedule")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"backupTime\":\"03:30:00\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.backupTime").value("03:30:00"));
+    }
+
+    @Test
+    void verifiesLatestBackup() throws Exception {
+        when(verifyLatestBackupUseCase.verifyLatest())
+                .thenReturn(new BackupIntegrityResult(
+                        BACKUP_ID, "BKP-20260814-0001", "BKP-20260814-0001.json",
+                        Instant.parse("2026-08-14T08:00:00Z"),
+                        true, null, 5, 10L, Instant.parse("2026-08-14T09:00:00Z")));
+
+        mockMvc.perform(post("/backups/latest/verify"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.tableCount").value(5))
+                .andExpect(jsonPath("$.rowCount").value(10));
+    }
+
     private BackupResult backupResult() {
         return new BackupResult(
                 BACKUP_ID,
@@ -126,6 +178,7 @@ class BackupControllerTest {
                 BackupStatus.SUCCESS,
                 BackupType.MANUAL,
                 "nightly",
+                null,
                 BACKUP_ID,
                 Instant.parse("2026-08-14T08:00:00Z"),
                 null,
@@ -142,6 +195,7 @@ class BackupControllerTest {
                 BackupStatus.SUCCESS,
                 BackupType.MANUAL,
                 "nightly",
+                null,
                 BACKUP_ID,
                 Instant.parse("2026-08-14T08:00:00Z"),
                 Instant.parse("2026-08-14T09:00:00Z"),

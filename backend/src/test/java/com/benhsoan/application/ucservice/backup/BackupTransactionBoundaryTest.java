@@ -35,7 +35,7 @@ class BackupTransactionBoundaryTest {
         when(repository.findById(record.getId())).thenReturn(Optional.of(record));
         when(repository.save(any(BackupRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        lifecycleService.markFailed(record.getId());
+        lifecycleService.markFailed(record.getId(), "failure");
 
         assertEquals(BackupStatus.FAILED, record.getStatus());
         verify(repository).save(record);
@@ -47,7 +47,8 @@ class BackupTransactionBoundaryTest {
                 "createInProgress", String.class, BackupType.class, String.class, UUID.class, Instant.class));
         assertRequiresNew(BackupRecordLifecycleService.class.getMethod(
                 "markSuccess", UUID.class, BackupSnapshot.class));
-        assertRequiresNew(BackupRecordLifecycleService.class.getMethod("markFailed", UUID.class));
+        assertRequiresNew(BackupRecordLifecycleService.class.getMethod(
+                "markFailed", UUID.class, String.class));
 
         Transactional exportTransaction = BackupSnapshotExportService.class
                 .getMethod("export", String.class)

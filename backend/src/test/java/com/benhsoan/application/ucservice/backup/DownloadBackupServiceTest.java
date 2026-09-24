@@ -73,6 +73,7 @@ class DownloadBackupServiceTest {
                 BackupStatus.SUCCESS,
                 BackupType.MANUAL,
                 "Test backup",
+                null,
                 ACTOR,
                 NOW,
                 null,

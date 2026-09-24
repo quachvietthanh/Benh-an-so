@@ -28,6 +28,7 @@ public class CreateBackupService implements CreateBackupUseCase {
     private final BackupAuditLogWriter auditLogWriter;
     private final BackupResultMapper resultMapper;
     private final BackupAuthorizer authorizer;
+    private final BackupFailureReason backupFailureReason;
     private final CurrentUserPort currentUserPort;
     private final ClockPort clockPort;
 
@@ -49,7 +50,7 @@ public class CreateBackupService implements CreateBackupUseCase {
             BackupSnapshot snapshot = snapshotExportService.export(backupCode);
             record = lifecycleService.markSuccess(record.getId(), snapshot);
         } catch (RuntimeException ex) {
-            lifecycleService.markFailed(record.getId());
+            lifecycleService.markFailed(record.getId(), backupFailureReason.sanitize(ex));
             throw new BackupExecutionException("Failed to create backup snapshot: " + ex.getMessage());
         }
 

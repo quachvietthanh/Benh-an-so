@@ -20,6 +20,7 @@ public class BackupPersistenceMapper {
                 entity.getStatus(),
                 entity.getBackupType(),
                 entity.getDescription(),
+                entity.getFailureReason(),
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
                 entity.getRestoredAt(),
@@ -39,6 +40,7 @@ public class BackupPersistenceMapper {
                 .status(domain.getStatus())
                 .backupType(domain.getBackupType())
                 .description(domain.getDescription())
+                .failureReason(domain.getFailureReason())
                 .createdBy(domain.getCreatedBy())
                 .createdAt(domain.getCreatedAt())
                 .restoredAt(domain.getRestoredAt())

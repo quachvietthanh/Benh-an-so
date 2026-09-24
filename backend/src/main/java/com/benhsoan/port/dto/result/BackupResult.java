@@ -14,6 +14,7 @@ public record BackupResult(
         BackupStatus status,
         BackupType backupType,
         String description,
+        String failureReason,
         UUID createdBy,
         Instant createdAt,
         Instant restoredAt,

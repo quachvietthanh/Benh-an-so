@@ -51,6 +51,9 @@ public class BackupRecordEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "failure_reason", length = 500)
+    private String failureReason;
+
     @Column(name = "created_by", nullable = false, columnDefinition = "BINARY(16)")
     private UUID createdBy;
 

@@ -11,6 +11,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -18,14 +19,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.BackupRestMapper;
 import com.benhsoan.adapter.inbound.rest.request.backup.CreateBackupRequest;
+import com.benhsoan.adapter.inbound.rest.request.backup.UpdateBackupScheduleRequest;
+import com.benhsoan.adapter.inbound.rest.response.backup.BackupIntegrityResponse;
 import com.benhsoan.adapter.inbound.rest.response.backup.BackupResponse;
+import com.benhsoan.adapter.inbound.rest.response.backup.BackupScheduleResponse;
 import com.benhsoan.infrastructure.security.annotation.RequirePermission;
 import com.benhsoan.port.dto.result.BackupDownloadResult;
 import com.benhsoan.port.inbound.backup.CreateBackupUseCase;
 import com.benhsoan.port.inbound.backup.DownloadBackupUseCase;
 import com.benhsoan.port.inbound.backup.GetBackupByIdUseCase;
+import com.benhsoan.port.inbound.backup.GetBackupScheduleUseCase;
 import com.benhsoan.port.inbound.backup.ListBackupsUseCase;
 import com.benhsoan.port.inbound.backup.RestoreBackupUseCase;
+import com.benhsoan.port.inbound.backup.UpdateBackupScheduleUseCase;
+import com.benhsoan.port.inbound.backup.VerifyLatestBackupUseCase;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +50,9 @@ public class BackupController {
     private final GetBackupByIdUseCase getBackupByIdUseCase;
     private final RestoreBackupUseCase restoreBackupUseCase;
     private final DownloadBackupUseCase downloadBackupUseCase;
+    private final GetBackupScheduleUseCase getBackupScheduleUseCase;
+    private final UpdateBackupScheduleUseCase updateBackupScheduleUseCase;
+    private final VerifyLatestBackupUseCase verifyLatestBackupUseCase;
     private final BackupRestMapper mapper;
 
     @PostMapping
@@ -56,6 +66,24 @@ public class BackupController {
     @RequirePermission("BACKUP_READ")
     public List<BackupResponse> list() {
         return mapper.toResponse(listBackupsUseCase.list());
+    }
+
+    @GetMapping("/schedule")
+    @RequirePermission("BACKUP_SCHEDULE_READ")
+    public BackupScheduleResponse getSchedule() {
+        return mapper.toResponse(getBackupScheduleUseCase.get());
+    }
+
+    @PutMapping("/schedule")
+    @RequirePermission("BACKUP_SCHEDULE_UPDATE")
+    public BackupScheduleResponse updateSchedule(@Valid @RequestBody UpdateBackupScheduleRequest request) {
+        return mapper.toResponse(updateBackupScheduleUseCase.update(mapper.toCommand(request)));
+    }
+
+    @PostMapping("/latest/verify")
+    @RequirePermission("BACKUP_VERIFY")
+    public BackupIntegrityResponse verifyLatest() {
+        return mapper.toResponse(verifyLatestBackupUseCase.verifyLatest());
     }
 
     @GetMapping("/{id}")

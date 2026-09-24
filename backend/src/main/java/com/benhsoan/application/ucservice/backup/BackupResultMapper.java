@@ -20,6 +20,7 @@ public class BackupResultMapper {
                 record.getStatus(),
                 record.getBackupType(),
                 record.getDescription(),
+                record.getFailureReason(),
                 record.getCreatedBy(),
                 record.getCreatedAt(),
                 record.getRestoredAt(),

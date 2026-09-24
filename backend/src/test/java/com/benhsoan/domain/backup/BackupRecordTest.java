@@ -65,9 +65,10 @@ class BackupRecordTest {
     void markFailedTransitionsInProgressToFailed() {
         BackupRecord record = BackupRecord.create("BKP-20260814-0001", BackupType.FULL, null, ACTOR, NOW);
 
-        record.markFailed();
+        record.markFailed("disk full");
 
         assertEquals(BackupStatus.FAILED, record.getStatus());
+        assertEquals("disk full", record.getFailureReason());
         assertFalse(record.isRestorable());
     }
 
@@ -75,7 +76,7 @@ class BackupRecordTest {
     void markRestoredRejectsNonSuccessStatus() {
         BackupRecord failed = BackupRecord.restore(
                 UUID.randomUUID(), "BKP-20260814-0001", null, 0L,
-                BackupStatus.FAILED, BackupType.FULL, null, ACTOR, NOW, null, null);
+                BackupStatus.FAILED, BackupType.FULL, null, null, ACTOR, NOW, null, null);
 
         assertThrows(InvalidBackupStatusException.class,
                 () -> failed.markRestored(ACTOR, NOW));

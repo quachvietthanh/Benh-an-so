@@ -28,6 +28,7 @@ public class BackupRecord {
     private BackupStatus status;
     private BackupType backupType;
     private String description;
+    private String failureReason;
     private UUID createdBy;
     private Instant createdAt;
     private Instant restoredAt;
@@ -41,6 +42,7 @@ public class BackupRecord {
             BackupStatus status,
             BackupType backupType,
             String description,
+            String failureReason,
             UUID createdBy,
             Instant createdAt,
             Instant restoredAt,
@@ -55,6 +57,7 @@ public class BackupRecord {
         this.fileName = fileName;
         this.fileSize = fileSize;
         this.description = description;
+        this.failureReason = failureReason;
         this.restoredAt = restoredAt;
         this.restoredBy = restoredBy;
     }
@@ -74,6 +77,7 @@ public class BackupRecord {
                 BackupStatus.IN_PROGRESS,
                 backupType,
                 description,
+                null,
                 createdBy,
                 createdAt,
                 null,
@@ -89,6 +93,7 @@ public class BackupRecord {
             BackupStatus status,
             BackupType backupType,
             String description,
+            String failureReason,
             UUID createdBy,
             Instant createdAt,
             Instant restoredAt,
@@ -102,6 +107,7 @@ public class BackupRecord {
                 status,
                 backupType,
                 description,
+                failureReason,
                 createdBy,
                 createdAt,
                 restoredAt,
@@ -121,11 +127,12 @@ public class BackupRecord {
         this.status = BackupStatus.SUCCESS;
     }
 
-    public void markFailed() {
+    public void markFailed(String failureReason) {
         if (status != BackupStatus.IN_PROGRESS) {
             throw new InvalidBackupStatusException("Only in-progress backups can be marked failed.");
         }
         this.status = BackupStatus.FAILED;
+        this.failureReason = failureReason;
     }
 
     public void markRestored(UUID restoredBy, Instant restoredAt) {

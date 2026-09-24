@@ -6,6 +6,8 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.benhsoan.domain.backup.enums.BackupStatus;
+import com.benhsoan.domain.backup.enums.BackupType;
 import com.benhsoan.persistence.entity.backup.BackupRecordEntity;
 
 public interface JpaBackupRecordRepository
@@ -14,4 +16,8 @@ public interface JpaBackupRecordRepository
     List<BackupRecordEntity> findAllByOrderByCreatedAtDesc();
 
     Optional<BackupRecordEntity> findTopByOrderByBackupCodeDesc();
+
+    Optional<BackupRecordEntity> findTopByStatusOrderByCreatedAtDesc(BackupStatus status);
+
+    Optional<BackupRecordEntity> findTopByBackupTypeOrderByCreatedAtDesc(BackupType backupType);
 }

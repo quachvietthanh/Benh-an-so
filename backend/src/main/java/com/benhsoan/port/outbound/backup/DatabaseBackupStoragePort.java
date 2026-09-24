@@ -7,4 +7,7 @@ public interface DatabaseBackupStoragePort {
     BackupSnapshot loadSnapshot(String fileName);
 
     void restoreSnapshot(String fileName);
+
+    BackupVerification verifySnapshot(String fileName);
 }
+

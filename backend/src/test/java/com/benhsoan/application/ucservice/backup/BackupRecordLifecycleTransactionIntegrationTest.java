@@ -30,6 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.benhsoan.domain.backup.exception.BackupExecutionException;
 import com.benhsoan.domain.backup.BackupRecord;
 import com.benhsoan.domain.backup.enums.BackupType;
+import com.benhsoan.domain.backup.enums.BackupStatus;
 import com.benhsoan.port.dto.command.backup.CreateBackupCommand;
 import com.benhsoan.port.outbound.backup.DatabaseBackupStoragePort;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -91,7 +92,7 @@ class BackupRecordLifecycleTransactionIntegrationTest {
         transactionTemplate.executeWithoutResult(status -> {
             record[0] = lifecycleService.createInProgress(
                     "BKP-20260814-0001", BackupType.FULL, null, actorId, Instant.now());
-            lifecycleService.markFailed(record[0].getId());
+            lifecycleService.markFailed(record[0].getId(), "rollback test");
             status.setRollbackOnly();
         });
 
@@ -123,6 +124,11 @@ class BackupRecordLifecycleTransactionIntegrationTest {
             public void restoreSnapshot(String fileName) {
                 throw new UnsupportedOperationException();
             }
+
+            @Override
+            public com.benhsoan.port.outbound.backup.BackupVerification verifySnapshot(String fileName) {
+                throw new UnsupportedOperationException();
+            }
         };
         CreateBackupService service = new CreateBackupService(
                 lifecycleService,
@@ -131,6 +137,7 @@ class BackupRecordLifecycleTransactionIntegrationTest {
                 auditLogWriter,
                 new BackupResultMapper(),
                 new BackupAuthorizer(currentUser),
+                new BackupFailureReason(),
                 currentUser,
                 clock
         );
@@ -201,6 +208,16 @@ class BackupRecordLifecycleTransactionIntegrationTest {
 
         @Override
         public Optional<BackupRecord> findTopByOrderByBackupCodeDesc() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<BackupRecord> findTopByStatusOrderByCreatedAtDesc(BackupStatus status) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<BackupRecord> findTopByBackupTypeOrderByCreatedAtDesc(BackupType backupType) {
             return Optional.empty();
         }
     }

@@ -41,6 +41,7 @@ class CreateBackupServiceTest {
 
     private final BackupAuthorizer authorizer = new BackupAuthorizer(currentUserPort);
     private final BackupResultMapper resultMapper = new BackupResultMapper();
+    private final BackupFailureReason backupFailureReason = new BackupFailureReason();
 
     private CreateBackupService service;
     private BackupRecord createdRecord;
@@ -54,6 +55,7 @@ class CreateBackupServiceTest {
                 auditLogWriter,
                 resultMapper,
                 authorizer,
+                backupFailureReason,
                 currentUserPort,
                 clockPort
         );
@@ -116,7 +118,7 @@ class CreateBackupServiceTest {
         assertThrows(BackupExecutionException.class,
                 () -> service.create(new CreateBackupCommand(BackupType.FULL, null)));
 
-        verify(lifecycleService).markFailed(any(UUID.class));
+        verify(lifecycleService).markFailed(any(UUID.class), any(String.class));
         verify(auditLogWriter, never()).write(any(), any(), any(), any());
     }
 

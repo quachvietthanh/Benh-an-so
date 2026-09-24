@@ -123,6 +123,7 @@ class RestoreBackupServiceTest {
                 status,
                 BackupType.FULL,
                 "desc",
+                null,
                 ACTOR,
                 NOW,
                 null,

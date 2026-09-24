@@ -48,6 +48,8 @@ public enum ActionType {
 
     RESTORE,
 
+    BACKUP_VERIFY,
+
     ACCESS_DENIED,
 
     MERGE,

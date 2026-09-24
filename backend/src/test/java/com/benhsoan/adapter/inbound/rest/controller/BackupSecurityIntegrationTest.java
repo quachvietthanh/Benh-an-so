@@ -5,9 +5,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,12 +32,17 @@ import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
 import com.benhsoan.port.dto.result.BackupDownloadResult;
+import com.benhsoan.port.dto.result.BackupIntegrityResult;
 import com.benhsoan.port.dto.result.BackupResult;
+import com.benhsoan.port.dto.result.BackupScheduleResult;
 import com.benhsoan.port.inbound.backup.CreateBackupUseCase;
 import com.benhsoan.port.inbound.backup.DownloadBackupUseCase;
 import com.benhsoan.port.inbound.backup.GetBackupByIdUseCase;
+import com.benhsoan.port.inbound.backup.GetBackupScheduleUseCase;
 import com.benhsoan.port.inbound.backup.ListBackupsUseCase;
 import com.benhsoan.port.inbound.backup.RestoreBackupUseCase;
+import com.benhsoan.port.inbound.backup.UpdateBackupScheduleUseCase;
+import com.benhsoan.port.inbound.backup.VerifyLatestBackupUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
@@ -68,6 +75,12 @@ class BackupSecurityIntegrationTest {
     private RestoreBackupUseCase restoreBackupUseCase;
     @MockitoBean
     private DownloadBackupUseCase downloadBackupUseCase;
+    @MockitoBean
+    private GetBackupScheduleUseCase getBackupScheduleUseCase;
+    @MockitoBean
+    private UpdateBackupScheduleUseCase updateBackupScheduleUseCase;
+    @MockitoBean
+    private VerifyLatestBackupUseCase verifyLatestBackupUseCase;
 
     @MockitoBean
     private JwtTokenPort jwtTokenPort;
@@ -127,6 +140,42 @@ class BackupSecurityIntegrationTest {
         }
     }
 
+    @Test
+    void scheduleAndVerifyEndpointsEnforcePermissions() throws Exception {
+        when(getBackupScheduleUseCase.get())
+                .thenReturn(new BackupScheduleResult(true, LocalTime.of(2, 0), Instant.now()));
+        when(updateBackupScheduleUseCase.update(any()))
+                .thenReturn(new BackupScheduleResult(true, LocalTime.of(2, 0), Instant.now()));
+        when(verifyLatestBackupUseCase.verifyLatest())
+                .thenReturn(new BackupIntegrityResult(
+                        BACKUP_ID, "BKP-20260814-0001", "f.json", Instant.now(), true, null, 5, 10L, Instant.now()));
+
+        mockMvc.perform(get("/backups/schedule")
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_BACKUP_SCHEDULE_READ"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/backups/schedule")
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_BACKUP_SCHEDULE_UPDATE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"backupTime\":\"02:00:00\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/backups/latest/verify")
+                        .with(user("admin").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_BACKUP_VERIFY"))))
+                .andExpect(status().isOk());
+
+        // A lower-privileged user holding only BACKUP_READ must be denied.
+        mockMvc.perform(get("/backups/schedule")
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_BACKUP_READ"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/backups/schedule")
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_BACKUP_READ")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"backupTime\":\"02:00:00\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/backups/latest/verify")
+                        .with(user("doctor").authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERMISSION_BACKUP_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
     private BackupResult backupResult() {
         return new BackupResult(
                 BACKUP_ID,
@@ -136,6 +185,7 @@ class BackupSecurityIntegrationTest {
                 BackupStatus.SUCCESS,
                 BackupType.FULL,
                 "desc",
+                null,
                 BACKUP_ID,
                 Instant.parse("2026-08-14T08:00:00Z"),
                 null,

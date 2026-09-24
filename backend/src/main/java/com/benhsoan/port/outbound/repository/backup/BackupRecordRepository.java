@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.benhsoan.domain.backup.BackupRecord;
+import com.benhsoan.domain.backup.enums.BackupStatus;
+import com.benhsoan.domain.backup.enums.BackupType;
 
 public interface BackupRecordRepository {
 
@@ -15,4 +17,8 @@ public interface BackupRecordRepository {
     List<BackupRecord> findAllByOrderByCreatedAtDesc();
 
     Optional<BackupRecord> findTopByOrderByBackupCodeDesc();
+
+    Optional<BackupRecord> findTopByStatusOrderByCreatedAtDesc(BackupStatus status);
+
+    Optional<BackupRecord> findTopByBackupTypeOrderByCreatedAtDesc(BackupType backupType);
 }

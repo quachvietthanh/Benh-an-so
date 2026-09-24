@@ -25,6 +25,7 @@ import org.springframework.jdbc.core.ResultSetExtractor;
 
 import com.benhsoan.domain.backup.exception.BackupExecutionException;
 import com.benhsoan.port.outbound.backup.BackupSnapshot;
+import com.benhsoan.port.outbound.backup.BackupVerification;
 import com.benhsoan.port.outbound.backup.DatabaseBackupStoragePort;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -76,6 +77,19 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
     @Override
     public BackupSnapshot loadSnapshot(String fileName) {
         return new BackupSnapshot(fileName, readFile(fileName));
+    }
+
+    @Override
+    public BackupVerification verifySnapshot(String fileName) {
+        try {
+            BackupDocument document = readJson(readFile(fileName));
+            validateSnapshot(document);
+            int tableCount = document.data().size();
+            long rowCount = document.data().stream().mapToLong(table -> table.rows().size()).sum();
+            return BackupVerification.valid(tableCount, rowCount);
+        } catch (RuntimeException ex) {
+            return BackupVerification.invalid(ex.getMessage());
+        }
     }
 
     @Override
