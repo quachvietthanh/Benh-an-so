@@ -1,0 +1,310 @@
+.portal-my-invoices-page {
+  min-height: 100vh;
+  background-color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-my-invoices-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.portal-my-invoices-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.portal-my-invoices-main {
+  flex: 1;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.portal-invoices-card-wrapper {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+}
+
+/* Stats Overview Banner */
+.portal-invoices-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.portal-stat-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s ease;
+}
+
+.portal-stat-card:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.06);
+  transform: translateY(-1px);
+}
+
+.portal-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.portal-stat-icon.blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.portal-stat-icon.green {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.portal-stat-icon.amber {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.portal-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-stat-label {
+  font-size: 12.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.portal-stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+/* Invoice List Card */
+.portal-invoice-item-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.portal-invoice-item-card:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-2px);
+}
+
+.portal-invoice-item-card.is-adjusted {
+  border-left: 4px solid #f59e0b;
+}
+
+.portal-invoice-item-card.is-adjustment-invoice {
+  border-left: 4px solid #2563eb;
+}
+
+.portal-invoice-item-card.is-original-valid {
+  border-left: 4px solid #10b981;
+}
+
+/* Card Header */
+.portal-invoice-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 20px;
+  background: #fbfcfe;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.portal-invoice-card-body {
+  padding: 18px 20px;
+}
+
+.portal-invoice-code-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.portal-invoice-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.portal-invoice-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.portal-invoice-amount-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.portal-invoice-amount-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.portal-invoice-amount-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e3a8a;
+  letter-spacing: -0.3px;
+}
+
+/* Adjusted Banner Inside Original Invoice */
+.portal-invoice-adjusted-alert {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #92400e;
+}
+
+/* 1-Click Download Button */
+.portal-download-btn-primary {
+  height: 38px !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 16px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.2) !important;
+}
+
+.portal-download-btn-primary:hover {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  transform: translateY(-1px);
+}
+
+.portal-view-detail-btn {
+  height: 38px !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 14px !important;
+  transition: all 0.2s ease !important;
+}
+
+.portal-view-detail-btn:hover {
+  border-color: #2563eb !important;
+  color: #2563eb !important;
+  background: #eff6ff !important;
+}
+
+/* Security Notice Box */
+.portal-security-note-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+  color: #166534;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .portal-my-invoices-main {
+    padding: 16px 12px 32px;
+  }
+
+  .portal-invoices-card-wrapper {
+    padding: 16px 12px;
+    border-radius: 12px;
+  }
+
+  .portal-invoice-amount-block {
+    align-items: flex-start;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #e2e8f0;
+    width: 100%;
+  }
+
+  .portal-invoice-card-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .portal-download-btn-primary,
+  .portal-view-detail-btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
