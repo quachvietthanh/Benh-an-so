@@ -3,6 +3,7 @@ package com.benhsoan.adapter.inbound.rest.controller;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.benhsoan.adapter.inbound.rest.mapper.PrescriptionTemplateRestMapper;
@@ -29,8 +31,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * NCL-05-CN-008: prescription templates by diagnosis. All endpoints require the
- * PRESCRIPTION_CREATE permission and doctor role (enforced in the service layer).
+ * NCL-05-CN-008: prescription templates by diagnosis. Write endpoints require the
+ * PRESCRIPTION_CREATE permission; read endpoints require PRESCRIPTION_READ. The
+ * doctor role and ownership checks are enforced in the service layer.
  */
 @RestController
 @RequestMapping("/prescription-templates")
@@ -45,6 +48,7 @@ public class PrescriptionTemplateController {
     private final PrescriptionTemplateRestMapper mapper;
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     @RequirePermission("PRESCRIPTION_CREATE")
     public PrescriptionTemplateResponse save(@Valid @RequestBody SavePrescriptionTemplateRequest request) {
         return mapper.toResponse(savePrescriptionTemplateUseCase.save(
@@ -52,7 +56,7 @@ public class PrescriptionTemplateController {
     }
 
     @GetMapping
-    @RequirePermission("PRESCRIPTION_CREATE")
+    @RequirePermission("PRESCRIPTION_READ")
     public List<PrescriptionTemplateResponse> getByDiagnosisCode(
             @RequestParam String diagnosisCode
     ) {
@@ -62,7 +66,7 @@ public class PrescriptionTemplateController {
     }
 
     @GetMapping("/{id}")
-    @RequirePermission("PRESCRIPTION_CREATE")
+    @RequirePermission("PRESCRIPTION_READ")
     public PrescriptionTemplateResponse getById(@PathVariable UUID id) {
         return mapper.toResponse(getPrescriptionTemplateUseCase.getById(id));
     }

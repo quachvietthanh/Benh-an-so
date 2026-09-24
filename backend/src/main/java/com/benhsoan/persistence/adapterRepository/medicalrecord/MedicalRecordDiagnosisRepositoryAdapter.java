@@ -32,6 +32,17 @@ public class MedicalRecordDiagnosisRepositoryAdapter implements MedicalRecordDia
     }
 
     @Override
+    public boolean existsByMedicalRecordIdAndDiagnosisCatalogId(
+            UUID medicalRecordId,
+            UUID diagnosisCatalogId
+    ) {
+        return jpaRepository.existsByMedicalRecordIdAndDiagnosisCatalogId(
+                medicalRecordId,
+                diagnosisCatalogId
+        );
+    }
+
+    @Override
     public List<MedicalRecordDiagnosis> findByMedicalRecordId(UUID medicalRecordId) {
         return jpaRepository.findByMedicalRecordIdOrdered(medicalRecordId).stream()
                 .map(mapper::toDomain)

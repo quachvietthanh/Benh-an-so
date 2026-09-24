@@ -25,12 +25,20 @@ import org.springframework.security.access.AccessDeniedException;
 import com.benhsoan.domain.medicalrecord.DiagnosisCatalog;
 import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.enums.AdministrationRoute;
+import com.benhsoan.domain.contraindication.enums.ContraindicationSeverity;
+import com.benhsoan.domain.contraindication.enums.ContraindicationType;
+import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
+import com.benhsoan.domain.patient.enums.AllergySeverity;
 import com.benhsoan.domain.prescription.PrescriptionTemplate;
 import com.benhsoan.domain.prescription.PrescriptionTemplateItem;
 import com.benhsoan.domain.prescription.exception.PrescriptionTemplateNotFoundException;
 import com.benhsoan.port.dto.command.prescription.ApplyPrescriptionTemplateCommand;
 import com.benhsoan.port.dto.result.AppliedPrescriptionTemplateResult;
 import com.benhsoan.port.dto.result.ContraindicationCheckResult;
+import com.benhsoan.port.dto.result.ContraindicationMissingDataResult;
+import com.benhsoan.port.dto.result.ContraindicationWarningResult;
+import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
@@ -174,6 +182,98 @@ class ApplyPrescriptionTemplateServiceTest {
 
         assertThrows(PrescriptionTemplateNotFoundException.class,
                 () -> service.apply(new ApplyPrescriptionTemplateCommand(TEMPLATE_ID, MEDICAL_RECORD_ID)));
+    }
+
+    @Test
+    void interactionWarningIsIncludedInResult() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
+
+        Medicine medicine = activeMedicine();
+        UUID medicineId = medicine.getId();
+        when(templateRepository.findById(TEMPLATE_ID))
+                .thenReturn(Optional.of(template(List.of(medicineId))));
+        when(diagnosisCatalogRepository.findById(DIAGNOSIS_ID))
+                .thenReturn(Optional.of(mock(DiagnosisCatalog.class)));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine));
+
+        UUID ruleId = UUID.randomUUID();
+        UUID otherMedicineId = UUID.randomUUID();
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of(
+                new DrugInteractionWarningResult(
+                        ruleId, medicineId, otherMedicineId,
+                        InteractionSeverity.MODERATE, "Tương tác", "Theo dõi sát")));
+        when(checkPatientDrugAllergyUseCase.check(eq(MEDICAL_RECORD_ID), anyList())).thenReturn(List.of());
+        when(checkContraindicationUseCase.check(eq(MEDICAL_RECORD_ID), anyList()))
+                .thenReturn(new ContraindicationCheckResult(List.of(), List.of()));
+
+        AppliedPrescriptionTemplateResult result = service.apply(
+                new ApplyPrescriptionTemplateCommand(TEMPLATE_ID, MEDICAL_RECORD_ID));
+
+        assertEquals(1, result.interactionWarnings().size());
+        assertEquals(ruleId, result.interactionWarnings().get(0).ruleId());
+    }
+
+    @Test
+    void allergyWarningIsIncludedInResult() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
+
+        Medicine medicine = activeMedicine();
+        UUID medicineId = medicine.getId();
+        when(templateRepository.findById(TEMPLATE_ID))
+                .thenReturn(Optional.of(template(List.of(medicineId))));
+        when(diagnosisCatalogRepository.findById(DIAGNOSIS_ID))
+                .thenReturn(Optional.of(mock(DiagnosisCatalog.class)));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        UUID allergyId = UUID.randomUUID();
+        when(checkPatientDrugAllergyUseCase.check(eq(MEDICAL_RECORD_ID), anyList())).thenReturn(List.of(
+                new PatientAllergyWarningResult(
+                        allergyId, UUID.randomUUID(), medicineId, "Paracetamol",
+                        "Paracetamol", "Paracetamol", AllergySeverity.SEVERE, "Nổi mề đay")));
+        when(checkContraindicationUseCase.check(eq(MEDICAL_RECORD_ID), anyList()))
+                .thenReturn(new ContraindicationCheckResult(List.of(), List.of()));
+
+        AppliedPrescriptionTemplateResult result = service.apply(
+                new ApplyPrescriptionTemplateCommand(TEMPLATE_ID, MEDICAL_RECORD_ID));
+
+        assertEquals(1, result.allergyWarnings().size());
+        assertEquals(allergyId, result.allergyWarnings().get(0).allergyId());
+    }
+
+    @Test
+    void contraindicationWarningAndMissingDataAreIncludedInResult() {
+        when(currentUserPort.hasRole("DOCTOR")).thenReturn(true);
+        when(currentUserPort.getCurrentUserId()).thenReturn(DOCTOR_ID);
+
+        Medicine medicine = activeMedicine();
+        UUID medicineId = medicine.getId();
+        when(templateRepository.findById(TEMPLATE_ID))
+                .thenReturn(Optional.of(template(List.of(medicineId))));
+        when(diagnosisCatalogRepository.findById(DIAGNOSIS_ID))
+                .thenReturn(Optional.of(mock(DiagnosisCatalog.class)));
+        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(medicine));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+        when(checkPatientDrugAllergyUseCase.check(eq(MEDICAL_RECORD_ID), anyList())).thenReturn(List.of());
+
+        UUID ruleId = UUID.randomUUID();
+        when(checkContraindicationUseCase.check(eq(MEDICAL_RECORD_ID), anyList()))
+                .thenReturn(new ContraindicationCheckResult(
+                        List.of(new ContraindicationWarningResult(
+                                UUID.randomUUID(), ruleId, medicineId, "Paracetamol",
+                                ContraindicationType.AGE, ContraindicationSeverity.MODERATE,
+                                "Cảnh báo tuổi", "Khuyến cáo")),
+                        List.of(new ContraindicationMissingDataResult(
+                                medicineId, "Paracetamol", ContraindicationType.PREGNANCY, "Thiếu dữ liệu"))));
+
+        AppliedPrescriptionTemplateResult result = service.apply(
+                new ApplyPrescriptionTemplateCommand(TEMPLATE_ID, MEDICAL_RECORD_ID));
+
+        assertEquals(1, result.contraindicationWarnings().size());
+        assertEquals(ruleId, result.contraindicationWarnings().get(0).ruleId());
+        assertEquals(1, result.contraindicationMissingData().size());
     }
 
     private Medicine activeMedicine() {

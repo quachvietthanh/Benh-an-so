@@ -20,6 +20,7 @@ import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionTemplate;
 import com.benhsoan.domain.prescription.PrescriptionTemplateItem;
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.SavePrescriptionTemplateCommand;
@@ -27,6 +28,7 @@ import com.benhsoan.port.dto.result.PrescriptionTemplateResult;
 import com.benhsoan.port.inbound.prescription.SavePrescriptionTemplateUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.DiagnosisCatalogRepository;
+import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionTemplateRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -45,6 +47,7 @@ public class SavePrescriptionTemplateService implements SavePrescriptionTemplate
     private final PrescriptionRepository prescriptionRepository;
     private final PrescriptionTemplateRepository templateRepository;
     private final DiagnosisCatalogRepository diagnosisCatalogRepository;
+    private final MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     private final PrescriptionTemplateResultMapper resultMapper;
     private final CurrentUserPort currentUserPort;
     private final AuditLogRepository auditLogRepository;
@@ -61,9 +64,9 @@ public class SavePrescriptionTemplateService implements SavePrescriptionTemplate
         Prescription prescription = prescriptionRepository.findById(command.prescriptionId())
                 .orElseThrow(() -> new PrescriptionNotFoundException(command.prescriptionId()));
 
-        if (!prescription.isPendingDispense()) {
+        if (prescription.getStatus() == PrescriptionStatus.CANCELLED) {
             throw new ValidationException(
-                    "Only a completed (pending-dispense) prescription can be saved as a template.");
+                    "A cancelled prescription cannot be saved as a template.");
         }
         if (!Objects.equals(prescription.getPrescribedBy(), currentUserId)) {
             throw new AccessDeniedException(
@@ -73,6 +76,13 @@ public class SavePrescriptionTemplateService implements SavePrescriptionTemplate
         DiagnosisCatalog diagnosis = diagnosisCatalogRepository.findByCode(command.diagnosisCode())
                 .orElseThrow(() -> new ValidationException(
                         "Diagnosis code not found: " + command.diagnosisCode()));
+
+        if (!medicalRecordDiagnosisRepository.existsByMedicalRecordIdAndDiagnosisCatalogId(
+                prescription.getMedicalRecordId(), diagnosis.getId())) {
+            throw new ValidationException(
+                    "Diagnosis does not belong to the prescription's medical record: "
+                            + command.diagnosisCode());
+        }
 
         UUID templateId = UUID.randomUUID();
         PrescriptionTemplate template = PrescriptionTemplate.create(
