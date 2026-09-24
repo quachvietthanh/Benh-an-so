@@ -62,4 +62,7 @@ public class BackupRecordEntity {
 
     @Column(name = "restored_by", columnDefinition = "BINARY(16)")
     private UUID restoredBy;
+
+    @Column(name = "failure_reason", columnDefinition = "TEXT")
+    private String failureReason;
 }

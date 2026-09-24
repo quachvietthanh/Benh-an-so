@@ -23,7 +23,8 @@ public class BackupResultMapper {
                 record.getCreatedBy(),
                 record.getCreatedAt(),
                 record.getRestoredAt(),
-                record.getRestoredBy()
+                record.getRestoredBy(),
+                record.getFailureReason()
         );
     }
 }

@@ -116,7 +116,7 @@ class CreateBackupServiceTest {
         assertThrows(BackupExecutionException.class,
                 () -> service.create(new CreateBackupCommand(BackupType.FULL, null)));
 
-        verify(lifecycleService).markFailed(any(UUID.class));
+        verify(lifecycleService).markFailed(any(UUID.class), eq("disk full"));
         verify(auditLogWriter, never()).write(any(), any(), any(), any());
     }
 
