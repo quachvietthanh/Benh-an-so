@@ -63,8 +63,8 @@ public class RequestPatientDataErasureService implements RequestPatientDataErasu
             }
         }
 
-        // 2. Tìm hồ sơ bệnh nhân
-        Patient patient = patientRepository.findById(patientId)
+        // 2. Tìm hồ sơ bệnh nhân (Khóa bi quan để bảo vệ thứ tự phiên bản và chống race condition - QTN-19, P1)
+        Patient patient = patientRepository.findByIdForUpdate(patientId)
                 .orElseThrow(() -> new PatientNotFoundException("Không tìm thấy thông tin bệnh nhân: " + patientId));
 
         patient.validateCanBeUpdated();

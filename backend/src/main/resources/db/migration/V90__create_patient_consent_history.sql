@@ -1,5 +1,5 @@
 -- =====================================================
--- V87__create_patient_consent_history.sql
+-- V90__create_patient_consent_history.sql
 -- NCL-15-CN-005: Rút lại và cập nhật phiếu đồng ý xử lý dữ liệu cá nhân
 -- Lưu trữ lịch sử các phiên bản phiếu đồng ý theo thời gian (AC-02),
 -- hỗ trợ thu hẹp phạm vi đồng ý (AC-01) và bảo vệ dữ liệu theo QTN-19, QTN-24.

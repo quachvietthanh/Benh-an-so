@@ -1,9 +1,16 @@
 package com.benhsoan.application.ucservice.patient;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
@@ -52,6 +59,8 @@ public class RegisterPatientService
 
     private final com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository;
 
+    private final ObjectMapper objectMapper;
+
     @Autowired
     public RegisterPatientService(
             PatientRepository patientRepository,
@@ -61,7 +70,8 @@ public class RegisterPatientService
             PatientChangeDetailBuilder changeDetailBuilder,
             PatientResultMapper patientResultMapper,
             AuditLogRepository auditLogRepository,
-            com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository
+            com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository,
+            ObjectMapper objectMapper
     ) {
         this.patientRepository = patientRepository;
         this.patientChangeLogRepository = patientChangeLogRepository;
@@ -71,18 +81,7 @@ public class RegisterPatientService
         this.patientResultMapper = patientResultMapper;
         this.auditLogRepository = auditLogRepository;
         this.patientConsentHistoryRepository = patientConsentHistoryRepository;
-    }
-
-    public RegisterPatientService(
-            PatientRepository patientRepository,
-            PatientChangeLogRepository patientChangeLogRepository,
-            PatientCodeGenerator patientCodeGenerator,
-            CurrentUserPort currentUserPort,
-            PatientChangeDetailBuilder changeDetailBuilder,
-            PatientResultMapper patientResultMapper,
-            AuditLogRepository auditLogRepository
-    ) {
-        this(patientRepository, patientChangeLogRepository, patientCodeGenerator, currentUserPort, changeDetailBuilder, patientResultMapper, auditLogRepository, null);
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -151,28 +150,27 @@ public class RegisterPatientService
 
         patientChangeLogRepository.save(log);
 
+        Map<String, Object> auditDetail = new LinkedHashMap<>();
+        auditDetail.put("patientCode", saved.getPatientCode());
+        auditDetail.put("fullName", saved.getFullName());
+        auditDetail.put("guardianName", saved.getGuardianName());
+        auditDetail.put("consentSignerName", saved.getConsentSignerName());
+        auditDetail.put("consentAgreed", saved.isConsentAgreed());
+        auditDetail.put("consentVersion", saved.getConsentVersion());
+
         auditLogRepository.save(
                 AuditLog.create(
                         currentUserId,
                         ActionType.CREATE,
                         ResourceType.PATIENT,
                         saved.getId(),
-                        """
-                        {
-                        "patientCode":"%s",
-                        "fullName":"%s",
-                        "guardianName":"%s",
-                        "consentSignerName":"%s",
-                        "consentAgreed":%s,
-                        "consentVersion":"%s"
-                        }
-                        """
-                        .formatted(saved.getPatientCode(), saved.getFullName(), saved.getGuardianName(), saved.getConsentSignerName(), saved.isConsentAgreed(), saved.getConsentVersion()),
-                        null
+                        toJson(auditDetail),
+                        null,
+                        saved.getCreatedAt() != null ? saved.getCreatedAt() : java.time.Instant.now()
                 )
         );
 
-        if (patientConsentHistoryRepository != null && saved.isConsentAgreed()) {
+        if (saved.isConsentAgreed()) {
             com.benhsoan.domain.patient.PatientConsentRecord initialRecord = com.benhsoan.domain.patient.PatientConsentRecord.create(
                     saved.getId(),
                     1,
@@ -193,6 +191,14 @@ public class RegisterPatientService
         }
 
         return patientResultMapper.toResult(saved);
+    }
+
+    private String toJson(Map<String, Object> detail) {
+        try {
+            return objectMapper.writeValueAsString(detail);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Không thể serialize chi tiết kiểm toán đăng ký bệnh nhân.", exception);
+        }
     }
 
     private void validate(RegisterPatientCommand command) {

@@ -116,7 +116,7 @@ class RequestPatientDataErasureServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
         when(clockPort.now()).thenReturn(NOW);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.of(patient));
         when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(medicalRecordRetentionPolicy.retentionYears()).thenReturn(10);
         when(patientConsentHistoryRepository.getNextVersionNumber(patientId)).thenReturn(2);
@@ -180,7 +180,7 @@ class RequestPatientDataErasureServiceTest {
         UUID patientId = UUID.randomUUID();
 
         when(currentUserPort.hasPermission("PATIENT_CONSENT_UPDATE")).thenReturn(true);
-        when(patientRepository.findById(patientId)).thenReturn(Optional.empty());
+        when(patientRepository.findByIdForUpdate(patientId)).thenReturn(Optional.empty());
 
         RequestPatientDataErasureCommand command = RequestPatientDataErasureCommand.builder()
                 .reason("Yêu cầu xóa dữ liệu")

@@ -80,7 +80,8 @@ class UpdatePatientConsentServiceTest {
                 patientChangeLogRepository,
                 changeDetailBuilder,
                 patientResultMapper,
-                patientAccessGuard
+                patientAccessGuard,
+                new ObjectMapper()
         );
     }
 

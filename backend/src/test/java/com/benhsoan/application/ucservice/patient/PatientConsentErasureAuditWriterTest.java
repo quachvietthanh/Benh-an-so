@@ -24,6 +24,8 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PatientConsentErasureAuditWriter Unit Tests (QTN-19)")
 class PatientConsentErasureAuditWriterTest {
@@ -37,7 +39,7 @@ class PatientConsentErasureAuditWriterTest {
 
     @BeforeEach
     void setUp() {
-        auditWriter = new PatientConsentErasureAuditWriter(auditLogRepository);
+        auditWriter = new PatientConsentErasureAuditWriter(auditLogRepository, new ObjectMapper());
     }
 
     @Test
@@ -87,5 +89,29 @@ class PatientConsentErasureAuditWriterTest {
         assertNotNull(transactional, "Method writeErasureRefusal bắt buộc phải có annotation @Transactional");
         assertEquals(Propagation.REQUIRES_NEW, transactional.propagation(),
                 "Propagation phải là REQUIRES_NEW để audit log không bị mất khi giao dịch chính rollback theo QTN-19");
+    }
+
+    @Test
+    @DisplayName("P3-4: writeErasureRefusal serialize an toàn lý do chứa ký tự đặc biệt (ngoặc kép, gạch chéo ngược)")
+    void writeErasureRefusal_escapesSpecialCharactersInReasonSafely() throws Exception {
+        UUID actorId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        String specialReason = "Bệnh nhân yêu cầu xóa: \"toàn bộ\" thông tin\\dữ liệu\nvà không lưu lại.";
+
+        auditWriter.writeErasureRefusal(actorId, patientId, "PAT-002", 10, specialReason, NOW);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+
+        AuditLog savedLog = captor.getValue();
+        assertNotNull(savedLog);
+        String detail = savedLog.getDetail();
+
+        // Kiểm tra tính hợp lệ của chuỗi JSON bằng ObjectMapper parser thật
+        com.fasterxml.jackson.databind.JsonNode rootNode = new ObjectMapper().readTree(detail);
+        assertEquals("DATA_ERASURE_REQUEST", rootNode.get("action").asText());
+        assertEquals("PAT-002", rootNode.get("patientCode").asText());
+        assertEquals(10, rootNode.get("retentionYears").asInt());
+        assertEquals(specialReason, rootNode.get("reason").asText());
     }
 }

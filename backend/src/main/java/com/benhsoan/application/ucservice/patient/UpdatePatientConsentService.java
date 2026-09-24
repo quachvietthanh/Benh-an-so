@@ -32,6 +32,11 @@ import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -51,6 +56,7 @@ public class UpdatePatientConsentService implements UpdatePatientConsentUseCase 
     private final PatientChangeDetailBuilder changeDetailBuilder;
     private final PatientResultMapper patientResultMapper;
     private final PatientAccessGuard patientAccessGuard;
+    private final ObjectMapper objectMapper;
 
     @Override
     public PatientResult updateConsent(UUID patientId, UpdatePatientConsentCommand command) {
@@ -221,40 +227,37 @@ public class UpdatePatientConsentService implements UpdatePatientConsentUseCase 
         patientChangeLogRepository.save(log);
 
         // Ghi nhật ký kiểm toán hệ thống (AuditLog)
+        Map<String, Object> auditDetail = new LinkedHashMap<>();
+        auditDetail.put("patientCode", updatedPatient.getPatientCode());
+        auditDetail.put("consentAgreed", updatedPatient.isConsentAgreed());
+        auditDetail.put("consentVersion", updatedPatient.getConsentVersion());
+        auditDetail.put("consentWithdrawn", updatedPatient.isConsentWithdrawn());
+        auditDetail.put("consentWithdrawnReason", updatedPatient.getConsentWithdrawnReason() != null ? updatedPatient.getConsentWithdrawnReason() : "");
+        auditDetail.put("nonMedicalUseRestricted", updatedPatient.isNonMedicalUseRestricted());
+        auditDetail.put("versionNumber", nextVersionNumber);
+        auditDetail.put("historyStatus", historyStatus.name());
+        auditDetail.put("scopes", ConsentScope.toCommaSeparated(effectiveScopes));
+
         auditLogRepository.save(
                 AuditLog.create(
                         currentUserId,
                         ActionType.UPDATE,
                         ResourceType.PATIENT,
                         updatedPatient.getId(),
-                        """
-                        {
-                        "patientCode":"%s",
-                        "consentAgreed":%s,
-                        "consentVersion":"%s",
-                        "consentWithdrawn":%s,
-                        "consentWithdrawnReason":"%s",
-                        "nonMedicalUseRestricted":%s,
-                        "versionNumber":%d,
-                        "historyStatus":"%s",
-                        "scopes":"%s"
-                        }
-                        """.formatted(
-                                updatedPatient.getPatientCode(),
-                                updatedPatient.isConsentAgreed(),
-                                updatedPatient.getConsentVersion(),
-                                updatedPatient.isConsentWithdrawn(),
-                                updatedPatient.getConsentWithdrawnReason() != null ? updatedPatient.getConsentWithdrawnReason() : "",
-                                updatedPatient.isNonMedicalUseRestricted(),
-                                nextVersionNumber,
-                                historyStatus.name(),
-                                ConsentScope.toCommaSeparated(effectiveScopes)
-                        ),
+                        toJson(auditDetail),
                         null,
                         now
                 )
         );
 
         return patientResultMapper.toResult(updatedPatient);
+    }
+
+    private String toJson(Map<String, Object> detail) {
+        try {
+            return objectMapper.writeValueAsString(detail);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Không thể serialize chi tiết kiểm toán cập nhật phiếu đồng ý.", exception);
+        }
     }
 }
