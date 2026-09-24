@@ -30,6 +30,7 @@ import {
   ScheduleOutlined,
   SearchOutlined,
   UserOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
@@ -327,14 +328,32 @@ function PatientMedicalHistoryPage() {
                       </Col>
 
                       <Col xs={24} md={8} style={{ textAlign: { xs: 'left', md: 'right' } }}>
-                        <Button
-                          type="primary"
-                          className="history-view-detail-btn"
-                          icon={<EyeOutlined />}
-                          onClick={() => handleOpenDetail(item)}
-                        >
-                          Xem chi tiết hồ sơ & đơn thuốc
-                        </Button>
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                          <Button
+                            type="primary"
+                            className="history-view-detail-btn"
+                            icon={<EyeOutlined />}
+                            onClick={() => handleOpenDetail(item)}
+                            block
+                          >
+                            Xem chi tiết hồ sơ & đơn thuốc
+                          </Button>
+                          <Link to={`/portal/my-clinical-results?visitId=${item.visitId}`} style={{ display: 'block' }}>
+                            <Button
+                              icon={<ExperimentOutlined />}
+                              style={{
+                                borderRadius: 8,
+                                borderColor: '#93c5fd',
+                                color: '#1d4ed8',
+                                background: '#eff6ff',
+                                fontWeight: 600,
+                              }}
+                              block
+                            >
+                              Xem kết quả cận lâm sàng
+                            </Button>
+                          </Link>
+                        </Space>
                       </Col>
                     </Row>
                   </Card>
