@@ -102,6 +102,19 @@ public class PatientRepositoryAdapter implements PatientRepository {
     }
 
     @Override
+    public Optional<Patient> findByGuardianUserIdAndId(UUID guardianUserId, UUID patientId) {
+        return jpaRepository.findByGuardianUserIdAndId(guardianUserId, patientId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Patient> findAllByGuardianUserIdOrderByFullNameAsc(UUID guardianUserId) {
+        return jpaRepository.findAllByGuardianUserIdOrderByFullNameAsc(guardianUserId).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<Patient> findAllByPhone(String phone) {
         return jpaRepository.findAllByPhone(phone).stream()
                 .map(mapper::toDomain)

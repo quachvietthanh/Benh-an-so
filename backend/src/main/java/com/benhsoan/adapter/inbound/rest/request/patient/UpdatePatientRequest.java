@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.request.patient;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.Gender;
@@ -60,6 +61,10 @@ public record UpdatePatientRequest(
         String guardianPhone,
 
         String guardianIdentityNumber,
+
+        // NCL-14-CN-010: staff-only guardian link. Optional; omitting it preserves the
+        // stored guardianUserId. Requires PATIENT_UPDATE (ADMIN/DOCTOR/RECEPTIONIST).
+        UUID guardianUserId,
 
         String consentSignerName,
 

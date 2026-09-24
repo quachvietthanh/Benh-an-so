@@ -32,6 +32,14 @@ public interface PatientRepository {
 
     Optional<Patient> findByUserId(UUID userId);
 
+    /**
+     * NCL-14-CN-010: resolves a dependent patient only when the guardian link is explicit
+     * (patients.guardian_user_id == guardianUserId).
+     */
+    Optional<Patient> findByGuardianUserIdAndId(UUID guardianUserId, UUID patientId);
+
+    List<Patient> findAllByGuardianUserIdOrderByFullNameAsc(UUID guardianUserId);
+
     List<Patient> findAllByPhone(String phone);
 
     Optional<Patient> findByIdForUpdate(UUID patientId);

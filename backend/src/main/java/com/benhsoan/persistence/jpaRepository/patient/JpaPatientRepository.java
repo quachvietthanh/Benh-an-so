@@ -35,6 +35,10 @@ public interface JpaPatientRepository extends JpaRepository<PatientEntity, UUID>
 
     Optional<PatientEntity> findByUserId(UUID userId);
 
+    Optional<PatientEntity> findByGuardianUserIdAndId(UUID guardianUserId, UUID patientId);
+
+    List<PatientEntity> findAllByGuardianUserIdOrderByFullNameAsc(UUID guardianUserId);
+
     List<PatientEntity> findAllByPhone(String phone);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

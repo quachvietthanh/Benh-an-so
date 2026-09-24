@@ -42,45 +42,48 @@ class GetPatientPortalAppointmentDetailServiceTest {
         );
     }
 
+    private Appointment appointment(UUID appointmentId, UUID patientId) {
+        return Appointment.restore(appointmentId, "APT000100", patientId, UUID.randomUUID(),
+                Instant.parse("2099-08-10T02:00:00Z"), Instant.parse("2099-08-10T02:30:00Z"),
+                AppointmentStatus.SCHEDULED, "Kham tong quat", null, null, null,
+                UUID.randomUUID(), Instant.parse("2026-08-01T00:00:00Z"));
+    }
+
+    private Patient patientWithId(UUID patientId) {
+        Patient patient = mock(Patient.class);
+        when(patient.getId()).thenReturn(patientId);
+        return patient;
+    }
+
     @Test
     void returnsOwnedAppointmentDetail() {
         UUID appointmentId = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
-        UUID doctorId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
 
-        Appointment appointment = Appointment.restore(appointmentId, "APT000100", patientId, doctorId,
-                Instant.parse("2099-08-10T02:00:00Z"), Instant.parse("2099-08-10T02:30:00Z"),
-                AppointmentStatus.SCHEDULED, "Khám tổng quát", null, null, null,
-                userId, Instant.parse("2026-08-01T00:00:00Z"));
-
-        when(appointmentRepository.findById(appointmentId)).thenReturn(Optional.of(appointment));
+        when(appointmentRepository.findById(appointmentId))
+                .thenReturn(Optional.of(appointment(appointmentId, patientId)));
+        Patient authorized = patientWithId(patientId);
         when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId))
-                .thenReturn(mock(Patient.class));
+                .thenReturn(authorized);
 
-        var result = service.getAppointmentDetail(appointmentId);
+        var result = service.getAppointmentDetail(appointmentId, null);
 
         assertEquals(appointmentId, result.id());
-        verify(patientAccessGuard).requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId);
+        verify(patientAccessGuard)
+                .requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId);
     }
 
     @Test
     void rejectsCrossPatientAccessWithForbidden() {
         UUID appointmentId = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
-        UUID doctorId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
 
-        Appointment appointment = Appointment.restore(appointmentId, "APT000101", patientId, doctorId,
-                Instant.parse("2099-08-10T02:00:00Z"), Instant.parse("2099-08-10T02:30:00Z"),
-                AppointmentStatus.SCHEDULED, "Khám tổng quát", null, null, null,
-                userId, Instant.parse("2026-08-01T00:00:00Z"));
-
-        when(appointmentRepository.findById(appointmentId)).thenReturn(Optional.of(appointment));
+        when(appointmentRepository.findById(appointmentId))
+                .thenReturn(Optional.of(appointment(appointmentId, patientId)));
         when(patientAccessGuard.requirePatientOwnership(patientId, ResourceType.APPOINTMENT, appointmentId))
                 .thenThrow(new AccessDeniedException("Patient may only access their own data."));
 
-        assertThrows(AccessDeniedException.class, () -> service.getAppointmentDetail(appointmentId));
+        assertThrows(AccessDeniedException.class, () -> service.getAppointmentDetail(appointmentId, null));
     }
 
     @Test
@@ -88,6 +91,79 @@ class GetPatientPortalAppointmentDetailServiceTest {
         UUID appointmentId = UUID.randomUUID();
         when(appointmentRepository.findById(appointmentId)).thenReturn(Optional.empty());
 
-        assertThrows(AppointmentNotFoundException.class, () -> service.getAppointmentDetail(appointmentId));
+        assertThrows(AppointmentNotFoundException.class,
+                () -> service.getAppointmentDetail(appointmentId, null));
+    }
+
+    // NCL-14-CN-010 -----------------------------------------------------
+
+    @Test
+    void returnsDependentAppointmentDetailWhenScopeAuthorised() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        when(appointmentRepository.findById(appointmentId))
+                .thenReturn(Optional.of(appointment(appointmentId, dependentId)));
+        Patient authorized = patientWithId(dependentId);
+        when(patientAccessGuard.requirePatientAccess(dependentId, ResourceType.APPOINTMENT, appointmentId))
+                .thenReturn(authorized);
+
+        var result = service.getAppointmentDetail(appointmentId, dependentId);
+
+        assertEquals(appointmentId, result.id());
+        verify(patientAccessGuard)
+                .requirePatientAccess(dependentId, ResourceType.APPOINTMENT, appointmentId);
+    }
+
+    @Test
+    void rejectsDetailOfUnrelatedPatient() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+
+        when(appointmentRepository.findById(appointmentId))
+                .thenReturn(Optional.of(appointment(appointmentId, strangerId)));
+        when(patientAccessGuard.requirePatientAccess(strangerId, ResourceType.APPOINTMENT, appointmentId))
+                .thenThrow(new AccessDeniedException("Patient may only access their own data."));
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.getAppointmentDetail(appointmentId, strangerId));
+    }
+
+    @Test
+    void rejectsIdorWhenSuppliedPatientIdDiffersFromAppointmentOwner() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID ownPatientId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        when(appointmentRepository.findById(appointmentId))
+                .thenReturn(Optional.of(appointment(appointmentId, ownPatientId)));
+        Patient authorized = patientWithId(dependentId);
+        when(patientAccessGuard.requirePatientAccess(dependentId, ResourceType.APPOINTMENT, appointmentId))
+                .thenReturn(authorized);
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.getAppointmentDetail(appointmentId, dependentId));
+
+        verify(patientAccessGuard)
+                .denyPatientAccess(ownPatientId, ResourceType.APPOINTMENT, appointmentId);
+    }
+
+    @Test
+    void rejectsOwnScopeUsedToReachAThirdPartyAppointment() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+        UUID ownPatientId = UUID.randomUUID();
+
+        when(appointmentRepository.findById(appointmentId))
+                .thenReturn(Optional.of(appointment(appointmentId, strangerId)));
+        Patient authorized = patientWithId(ownPatientId);
+        when(patientAccessGuard.requirePatientAccess(ownPatientId, ResourceType.APPOINTMENT, appointmentId))
+                .thenReturn(authorized);
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.getAppointmentDetail(appointmentId, ownPatientId));
+
+        verify(patientAccessGuard)
+                .denyPatientAccess(strangerId, ResourceType.APPOINTMENT, appointmentId);
     }
 }
