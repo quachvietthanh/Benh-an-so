@@ -40,7 +40,7 @@ class PrescriptionMaxDailyDoseMigrationH2Test {
             stmt.execute("CREATE TABLE patients (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
             stmt.execute("CREATE TABLE users (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
 
-            String ddl = readResource("db/migration/V92__add_max_daily_dose_to_medicines.sql");
+            String ddl = readResource("db/migration/V94__add_max_daily_dose_to_medicines.sql");
             RunScript.execute(conn, new StringReader(ddl));
 
             // The new warning log table must be queryable and reference parent rows.
