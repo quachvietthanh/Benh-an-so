@@ -595,6 +595,11 @@ public class Patient {
         this.updatedAt = Instant.now();
     }
 
+    public void updateConsentScope(boolean nonMedicalUseRestricted, Instant updatedAt) {
+        this.nonMedicalUseRestricted = nonMedicalUseRestricted;
+        this.updatedAt = updatedAt != null ? updatedAt : Instant.now();
+    }
+
     public void activate() {
         this.active = true;
         this.updatedAt = Instant.now();

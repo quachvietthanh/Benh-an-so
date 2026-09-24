@@ -2,6 +2,7 @@ package com.benhsoan.persistence.jpaRepository.inventory;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,8 @@ public interface JpaMedicineBatchRepository
     List<MedicineBatchEntity> findAllByOrderByExpiryDateAscCreatedAtAsc();
 
     List<MedicineBatchEntity> findByMedicineIdOrderByExpiryDateAscCreatedAtAsc(UUID medicineId);
+
+    List<MedicineBatchEntity> findByMedicineIdInOrderByExpiryDateAscCreatedAtAsc(Collection<UUID> medicineIds);
 
     Optional<MedicineBatchEntity> findByMedicineIdAndBatchNumber(
             UUID medicineId, String batchNumber);
